@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import {
+  Copy,
   Minus,
   Pencil,
   Play,
@@ -8,11 +9,13 @@ import {
   Skull,
   Swords,
   Trash2,
+  Waves,
 } from "lucide-react";
 import type {
   CharacterRecord,
   Encounter,
   EncounterCombatant,
+  EncounterLaunchMode,
   InitiativeEntry,
   Monster,
   Scene,
@@ -22,8 +25,11 @@ import type {
 import {
   ENCOUNTER_DIFFICULTY_LABELS,
   ENCOUNTER_DIFFICULTY_TONES,
+  PARTY_SIZE_PRESETS,
   combatantXp,
   encounterBudget,
+  encounterAwardXp,
+  encounterWaveSummaries,
   partyDefaults,
 } from "../../../shared/encounters";
 import { api } from "../../api";
@@ -51,6 +57,10 @@ export interface EncounterLaunchResult {
   tokens: Token[];
   initiative: InitiativeEntry[];
   combatants: number;
+  wave: number | null;
+  mode: EncounterLaunchMode;
+  round: number;
+  turnIndex: number;
 }
 
 export function EncounterBuilder({
@@ -81,10 +91,15 @@ export function EncounterBuilder({
   const [partySizeOverride, setPartySizeOverride] = useState<number | null>(null);
   const [monsterQuery, setMonsterQuery] = useState("");
   const [monsterLevel, setMonsterLevel] = useState("");
+  const [bestiaryWave, setBestiaryWave] = useState("1");
   const [monsters, setMonsters] = useState<Monster[]>([]);
   const [monsterTotal, setMonsterTotal] = useState(0);
   const [monsterLoading, setMonsterLoading] = useState(false);
   const [combatantEditor, setCombatantEditor] = useState<EncounterCombatant | "new" | null>(null);
+  const [launchOpen, setLaunchOpen] = useState(false);
+  const [launchSceneId, setLaunchSceneId] = useState("");
+  const [launchWave, setLaunchWave] = useState("all");
+  const [launchMode, setLaunchMode] = useState<EncounterLaunchMode>("fresh");
 
   const defaults = useMemo(
     () => partyDefaults(characters.map((character) => character.summary?.level ?? null)),
@@ -111,6 +126,28 @@ export function EncounterBuilder({
   const creatureCount = useMemo(
     () => (selected?.combatants ?? []).reduce((total, combatant) => total + combatant.count, 0),
     [selected?.combatants],
+  );
+
+  const waveSummaries = useMemo(
+    () => encounterWaveSummaries(selected?.combatants ?? []),
+    [selected?.combatants],
+  );
+
+  const launchCombatants = useMemo(() => {
+    if (!selected) return [];
+    if (launchWave === "all") return selected.combatants;
+    const wave = Number(launchWave);
+    return selected.combatants.filter((combatant) => combatant.wave === wave);
+  }, [selected, launchWave]);
+
+  const launchCreatures = useMemo(
+    () => launchCombatants.reduce((total, combatant) => total + combatant.count, 0),
+    [launchCombatants],
+  );
+
+  const launchBudget = useMemo(
+    () => encounterBudget(launchCombatants, partyLevel, partySize),
+    [launchCombatants, partyLevel, partySize],
   );
 
   useEffect(() => {
@@ -150,6 +187,8 @@ export function EncounterBuilder({
 
   useEffect(() => {
     if (!isGm) return;
+    let cancelled = false;
+    const controller = new AbortController();
     setMonsterLoading(true);
     const timer = window.setTimeout(async () => {
       try {
@@ -160,16 +199,23 @@ export function EncounterBuilder({
         }
         const result = await api<{ items: Monster[]; total: number }>(
           `/api/compendium/monsters?${params.toString()}`,
+          { signal: controller.signal },
         );
+        if (cancelled) return;
         setMonsters(result.items);
         setMonsterTotal(result.total);
       } catch (err) {
+        if (cancelled || (err as { name?: string }).name === "AbortError") return;
         setError(errorMessage(err));
       } finally {
-        setMonsterLoading(false);
+        if (!cancelled) setMonsterLoading(false);
       }
     }, 220);
-    return () => window.clearTimeout(timer);
+    return () => {
+      cancelled = true;
+      controller.abort();
+      window.clearTimeout(timer);
+    };
   }, [monsterQuery, monsterLevel, isGm]);
 
   const replaceEncounter = (encounter: Encounter) => {
@@ -233,13 +279,31 @@ export function EncounterBuilder({
     }
   };
 
+  const duplicateEncounter = async () => {
+    if (!selected) return;
+    setBusy(true);
+    try {
+      const result = await api<{ encounter: Encounter }>(
+        `/api/campaigns/${campaignId}/encounters/${selected.id}/duplicate`,
+        { method: "POST" },
+      );
+      setEncounters((current) => [...current, result.encounter]);
+      setSelectedId(result.encounter.id);
+      toast("Encounter duplicated.", "success");
+    } catch (err) {
+      toast(errorMessage(err), "error");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const addMonster = async (monster: Monster) => {
     if (!selected) return;
     setBusy(true);
     try {
       const result = await api<{ combatant: EncounterCombatant }>(
         `/api/campaigns/${campaignId}/encounters/${selected.id}/combatants`,
-        { method: "POST", body: { monsterId: monster.id, count: 1 } },
+        { method: "POST", body: { monsterId: monster.id, count: 1, wave: Number(bestiaryWave) || 1 } },
       );
       setEncounters((current) =>
         current.map((encounter) =>
@@ -301,20 +365,40 @@ export function EncounterBuilder({
     }
   };
 
+  const openLaunch = () => {
+    if (!selected) return;
+    setLaunchSceneId(selected.sceneId ?? scenes[0]?.id ?? "");
+    setLaunchWave("all");
+    setLaunchMode("fresh");
+    setLaunchOpen(true);
+  };
+
   const launch = async () => {
     if (!selected) return;
-    if (!selected.combatants.length) {
-      toast("Add at least one combatant first.", "error");
+    if (!launchCombatants.length) {
+      toast("Choose a wave with at least one combatant.", "error");
       return;
     }
-    if (!window.confirm(`Launch “${selected.name}” and roll initiative for the scene?`)) return;
     setBusy(true);
     try {
       const result = await api<EncounterLaunchResult>(
         `/api/campaigns/${campaignId}/encounters/${selected.id}/launch`,
-        { method: "POST", body: { sceneId: selected.sceneId } },
+        {
+          method: "POST",
+          body: {
+            sceneId: launchSceneId || selected.sceneId || null,
+            wave: launchWave === "all" ? null : Number(launchWave),
+            mode: launchMode,
+          },
+        },
       );
-      toast(`Launched ${result.combatants} combatants.`, "success");
+      toast(
+        result.mode === "reinforce"
+          ? `Reinforcements arrived: ${result.combatants} combatants.`
+          : `Launched ${result.combatants} combatants.`,
+        "success",
+      );
+      setLaunchOpen(false);
       onLaunched(result);
     } catch (err) {
       toast(errorMessage(err), "error");
@@ -432,6 +516,9 @@ export function EncounterBuilder({
                     >
                       Save
                     </Button>
+                    <Button size="sm" variant="ghost" icon={<Copy size={13} />} onClick={duplicateEncounter}>
+                      Duplicate
+                    </Button>
                     <Button size="sm" variant="ghost" icon={<Trash2 size={13} />} onClick={deleteEncounter}>
                       Delete
                     </Button>
@@ -492,6 +579,26 @@ export function EncounterBuilder({
                       />
                     </Field>
                     <Stat label="Combatants" value={creatureCount} hint={`${selected.combatants.length} roster rows`} />
+                  </div>
+                  <div className="encounter-party-presets">
+                    <span className="tiny muted">Quick party size</span>
+                    <button
+                      type="button"
+                      className={`encounter-preset ${partySizeOverride === null ? "is-active" : ""}`}
+                      onClick={() => setPartySizeOverride(null)}
+                    >
+                      Auto ({defaults.partySize})
+                    </button>
+                    {PARTY_SIZE_PRESETS.map((size) => (
+                      <button
+                        key={size}
+                        type="button"
+                        className={`encounter-preset ${partySizeOverride === size ? "is-active" : ""}`}
+                        onClick={() => setPartySizeOverride(size)}
+                      >
+                        {size}
+                      </button>
+                    ))}
                   </div>
 
                   {xpMode === "xp" ? (
@@ -557,48 +664,65 @@ export function EncounterBuilder({
                       </p>
                     ) : (
                       <div className="encounter-roster-list">
-                        {selected.combatants.map((combatant) => (
-                          <div key={combatant.id} className="encounter-roster-row">
-                            <div className="encounter-roster-main">
-                              <div className="row wrap" style={{ gap: 7 }}>
-                                <strong>{combatant.name}</strong>
-                                <Tag tone="neutral">Level {combatant.level}</Tag>
-                                {xpMode === "xp" ? (
-                                  <Tag tone="gold">{combatantXp(combatant, partyLevel)} XP</Tag>
-                                ) : null}
+                        {waveSummaries.map((wave) => {
+                          const waveCombatants = selected.combatants.filter(
+                            (combatant) => combatant.wave === wave.wave,
+                          );
+                          const waveXp = encounterAwardXp(waveCombatants, partyLevel);
+                          return (
+                            <div key={wave.wave} className="encounter-wave-group">
+                              <div className="encounter-wave-head">
+                                <span>
+                                  <strong>Wave {wave.wave}</strong> · {wave.creatures}{" "}
+                                  {wave.creatures === 1 ? "creature" : "creatures"}
+                                </span>
+                                {xpMode === "xp" ? <Tag tone="gold">{waveXp} XP</Tag> : null}
                               </div>
-                              <span className="tiny muted">
-                                {combatant.hp !== null ? `${combatant.hp} HP` : "HP not set"}
-                                {combatant.ac !== null ? ` · AC ${combatant.ac}` : ""}
-                                {combatant.perception !== null ? ` · Perception ${combatant.perception}` : ""}
-                              </span>
+                              {waveCombatants.map((combatant) => (
+                                <div key={combatant.id} className="encounter-roster-row">
+                                  <div className="encounter-roster-main">
+                                    <div className="row wrap" style={{ gap: 7 }}>
+                                      <strong>{combatant.name}</strong>
+                                      <Tag tone="neutral">Level {combatant.level}</Tag>
+                                      {xpMode === "xp" ? (
+                                        <Tag tone="gold">{combatantXp(combatant, partyLevel)} XP</Tag>
+                                      ) : null}
+                                    </div>
+                                    <span className="tiny muted">
+                                      {combatant.hp !== null ? `${combatant.hp} HP` : "HP not set"}
+                                      {combatant.ac !== null ? ` · AC ${combatant.ac}` : ""}
+                                      {combatant.perception !== null ? ` · Perception ${combatant.perception}` : ""}
+                                    </span>
+                                  </div>
+                                  <div className="encounter-count">
+                                    <IconButton
+                                      label="Remove one"
+                                      onClick={() => void updateCombatant(combatant, { count: combatant.count - 1 })}
+                                      disabled={combatant.count <= 1}
+                                    >
+                                      <Minus size={13} />
+                                    </IconButton>
+                                    <span>{combatant.count}</span>
+                                    <IconButton
+                                      label="Add one"
+                                      onClick={() => void updateCombatant(combatant, { count: combatant.count + 1 })}
+                                    >
+                                      <Plus size={13} />
+                                    </IconButton>
+                                  </div>
+                                  <div className="encounter-row-actions">
+                                    <IconButton label={`Edit ${combatant.name}`} onClick={() => setCombatantEditor(combatant)}>
+                                      <Pencil size={13} />
+                                    </IconButton>
+                                    <IconButton label={`Remove ${combatant.name}`} onClick={() => void removeCombatant(combatant)}>
+                                      <Trash2 size={13} />
+                                    </IconButton>
+                                  </div>
+                                </div>
+                              ))}
                             </div>
-                            <div className="encounter-count">
-                              <IconButton
-                                label="Remove one"
-                                onClick={() => void updateCombatant(combatant, { count: combatant.count - 1 })}
-                                disabled={combatant.count <= 1}
-                              >
-                                <Minus size={13} />
-                              </IconButton>
-                              <span>{combatant.count}</span>
-                              <IconButton
-                                label="Add one"
-                                onClick={() => void updateCombatant(combatant, { count: combatant.count + 1 })}
-                              >
-                                <Plus size={13} />
-                              </IconButton>
-                            </div>
-                            <div className="encounter-row-actions">
-                              <IconButton label={`Edit ${combatant.name}`} onClick={() => setCombatantEditor(combatant)}>
-                                <Pencil size={13} />
-                              </IconButton>
-                              <IconButton label={`Remove ${combatant.name}`} onClick={() => void removeCombatant(combatant)}>
-                                <Trash2 size={13} />
-                              </IconButton>
-                            </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
                     <div className="encounter-launch">
@@ -613,7 +737,7 @@ export function EncounterBuilder({
                         icon={<Play size={14} />}
                         loading={busy}
                         disabled={!selected.combatants.length}
-                        onClick={launch}
+                        onClick={openLaunch}
                       >
                         Launch
                       </Button>
@@ -653,6 +777,15 @@ export function EncounterBuilder({
                           placeholder="Any"
                         />
                       </Field>
+                      <Field label="Wave" hint="New monsters join this wave.">
+                        <Input
+                          type="number"
+                          min={1}
+                          max={20}
+                          value={bestiaryWave}
+                          onChange={(event) => setBestiaryWave(event.target.value)}
+                        />
+                      </Field>
                     </div>
                     {monsterLoading ? (
                       <Spinner label="Searching the bestiary…" />
@@ -689,6 +822,124 @@ export function EncounterBuilder({
           </div>
         </div>
       )}
+
+      <Modal
+        open={launchOpen}
+        onClose={() => setLaunchOpen(false)}
+        title={`Launch ${selected?.name ?? "encounter"}`}
+        subtitle="Preview the scene and wave, then choose whether to start fresh or reinforce the current fight."
+        wide
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setLaunchOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              icon={<Play size={14} />}
+              loading={busy}
+              disabled={!launchCombatants.length}
+              onClick={launch}
+            >
+              {launchMode === "reinforce" ? "Launch wave" : "Launch encounter"}
+            </Button>
+          </>
+        }
+      >
+        {selected ? (
+          <>
+            <Field label="Scene" hint="The wave is placed on this scene and broadcast to the table.">
+              <Select
+                value={launchSceneId}
+                onChange={(event) => setLaunchSceneId(event.target.value)}
+              >
+                {scenes.map((scene) => (
+                  <option key={scene.id} value={scene.id}>
+                    {scene.name}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <Field label="Wave" hint="Launch one wave now and bring later waves in when they arrive.">
+              <div className="encounter-wave-options">
+                <button
+                  type="button"
+                  className={`encounter-wave-option ${launchWave === "all" ? "is-active" : ""}`}
+                  onClick={() => setLaunchWave("all")}
+                >
+                  <span>
+                    <strong>All waves</strong>{" "}
+                    <span className="tiny muted">{selected.combatants.length} roster rows</span>
+                  </span>
+                  <span>{creatureCount} creatures</span>
+                </button>
+                {waveSummaries.map((wave) => (
+                  <button
+                    key={wave.wave}
+                    type="button"
+                    className={`encounter-wave-option ${launchWave === String(wave.wave) ? "is-active" : ""}`}
+                    onClick={() => setLaunchWave(String(wave.wave))}
+                  >
+                    <span>
+                      <strong>Wave {wave.wave}</strong>{" "}
+                      <span className="tiny muted">
+                        {wave.combatants} {wave.combatants === 1 ? "roster row" : "roster rows"}
+                      </span>
+                    </span>
+                    <span>
+                      {wave.creatures} {wave.creatures === 1 ? "creature" : "creatures"}
+                      {xpMode === "xp"
+                        ? ` · ${encounterAwardXp(
+                            selected.combatants.filter((combatant) => combatant.wave === wave.wave),
+                            partyLevel,
+                          )} XP`
+                        : ""}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </Field>
+            <Field
+              label="Initiative"
+              hint="Reinforcements roll initiative and slot into the existing order without resetting the round."
+            >
+              <div className="row wrap" style={{ gap: 6 }}>
+                <Button
+                  size="sm"
+                  variant={launchMode === "fresh" ? "primary" : "ghost"}
+                  onClick={() => setLaunchMode("fresh")}
+                >
+                  Start fresh
+                </Button>
+                <Button
+                  size="sm"
+                  variant={launchMode === "reinforce" ? "primary" : "ghost"}
+                  onClick={() => setLaunchMode("reinforce")}
+                >
+                  Add to current order
+                </Button>
+              </div>
+            </Field>
+            <div className="encounter-launch-preview">
+              <Waves size={18} />
+              <div>
+                <strong>
+                  {launchCreatures} {launchCreatures === 1 ? "creature" : "creatures"} ·{" "}
+                  {launchCombatants.length} roster {launchCombatants.length === 1 ? "row" : "rows"}
+                </strong>
+                <span className="tiny muted">
+                  {launchMode === "reinforce"
+                    ? "Reinforcements arrive at the bottom edge of the scene. The current round and active turn stay put."
+                    : "Starts round 1 and rolls initiative for every visible token on the scene."}
+                  {xpMode === "xp"
+                    ? ` ${launchBudget.awardXp} XP against a ${launchBudget.thresholds.moderate} XP moderate budget.`
+                    : ""}
+                </span>
+              </div>
+            </div>
+          </>
+        ) : null}
+      </Modal>
 
       <CombatantModal
         open={Boolean(combatantEditor)}
@@ -733,6 +984,7 @@ function CombatantModal({
   const [name, setName] = useState("");
   const [level, setLevel] = useState("1");
   const [count, setCount] = useState("1");
+  const [wave, setWave] = useState("1");
   const [hp, setHp] = useState("");
   const [ac, setAc] = useState("");
   const [perception, setPerception] = useState("");
@@ -745,6 +997,7 @@ function CombatantModal({
     setName(editing?.name ?? "Custom NPC");
     setLevel(String(editing?.level ?? 1));
     setCount(String(editing?.count ?? 1));
+    setWave(String(editing?.wave ?? 1));
     setHp(editing?.hp === null || editing?.hp === undefined ? "" : String(editing.hp));
     setAc(editing?.ac === null || editing?.ac === undefined ? "" : String(editing.ac));
     setPerception(
@@ -769,6 +1022,7 @@ function CombatantModal({
         name: name.trim(),
         level: Number(level) || 1,
         count: Number(count) || 1,
+        wave: Number(wave) || 1,
         hp: hp === "" ? null : Number(hp),
         ac: ac === "" ? null : Number(ac),
         perception: perception === "" ? null : Number(perception),
@@ -807,6 +1061,9 @@ function CombatantModal({
           </Field>
           <Field label="Count">
             <Input type="number" min={1} max={50} value={count} onChange={(event) => setCount(event.target.value)} />
+          </Field>
+          <Field label="Wave" hint="Bring reinforcements in later.">
+            <Input type="number" min={1} max={20} value={wave} onChange={(event) => setWave(event.target.value)} />
           </Field>
           <Field label="HP">
             <Input type="number" min={0} value={hp} onChange={(event) => setHp(event.target.value)} placeholder="Optional" />

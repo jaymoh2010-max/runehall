@@ -831,6 +831,77 @@ async function main() {
   reconnectedPlayer.close();
   log("disconnected client caught up from the authoritative snapshot");
 
+  const smokeEncounter = (
+    await api(`/api/campaigns/${campaign.id}/encounters`, {
+      method: "POST",
+      cookie: gmCookie,
+      body: { name: "Smoke Waves", description: "Wave fixture.", sceneId: scene.id },
+    })
+  ).payload.encounter;
+  const waveOne = (
+    await api(`/api/campaigns/${campaign.id}/encounters/${smokeEncounter.id}/combatants`, {
+      method: "POST",
+      cookie: gmCookie,
+      body: { name: "Wave One Guard", level: 2, count: 2, hp: 20, ac: 16, perception: 8, wave: 1 },
+    })
+  ).payload.combatant;
+  const waveTwo = (
+    await api(`/api/campaigns/${campaign.id}/encounters/${smokeEncounter.id}/combatants`, {
+      method: "POST",
+      cookie: gmCookie,
+      body: { name: "Wave Two Guard", level: 2, count: 1, hp: 20, ac: 16, perception: 8, wave: 2 },
+    })
+  ).payload.combatant;
+  if (waveOne.wave !== 1 || waveTwo.wave !== 2) throw new Error("Encounter waves were not saved");
+  const movedWave = await api(
+    `/api/campaigns/${campaign.id}/encounters/${smokeEncounter.id}/combatants/${waveTwo.id}`,
+    { method: "PATCH", cookie: gmCookie, body: { wave: 3, count: 2 } },
+  );
+  if (movedWave.payload.combatant.wave !== 3) throw new Error("Encounter wave was not updated");
+  const duplicateEncounter = (
+    await api(`/api/campaigns/${campaign.id}/encounters/${smokeEncounter.id}/duplicate`, {
+      method: "POST",
+      cookie: gmCookie,
+    })
+  ).payload.encounter;
+  if (
+    duplicateEncounter.name !== "Smoke Waves (copy)" ||
+    duplicateEncounter.combatants.length !== 2 ||
+    duplicateEncounter.combatants.find((entry) => entry.name === "Wave Two Guard")?.wave !== 3
+  ) {
+    throw new Error("Encounter duplication did not preserve waves");
+  }
+  const firstLaunch = await api(
+    `/api/campaigns/${campaign.id}/encounters/${smokeEncounter.id}/launch`,
+    { method: "POST", cookie: gmCookie, body: { sceneId: scene.id, wave: 1, mode: "fresh" } },
+  );
+  if (firstLaunch.payload.mode !== "fresh" || firstLaunch.payload.combatants !== 2) {
+    throw new Error("Wave one did not launch as a fresh encounter");
+  }
+  const beforeReinforcement = await api(`/api/campaigns/${campaign.id}/table`, {
+    cookie: gmCookie,
+  });
+  const activeBefore = beforeReinforcement.payload.initiative[beforeReinforcement.payload.turnIndex];
+  const reinforcement = await api(
+    `/api/campaigns/${campaign.id}/encounters/${smokeEncounter.id}/launch`,
+    { method: "POST", cookie: gmCookie, body: { sceneId: scene.id, wave: 3, mode: "reinforce" } },
+  );
+  const activeAfter = reinforcement.payload.initiative[reinforcement.payload.turnIndex];
+  if (
+    reinforcement.payload.mode !== "reinforce" ||
+    reinforcement.payload.wave !== 3 ||
+    reinforcement.payload.combatants !== 2 ||
+    reinforcement.payload.round !== beforeReinforcement.payload.round ||
+    activeAfter?.id !== activeBefore?.id
+  ) {
+    throw new Error("Reinforcement wave did not preserve the active initiative turn");
+  }
+  const playerEncounter = await fetch(`${base}/api/campaigns/${campaign.id}/encounters`, {
+    headers: { cookie: playerCookie },
+  });
+  if (playerEncounter.status !== 403) throw new Error("Player could read GM encounter prep");
+  log("encounter waves, reinforcement launches, and duplication are supported");
+
   gmSocket.close();
   playerSocket.close();
 

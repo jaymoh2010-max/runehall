@@ -51,7 +51,7 @@ The target table size is one GM plus 4–10 players. That means the product shou
 - LAN-aware invite links for friends joining a locally hosted table.
 - Party roster, character permissions, journal with visibility, settings, member management.
 - Library and rules quick reference.
-- Encounter builder with saved fights, bestiary counts, launch-to-table, and a GM-controlled Milestone/XP-budget toggle. GM can advance the party without XP bookkeeping.
+- Encounter builder with saved fights, bestiary counts, launch-to-table, waves, duplication, launch preview, party-size presets, and a GM-controlled Milestone/XP-budget toggle. Reinforcements join the existing initiative without resetting the round; the GM can advance the party without XP bookkeeping.
 - Loot parcels with compendium equipment, coins, and one-action distribution to a character sheet.
 - Journal handouts with image attachments, shared/GM-only visibility, a player-facing gallery, and one-click duplication.
 - Campaign Overview with last-session summary, next-session details, party status, and shared or GM-only clue threads. The GM can generate an editable recap from shared rolls, visible handouts, loot, and open threads, then save it as the summary or a shared handout.

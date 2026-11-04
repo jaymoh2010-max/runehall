@@ -197,6 +197,7 @@ export function serializeEncounterCombatant(row: EncounterCombatantRow): Encount
     ac: row.ac,
     perception: row.perception,
     notes: row.notes,
+    wave: Math.max(1, Math.round(row.wave ?? 1)),
     sortOrder: row.sort_order,
   };
 }

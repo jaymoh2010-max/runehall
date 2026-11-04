@@ -420,7 +420,12 @@ Acceptance: a GM can prepare a full session in Runehall and start it with one â€
 
 **Goal:** make session prep and between-session continuity excellent.
 
-- [ ] Encounter improvements: duplicate, waves, party-size presets, and launch preview remain.
+- [x] **Encounter improvements**
+  - Encounters can be duplicated with their combatants, waves, notes, and scene.
+  - Combatants belong to numbered waves, and the roster is grouped by wave with per-wave XP.
+  - The launch preview chooses a scene, wave, and initiative mode.
+  - Reinforcements roll initiative into the existing order while preserving the current round and active turn.
+  - Party-size presets offer Auto plus 3, 4, 5, and 6 characters.
 - [x] **Session recap draft**
   - The GM can generate an editable recap from the selected time window.
   - It draws on shared rolls, visible journal entries and handouts, loot parcels, the played session, and open shared threads.

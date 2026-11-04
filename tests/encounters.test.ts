@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
+  PARTY_SIZE_PRESETS,
   classifyEncounter,
   combatantXp,
   creatureXp,
   encounterAwardXp,
   encounterBudget,
   encounterBudgetThresholds,
+  encounterWaveSummaries,
   partyDefaults,
 } from "../src/shared/encounters";
 import { isXpMode, normalizeXpMode } from "../src/shared/content";
@@ -84,6 +86,35 @@ describe("PF2e encounter budgets", () => {
     expect(budget.awardXp).toBe(200);
     expect(budget.difficulty).toBe("beyond");
     expect(budget.nextThreshold).toBeNull();
+  });
+});
+
+describe("encounter waves", () => {
+  it("groups combatants into sorted waves and totals creatures", () => {
+    expect(
+      encounterWaveSummaries([
+        { wave: 2, count: 3 },
+        { wave: 1, count: 2 },
+        { wave: 2, count: 1 },
+        { wave: 1, count: 4 },
+      ]),
+    ).toEqual([
+      { wave: 1, combatants: 2, creatures: 6 },
+      { wave: 2, combatants: 2, creatures: 4 },
+    ]);
+  });
+
+  it("normalizes missing or invalid wave values to wave one", () => {
+    expect(
+      encounterWaveSummaries([
+        { wave: 0, count: 1 },
+        { wave: Number.NaN, count: 0 },
+      ]),
+    ).toEqual([{ wave: 1, combatants: 2, creatures: 2 }]);
+  });
+
+  it("offers common party-size presets", () => {
+    expect(PARTY_SIZE_PRESETS).toEqual([3, 4, 5, 6]);
   });
 });
 

@@ -372,8 +372,8 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
       for (const combatant of records(encounter.combatants, 500, "combatants")) {
         db.prepare(
           `INSERT INTO encounter_combatants
-            (id, encounter_id, monster_id, name, level, count, hp, ac, perception, notes, sort_order, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            (id, encounter_id, monster_id, name, level, count, hp, ac, perception, notes, wave, sort_order, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         ).run(
           newId("encm"),
           encounterId,
@@ -387,6 +387,7 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
             ? null
             : numberValue(combatant.perception, 0, -100, 1000),
           longText(combatant.notes, "", 2000),
+          clamp(numberValue(combatant.wave, 1, 1, 20), 1, 20),
           numberValue(combatant.sortOrder, 0),
           ts,
           ts,

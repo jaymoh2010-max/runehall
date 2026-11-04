@@ -1,4 +1,9 @@
-import type { EncounterBudget, EncounterCombatant, EncounterDifficulty } from "./types";
+import type {
+  EncounterBudget,
+  EncounterCombatant,
+  EncounterDifficulty,
+  EncounterWaveSummary,
+} from "./types";
 
 /**
  * PF2e encounter math. Creatures are worth XP based on their level relative to
@@ -60,6 +65,24 @@ export function clampPartyLevel(value: number): number {
 export function clampPartySize(value: number): number {
   if (!Number.isFinite(value)) return 4;
   return Math.max(1, Math.min(10, Math.round(value)));
+}
+
+/** Common party sizes offered as one-click planning presets. */
+export const PARTY_SIZE_PRESETS = [3, 4, 5, 6] as const;
+
+export function encounterWaveSummaries(
+  combatants: Pick<EncounterCombatant, "wave" | "count">[],
+): EncounterWaveSummary[] {
+  const waves = new Map<number, EncounterWaveSummary>();
+  for (const combatant of combatants) {
+    const wave = Math.max(1, Math.round(Number(combatant.wave) || 1));
+    const count = Math.max(1, Math.round(Number(combatant.count) || 1));
+    const existing = waves.get(wave) ?? { wave, combatants: 0, creatures: 0 };
+    existing.combatants += 1;
+    existing.creatures += count;
+    waves.set(wave, existing);
+  }
+  return [...waves.values()].sort((a, b) => a.wave - b.wave);
 }
 
 /** XP a single creature contributes against the encounter budget. */

@@ -372,4 +372,11 @@ export const migrations: Migration[] = [
       ALTER TABLE scenes ADD COLUMN templates TEXT NOT NULL DEFAULT '[]';
     `,
   },
+  {
+    version: 14,
+    name: "encounter_waves",
+    sql: `
+      ALTER TABLE encounter_combatants ADD COLUMN wave INTEGER NOT NULL DEFAULT 1;
+    `,
+  },
 ];

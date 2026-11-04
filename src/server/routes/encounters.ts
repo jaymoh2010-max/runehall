@@ -16,10 +16,10 @@ import {
   serializeToken,
   touchCampaign,
 } from "../serialize";
-import type { InitiativeEntry } from "../../shared/types";
+import type { EncounterLaunchMode, InitiativeEntry } from "../../shared/types";
 import { rollFormula } from "../../shared/dice";
 import { sortInitiativeEntries } from "../../shared/initiative";
-import { clamp, newId, now, safeInt, safeString, sanitizeUserText } from "../util";
+import { clamp, newId, now, parseJson, safeInt, safeString, sanitizeUserText } from "../util";
 
 function gmRequires(
   request: { user: { id: string } | null },
@@ -200,6 +200,60 @@ export async function registerEncounterRoutes(app: FastifyInstance): Promise<voi
     return reply.send({ ok: true });
   });
 
+  app.post("/api/campaigns/:id/encounters/:encounterId/duplicate", async (request, reply) => {
+    const { id, encounterId } = request.params as { id: string; encounterId: string };
+    const access = gmRequires(request, id);
+    if (!access.row) return reply.code(access.code ?? 403).send({ error: access.error });
+    const source = getEncounter(id, encounterId);
+    if (!source) return reply.code(404).send({ error: "Encounter not found." });
+    const duplicateId = newId("enc");
+    const ts = now();
+    db.prepare(
+      `INSERT INTO encounters (id, campaign_id, name, description, scene_id, sort_order, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run(
+      duplicateId,
+      id,
+      `${source.name} (copy)`.slice(0, 100),
+      source.description,
+      source.scene_id,
+      nextSortOrder("encounters", "campaign_id", id),
+      ts,
+      ts,
+    );
+    const combatants = db
+      .prepare(
+        "SELECT * FROM encounter_combatants WHERE encounter_id = ? ORDER BY sort_order ASC, created_at ASC",
+      )
+      .all(encounterId) as EncounterCombatantRow[];
+    for (const combatant of combatants) {
+      db.prepare(
+        `INSERT INTO encounter_combatants
+          (id, encounter_id, monster_id, name, level, count, hp, ac, perception, notes, wave, sort_order, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ).run(
+        newId("encm"),
+        duplicateId,
+        combatant.monster_id,
+        combatant.name,
+        combatant.level,
+        combatant.count,
+        combatant.hp,
+        combatant.ac,
+        combatant.perception,
+        combatant.notes,
+        Math.max(1, Math.round(combatant.wave ?? 1)),
+        combatant.sort_order,
+        ts,
+        ts,
+      );
+    }
+    touchCampaign(id);
+    return reply
+      .code(201)
+      .send({ encounter: serializeEncounter(getEncounter(id, duplicateId)!) });
+  });
+
   app.post("/api/campaigns/:id/encounters/:encounterId/combatants", async (request, reply) => {
     const { id, encounterId } = request.params as { id: string; encounterId: string };
     const access = gmRequires(request, id);
@@ -208,6 +262,7 @@ export async function registerEncounterRoutes(app: FastifyInstance): Promise<voi
     if (!encounter) return reply.code(404).send({ error: "Encounter not found." });
     const body = (request.body ?? {}) as Record<string, unknown>;
     const count = clamp(safeInt(body.count, 1, 1, 50), 1, 50);
+    const wave = clamp(safeInt(body.wave, 1, 1, 20), 1, 20);
     let monsterId: string | null = null;
     let name = safeString(body.name, "Combatant", 100);
     let level = clamp(safeInt(body.level, 1, -1, 30), -1, 30);
@@ -239,8 +294,8 @@ export async function registerEncounterRoutes(app: FastifyInstance): Promise<voi
     const ts = now();
     db.prepare(
       `INSERT INTO encounter_combatants
-        (id, encounter_id, monster_id, name, level, count, hp, ac, perception, notes, sort_order, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        (id, encounter_id, monster_id, name, level, count, hp, ac, perception, notes, wave, sort_order, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).run(
       combatantId,
       encounterId,
@@ -252,6 +307,7 @@ export async function registerEncounterRoutes(app: FastifyInstance): Promise<voi
       ac,
       perception,
       sanitizeUserText(body.notes, 2000),
+      wave,
       nextSortOrder("encounter_combatants", "encounter_id", encounterId),
       ts,
       ts,
@@ -296,11 +352,15 @@ export async function registerEncounterRoutes(app: FastifyInstance): Promise<voi
             : safeInt(body.perception, 0, -100, 1000);
       const notes =
         body.notes === undefined ? existing.notes : sanitizeUserText(body.notes, 2000);
+      const wave =
+        body.wave === undefined
+          ? Math.max(1, Math.round(existing.wave ?? 1))
+          : clamp(safeInt(body.wave, existing.wave, 1, 20), 1, 20);
       db.prepare(
         `UPDATE encounter_combatants
-         SET name = ?, level = ?, count = ?, hp = ?, ac = ?, perception = ?, notes = ?, updated_at = ?
+         SET name = ?, level = ?, count = ?, hp = ?, ac = ?, perception = ?, notes = ?, wave = ?, updated_at = ?
          WHERE id = ?`,
-      ).run(name, level, count, hp, ac, perception, notes, now(), combatantId);
+      ).run(name, level, count, hp, ac, perception, notes, wave, now(), combatantId);
       db.prepare("UPDATE encounters SET updated_at = ? WHERE id = ?").run(now(), encounterId);
       touchCampaign(id);
       return reply.send({
@@ -336,6 +396,12 @@ export async function registerEncounterRoutes(app: FastifyInstance): Promise<voi
     const encounter = getEncounter(id, encounterId);
     if (!encounter) return reply.code(404).send({ error: "Encounter not found." });
     const body = (request.body ?? {}) as Record<string, unknown>;
+    const mode: EncounterLaunchMode = body.mode === "reinforce" ? "reinforce" : "fresh";
+    const waveValue = body.wave;
+    const wave =
+      waveValue === undefined || waveValue === null || waveValue === "" || waveValue === "all"
+        ? null
+        : clamp(safeInt(waveValue, 1, 1, 20), 1, 20);
     const state = ensureState(id);
     const requestedScene =
       typeof body.sceneId === "string" && body.sceneId ? body.sceneId : encounter.scene_id;
@@ -348,13 +414,20 @@ export async function registerEncounterRoutes(app: FastifyInstance): Promise<voi
       null;
     if (!scene) return reply.code(400).send({ error: "Create a scene before launching an encounter." });
 
-    const combatants = db
+    const allCombatants = db
       .prepare(
         "SELECT * FROM encounter_combatants WHERE encounter_id = ? ORDER BY sort_order ASC, created_at ASC",
       )
       .all(encounterId) as EncounterCombatantRow[];
-    if (!combatants.length) {
+    const combatants =
+      wave === null
+        ? allCombatants
+        : allCombatants.filter((combatant) => Math.max(1, Math.round(combatant.wave ?? 1)) === wave);
+    if (!allCombatants.length) {
       return reply.code(400).send({ error: "Add at least one combatant before launching." });
+    }
+    if (!combatants.length) {
+      return reply.code(400).send({ error: `Wave ${wave} has no combatants.` });
     }
 
     const copies = combatants.reduce((total, combatant) => total + Math.max(1, combatant.count), 0);
@@ -367,7 +440,10 @@ export async function registerEncounterRoutes(app: FastifyInstance): Promise<voi
     const rows = Math.max(1, Math.ceil(copies / columns));
     const spacing = Math.max(scene.grid_size, 50);
     const startX = scene.width / 2 - ((columns - 1) * spacing) / 2;
-    const startY = scene.height / 2 - ((rows - 1) * spacing) / 2;
+    const startY =
+      mode === "reinforce"
+        ? Math.max(spacing / 2, scene.height - (rows + 1) * spacing)
+        : scene.height / 2 - ((rows - 1) * spacing) / 2;
 
     const nameTotals = new Map<string, number>();
     for (const combatant of combatants) {
@@ -426,16 +502,32 @@ export async function registerEncounterRoutes(app: FastifyInstance): Promise<voi
     const sceneTokens = db
       .prepare("SELECT * FROM tokens WHERE scene_id = ? AND hidden = 0")
       .all(scene.id) as TokenRow[];
-    const entries = sortInitiative(sceneTokens.map(initiativeEntryForToken));
+    let entries: InitiativeEntry[];
+    let round = 1;
+    let turnIndex = 0;
+    if (mode === "reinforce") {
+      const existingEntries = parseJson<InitiativeEntry[]>(state.initiative, []);
+      const activeId = existingEntries[state.turn_index]?.id ?? null;
+      entries = sortInitiative([
+        ...existingEntries,
+        ...createdTokens.map(initiativeEntryForToken),
+      ]);
+      round = existingEntries.length ? Math.max(1, state.round) : 1;
+      turnIndex = activeId
+        ? Math.max(0, entries.findIndex((entry) => entry.id === activeId))
+        : 0;
+    } else {
+      entries = sortInitiative(sceneTokens.map(initiativeEntryForToken));
+    }
     db.prepare(
-      "UPDATE campaign_state SET active_scene_id = ?, initiative = ?, round = 1, turn_index = 0, updated_at = ? WHERE campaign_id = ?",
-    ).run(scene.id, JSON.stringify(entries), now(), id);
+      "UPDATE campaign_state SET active_scene_id = ?, initiative = ?, round = ?, turn_index = ?, updated_at = ? WHERE campaign_id = ?",
+    ).run(scene.id, JSON.stringify(entries), round, turnIndex, now(), id);
 
     for (const token of createdTokens) {
       app.broadcastCampaign(id, "token:created", serializeToken(token));
     }
     app.broadcastCampaign(id, "scene:activated", { sceneId: scene.id });
-    app.broadcastCampaign(id, "initiative:updated", { entries, round: 1, turnIndex: 0 });
+    app.broadcastCampaign(id, "initiative:updated", { entries, round, turnIndex });
     touchCampaign(id);
 
     return reply.send({
@@ -443,6 +535,10 @@ export async function registerEncounterRoutes(app: FastifyInstance): Promise<voi
       tokens: createdTokens.map((token) => serializeToken(token)),
       initiative: entries,
       combatants: copies,
+      wave,
+      mode,
+      round,
+      turnIndex,
     });
   });
 }

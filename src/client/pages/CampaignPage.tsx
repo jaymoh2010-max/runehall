@@ -550,8 +550,8 @@ export function CampaignPage() {
           ...result.tokens.filter((token) => !known.has(token.id)),
         ],
         initiative: result.initiative,
-        round: 1,
-        turnIndex: 0,
+        round: result.round,
+        turnIndex: result.turnIndex,
       };
     });
     setTableMounted(true);

@@ -233,6 +233,7 @@ export interface EncounterCombatantRow {
   ac: number | null;
   perception: number | null;
   notes: string;
+  wave: number;
   sort_order: number;
   created_at: number;
   updated_at: number;

@@ -814,6 +814,8 @@ export interface EncounterCombatant {
   ac: number | null;
   perception: number | null;
   notes: string;
+  /** Reinforcement wave. Combatants in the same wave arrive together. */
+  wave: number;
   sortOrder: number;
 }
 
@@ -826,6 +828,14 @@ export interface Encounter {
   combatants: EncounterCombatant[];
   createdAt: number;
   updatedAt: number;
+}
+
+export type EncounterLaunchMode = "fresh" | "reinforce";
+
+export interface EncounterWaveSummary {
+  wave: number;
+  combatants: number;
+  creatures: number;
 }
 
 export interface LootItem {

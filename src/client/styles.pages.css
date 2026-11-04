@@ -1278,6 +1278,10 @@
 .encounter-budget-head h3 { font-size: 1.05rem; margin-top: 4px; }
 .encounter-party-controls { display: grid; grid-template-columns: 160px 160px minmax(0, 1fr); gap: 12px; align-items: end; margin-top: 12px; }
 .encounter-party-controls .field { margin-top: 0; }
+.encounter-party-presets { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 9px; }
+.encounter-preset { border: 1px solid var(--line); border-radius: 999px; background: transparent; color: var(--muted); padding: 3px 10px; font-size: 0.72rem; cursor: pointer; }
+.encounter-preset:hover { border-color: rgba(200,169,107,0.32); color: var(--text-2); }
+.encounter-preset.is-active { border-color: rgba(200,169,107,0.55); background: rgba(200,169,107,0.1); color: var(--gold-bright); }
 .encounter-budget-bar { margin-top: 14px; }
 .encounter-thresholds { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; margin-top: 10px; }
 .encounter-threshold { display: flex; flex-direction: column; gap: 2px; border: 1px solid var(--line); border-radius: 7px; padding: 8px; text-align: center; font-size: 0.72rem; color: var(--muted); }
@@ -1288,6 +1292,10 @@
 .encounter-roster, .encounter-bestiary { padding: 16px; min-width: 0; }
 .encounter-roster h3, .encounter-bestiary h3 { font-size: 1rem; margin-top: 3px; }
 .encounter-roster-list { display: flex; flex-direction: column; gap: 6px; margin: 12px 0; }
+.encounter-wave-group { display: flex; flex-direction: column; gap: 6px; }
+.encounter-wave-group + .encounter-wave-group { margin-top: 8px; }
+.encounter-wave-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; border-radius: 6px; padding: 5px 8px; background: rgba(255,255,255,0.03); color: var(--muted); font-size: 0.76rem; }
+.encounter-wave-head strong { color: var(--text-2); }
 .encounter-roster-row { display: flex; align-items: center; gap: 10px; border: 1px solid var(--line); border-radius: 8px; padding: 9px 10px; background: rgba(255,255,255,0.015); }
 .encounter-roster-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
 .encounter-count { display: flex; align-items: center; gap: 4px; border: 1px solid var(--line); border-radius: 7px; padding: 2px 4px; }
@@ -1295,7 +1303,15 @@
 .encounter-count .icon-btn { width: 24px; height: 24px; }
 .encounter-row-actions { display: flex; gap: 2px; }
 .encounter-launch { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; border-top: 1px solid var(--line); padding-top: 12px; margin-top: 12px; }
-.encounter-search { display: grid; grid-template-columns: minmax(0, 1fr) 90px; gap: 8px; align-items: end; margin: 12px 0; }
+.encounter-wave-options { display: flex; flex-direction: column; gap: 6px; }
+.encounter-wave-option { display: flex; align-items: center; justify-content: space-between; gap: 12px; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: var(--text-2); padding: 9px 11px; text-align: left; cursor: pointer; }
+.encounter-wave-option:hover { background: rgba(255,255,255,0.03); }
+.encounter-wave-option.is-active { border-color: rgba(200,169,107,0.5); background: rgba(200,169,107,0.08); }
+.encounter-wave-option strong { color: var(--text); }
+.encounter-launch-preview { display: flex; align-items: flex-start; gap: 10px; border: 1px solid var(--line); border-radius: 8px; padding: 11px 12px; background: rgba(200,169,107,0.04); color: var(--muted); }
+.encounter-launch-preview > svg { color: var(--gold); flex: none; margin-top: 1px; }
+.encounter-launch-preview strong { display: block; color: var(--text-2); font-size: 0.86rem; margin-bottom: 2px; }
+.encounter-search { display: grid; grid-template-columns: minmax(0, 1fr) 80px 64px; gap: 8px; align-items: end; margin: 12px 0; }
 .encounter-search .field { margin-top: 0; }
 .encounter-search .search-box { margin: 0; }
 .encounter-monster-list { display: flex; flex-direction: column; gap: 2px; max-height: 540px; overflow-y: auto; padding-right: 4px; }
