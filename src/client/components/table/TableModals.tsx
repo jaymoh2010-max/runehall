@@ -16,6 +16,8 @@ import {
   Users,
 } from "lucide-react";
 import type { CharacterRecord, Monster, Scene, Token } from "../../../shared/types";
+import { stripHtml } from "../../../shared/compendium";
+import { HoverCard } from "../HoverCard";
 import { api, uploadImage } from "../../api";
 import { createThumbnailFile } from "../../thumbnail";
 import { errorMessage } from "../../stores";
@@ -82,20 +84,29 @@ export function AddTokenModal({
 
   useEffect(() => {
     if (!open || tab !== "monster") return;
+    let cancelled = false;
+    const controller = new AbortController();
     setMonsterLoading(true);
     const timer = window.setTimeout(async () => {
       try {
         const result = await api<{ items: Monster[] }>(
           `/api/compendium/monsters?q=${encodeURIComponent(monsterQuery)}&limit=40`,
+          { signal: controller.signal },
         );
+        if (cancelled) return;
         setMonsters(result.items);
       } catch (err) {
+        if (cancelled || (err as { name?: string }).name === "AbortError") return;
         setError(errorMessage(err));
       } finally {
-        setMonsterLoading(false);
+        if (!cancelled) setMonsterLoading(false);
       }
     }, 220);
-    return () => window.clearTimeout(timer);
+    return () => {
+      cancelled = true;
+      controller.abort();
+      window.clearTimeout(timer);
+    };
   }, [open, tab, monsterQuery]);
 
   const custom = () => {
@@ -188,18 +199,25 @@ export function AddTokenModal({
             <div className="token-monster-results">
               {monsterLoading ? <Spinner label="Searching…" /> : null}
               {monsters.map((monster) => (
-                <button
-                  type="button"
+                <HoverCard
                   key={monster.id}
-                  className={`picker-item ${selectedMonster?.id === monster.id ? "is-selected" : ""}`}
-                  onClick={() => setSelectedMonster(monster)}
+                  title={monster.name}
+                  subtitle={`Level ${monster.level} · ${monster.source}`}
+                  meta={<span>{monster.hp} HP · AC {monster.ac} · {monster.size}</span>}
+                  body={stripHtml(monster.description || monster.blurb, 220) || undefined}
                 >
-                  <div className="picker-item-main">
-                    <span className="picker-item-name">{monster.name}</span>
-                    <span className="picker-item-sub">Level {monster.level} · {monster.hp} HP · AC {monster.ac}</span>
-                  </div>
-                  {monster.rarity !== "common" ? <RarityTag rarity={monster.rarity} /> : null}
-                </button>
+                  <button
+                    type="button"
+                    className={`picker-item ${selectedMonster?.id === monster.id ? "is-selected" : ""}`}
+                    onClick={() => setSelectedMonster(monster)}
+                  >
+                    <div className="picker-item-main">
+                      <span className="picker-item-name">{monster.name}</span>
+                      <span className="picker-item-sub">Level {monster.level} · {monster.hp} HP · AC {monster.ac}</span>
+                    </div>
+                    {monster.rarity !== "common" ? <RarityTag rarity={monster.rarity} /> : null}
+                  </button>
+                </HoverCard>
               ))}
               {!monsterLoading && !monsters.length ? <p className="muted small">No creatures match that search.</p> : null}
             </div>

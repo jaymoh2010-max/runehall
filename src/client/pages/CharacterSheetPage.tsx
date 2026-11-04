@@ -48,6 +48,7 @@ import {
 } from "../../shared/rules";
 import { DEGREE_LABELS, mod, rollFormula } from "../../shared/dice";
 import { currencyToCp } from "../../shared/inventory";
+import { spellTraditionLabel, stripHtml } from "../../shared/compendium";
 import { conditionLabel } from "../../shared/tokens";
 import { api, ApiError, formatCp } from "../api";
 import { errorMessage } from "../stores";
@@ -72,6 +73,7 @@ import {
   Tag,
   Toggle,
 } from "../components/ui";
+import { HoverCard } from "../components/HoverCard";
 
 const COMMON_CONDITIONS = [
   "Blinded",
@@ -1413,27 +1415,34 @@ function SpellRow({
 }) {
   const damageFormula = spell.damage?.[0]?.formula;
   return (
-    <div className="sheet-spell-row">
-      <div className="grow">
-        <strong>{spell.name}</strong>
-        {prepared ? (
-          <span className="tiny gold-text"> · Prepared{prepared > 1 ? ` ×${prepared}` : ""}</span>
-        ) : null}
-        <span className="tiny muted"> · {spell.actions || "—"} · {spell.range || "range —"}{spell.defense?.save ? ` · ${spell.defense.save}` : ""}</span>
-        {spell.damageText ? <span className="tiny gold-text"> · {spell.damageText}</span> : null}
+    <HoverCard
+      title={spell.name}
+      subtitle={`${spell.rank === 0 ? "Cantrip" : `Rank ${spell.rank}`} · ${spellTraditionLabel(spell)} · ${spell.source}`}
+      body={stripHtml(spell.description, 220) || undefined}
+      meta={spell.damageText ? <span>{spell.damageText}</span> : undefined}
+    >
+      <div className="sheet-spell-row">
+        <div className="grow">
+          <strong>{spell.name}</strong>
+          {prepared ? (
+            <span className="tiny gold-text"> · Prepared{prepared > 1 ? ` ×${prepared}` : ""}</span>
+          ) : null}
+          <span className="tiny muted"> · {spell.actions || "—"} · {spell.range || "range —"}{spell.defense?.save ? ` · ${spell.defense.save}` : ""}</span>
+          {spell.damageText ? <span className="tiny gold-text"> · {spell.damageText}</span> : null}
+        </div>
+        <div className="row" style={{ gap: 5 }}>
+          {spellAttack !== null && spell.traits.includes("attack") ? (
+            <Button size="sm" variant="ghost" onClick={() => onRoll(`1d20${signed(spellAttack)}`, `${spell.name} spell attack`)}>
+              <Dices size={13} /> Attack
+            </Button>
+          ) : null}
+          {damageFormula ? (
+            <Button size="sm" variant="ghost" onClick={() => onRoll(damageFormula, `${spell.name} damage`)}>
+              <Swords size={13} /> {damageFormula}
+            </Button>
+          ) : null}
+        </div>
       </div>
-      <div className="row" style={{ gap: 5 }}>
-        {spellAttack !== null && spell.traits.includes("attack") ? (
-          <Button size="sm" variant="ghost" onClick={() => onRoll(`1d20${signed(spellAttack)}`, `${spell.name} spell attack`)}>
-            <Dices size={13} /> Attack
-          </Button>
-        ) : null}
-        {damageFormula ? (
-          <Button size="sm" variant="ghost" onClick={() => onRoll(damageFormula, `${spell.name} damage`)}>
-            <Swords size={13} /> {damageFormula}
-          </Button>
-        ) : null}
-      </div>
-    </div>
+    </HoverCard>
   );
 }

@@ -3,7 +3,9 @@ import { BookOpen, GripVertical, Plus, Search, X } from "lucide-react";
 import type { Monster } from "../../../shared/types";
 import { api } from "../../api";
 import { errorMessage } from "../../stores";
+import { stripHtml } from "../../../shared/compendium";
 import { Button, Field, IconButton, Input, Spinner } from "../ui";
+import { HoverCard } from "../HoverCard";
 import { BESTIARY_DRAG_TYPE, type BestiaryDragPayload } from "./bestiaryDrag";
 
 export function BestiaryPalette({
@@ -22,6 +24,8 @@ export function BestiaryPalette({
   const [error, setError] = useState("");
 
   useEffect(() => {
+    let cancelled = false;
+    const controller = new AbortController();
     setLoading(true);
     const timer = window.setTimeout(async () => {
       try {
@@ -32,17 +36,24 @@ export function BestiaryPalette({
         }
         const result = await api<{ items: Monster[]; total: number }>(
           `/api/compendium/monsters?${params.toString()}`,
+          { signal: controller.signal },
         );
+        if (cancelled) return;
         setMonsters(result.items);
         setTotal(result.total);
         setError("");
       } catch (err) {
+        if (cancelled || (err as { name?: string }).name === "AbortError") return;
         setError(errorMessage(err));
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     }, 220);
-    return () => window.clearTimeout(timer);
+    return () => {
+      cancelled = true;
+      controller.abort();
+      window.clearTimeout(timer);
+    };
   }, [query, level]);
 
   const groupCount = Math.max(1, Math.min(20, Number(count) || 1));
@@ -102,31 +113,39 @@ export function BestiaryPalette({
       ) : (
         <div className="vtt-bestiary-list">
           {monsters.map((monster) => (
-            <div
+            <HoverCard
               key={monster.id}
-              className="vtt-bestiary-row"
-              draggable
-              onDragStart={(event) => {
-                const payload: BestiaryDragPayload = { monster, count: groupCount };
-                event.dataTransfer.setData(BESTIARY_DRAG_TYPE, JSON.stringify(payload));
-                event.dataTransfer.effectAllowed = "copy";
-              }}
+              title={monster.name}
+              subtitle={`Level ${monster.level} · ${monster.size} · ${monster.source}`}
+              meta={<span>HP {monster.hp} · AC {monster.ac} · Fort {monster.fortitude} · Ref {monster.reflex} · Will {monster.will}</span>}
+              body={stripHtml(monster.description || monster.blurb, 240) || undefined}
+              footer="Drag onto the map or press Add"
             >
-              <GripVertical size={13} className="muted" />
-              <span className="vtt-bestiary-mark">L{monster.level}</span>
-              <span className="grow">
-                <strong>{monster.name}</strong>
-                <span className="tiny muted">{monster.hp} HP · AC {monster.ac}</span>
-              </span>
-              <Button
-                size="sm"
-                variant="ghost"
-                icon={<Plus size={12} />}
-                onClick={() => onAdd(monster, groupCount)}
+              <div
+                className="vtt-bestiary-row"
+                draggable
+                onDragStart={(event) => {
+                  const payload: BestiaryDragPayload = { monster, count: groupCount };
+                  event.dataTransfer.setData(BESTIARY_DRAG_TYPE, JSON.stringify(payload));
+                  event.dataTransfer.effectAllowed = "copy";
+                }}
               >
-                Add
-              </Button>
-            </div>
+                <GripVertical size={13} className="muted" />
+                <span className="vtt-bestiary-mark">L{monster.level}</span>
+                <span className="grow">
+                  <strong>{monster.name}</strong>
+                  <span className="tiny muted">{monster.hp} HP · AC {monster.ac}</span>
+                </span>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  icon={<Plus size={12} />}
+                  onClick={() => onAdd(monster, groupCount)}
+                >
+                  Add
+                </Button>
+              </div>
+            </HoverCard>
           ))}
           {!monsters.length ? <p className="muted small">No creatures match that search.</p> : null}
         </div>

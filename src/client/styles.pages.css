@@ -2247,6 +2247,24 @@
 .library-detail-body { max-width: 780px; }
 .library-detail-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 11px; }
 .library-detail-head h2 { margin-top: 4px; font-size: 1.5rem; }
+.compendium-detail-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.compendium-detail .rich-text { margin-top: 13px; }
+.compendium-facts { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 16px; margin: 12px 0 4px; }
+.compendium-facts > div { display: flex; flex-direction: column; gap: 1px; padding: 6px 8px; border: 1px solid rgba(255, 255, 255, 0.055); border-radius: 6px; background: rgba(255, 255, 255, 0.014); }
+.compendium-facts span { color: var(--muted-2); font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.07em; }
+.compendium-facts strong { color: var(--text-2); font-size: 0.8rem; font-weight: 500; }
+.compendium-section { margin-top: 20px; }
+.compendium-section > h3 { font-size: 0.95rem; margin-bottom: 8px; }
+.compendium-choice-groups { padding: 0 9px 9px; display: flex; flex-direction: column; gap: 7px; }
+.compendium-choice-group { border-top: 1px solid rgba(255, 255, 255, 0.05); padding-top: 7px; }
+.compendium-skill-list { display: flex; flex-wrap: wrap; gap: 5px 12px; margin: 10px 0 4px; color: var(--muted); font-size: 0.76rem; }
+.compendium-skill-list strong { color: var(--text-2); }
+.compendium-heightening { margin: 9px 0; padding: 8px 10px; border: 1px solid rgba(200, 169, 107, 0.2); border-radius: 6px; background: rgba(200, 169, 107, 0.04); color: var(--muted); font-size: 0.8rem; display: flex; flex-direction: column; gap: 2px; }
+.compendium-heightening strong { color: var(--gold-bright); font-size: 0.69rem; text-transform: uppercase; letter-spacing: 0.08em; }
+.compendium-entry-page .page-head .back-link { margin-bottom: 8px; }
+.compendium-entry-page .page-head h1 { font-size: clamp(1.7rem, 3vw, 2.35rem); }
+.compendium-entry-card { padding: 26px; max-height: none; }
+.compendium-entry-card .library-detail-body { max-width: 900px; }
 .monster-stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 15px; }
 .monster-stat-grid > div { border: 1px solid var(--line); border-radius: 6px; background: rgba(255,255,255,0.014); padding: 6px 8px; display: flex; flex-direction: column; }
 .monster-stat-grid span { color: var(--muted-2); font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.08em; }

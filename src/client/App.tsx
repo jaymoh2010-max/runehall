@@ -8,6 +8,7 @@ import { useSession } from "./stores";
 import { LandingPage } from "./pages/LandingPage";
 import { AuthPage } from "./pages/AuthPage";
 import { JoinCampaignPage } from "./pages/JoinCampaignPage";
+import { CompendiumEntryPage } from "./pages/CompendiumEntryPage";
 
 const DashboardPage = lazy(() =>
   import("./pages/DashboardPage").then((module) => ({ default: module.DashboardPage })),
@@ -73,6 +74,7 @@ export default function App() {
           <Route path="/characters/:id" element={<CharacterSheetPage />} />
           <Route path="/characters/:id/edit" element={<CharacterBuilderPage />} />
           <Route path="/library" element={<LibraryPage />} />
+          <Route path="/library/:kind/:id" element={<CompendiumEntryPage />} />
           <Route path="/rules" element={<RulesPage />} />
           <Route path="/account" element={<AccountPage />} />
           <Route path="/admin" element={<AdminPage />} />

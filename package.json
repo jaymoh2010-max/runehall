@@ -11,6 +11,7 @@
     "build": "vite build",
     "start": "tsx src/server/index.ts",
     "ingest": "node scripts/ingest-pf2e.mjs",
+    "verify:data": "node scripts/verify-compendium.mjs",
     "simulate": "tsx scripts/simulate-characters.ts 1000 --matrix --content --options --prereqs",
     "backup": "node scripts/backup.mjs",
     "restore": "node scripts/restore.mjs",

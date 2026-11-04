@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { Dices, Eye, EyeOff, Lock, Minus, MousePointer2, Plus, Swords, Trash2, Unlock, X } from "lucide-react";
 import type { CharacterRecord, PublicUser, Scene, Token } from "../../../shared/types";
-import { groupHp, tokenConditionLabel } from "../../../shared/tokens";
+import { groupHp, tokenConditionLabel, tokenConditionSummary } from "../../../shared/tokens";
 import { Avatar, Badge, Button, Field, IconButton, Input, ProgressBar, Select, Stat, Tag, Toggle } from "../ui";
+import { HoverCard } from "../HoverCard";
 
 export function VttTokenPanel({
   activeScene,
@@ -127,25 +128,38 @@ export function VttTokenPanel({
           const character = token.characterId ? characters.find((c) => c.id === token.characterId) : null;
           const portrait = token.imageUrl || character?.summary?.portraitUrl;
           return (
-            <button
-              type="button"
+            <HoverCard
               key={token.id}
-              className={`vtt-token-row ${selectedTokenIds.includes(token.id) || selectedTokenId === token.id ? "is-selected" : ""} ${token.hidden ? "is-hidden" : ""}`}
-              onClick={() => setSelectedTokenId(token.id)}
-              onDoubleClick={() => character && window.open(`/characters/${character.id}`, "_blank")}
-            >
-              <Avatar name={token.name} src={portrait} size={34} />
-              <span className="grow">
-                <strong>{token.name}</strong>
-                <span className="tiny muted">
+              title={token.name}
+              subtitle={character?.summary ? `Level ${character.summary.level} ${character.summary.className || "adventurer"}` : token.groupName ?? "Token"}
+              meta={
+                <span>
                   {token.hpMax !== null ? `${token.hpCurrent ?? "?"} / ${token.hpMax} HP` : "No HP"}
                   {token.ac !== null ? ` · AC ${token.ac}` : ""}
+                  {token.conditions.length ? ` · ${tokenConditionSummary(token.conditions)}` : ""}
                 </span>
-              </span>
-              {token.hidden ? <EyeOff size={12} /> : null}
-              {token.locked ? <Lock size={12} /> : null}
-              {token.ownerId === user.id ? <Badge tone="blue">Yours</Badge> : null}
-            </button>
+              }
+              footer={character ? "Double-click for the character sheet" : undefined}
+            >
+              <button
+                type="button"
+                className={`vtt-token-row ${selectedTokenIds.includes(token.id) || selectedTokenId === token.id ? "is-selected" : ""} ${token.hidden ? "is-hidden" : ""}`}
+                onClick={() => setSelectedTokenId(token.id)}
+                onDoubleClick={() => character && window.open(`/characters/${character.id}`, "_blank")}
+              >
+                <Avatar name={token.name} src={portrait} size={34} />
+                <span className="grow">
+                  <strong>{token.name}</strong>
+                  <span className="tiny muted">
+                    {token.hpMax !== null ? `${token.hpCurrent ?? "?"} / ${token.hpMax} HP` : "No HP"}
+                    {token.ac !== null ? ` · AC ${token.ac}` : ""}
+                  </span>
+                </span>
+                {token.hidden ? <EyeOff size={12} /> : null}
+                {token.locked ? <Lock size={12} /> : null}
+                {token.ownerId === user.id ? <Badge tone="blue">Yours</Badge> : null}
+              </button>
+            </HoverCard>
           );
         })}
         {!sceneTokens.length ? <p className="muted small">No tokens on this scene.</p> : null}

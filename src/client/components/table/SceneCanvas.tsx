@@ -11,6 +11,7 @@ import {
 import { Maximize, Minus, Move, Plus, Ruler } from "lucide-react";
 import type { CharacterRecord, Monster, Scene, Token } from "../../../shared/types";
 import { Tag } from "../ui";
+import { HoverCard } from "../HoverCard";
 import { BESTIARY_DRAG_TYPE, type BestiaryDragPayload } from "./bestiaryDrag";
 import {
   templateLabel,
@@ -99,6 +100,11 @@ export function SceneCanvas({
   const portraitMap = useMemo(() => {
     const map = new Map<string, string | null>();
     for (const character of characters) map.set(character.id, character.summary?.portraitUrl ?? null);
+    return map;
+  }, [characters]);
+  const characterMap = useMemo(() => {
+    const map = new Map<string, CharacterRecord>();
+    for (const character of characters) map.set(character.id, character);
     return map;
   }, [characters]);
 
@@ -545,53 +551,77 @@ export function SceneCanvas({
           const portrait = token.imageUrl || (token.characterId ? portraitMap.get(token.characterId) : null);
           const canDrag = isGm || (token.ownerId === userId && !token.locked);
           const isSelected = selectedTokenIds.includes(token.id) || selectedTokenId === token.id;
+          const character = token.characterId ? characterMap.get(token.characterId) : null;
+          const summary = character?.summary;
+          const conditions = token.conditions
+            .map((condition) =>
+              [condition.name, condition.value ? ` ${condition.value}` : "", condition.duration ? ` (${condition.duration}r)` : ""].join(""),
+            )
+            .join(", ");
+          const tokenMeta = [
+            token.hpMax !== null && token.hpCurrent !== null ? `HP ${token.hpCurrent}/${token.hpMax}` : "",
+            token.ac !== null ? `AC ${token.ac}` : "",
+            conditions ? `Conditions: ${conditions}` : "",
+          ].filter(Boolean);
           return (
-            <div
+            <HoverCard
               key={token.id}
-              className={`scene-token ${isSelected ? "is-selected" : ""} ${canDrag ? "can-drag" : ""} ${token.hidden && isGm ? "is-hidden" : ""}`}
-              style={{
-                width: size,
-                height: size,
-                left: position.x - size / 2,
-                top: position.y - size / 2,
-                borderColor: token.color,
-              }}
-              onPointerDown={(event) => onTokenPointerDown(event, token)}
-              onPointerMove={(event) => onTokenPointerMove(event, token)}
-              onPointerUp={(event) => onTokenPointerUp(event, token)}
-              onPointerCancel={(event) => onTokenPointerUp(event, token)}
-              onDoubleClick={() => token.characterId && onOpenCharacter(token.characterId)}
-              onContextMenu={(event) => {
-                if (!onEditToken) return;
-                event.preventDefault();
-                event.stopPropagation();
-                onSelectToken(token.id);
-                onEditToken(token.id);
-              }}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" || event.key === " ") {
-                  event.preventDefault();
-                  onSelectToken(token.id);
-                }
-              }}
-              tabIndex={0}
-              role="button"
-              aria-label={`${token.name}${token.characterId ? ", character token" : ""}${isGm ? ", right-click to edit" : ""}`}
-              title={isGm ? `${token.name} · right-click to edit` : token.name}
+              title={token.name}
+              subtitle={
+                summary
+                  ? `Level ${summary.level} ${summary.className || "adventurer"}${token.groupName ? ` · ${token.groupName}` : ""}`
+                  : token.groupName ?? (token.hidden && isGm ? "Hidden token" : "Token")
+              }
+              meta={tokenMeta.length ? <span>{tokenMeta.join(" · ")}</span> : undefined}
+              body={summary ? <span>{[summary.ancestry, summary.heritage].filter(Boolean).join(" · ") || "Party member"}</span> : undefined}
+              footer={isGm ? "Right-click to edit" : character ? "Double-click for the character sheet" : undefined}
+              disabled={Boolean(dragging)}
             >
-              {portrait ? (
-                <img src={portrait} alt="" draggable={false} />
-              ) : (
-                <span style={{ background: `linear-gradient(145deg, ${token.color}33, #11161f)` }}>
-                  {token.name.slice(0, 2).toUpperCase()}
-                </span>
-              )}
-              <span className="scene-token-name">{token.name}</span>
-              {token.hpMax !== null && token.hpCurrent !== null ? (
-                <span className="token-hp"><span style={{ width: `${Math.max(0, Math.min(100, (token.hpCurrent / Math.max(1, token.hpMax)) * 100))}%` }} /></span>
-              ) : null}
-              {token.locked ? <span className="token-lock" title="Locked"></span> : null}
-            </div>
+              <div
+                className={`scene-token ${isSelected ? "is-selected" : ""} ${canDrag ? "can-drag" : ""} ${token.hidden && isGm ? "is-hidden" : ""}`}
+                style={{
+                  width: size,
+                  height: size,
+                  left: position.x - size / 2,
+                  top: position.y - size / 2,
+                  borderColor: token.color,
+                }}
+                onPointerDown={(event) => onTokenPointerDown(event, token)}
+                onPointerMove={(event) => onTokenPointerMove(event, token)}
+                onPointerUp={(event) => onTokenPointerUp(event, token)}
+                onPointerCancel={(event) => onTokenPointerUp(event, token)}
+                onDoubleClick={() => token.characterId && onOpenCharacter(token.characterId)}
+                onContextMenu={(event) => {
+                  if (!onEditToken) return;
+                  event.preventDefault();
+                  event.stopPropagation();
+                  onSelectToken(token.id);
+                  onEditToken(token.id);
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    onSelectToken(token.id);
+                  }
+                }}
+                tabIndex={0}
+                role="button"
+                aria-label={`${token.name}${token.characterId ? ", character token" : ""}${isGm ? ", right-click to edit" : ""}`}
+              >
+                {portrait ? (
+                  <img src={portrait} alt="" draggable={false} />
+                ) : (
+                  <span style={{ background: `linear-gradient(145deg, ${token.color}33, #11161f)` }}>
+                    {token.name.slice(0, 2).toUpperCase()}
+                  </span>
+                )}
+                <span className="scene-token-name">{token.name}</span>
+                {token.hpMax !== null && token.hpCurrent !== null ? (
+                  <span className="token-hp"><span style={{ width: `${Math.max(0, Math.min(100, (token.hpCurrent / Math.max(1, token.hpMax)) * 100))}%` }} /></span>
+                ) : null}
+                {token.locked ? <span className="token-lock" title="Locked"></span> : null}
+              </div>
+            </HoverCard>
           );
         })}
         {measuring ? (

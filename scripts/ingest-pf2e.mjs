@@ -83,8 +83,36 @@ function stripUuid(match, body, label) {
   return parts[parts.length - 1] || body;
 }
 
+// Source items are registered after the packs are loaded. @Embed macros are
+// used by several equipment entries to pull in a class feature's rules text.
+const EMBED_SOURCES = new Map();
+
+function expandEmbeds(html, depth = 0) {
+  if (depth > 4) return "";
+  return html.replace(/@Embed\[([^\]]+)\](?:\{([^}]*)\})?/g, (_match, body, label) => {
+    const uuid = String(body).trim().split(/\s+/)[0] || "";
+    const id = uuid.split(".").pop() || "";
+    const source = EMBED_SOURCES.get(id);
+    const embedded =
+      source?.system?.description?.value ||
+      source?.system?.description?.gm ||
+      "";
+    return embedded ? expandEmbeds(embedded, depth + 1) : label || "";
+  });
+}
+
+function descriptionOf(system, includeGm = false) {
+  const value = system?.description?.value;
+  if (typeof value === "string" && value.trim()) return value;
+  if (includeGm) {
+    const gm = system?.description?.gm;
+    if (typeof gm === "string" && gm.trim()) return gm;
+  }
+  return "";
+}
+
 function expandMacros(html) {
-  let out = resolveLocalize(html);
+  let out = expandEmbeds(resolveLocalize(html));
 
   // Foundry inline roll/action macros, e.g. [[/act recall-knowledge]],
   // [[/r 2d6 #fire]], and [[/check athletics dc=15]].
@@ -532,7 +560,10 @@ for (const file of walkJson(path.join(PACKS, "feats"))) {
 }
 for (const file of walkJson(path.join(PACKS, "spells"))) {
   const j = readJson(file);
-  if (j?.type === "spell") raw.spells.push(j);
+  if (j?.type === "spell") {
+    const relative = path.relative(path.join(PACKS, "spells"), file);
+    raw.spells.push({ ...j, __folder: relative.split(path.sep)[0] });
+  }
 }
 for (const file of walkJson(path.join(PACKS, "equipment"))) {
   const j = readJson(file);
@@ -554,6 +585,12 @@ for (const pack of ["pathfinder-monster-core", "pathfinder-monster-core-2", "pat
   for (const file of walkJson(path.join(PACKS, pack))) {
     const j = readJson(file);
     if (j?.type === "npc") raw.monsters.push({ ...j, __pack: pack });
+  }
+}
+
+for (const items of Object.values(raw)) {
+  for (const item of items) {
+    if (item?._id) EMBED_SOURCES.set(item._id, item);
   }
 }
 
@@ -1207,11 +1244,15 @@ const spells = raw.spells
     const damage = resolveRank(normalizeDamage(s.damage));
     const heightening = normalizeHeightening(s.heightening, damage?.[0]?.type);
     if (heightening) heightening.damage = resolveRank(heightening.damage);
+    const gmOnlyDescription =
+      !String(s.description?.value ?? "").trim() && Boolean(String(s.description?.gm ?? "").trim());
     return {
       id: `spell:${j._id}`,
       name: j.name,
       type: "spell",
       rank,
+      /** Rituals are stored with the spells but have no magical tradition. */
+      ritual: j.__folder === "rituals",
       traditions: Array.isArray(s.traits?.traditions) ? s.traits.traditions : [],
       rarity: tr.rarity,
       traits: tr.traits,
@@ -1219,6 +1260,7 @@ const spells = raw.spells
       license: pub.license,
       remaster: pub.remaster,
       playtest: pub.playtest,
+      gmDescription: gmOnlyDescription || undefined,
       actionType: s.time?.value ?? "",
       actions: s.time?.value ?? "",
       range: s.range?.value ?? "",
@@ -1231,7 +1273,7 @@ const spells = raw.spells
       damage,
       damageText: spellDamageText(damage),
       heightening,
-      description: cleanHtml(s.description?.value),
+      description: cleanHtml(descriptionOf(s, true)),
     };
   })
   .sort((a, b) => a.rank - b.rank || a.name.localeCompare(b.name));
@@ -1243,6 +1285,8 @@ const equipment = raw.equipment
     const pub = publication(s);
     const tr = traits(s);
     const price = normalizePrice(s.price?.value);
+    const gmOnlyDescription =
+      !String(s.description?.value ?? "").trim() && Boolean(String(s.description?.gm ?? "").trim());
     const out = {
       id: `item:${j._id}`,
       name: j.name,
@@ -1257,7 +1301,8 @@ const equipment = raw.equipment
       remaster: pub.remaster,
       playtest: pub.playtest,
       usage: s.usage?.value ?? "",
-      description: cleanHtml(s.description?.value),
+      description: cleanHtml(descriptionOf(s, true)),
+      gmDescription: gmOnlyDescription || undefined,
     };
     if (j.type === "weapon") {
       out.weapon = {

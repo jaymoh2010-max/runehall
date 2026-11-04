@@ -20,6 +20,7 @@ import type {
   Spell,
 } from "../../../shared/types";
 import { isCoreSource } from "../../../shared/content";
+import { spellTraditionLabel, stripHtml } from "../../../shared/compendium";
 import { automationForEquipment, automationForFeat } from "../../../shared/automation";
 import { ContentSourceToggle, ContentTierTag } from "./ContentSourceToggle";
 import { api } from "../../api";
@@ -40,6 +41,7 @@ import {
 } from "../ui";
 import { formatCp } from "../../api";
 import { computeCharacter, featPrerequisiteStatus, weaponDamageLabel } from "../../../shared/rules";
+import { HoverCard } from "../HoverCard";
 
 interface PickerBase {
   open: boolean;
@@ -304,30 +306,36 @@ export function FeatPicker({
               </p>
             ) : null}
             {eligible.map((feat) => (
-              <button
-                type="button"
+              <HoverCard
                 key={feat.id}
-                className={`picker-item ${selected?.id === feat.id ? "is-selected" : ""}`}
-                onClick={() => setSelected(feat)}
+                title={feat.name}
+                subtitle={`${CATEGORY_LABELS[feat.category] || feat.category} feat · level ${feat.level} · ${feat.source}`}
+                body={stripHtml(feat.description, 240) || undefined}
               >
-                <div className="picker-item-main">
-                  <span className="picker-item-name">{feat.name}</span>
-                  <span className="picker-item-sub">
-                    {CATEGORY_LABELS[feat.category] || feat.category} · level {feat.level}
-                    {feat.actionType && feat.actionType !== "passive"
-                      ? ` · ${feat.actions ?? 1} action${feat.actions === 1 ? "" : "s"}`
-                      : ""}
-                  </span>
-                </div>
-                <div className="picker-item-tags">
-                  <AutomationTag level={automationForFeat(feat).level} />
-                  {feat.rarity !== "common" ? <RarityTag rarity={feat.rarity} /> : null}
-                  {statusById[feat.id]?.status === "unknown" ? <Tag tone="gold">Check prereqs</Tag> : null}
-                  {feat.traits.slice(0, 3).map((trait) => (
-                    <Tag key={trait}>{trait}</Tag>
-                  ))}
-                </div>
-              </button>
+                <button
+                  type="button"
+                  className={`picker-item ${selected?.id === feat.id ? "is-selected" : ""}`}
+                  onClick={() => setSelected(feat)}
+                >
+                  <div className="picker-item-main">
+                    <span className="picker-item-name">{feat.name}</span>
+                    <span className="picker-item-sub">
+                      {CATEGORY_LABELS[feat.category] || feat.category} · level {feat.level}
+                      {feat.actionType && feat.actionType !== "passive"
+                        ? ` · ${feat.actions ?? 1} action${feat.actions === 1 ? "" : "s"}`
+                        : ""}
+                    </span>
+                  </div>
+                  <div className="picker-item-tags">
+                    <AutomationTag level={automationForFeat(feat).level} />
+                    {feat.rarity !== "common" ? <RarityTag rarity={feat.rarity} /> : null}
+                    {statusById[feat.id]?.status === "unknown" ? <Tag tone="gold">Check prereqs</Tag> : null}
+                    {feat.traits.slice(0, 3).map((trait) => (
+                      <Tag key={trait}>{trait}</Tag>
+                    ))}
+                  </div>
+                </button>
+              </HoverCard>
             ))}
             {!loading && !eligible.length && !error ? (
               <div className="picker-empty">
@@ -558,26 +566,33 @@ export function SpellPicker({
               Automation badges are conservative. Manual means Runehall does not apply that effect for you.
             </p>
             {filtered.map((spell) => (
-              <button
-                type="button"
+              <HoverCard
                 key={spell.id}
-                className={`picker-item ${selected?.id === spell.id ? "is-selected" : ""}`}
-                onClick={() => setSelected(spell)}
+                title={spell.name}
+                subtitle={`${spell.rank === 0 ? "Cantrip" : `Rank ${spell.rank}`} · ${spellTraditionLabel(spell)} · ${spell.source}`}
+                body={stripHtml(spell.description, 240) || undefined}
+                meta={spell.damageText ? <span>{spell.damageText}</span> : undefined}
               >
-                <div className="picker-item-main">
-                  <span className="picker-item-name">{spell.name}</span>
-                  <span className="picker-item-sub">
-                    {spell.rank === 0 ? "Cantrip" : `Rank ${spell.rank}`} · {spell.traditions.join(", ") || "focus"}
-                    {spell.actions ? ` · ${spell.actions}` : ""}
-                  </span>
-                </div>
-                <div className="picker-item-tags">
-                  {spell.rarity !== "common" ? <RarityTag rarity={spell.rarity} /> : null}
-                  {spell.traits.slice(0, 3).map((trait) => (
-                    <Tag key={trait}>{trait}</Tag>
-                  ))}
-                </div>
-              </button>
+                <button
+                  type="button"
+                  className={`picker-item ${selected?.id === spell.id ? "is-selected" : ""}`}
+                  onClick={() => setSelected(spell)}
+                >
+                  <div className="picker-item-main">
+                    <span className="picker-item-name">{spell.name}</span>
+                    <span className="picker-item-sub">
+                      {spell.rank === 0 ? "Cantrip" : `Rank ${spell.rank}`} · {spellTraditionLabel(spell)}
+                      {spell.actions ? ` · ${spell.actions}` : ""}
+                    </span>
+                  </div>
+                  <div className="picker-item-tags">
+                    {spell.rarity !== "common" ? <RarityTag rarity={spell.rarity} /> : null}
+                    {spell.traits.slice(0, 3).map((trait) => (
+                      <Tag key={trait}>{trait}</Tag>
+                    ))}
+                  </div>
+                </button>
+              </HoverCard>
             ))}
             {!loading && !filtered.length && !error ? <div className="picker-empty">No spells match those filters.</div> : null}
             {loading ? <Spinner label="Searching spellbooks…" /> : null}
@@ -769,27 +784,33 @@ export function EquipmentPicker({
               Automation badges are conservative. Manual means Runehall does not apply that effect for you.
             </p>
             {items.map((item) => (
-              <button
-                type="button"
+              <HoverCard
                 key={item.id}
-                className={`picker-item ${selected?.id === item.id ? "is-selected" : ""}`}
-                onClick={() => setSelected(item)}
+                title={item.name}
+                subtitle={`${item.type} · level ${item.level} · ${formatCp(item.price.cpTotal)} · ${item.source}`}
+                body={stripHtml(item.description, 240) || undefined}
               >
-                <div className="picker-item-main">
-                  <span className="picker-item-name">{item.name}</span>
-                  <span className="picker-item-sub">
-                    {item.type} · level {item.level} · {formatCp(item.price.cpTotal)}
-                    {item.bulk ? ` · ${item.bulk} bulk` : ""}
-                  </span>
-                </div>
-                <div className="picker-item-tags">
-                  <AutomationTag level={automationForEquipment(item).level} />
-                  {item.rarity !== "common" ? <RarityTag rarity={item.rarity} /> : null}
-                  {item.traits.slice(0, 3).map((trait) => (
-                    <Tag key={trait}>{trait}</Tag>
-                  ))}
-                </div>
-              </button>
+                <button
+                  type="button"
+                  className={`picker-item ${selected?.id === item.id ? "is-selected" : ""}`}
+                  onClick={() => setSelected(item)}
+                >
+                  <div className="picker-item-main">
+                    <span className="picker-item-name">{item.name}</span>
+                    <span className="picker-item-sub">
+                      {item.type} · level {item.level} · {formatCp(item.price.cpTotal)}
+                      {item.bulk ? ` · ${item.bulk} bulk` : ""}
+                    </span>
+                  </div>
+                  <div className="picker-item-tags">
+                    <AutomationTag level={automationForEquipment(item).level} />
+                    {item.rarity !== "common" ? <RarityTag rarity={item.rarity} /> : null}
+                    {item.traits.slice(0, 3).map((trait) => (
+                      <Tag key={trait}>{trait}</Tag>
+                    ))}
+                  </div>
+                </button>
+              </HoverCard>
             ))}
             {!loading && !items.length && !error ? <div className="picker-empty">No items match those filters.</div> : null}
             {loading ? <Spinner label="Opening the armory…" /> : null}
@@ -935,22 +956,29 @@ export function DeityPicker({
             {loading ? <Spinner label="Reading the heavens…" /> : null}
             {error ? <div className="auth-error">{error}</div> : null}
             {!loading && filtered.map((deity) => (
-              <button
-                type="button"
+              <HoverCard
                 key={deity.id}
-                className={`picker-item ${selected?.id === deity.id ? "is-selected" : ""}`}
-                onClick={() => setSelected(deity)}
+                title={deity.name}
+                subtitle={`${deity.category} · ${deity.source}`}
+                body={stripHtml(deity.description, 240) || undefined}
+                meta={<span>{deity.domains.slice(0, 4).join(" · ")}</span>}
               >
-                <div className="picker-item-main">
-                  <span className="picker-item-name">{deity.name}</span>
-                  <span className="picker-item-sub">
-                    {deity.domains.slice(0, 4).join(" · ") || "Deity"} · {deity.source}
-                  </span>
-                </div>
-                <div className="picker-item-tags">
-                  {deity.font.map((font) => <Tag key={font} tone="gold">{font}</Tag>)}
-                </div>
-              </button>
+                <button
+                  type="button"
+                  className={`picker-item ${selected?.id === deity.id ? "is-selected" : ""}`}
+                  onClick={() => setSelected(deity)}
+                >
+                  <div className="picker-item-main">
+                    <span className="picker-item-name">{deity.name}</span>
+                    <span className="picker-item-sub">
+                      {deity.domains.slice(0, 4).join(" · ") || "Deity"} · {deity.source}
+                    </span>
+                  </div>
+                  <div className="picker-item-tags">
+                    {deity.font.map((font) => <Tag key={font} tone="gold">{font}</Tag>)}
+                  </div>
+                </button>
+              </HoverCard>
             ))}
             {!loading && !filtered.length ? <div className="picker-empty">No deity matches that search.</div> : null}
           </div>

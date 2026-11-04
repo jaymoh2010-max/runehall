@@ -18,6 +18,15 @@ import type {
   Spell,
 } from "../shared/types";
 import { isCoreSource } from "../shared/content";
+import {
+  COMPENDIUM_KIND_ORDER,
+  compendiumKindFromId,
+  stripHtml,
+  truncateText,
+  type CompendiumEntryKind,
+  type CompendiumSearchItem,
+  type CompendiumSearchResponse,
+} from "../shared/compendium";
 
 const compendiumDir = path.resolve(process.env.COMPENDIUM_DIR || "data/compendium");
 
@@ -64,7 +73,8 @@ const maps = {
 };
 
 export function lookupItem(id: string): unknown | null {
-  const [kind] = id.split(":");
+  const kind = compendiumKindFromId(id);
+  if (!kind) return null;
   const map = maps[kind as keyof typeof maps];
   return map?.get(id) ?? null;
 }
@@ -226,28 +236,164 @@ export function searchDeities(q?: string, limit = 80) {
   };
 }
 
-export function globalSearch(q: string, limit = 40) {
-  const query = String(q || "").trim();
-  if (!query) return [];
-  const results: { id: string; name: string; type: string; level: number; source: string }[] = [];
-  const add = (items: { id: string; name: string; source: string }[], type: string, level: (item: never) => number) => {
+interface SearchCandidate {
+  id: string;
+  name: string;
+  kind: CompendiumEntryKind;
+  level: number | null;
+  source: string;
+  rarity: string;
+  traits: string[];
+  description: string;
+  searchMeta: string;
+  ritual?: boolean;
+  gmDescription?: boolean;
+}
+
+const searchCandidates: SearchCandidate[] = (() => {
+  const candidates: SearchCandidate[] = [];
+  const add = (
+    items: {
+      id: string;
+      name: string;
+      source?: string;
+      rarity?: string;
+      traits?: string[];
+      description?: string;
+      ritual?: boolean;
+      gmDescription?: boolean;
+    }[],
+    kind: CompendiumEntryKind,
+    level: (item: never) => number | null,
+  ) => {
     for (const item of items) {
-      if (results.length >= limit) return;
-      if (item.name.toLowerCase().includes(query.toLowerCase())) {
-        results.push({ id: item.id, name: item.name, type, level: level(item as never), source: item.source });
-      }
+      candidates.push({
+        id: item.id,
+        name: item.name,
+        kind,
+        level: level(item as never),
+        source: item.source ?? "",
+        rarity: item.rarity ?? "common",
+        traits: item.traits ?? [],
+        description: stripHtml(item.description, 2000),
+        searchMeta: `${item.name} ${(item.traits ?? []).join(" ")} ${item.source ?? ""}`.toLowerCase(),
+        ritual: item.ritual,
+        gmDescription: item.gmDescription,
+      });
     }
   };
-  add(ancestries, "ancestry", () => 1);
-  add(backgrounds, "background", () => 1);
-  add(classes, "class", () => 1);
+
+  add(ancestries, "ancestry", () => null);
+  add(heritages, "heritage", () => null);
+  add(backgrounds, "background", () => null);
+  add(classes, "class", () => null);
+  add(classFeatures, "classFeature", (item: ClassFeature) => item.level);
   add(feats, "feat", (item: Feat) => item.level);
   add(spells, "spell", (item: Spell) => item.rank);
-  add(equipment, "item", (item: Equipment) => item.level);
+  add(equipment, "equipment", (item: Equipment) => item.level);
+  add(deities, "deity", () => null);
+  add(conditions, "condition", () => null);
+  add(actions, "action", () => null);
   add(monsters, "monster", (item: Monster) => item.level);
-  add(deities, "deity", () => 1);
-  add(conditions, "condition", () => 0);
-  return results.slice(0, limit);
+  return candidates;
+})();
+
+function searchCandidateScore(candidate: SearchCandidate, query: string): number {
+  const name = candidate.name.toLowerCase();
+  if (name === query) return 0;
+  if (name.startsWith(query)) return 1;
+
+  const words = name.split(/[^a-z0-9]+/).filter(Boolean);
+  if (words.some((word) => word.startsWith(query))) return 2;
+  if (name.includes(query)) return 3;
+
+  const tokens = query.split(/\s+/).filter(Boolean);
+  if (tokens.length > 1 && tokens.every((token) => candidate.searchMeta.includes(token))) return 4;
+  if (candidate.traits.some((trait) => trait.toLowerCase().includes(query))) return 4;
+  if (candidate.source.toLowerCase().includes(query)) return 5;
+  if (candidate.description.toLowerCase().includes(query)) return 6;
+  return Number.POSITIVE_INFINITY;
+}
+
+/**
+ * Search the entire compendium, not just one tab. Each entry type gets a fair
+ * share of the first page so a broad query like "fire" surfaces spells, items,
+ * creatures, and feats instead of letting one large category crowd out the rest.
+ */
+export function globalSearch(
+  q: string,
+  limit = 48,
+  kinds?: CompendiumEntryKind[],
+): CompendiumSearchResponse {
+  const query = String(q || "").trim().toLowerCase();
+  const safeLimit = Math.max(1, Math.min(200, Math.floor(limit)));
+  if (!query) return { items: [], total: 0, counts: {} };
+
+  const allowed = kinds?.length ? new Set(kinds) : null;
+  const matches: { candidate: SearchCandidate; score: number }[] = [];
+  const counts: Partial<Record<CompendiumEntryKind, number>> = {};
+
+  for (const candidate of searchCandidates) {
+    if (allowed && !allowed.has(candidate.kind)) continue;
+    const score = searchCandidateScore(candidate, query);
+    if (!Number.isFinite(score)) continue;
+    matches.push({ candidate, score });
+    counts[candidate.kind] = (counts[candidate.kind] ?? 0) + 1;
+  }
+
+  matches.sort(
+    (a, b) =>
+      a.score - b.score ||
+      (a.candidate.level ?? 0) - (b.candidate.level ?? 0) ||
+      a.candidate.name.localeCompare(b.candidate.name),
+  );
+
+  const perKind = Math.max(3, Math.ceil(safeLimit / COMPENDIUM_KIND_ORDER.length));
+  const picked = new Map<string, { candidate: SearchCandidate; score: number }>();
+  const perKindCount = new Map<CompendiumEntryKind, number>();
+
+  for (const match of matches) {
+    const used = perKindCount.get(match.candidate.kind) ?? 0;
+    if (used >= perKind) continue;
+    picked.set(match.candidate.id, match);
+    perKindCount.set(match.candidate.kind, used + 1);
+  }
+
+  // Fill any remaining slots with the best matches that lost the per-kind
+  // lottery. This keeps exact-name searches useful even when a single type
+  // has many close matches.
+  if (picked.size < safeLimit) {
+    for (const match of matches) {
+      if (picked.size >= safeLimit) break;
+      picked.set(match.candidate.id, match);
+    }
+  }
+
+  const items: CompendiumSearchItem[] = [...picked.values()]
+    .sort(
+      (a, b) =>
+        a.score - b.score ||
+        (a.candidate.level ?? 0) - (b.candidate.level ?? 0) ||
+        a.candidate.name.localeCompare(b.candidate.name),
+    )
+    .slice(0, safeLimit)
+    .map(({ candidate }) => ({
+      id: candidate.id,
+      name: candidate.name,
+      kind: candidate.kind,
+      level: candidate.level,
+      source: candidate.source,
+      rarity: candidate.rarity,
+      summary: truncateText(candidate.description, 180),
+      ritual: candidate.ritual,
+      gmDescription: candidate.gmDescription,
+    }));
+
+  return { items, total: matches.length, counts };
+}
+
+export function compendiumEntry(id: string): unknown | null {
+  return lookupItem(id);
 }
 
 // ---------------------------------------------------------------------------

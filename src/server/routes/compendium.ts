@@ -9,6 +9,7 @@ import {
   deities,
   equipment,
   feats,
+  compendiumEntry,
   globalSearch,
   heritages,
   lookupItem,
@@ -21,6 +22,7 @@ import {
   spells,
   type SearchOptions,
 } from "../compendium";
+import { isCompendiumEntryKind } from "../../shared/compendium";
 
 function csv(value: unknown): string[] | undefined {
   if (typeof value !== "string" || !value.trim()) return undefined;
@@ -189,7 +191,15 @@ export async function registerCompendiumRoutes(app: FastifyInstance): Promise<vo
   app.get("/api/compendium/search", async (request, reply) => {
     const query = request.query as Record<string, unknown>;
     const q = typeof query.q === "string" ? query.q : "";
-    return reply.send({ items: globalSearch(q, num(query.limit) ?? 40) });
+    const kinds = csv(query.kind)?.filter(isCompendiumEntryKind);
+    return reply.send(globalSearch(q, num(query.limit) ?? 48, kinds));
+  });
+
+  app.get("/api/compendium/entries/:id", async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const item = compendiumEntry(id);
+    if (!item) return reply.code(404).send({ error: "Compendium entry not found." });
+    return reply.send({ item });
   });
 
   app.post("/api/compendium/lookup", async (request, reply) => {

@@ -85,10 +85,23 @@ The script writes:
 | `monsters.json` | Bestiary/NPC data, attacks, abilities, stat block |
 | `manifest.json` | Counts, generated timestamp, source, `sourceCommit`, `sourceRef`, `sourceDirty` |
 
+## Verify the data
+
+Run:
+
+```bash
+npm run verify:data
+```
+
+The verifier checks manifest counts, unique and prefixed IDs, required fields, cross-references (heritage ancestries, background feats, class-feature options, skills), numeric ranges, unresolved Foundry macros, and the SQLite database (`PRAGMA integrity_check` and `PRAGMA foreign_key_check`). Missing descriptions, class-locked spells without a tradition, and non-damaging creature attacks are reported as warnings because those are legitimate content patterns, not structural errors.
+
 ## Normalization notes
 
 - **Descriptions are sanitized** with `sanitize-html`; only safe structural HTML is kept.
-- **Foundry inline macros** (`@UUID`, `@Localize`, `@Damage`, etc.) are converted to readable text or resolved through the English language packs.
+- **Foundry inline macros** (`@UUID`, `@Localize`, `@Damage`, etc.) are converted to readable text or resolved through the English language packs. `@Embed` references are resolved against the loaded class-feature, feat, and equipment source items.
+- **GM-facing rules text** is used as a fallback when a spell or item has an empty player-facing description. Those entries carry `gmDescription: true` and are labeled **GM source text** in the library.
+- **Rituals** are marked with `ritual: true`; they live in the spell pack but have no magical tradition.
+- **Source gaps remain visible.** Some generic gear, treasure, and a handful of creature entries have no separate rules text in the source export; the UI shows their structured statistics plus an explicit fallback instead of inventing rules text.
 - **Traits:** visible traits live in `traits`; internal subclass tags live in `otherTags`. Class choice groups are derived from `system.traits.otherTags` and ChoiceSet tag filters.
 - **Proficiency subfeatures and rules:** class features and subclass options can carry `subfeatures.proficiencies`, static `ActiveEffectLike` rank upgrades, and `MartialProficiency` rules. These are merged so the rules engine can apply expert/master/legendary upgrades at the correct level. Static skill-rank rules are also preserved as `skillRanks` for automatic upgrades such as Inventor Overdrive.
 - **Ancestry features and speeds:** ancestry feature items resolve by name and UUID fallback; non-land speeds and land-speed override rules become `otherSpeeds` and `speed`.

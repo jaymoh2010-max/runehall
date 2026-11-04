@@ -3,6 +3,7 @@ import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
 import { BookOpen, ChevronDown, LogOut, Shield, ShieldCheck, Swords, UserRound, Users } from "lucide-react";
 import { useSession } from "../stores";
 import { Avatar, IconButton, LoadingScreen } from "./ui";
+import { GlobalSearch } from "./GlobalSearch";
 
 export function AppShell() {
   const user = useSession((state) => state.user);
@@ -51,6 +52,7 @@ export function AppShell() {
             </NavLink>
           ) : null}
         </nav>
+        <GlobalSearch />
         <div className="topbar-user" ref={menuRef}>
           <Avatar name={user?.displayName ?? "Adventurer"} src={user?.avatarUrl} size={32} />
           <span className="user-name">{user?.displayName}</span>

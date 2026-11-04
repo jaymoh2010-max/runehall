@@ -23,6 +23,8 @@ Runehall is built for a private group of roughly 4–10 players and a GM. It run
 - Printable character sheet with a clean Print/PDF layout.
 - Real compendium content: 51 ancestries, 334 heritages, 540 backgrounds, 29 classes, 3,000+ class features/feats, 2,000+ spells, 5,900+ items, 480+ deities, 1,200+ creatures.
 - Feat, spell, and equipment pickers default to a **Recommended only** view (common, non-playtest options) and rank exact/prefix name matches first; toggle the filter off to browse everything.
+- **Global compendium search** in the top bar (`Ctrl+K` or `/`) searches feats, spells, items, creatures, ancestries, heritages, backgrounds, classes, class features, deities, conditions, and actions at once. Results are grouped by relevance and open a full entry page with traits, statistics, and complete rules text.
+- **Hover descriptions** on library rows, picker results, bestiary entries, token list rows, and map tokens show a short rules summary and key stats without leaving the current screen.
 - Ability boost validation, key ability selection, ancestry/background/class choices, doctrine/bloodline/racket-style subclass selection.
 - Derived HP, AC, saves, perception, class DC, spell DC/attack, skills, lore, attacks, bulk, and wealth.
 - Autosaves every change; portable JSON export/import.
@@ -108,6 +110,7 @@ Players join with the GM's invite link or code from their own accounts. They can
 | `npm run check:full` | `check` plus the two-user smoke test |
 | `npm run smoke` | Two-user GM/player API + socket smoke test against a temporary database |
 | `npm run ingest` | Rebuild the compendium from the Foundry PF2e data clone |
+| `npm run verify:data` | Validate compendium counts, required fields, cross-references, inline macros, SQLite integrity, and foreign keys |
 | `npm run simulate` | Generate valid characters across classes, levels, ancestries, backgrounds, subclass options, feats, spells, and gear; report rule/math problems |
 | `npm run backup` | Snapshot SQLite + uploaded assets into `backups/` |
 | `npm run restore -- --from <dir> --yes` | Restore a backup (server must be stopped) |
@@ -194,13 +197,14 @@ This is a substantial, playable foundation — not a complete Pathbuilder/Foundr
 - **The audit log is local.** Sign-ins, failed sign-ins, password changes, campaign creation/deletion, member removal, party level-ups, and administrative actions are recorded in SQLite. There is no shipping or automatic retention pipeline yet.
 - **Password recovery is local.** Signed-in users can change their password in **Account & security**. A host with shell access can run `npm run reset-password -- --username <name>` to issue a temporary password or grant administrator access; there is no email reset.
 - **Backups can be scheduled.** `npm run backup -- --keep N` prunes older archives. Use cron, a systemd timer, or Windows Task Scheduler, then copy the archive off the machine.
-- **No full rules search engine.** The library and compendium endpoints are searchable, but there is no natural-language rules lookup.
+- **Search is keyword-based, not natural-language.** The global search bar and library cover every compendium entry type, but there is no semantic rules lookup or question answering over rules text.
+- **Some upstream entries have no separate rules text.** About 189 generic treasure/gear items and seven creatures have empty descriptions in the Foundry source export; the library shows their statistics and an explicit fallback rather than inventing text. Thirteen recovered entries use GM-facing source text and are labeled **GM source text**. Twenty-eight control attacks legitimately have no damage, and 716 spells have no tradition because they are focus, ritual, or class-locked.
 
 ### Good next steps
-1. **Reliability:** campaign revisions, autosave conflict detection, reconnect coverage, and upload/health hardening.
-2. **Character trust:** automation labels, golden-sheet fixtures, and a full level-up wizard.
-3. **Table depth:** AoE templates, condition values, multi-select, scene playlists, and combat-log filters.
-4. **Hosting and scale:** optional Postgres/S3 adapters, off-machine backup shipping, and optional OAuth.
+1. **Hosting and scale:** verify the Docker image in CI or a Docker host, add off-machine backup shipping, and run a clean-machine restore drill.
+2. **Browser E2E:** automate the GM/player campaign, table, modal, and lazy-route flows.
+3. **Rules automation:** close the remaining subclass, feat, and item effect gaps.
+4. **Optional scale:** Postgres/S3 adapters and OAuth only when the local deployment is proven.
 
 ---
 

@@ -1,10 +1,25 @@
 import { describe, expect, it } from "vitest";
 import {
+  actions,
+  ancestries,
+  backgrounds,
+  classFeatures,
+  classes,
+  conditions,
+  deities,
+  equipment,
+  feats,
+  globalSearch,
+  heritages,
+  lookupItem,
+  monsters,
   searchEquipment,
   searchFeats,
   searchMonsters,
   searchSpells,
+  spells,
 } from "../src/server/compendium";
+import { compendiumKindFromId } from "../src/shared/compendium";
 
 describe("compendium search", () => {
   it("ranks an exact name match first", () => {
@@ -26,5 +41,73 @@ describe("compendium search", () => {
     const items = searchEquipment({ limit: 200, includeLegacy: true, recommended: true });
     expect(spells.items.every((spell) => spell.rarity === "common" && !spell.playtest)).toBe(true);
     expect(items.items.every((item) => item.rarity === "common" && !item.playtest)).toBe(true);
+  });
+
+  it("searches every compendium category from one query", () => {
+    const cases: [string, string][] = [
+      ["Dwarf", "ancestry"],
+      ["Aiuvarin", "heritage"],
+      ["Acolyte", "background"],
+      ["Wizard", "class"],
+      ["Arcane Spellcasting", "classFeature"],
+      ["Toughness", "feat"],
+      ["Fireball", "spell"],
+      ["Longsword", "equipment"],
+      ["Abadar", "deity"],
+      ["Frightened", "condition"],
+      ["A Challenge for Heroes", "action"],
+      ["Goblin Warrior", "monster"],
+    ];
+    for (const [query, kind] of cases) {
+      const result = globalSearch(query, 60);
+      expect(result.counts[kind as keyof typeof result.counts], `${query} should reach ${kind}`).toBeGreaterThan(0);
+      expect(result.items.some((item) => item.kind === kind), `${query} should return a ${kind}`).toBe(true);
+    }
+  });
+
+  it("ranks exact global matches first and resolves every result id", () => {
+    const result = globalSearch("Fireball", 30);
+    expect(result.items[0]).toMatchObject({ name: "Fireball", kind: "spell" });
+    expect(result.items.every((item) => compendiumKindFromId(item.id) === item.kind)).toBe(true);
+    for (const item of result.items) {
+      expect(lookupItem(item.id), `${item.name} should resolve`).toBeTruthy();
+    }
+  });
+
+  it("filters global search by kind and returns plain-text summaries", () => {
+    const result = globalSearch("fire", 40, ["spell", "equipment"]);
+    expect(result.items.length).toBeGreaterThan(0);
+    expect(result.items.every((item) => item.kind === "spell" || item.kind === "equipment")).toBe(true);
+    expect(result.items.every((item) => !item.summary.includes("<") && !item.summary.includes("&nbsp;"))).toBe(true);
+    expect(globalSearch("", 10)).toEqual({ items: [], total: 0, counts: {} });
+  });
+
+  it("does not let one huge category crowd out the rest of a broad query", () => {
+    const result = globalSearch("fire", 60);
+    expect(result.items.length).toBeLessThanOrEqual(60);
+    const kinds = new Set(result.items.map((item) => item.kind));
+    expect(kinds.size).toBeGreaterThan(3);
+  });
+
+  it("resolves every compendium id through the shared lookup", () => {
+    const groups = [
+      ancestries,
+      heritages,
+      backgrounds,
+      classes,
+      classFeatures,
+      feats,
+      spells,
+      equipment,
+      deities,
+      conditions,
+      actions,
+      monsters,
+    ];
+    for (const group of groups) {
+      for (const item of group) {
+        expect(lookupItem(item.id), `${item.name} (${item.id}) should resolve`).toBe(item);
+      }
+    }
   });
 });

@@ -82,6 +82,23 @@ describe("compendium data", () => {
     }
   });
 
+  it("restores ritual and embedded equipment rules text", () => {
+    for (const name of ["Open the Wall of Ghosts", "Mindscape Shift", "Transmigrate"]) {
+      const ritual = byName(spells, name);
+      expect(ritual.ritual, `${name} should be marked as a ritual`).toBe(true);
+      expect(ritual.description.length, `${name} description`).toBeGreaterThan(100);
+    }
+
+    for (const name of ["Horn of Plenty", "Amulet Implement", "Thousand-League Sandals"]) {
+      const item = byName(equipment, name);
+      expect(item.description.length, `${name} embedded description`).toBeGreaterThan(40);
+    }
+
+    const gmItem = byName(equipment, "Alisendra's Fan");
+    expect(gmItem.gmDescription).toBe(true);
+    expect(gmItem.description.length).toBeGreaterThan(100);
+  });
+
   it("normalizes deity domains, alternate domains, and skill choices", () => {
     const abadar = byName(deities, "Abadar");
     expect(abadar.domains).toEqual(["cities", "earth", "travel", "wealth"]);

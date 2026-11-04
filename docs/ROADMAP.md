@@ -13,11 +13,11 @@
 ### What is still prototype-level
 - **Rules automation is partial.** Feat prerequisites are enforced for mechanical requirements, while complex/story prerequisites are flagged for review; some subclass/feature/item effects are manual; companions and split-caster casting restrictions are not automated. This can make a sheet look correct while missing situational bonuses.
 - **Realtime recovery is revision-aware.** Reconnects refetch the authoritative table, campaign revisions detect missed events, character saves reject stale writes, and the table socket/state layer now lives in a tested hook with pure event reducers.
-- **Table polish is thin around tokens and scenes.** No AoE templates, condition values/durations, multi-select, scene playlists, walls, lighting, or robust grid calibration beyond the current first pass.
+- **Table polish is deep.** AoE templates, condition values/durations, multi-select, group drag, bulk actions, scene playlists, generated thumbnails, combat-log filters, group checks, delay/ready/ties, and first-run setup are built. Walls, doors, and dynamic lighting remain future work.
 - **Content volume needs curation.** The builder exposes 540 backgrounds and 29 classes by default. That is impressive, but overwhelming; not every option has the same automation quality.
 - **Test coverage is unit + smoke + simulation.** Dice, rules math, compendium integrity, content tiers, security, and migrations are unit-tested; the GM/player campaign flow and registration/admin flows have an automated smoke test. Browser-level E2E and upload edge cases still rely on manual checks.
-- **Code health needs guardrails.** The production bundle is ~741 KB (204 KB gzip) with no route-level splitting, and several files are still 700–1,000 lines. There is now a baseline commit, CI, and `npm run check`, but no lint/format step yet.
-- **Operations are not fully proven.** Docker has not been built or run in this environment, `/api/health` is shallow, uploads validate MIME instead of file bytes, and the audit log has no automatic retention.
+- **Code health has guardrails.** Route-level splitting keeps the entry bundle near 107–122 KB gzip, `npm run check` covers types, tests, build, and bundle budgets, and the table state layer is tested. There is still no lint/format gate and some large components remain.
+- **Operations are not fully proven.** Docker has not been built and run in this environment, backup shipping is still manual, and the audit log has no automatic retention. Uploads now validate magic bytes and image dimensions.
 
 ### Highest-risk issues (fix before adding lots of features)
 1. Losing campaign data or failing to upgrade a database.
@@ -520,12 +520,12 @@ That is more trustworthy than silently showing a number that may be missing a +1
 
 ## Recommended next session
 
-Sprint 6 is complete. Start Sprint 7:
+The feature roadmap through Sprint 11 is complete. Start Sprint 12:
 
-1. commit the baseline and keep `npm run check` green,
-2. add campaign revisions and autosave conflict detection,
-3. extract the table socket/state hook and add reconnect coverage,
-4. harden uploads and the health check,
-5. then choose builder trust (Sprint 8) or table depth (Sprint 9).
+1. verify the Docker build in CI or on a Docker host,
+2. add off-machine backup shipping with checksum verification,
+3. run a clean-machine restore drill,
+4. add audit-log retention and export,
+5. defer Postgres/S3 adapters and OAuth until the local deployment is proven.
 
 Keep the two-user smoke test green as new socket events are added.
