@@ -53,6 +53,7 @@ The target table size is one GM plus 4–10 players. That means the product shou
 - Library and rules quick reference.
 - Encounter builder with saved fights, bestiary counts, launch-to-table, waves, duplication, launch preview, party-size presets, and a GM-controlled Milestone/XP-budget toggle. Reinforcements join the existing initiative without resetting the round; the GM can advance the party without XP bookkeeping.
 - Loot parcels with compendium equipment, coins, and one-action distribution to a character sheet.
+- Player-facing inventory and purse ledger with quantity, equipped, bulk, and value tracking; item stacks and coins can be transferred between campaign characters with revision-checked, two-sheet updates.
 - Journal handouts with image attachments, shared/GM-only visibility, a player-facing gallery, and one-click duplication.
 - Campaign Overview with last-session summary, next-session details, party status, and shared or GM-only clue threads. The GM can generate an editable recap from shared rolls, visible handouts, loot, and open threads, then save it as the summary or a shared handout.
 - Grouped bestiary tokens with formation dragging, aggregate group HP, and one initiative roll per group.
@@ -61,7 +62,7 @@ The target table size is one GM plus 4–10 players. That means the product shou
 - Persistent bestiary palette with drag-to-map group placement.
 - GM screen with level/simple DCs, condition lookup, secret rolls, and player roll requests.
 - Campaign import with ID remapping and player-account matching, plus a dry-run-first unused-asset cleanup command.
-- Next: encounter waves, session agendas, player inventory/currency, and a reusable asset library.
+- Next: session agendas and a reusable asset library.
 
 ### Phase 4 — Reliability and trust (in progress)
 - [x] Per-campaign revisions, `campaign:revision` socket events, gap detection, and reconnect snapshot refresh.

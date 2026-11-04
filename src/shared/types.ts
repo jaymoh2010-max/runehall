@@ -511,6 +511,12 @@ export interface CharacterEquipment {
   runes?: string[];
 }
 
+export interface CharacterCurrency {
+  gp: number;
+  sp: number;
+  cp: number;
+}
+
 export interface CharacterCondition {
   name: string;
   value?: number | null;
@@ -610,7 +616,7 @@ export interface CharacterDraft {
   };
   equipment: CharacterEquipment[];
   companions: CharacterCompanion[];
-  currency: { gp: number; sp: number; cp: number };
+  currency: CharacterCurrency;
   details: CharacterDetails;
   play: CharacterPlay;
 }

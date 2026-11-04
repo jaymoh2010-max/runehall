@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft,
+  ArrowRightLeft,
   BookOpen,
   CheckCircle2,
   CircleAlert,
@@ -46,6 +47,7 @@ import {
   titleCase,
 } from "../../shared/rules";
 import { DEGREE_LABELS, mod, rollFormula } from "../../shared/dice";
+import { currencyToCp } from "../../shared/inventory";
 import { conditionLabel } from "../../shared/tokens";
 import { api, ApiError, formatCp } from "../api";
 import { errorMessage } from "../stores";
@@ -114,6 +116,16 @@ export function CharacterSheetPage() {
   const [conditionValue, setConditionValue] = useState("");
   const [conditionDuration, setConditionDuration] = useState("");
   const [conditions, setConditions] = useState<ConditionRef[]>([]);
+  const [party, setParty] = useState<CharacterRecord[]>([]);
+  const [transferOpen, setTransferOpen] = useState(false);
+  const [transferMode, setTransferMode] = useState<"item" | "coins">("item");
+  const [transferItemId, setTransferItemId] = useState<string | null>(null);
+  const [transferQuantity, setTransferQuantity] = useState("1");
+  const [transferTargetId, setTransferTargetId] = useState("");
+  const [transferCoins, setTransferCoins] = useState({ gp: "0", sp: "0", cp: "0" });
+  const [transferBusy, setTransferBusy] = useState(false);
+  const [transferError, setTransferError] = useState("");
+  const [transferLoading, setTransferLoading] = useState(false);
   const [conflict, setConflict] = useState<CharacterRecord | null>(null);
   const initialized = useRef(false);
   const skipInitialSave = useRef(true);
@@ -160,6 +172,30 @@ export function CharacterSheetPage() {
 
   const derived = useMemo(() => (draft ? computeCharacter(draft, context) : null), [draft, context]);
   const canEdit = Boolean(character?.permissions?.canEdit);
+
+  const transferTargets = useMemo(
+    () => party.filter((entry) => entry.id !== character?.id),
+    [party, character?.id],
+  );
+  const transferEntry = useMemo(
+    () => (draft && transferItemId ? draft.equipment.find((entry) => entry.itemId === transferItemId) ?? null : null),
+    [draft, transferItemId],
+  );
+  const transferItem = transferItemId ? context.equipment[transferItemId] ?? null : null;
+  const transferTotalCp = currencyToCp({
+    gp: Number(transferCoins.gp) || 0,
+    sp: Number(transferCoins.sp) || 0,
+    cp: Number(transferCoins.cp) || 0,
+  });
+  const inventoryValue = useMemo(
+    () =>
+      (draft?.equipment ?? []).reduce(
+        (total, entry) =>
+          total + (context.equipment[entry.itemId]?.price.cpTotal ?? 0) * entry.quantity,
+        0,
+      ),
+    [draft?.equipment, context.equipment],
+  );
 
   const saveDraft = useCallback(
     async (force = false) => {
@@ -258,6 +294,97 @@ export function CharacterSheetPage() {
       draftRef.current = next;
       return next;
     });
+  };
+
+  const openTransfer = (mode: "item" | "coins", itemId: string | null = null) => {
+    if (!character || !draft) return;
+    setTransferMode(mode);
+    setTransferItemId(itemId);
+    setTransferQuantity("1");
+    setTransferCoins({ gp: "0", sp: "0", cp: "0" });
+    setTransferError("");
+    setTransferOpen(true);
+    setTransferLoading(true);
+    setParty([]);
+    setTransferTargetId("");
+    if (!character.campaignId) {
+      setTransferLoading(false);
+      return;
+    }
+    api<{ characters: CharacterRecord[] }>(
+      `/api/characters?campaignId=${character.campaignId}`,
+    )
+      .then((result) => {
+        setParty(result.characters);
+        const others = result.characters.filter((entry) => entry.id !== character.id);
+        setTransferTargetId(others[0]?.id ?? "");
+      })
+      .catch((err) => setTransferError(errorMessage(err)))
+      .finally(() => setTransferLoading(false));
+  };
+
+  const submitTransfer = async () => {
+    if (!character || !draft) return;
+    if (!transferTargetId) {
+      setTransferError("Choose who receives the transfer.");
+      return;
+    }
+    setTransferBusy(true);
+    setTransferError("");
+    try {
+      let body: Record<string, unknown> = {
+        toCharacterId: transferTargetId,
+        expectedRevision: characterRef.current?.revision,
+        data: draftRef.current,
+      };
+      let description = "";
+      if (transferMode === "item") {
+        if (!transferEntry) throw new Error("That item is no longer in the pack.");
+        const quantity = Math.max(
+          1,
+          Math.min(transferEntry.quantity, Math.floor(Number(transferQuantity) || 1)),
+        );
+        body = { ...body, itemId: transferEntry.itemId, quantity };
+        description = `${quantity}× ${transferItem?.name ?? transferEntry.itemId}`;
+      } else {
+        if (transferTotalCp <= 0) throw new Error("Enter some coins to give.");
+        body = {
+          ...body,
+          currency: {
+            gp: Math.max(0, Math.floor(Number(transferCoins.gp) || 0)),
+            sp: Math.max(0, Math.floor(Number(transferCoins.sp) || 0)),
+            cp: Math.max(0, Math.floor(Number(transferCoins.cp) || 0)),
+          },
+        };
+        description = formatCp(transferTotalCp);
+      }
+      const result = await api<{ from: CharacterRecord; to: CharacterRecord }>(
+        `/api/characters/${character.id}/transfer`,
+        { method: "POST", body },
+      );
+      const normalized = normalizeCharacterDraft(result.from.data, result.from.name);
+      characterRef.current = result.from;
+      setCharacter(result.from);
+      skipInitialSave.current = true;
+      setDraft(normalized);
+      draftRef.current = normalized;
+      setSaveState("saved");
+      setTransferOpen(false);
+      toast(`Sent ${description} to ${result.to.name}.`, "success");
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 409) {
+        const payload = err.payload as { character?: CharacterRecord } | null;
+        if (payload?.character) {
+          setConflict(payload.character);
+          conflictRef.current = true;
+          setTransferOpen(false);
+          return;
+        }
+      }
+      setTransferError(errorMessage(err));
+    } finally {
+      setTransferBusy(false);
+    }
   };
 
   const roll = (formula: string, label: string, dc?: number | null) => {
@@ -643,24 +770,137 @@ export function CharacterSheetPage() {
             </div>
           </Card>
 
-          <Card className="sheet-section">
+          <Card className="sheet-section sheet-inventory">
             <div className="sheet-section-head">
-              <h2>Equipment</h2>
-              <span className="tiny muted">{derived.bulk.total} bulk · {formatCp(derived.wealth.spent)} spent</span>
+              <h2>Inventory &amp; purse</h2>
+              <span className="tiny muted">
+                {draft.equipment.length} {draft.equipment.length === 1 ? "stack" : "stacks"} ·{" "}
+                {derived.bulk.total} bulk · {formatCp(inventoryValue)} value
+              </span>
+            </div>
+            <div className="sheet-purse">
+              {(["gp", "sp", "cp"] as const).map((coin) => (
+                <div key={coin} className="sheet-coin">
+                  <span>{coin.toUpperCase()}</span>
+                  <strong>{draft.currency[coin]}</strong>
+                </div>
+              ))}
+              <span className="grow" />
+              {canEdit && character.campaignId ? (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  icon={<Coins size={13} />}
+                  onClick={() => openTransfer("coins")}
+                >
+                  Give coins
+                </Button>
+              ) : null}
             </div>
             <div className="sheet-equipment">
-              {derived.equipment.map((entry) => {
-                const item = context.equipment[entry.itemId];
-                if (!item) return null;
+              {draft.equipment.map((entry) => {
+                const item = context.equipment[entry.itemId] ?? null;
+                const name = item?.name ?? entry.itemId;
+                const canTransfer = Boolean(canEdit && character.campaignId);
                 return (
                   <div key={entry.itemId} className="sheet-equipment-row">
-                    <span className="grow"><strong>{item.name}</strong> <span className="tiny muted">×{entry.quantity}</span></span>
-                    <span className="tiny muted">{formatCp(item.price.cpTotal * entry.quantity)}</span>
-                    {entry.equipped ? <Badge tone="green">Equipped</Badge> : null}
+                    <span className="grow">
+                      <strong>{name}</strong>{" "}
+                      <span className="tiny muted">×{entry.quantity}</span>
+                      {item ? (
+                        <span className="tiny muted"> · {formatCp(item.price.cpTotal)} each</span>
+                      ) : null}
+                      {entry.runes?.length ? (
+                        <span className="tiny muted"> · {entry.runes.length} runes</span>
+                      ) : null}
+                    </span>
+                    <span className="qty-control sheet-qty">
+                      <button
+                        type="button"
+                        title="Remove one"
+                        onClick={() =>
+                          update((current) => ({
+                            ...current,
+                            equipment: current.equipment.map((candidate) =>
+                              candidate.itemId === entry.itemId
+                                ? { ...candidate, quantity: Math.max(1, candidate.quantity - 1) }
+                                : candidate,
+                            ),
+                          }))
+                        }
+                        disabled={!canEdit || entry.quantity <= 1}
+                      >
+                        <Minus size={12} />
+                      </button>
+                      <span>{entry.quantity}</span>
+                      <button
+                        type="button"
+                        title="Add one"
+                        onClick={() =>
+                          update((current) => ({
+                            ...current,
+                            equipment: current.equipment.map((candidate) =>
+                              candidate.itemId === entry.itemId
+                                ? { ...candidate, quantity: candidate.quantity + 1 }
+                                : candidate,
+                            ),
+                          }))
+                        }
+                        disabled={!canEdit}
+                      >
+                        <Plus size={12} />
+                      </button>
+                    </span>
+                    <Toggle
+                      checked={entry.equipped}
+                      onChange={(value) =>
+                        update((current) => ({
+                          ...current,
+                          equipment: current.equipment.map((candidate) =>
+                            candidate.itemId === entry.itemId
+                              ? { ...candidate, equipped: value }
+                              : candidate,
+                          ),
+                        }))
+                      }
+                      label="Equipped"
+                      disabled={!canEdit}
+                    />
+                    <button
+                      type="button"
+                      className="icon-btn"
+                      title={`Remove ${name}`}
+                      disabled={!canEdit}
+                      onClick={() => {
+                        if (!window.confirm(`Remove ${name} from the pack?`)) return;
+                        update((current) => ({
+                          ...current,
+                          equipment: current.equipment.filter(
+                            (candidate) => candidate.itemId !== entry.itemId,
+                          ),
+                        }));
+                      }}
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                    {canTransfer ? (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        icon={<ArrowRightLeft size={13} />}
+                        onClick={() => openTransfer("item", entry.itemId)}
+                      >
+                        Give
+                      </Button>
+                    ) : null}
                   </div>
                 );
               })}
-              {!derived.equipment.length ? <p className="muted small">No equipment recorded.</p> : null}
+              {!draft.equipment.length ? (
+                <p className="muted small" style={{ marginTop: 10 }}>
+                  No equipment recorded. Add gear from the character builder.
+                </p>
+              ) : null}
             </div>
           </Card>
 
@@ -964,6 +1204,112 @@ export function CharacterSheetPage() {
           {draft.play.conditions.map((condition) => <Badge key={condition.name} tone="red">{conditionLabel(condition)}</Badge>)}
         </div>
       )}
+
+      <Modal
+        open={transferOpen}
+        onClose={() => setTransferOpen(false)}
+        title={`Give from ${character.name}`}
+        subtitle="Send an item stack or coins to another character in this campaign."
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setTransferOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              icon={<ArrowRightLeft size={14} />}
+              loading={transferBusy}
+              disabled={!transferTargetId || transferLoading}
+              onClick={submitTransfer}
+            >
+              Give
+            </Button>
+          </>
+        }
+      >
+        {transferError ? <div className="auth-error">{transferError}</div> : null}
+        {!character.campaignId ? (
+          <p className="muted small">Assign this character to a campaign before giving items away.</p>
+        ) : transferLoading ? (
+          <p className="muted small">Loading the party…</p>
+        ) : !transferTargets.length ? (
+          <p className="muted small">No other characters are in this campaign yet.</p>
+        ) : (
+          <>
+            <Field label="Give to">
+              <Select
+                value={transferTargetId}
+                onChange={(event) => setTransferTargetId(event.target.value)}
+              >
+                {transferTargets.map((entry) => (
+                  <option key={entry.id} value={entry.id}>
+                    {entry.name}
+                    {entry.ownerName ? ` · ${entry.ownerName}` : ""}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            {transferMode === "item" ? (
+              <>
+                <Field label="Item">
+                  <Input value={transferItem?.name ?? transferEntry?.itemId ?? ""} disabled />
+                </Field>
+                <Field
+                  label="Quantity"
+                  hint={`You have ${transferEntry?.quantity ?? 0} in this stack.`}
+                >
+                  <Input
+                    type="number"
+                    min={1}
+                    max={transferEntry?.quantity ?? 1}
+                    value={transferQuantity}
+                    onChange={(event) => setTransferQuantity(event.target.value)}
+                  />
+                </Field>
+              </>
+            ) : (
+              <>
+                <div className="form-grid three">
+                  <Field label="Gold">
+                    <Input
+                      type="number"
+                      min={0}
+                      value={transferCoins.gp}
+                      onChange={(event) =>
+                        setTransferCoins((current) => ({ ...current, gp: event.target.value }))
+                      }
+                    />
+                  </Field>
+                  <Field label="Silver">
+                    <Input
+                      type="number"
+                      min={0}
+                      value={transferCoins.sp}
+                      onChange={(event) =>
+                        setTransferCoins((current) => ({ ...current, sp: event.target.value }))
+                      }
+                    />
+                  </Field>
+                  <Field label="Copper">
+                    <Input
+                      type="number"
+                      min={0}
+                      value={transferCoins.cp}
+                      onChange={(event) =>
+                        setTransferCoins((current) => ({ ...current, cp: event.target.value }))
+                      }
+                    />
+                  </Field>
+                </div>
+                <p className="tiny muted">
+                  Total: <strong>{formatCp(transferTotalCp)}</strong>. Ten copper make a silver; ten
+                  silver make a gold.
+                </p>
+              </>
+            )}
+          </>
+        )}
+      </Modal>
 
       <Modal
         open={Boolean(conflict)}

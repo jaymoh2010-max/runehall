@@ -833,6 +833,13 @@
 .sheet-feature.static { display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; font-size: 0.85rem; }
 .sheet-equipment { display: flex; flex-direction: column; }
 .sheet-equipment-row { display: flex; align-items: center; gap: 9px; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.04); font-size: 0.84rem; }
+.sheet-purse { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 8px; padding: 9px 11px; border: 1px solid var(--line); border-radius: 8px; background: rgba(200,169,107,0.035); }
+.sheet-coin { display: flex; flex-direction: column; gap: 1px; min-width: 42px; }
+.sheet-coin span { color: var(--muted-2); font-size: 0.62rem; letter-spacing: 0.08em; text-transform: uppercase; }
+.sheet-coin strong { color: var(--gold-bright); font-size: 1rem; }
+.sheet-inventory .sheet-equipment-row { flex-wrap: wrap; }
+.sheet-inventory .sheet-equipment-row .grow { flex: 1 1 170px; min-width: 0; }
+.sheet-qty { flex: none; }
 .sheet-companion-list { display: flex; flex-direction: column; gap: 8px; }
 .sheet-companion-row { border: 1px solid var(--line); border-radius: 7px; background: rgba(255,255,255,0.012); padding: 9px 10px; display: flex; flex-direction: column; gap: 5px; }
 .sheet-companion-notes { white-space: pre-wrap; line-height: 1.45; }

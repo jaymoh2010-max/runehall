@@ -415,6 +415,51 @@ async function main() {
   if (playerLoot.status !== 403) throw new Error("Player should not be able to read GM loot prep");
   log("loot parcel distributed to the player's sheet");
 
+  const quartermaster = (
+    await api("/api/characters", {
+      method: "POST",
+      cookie: gmCookie,
+      body: { name: "Smoke Quartermaster", campaignId: campaign.id },
+    })
+  ).payload.character;
+  const transferResult = await api(`/api/characters/${character.id}/transfer`, {
+    method: "POST",
+    cookie: playerCookie,
+    body: {
+      toCharacterId: quartermaster.id,
+      itemId: sword.id,
+      quantity: 1,
+      currency: { gp: 2, sp: 0, cp: 0 },
+    },
+  });
+  const transferredFrom = transferResult.payload.from;
+  const transferredTo = transferResult.payload.to;
+  if (transferredFrom.data.equipment.find((entry) => entry.itemId === sword.id)?.quantity !== 1) {
+    throw new Error("Source stack was not reduced by the transfer");
+  }
+  if (transferredFrom.data.currency.gp !== 3) {
+    throw new Error("Source coins were not reduced by the transfer");
+  }
+  if (
+    transferredTo.data.equipment.find((entry) => entry.itemId === sword.id)?.quantity !== 1 ||
+    transferredTo.data.currency.gp !== 2
+  ) {
+    throw new Error("Target character did not receive the item and coins");
+  }
+  const playerTarget = await api(`/api/characters/${quartermaster.id}`, { cookie: playerCookie });
+  if (playerTarget.payload.character.name !== "Smoke Quartermaster") {
+    throw new Error("Player could not read the receiving character");
+  }
+  const stolenTransfer = await fetch(`${base}/api/characters/${quartermaster.id}/transfer`, {
+    method: "POST",
+    headers: { "content-type": "application/json", cookie: playerCookie },
+    body: JSON.stringify({ toCharacterId: character.id, currency: { gp: 1 } }),
+  });
+  if (stolenTransfer.status !== 403) {
+    throw new Error("Player could give items from a character they do not control");
+  }
+  log("inventory stacks and coins transferred between campaign characters");
+
   await api(`/api/campaigns/${campaign.id}/journal`, {
     method: "POST",
     cookie: gmCookie,

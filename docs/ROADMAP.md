@@ -435,7 +435,12 @@ Acceptance: a GM can prepare a full session in Runehall and start it with one â€
 - [x] **Reusable handouts**
   - The GM can duplicate any journal entry or handout in one click.
   - Duplicates preserve content, kind, visibility, and attachments.
-- [ ] Player-facing inventory/currency ledger and item transfer.
+- [x] **Player-facing inventory and transfers**
+  - The character sheet shows gear stacks, equipped state, bulk, gear value, and the purse.
+  - Players can adjust quantities, equip or unequip gear, and remove items from the sheet.
+  - A player can give an item stack or coins to another character in the same campaign.
+  - Transfers are server-side, revision-checked, and applied to both sheets atomically.
+  - Received items arrive unequipped; transferring a whole stack moves its runes.
 - [ ] Reusable handout/asset library tied into cleanup.
 - [ ] Optional automatic XP only if it still matters after milestone play.
 

@@ -16,8 +16,15 @@ import {
   rulesetIncludesLegacy,
 } from "../../shared/content";
 import { contextForDraft } from "../compendium";
-import { db, type TokenRow } from "../db";
+import { db, type CharacterRow, type TokenRow } from "../db";
 import { serializeCharacter, serializeToken, touchCampaign } from "../serialize";
+import {
+  addCurrency,
+  addItemToDraft,
+  currencyToCp,
+  removeItemQuantity,
+  spendCurrency,
+} from "../../shared/inventory";
 import { newId, now, parseJson, safeString } from "../util";
 
 function parseDraft(raw: unknown, fallbackName = "New Hero"): CharacterDraft {
@@ -31,6 +38,36 @@ function parseDraft(raw: unknown, fallbackName = "New Hero"): CharacterDraft {
 
 function summarize(draft: CharacterDraft): CharacterSummary {
   return characterSummary(draft, contextForDraft(draft));
+}
+
+function syncCharacterDraft(
+  app: FastifyInstance,
+  row: CharacterRow,
+  draft: CharacterDraft,
+  summary: CharacterSummary,
+): void {
+  if (!row.campaign_id) return;
+  // Keep any linked table tokens in step with the sheet.
+  const linkedTokens = db.prepare("SELECT * FROM tokens WHERE character_id = ?").all(row.id) as TokenRow[];
+  for (const token of linkedTokens) {
+    db.prepare(
+      "UPDATE tokens SET name = ?, hp_max = ?, hp_current = ?, ac = ?, updated_at = ? WHERE id = ?",
+    ).run(
+      draft.name,
+      summary.hp,
+      draft.play.hp === null ? summary.hp : Math.max(0, Math.min(summary.hp, draft.play.hp)),
+      summary.ac,
+      now(),
+      token.id,
+    );
+    const updatedToken = db.prepare("SELECT * FROM tokens WHERE id = ?").get(token.id) as TokenRow;
+    app.broadcastCampaign(row.campaign_id, "token:updated", serializeToken(updatedToken));
+  }
+  app.broadcastCampaign(row.campaign_id, "character:updated", {
+    characterId: row.id,
+    summary,
+    name: draft.name,
+  });
 }
 
 export async function registerCharacterRoutes(app: FastifyInstance): Promise<void> {
@@ -181,33 +218,148 @@ export async function registerCharacterRoutes(app: FastifyInstance): Promise<voi
     }
     const updated = getCharacter(id);
     const owner = getUser(updated!.user_id);
-    if (row.campaign_id) {
-      // Keep any linked table tokens in step with the sheet.
-      const linkedTokens = db.prepare("SELECT * FROM tokens WHERE character_id = ?").all(id) as TokenRow[];
-      for (const token of linkedTokens) {
-        db.prepare(
-          "UPDATE tokens SET name = ?, hp_max = ?, hp_current = ?, ac = ?, updated_at = ? WHERE id = ?",
-        ).run(
-          draft.name,
-          summary.hp,
-          draft.play.hp === null ? summary.hp : Math.max(0, Math.min(summary.hp, draft.play.hp)),
-          summary.ac,
-          now(),
-          token.id,
-        );
-        const updatedToken = db.prepare("SELECT * FROM tokens WHERE id = ?").get(token.id) as TokenRow;
-        app.broadcastCampaign(row.campaign_id, "token:updated", serializeToken(updatedToken));
-      }
-      app.broadcastCampaign(row.campaign_id, "character:updated", {
-        characterId: id,
-        summary,
-        name: draft.name,
-      });
-      touchCampaign(row.campaign_id);
-    }
+    syncCharacterDraft(app, row, draft, summary);
+    if (row.campaign_id) touchCampaign(row.campaign_id);
     return reply.send({
       character: serializeCharacter(updated!, owner?.display_name ?? "", {
         canEdit: true,
+        canView: true,
+      }),
+    });
+  });
+
+  app.post("/api/characters/:id/transfer", async (request, reply) => {
+    if (!request.user) return reply.code(401).send({ error: "Sign in to continue." });
+    const { id } = request.params as { id: string };
+    const source = getCharacter(id);
+    if (!source) return reply.code(404).send({ error: "Character not found." });
+    if (!canEditCharacter(source, request.user.id)) {
+      return reply.code(403).send({ error: "You can't give items from that character." });
+    }
+    const body = (request.body ?? {}) as Record<string, unknown>;
+    const targetId = safeString(body.toCharacterId, "", 120);
+    if (!targetId) return reply.code(400).send({ error: "Choose who receives the transfer." });
+    if (targetId === id) return reply.code(400).send({ error: "Choose another character." });
+    const target = getCharacter(targetId);
+    if (!target) return reply.code(404).send({ error: "That character was not found." });
+    if (source.campaign_id && target.campaign_id !== source.campaign_id) {
+      return reply
+        .code(400)
+        .send({ error: "Items can only be transferred between characters in the same campaign." });
+    }
+    if (!source.campaign_id) {
+      return reply
+        .code(400)
+        .send({ error: "Assign both characters to a campaign before transferring items." });
+    }
+    if (!canViewCharacter(target, request.user.id)) {
+      return reply.code(403).send({ error: "You can't give items to that character." });
+    }
+
+    const expectedRevision =
+      typeof body.expectedRevision === "number" && Number.isFinite(body.expectedRevision)
+        ? Math.round(body.expectedRevision)
+        : null;
+    if (expectedRevision !== null && Number(source.revision) !== expectedRevision) {
+      const owner = getUser(source.user_id);
+      return reply.code(409).send({
+        error: "This character changed somewhere else. Reload before transferring.",
+        character: serializeCharacter(source, owner?.display_name ?? "", {
+          canEdit: true,
+          canView: true,
+        }),
+      });
+    }
+
+    let sourceDraft = body.data
+      ? parseDraft(body.data, source.name)
+      : parseDraft(parseJson(source.data, {}), source.name);
+    let targetDraft = parseDraft(parseJson(target.data, {}), target.name);
+    let transferred = false;
+
+    if (typeof body.itemId === "string" && body.itemId.trim()) {
+      const itemId = body.itemId.trim().slice(0, 200);
+      const owned = sourceDraft.equipment.find((entry) => entry.itemId === itemId);
+      if (!owned) return reply.code(400).send({ error: "That item is not in this character's pack." });
+      const quantity = Math.max(
+        1,
+        Math.min(owned.quantity, Math.floor(Number(body.quantity) || 1)),
+      );
+      const result = removeItemQuantity(sourceDraft, itemId, quantity);
+      if (!result.moved) return reply.code(400).send({ error: "That item is not in this pack." });
+      sourceDraft = result.draft;
+      targetDraft = addItemToDraft(targetDraft, result.moved);
+      transferred = true;
+    }
+
+    const rawCurrency = body.currency;
+    let amountCp = 0;
+    if (rawCurrency && typeof rawCurrency === "object") {
+      const currency = rawCurrency as Record<string, unknown>;
+      amountCp = currencyToCp({
+        gp: Number(currency.gp) || 0,
+        sp: Number(currency.sp) || 0,
+        cp: Number(currency.cp) || 0,
+      });
+    }
+    if (amountCp > 0) {
+      const remaining = spendCurrency(sourceDraft.currency, amountCp);
+      if (!remaining) return reply.code(400).send({ error: "That character doesn't have that many coins." });
+      sourceDraft = { ...sourceDraft, currency: remaining };
+      targetDraft = {
+        ...targetDraft,
+        currency: addCurrency(targetDraft.currency, amountCp),
+      };
+      transferred = true;
+    }
+    if (!transferred) {
+      return reply.code(400).send({ error: "Choose an item or an amount of coins to transfer." });
+    }
+
+    const sourceSummary = summarize(sourceDraft);
+    const targetSummary = summarize(targetDraft);
+    const updatedAt = now();
+    db.exec("BEGIN");
+    try {
+      db.prepare(
+        "UPDATE characters SET name = ?, data = ?, summary = ?, updated_at = ?, revision = revision + 1 WHERE id = ?",
+      ).run(
+        sourceDraft.name,
+        JSON.stringify(sourceDraft),
+        JSON.stringify(sourceSummary),
+        updatedAt,
+        source.id,
+      );
+      db.prepare(
+        "UPDATE characters SET name = ?, data = ?, summary = ?, updated_at = ?, revision = revision + 1 WHERE id = ?",
+      ).run(
+        targetDraft.name,
+        JSON.stringify(targetDraft),
+        JSON.stringify(targetSummary),
+        updatedAt,
+        target.id,
+      );
+      db.exec("COMMIT");
+    } catch (error) {
+      db.exec("ROLLBACK");
+      throw error;
+    }
+
+    syncCharacterDraft(app, source, sourceDraft, sourceSummary);
+    syncCharacterDraft(app, target, targetDraft, targetSummary);
+    touchCampaign(source.campaign_id);
+
+    const updatedSource = getCharacter(source.id)!;
+    const updatedTarget = getCharacter(target.id)!;
+    const sourceOwner = getUser(updatedSource.user_id);
+    const targetOwner = getUser(updatedTarget.user_id);
+    return reply.send({
+      from: serializeCharacter(updatedSource, sourceOwner?.display_name ?? "", {
+        canEdit: true,
+        canView: true,
+      }),
+      to: serializeCharacter(updatedTarget, targetOwner?.display_name ?? "", {
+        canEdit: canEditCharacter(updatedTarget, request.user.id),
         canView: true,
       }),
     });
