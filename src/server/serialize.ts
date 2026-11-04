@@ -41,6 +41,7 @@ import {
 import { parseJson } from "./util";
 import { bumpCampaign } from "./revisions";
 import { normalizeTokenConditions } from "../shared/tokens";
+import { normalizeAoeTemplates } from "../shared/templates";
 
 export function serializeCampaignSummary(
   campaign: CampaignRow,
@@ -120,6 +121,7 @@ export function serializeScene(row: SceneRow): Scene {
     gridOffsetY: row.grid_offset_y,
     fogEnabled: Boolean(row.fog_enabled),
     revealed: parseJson<string[]>(row.fog_revealed, []),
+    templates: normalizeAoeTemplates(parseJson(row.templates, [])),
     sortOrder: row.sort_order,
     createdAt: row.created_at,
     updatedAt: row.updated_at,

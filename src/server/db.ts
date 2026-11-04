@@ -154,6 +154,7 @@ export interface SceneRow {
   grid_offset_y: number;
   fog_enabled: number;
   fog_revealed: string;
+  templates: string;
   sort_order: number;
   created_at: number;
   updated_at: number;

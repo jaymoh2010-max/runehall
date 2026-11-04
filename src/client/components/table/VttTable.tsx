@@ -96,7 +96,6 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
   const [bestiaryOpen, setBestiaryOpen] = useState(false);
   const [templateKind, setTemplateKind] = useState<TemplateKind | null>(null);
   const [templateSize, setTemplateSize] = useState(20);
-  const [template, setTemplate] = useState<AoeTemplate | null>(null);
   const [leftOpen, setLeftOpen] = useState(true);
   const [rightOpen, setRightOpen] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -140,10 +139,6 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
   const selectedToken = sceneTokens.find((token) => token.id === selectedTokenId) ?? null;
   const editingToken = tokens.find((token) => token.id === editingTokenId) ?? null;
 
-  useEffect(() => {
-    setTemplate(null);
-  }, [activeSceneId]);
-
   // ---- Realtime -----------------------------------------------------------
   useEffect(() => {
     if (window.innerWidth < 1160) setRightOpen(false);
@@ -156,6 +151,16 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
     setActiveSceneId(sceneId);
     setSelectedTokenId(null);
     getSocket().emit("scene:activate", { campaignId, sceneId });
+  };
+
+  const placeTemplate = (next: AoeTemplate) => {
+    if (!activeSceneId) return;
+    getSocket().emit("template:add", { campaignId, sceneId: activeSceneId, template: next });
+  };
+
+  const clearTemplates = () => {
+    if (!activeSceneId) return;
+    getSocket().emit("template:clear", { campaignId, sceneId: activeSceneId });
   };
 
   const duplicateScene = async (sceneId: string) => {
@@ -363,7 +368,6 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
         setMeasureMode(false);
         setSelectedTokenId(null);
         setTheaterMode(false);
-        setTemplate(null);
         setTemplateKind(null);
         return;
       }
@@ -501,8 +505,8 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
         setTemplateKind={setTemplateKind}
         templateSize={templateSize}
         setTemplateSize={setTemplateSize}
-        hasTemplate={Boolean(template)}
-        onClearTemplate={() => setTemplate(null)}
+        hasTemplate={Boolean(activeScene?.templates.length)}
+        onClearTemplate={clearTemplates}
         connectionStatus={connectionStatus}
         presence={presence}
         leftOpen={leftOpen}
@@ -567,8 +571,7 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
             onDropMonster={placeMonster}
             templateKind={templateKind}
             templateSize={templateSize}
-            template={template}
-            onTemplate={setTemplate}
+            onTemplate={placeTemplate}
           />
           {isGm && bestiaryOpen ? (
             <BestiaryPalette

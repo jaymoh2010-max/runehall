@@ -163,6 +163,16 @@ export function useCampaignTable({ initial, campaignId, toast }: UseCampaignTabl
         current && result.tokens.some((token) => token.id === current) ? current : null,
       );
     };
+    const onSceneTemplates = ({
+      sceneId,
+      templates,
+    }: {
+      sceneId: string;
+      templates: Scene["templates"];
+    }) =>
+      setScenes((current) =>
+        current.map((scene) => (scene.id === sceneId ? { ...scene, templates } : scene)),
+      );
     const onChatMessage = (message: ChatMessage) =>
       setMessages((current) => applyChatMessage(current, message));
     const onInitiativeUpdated = (payload: {
@@ -212,6 +222,7 @@ export function useCampaignTable({ initial, campaignId, toast }: UseCampaignTabl
     socket.on("scene:updated", onSceneUpdated);
     socket.on("scene:created", onSceneCreated);
     socket.on("scene:deleted", onSceneDeleted);
+    socket.on("scene:templates", onSceneTemplates);
     socket.on("chat:message", onChatMessage);
     socket.on("initiative:updated", onInitiativeUpdated);
     socket.on("pointer:show", onPointer);
@@ -235,6 +246,7 @@ export function useCampaignTable({ initial, campaignId, toast }: UseCampaignTabl
       socket.off("scene:updated", onSceneUpdated);
       socket.off("scene:created", onSceneCreated);
       socket.off("scene:deleted", onSceneDeleted);
+      socket.off("scene:templates", onSceneTemplates);
       socket.off("chat:message", onChatMessage);
       socket.off("initiative:updated", onInitiativeUpdated);
       socket.off("pointer:show", onPointer);

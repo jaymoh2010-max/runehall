@@ -42,7 +42,6 @@ interface SceneCanvasProps {
   onDropMonster?: (monster: Monster, count: number, x: number, y: number) => void;
   templateKind: TemplateKind | null;
   templateSize: number;
-  template: AoeTemplate | null;
   onTemplate: (template: AoeTemplate) => void;
 }
 
@@ -71,7 +70,6 @@ export function SceneCanvas({
   onDropMonster,
   templateKind,
   templateSize,
-  template,
   onTemplate,
 }: SceneCanvasProps) {
   const viewportRef = useRef<HTMLDivElement>(null);
@@ -404,58 +402,57 @@ export function SceneCanvas({
     : 0;
   const measureSquares = measureDistance / scene.gridSize;
   const measureFeet = Math.round(measureSquares * 5);
-  const shownTemplate: AoeTemplate | null =
-    templateDraft && templateKind
-      ? { kind: templateKind, size: templateSize, ...templateDraft }
-      : template;
-  const templateRadius = shownTemplate ? templateRadiusPx(shownTemplate.size, scene.gridSize) : 0;
   const templateStroke = 2 / Math.max(zoom, 0.4);
-  const templateFill = templateDraft ? "rgba(240,217,168,0.2)" : "rgba(200,169,107,0.14)";
-  let templateShape: ReactElement | null = null;
-  if (shownTemplate) {
-    if (shownTemplate.kind === "burst" || shownTemplate.kind === "emanation") {
-      templateShape = (
+  const renderTemplate = (value: AoeTemplate, draft = false): ReactElement => {
+    const radius = templateRadiusPx(value.size, scene.gridSize);
+    const fill = draft ? "rgba(240,217,168,0.2)" : "rgba(200,169,107,0.14)";
+    if (value.kind === "burst" || value.kind === "emanation") {
+      return (
         <circle
-          cx={shownTemplate.x}
-          cy={shownTemplate.y}
-          r={templateRadius}
-          fill={templateFill}
-          stroke="#e5ca91"
-          strokeWidth={templateStroke}
-        />
-      );
-    } else if (shownTemplate.kind === "cone") {
-      const spread = Math.PI / 2;
-      const a1 = shownTemplate.direction - spread / 2;
-      const a2 = shownTemplate.direction + spread / 2;
-      const p1x = shownTemplate.x + Math.cos(a1) * templateRadius;
-      const p1y = shownTemplate.y + Math.sin(a1) * templateRadius;
-      const p2x = shownTemplate.x + Math.cos(a2) * templateRadius;
-      const p2y = shownTemplate.y + Math.sin(a2) * templateRadius;
-      templateShape = (
-        <path
-          d={`M ${shownTemplate.x} ${shownTemplate.y} L ${p1x} ${p1y} A ${templateRadius} ${templateRadius} 0 0 1 ${p2x} ${p2y} Z`}
-          fill={templateFill}
-          stroke="#e5ca91"
-          strokeWidth={templateStroke}
-        />
-      );
-    } else {
-      const half = scene.gridSize / 2;
-      const px = Math.cos(shownTemplate.direction + Math.PI / 2) * half;
-      const py = Math.sin(shownTemplate.direction + Math.PI / 2) * half;
-      const ex = shownTemplate.x + Math.cos(shownTemplate.direction) * templateRadius;
-      const ey = shownTemplate.y + Math.sin(shownTemplate.direction) * templateRadius;
-      templateShape = (
-        <polygon
-          points={`${shownTemplate.x + px},${shownTemplate.y + py} ${ex + px},${ey + py} ${ex - px},${ey - py} ${shownTemplate.x - px},${shownTemplate.y - py}`}
-          fill={templateFill}
+          cx={value.x}
+          cy={value.y}
+          r={radius}
+          fill={fill}
           stroke="#e5ca91"
           strokeWidth={templateStroke}
         />
       );
     }
-  }
+    if (value.kind === "cone") {
+      const spread = Math.PI / 2;
+      const a1 = value.direction - spread / 2;
+      const a2 = value.direction + spread / 2;
+      const p1x = value.x + Math.cos(a1) * radius;
+      const p1y = value.y + Math.sin(a1) * radius;
+      const p2x = value.x + Math.cos(a2) * radius;
+      const p2y = value.y + Math.sin(a2) * radius;
+      return (
+        <path
+          d={`M ${value.x} ${value.y} L ${p1x} ${p1y} A ${radius} ${radius} 0 0 1 ${p2x} ${p2y} Z`}
+          fill={fill}
+          stroke="#e5ca91"
+          strokeWidth={templateStroke}
+        />
+      );
+    }
+    const half = scene.gridSize / 2;
+    const px = Math.cos(value.direction + Math.PI / 2) * half;
+    const py = Math.sin(value.direction + Math.PI / 2) * half;
+    const ex = value.x + Math.cos(value.direction) * radius;
+    const ey = value.y + Math.sin(value.direction) * radius;
+    return (
+      <polygon
+        points={`${value.x + px},${value.y + py} ${ex + px},${ey + py} ${ex - px},${ey - py} ${value.x - px},${value.y - py}`}
+        fill={fill}
+        stroke="#e5ca91"
+        strokeWidth={templateStroke}
+      />
+    );
+  };
+  const draftTemplate: AoeTemplate | null =
+    templateDraft && templateKind
+      ? { kind: templateKind, size: templateSize, ...templateDraft }
+      : null;
 
   return (
     <div
@@ -578,18 +575,25 @@ export function SceneCanvas({
             style={{ width: scene.width, height: scene.height }}
           />
         ) : null}
-        {shownTemplate ? (
+        {scene.templates.length || draftTemplate ? (
           <svg className="template-layer" width={scene.width} height={scene.height}>
-            {templateShape}
-            <text
-              x={shownTemplate.x + 8}
-              y={shownTemplate.y - 8}
-              fill="#f0d9a8"
-              fontSize={14 / Math.max(zoom, 0.4)}
-              fontWeight={600}
-            >
-              {templateLabel(shownTemplate)}
-            </text>
+            {scene.templates.map((entry, index) => (
+              <g key={`${entry.kind}-${index}`}>{renderTemplate(entry)}</g>
+            ))}
+            {draftTemplate ? (
+              <g>
+                {renderTemplate(draftTemplate, true)}
+                <text
+                  x={draftTemplate.x + 8}
+                  y={draftTemplate.y - 8}
+                  fill="#f0d9a8"
+                  fontSize={14 / Math.max(zoom, 0.4)}
+                  fontWeight={600}
+                >
+                  {templateLabel(draftTemplate)}
+                </text>
+              </g>
+            ) : null}
           </svg>
         ) : null}
         {measuring ? (

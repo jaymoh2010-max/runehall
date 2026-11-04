@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   groupHp,
   normalizeTokenConditions,
+  tickTokenConditions,
   tokenConditionLabel,
 } from "../src/shared/tokens";
 
@@ -60,5 +61,19 @@ describe("token conditions", () => {
     );
     expect(tokenConditionLabel({ name: "Prone" })).toBe("Prone");
     expect(tokenConditionLabel({ name: "Clumsy", value: 0, duration: null })).toBe("Clumsy");
+  });
+
+  it("ticks timed conditions and removes expired ones", () => {
+    expect(
+      tickTokenConditions([
+        { name: "Clumsy", duration: 2 },
+        { name: "Drained", duration: 1 },
+        { name: "Prone", duration: null },
+        { name: "Frightened", value: 2, duration: 0 },
+      ]),
+    ).toEqual([
+      { name: "Clumsy", duration: 1 },
+      { name: "Prone", duration: null },
+    ]);
   });
 });

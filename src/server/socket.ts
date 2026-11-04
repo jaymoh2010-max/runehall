@@ -11,7 +11,8 @@ import { userFromCookieHeader } from "./auth";
 import { now, newId, safeInt, safeString, parseJson, clamp, sanitizeUserText } from "./util";
 import { characterSummary, computeCharacter, normalizeCharacterDraft } from "../shared/rules";
 import { rollFormula, validateFormula } from "../shared/dice";
-import { normalizeTokenConditions } from "../shared/tokens";
+import { normalizeTokenConditions, tickTokenConditions } from "../shared/tokens";
+import { normalizeAoeTemplate, normalizeAoeTemplates } from "../shared/templates";
 import type {
   ClientToServerEvents,
   InitiativeEntry,
@@ -187,6 +188,35 @@ function groupTokens(sceneId: string, groupId: string): TokenRow[] {
       "SELECT * FROM tokens WHERE scene_id = ? AND group_id = ? ORDER BY sort_order ASC, created_at ASC",
     )
     .all(sceneId, groupId) as TokenRow[];
+}
+
+function tickConditionsForEntry(
+  io: TypedServer,
+  campaignId: string,
+  entry: InitiativeEntry | undefined,
+): boolean {
+  if (!entry) return false;
+  let rows: TokenRow[] = [];
+  if (entry.groupId && entry.sceneId) rows = groupTokens(entry.sceneId, entry.groupId);
+  else if (entry.tokenId) {
+    const row = tokenRow(entry.tokenId);
+    if (row) rows = [row];
+  }
+  let changed = false;
+  for (const row of rows) {
+    const current = normalizeTokenConditions(parseJson(row.conditions, []));
+    const next = tickTokenConditions(current);
+    if (JSON.stringify(next) === JSON.stringify(current)) continue;
+    db.prepare("UPDATE tokens SET conditions = ?, updated_at = ? WHERE id = ?").run(
+      JSON.stringify(next),
+      now(),
+      row.id,
+    );
+    const updated = tokenRow(row.id);
+    if (updated) io.to(room(campaignId)).emit("token:updated", tokenWithOwner(updated));
+    changed = true;
+  }
+  return changed;
 }
 
 function initiativeEntriesForTokens(tokens: TokenRow[]): InitiativeEntry[] {
@@ -592,6 +622,34 @@ export function registerSocketServer(io: TypedServer): void {
       touchCampaign(campaignId);
     });
 
+    socket.on("template:add", ({ campaignId, sceneId, template }) => {
+      if (!requireGm(socket, campaignId)) return;
+      const scene = sceneBelongs(sceneId, campaignId);
+      if (!scene) return;
+      const normalized = normalizeAoeTemplate(template);
+      if (!normalized) return;
+      const templates = [
+        ...normalizeAoeTemplates(parseJson(scene.templates, [])),
+        normalized,
+      ].slice(-20);
+      db.prepare("UPDATE scenes SET templates = ?, updated_at = ? WHERE id = ?").run(
+        JSON.stringify(templates),
+        now(),
+        sceneId,
+      );
+      io.to(room(campaignId)).emit("scene:templates", { sceneId, templates });
+      touchCampaign(campaignId);
+    });
+
+    socket.on("template:clear", ({ campaignId, sceneId }) => {
+      if (!requireGm(socket, campaignId)) return;
+      const scene = sceneBelongs(sceneId, campaignId);
+      if (!scene) return;
+      db.prepare("UPDATE scenes SET templates = '[]', updated_at = ? WHERE id = ?").run(now(), sceneId);
+      io.to(room(campaignId)).emit("scene:templates", { sceneId, templates: [] });
+      touchCampaign(campaignId);
+    });
+
     socket.on("chat:send", ({ campaignId, content, visibility }, ack) => {
       if (!getMembership(campaignId, socket.data.user.id)) {
         sendError(socket, "You're not a member of that campaign.");
@@ -748,6 +806,7 @@ export function registerSocketServer(io: TypedServer): void {
       const state = ensureState(campaignId);
       const entries = serializeInitiative(JSON.parse(state.initiative || "[]"));
       if (!entries.length) return;
+      tickConditionsForEntry(io, campaignId, entries[state.turn_index]);
       const dir = direction === -1 ? -1 : 1;
       let turn = state.turn_index + dir;
       let round = state.round;

@@ -46,6 +46,25 @@ export function tokenConditionSummary(conditions: TokenCondition[]): string {
 }
 
 /**
+ * Tick timed conditions at the end of a turn. Conditions without a duration
+ * are left alone; a condition whose duration reaches zero is removed.
+ */
+export function tickTokenConditions(conditions: TokenCondition[]): TokenCondition[] {
+  return conditions
+    .map((condition) =>
+      condition.duration !== null && condition.duration !== undefined && condition.duration > 0
+        ? { ...condition, duration: condition.duration - 1 }
+        : condition,
+    )
+    .filter(
+      (condition) =>
+        condition.duration === null ||
+        condition.duration === undefined ||
+        condition.duration > 0,
+    );
+}
+
+/**
  * Aggregate HP for a token group. Only members with a defined maximum
  * contribute to the pool; members without HP still count toward the group
  * size shown at the table.

@@ -73,6 +73,12 @@ describe("migrations", () => {
     expect(campaignRevision.revision).toBe(0);
     expect(characterRevision.revision).toBe(1);
 
+    const templateMigration = migrations.find((entry) => entry.version === 13);
+    expect(templateMigration).toBeDefined();
+    db.exec(templateMigration!.sql);
+    const sceneColumns = db.prepare("PRAGMA table_info(scenes)").all() as { name: string }[];
+    expect(sceneColumns.map((column) => column.name)).toContain("templates");
+
     const columns = db.prepare("PRAGMA table_info(users)").all() as { name: string }[];
     expect(columns.map((column) => column.name)).toContain("is_admin");
 

@@ -365,4 +365,11 @@ export const migrations: Migration[] = [
       CREATE INDEX IF NOT EXISTS idx_characters_revision ON characters(id, revision);
     `,
   },
+  {
+    version: 13,
+    name: "shared_scene_templates",
+    sql: `
+      ALTER TABLE scenes ADD COLUMN templates TEXT NOT NULL DEFAULT '[]';
+    `,
+  },
 ];

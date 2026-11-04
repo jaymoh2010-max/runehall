@@ -1,6 +1,8 @@
 // ---------------------------------------------------------------------------
 // Core PF2e vocabulary
 // ---------------------------------------------------------------------------
+import type { AoeTemplate } from "./templates";
+
 export type AbilityKey = "str" | "dex" | "con" | "int" | "wis" | "cha";
 export type SaveKey = "fortitude" | "reflex" | "will";
 export type SkillId =
@@ -945,6 +947,8 @@ export interface Scene {
   gridOffsetY: number;
   fogEnabled: boolean;
   revealed: string[];
+  /** Shared area templates placed on this scene. */
+  templates: AoeTemplate[];
   sortOrder: number;
   createdAt: number;
   updatedAt: number;
@@ -1111,6 +1115,8 @@ export interface ClientToServerEvents {
   "scene:update": (payload: { campaignId: string; scene: Partial<Scene> & { id: string } }) => void;
   "scene:create": (payload: { campaignId: string; scene: Partial<Scene> }, ack?: (scene: Scene | null) => void) => void;
   "scene:delete": (payload: { campaignId: string; sceneId: string }) => void;
+  "template:add": (payload: { campaignId: string; sceneId: string; template: AoeTemplate }) => void;
+  "template:clear": (payload: { campaignId: string; sceneId: string }) => void;
   "chat:send": (payload: { campaignId: string; content: string; visibility?: "all" | "gm" }, ack?: (message: ChatMessage | null) => void) => void;
   "dice:roll": (payload: { campaignId: string; formula: string; label?: string; dc?: number | null; visibility?: "all" | "gm"; characterId?: string | null }, ack?: (message: ChatMessage | null) => void) => void;
   "dice:request": (payload: { campaignId: string; formula: string; label?: string; dc?: number | null }, ack?: (message: ChatMessage | null) => void) => void;
@@ -1134,6 +1140,7 @@ export interface ServerToClientEvents {
   "scene:updated": (scene: Scene) => void;
   "scene:created": (scene: Scene) => void;
   "scene:deleted": (payload: { sceneId: string }) => void;
+  "scene:templates": (payload: { sceneId: string; templates: AoeTemplate[] }) => void;
   "chat:message": (message: ChatMessage) => void;
   "initiative:updated": (payload: { entries: InitiativeEntry[]; round: number; turnIndex: number }) => void;
   "pointer:show": (payload: { userId: string; displayName: string; sceneId: string; x: number; y: number }) => void;
