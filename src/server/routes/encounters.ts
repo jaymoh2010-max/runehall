@@ -100,16 +100,54 @@ function tokenInitiativeBonus(token: TokenRow): number {
 }
 
 function initiativeEntryForToken(token: TokenRow): InitiativeEntry {
+  const bonus = tokenInitiativeBonus(token);
   return {
     id: newId("init"),
     tokenId: token.id,
     name: token.name,
-    initiative: (rollFormula("1d20", {}).d20 ?? 10) + tokenInitiativeBonus(token),
+    initiative: (rollFormula("1d20", {}).d20 ?? 10) + bonus,
     color: token.color,
     ownerId: token.owner_id,
     sceneId: token.scene_id,
-    perception: tokenInitiativeBonus(token),
+    groupId: token.group_id,
+    perception: bonus,
   };
+}
+
+function initiativeEntryForGroup(rows: TokenRow[]): InitiativeEntry {
+  const anchor = rows[0];
+  const bonus = tokenInitiativeBonus(anchor);
+  return {
+    id: newId("init"),
+    tokenId: anchor.id,
+    name: `${anchor.group_name || anchor.name} ×${rows.length}`.slice(0, 80),
+    initiative: (rollFormula("1d20", {}).d20 ?? 10) + bonus,
+    color: anchor.color,
+    ownerId: anchor.owner_id,
+    sceneId: anchor.scene_id,
+    groupId: anchor.group_id,
+    perception: bonus,
+  };
+}
+
+function initiativeEntriesForTokens(tokens: TokenRow[]): InitiativeEntry[] {
+  const groups = new Map<string, TokenRow[]>();
+  const singles: TokenRow[] = [];
+  for (const token of tokens) {
+    if (!token.group_id) {
+      singles.push(token);
+      continue;
+    }
+    const members = groups.get(token.group_id) ?? [];
+    members.push(token);
+    groups.set(token.group_id, members);
+  }
+  return [
+    ...singles.map((token) => initiativeEntryForToken(token)),
+    ...[...groups.values()].map((members) =>
+      members.length > 1 ? initiativeEntryForGroup(members) : initiativeEntryForToken(members[0]),
+    ),
+  ];
 }
 
 function sortInitiative(entries: InitiativeEntry[]): InitiativeEntry[] {
@@ -414,6 +452,19 @@ export async function registerEncounterRoutes(app: FastifyInstance): Promise<voi
       null;
     if (!scene) return reply.code(400).send({ error: "Create a scene before launching an encounter." });
 
+    const existingEntries =
+      mode === "reinforce" ? parseJson<InitiativeEntry[]>(state.initiative, []) : [];
+    if (
+      mode === "reinforce" &&
+      existingEntries.length &&
+      ((state.active_scene_id && state.active_scene_id !== scene.id) ||
+        existingEntries.some((entry) => entry.sceneId && entry.sceneId !== scene.id))
+    ) {
+      return reply
+        .code(400)
+        .send({ error: "Reinforcements must join the scene with the active initiative order." });
+    }
+
     const allCombatants = db
       .prepare(
         "SELECT * FROM encounter_combatants WHERE encounter_id = ? ORDER BY sort_order ASC, created_at ASC",
@@ -500,24 +551,25 @@ export async function registerEncounterRoutes(app: FastifyInstance): Promise<voi
     }
 
     const sceneTokens = db
-      .prepare("SELECT * FROM tokens WHERE scene_id = ? AND hidden = 0")
+      .prepare(
+        "SELECT * FROM tokens WHERE scene_id = ? AND hidden = 0 ORDER BY sort_order ASC, created_at ASC",
+      )
       .all(scene.id) as TokenRow[];
     let entries: InitiativeEntry[];
     let round = 1;
     let turnIndex = 0;
     if (mode === "reinforce") {
-      const existingEntries = parseJson<InitiativeEntry[]>(state.initiative, []);
       const activeId = existingEntries[state.turn_index]?.id ?? null;
       entries = sortInitiative([
         ...existingEntries,
-        ...createdTokens.map(initiativeEntryForToken),
+        ...initiativeEntriesForTokens(createdTokens),
       ]);
       round = existingEntries.length ? Math.max(1, state.round) : 1;
       turnIndex = activeId
         ? Math.max(0, entries.findIndex((entry) => entry.id === activeId))
         : 0;
     } else {
-      entries = sortInitiative(sceneTokens.map(initiativeEntryForToken));
+      entries = sortInitiative(initiativeEntriesForTokens(sceneTokens));
     }
     db.prepare(
       "UPDATE campaign_state SET active_scene_id = ?, initiative = ?, round = ?, turn_index = ?, updated_at = ? WHERE campaign_id = ?",

@@ -1032,6 +1032,16 @@ async function main() {
   if (firstLaunch.payload.mode !== "fresh" || firstLaunch.payload.combatants !== 2) {
     throw new Error("Wave one did not launch as a fresh encounter");
   }
+  const waveOneEntries = firstLaunch.payload.initiative.filter((entry) =>
+    String(entry.name).startsWith("Wave One Guard"),
+  );
+  if (
+    waveOneEntries.length !== 1 ||
+    !waveOneEntries[0].groupId ||
+    !String(waveOneEntries[0].name).includes("×2")
+  ) {
+    throw new Error("Encounter launch did not group a multi-creature wave into one initiative entry");
+  }
   const beforeReinforcement = await api(`/api/campaigns/${campaign.id}/table`, {
     cookie: gmCookie,
   });
@@ -1049,6 +1059,16 @@ async function main() {
     activeAfter?.id !== activeBefore?.id
   ) {
     throw new Error("Reinforcement wave did not preserve the active initiative turn");
+  }
+  const reinforcedEntries = reinforcement.payload.initiative.filter((entry) =>
+    String(entry.name).startsWith("Wave Two Guard"),
+  );
+  if (
+    reinforcedEntries.length !== 1 ||
+    !reinforcedEntries[0].groupId ||
+    !String(reinforcedEntries[0].name).includes("×2")
+  ) {
+    throw new Error("Reinforcement wave did not create one grouped initiative entry");
   }
   const playerEncounter = await fetch(`${base}/api/campaigns/${campaign.id}/encounters`, {
     headers: { cookie: playerCookie },

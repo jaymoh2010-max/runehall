@@ -791,6 +791,7 @@ export function CampaignPage() {
             xpMode={campaign.xpMode}
             characters={characters}
             scenes={tableData.scenes}
+            activeSceneId={tableData.activeSceneId}
             onLaunched={handleEncounterLaunch}
             toast={toast}
           />

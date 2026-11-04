@@ -69,6 +69,7 @@ export function EncounterBuilder({
   xpMode,
   characters,
   scenes,
+  activeSceneId,
   onLaunched,
   toast,
 }: {
@@ -77,6 +78,7 @@ export function EncounterBuilder({
   xpMode: XpMode;
   characters: CharacterRecord[];
   scenes: Scene[];
+  activeSceneId: string | null;
   onLaunched: (result: EncounterLaunchResult) => void;
   toast: (message: string, kind?: "info" | "success" | "error") => void;
 }) {
@@ -149,6 +151,9 @@ export function EncounterBuilder({
     () => encounterBudget(launchCombatants, partyLevel, partySize),
     [launchCombatants, partyLevel, partySize],
   );
+
+  const activeLaunchSceneId =
+    activeSceneId && scenes.some((scene) => scene.id === activeSceneId) ? activeSceneId : null;
 
   useEffect(() => {
     if (!isGm) return;
@@ -367,7 +372,7 @@ export function EncounterBuilder({
 
   const openLaunch = () => {
     if (!selected) return;
-    setLaunchSceneId(selected.sceneId ?? scenes[0]?.id ?? "");
+    setLaunchSceneId(selected.sceneId ?? activeLaunchSceneId ?? scenes[0]?.id ?? "");
     setLaunchWave("all");
     setLaunchMode("fresh");
     setLaunchOpen(true);
@@ -838,7 +843,7 @@ export function EncounterBuilder({
               variant="primary"
               icon={<Play size={14} />}
               loading={busy}
-              disabled={!launchCombatants.length}
+              disabled={!launchCombatants.length || !launchSceneId}
               onClick={launch}
             >
               {launchMode === "reinforce" ? "Launch wave" : "Launch encounter"}
@@ -852,6 +857,7 @@ export function EncounterBuilder({
               <Select
                 value={launchSceneId}
                 onChange={(event) => setLaunchSceneId(event.target.value)}
+                disabled={launchMode === "reinforce" && Boolean(activeLaunchSceneId)}
               >
                 {scenes.map((scene) => (
                   <option key={scene.id} value={scene.id}>
@@ -859,6 +865,12 @@ export function EncounterBuilder({
                   </option>
                 ))}
               </Select>
+              {!scenes.length ? (
+                <p className="tiny danger-text">Create a scene before launching this encounter.</p>
+              ) : null}
+              {launchMode === "reinforce" && activeLaunchSceneId ? (
+                <p className="tiny muted">Reinforcements join the active scene and initiative order.</p>
+              ) : null}
             </Field>
             <Field label="Wave" hint="Launch one wave now and bring later waves in when they arrive.">
               <div className="encounter-wave-options">
@@ -914,7 +926,10 @@ export function EncounterBuilder({
                 <Button
                   size="sm"
                   variant={launchMode === "reinforce" ? "primary" : "ghost"}
-                  onClick={() => setLaunchMode("reinforce")}
+                  onClick={() => {
+                    setLaunchMode("reinforce");
+                    if (activeLaunchSceneId) setLaunchSceneId(activeLaunchSceneId);
+                  }}
                 >
                   Add to current order
                 </Button>
