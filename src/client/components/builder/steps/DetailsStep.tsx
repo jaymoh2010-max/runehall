@@ -54,6 +54,7 @@ import {
   type Equipment,
   type Feat,
   type Heritage,
+  type Monster,
   type SkillId,
   type Spell,
 } from "../../../../shared/types";
@@ -127,8 +128,60 @@ import {
   MiniFeatureList,
 } from "../shared";
 
-export function DetailsStep({ draft, update, setStep, onPortrait }: BuilderProps) {
+export function DetailsStep({ draft, update, context, setStep, onPortrait }: BuilderProps) {
   const fileRef = useRef<HTMLInputElement>(null);
+  const toast = useToasts((state) => state.push);
+  const [bestiaryFor, setBestiaryFor] = useState<string | null>(null);
+  const [monsterQuery, setMonsterQuery] = useState("");
+  const [monsterResults, setMonsterResults] = useState<Monster[]>([]);
+  const [monsterLoading, setMonsterLoading] = useState(false);
+
+  useEffect(() => {
+    if (!bestiaryFor) return;
+    let cancelled = false;
+    setMonsterLoading(true);
+    const timer = window.setTimeout(() => {
+      api<{ items: Monster[] }>(
+        `/api/compendium/monsters?q=${encodeURIComponent(monsterQuery)}&limit=30`,
+      )
+        .then((result) => {
+          if (!cancelled) setMonsterResults(result.items);
+        })
+        .catch((error) => {
+          if (!cancelled) toast(errorMessage(error), "error");
+        })
+        .finally(() => {
+          if (!cancelled) setMonsterLoading(false);
+        });
+    }, 200);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [bestiaryFor, monsterQuery, toast]);
+
+  const linkMonster = (monster: Monster) => {
+    const companion = draft.companions.find((entry) => entry.id === bestiaryFor);
+    if (!companion) return;
+    const attacks = monster.attacks
+      .map((attack) => `${attack.name} ${attack.bonus >= 0 ? "+" : ""}${attack.bonus} (${attack.damage})`)
+      .join(", ");
+    const abilities = monster.abilities.map((ability) => ability.name).join(", ");
+    const generatedNotes = [attacks, abilities].filter(Boolean).join(". ");
+    updateCompanion(draft.companions.indexOf(companion), {
+      monsterId: monster.id,
+      name: monster.name,
+      level: Math.max(1, Math.min(20, monster.level)),
+      hpMax: monster.hp,
+      hpCurrent: monster.hp,
+      ac: monster.ac,
+      notes: companion.notes.trim() ? companion.notes : generatedNotes,
+    });
+    setBestiaryFor(null);
+    setMonsterQuery("");
+    setMonsterResults([]);
+    toast(`Linked ${monster.name}.`, "success");
+  };
   const updateCompanion = (index: number, patch: Partial<CharacterDraft["companions"][number]>) =>
     update((current) => ({
       ...current,
@@ -149,6 +202,7 @@ export function DetailsStep({ draft, update, setStep, onPortrait }: BuilderProps
           hpCurrent: null,
           hpMax: null,
           ac: null,
+          monsterId: null,
           notes: "",
         },
       ],
@@ -260,7 +314,9 @@ export function DetailsStep({ draft, update, setStep, onPortrait }: BuilderProps
             Add companion
           </Button>
         </div>
-        {draft.companions.map((companion, index) => (
+        {draft.companions.map((companion, index) => {
+          const linkedMonster = companion.monsterId ? context.monsters?.[companion.monsterId] : null;
+          return (
           <div key={companion.id} className="companion-row">
             <div className="companion-row-head">
               <strong>{companion.name || "Companion"}</strong>
@@ -276,6 +332,52 @@ export function DetailsStep({ draft, update, setStep, onPortrait }: BuilderProps
                 <Trash2 size={13} />
               </IconButton>
             </div>
+            <div className="row wrap" style={{ gap: 6 }}>
+              <Button
+                size="sm"
+                icon={<BookOpen size={14} />}
+                onClick={() => {
+                  setBestiaryFor(companion.id);
+                  setMonsterQuery("");
+                }}
+              >
+                {companion.monsterId ? "Change bestiary link" : "Link bestiary"}
+              </Button>
+              {companion.monsterId ? (
+                <Button size="sm" variant="ghost" onClick={() => updateCompanion(index, { monsterId: null })}>
+                  Clear link
+                </Button>
+              ) : null}
+              {linkedMonster ? <Badge tone="blue">Bestiary · {linkedMonster.name}</Badge> : null}
+            </div>
+            {linkedMonster ? (
+              <div className="companion-statblock">
+                <div className="tiny muted">
+                  Level {linkedMonster.level} · HP {linkedMonster.hp} · AC {linkedMonster.ac} · Fort{" "}
+                  {signed(linkedMonster.fortitude)} · Ref {signed(linkedMonster.reflex)} · Will{" "}
+                  {signed(linkedMonster.will)} · Per {signed(linkedMonster.perception)}
+                </div>
+                {linkedMonster.attacks.length ? (
+                  <div className="tiny">
+                    {linkedMonster.attacks
+                      .map((attack) => `${attack.name} ${signed(attack.bonus)} (${attack.damage})`)
+                      .join(" · ")}
+                  </div>
+                ) : null}
+                {linkedMonster.abilities.length ? (
+                  <details>
+                    <summary className="tiny gold-text">{linkedMonster.abilities.length} abilities</summary>
+                    {linkedMonster.abilities.map((ability) => (
+                      <div key={ability.name} className="companion-ability">
+                        <strong>{ability.name}</strong>
+                        {ability.actions ? <span className="tiny muted"> · {ability.actions}</span> : null}
+                        <RichText html={ability.description} />
+                      </div>
+                    ))}
+                  </details>
+                ) : null}
+              </div>
+            ) : null}
             <div className="companion-grid">
               <Field label="Name">
                 <Input
@@ -352,11 +454,51 @@ export function DetailsStep({ draft, update, setStep, onPortrait }: BuilderProps
               />
             </Field>
           </div>
-        ))}
+          );
+        })}
         {!draft.companions.length ? (
           <p className="muted small">No companions yet. Add one when a class feature grants it.</p>
         ) : null}
       </Card>
+      <Modal
+        open={Boolean(bestiaryFor)}
+        onClose={() => setBestiaryFor(null)}
+        title="Link a bestiary statblock"
+        subtitle="Search the bestiary to prefill this companion's combat basics."
+      >
+        <div className="stack">
+          <Input
+            autoFocus
+            value={monsterQuery}
+            onChange={(event) => setMonsterQuery(event.target.value)}
+            placeholder="Search monsters…"
+          />
+          {monsterLoading ? <Spinner label="Searching the bestiary…" /> : null}
+          <div className="bestiary-picker-list">
+            {monsterResults.map((monster) => (
+              <button
+                key={monster.id}
+                type="button"
+                className="picker-item"
+                onClick={() => linkMonster(monster)}
+              >
+                <div className="picker-item-main">
+                  <span className="picker-item-name">{monster.name}</span>
+                  <span className="picker-item-sub">
+                    Level {monster.level} · {monster.size} · HP {monster.hp} · AC {monster.ac}
+                  </span>
+                </div>
+                <div className="picker-item-tags">
+                  <Tag>{monster.source}</Tag>
+                </div>
+              </button>
+            ))}
+            {!monsterLoading && !monsterResults.length ? (
+              <p className="muted small">No creatures match that search.</p>
+            ) : null}
+          </div>
+        </div>
+      </Modal>
       <div className="step-actions">
         <Button variant="ghost" onClick={() => setStep("gear")}>Back</Button>
         <Button variant="primary" onClick={() => setStep("review")} icon={<ArrowRight size={15} />}>Review character</Button>

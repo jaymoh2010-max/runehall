@@ -834,6 +834,8 @@
 .sheet-companion-list { display: flex; flex-direction: column; gap: 8px; }
 .sheet-companion-row { border: 1px solid var(--line); border-radius: 7px; background: rgba(255,255,255,0.012); padding: 9px 10px; display: flex; flex-direction: column; gap: 5px; }
 .sheet-companion-notes { white-space: pre-wrap; line-height: 1.45; }
+.sheet-companion-statblock { margin-top: 2px; }
+.sheet-companion-statblock summary { cursor: pointer; }
 .sheet-notes { display: flex; flex-direction: column; gap: 12px; }
 .sheet-notes h4 { color: var(--gold); font-size: 0.73rem; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 3px; }
 .sheet-notes p { color: var(--text-2); font-size: 0.88rem; line-height: 1.55; }
@@ -1433,6 +1435,10 @@
 .companions-card { display: flex; flex-direction: column; gap: 12px; }
 .companion-row { border: 1px solid var(--line); border-radius: 8px; background: rgba(255,255,255,0.015); padding: 11px; display: flex; flex-direction: column; gap: 9px; }
 .companion-row-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.companion-statblock { display: flex; flex-direction: column; gap: 4px; border: 1px solid rgba(200,169,107,0.18); border-radius: 7px; background: rgba(200,169,107,0.04); padding: 8px 10px; }
+.companion-ability { margin-top: 7px; }
+.companion-ability .rich-text { font-size: 0.78rem; margin-top: 3px; }
+.bestiary-picker-list { display: flex; flex-direction: column; gap: 6px; max-height: 380px; overflow: auto; }
 .companion-grid { display: grid; grid-template-columns: 1.4fr 1fr 0.65fr 0.7fr 0.7fr 0.6fr; gap: 8px; }
 @media (max-width: 980px) {
   .companion-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }

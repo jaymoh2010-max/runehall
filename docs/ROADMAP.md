@@ -346,8 +346,11 @@ Acceptance: a GM can prepare a full session in Runehall and start it with one �
   - Prepared casters label their spell lists as **spellbook** and show prepared counts; spontaneous casters use **repertoire**.
   - The sheet shows the same separation and labels.
   - Remaining: enforce heal-or-harm on font preparations and fully separate spellbook from known lists for every prepared class.
-- [ ] **Companion support**
-  - Bestiary-linked statblocks or a clear actor-lite sheet for companions, familiars, and eidolons.
+- [x] **Companion support (first pass)**
+  - Companions can link to a bestiary entry, which prefills name, level, HP, AC, and attack notes.
+  - Linked statblocks show saves, perception, attacks, and abilities in the builder and sheet.
+  - Links are stored as `monsterId` on the companion and resolved through the character context.
+  - Remaining: place companions as linked tokens, automate companion advancement, and enforce companion-level rules.
 - [ ] **Content curation**
   - “Recommended core” filter and search ranking.
 

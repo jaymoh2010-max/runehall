@@ -535,6 +535,7 @@ export function normalizeCharacterDraft(input: unknown, fallbackName = "New Hero
             typeof companion.ac === "number" && Number.isFinite(companion.ac)
               ? Math.max(0, Math.floor(companion.ac))
               : null,
+          monsterId: typeof companion.monsterId === "string" ? companion.monsterId : null,
           notes: str(companion.notes).slice(0, 4000),
         };
       }),

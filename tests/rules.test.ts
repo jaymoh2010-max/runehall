@@ -152,6 +152,30 @@ describe("PF2e character rules", () => {
     expect(draft.details.notes).toBe("Hello");
   });
 
+  it("preserves companion bestiary links when normalizing", () => {
+    const draft = normalizeCharacterDraft(
+      {
+        name: "Beastmaster",
+        companions: [
+          {
+            id: "comp_wolf",
+            name: "Wolf",
+            kind: "animal",
+            level: 1,
+            hpCurrent: 10,
+            hpMax: 10,
+            ac: 15,
+            monsterId: "monster:wolf",
+            notes: "Jaws +6",
+          },
+        ],
+      },
+      "Fallback",
+    );
+    expect(draft.companions[0].monsterId).toBe("monster:wolf");
+    expect(draft.companions[0].name).toBe("Wolf");
+  });
+
   it("uses partial boosts at 5th, 10th, 15th, and 20th level", () => {
     const { draft, context } = buildCleric();
     draft.level = 10;

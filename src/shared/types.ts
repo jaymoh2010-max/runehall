@@ -524,6 +524,8 @@ export interface CharacterCompanion {
   hpCurrent: number | null;
   hpMax: number | null;
   ac: number | null;
+  /** Optional bestiary entry used as the companion's statblock. */
+  monsterId: string | null;
   notes: string;
 }
 
@@ -684,6 +686,8 @@ export interface CharacterContext {
   feats: Record<string, Feat>;
   spells: Record<string, Spell>;
   equipment: Record<string, Equipment>;
+  /** Bestiary entries linked to companion statblocks. */
+  monsters?: Record<string, Monster>;
   /** Lowercased names of every feat in the compendium, used for prerequisite checks. */
   featNames?: string[];
 }

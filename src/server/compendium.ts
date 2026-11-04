@@ -276,6 +276,13 @@ export function contextForDraft(draft: CharacterDraft): CharacterContext {
     }
   }
 
+  const monsterMap: Record<string, Monster> = {};
+  for (const companion of draft.companions) {
+    if (!companion.monsterId) continue;
+    const monster = maps.monster.get(companion.monsterId);
+    if (monster) monsterMap[monster.id] = monster;
+  }
+
   return {
     ancestry,
     heritage,
@@ -285,6 +292,7 @@ export function contextForDraft(draft: CharacterDraft): CharacterContext {
     feats: featMap,
     spells: spellMap,
     equipment: equipmentMap,
+    monsters: monsterMap,
     featNames,
   };
 }

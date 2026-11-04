@@ -658,13 +658,16 @@ export function CharacterSheetPage() {
                 <span className="tiny muted">{draft.companions.length} in the roster</span>
               </div>
               <div className="sheet-companion-list">
-                {draft.companions.map((companion) => (
+                {draft.companions.map((companion) => {
+                  const linkedMonster = companion.monsterId ? context.monsters?.[companion.monsterId] : null;
+                  return (
                   <div key={companion.id} className="sheet-companion-row">
                     <div>
                       <div className="row" style={{ gap: 7 }}>
                         <strong>{companion.name}</strong>
                         <Tag tone="blue">{companion.kind}</Tag>
                         <span className="tiny muted">level {companion.level}</span>
+                        {linkedMonster ? <Tag tone="gold">Bestiary</Tag> : null}
                       </div>
                       <p className="tiny muted">
                         {companion.hpMax !== null
@@ -675,9 +678,39 @@ export function CharacterSheetPage() {
                         {companion.ac !== null ? ` · AC ${companion.ac}` : ""}
                       </p>
                     </div>
+                    {linkedMonster ? (
+                      <details className="sheet-companion-statblock">
+                        <summary className="tiny gold-text">Bestiary statblock · {linkedMonster.name}</summary>
+                        <p className="tiny muted">
+                          HP {linkedMonster.hp} · AC {linkedMonster.ac} · Fort {signed(linkedMonster.fortitude)} ·
+                          Ref {signed(linkedMonster.reflex)} · Will {signed(linkedMonster.will)} · Per{" "}
+                          {signed(linkedMonster.perception)}
+                        </p>
+                        {linkedMonster.attacks.length ? (
+                          <p className="tiny muted">
+                            {linkedMonster.attacks
+                              .map((attack) => `${attack.name} ${signed(attack.bonus)} (${attack.damage})`)
+                              .join(" · ")}
+                          </p>
+                        ) : null}
+                        {linkedMonster.abilities.length ? (
+                          <details>
+                            <summary className="tiny gold-text">{linkedMonster.abilities.length} abilities</summary>
+                            {linkedMonster.abilities.map((ability) => (
+                              <div key={ability.name} className="companion-ability">
+                                <strong>{ability.name}</strong>
+                                {ability.actions ? <span className="tiny muted"> · {ability.actions}</span> : null}
+                                <RichText html={ability.description} />
+                              </div>
+                            ))}
+                          </details>
+                        ) : null}
+                      </details>
+                    ) : null}
                     {companion.notes ? <p className="tiny muted sheet-companion-notes">{companion.notes}</p> : null}
                   </div>
-                ))}
+                  );
+                })}
               </div>
             </Card>
           ) : null}

@@ -32,7 +32,7 @@ The target table size is one GM plus 4–10 players. That means the product shou
 - Real compendium content and live derived statistics.
 - Class choice groups (doctrines, bloodlines, rackets, schools, instincts, etc.) driven by Foundry choice tags.
 - Autosave, export/import, at-the-table sheet, local and campaign rolls.
-- Known gaps: complex/story prerequisites, all feat/item effects, companions, and exact split-caster casting restrictions.
+- Known gaps: complex/story prerequisites, all feat/item effects, companion advancement, and exact split-caster casting restrictions.
 - Feat and equipment pickers now show conservative automation badges, and level-1 fighter/wizard/rogue golden fixtures pin the derived math.
 - Leveling up creates a persistent checklist of required boosts, skills, feats, and spell ranks.
 
@@ -177,7 +177,7 @@ The character draft is a versioned JSON document (`CharacterDraft.version = 1`).
 - Prepared-vs-spontaneous slot enforcement (animist apparition slots and cleric divine font slots are counted, and divine font now has separate pips, but heal-or-harm casting restrictions are not enforced).
 - Exact prepared-vs-spontaneous restrictions for split casters such as the animist.
 - Psychic amps, focus-spell maximums from every feat, and focus spell selection restricted by class.
-- Animist apparitions, animal companions, eidolons, familiars, constructs, and summon stat blocks.
+- Animist apparitions, animal companions, eidolons, familiars, constructs, and summon stat blocks. Bestiary-linked companion statblocks now prefills HP, AC, attacks, and abilities; advancement and companion-specific rules remain manual.
 - Alchemical formula books and daily consumable preparation.
 - Automatic language/sense grants from every feat, and paired background skill/Lore/feat choices that must be selected together.
 - Spells with unusual action costs and heightening automation.
