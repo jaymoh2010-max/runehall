@@ -283,7 +283,7 @@ if (noTraditions.length) {
   );
 }
 
-const unresolvedMacro = /@UUID|\[\[\/|@Damage|@Check|@Localize|@Compendium/;
+const unresolvedMacro = /@UUID|\[\[\/|@Damage|@Check|@Localize|@Compendium|\{[+-]\d+\}/;
 for (const file of files) {
   for (const item of data[file.key] ?? []) {
     if (unresolvedMacro.test(JSON.stringify(item))) {

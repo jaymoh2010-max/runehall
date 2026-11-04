@@ -116,20 +116,26 @@ function expandMacros(html) {
 
   // Foundry inline roll/action macros, e.g. [[/act recall-knowledge]],
   // [[/r 2d6 #fire]], and [[/check athletics dc=15]].
-  out = out.replace(/\[\[\/([a-z]+)\s*([^\]]*)\]\]/gi, (_match, command, body) => {
-    const tokens = String(body || "").trim().split(/\s+/).filter(Boolean);
-    if (["r", "gmr", "br", "dr"].includes(command.toLowerCase())) {
-      const formula = (tokens[0] || "").replace(/^\{|\}$/g, "");
-      const label = tokens.slice(1).join(" ").replace(/^#/, "");
-      return [formula, label].filter(Boolean).join(" ");
-    }
-    const slug = tokens[0] || command;
-    const keys = tokens
-      .filter((token) => token.startsWith("key="))
-      .map((token) => titleCase(token.slice(4)));
-    const name = titleCase(slug);
-    return keys.length ? `${name} (${keys.join(", ")})` : name;
-  });
+  out = out.replace(
+    /\[\[\/([a-z]+)\s*([^\]]*)\]\](?:\{([^}]*)\})?/gi,
+    (_match, command, body, display) => {
+      const tokens = String(body || "").trim().split(/\s+/).filter(Boolean);
+      if (["r", "gmr", "br", "dr"].includes(command.toLowerCase())) {
+        const formula = (tokens[0] || "").replace(/^\{|\}$/g, "");
+        const label = tokens.slice(1).join(" ").replace(/^#/, "");
+        // Inline rolls often repeat the modifier in a trailing display label,
+        // e.g. [[/r 1d20+17]]{+17}; the formula already contains it.
+        return [formula, label].filter(Boolean).join(" ");
+      }
+      if (display && display.trim()) return display.trim();
+      const slug = tokens[0] || command;
+      const keys = tokens
+        .filter((token) => token.startsWith("key="))
+        .map((token) => titleCase(token.slice(4)));
+      const name = titleCase(slug);
+      return keys.length ? `${name} (${keys.join(", ")})` : name;
+    },
+  );
 
   out = out.replace(/@UUID\[([^\]]+)\](?:\{([^}]*)\})?/g, (m, body, label) => stripUuid(m, body, label));
   out = out.replace(/@Compendium\[([^\]]+)\](?:\{([^}]*)\})?/g, (m, body, label) => stripUuid(m, body, label));
