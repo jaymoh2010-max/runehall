@@ -376,7 +376,8 @@ Acceptance: a GM can prepare a full session in Runehall and start it with one �
   - The token editor, token panel, and initiative tooltip show labels such as “Frightened 2 (3r)”.
   - Advancing initiative ticks the active entry’s timed conditions and removes expired ones.
   - Character-sheet conditions also track value and round duration, with a one-click −1 duration button.
-  - Remaining: automatic character-sheet ticking when the character’s turn ends.
+  - Character-sheet condition durations tick automatically when that character’s linked token ends its turn in initiative.
+  - Remaining: sheet ticking without a linked token.
 - [x] **Multi-select, marquee, and group drag**
   - Shift/Ctrl/Cmd-click toggles tokens in the selection; a plain click selects one token.
   - Shift-drag on empty map space draws a marquee and selects every token inside it.
@@ -385,22 +386,22 @@ Acceptance: a GM can prepare a full session in Runehall and start it with one �
   - The primary selected token still drives the token panel.
 - [x] **Bulk token actions**
   - Multi-selected tokens can take damage, heal, or be restored to full HP together.
-  - A condition can be applied to every selected token at once.
-  - Conditions can be cleared from the whole selection.
-  - Remaining: bulk delete, bulk hidden/locked toggles, and per-token confirmation for destructive actions.
+  - A condition can be applied to every selected token at once, and conditions can be cleared.
+  - The GM can hide, show, lock, unlock, or delete the whole selection.
+  - Remaining: per-token confirmation for destructive bulk actions.
 - [x] **Scene playlists and player-safe preview**
-  - Scenes can be reordered with up/down controls; ordering is persisted and broadcast.
+  - Scenes can be reordered with up/down controls or drag-and-drop; ordering is persisted and broadcast.
   - Toolbar previous/next buttons step through the scene playlist.
   - Creating a scene can activate it immediately.
   - The GM can preview any scene as players see it without changing the active scene.
-  - Remaining: drag-and-drop reordering and player-facing preview controls.
+  - Remaining: generated scene thumbnails and player-facing preview controls.
 - [x] **Combat-log filters and group checks**
   - Chat log filters for All, Talk, Rolls, Requests, and GM-only messages.
   - Empty-filter states explain when nothing matches.
   - GM Screen can mark a roll request as a **Group check**.
   - Group check cards are labeled in the shared chat and still open the prefilled dice tray.
-  - Player rolls made from a request are linked back to it, and the request card shows each responder, total, and degree of success.
-  - Remaining: automated summary/tally cards and GM-only response filtering.
+  - Player rolls made from a request are linked back to it, and the request card shows each responder, total, degree of success, and a pass/fail tally for group checks.
+  - Remaining: GM-only response filtering and exportable check summaries.
 - [x] **Delay, ready, and initiative ties**
   - The active combatant can **Delay** their turn, moving to the end of the order with a Delayed badge.
   - **Ready** marks the readied state and advances the turn (and round when needed).

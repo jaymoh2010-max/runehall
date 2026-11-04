@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Dices, EyeOff, Lock, Minus, MousePointer2, Plus, Swords, Trash2, X } from "lucide-react";
+import { Dices, Eye, EyeOff, Lock, Minus, MousePointer2, Plus, Swords, Trash2, Unlock, X } from "lucide-react";
 import type { CharacterRecord, PublicUser, Scene, Token } from "../../../shared/types";
 import { groupHp, tokenConditionLabel } from "../../../shared/tokens";
 import { Avatar, Badge, Button, Field, IconButton, Input, ProgressBar, Select, Stat, Tag, Toggle } from "../ui";
@@ -25,6 +25,8 @@ export function VttTokenPanel({
   onBulkHp,
   onBulkCondition,
   onBulkClearConditions,
+  onBulkPatch,
+  onBulkDelete,
 }: {
   activeScene: Scene;
   isGm: boolean;
@@ -46,6 +48,8 @@ export function VttTokenPanel({
   onBulkHp: (delta: number, full?: boolean) => void;
   onBulkCondition: (name: string, value: number | null, duration: number | null) => void;
   onBulkClearConditions: () => void;
+  onBulkPatch: (patch: Partial<Token>) => void;
+  onBulkDelete: () => void;
 }) {
   const [groupAmount, setGroupAmount] = useState("5");
   const [bulkCondition, setBulkCondition] = useState("");
@@ -98,6 +102,24 @@ export function VttTokenPanel({
             <Button size="sm" icon={<Plus size={13} />} onClick={applyBulkCondition}>Apply</Button>
           </div>
           <Button size="sm" variant="ghost" onClick={onBulkClearConditions}>Clear conditions</Button>
+          {isGm ? (
+            <div className="row wrap" style={{ gap: 5 }}>
+              <Button size="sm" variant="ghost" icon={<EyeOff size={13} />} onClick={() => onBulkPatch({ hidden: true })}>Hide</Button>
+              <Button size="sm" variant="ghost" icon={<Eye size={13} />} onClick={() => onBulkPatch({ hidden: false })}>Show</Button>
+              <Button size="sm" variant="ghost" icon={<Lock size={13} />} onClick={() => onBulkPatch({ locked: true })}>Lock</Button>
+              <Button size="sm" variant="ghost" icon={<Unlock size={13} />} onClick={() => onBulkPatch({ locked: false })}>Unlock</Button>
+              <Button
+                size="sm"
+                variant="danger"
+                icon={<Trash2 size={13} />}
+                onClick={() => {
+                  if (window.confirm(`Delete ${selectedTokens.length} selected tokens?`)) onBulkDelete();
+                }}
+              >
+                Delete
+              </Button>
+            </div>
+          ) : null}
         </div>
       ) : null}
       <div className="vtt-token-list">

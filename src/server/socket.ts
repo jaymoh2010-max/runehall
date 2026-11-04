@@ -219,6 +219,34 @@ function tickConditionsForEntry(
     if (updated) io.to(room(campaignId)).emit("token:updated", tokenWithOwner(updated));
     changed = true;
   }
+  const characterIds = new Set(
+    rows
+      .map((row) => row.character_id)
+      .filter((id): id is string => typeof id === "string" && Boolean(id)),
+  );
+  for (const characterId of characterIds) {
+    const character = getCharacter(characterId);
+    if (!character) continue;
+    try {
+      const draft = normalizeCharacterDraft(JSON.parse(character.data), character.name);
+      const current = draft.play.conditions;
+      const next = tickTokenConditions(current);
+      if (JSON.stringify(next) === JSON.stringify(current)) continue;
+      draft.play.conditions = next;
+      const summary = characterSummary(draft, contextForDraft(draft));
+      db.prepare(
+        "UPDATE characters SET data = ?, summary = ?, updated_at = ?, revision = revision + 1 WHERE id = ?",
+      ).run(JSON.stringify(draft), JSON.stringify(summary), now(), characterId);
+      io.to(room(campaignId)).emit("character:updated", {
+        characterId,
+        summary,
+        name: draft.name,
+      });
+      changed = true;
+    } catch {
+      // A malformed draft should not block the initiative advance.
+    }
+  }
   return changed;
 }
 

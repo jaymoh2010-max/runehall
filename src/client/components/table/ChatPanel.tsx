@@ -284,6 +284,14 @@ function RequestCard({
   onUse: () => void;
 }) {
   const completed = responses.filter((message) => message.data && "total" in message.data);
+  const successes = completed.filter((message) => {
+    const result = message.data as RollResult;
+    return result.degree === "success" || result.degree === "critical-success";
+  }).length;
+  const failures = completed.filter((message) => {
+    const result = message.data as RollResult;
+    return result.degree === "failure" || result.degree === "critical-failure";
+  }).length;
   return (
     <div className="roll-request-card">
       <div className="roll-request-head">
@@ -291,6 +299,9 @@ function RequestCard({
         <span className="row" style={{ gap: 5 }}>
           {data.group ? <Badge tone="gold">Group check</Badge> : null}
           {data.dc !== null ? <Badge tone="gold">DC {data.dc}</Badge> : null}
+          {data.group && completed.length ? (
+            <Badge tone={failures ? "red" : "green"}>{successes} pass · {failures} fail</Badge>
+          ) : null}
           {completed.length ? <Badge tone="green">{completed.length} response{completed.length === 1 ? "" : "s"}</Badge> : null}
         </span>
       </div>

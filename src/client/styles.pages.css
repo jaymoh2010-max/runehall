@@ -667,6 +667,8 @@
 .scene-manager-list { display: flex; flex-direction: column; gap: 6px; }
 .scene-manager-row { display: flex; align-items: center; gap: 11px; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; background: rgba(255,255,255,0.014); }
 .scene-manager-row.is-active { border-color: rgba(200,169,107,0.4); background: rgba(200,169,107,0.05); }
+.scene-manager-row.is-dragging { opacity: 0.5; }
+.scene-drag-handle { display: inline-flex; align-items: center; color: var(--muted-2); cursor: grab; flex: none; }
 .scene-manager-thumb { width: 58px; height: 38px; border-radius: 5px; overflow: hidden; background: #0d121a; border: 1px solid var(--line); display: grid; place-items: center; color: var(--muted-2); flex: 0 0 auto; }
 .scene-manager-thumb img { width: 100%; height: 100%; object-fit: cover; }
 .map-upload-zone {

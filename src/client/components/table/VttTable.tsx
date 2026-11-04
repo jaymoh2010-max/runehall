@@ -379,6 +379,26 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
     for (const token of selected) updateToken(token.id, { conditions: [] });
   };
 
+  const bulkPatch = (patch: Partial<Token>) => {
+    const selected = tokens.filter(
+      (token) => selectedTokenIds.includes(token.id) && token.sceneId === activeSceneId,
+    );
+    for (const token of selected) updateToken(token.id, patch);
+  };
+
+  const bulkDelete = () => {
+    const selected = tokens.filter(
+      (token) => selectedTokenIds.includes(token.id) && token.sceneId === activeSceneId,
+    );
+    if (!selected.length) return;
+    const ids = new Set(selected.map((token) => token.id));
+    setTokens((current) => current.filter((token) => !ids.has(token.id)));
+    for (const token of selected) {
+      getSocket().emit("token:delete", { campaignId, tokenId: token.id });
+    }
+    setSelectedTokenId(null);
+  };
+
   const deleteToken = (tokenId: string) => {
     setTokens((current) => current.filter((token) => token.id !== tokenId));
     setSelectedTokenId(null);
@@ -694,6 +714,8 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
             onBulkHp={bulkHp}
             onBulkCondition={bulkCondition}
             onBulkClearConditions={bulkClearConditions}
+            onBulkPatch={bulkPatch}
+            onBulkDelete={bulkDelete}
           />
         ) : null}
 

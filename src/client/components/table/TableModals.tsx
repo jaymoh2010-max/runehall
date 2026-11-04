@@ -4,6 +4,7 @@ import {
   ArrowUp,
   Check,
   Eye,
+  GripVertical,
   ImagePlus,
   Map,
   Plus,
@@ -359,6 +360,7 @@ export function SceneManagerModal({
   const [dimensions, setDimensions] = useState({ width: 1600, height: 1000 });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [draggingSceneId, setDraggingSceneId] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -427,7 +429,33 @@ export function SceneManagerModal({
         <>
           <div className="scene-manager-list">
             {scenes.map((scene, index) => (
-              <div key={scene.id} className={`scene-manager-row ${scene.id === activeSceneId ? "is-active" : ""}`}>
+              <div
+                key={scene.id}
+                className={`scene-manager-row ${scene.id === activeSceneId ? "is-active" : ""} ${scene.id === draggingSceneId ? "is-dragging" : ""}`}
+                draggable
+                onDragStart={(event) => {
+                  setDraggingSceneId(scene.id);
+                  event.dataTransfer.effectAllowed = "move";
+                  event.dataTransfer.setData("text/plain", scene.id);
+                }}
+                onDragOver={(event) => {
+                  if (draggingSceneId && draggingSceneId !== scene.id) event.preventDefault();
+                }}
+                onDrop={(event) => {
+                  event.preventDefault();
+                  if (!draggingSceneId || draggingSceneId === scene.id) return;
+                  const ids = scenes.map((entry) => entry.id);
+                  const from = ids.indexOf(draggingSceneId);
+                  const to = ids.indexOf(scene.id);
+                  if (from < 0 || to < 0) return;
+                  const [moved] = ids.splice(from, 1);
+                  ids.splice(to, 0, moved);
+                  onReorder(ids);
+                  setDraggingSceneId(null);
+                }}
+                onDragEnd={() => setDraggingSceneId(null)}
+              >
+                <span className="scene-drag-handle" title="Drag to reorder"><GripVertical size={14} /></span>
                 <div className="scene-manager-thumb">
                   {scene.imageUrl ? <img src={scene.imageUrl} alt="" /> : <Map size={20} />}
                 </div>
