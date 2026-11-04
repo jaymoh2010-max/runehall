@@ -351,8 +351,11 @@ Acceptance: a GM can prepare a full session in Runehall and start it with one �
   - Linked statblocks show saves, perception, attacks, and abilities in the builder and sheet.
   - Links are stored as `monsterId` on the companion and resolved through the character context.
   - Remaining: place companions as linked tokens, automate companion advancement, and enforce companion-level rules.
-- [ ] **Content curation**
-  - “Recommended core” filter and search ranking.
+- [x] **Content curation**
+  - Feat, spell, and equipment pickers now default to a **Recommended only** filter.
+  - Recommended means common, non-playtest options; users can toggle it off to see everything.
+  - Search ranks exact names first, then prefix and word-prefix matches, before falling back to level/name order.
+  - Unit tests cover recommended filtering and exact-name ranking.
 
 **Acceptance:** level-up cannot skip required choices; golden fixtures match; manual effects are visibly flagged.
 

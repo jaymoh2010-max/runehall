@@ -22,6 +22,7 @@ Runehall is built for a private group of roughly 4–10 players and a GM. It run
 - A persistent level-up checklist tracks required boosts, skill increases, feat slots, and spell ranks, with links back to each chapter.
 - Printable character sheet with a clean Print/PDF layout.
 - Real compendium content: 51 ancestries, 334 heritages, 540 backgrounds, 29 classes, 3,000+ class features/feats, 2,000+ spells, 5,900+ items, 480+ deities, 1,200+ creatures.
+- Feat, spell, and equipment pickers default to a **Recommended only** view (common, non-playtest options) and rank exact/prefix name matches first; toggle the filter off to browse everything.
 - Ability boost validation, key ability selection, ancestry/background/class choices, doctrine/bloodline/racket-style subclass selection.
 - Derived HP, AC, saves, perception, class DC, spell DC/attack, skills, lore, attacks, bulk, and wealth.
 - Autosaves every change; portable JSON export/import.

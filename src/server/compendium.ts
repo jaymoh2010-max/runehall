@@ -84,6 +84,7 @@ export interface SearchOptions {
   rarity?: string[];
   includeLegacy?: boolean;
   coreOnly?: boolean;
+  recommended?: boolean;
   type?: string[];
   usage?: string[];
 }
@@ -91,6 +92,27 @@ export interface SearchOptions {
 function matchesText(text: string, q: string | undefined): boolean {
   if (!q) return true;
   return text.toLowerCase().includes(q.toLowerCase());
+}
+
+function searchScore(name: string, q: string | undefined): number {
+  if (!q?.trim()) return 0;
+  const normalized = name.toLowerCase();
+  const query = q.toLowerCase().trim();
+  if (normalized === query) return 0;
+  if (normalized.startsWith(query)) return 1;
+  if (normalized.split(/[^a-z0-9]+/).some((word) => word.startsWith(query))) return 2;
+  if (normalized.includes(query)) return 3;
+  return 4;
+}
+
+function sortByRelevance<T extends { name: string }>(
+  items: T[],
+  q: string | undefined,
+  tieBreak: (a: T, b: T) => number,
+): T[] {
+  return items.sort(
+    (a, b) => searchScore(a.name, q) - searchScore(b.name, q) || tieBreak(a, b),
+  );
 }
 
 function matchesTraits(itemTraits: string[], requested: string[] | undefined): boolean {
@@ -116,6 +138,7 @@ export function searchFeats(opts: SearchOptions) {
   const filtered = feats.filter((feat) => {
     if (!opts.includeLegacy && !feat.remaster) return false;
     if (opts.coreOnly && !isCoreSource(feat.source)) return false;
+    if (opts.recommended && (feat.rarity !== "common" || feat.playtest)) return false;
     if (opts.levelMin !== undefined && feat.level < opts.levelMin) return false;
     if (opts.levelMax !== undefined && feat.level > opts.levelMax) return false;
     if (categories.length && !categories.includes(feat.category)) return false;
@@ -124,7 +147,7 @@ export function searchFeats(opts: SearchOptions) {
     if (!matchesText(`${feat.name} ${feat.traits.join(" ")} ${feat.source}`, opts.q)) return false;
     return true;
   });
-  filtered.sort((a, b) => a.level - b.level || a.name.localeCompare(b.name));
+  sortByRelevance(filtered, opts.q, (a, b) => a.level - b.level || a.name.localeCompare(b.name));
   return paginate(filtered, opts);
 }
 
@@ -134,6 +157,7 @@ export function searchSpells(opts: SearchOptions & { rank?: number; tradition?: 
   const filtered = spells.filter((spell) => {
     if (!opts.includeLegacy && !spell.remaster) return false;
     if (opts.coreOnly && !isCoreSource(spell.source)) return false;
+    if (opts.recommended && (spell.rarity !== "common" || spell.playtest)) return false;
     // Focus spells belong in the focus picker, not the ordinary spell list.
     if (opts.rank !== undefined && !wantsFocus && spell.traits.includes("focus")) return false;
     if (opts.rank !== undefined && spell.rank !== opts.rank) return false;
@@ -147,7 +171,7 @@ export function searchSpells(opts: SearchOptions & { rank?: number; tradition?: 
     if (!matchesText(`${spell.name} ${spell.traits.join(" ")} ${spell.traditions.join(" ")}`, opts.q)) return false;
     return true;
   });
-  filtered.sort((a, b) => a.rank - b.rank || a.name.localeCompare(b.name));
+  sortByRelevance(filtered, opts.q, (a, b) => a.rank - b.rank || a.name.localeCompare(b.name));
   return paginate(filtered, opts);
 }
 
@@ -166,6 +190,7 @@ export function searchEquipment(opts: SearchOptions) {
   const filtered = equipment.filter((item) => {
     if (!opts.includeLegacy && !item.remaster) return false;
     if (opts.coreOnly && !isCoreSource(item.source)) return false;
+    if (opts.recommended && (item.rarity !== "common" || item.playtest)) return false;
     if (types.length && !types.includes(item.type)) return false;
     if (usages.length && !usages.some((usage) => matchesUsage(item.usage, usage))) return false;
     if (opts.levelMin !== undefined && item.level < opts.levelMin) return false;
@@ -175,12 +200,13 @@ export function searchEquipment(opts: SearchOptions) {
     if (!matchesText(`${item.name} ${item.traits.join(" ")} ${item.type} ${item.source}`, opts.q)) return false;
     return true;
   });
-  filtered.sort((a, b) => a.level - b.level || a.name.localeCompare(b.name));
+  sortByRelevance(filtered, opts.q, (a, b) => a.level - b.level || a.name.localeCompare(b.name));
   return paginate(filtered, opts);
 }
 
 export function searchMonsters(opts: SearchOptions) {
   const filtered = monsters.filter((monster) => {
+    if (opts.recommended && (monster.rarity !== "common" || monster.playtest)) return false;
     if (opts.levelMin !== undefined && monster.level < opts.levelMin) return false;
     if (opts.levelMax !== undefined && monster.level > opts.levelMax) return false;
     if (opts.rarity?.length && !opts.rarity.includes(monster.rarity)) return false;
@@ -188,7 +214,7 @@ export function searchMonsters(opts: SearchOptions) {
     if (!matchesText(`${monster.name} ${monster.traits.join(" ")} ${monster.source}`, opts.q)) return false;
     return true;
   });
-  filtered.sort((a, b) => a.level - b.level || a.name.localeCompare(b.name));
+  sortByRelevance(filtered, opts.q, (a, b) => a.level - b.level || a.name.localeCompare(b.name));
   return paginate(filtered, opts);
 }
 

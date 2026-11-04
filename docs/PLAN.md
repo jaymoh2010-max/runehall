@@ -35,6 +35,7 @@ The target table size is one GM plus 4–10 players. That means the product shou
 - Known gaps: complex/story prerequisites, all feat/item effects, companion advancement, and exact split-caster casting restrictions.
 - Feat and equipment pickers now show conservative automation badges, and level-1 fighter/wizard/rogue golden fixtures pin the derived math.
 - Leveling up creates a persistent checklist of required boosts, skills, feats, and spell ranks.
+- Feat, spell, and equipment pickers default to a recommended common-only view and rank exact/prefix name matches first.
 
 ### Phase 2 — Shared table (built, with known gaps)
 - Scene upload, grid sizing, pan/zoom/fit, token drag/snap, hidden/locked/owned tokens.

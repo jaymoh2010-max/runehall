@@ -52,6 +52,7 @@ function parseSearch(query: Record<string, unknown>): SearchOptions {
     rarity: csv(query.rarity),
     includeLegacy: bool(query.legacy, true),
     coreOnly: bool(query.core, false),
+    recommended: bool(query.recommended, false),
     type: csv(query.type),
     usage: csv(query.usage),
   };

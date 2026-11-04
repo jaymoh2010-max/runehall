@@ -164,6 +164,7 @@ export function FeatPicker({
   const [query, setQuery] = useState("");
   const [onlyMine, setOnlyMine] = useState(category === "ancestry" || category === "class");
   const [legacy, setLegacy] = useState(Boolean(legacyDefault));
+  const [recommended, setRecommended] = useState(true);
   const [selected, setSelected] = useState<Feat | null>(null);
 
   useEffect(() => {
@@ -191,12 +192,13 @@ export function FeatPicker({
   }
   if (!legacy) params.set("legacy", "0");
   if (!expanded) params.set("core", "1");
+  if (recommended) params.set("recommended", "1");
   if (query.trim()) params.set("q", query.trim());
 
   const { items, total, next, loading, error, offset, setOffset } = useSearch<Feat>(
     open,
     `/api/compendium/feats?${params.toString()}`,
-    [query, onlyMine, legacy, expanded, category, slotLevel, ancestryTrait, classTrait],
+    [query, onlyMine, legacy, expanded, recommended, category, slotLevel, ancestryTrait, classTrait],
   );
 
   // Evaluate prerequisites as if this slot were empty, so replacing a feat
@@ -274,6 +276,15 @@ export function FeatPicker({
                   setOffset(0);
                 }}
                 disabled={contentModeLocked}
+              />
+              <Toggle
+                checked={recommended}
+                onChange={(value) => {
+                  setRecommended(value);
+                  setOffset(0);
+                }}
+                label="Recommended only"
+                title="Show common, non-playtest options first."
               />
             </div>
           </div>
@@ -449,6 +460,7 @@ export function SpellPicker({
 }) {
   const [query, setQuery] = useState("");
   const [legacy, setLegacy] = useState(Boolean(legacyDefault));
+  const [recommended, setRecommended] = useState(true);
   const [selected, setSelected] = useState<Spell | null>(null);
 
   useEffect(() => {
@@ -472,6 +484,7 @@ export function SpellPicker({
   if (tradition) params.set("tradition", tradition);
   if (!legacy) params.set("legacy", "0");
   if (!expanded) params.set("core", "1");
+  if (recommended) params.set("recommended", "1");
   if (query.trim()) params.set("q", query.trim());
   if (focus) {
     params.set("traitAll", [classTrait, "focus"].filter(Boolean).join(","));
@@ -480,7 +493,7 @@ export function SpellPicker({
   const { items, total, next, loading, error, offset, setOffset } = useSearch<Spell>(
     open,
     `/api/compendium/spells?${params.toString()}`,
-    [query, legacy, expanded, rank, maxRank, tradition, focus, classTrait],
+    [query, legacy, expanded, recommended, rank, maxRank, tradition, focus, classTrait],
   );
 
   const filtered = items;
@@ -523,6 +536,15 @@ export function SpellPicker({
                 setOffset(0);
               }}
               disabled={contentModeLocked}
+            />
+            <Toggle
+              checked={recommended}
+              onChange={(value) => {
+                setRecommended(value);
+                setOffset(0);
+              }}
+              label="Recommended only"
+              title="Show common, non-playtest options first."
             />
           </div>
           <div className="picker-scroll">
@@ -653,6 +675,7 @@ export function EquipmentPicker({
   const [query, setQuery] = useState("");
   const [type, setType] = useState("");
   const [legacy, setLegacy] = useState(Boolean(legacyDefault));
+  const [recommended, setRecommended] = useState(true);
   const [selected, setSelected] = useState<Equipment | null>(null);
 
   useEffect(() => {
@@ -674,13 +697,14 @@ export function EquipmentPicker({
   if (type) params.set("type", type);
   if (!legacy) params.set("legacy", "0");
   if (!expanded) params.set("core", "1");
+  if (recommended) params.set("recommended", "1");
   if (query.trim()) params.set("q", query.trim());
   params.set("levelMax", String(level + 2));
 
   const { items, total, next, loading, error, offset, setOffset } = useSearch<Equipment>(
     open,
     `/api/compendium/equipment?${params.toString()}`,
-    [query, type, legacy, expanded, level],
+    [query, type, legacy, expanded, recommended, level],
   );
 
   return (
@@ -723,6 +747,15 @@ export function EquipmentPicker({
                 setOffset(0);
               }}
               disabled={contentModeLocked}
+            />
+            <Toggle
+              checked={recommended}
+              onChange={(value) => {
+                setRecommended(value);
+                setOffset(0);
+              }}
+              label="Recommended only"
+              title="Show common, non-playtest options first."
             />
           </div>
           <div className="picker-scroll">
