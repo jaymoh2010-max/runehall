@@ -334,8 +334,13 @@ Acceptance: a GM can prepare a full session in Runehall and start it with one â€
 - [x] **Golden-sheet regression fixtures**
   - Level-1 fighter, wizard, and rogue fixtures pin abilities, HP, AC, saves, perception, DCs, attacks, and key skills.
   - Build legality remains covered separately by the existing rules tests.
-- [ ] **Guided level-up wizard**
-  - Step-by-step choices, before/after diff, prerequisite explanations, and validation.
+- [x] **Level-up checklist (first pass)**
+  - After leveling, a persistent checklist lists required choices and links to each chapter.
+  - Feat tasks check the actual slot; ability, skill, and spell tasks use validation.
+  - Completed tasks are marked and the header reports the remaining count.
+- [ ] **Full guided level-up wizard**
+  - Gate level-up when the current level still has unresolved required choices.
+  - Add a step-by-step next/back flow with before/after explanations.
 - [ ] **Casting presentation**
   - Separate divine-font tracking and clearer spellbook-vs-known presentation.
 - [ ] **Companion support**

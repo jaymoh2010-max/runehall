@@ -1409,6 +1409,23 @@
 .levelup-item:hover { border-color: var(--gold-deep); background: rgba(200,169,107,0.05); }
 .levelup-item > span { display: flex; flex-direction: column; gap: 2px; }
 
+.levelup-checklist { display: flex; flex-direction: column; gap: 10px; border: 1px solid rgba(200,169,107,0.3); border-radius: 10px; background: rgba(200,169,107,0.05); padding: 13px 15px; margin-bottom: 16px; }
+.levelup-checklist.is-complete { border-color: rgba(127,190,149,0.4); background: rgba(127,190,149,0.06); }
+.levelup-checklist-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.levelup-checklist-head > div { display: flex; flex-direction: column; gap: 2px; }
+.levelup-checklist-head strong { font-size: 0.94rem; }
+.levelup-checklist-items { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+.levelup-checklist-item { display: flex; align-items: flex-start; gap: 9px; border: 1px solid var(--line); border-radius: 8px; background: rgba(0,0,0,0.12); padding: 8px 10px; color: var(--text-2); text-align: left; cursor: pointer; }
+.levelup-checklist-item:hover { border-color: var(--gold-deep); }
+.levelup-checklist-item.is-done { opacity: 0.7; border-color: rgba(127,190,149,0.3); }
+.levelup-checklist-item > span:nth-child(2) { display: flex; flex-direction: column; gap: 1px; flex: 1; }
+.levelup-checklist-item small { color: var(--muted); font-size: 0.72rem; line-height: 1.35; }
+.levelup-checklist-check { display: grid; place-items: center; width: 18px; height: 18px; flex: none; border: 1px solid var(--line); border-radius: 50%; color: var(--green); margin-top: 1px; }
+.levelup-checklist-item.is-done .levelup-checklist-check { border-color: rgba(127,190,149,0.5); background: rgba(127,190,149,0.12); }
+@media (max-width: 900px) {
+  .levelup-checklist-items { grid-template-columns: 1fr; }
+}
+
 /* Companion roster */
 .companions-card { display: flex; flex-direction: column; gap: 12px; }
 .companion-row { border: 1px solid var(--line); border-radius: 8px; background: rgba(255,255,255,0.015); padding: 11px; display: flex; flex-direction: column; gap: 9px; }

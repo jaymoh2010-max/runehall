@@ -776,6 +776,15 @@ try {
     ]);
     if (child.exitCode === null) child.kill("SIGKILL");
   }
-  fs.rmSync(tempDir, { recursive: true, force: true });
+  try {
+    fs.rmSync(tempDir, {
+      recursive: true,
+      force: true,
+      maxRetries: 5,
+      retryDelay: 200,
+    });
+  } catch (error) {
+    console.warn(`Could not remove temporary smoke directory ${tempDir}:`, error instanceof Error ? error.message : error);
+  }
   process.exit(exitCode);
 }

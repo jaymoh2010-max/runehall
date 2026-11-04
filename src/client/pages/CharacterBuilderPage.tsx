@@ -29,6 +29,7 @@ import {
   Upload,
   UserRound,
   Users,
+  X,
 } from "lucide-react";
 import {
   ABILITIES,
@@ -132,6 +133,15 @@ import {
 } from "../../shared/content";
 import { summarizeRunes } from "../../shared/runes";
 
+type LevelUpTask = {
+  id: string;
+  label: string;
+  detail: string;
+  step: StepId;
+  kind: "abilities" | "skills" | "feat" | "spells" | "class";
+  category?: "ancestry" | "class" | "skill" | "general";
+};
+
 export function CharacterBuilderPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -145,6 +155,7 @@ export function CharacterBuilderPage() {
   const [step, setStep] = useState<StepId>("ancestry");
   const [picker, setPicker] = useState<Picker>(null);
   const [levelUpOpen, setLevelUpOpen] = useState(false);
+  const [levelUpPlan, setLevelUpPlan] = useState<{ level: number; tasks: LevelUpTask[] } | null>(null);
   const [saveState, setSaveState] = useState<"saved" | "saving" | "dirty" | "error">("saved");
   const [conflict, setConflict] = useState<CharacterRecord | null>(null);
   const initialized = useRef(false);
@@ -424,23 +435,27 @@ export function CharacterBuilderPage() {
   const legacyDefault = campaignRuleset ? rulesetIncludesLegacy(campaignRuleset) : draft.includeLegacy;
   const legacyLocked = Boolean(campaignRuleset);
   const nextLevel = Math.min(20, draft.level + 1);
-  const levelUpItems: { label: string; detail: string; step: StepId }[] = [];
+  const levelUpItems: LevelUpTask[] = [];
   if (nextLevel !== draft.level) {
     for (const milestone of [5, 10, 15, 20]) {
       if (nextLevel === milestone) {
         levelUpItems.push({
+          id: `abilities-${nextLevel}`,
           label: "Ability boosts",
           detail: "Choose four ability boosts for this milestone.",
           step: "abilities",
+          kind: "abilities",
         });
       }
     }
     for (const level of context.classData?.skillIncreaseLevels ?? []) {
       if (level === nextLevel) {
         levelUpItems.push({
+          id: `skills-${nextLevel}`,
           label: "Skill increase",
           detail: "Raise one skill’s proficiency rank.",
           step: "skills",
+          kind: "skills",
         });
       }
     }
@@ -449,9 +464,12 @@ export function CharacterBuilderPage() {
     );
     for (const slot of newFeatSlots) {
       levelUpItems.push({
+        id: `feat-${slot.category}-${slot.level}`,
         label: `${slot.category === "class" ? "Class" : slot.category === "ancestry" ? "Ancestry" : slot.category === "skill" ? "Skill" : "General"} feat`,
         detail: `Choose a level ${slot.level} feat for this slot.`,
         step: "feats",
+        kind: "feat",
+        category: slot.category,
       });
     }
     const currentCaster = casterInfo(context.classData);
@@ -461,18 +479,22 @@ export function CharacterBuilderPage() {
       const newRank = newSlots?.length ?? currentRank;
       if (newRank > currentRank) {
         levelUpItems.push({
+          id: `spells-${newRank}`,
           label: `Rank ${newRank} spells`,
           detail: "Your highest spell rank increases. Review your spellbook and slots.",
           step: "spells",
+          kind: "spells",
         });
       }
     }
     for (const feature of context.classData?.features ?? []) {
       if (feature.level === nextLevel) {
         levelUpItems.push({
+          id: `class-${feature.name}`,
           label: feature.name,
           detail: "New class feature.",
           step: "class",
+          kind: "class",
         });
       }
     }
@@ -506,10 +528,21 @@ export function CharacterBuilderPage() {
   const completeLevelUp = (targetStep?: StepId) => {
     if (nextLevel === draft.level) return;
     update((current) => ({ ...current, level: nextLevel }));
+    setLevelUpPlan(levelUpItems.length ? { level: nextLevel, tasks: levelUpItems } : null);
     setLevelUpOpen(false);
     setStep(targetStep ?? levelUpItems[0]?.step ?? "review");
     toast(`Level ${nextLevel} reached. Review the new choices.`, "success");
   };
+  const levelUpTaskDone = (task: LevelUpTask): boolean => {
+    if (task.kind === "class") return true;
+    if (task.kind === "feat" && task.category) {
+      return Boolean(draft.feats[task.category]?.[String(levelUpPlan?.level ?? draft.level)]);
+    }
+    return stepErrors(task.step).length === 0;
+  };
+  const levelUpRemaining = levelUpPlan
+    ? levelUpPlan.tasks.filter((task) => !levelUpTaskDone(task)).length
+    : 0;
 
   const renderStep = () => {
     const props: BuilderProps = {
@@ -569,7 +602,10 @@ export function CharacterBuilderPage() {
           <Field label="Level">
             <Select
               value={draft.level}
-              onChange={(event) => update((current) => ({ ...current, level: Number(event.target.value) }))}
+              onChange={(event) => {
+                update((current) => ({ ...current, level: Number(event.target.value) }));
+                setLevelUpPlan(null);
+              }}
               className="level-select"
             >
               {Array.from({ length: 20 }, (_, index) => index + 1).map((level) => (
@@ -629,6 +665,43 @@ export function CharacterBuilderPage() {
         </aside>
 
         <main className="builder-content">
+          {levelUpPlan && levelUpPlan.level === draft.level ? (
+            <div className={`levelup-checklist ${levelUpRemaining ? "" : "is-complete"}`}>
+              <div className="levelup-checklist-head">
+                <div>
+                  <span className="page-eyebrow">LEVEL {levelUpPlan.level} CHECKLIST</span>
+                  <strong>
+                    {levelUpRemaining
+                      ? `${levelUpRemaining} choice${levelUpRemaining === 1 ? "" : "s"} remaining`
+                      : "Level complete"}
+                  </strong>
+                </div>
+                <IconButton label="Dismiss level-up checklist" onClick={() => setLevelUpPlan(null)}>
+                  <X size={14} />
+                </IconButton>
+              </div>
+              <div className="levelup-checklist-items">
+                {levelUpPlan.tasks.map((task) => {
+                  const done = levelUpTaskDone(task);
+                  return (
+                    <button
+                      key={task.id}
+                      type="button"
+                      className={`levelup-checklist-item ${done ? "is-done" : ""}`}
+                      onClick={() => setStep(task.step)}
+                    >
+                      <span className="levelup-checklist-check">{done ? <Check size={12} /> : null}</span>
+                      <span>
+                        <strong>{task.label}</strong>
+                        <small>{done ? "Done" : task.detail}</small>
+                      </span>
+                      {done ? null : <ArrowRight size={13} />}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
           {renderStep()}
           <div className="builder-nav-mobile">
             <Button variant="ghost" onClick={() => go(-1)} disabled={stepIndex <= 0}><ArrowLeft size={15} /> Back</Button>

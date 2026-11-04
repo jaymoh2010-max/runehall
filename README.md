@@ -19,6 +19,7 @@ Runehall is built for a private group of roughly 4–10 players and a GM. It run
 - Prepared casters are capped by their rank-by-rank spell slots; duplicate preparations are supported, spontaneous repertoire limits are checked, and slot pips can be reset between sessions.
 - Manual companion roster for animal companions, familiars, eidolons, and summons, with HP, AC, and attack notes.
 - Guided level-up previews new feats, skills, spells, ability boosts, and class features, then jumps into the relevant chapter.
+- A persistent level-up checklist tracks required boosts, skill increases, feat slots, and spell ranks, with links back to each chapter.
 - Printable character sheet with a clean Print/PDF layout.
 - Real compendium content: 51 ancestries, 334 heritages, 540 backgrounds, 29 classes, 3,000+ class features/feats, 2,000+ spells, 5,900+ items, 480+ deities, 1,200+ creatures.
 - Ability boost validation, key ability selection, ancestry/background/class choices, doctrine/bloodline/racket-style subclass selection.
