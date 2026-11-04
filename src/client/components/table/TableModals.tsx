@@ -399,7 +399,7 @@ export function SceneManagerModal({
     try {
       let imageUrl: string | null = null;
       if (file) {
-        const uploaded = await uploadImage(file);
+        const uploaded = await uploadImage(file, campaignId);
         imageUrl = uploaded.url;
       }
       const result = await api<{ scene: Scene }>(`/api/campaigns/${campaignId}/scenes`, {
@@ -627,7 +627,7 @@ export function SceneEditModal({
     try {
       let imageUrl = scene.imageUrl;
       if (file) {
-        const uploaded = await uploadImage(file);
+        const uploaded = await uploadImage(file, scene.campaignId);
         imageUrl = uploaded.url;
       }
       const result = await api<{ scene: Scene }>(`/api/scenes/${scene.id}`, {

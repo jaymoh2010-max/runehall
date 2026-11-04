@@ -1058,6 +1058,22 @@ export interface JournalAttachment {
   mimeType: string;
 }
 
+export interface CampaignAsset {
+  filename: string;
+  url: string;
+  name: string;
+  mimeType: string;
+  size: number;
+  createdAt: number;
+  /** Human-readable places in this campaign that reference the image. */
+  usage: string[];
+  unused: boolean;
+  /** True when no table in any campaign references the file. */
+  deletable: boolean;
+  /** The image is no longer used here but is still referenced elsewhere. */
+  usedElsewhere: boolean;
+}
+
 export interface JournalEntry {
   id: string;
   campaignId: string;

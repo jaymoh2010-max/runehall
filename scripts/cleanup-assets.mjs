@@ -62,7 +62,6 @@ for (const table of tables) {
     }
   }
 }
-db.close();
 
 const files = fs.existsSync(uploadsDir)
   ? fs
@@ -101,4 +100,22 @@ if (!shouldDelete) {
 for (const file of unused) {
   fs.rmSync(path.join(uploadsDir, file), { force: true });
 }
+
+// Uploaded files are now tracked in uploaded_assets. Remove the metadata rows
+// for the files we just deleted so the asset library does not keep stale
+// records. Older databases without the table are left untouched.
+try {
+  const cleanupDb = new DatabaseSync(databasePath);
+  const hasAssetTable = cleanupDb
+    .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'uploaded_assets'")
+    .get();
+  if (hasAssetTable) {
+    const removeRecord = cleanupDb.prepare("DELETE FROM uploaded_assets WHERE filename = ?");
+    for (const file of unused) removeRecord.run(file);
+  }
+  cleanupDb.close();
+} catch {
+  // File cleanup is still successful if an older database cannot be updated.
+}
+
 console.log(`\nDeleted ${unused.length} unused upload${unused.length === 1 ? "" : "s"}.`);

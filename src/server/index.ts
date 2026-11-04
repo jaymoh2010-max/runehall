@@ -8,6 +8,7 @@ import { Server } from "socket.io";
 import { attachUser } from "./auth";
 import { registerAuthRoutes } from "./routes/auth";
 import { registerAdminRoutes } from "./routes/admin";
+import { registerAssetRoutes } from "./routes/assets";
 import { registerCampaignRoutes } from "./routes/campaigns";
 import { registerCharacterRoutes } from "./routes/characters";
 import { registerCompendiumRoutes } from "./routes/compendium";
@@ -110,6 +111,7 @@ app.get("/api/health", async (_request, reply) => {
 
 await registerAuthRoutes(app);
 await registerAdminRoutes(app);
+await registerAssetRoutes(app);
 await registerCampaignRoutes(app);
 await registerCharacterRoutes(app);
 await registerCompendiumRoutes(app);

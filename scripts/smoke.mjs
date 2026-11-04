@@ -486,6 +486,67 @@ async function main() {
   }
   log("shared handout reached the player with its attachment");
 
+  const pixel = Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9ZlwAAAABJRU5ErkJggg==",
+    "base64",
+  );
+  const uploadImageFile = async (name) => {
+    const form = new FormData();
+    form.append("file", new Blob([pixel], { type: "image/png" }), name);
+    const response = await fetch(`${base}/api/uploads`, {
+      method: "POST",
+      headers: { cookie: gmCookie, "x-campaign-id": campaign.id },
+      body: form,
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(`Asset upload failed (${response.status}): ${JSON.stringify(payload)}`);
+    return payload;
+  };
+  const firstAsset = await uploadImageFile("smoke-asset.png");
+  const initialAssets = await api(`/api/campaigns/${campaign.id}/assets`, { cookie: gmCookie });
+  const unusedAsset = initialAssets.payload.assets.find((asset) => asset.filename === firstAsset.filename);
+  if (!unusedAsset || !unusedAsset.unused || !unusedAsset.deletable) {
+    throw new Error("Uploaded asset did not appear as unused and deletable");
+  }
+  await api(`/api/campaigns/${campaign.id}/journal`, {
+    method: "POST",
+    cookie: gmCookie,
+    body: {
+      title: "Smoke Asset Handout",
+      content: "Uses a library image.",
+      visible: true,
+      kind: "handout",
+      attachments: [
+        { name: "Library image", url: firstAsset.url, mimeType: firstAsset.mimeType },
+      ],
+    },
+  });
+  const usedAssets = await api(`/api/campaigns/${campaign.id}/assets`, { cookie: gmCookie });
+  const usedAsset = usedAssets.payload.assets.find((asset) => asset.filename === firstAsset.filename);
+  if (!usedAsset || usedAsset.unused || usedAsset.deletable || !usedAsset.usage.includes("Journal: Smoke Asset Handout")) {
+    throw new Error("Asset usage was not reflected in the library");
+  }
+  const attachedDelete = await fetch(
+    `${base}/api/campaigns/${campaign.id}/assets/${encodeURIComponent(firstAsset.filename)}`,
+    { method: "DELETE", headers: { cookie: gmCookie } },
+  );
+  if (attachedDelete.status !== 409) throw new Error("Referenced asset could be deleted");
+  const secondAsset = await uploadImageFile("smoke-unused-asset.png");
+  const removedAsset = await api(
+    `/api/campaigns/${campaign.id}/assets/${encodeURIComponent(secondAsset.filename)}`,
+    { method: "DELETE", cookie: gmCookie },
+  );
+  if (!removedAsset.payload.ok) throw new Error("Unused asset was not deleted");
+  const remainingAssets = await api(`/api/campaigns/${campaign.id}/assets`, { cookie: gmCookie });
+  if (remainingAssets.payload.assets.some((asset) => asset.filename === secondAsset.filename)) {
+    throw new Error("Deleted asset remained in the library");
+  }
+  const playerAssets = await fetch(`${base}/api/campaigns/${campaign.id}/assets`, {
+    headers: { cookie: playerCookie },
+  });
+  if (playerAssets.status !== 403) throw new Error("Player could read the GM asset library");
+  log("campaign assets track usage and delete unused files");
+
   const dashboardResult = await api(`/api/campaigns/${campaign.id}/dashboard`, {
     method: "PATCH",
     cookie: gmCookie,

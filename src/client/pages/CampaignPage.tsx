@@ -13,6 +13,7 @@ import {
   FileImage,
   FilePlus2,
   ImagePlus,
+  Images,
   LayoutGrid,
   LogOut,
   Pencil,
@@ -31,6 +32,7 @@ import {
 } from "lucide-react";
 import type {
   CampaignMember,
+  CampaignAsset,
   CampaignRuleset,
   CampaignSummary,
   CampaignTable,
@@ -73,6 +75,7 @@ import {
 } from "../components/campaign/EncounterBuilder";
 import { LootBuilder } from "../components/campaign/LootBuilder";
 import { CampaignDashboard } from "../components/campaign/CampaignDashboard";
+import { AssetLibrary } from "../components/campaign/AssetLibrary";
 import { NpcLibrary } from "../components/campaign/NpcLibrary";
 import { SessionsPage } from "../components/campaign/SessionsPage";
 import { GmScreen } from "../components/campaign/GmScreen";
@@ -86,6 +89,7 @@ type Tab =
   | "encounters"
   | "loot"
   | "npcs"
+  | "assets"
   | "journal"
   | "gm-screen"
   | "settings";
@@ -98,6 +102,7 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode; gmOnly?: boolean }[
   { id: "encounters", label: "Encounters", icon: <Skull size={15} />, gmOnly: true },
   { id: "loot", label: "Loot", icon: <Coins size={15} />, gmOnly: true },
   { id: "npcs", label: "NPCs", icon: <UserRound size={15} />, gmOnly: true },
+  { id: "assets", label: "Assets", icon: <Images size={15} />, gmOnly: true },
   { id: "journal", label: "Journal", icon: <ScrollText size={15} /> },
   { id: "gm-screen", label: "GM Screen", icon: <Shield size={15} />, gmOnly: true },
   { id: "settings", label: "Settings", icon: <Settings size={15} /> },
@@ -118,6 +123,7 @@ export function CampaignPage() {
     rawTab === "encounters" ||
     rawTab === "loot" ||
     rawTab === "npcs" ||
+    rawTab === "assets" ||
     rawTab === "journal" ||
     rawTab === "gm-screen" ||
     rawTab === "settings"
@@ -139,6 +145,10 @@ export function CampaignPage() {
   const [journalBusy, setJournalBusy] = useState(false);
   const [journalUploadBusy, setJournalUploadBusy] = useState(false);
   const [journalFilter, setJournalFilter] = useState<"all" | JournalKind>("all");
+  const [assetPickerOpen, setAssetPickerOpen] = useState(false);
+  const [assetPickerAssets, setAssetPickerAssets] = useState<CampaignAsset[]>([]);
+  const [assetPickerLoading, setAssetPickerLoading] = useState(false);
+  const [assetPickerError, setAssetPickerError] = useState("");
   const [previewAttachment, setPreviewAttachment] = useState<JournalAttachment | null>(null);
   const [selectedJournalId, setSelectedJournalId] = useState<string | null>(null);
   const journalFileInputRef = useRef<HTMLInputElement>(null);
@@ -155,6 +165,7 @@ export function CampaignPage() {
     (requestedTab === "encounters" ||
       requestedTab === "loot" ||
       requestedTab === "npcs" ||
+      requestedTab === "assets" ||
       requestedTab === "gm-screen") &&
     campaign &&
     !isGm
@@ -279,7 +290,7 @@ export function CampaignPage() {
     setJournalUploadBusy(true);
     try {
       for (const file of files.slice(0, 12)) {
-        const result = await uploadImage(file);
+        const result = await uploadImage(file, id);
         setJournalAttachments((current) => {
           if (current.length >= 12) return current;
           return [
@@ -299,6 +310,44 @@ export function CampaignPage() {
     } finally {
       setJournalUploadBusy(false);
     }
+  };
+
+  const openAssetPicker = async () => {
+    if (!id) return;
+    setAssetPickerOpen(true);
+    setAssetPickerLoading(true);
+    setAssetPickerError("");
+    setAssetPickerAssets([]);
+    try {
+      const result = await api<{ assets: CampaignAsset[] }>(`/api/campaigns/${id}/assets`);
+      setAssetPickerAssets(result.assets);
+    } catch (err) {
+      setAssetPickerError(errorMessage(err));
+    } finally {
+      setAssetPickerLoading(false);
+    }
+  };
+
+  const attachAsset = (asset: CampaignAsset) => {
+    if (journalAttachments.some((attachment) => attachment.url === asset.url)) {
+      toast("That image is already attached.", "info");
+      return;
+    }
+    if (journalAttachments.length >= 12) {
+      toast("A handout can hold up to 12 images.", "error");
+      return;
+    }
+    setJournalAttachments((current) => [
+      ...current,
+      {
+        id: `att_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`,
+        name: asset.name,
+        url: asset.url,
+        mimeType: asset.mimeType,
+      },
+    ]);
+    setAssetPickerOpen(false);
+    toast("Image attached from the library.", "success");
   };
 
   const saveJournal = async (event: FormEvent) => {
@@ -764,6 +813,10 @@ export function CampaignPage() {
           />
         ) : null}
 
+        {tab === "assets" ? (
+          <AssetLibrary campaignId={campaign.id} toast={toast} />
+        ) : null}
+
         {tab === "journal" ? (
           <div className="page-inner journal-layout">
             <div className="journal-list">
@@ -1058,15 +1111,29 @@ export function CampaignPage() {
                 <span className="field-label">Images</span>
                 <p className="field-hint">Attach maps, letters, portraits, or clues. Shared entries show these to players.</p>
               </div>
-              <Button
-                size="sm"
-                variant="secondary"
-                icon={<ImagePlus size={14} />}
-                loading={journalUploadBusy}
-                onClick={() => journalFileInputRef.current?.click()}
-              >
-                Add image
-              </Button>
+              <div className="row" style={{ gap: 6 }}>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  icon={<ImagePlus size={14} />}
+                  loading={journalUploadBusy}
+                  onClick={() => journalFileInputRef.current?.click()}
+                >
+                  Add image
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  icon={<Images size={14} />}
+                  loading={assetPickerLoading}
+                  onClick={() => void openAssetPicker()}
+                  disabled={journalAttachments.length >= 12}
+                >
+                  From library
+                </Button>
+              </div>
               <input
                 ref={journalFileInputRef}
                 type="file"
@@ -1115,6 +1182,45 @@ export function CampaignPage() {
             </p>
           ) : null}
         </form>
+      </Modal>
+
+      <Modal
+        open={assetPickerOpen}
+        onClose={() => setAssetPickerOpen(false)}
+        title="Choose from library"
+        subtitle="Attach an image already uploaded for this campaign, including scene art, portraits, and token images."
+        wide
+        footer={<Button variant="ghost" onClick={() => setAssetPickerOpen(false)}>Done</Button>}
+      >
+        {assetPickerError ? <div className="auth-error">{assetPickerError}</div> : null}
+        {assetPickerLoading ? (
+          <Spinner label="Reading the asset library…" />
+        ) : !assetPickerAssets.length ? (
+          <EmptyState
+            icon={<Images size={28} />}
+            title="No images in the library"
+            description="Upload one with Add image first, or add art to a scene, token, character, or NPC."
+          />
+        ) : (
+          <div className="asset-picker-grid">
+            {assetPickerAssets.map((asset) => (
+              <button
+                key={asset.filename}
+                type="button"
+                className="asset-picker-card"
+                onClick={() => attachAsset(asset)}
+              >
+                <img src={asset.url} alt={asset.name} loading="lazy" />
+                <span>
+                  <strong>{asset.name}</strong>
+                  <span className="tiny muted">
+                    {asset.unused ? "Unused" : asset.usage[0] ?? "In use"}
+                  </span>
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
       </Modal>
 
       <Modal

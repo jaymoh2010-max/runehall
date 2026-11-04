@@ -79,6 +79,14 @@ describe("migrations", () => {
     const sceneColumns = db.prepare("PRAGMA table_info(scenes)").all() as { name: string }[];
     expect(sceneColumns.map((column) => column.name)).toContain("templates");
 
+    for (const migration of migrations.filter((entry) => entry.version >= 14)) {
+      db.exec(migration.sql);
+    }
+    const tablesAfterAssets = db
+      .prepare("SELECT name FROM sqlite_master WHERE type = 'table'")
+      .all() as { name: string }[];
+    expect(tablesAfterAssets.map((table) => table.name)).toContain("uploaded_assets");
+
     const columns = db.prepare("PRAGMA table_info(users)").all() as { name: string }[];
     expect(columns.map((column) => column.name)).toContain("is_admin");
 

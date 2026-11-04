@@ -441,7 +441,12 @@ Acceptance: a GM can prepare a full session in Runehall and start it with one â€
   - A player can give an item stack or coins to another character in the same campaign.
   - Transfers are server-side, revision-checked, and applied to both sheets atomically.
   - Received items arrive unequipped; transferring a whole stack moves its runes.
-- [ ] Reusable handout/asset library tied into cleanup.
+- [x] **Campaign asset library**
+  - Uploaded images are tracked with their campaign, original name, type, and size.
+  - The GM-only Assets tab lists scene art, token art, portraits, NPC art, and handout images with usage labels.
+  - Any campaign image can be attached to a journal entry or handout from the editor without uploading it again.
+  - Unused images can be deleted in-app; referenced images are protected.
+  - The cleanup CLI remains available for orphaned legacy files.
 - [ ] Optional automatic XP only if it still matters after milestone play.
 
 **Acceptance:** prep a three-scene session with encounters, loot, handouts, and a recap in one flow.

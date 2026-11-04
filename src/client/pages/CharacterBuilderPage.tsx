@@ -367,7 +367,7 @@ export function CharacterBuilderPage() {
 
   const portrait = async (file: File) => {
     try {
-      const result = await uploadImage(file);
+      const result = await uploadImage(file, character?.campaignId);
       update((current) => ({ ...current, portraitUrl: result.url }));
       toast("Portrait updated.", "success");
     } catch (err) {

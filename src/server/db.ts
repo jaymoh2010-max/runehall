@@ -286,6 +286,17 @@ export interface CampaignDashboardRow {
   updated_at: number;
 }
 
+export interface UploadedAssetRow {
+  id: string;
+  filename: string;
+  original_name: string;
+  mime_type: string;
+  size: number;
+  campaign_id: string | null;
+  uploaded_by: string | null;
+  created_at: number;
+}
+
 export interface LootParcelRow {
   id: string;
   campaign_id: string;

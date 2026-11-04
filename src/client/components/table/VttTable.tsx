@@ -837,6 +837,7 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
       <TokenEditModal
         open={Boolean(editingToken)}
         token={editingToken}
+        campaignId={campaignId}
         characters={characters}
         members={initial.members}
         onClose={() => setEditingTokenId(null)}

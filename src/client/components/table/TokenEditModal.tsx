@@ -9,6 +9,7 @@ import { Avatar, Button, Field, Input, Modal, Select, Tag, Toggle } from "../ui"
 interface TokenEditModalProps {
   open: boolean;
   token: Token | null;
+  campaignId: string;
   characters: CharacterRecord[];
   members: CampaignMember[];
   onClose: () => void;
@@ -20,6 +21,7 @@ interface TokenEditModalProps {
 export function TokenEditModal({
   open,
   token,
+  campaignId,
   characters,
   members,
   onClose,
@@ -74,7 +76,7 @@ export function TokenEditModal({
     setUploading(true);
     setError("");
     try {
-      const result = await uploadImage(file);
+      const result = await uploadImage(file, campaignId);
       setImageUrl(result.url);
     } catch (err) {
       setError(errorMessage(err));

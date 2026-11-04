@@ -295,7 +295,7 @@ function NpcEditor({
     setUploading(true);
     setError("");
     try {
-      const result = await uploadImage(file);
+      const result = await uploadImage(file, campaignId);
       setImageUrl(result.url);
     } catch (err) {
       setError(errorMessage(err));

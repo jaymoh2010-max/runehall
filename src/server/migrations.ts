@@ -379,4 +379,22 @@ export const migrations: Migration[] = [
       ALTER TABLE encounter_combatants ADD COLUMN wave INTEGER NOT NULL DEFAULT 1;
     `,
   },
+  {
+    version: 15,
+    name: "uploaded_assets",
+    sql: `
+      CREATE TABLE IF NOT EXISTS uploaded_assets (
+        id TEXT PRIMARY KEY,
+        filename TEXT NOT NULL UNIQUE,
+        original_name TEXT NOT NULL DEFAULT '',
+        mime_type TEXT NOT NULL DEFAULT '',
+        size INTEGER NOT NULL DEFAULT 0,
+        campaign_id TEXT REFERENCES campaigns(id) ON DELETE SET NULL,
+        uploaded_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+        created_at INTEGER NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_uploaded_assets_campaign ON uploaded_assets(campaign_id);
+    `,
+  },
 ];

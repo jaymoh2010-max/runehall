@@ -3,7 +3,9 @@ import fs from "node:fs";
 import path from "node:path";
 import { pipeline } from "node:stream/promises";
 import type { FastifyInstance } from "fastify";
-import { uploadsDir } from "../util";
+import { getCampaignRole } from "../access";
+import { db } from "../db";
+import { newId, now, safeString, uploadsDir } from "../util";
 import { inspectImage } from "../imageMeta";
 import crypto from "node:crypto";
 
@@ -21,6 +23,14 @@ const MAX_HEADER_BYTES = 2 * 1024 * 1024;
 export async function registerUploadRoutes(app: FastifyInstance): Promise<void> {
   app.post("/api/uploads", async (request, reply) => {
     if (!request.user) return reply.code(401).send({ error: "Sign in to continue." });
+    const campaignHeader = request.headers["x-campaign-id"];
+    const campaignId =
+      typeof campaignHeader === "string" && campaignHeader.trim()
+        ? campaignHeader.trim()
+        : null;
+    if (campaignId && !getCampaignRole(campaignId, request.user.id)) {
+      return reply.code(403).send({ error: "You are not a member of that campaign." });
+    }
     if (!request.isMultipart()) return reply.code(400).send({ error: "Upload an image file." });
     let file;
     try {
@@ -77,6 +87,31 @@ export async function registerUploadRoutes(app: FastifyInstance): Promise<void> 
       return reject(413, "That image is too large. Keep it under 12,000 pixels per side and 100 megapixels.");
     }
 
-    return reply.send({ url: `/uploads/${filename}`, filename, size, mimeType: metadata.mime });
+    try {
+      db.prepare(
+        `INSERT INTO uploaded_assets
+          (id, filename, original_name, mime_type, size, campaign_id, uploaded_by, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      ).run(
+        newId("asset"),
+        filename,
+        safeString(file.filename, "Uploaded image", 200),
+        metadata.mime,
+        size,
+        campaignId,
+        request.user.id,
+        now(),
+      );
+    } catch {
+      return reject(500, "Could not record the uploaded image.");
+    }
+
+    return reply.send({
+      url: `/uploads/${filename}`,
+      filename,
+      size,
+      mimeType: metadata.mime,
+      campaignId,
+    });
   });
 }

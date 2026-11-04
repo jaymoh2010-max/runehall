@@ -54,15 +54,16 @@ The target table size is one GM plus 4–10 players. That means the product shou
 - Encounter builder with saved fights, bestiary counts, launch-to-table, waves, duplication, launch preview, party-size presets, and a GM-controlled Milestone/XP-budget toggle. Reinforcements join the existing initiative without resetting the round; the GM can advance the party without XP bookkeeping.
 - Loot parcels with compendium equipment, coins, and one-action distribution to a character sheet.
 - Player-facing inventory and purse ledger with quantity, equipped, bulk, and value tracking; item stacks and coins can be transferred between campaign characters with revision-checked, two-sheet updates.
-- Journal handouts with image attachments, shared/GM-only visibility, a player-facing gallery, and one-click duplication.
+- Journal handouts with image attachments, shared/GM-only visibility, a player-facing gallery, one-click duplication, and a campaign asset picker for reusing existing images.
+- GM-only asset library with usage labels, in-app deletion for unreferenced campaign images, and upload tracking per campaign.
 - Campaign Overview with last-session summary, next-session details, party status, and shared or GM-only clue threads. The GM can generate an editable recap from shared rolls, visible handouts, loot, and open threads, then save it as the summary or a shared handout.
 - Grouped bestiary tokens with formation dragging, aggregate group HP, and one initiative roll per group.
 - GM-only NPC statblock library with optional art and one-click token placement.
 - Shared session schedule with GM-managed attendance and automatic Overview date sync.
 - Persistent bestiary palette with drag-to-map group placement.
 - GM screen with level/simple DCs, condition lookup, secret rolls, and player roll requests.
-- Campaign import with ID remapping and player-account matching, plus a dry-run-first unused-asset cleanup command.
-- Next: session agendas and a reusable asset library.
+- Campaign import with ID remapping and player-account matching, plus a dry-run-first unused-asset cleanup command for legacy files.
+- Next: session agendas and check-in reminders.
 
 ### Phase 4 — Reliability and trust (in progress)
 - [x] Per-campaign revisions, `campaign:revision` socket events, gap detection, and reconnect snapshot refresh.
@@ -87,7 +88,7 @@ The target table size is one GM plus 4–10 players. That means the product shou
 - Backups support retention pruning and documented cron/systemd/Task Scheduler automation plus a restore drill.
 - The compendium manifest is pinned to the source commit.
 - Remaining: optional Postgres/S3 adapters and built-in off-machine backup shipping.
-- Multi-device uploads, asset library, and campaign import/export.
+- Multi-device uploads and campaign import/export.
 - Optional OAuth.
 
 ---

@@ -49,10 +49,15 @@ export async function api<T>(path: string, options: ApiOptions = {}): Promise<T>
 
 export async function uploadImage(
   file: File,
-): Promise<{ url: string; filename: string; size: number; mimeType: string }> {
+  campaignId?: string | null,
+): Promise<{ url: string; filename: string; size: number; mimeType: string; campaignId?: string | null }> {
   const form = new FormData();
   form.append("file", file);
-  return api("/api/uploads", { method: "POST", body: form });
+  return api("/api/uploads", {
+    method: "POST",
+    body: form,
+    headers: campaignId ? { "x-campaign-id": campaignId } : undefined,
+  });
 }
 
 export function formatDate(timestamp: number | null | undefined): string {
