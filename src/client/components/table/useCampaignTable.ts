@@ -24,6 +24,7 @@ import {
   applyTokenMoved,
   applyTokenUpdated,
   mergeSnapshotMessages,
+  toggleTokenSelection,
 } from "./tableEvents";
 
 type ToastKind = "info" | "success" | "error";
@@ -49,7 +50,8 @@ export function useCampaignTable({ initial, campaignId, toast }: UseCampaignTabl
   const [round, setRound] = useState(initial.round);
   const [turnIndex, setTurnIndex] = useState(initial.turnIndex);
   const [presence, setPresence] = useState<PresenceUser[]>([]);
-  const [selectedTokenId, setSelectedTokenId] = useState<string | null>(null);
+  const [selectedTokenId, setSelectedTokenIdState] = useState<string | null>(null);
+  const [selectedTokenIds, setSelectedTokenIds] = useState<string[]>([]);
   const [remotePointer, setRemotePointer] = useState<{ x: number; y: number; name: string; ts: number } | null>(
     null,
   );
@@ -67,6 +69,29 @@ export function useCampaignTable({ initial, campaignId, toast }: UseCampaignTabl
   tokensRef.current = tokens;
   activeSceneIdRef.current = activeSceneId;
 
+  const setSelectedTokenId = useCallback((tokenId: string | null) => {
+    setSelectedTokenIdState(tokenId);
+    setSelectedTokenIds(tokenId ? [tokenId] : []);
+  }, []);
+
+  const selectToken = useCallback((tokenId: string | null, additive = false) => {
+    if (!tokenId) {
+      setSelectedTokenIdState(null);
+      setSelectedTokenIds([]);
+      return;
+    }
+    if (!additive) {
+      setSelectedTokenIdState(tokenId);
+      setSelectedTokenIds([tokenId]);
+      return;
+    }
+    setSelectedTokenIds((current) => {
+      const next = toggleTokenSelection(current, tokenId);
+      setSelectedTokenIdState(next.includes(tokenId) ? tokenId : next[0] ?? null);
+      return next;
+    });
+  }, []);
+
   const refreshTable = useCallback(async () => {
     try {
       const snapshot = await api<CampaignTable>(`/api/campaigns/${campaignId}/table`);
@@ -79,7 +104,10 @@ export function useCampaignTable({ initial, campaignId, toast }: UseCampaignTabl
       setTurnIndex(snapshot.turnIndex);
       revisionRef.current = snapshot.revision;
       setMessages((current) => mergeSnapshotMessages(current, snapshot.messages));
-      setSelectedTokenId((current) =>
+      setSelectedTokenIds((current) =>
+        current.filter((tokenId) => snapshot.tokens.some((token) => token.id === tokenId)),
+      );
+      setSelectedTokenIdState((current) =>
         current && snapshot.tokens.some((token) => token.id === current) ? current : null,
       );
     } catch (error) {
@@ -126,12 +154,19 @@ export function useCampaignTable({ initial, campaignId, toast }: UseCampaignTabl
       setTokens((current) => applyTokenMoved(current, payload));
     const onTokenCreated = (token: Token) => {
       setTokens((current) => applyTokenCreated(current, token));
-      setSelectedTokenId(token.id);
+      setSelectedTokenIdState(token.id);
+      setSelectedTokenIds([token.id]);
     };
     const onTokenUpdated = (token: Token) => setTokens((current) => applyTokenUpdated(current, token));
     const onTokenDeleted = ({ tokenId }: { tokenId: string }) => {
       setTokens((current) => applyTokenDeleted(current, tokenId));
-      setSelectedTokenId((current) => (current === tokenId ? null : current));
+      setSelectedTokenIds((current) => {
+        const next = current.filter((id) => id !== tokenId);
+        setSelectedTokenIdState((primary) =>
+          primary === tokenId ? next[0] ?? null : primary,
+        );
+        return next;
+      });
     };
     const onFogUpdated = (payload: {
       sceneId: string;
@@ -140,7 +175,8 @@ export function useCampaignTable({ initial, campaignId, toast }: UseCampaignTabl
     }) => setScenes((current) => applyFogUpdated(current, payload));
     const onSceneActivated = ({ sceneId }: { sceneId: string }) => {
       setActiveSceneId(sceneId);
-      setSelectedTokenId(null);
+      setSelectedTokenIdState(null);
+      setSelectedTokenIds([]);
     };
     const onSceneUpdated = (scene: Scene) => setScenes((current) => applySceneUpdated(current, scene));
     const onSceneCreated = (scene: Scene) => {
@@ -159,7 +195,10 @@ export function useCampaignTable({ initial, campaignId, toast }: UseCampaignTabl
       setScenes(result.scenes);
       setTokens(result.tokens);
       setActiveSceneId(result.activeSceneId);
-      setSelectedTokenId((current) =>
+      setSelectedTokenIds((current) =>
+        current.filter((tokenId) => result.tokens.some((token) => token.id === tokenId)),
+      );
+      setSelectedTokenIdState((current) =>
         current && result.tokens.some((token) => token.id === current) ? current : null,
       );
     };
@@ -275,6 +314,8 @@ export function useCampaignTable({ initial, campaignId, toast }: UseCampaignTabl
     presence,
     selectedTokenId,
     setSelectedTokenId,
+    selectedTokenIds,
+    selectToken,
     remotePointer,
     connectionStatus,
     refreshTable,

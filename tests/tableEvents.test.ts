@@ -13,6 +13,7 @@ import {
   applyTokenMoved,
   applyTokenUpdated,
   mergeSnapshotMessages,
+  toggleTokenSelection,
 } from "../src/client/components/table/tableEvents";
 
 function token(id: string, overrides: Partial<Token> = {}): Token {
@@ -44,6 +45,12 @@ describe("table event application", () => {
     expect(updated.find((entry) => entry.id === "b")).toMatchObject({ name: "Updated" });
 
     expect(applyTokenDeleted(updated, "a").map((entry) => entry.id)).toEqual(["b"]);
+  });
+
+  it("toggles multi-token selection", () => {
+    expect(toggleTokenSelection([], "a")).toEqual(["a"]);
+    expect(toggleTokenSelection(["a"], "b")).toEqual(["a", "b"]);
+    expect(toggleTokenSelection(["a", "b"], "a")).toEqual(["b"]);
   });
 
   it("reveals, hides, and replaces fog cells", () => {

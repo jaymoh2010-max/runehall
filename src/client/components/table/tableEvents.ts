@@ -27,6 +27,12 @@ export function applyTokenDeleted(tokens: Token[], tokenId: string): Token[] {
   return tokens.filter((token) => token.id !== tokenId);
 }
 
+export function toggleTokenSelection(current: string[], tokenId: string): string[] {
+  return current.includes(tokenId)
+    ? current.filter((id) => id !== tokenId)
+    : [...current, tokenId];
+}
+
 export function applyFogUpdated(
   scenes: Scene[],
   payload: { sceneId: string; cells: string[]; mode: "reveal" | "hide" | "replace" },

@@ -29,7 +29,8 @@ interface SceneCanvasProps {
   isGm: boolean;
   userId: string;
   selectedTokenId: string | null;
-  onSelectToken: (id: string | null) => void;
+  selectedTokenIds: string[];
+  onSelectToken: (id: string | null, additive?: boolean) => void;
   onOpenCharacter: (id: string) => void;
   onEditToken?: (id: string) => void;
   onMoveToken: (tokenId: string, x: number, y: number) => void;
@@ -57,6 +58,7 @@ export function SceneCanvas({
   isGm,
   userId,
   selectedTokenId,
+  selectedTokenIds,
   onSelectToken,
   onOpenCharacter,
   onEditToken,
@@ -349,11 +351,30 @@ export function SceneCanvas({
 
   const onTokenPointerDown = (event: ReactPointerEvent<HTMLDivElement>, token: Token) => {
     event.stopPropagation();
-    onSelectToken(token.id);
+    const additive = event.shiftKey || event.ctrlKey || event.metaKey;
+    if (additive) {
+      onSelectToken(token.id, true);
+      return;
+    }
+    if (!selectedTokenIds.includes(token.id)) onSelectToken(token.id);
     if (event.button !== 0) return;
     if (!isGm && (token.ownerId !== userId || token.locked)) return;
     const point = scenePoint(event.clientX, event.clientY);
-    setDragging({ tokenId: token.id, positions: { [token.id]: { x: point.x, y: point.y } } });
+    const movingIds = new Set(selectedTokenIds);
+    movingIds.add(token.id);
+    if (token.groupId) {
+      for (const member of tokens) {
+        if (member.groupId === token.groupId) movingIds.add(member.id);
+      }
+    }
+    const positions: Record<string, { x: number; y: number }> = { [token.id]: { x: point.x, y: point.y } };
+    for (const id of movingIds) {
+      const member = tokens.find((entry) => entry.id === id);
+      if (!member) continue;
+      if (!isGm && (member.ownerId !== userId || member.locked)) continue;
+      positions[id] = { x: member.x, y: member.y };
+    }
+    setDragging({ tokenId: token.id, positions });
     (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
   };
 
@@ -371,9 +392,9 @@ export function SceneCanvas({
     );
     const dx = nextX - token.x;
     const dy = nextY - token.y;
-    const members = token.groupId
-      ? tokens.filter((entry) => entry.groupId === token.groupId)
-      : [token];
+    const members = Object.keys(dragging.positions)
+      .map((id) => tokens.find((entry) => entry.id === id))
+      .filter((entry): entry is Token => Boolean(entry));
     const positions: Record<string, { x: number; y: number }> = {};
     for (const member of members) {
       const memberHalf = (member.size * scene.gridSize) / 2;
@@ -497,7 +518,7 @@ export function SceneCanvas({
           const position = dragPosition(token);
           const portrait = token.imageUrl || (token.characterId ? portraitMap.get(token.characterId) : null);
           const canDrag = isGm || (token.ownerId === userId && !token.locked);
-          const isSelected = selectedTokenId === token.id;
+          const isSelected = selectedTokenIds.includes(token.id) || selectedTokenId === token.id;
           return (
             <div
               key={token.id}

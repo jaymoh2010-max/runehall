@@ -83,6 +83,8 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
     presence,
     selectedTokenId,
     setSelectedTokenId,
+    selectedTokenIds,
+    selectToken,
     remotePointer,
     connectionStatus,
   } = useCampaignTable({ initial, campaignId, toast });
@@ -558,7 +560,8 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
             isGm={isGm}
             userId={user.id}
             selectedTokenId={selectedTokenId}
-            onSelectToken={setSelectedTokenId}
+            selectedTokenIds={selectedTokenIds}
+            onSelectToken={selectToken}
             onOpenCharacter={(id) => window.open(`/characters/${id}`, "_blank")}
             onEditToken={isGm ? setEditingTokenId : undefined}
             onMoveToken={moveToken}
