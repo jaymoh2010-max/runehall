@@ -86,6 +86,7 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
     setSelectedTokenId,
     selectedTokenIds,
     selectToken,
+    selectTokens,
     remotePointer,
     connectionStatus,
   } = useCampaignTable({ initial, campaignId, toast });
@@ -343,6 +344,39 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
   const updateToken = (tokenId: string, patch: Partial<Token>) => {
     setTokens((current) => current.map((token) => (token.id === tokenId ? { ...token, ...patch } : token)));
     getSocket().emit("token:update", { campaignId, token: { id: tokenId, ...patch } });
+  };
+
+  const bulkHp = (delta: number, full = false) => {
+    const selected = tokens.filter(
+      (token) => selectedTokenIds.includes(token.id) && token.sceneId === activeSceneId,
+    );
+    for (const token of selected) {
+      const max = token.hpMax;
+      const current = token.hpCurrent ?? max ?? 0;
+      const next = full
+        ? max ?? current
+        : Math.max(0, Math.min(max ?? 1_000_000, current + delta));
+      updateToken(token.id, { hpCurrent: next });
+    }
+  };
+
+  const bulkCondition = (name: string, value: number | null, duration: number | null) => {
+    const selected = tokens.filter(
+      (token) => selectedTokenIds.includes(token.id) && token.sceneId === activeSceneId,
+    );
+    for (const token of selected) {
+      if (token.conditions.some((condition) => condition.name.toLowerCase() === name.toLowerCase())) {
+        continue;
+      }
+      updateToken(token.id, { conditions: [...token.conditions, { name, value, duration }] });
+    }
+  };
+
+  const bulkClearConditions = () => {
+    const selected = tokens.filter(
+      (token) => selectedTokenIds.includes(token.id) && token.sceneId === activeSceneId,
+    );
+    for (const token of selected) updateToken(token.id, { conditions: [] });
   };
 
   const deleteToken = (tokenId: string) => {
@@ -636,6 +670,7 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
             sceneTokens={sceneTokens}
             characters={characters}
             selectedTokenId={selectedTokenId}
+            selectedTokenIds={selectedTokenIds}
             setSelectedTokenId={setSelectedTokenId}
             setTokens={setTokens}
             selectedToken={selectedToken}
@@ -647,6 +682,9 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
             setEditingScene={setEditingScene}
             user={user}
             onGroupHp={updateGroupHp}
+            onBulkHp={bulkHp}
+            onBulkCondition={bulkCondition}
+            onBulkClearConditions={bulkClearConditions}
           />
         ) : null}
 
@@ -670,6 +708,7 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
             selectedTokenId={selectedTokenId}
             selectedTokenIds={selectedTokenIds}
             onSelectToken={selectToken}
+            onSelectTokens={selectTokens}
             onOpenCharacter={(id) => window.open(`/characters/${id}`, "_blank")}
             onEditToken={isGm && !previewing ? setEditingTokenId : undefined}
             onMoveToken={moveToken}

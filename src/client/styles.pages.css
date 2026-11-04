@@ -1834,6 +1834,9 @@
 .fog-canvas.is-brush { pointer-events: auto; }
 .measure-layer { position: absolute; inset: 0; z-index: 6; pointer-events: none; overflow: visible; }
 .template-layer { position: absolute; inset: 0; z-index: 7; pointer-events: none; overflow: visible; }
+.marquee-layer { position: absolute; inset: 0; z-index: 7; pointer-events: none; overflow: visible; }
+.bulk-token-bar { display: flex; flex-direction: column; gap: 7px; border-bottom: 1px solid rgba(200,169,107,0.18); background: rgba(200,169,107,0.05); padding: 9px 10px; }
+.bulk-token-bar strong { font-size: 0.82rem; color: var(--gold-bright); }
 .measure-label {
   position: absolute;
   z-index: 7;

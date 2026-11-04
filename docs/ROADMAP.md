@@ -376,12 +376,17 @@ Acceptance: a GM can prepare a full session in Runehall and start it with one �
   - The token editor, token panel, and initiative tooltip show labels such as “Frightened 2 (3r)”.
   - Advancing initiative ticks the active entry’s timed conditions and removes expired ones.
   - Remaining: character-sheet duration tracking and a manual tick button.
-- [x] **Multi-select and group drag**
+- [x] **Multi-select, marquee, and group drag**
   - Shift/Ctrl/Cmd-click toggles tokens in the selection; a plain click selects one token.
+  - Shift-drag on empty map space draws a marquee and selects every token inside it.
   - Dragging any selected token moves the whole selection, clamped to the scene.
   - Bestiary group members still move together and are merged into multi-selection drags.
   - The primary selected token still drives the token panel.
-  - Remaining: marquee selection and bulk condition/HP actions.
+- [x] **Bulk token actions**
+  - Multi-selected tokens can take damage, heal, or be restored to full HP together.
+  - A condition can be applied to every selected token at once.
+  - Conditions can be cleared from the whole selection.
+  - Remaining: bulk delete, bulk hidden/locked toggles, and per-token confirmation for destructive actions.
 - [x] **Scene playlists and player-safe preview**
   - Scenes can be reordered with up/down controls; ordering is persisted and broadcast.
   - Toolbar previous/next buttons step through the scene playlist.

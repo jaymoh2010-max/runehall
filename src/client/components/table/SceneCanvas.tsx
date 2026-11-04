@@ -31,6 +31,7 @@ interface SceneCanvasProps {
   selectedTokenId: string | null;
   selectedTokenIds: string[];
   onSelectToken: (id: string | null, additive?: boolean) => void;
+  onSelectTokens: (ids: string[], additive?: boolean) => void;
   onOpenCharacter: (id: string) => void;
   onEditToken?: (id: string) => void;
   onMoveToken: (tokenId: string, x: number, y: number) => void;
@@ -60,6 +61,7 @@ export function SceneCanvas({
   selectedTokenId,
   selectedTokenIds,
   onSelectToken,
+  onSelectTokens,
   onOpenCharacter,
   onEditToken,
   onMoveToken,
@@ -85,6 +87,7 @@ export function SceneCanvas({
   } | null>(null);
   const [panning, setPanning] = useState<{ startX: number; startY: number; panX: number; panY: number } | null>(null);
   const [measuring, setMeasuring] = useState<{ startX: number; startY: number; x: number; y: number } | null>(null);
+  const [marquee, setMarquee] = useState<{ startX: number; startY: number; x: number; y: number } | null>(null);
   const [fogPreview, setFogPreview] = useState<Set<string>>(() => new Set(scene.revealed));
   const [templateDraft, setTemplateDraft] = useState<{ x: number; y: number; direction: number } | null>(null);
   const templateDraftRef = useRef<{ x: number; y: number; direction: number } | null>(null);
@@ -266,6 +269,12 @@ export function SceneCanvas({
       viewportRef.current?.setPointerCapture(event.pointerId);
       return;
     }
+    if (event.shiftKey) {
+      const point = scenePoint(event.clientX, event.clientY);
+      setMarquee({ startX: point.x, startY: point.y, x: point.x, y: point.y });
+      viewportRef.current?.setPointerCapture(event.pointerId);
+      return;
+    }
     setPanning({
       startX: event.clientX,
       startY: event.clientY,
@@ -316,6 +325,11 @@ export function SceneCanvas({
       });
       return;
     }
+    if (marquee) {
+      const point = scenePoint(event.clientX, event.clientY);
+      setMarquee((current) => (current ? { ...current, x: point.x, y: point.y } : current));
+      return;
+    }
     if (measuring) {
       const point = scenePoint(event.clientX, event.clientY);
       setMeasuring((current) => (current ? { ...current, x: point.x, y: point.y } : current));
@@ -342,6 +356,18 @@ export function SceneCanvas({
     }
     if (panning) {
       setPanning(null);
+      viewportRef.current?.releasePointerCapture(event.pointerId);
+    }
+    if (marquee) {
+      const minX = Math.min(marquee.startX, marquee.x);
+      const maxX = Math.max(marquee.startX, marquee.x);
+      const minY = Math.min(marquee.startY, marquee.y);
+      const maxY = Math.max(marquee.startY, marquee.y);
+      const ids = tokens
+        .filter((token) => token.x >= minX && token.x <= maxX && token.y >= minY && token.y <= maxY)
+        .map((token) => token.id);
+      onSelectTokens(ids, event.ctrlKey || event.metaKey);
+      setMarquee(null);
       viewportRef.current?.releasePointerCapture(event.pointerId);
     }
     if (measuring) {
@@ -617,6 +643,20 @@ export function SceneCanvas({
             ) : null}
           </svg>
         ) : null}
+        {marquee ? (
+          <svg className="marquee-layer" width={scene.width} height={scene.height}>
+            <rect
+              x={Math.min(marquee.startX, marquee.x)}
+              y={Math.min(marquee.startY, marquee.y)}
+              width={Math.abs(marquee.x - marquee.startX)}
+              height={Math.abs(marquee.y - marquee.startY)}
+              fill="rgba(200,169,107,0.12)"
+              stroke="#e5ca91"
+              strokeWidth={2 / Math.max(zoom, 0.4)}
+              strokeDasharray={`${6 / Math.max(zoom, 0.4)} ${4 / Math.max(zoom, 0.4)}`}
+            />
+          </svg>
+        ) : null}
         {measuring ? (
           <div
             className="measure-label"
@@ -637,7 +677,7 @@ export function SceneCanvas({
         {fogBrush ? <Tag tone="gold"><Move size={11} /> Painting fog ({brushSize === 1 ? "1" : brushSize === 3 ? "3×3" : "5×5"})</Tag> : null}
         {measureMode ? <Tag tone="gold"><Ruler size={11} /> Measuring</Tag> : null}
         {templateKind ? <Tag tone="gold"><Move size={11} /> {TEMPLATE_LABELS[templateKind]} template · click and drag</Tag> : null}
-        {!fogBrush && !measureMode && !templateKind ? <span>Drag to pan · wheel to zoom · right-click to ping</span> : null}
+        {!fogBrush && !measureMode && !templateKind ? <span>Drag to pan · Shift-drag to select · wheel to zoom · right-click to ping</span> : null}
       </div>
     </div>
   );

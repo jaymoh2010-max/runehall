@@ -92,6 +92,14 @@ export function useCampaignTable({ initial, campaignId, toast }: UseCampaignTabl
     });
   }, []);
 
+  const selectTokens = useCallback((tokenIds: string[], additive = false) => {
+    setSelectedTokenIds((current) => {
+      const next = additive ? [...new Set([...current, ...tokenIds])] : tokenIds;
+      setSelectedTokenIdState(next[0] ?? null);
+      return next;
+    });
+  }, []);
+
   const refreshTable = useCallback(async () => {
     try {
       const snapshot = await api<CampaignTable>(`/api/campaigns/${campaignId}/table`);
@@ -319,6 +327,7 @@ export function useCampaignTable({ initial, campaignId, toast }: UseCampaignTabl
     setSelectedTokenId,
     selectedTokenIds,
     selectToken,
+    selectTokens,
     remotePointer,
     connectionStatus,
     refreshTable,

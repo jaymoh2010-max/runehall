@@ -10,6 +10,7 @@ export function VttTokenPanel({
   sceneTokens,
   characters,
   selectedTokenId,
+  selectedTokenIds,
   setSelectedTokenId,
   setTokens,
   selectedToken,
@@ -21,12 +22,16 @@ export function VttTokenPanel({
   setEditingScene,
   user,
   onGroupHp,
+  onBulkHp,
+  onBulkCondition,
+  onBulkClearConditions,
 }: {
   activeScene: Scene;
   isGm: boolean;
   sceneTokens: Token[];
   characters: CharacterRecord[];
   selectedTokenId: string | null;
+  selectedTokenIds: string[];
   setSelectedTokenId: (tokenId: string | null) => void;
   setTokens: (updater: (current: Token[]) => Token[]) => void;
   selectedToken: Token | null;
@@ -38,13 +43,33 @@ export function VttTokenPanel({
   setEditingScene: (scene: Scene) => void;
   user: PublicUser;
   onGroupHp: (groupId: string, delta: number) => void;
+  onBulkHp: (delta: number, full?: boolean) => void;
+  onBulkCondition: (name: string, value: number | null, duration: number | null) => void;
+  onBulkClearConditions: () => void;
 }) {
   const [groupAmount, setGroupAmount] = useState("5");
+  const [bulkCondition, setBulkCondition] = useState("");
+  const [bulkValue, setBulkValue] = useState("");
+  const [bulkDuration, setBulkDuration] = useState("");
+  const selectedTokens = sceneTokens.filter((token) => selectedTokenIds.includes(token.id));
   const groupTokens = selectedToken?.groupId
     ? sceneTokens.filter((token) => token.groupId === selectedToken.groupId)
     : [];
   const group = groupTokens.length > 1 ? groupHp(groupTokens) : null;
   const groupName = selectedToken?.groupName || groupTokens[0]?.name || "Group";
+
+  const applyBulkCondition = () => {
+    const name = bulkCondition.trim();
+    if (!name) return;
+    onBulkCondition(
+      name,
+      bulkValue === "" ? null : Math.max(0, Math.round(Number(bulkValue))),
+      bulkDuration === "" ? null : Math.max(0, Math.round(Number(bulkDuration))),
+    );
+    setBulkCondition("");
+    setBulkValue("");
+    setBulkDuration("");
+  };
 
   return (
     <aside className="vtt-left">
@@ -55,6 +80,26 @@ export function VttTokenPanel({
         </div>
         {isGm ? <Button size="sm" variant="ghost" onClick={() => setEditingScene(activeScene)}>Edit</Button> : null}
       </div>
+      {selectedTokens.length > 1 ? (
+        <div className="bulk-token-bar">
+          <div className="row-between">
+            <strong>{selectedTokens.length} tokens selected</strong>
+            <IconButton label="Clear selection" onClick={() => setSelectedTokenId(null)}><X size={13} /></IconButton>
+          </div>
+          <div className="row wrap" style={{ gap: 5 }}>
+            <Button size="sm" onClick={() => onBulkHp(-5)}>-5 HP</Button>
+            <Button size="sm" onClick={() => onBulkHp(5)}>+5 HP</Button>
+            <Button size="sm" variant="ghost" onClick={() => onBulkHp(0, true)}>Full HP</Button>
+          </div>
+          <div className="row wrap" style={{ gap: 5 }}>
+            <Input value={bulkCondition} onChange={(event) => setBulkCondition(event.target.value)} placeholder="Condition" style={{ minWidth: 100 }} />
+            <Input type="number" min={0} value={bulkValue} onChange={(event) => setBulkValue(event.target.value)} placeholder="Val" style={{ maxWidth: 62 }} />
+            <Input type="number" min={0} value={bulkDuration} onChange={(event) => setBulkDuration(event.target.value)} placeholder="Rounds" style={{ maxWidth: 76 }} />
+            <Button size="sm" icon={<Plus size={13} />} onClick={applyBulkCondition}>Apply</Button>
+          </div>
+          <Button size="sm" variant="ghost" onClick={onBulkClearConditions}>Clear conditions</Button>
+        </div>
+      ) : null}
       <div className="vtt-token-list">
         {sceneTokens.map((token) => {
           const character = token.characterId ? characters.find((c) => c.id === token.characterId) : null;
@@ -63,7 +108,7 @@ export function VttTokenPanel({
             <button
               type="button"
               key={token.id}
-              className={`vtt-token-row ${selectedTokenId === token.id ? "is-selected" : ""} ${token.hidden ? "is-hidden" : ""}`}
+              className={`vtt-token-row ${selectedTokenIds.includes(token.id) || selectedTokenId === token.id ? "is-selected" : ""} ${token.hidden ? "is-hidden" : ""}`}
               onClick={() => setSelectedTokenId(token.id)}
               onDoubleClick={() => character && window.open(`/characters/${character.id}`, "_blank")}
             >

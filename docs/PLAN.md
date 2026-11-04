@@ -75,7 +75,7 @@ The target table size is one GM plus 4–10 players. That means the product shou
 - Walls/doors and dynamic light.
 - Area templates (burst, emanation, cone, line) persisted per scene and shared across clients; rotation handles and save/roll cards remain.
 - Token conditions with values and round durations, ticking automatically when initiative advances; character-sheet durations remain.
-- Auras, multi-select, and a proper token context menu. Multi-select group drag is built; marquee selection and bulk actions remain.
+- Auras, multi-select, and a proper token context menu. Multi-select, marquee selection, group drag, and bulk HP/condition actions are built; bulk delete and bulk hidden/locked toggles remain.
 - Scene playlists with reorder controls, previous/next navigation, activate-on-create, and GM player-safe preview; drag reordering and thumbnails remain.
 - Player-side group check requests and combat-log filters (built); per-player response tracking remains.
 - Initiative delay/ready states and explicit tie reordering (built); automatic ready triggers and Perception-based ties remain.
