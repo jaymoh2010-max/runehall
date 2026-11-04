@@ -124,6 +124,8 @@ export interface Publication {
   license: string;
   remaster: boolean;
   playtest: boolean;
+  /** The displayed rules text came from the source's GM-facing description. */
+  gmDescription?: boolean;
 }
 
 export interface FeatureSummary {
@@ -324,6 +326,8 @@ export interface Spell extends Publication {
   name: string;
   type: "spell";
   rank: number;
+  /** Rituals live with spells but are not tied to a magical tradition. */
+  ritual?: boolean;
   traditions: string[];
   rarity: string;
   traits: string[];
@@ -999,6 +1003,8 @@ export interface Scene {
   campaignId: string;
   name: string;
   imageUrl: string | null;
+  /** Generated small preview used by scene pickers. */
+  thumbnailUrl: string | null;
   width: number;
   height: number;
   gridSize: number;

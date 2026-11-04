@@ -459,24 +459,31 @@ Acceptance: a GM can prepare a full session in Runehall and start it with one â€
 
 ## Sprint 11 â€” Performance, accessibility, and polish
 
-**Goal:** make the app fast and comfortable on real tables and tablets.
+**Goal:** make the desktop app fast and comfortable on real tables.
 
 - [x] **Route-level code splitting**
   - Campaign, character sheet, builder, library, dashboard, rules, account, admin, and not-found pages load on demand.
   - The production entry bundle is roughly 122 KB gzip and enforced by a budget check.
-- [ ] Thumbnail/lazy-load maps, token art, and handout galleries.
-- [ ] Mobile/tablet layouts for the table and sheet.
-- [x] **Dialog and motion accessibility**
+- [x] **Generated scene thumbnails and lazy image loading**
+  - Scene creation and replacement generate a small WebP preview locally and upload it with the full map.
+  - Scene managers use the thumbnail with lazy/async loading, falling back to the full map.
+  - Avatars, NPC lists, and handout attachment thumbnails load lazily.
+- [x] **Desktop keyboard and contrast pass**
   - Modals trap Tab, restore focus on close, and close on Escape without leaking focus to the page.
+  - Campaign tabs expose `aria-current`; segmented filters expose `aria-pressed`.
   - A skip link targets the main content region.
   - Reduced-motion preferences disable animations and smooth scrolling.
-- [ ] Full keyboard-only audit, form labeling, and contrast pass.
-- [ ] Better empty states and a first-run checklist.
+  - Secondary text contrast was raised, and focus outlines use the brighter gold token.
+- [x] **First-run checklist**
+  - New campaigns show a four-step setup card: invite players, create a character, schedule a session, and write a handout.
+  - Completed steps are marked automatically, and the card disappears once all four are done.
 - [x] **Bundle-size budget**
   - `npm run check:bundle` enforces the entry JavaScript and CSS gzip budgets.
   - `npm run check` now runs the budget after the production build.
+- [x] **Desktop-first scope**
+  - Mobile and tablet layouts are intentionally deferred; the supported target is a desktop browser at table size.
 
-**Acceptance:** initial JS meaningfully smaller; the core loop works keyboard-only and on a tablet.
+**Acceptance:** initial JS meaningfully smaller; the desktop core loop works keyboard-only, focus is visible, and the bundle budget stays green.
 
 ---
 

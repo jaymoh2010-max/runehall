@@ -192,13 +192,14 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
       const sceneId = newId("scene");
       db.prepare(
         `INSERT INTO scenes
-          (id, campaign_id, name, image_url, width, height, grid_size, grid_offset_x, grid_offset_y, fog_enabled, fog_revealed, sort_order, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          (id, campaign_id, name, image_url, thumbnail_url, width, height, grid_size, grid_offset_x, grid_offset_y, fog_enabled, fog_revealed, sort_order, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       ).run(
         sceneId,
         campaignId,
         text(scene.name, "Imported scene", 80),
         scene.imageUrl ? text(scene.imageUrl, "", 500) : null,
+        scene.thumbnailUrl ? text(scene.thumbnailUrl, "", 500) : null,
         clamp(numberValue(scene.width, 1600, 100, 10_000), 100, 10_000),
         clamp(numberValue(scene.height, 1000, 100, 10_000), 100, 10_000),
         clamp(numberValue(scene.gridSize, 70, 20, 300), 20, 300),

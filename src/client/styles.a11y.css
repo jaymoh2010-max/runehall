@@ -1,5 +1,19 @@
 /* Accessibility and motion preferences loaded after the main visual styles. */
 
+:root {
+  /* Slightly lighter secondary text keeps hints above 4.5:1 on the dark panel. */
+  --muted-2: #7b8797;
+}
+
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline-color: var(--gold-bright);
+}
+
+.app-main:focus-visible {
+  outline: 2px solid var(--gold-bright);
+  outline-offset: -2px;
+}
+
 .sr-only {
   position: absolute;
   width: 1px;

@@ -364,7 +364,7 @@ function NpcEditor({
         <div className="npc-editor-layout">
           <div className="npc-editor-art">
             <div className="npc-editor-preview">
-              {imageUrl ? <img src={imageUrl} alt="" /> : <span>{(name || "NPC").slice(0, 2).toUpperCase()}</span>}
+              {imageUrl ? <img src={imageUrl} alt="" loading="lazy" decoding="async" /> : <span>{(name || "NPC").slice(0, 2).toUpperCase()}</span>}
             </div>
             <Button
               variant="secondary"

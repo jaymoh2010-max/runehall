@@ -78,7 +78,7 @@ The target table size is one GM plus 4–10 players. That means the product shou
 - Area templates (burst, emanation, cone, line) persisted per scene and shared across clients; rotation handles and save/roll cards remain.
 - Token conditions with values and round durations, ticking automatically when initiative advances; linked character-sheet conditions also tick, with a manual −1 button.
 - Auras, multi-select, and a proper token context menu. Multi-select, marquee selection, group drag, bulk HP/condition actions, bulk visibility/lock toggles, and bulk delete are built.
-- Scene playlists with reorder controls, drag-and-drop reordering, previous/next navigation, activate-on-create, and GM player-safe preview; generated thumbnails remain.
+- Scene playlists with reorder controls, drag-and-drop reordering, previous/next navigation, activate-on-create, GM player-safe preview, and generated WebP thumbnails with lazy loading.
 - Player-side group check requests and combat-log filters (built), with responses linked back to the request card and pass/fail tallies.
 - Initiative delay/ready states, manual readied-action triggers, automatic ready expiry, and Perception-based tie ordering are built.
 
@@ -90,6 +90,13 @@ The target table size is one GM plus 4–10 players. That means the product shou
 - Remaining: optional Postgres/S3 adapters and built-in off-machine backup shipping.
 - Multi-device uploads and campaign import/export.
 - Optional OAuth.
+
+### Phase 7 — Desktop performance and polish (built)
+- Route-level code splitting and an enforced entry JS/CSS gzip budget.
+- Generated scene thumbnails plus lazy image loading across pickers, avatars, and attachment galleries.
+- Focus-trapped dialogs, focus restoration, a skip link, reduced-motion support, and improved secondary-text contrast.
+- First-run campaign setup checklist.
+- Desktop-first scope; mobile and tablet layouts are intentionally deferred.
 
 ---
 

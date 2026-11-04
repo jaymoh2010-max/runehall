@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import type { CharacterRecord, Monster, Scene, Token } from "../../../shared/types";
 import { api, uploadImage } from "../../api";
+import { createThumbnailFile } from "../../thumbnail";
 import { errorMessage } from "../../stores";
 import { useToasts } from "../../stores";
 import {
@@ -398,15 +399,22 @@ export function SceneManagerModal({
     setError("");
     try {
       let imageUrl: string | null = null;
+      let thumbnailUrl: string | null = null;
       if (file) {
+        const thumbnailFile = await createThumbnailFile(file);
         const uploaded = await uploadImage(file, campaignId);
         imageUrl = uploaded.url;
+        if (thumbnailFile) {
+          const thumbnail = await uploadImage(thumbnailFile, campaignId);
+          thumbnailUrl = thumbnail.url;
+        }
       }
       const result = await api<{ scene: Scene }>(`/api/campaigns/${campaignId}/scenes`, {
         method: "POST",
         body: {
           name: name.trim() || "New Scene",
           imageUrl,
+          thumbnailUrl,
           width: dimensions.width,
           height: dimensions.height,
           gridSize: Number(gridSize) || 70,
@@ -457,7 +465,16 @@ export function SceneManagerModal({
               >
                 <span className="scene-drag-handle" title="Drag to reorder"><GripVertical size={14} /></span>
                 <div className="scene-manager-thumb">
-                  {scene.imageUrl ? <img src={scene.imageUrl} alt="" /> : <Map size={20} />}
+                  {scene.thumbnailUrl || scene.imageUrl ? (
+                    <img
+                      src={scene.thumbnailUrl ?? scene.imageUrl ?? ""}
+                      alt=""
+                      loading="lazy"
+                      decoding="async"
+                    />
+                  ) : (
+                    <Map size={20} />
+                  )}
                 </div>
                 <div className="grow">
                   <div className="row" style={{ gap: 7 }}>
@@ -626,9 +643,16 @@ export function SceneEditModal({
     setError("");
     try {
       let imageUrl = scene.imageUrl;
+      let thumbnailUrl = scene.thumbnailUrl;
       if (file) {
+        const thumbnailFile = await createThumbnailFile(file);
         const uploaded = await uploadImage(file, scene.campaignId);
         imageUrl = uploaded.url;
+        thumbnailUrl = null;
+        if (thumbnailFile) {
+          const thumbnail = await uploadImage(thumbnailFile, scene.campaignId);
+          thumbnailUrl = thumbnail.url;
+        }
       }
       const result = await api<{ scene: Scene }>(`/api/scenes/${scene.id}`, {
         method: "PATCH",
@@ -639,6 +663,7 @@ export function SceneEditModal({
           gridOffsetY: Number(offsetY) || 0,
           fogEnabled,
           imageUrl,
+          thumbnailUrl,
           width: dimensions.width,
           height: dimensions.height,
         },

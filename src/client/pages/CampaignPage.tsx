@@ -670,7 +670,7 @@ export function CampaignPage() {
 
       <nav className="campaign-tabs">
         {visibleTabs.map((entry) => (
-          <button key={entry.id} type="button" className={tab === entry.id ? "is-active" : ""} onClick={() => setTab(entry.id)}>
+          <button key={entry.id} type="button" className={tab === entry.id ? "is-active" : ""} aria-current={tab === entry.id ? "page" : undefined} onClick={() => setTab(entry.id)}>
             {entry.icon}
             <span>{entry.label}</span>
             {entry.id === "party" ? <span className="tab-count">{characters.length}</span> : null}
@@ -693,6 +693,8 @@ export function CampaignPage() {
             campaignId={campaign.id}
             isGm={isGm}
             currentUserId={user?.id ?? ""}
+            memberCount={members.length}
+            journalCount={tableData.journal.length}
             characters={characters}
             onNavigate={(next) => setTab(next)}
             onJournalCreated={(entry) => {
@@ -703,6 +705,7 @@ export function CampaignPage() {
               );
               setSelectedJournalId(entry.id);
             }}
+            onInvite={() => setInviteOpen(true)}
             toast={toast}
           />
         ) : null}
@@ -830,9 +833,9 @@ export function CampaignPage() {
                 {isGm ? <Button size="sm" variant="primary" icon={<FilePlus2 size={14} />} onClick={() => setJournalEditor("new")}>New entry</Button> : null}
               </div>
               <div className="segmented journal-filter">
-                <button type="button" className={journalFilter === "all" ? "is-active" : ""} onClick={() => setJournalFilter("all")}>All</button>
-                <button type="button" className={journalFilter === "note" ? "is-active" : ""} onClick={() => setJournalFilter("note")}>Entries</button>
-                <button type="button" className={journalFilter === "handout" ? "is-active" : ""} onClick={() => setJournalFilter("handout")}><FileImage size={12} /> Handouts</button>
+                <button type="button" className={journalFilter === "all" ? "is-active" : ""} aria-pressed={journalFilter === "all"} onClick={() => setJournalFilter("all")}>All</button>
+                <button type="button" className={journalFilter === "note" ? "is-active" : ""} aria-pressed={journalFilter === "note"} onClick={() => setJournalFilter("note")}>Entries</button>
+                <button type="button" className={journalFilter === "handout" ? "is-active" : ""} aria-pressed={journalFilter === "handout"} onClick={() => setJournalFilter("handout")}><FileImage size={12} /> Handouts</button>
               </div>
               {filteredJournal.map((entry) => (
                 <button
@@ -1155,7 +1158,7 @@ export function CampaignPage() {
               <div className="attachment-editor-grid">
                 {journalAttachments.map((attachment) => (
                   <div className="attachment-editor-item" key={attachment.id}>
-                    <img src={attachment.url} alt={attachment.name} />
+                    <img src={attachment.url} alt={attachment.name} loading="lazy" decoding="async" />
                     <span>{attachment.name}</span>
                     <button
                       type="button"

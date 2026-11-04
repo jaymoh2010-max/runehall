@@ -78,10 +78,13 @@ describe("migrations", () => {
     db.exec(templateMigration!.sql);
     const sceneColumns = db.prepare("PRAGMA table_info(scenes)").all() as { name: string }[];
     expect(sceneColumns.map((column) => column.name)).toContain("templates");
-
     for (const migration of migrations.filter((entry) => entry.version >= 14)) {
       db.exec(migration.sql);
     }
+    const sceneColumnsAfter = db.prepare("PRAGMA table_info(scenes)").all() as {
+      name: string;
+    }[];
+    expect(sceneColumnsAfter.map((column) => column.name)).toContain("thumbnail_url");
     const tablesAfterAssets = db
       .prepare("SELECT name FROM sqlite_master WHERE type = 'table'")
       .all() as { name: string }[];

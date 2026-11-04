@@ -147,6 +147,7 @@ export interface SceneRow {
   campaign_id: string;
   name: string;
   image_url: string | null;
+  thumbnail_url: string | null;
   width: number;
   height: number;
   grid_size: number;

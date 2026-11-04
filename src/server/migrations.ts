@@ -414,4 +414,11 @@ export const migrations: Migration[] = [
       CREATE INDEX IF NOT EXISTS idx_session_checkins_session ON session_checkins(session_id);
     `,
   },
+  {
+    version: 17,
+    name: "scene_thumbnails",
+    sql: `
+      ALTER TABLE scenes ADD COLUMN thumbnail_url TEXT;
+    `,
+  },
 ];

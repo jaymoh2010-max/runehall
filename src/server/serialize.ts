@@ -120,6 +120,7 @@ export function serializeScene(row: SceneRow): Scene {
     campaignId: row.campaign_id,
     name: row.name,
     imageUrl: row.image_url,
+    thumbnailUrl: row.thumbnail_url ?? null,
     width: row.width,
     height: row.height,
     gridSize: row.grid_size,

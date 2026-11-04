@@ -142,6 +142,7 @@ export async function registerTableRoutes(app: FastifyInstance): Promise<void> {
     const body = (request.body ?? {}) as Record<string, unknown>;
     const name = safeString(body.name, "New Scene", 80);
     const imageUrl = body.imageUrl ? safeString(body.imageUrl, "", 500) : null;
+    const thumbnailUrl = body.thumbnailUrl ? safeString(body.thumbnailUrl, "", 500) : null;
     const width = clamp(safeInt(body.width, 1600, 100, 10_000), 100, 10_000);
     const height = clamp(safeInt(body.height, 1000, 100, 10_000), 100, 10_000);
     const gridSize = clamp(safeInt(body.gridSize, 70, 20, 300), 20, 300);
@@ -153,13 +154,14 @@ export async function registerTableRoutes(app: FastifyInstance): Promise<void> {
     const sceneId = `scene_${Math.random().toString(16).slice(2, 14)}${Date.now().toString(16)}`;
     const ts = now();
     db.prepare(
-      `INSERT INTO scenes (id, campaign_id, name, image_url, width, height, grid_size, grid_offset_x, grid_offset_y, fog_enabled, fog_revealed, sort_order, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, '[]', ?, ?, ?)`,
+      `INSERT INTO scenes (id, campaign_id, name, image_url, thumbnail_url, width, height, grid_size, grid_offset_x, grid_offset_y, fog_enabled, fog_revealed, sort_order, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, '[]', ?, ?, ?)`,
     ).run(
       sceneId,
       id,
       name,
       imageUrl,
+      thumbnailUrl,
       width,
       height,
       gridSize,
@@ -200,13 +202,14 @@ export async function registerTableRoutes(app: FastifyInstance): Promise<void> {
     const ts = now();
     const name = `${source.name} (copy)`.slice(0, 80);
     db.prepare(
-      `INSERT INTO scenes (id, campaign_id, name, image_url, width, height, grid_size, grid_offset_x, grid_offset_y, fog_enabled, fog_revealed, sort_order, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO scenes (id, campaign_id, name, image_url, thumbnail_url, width, height, grid_size, grid_offset_x, grid_offset_y, fog_enabled, fog_revealed, sort_order, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).run(
       sceneId,
       source.campaign_id,
       name,
       source.image_url,
+      source.thumbnail_url,
       source.width,
       source.height,
       source.grid_size,
@@ -266,6 +269,12 @@ export async function registerTableRoutes(app: FastifyInstance): Promise<void> {
     const body = (request.body ?? {}) as Record<string, unknown>;
     const name = body.name === undefined ? row.name : safeString(body.name, row.name, 80);
     const imageUrl = body.imageUrl === undefined ? row.image_url : body.imageUrl ? safeString(body.imageUrl, "", 500) : null;
+    const thumbnailUrl =
+      body.thumbnailUrl === undefined
+        ? row.thumbnail_url
+        : body.thumbnailUrl
+          ? safeString(body.thumbnailUrl, "", 500)
+          : null;
     const width = body.width === undefined ? row.width : clamp(safeInt(body.width, row.width, 100, 10_000), 100, 10_000);
     const height = body.height === undefined ? row.height : clamp(safeInt(body.height, row.height, 100, 10_000), 100, 10_000);
     const gridSize = body.gridSize === undefined ? row.grid_size : clamp(safeInt(body.gridSize, row.grid_size, 20, 300), 20, 300);
@@ -273,8 +282,8 @@ export async function registerTableRoutes(app: FastifyInstance): Promise<void> {
     const gridOffsetY = body.gridOffsetY === undefined ? row.grid_offset_y : clamp(Number(body.gridOffsetY) || 0, -gridSize, gridSize);
     const fogEnabled = body.fogEnabled === undefined ? row.fog_enabled : body.fogEnabled ? 1 : 0;
     db.prepare(
-      `UPDATE scenes SET name = ?, image_url = ?, width = ?, height = ?, grid_size = ?, grid_offset_x = ?, grid_offset_y = ?, fog_enabled = ?, updated_at = ? WHERE id = ?`,
-    ).run(name, imageUrl, width, height, gridSize, gridOffsetX, gridOffsetY, fogEnabled, now(), id);
+      `UPDATE scenes SET name = ?, image_url = ?, thumbnail_url = ?, width = ?, height = ?, grid_size = ?, grid_offset_x = ?, grid_offset_y = ?, fog_enabled = ?, updated_at = ? WHERE id = ?`,
+    ).run(name, imageUrl, thumbnailUrl, width, height, gridSize, gridOffsetX, gridOffsetY, fogEnabled, now(), id);
     const updated = db.prepare("SELECT * FROM scenes WHERE id = ?").get(id) as SceneRow;
     const scene = serializeScene(updated);
     app.broadcastCampaign(row.campaign_id, "scene:updated", scene);

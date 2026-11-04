@@ -311,7 +311,7 @@ export function Avatar({
       className={`avatar ${className}`}
       style={{ width: size, height: size, fontSize: Math.max(11, size * 0.32) }}
     >
-      {src ? <img src={src} alt="" /> : initials || "?"}
+      {src ? <img src={src} alt="" loading="lazy" decoding="async" /> : initials || "?"}
     </span>
   );
 }

@@ -40,6 +40,7 @@ import {
   Input,
   Modal,
   PageEyebrow,
+  ProgressBar,
   Spinner,
   Tag,
   Textarea,
@@ -74,17 +75,23 @@ export function CampaignDashboard({
   campaignId,
   isGm,
   currentUserId,
+  memberCount,
+  journalCount,
   characters,
   onNavigate,
   onJournalCreated,
+  onInvite,
   toast,
 }: {
   campaignId: string;
   isGm: boolean;
   currentUserId: string;
+  memberCount: number;
+  journalCount: number;
   characters: CharacterRecord[];
   onNavigate: (tab: DashboardTab) => void;
   onJournalCreated: (entry: JournalEntry) => void;
+  onInvite: () => void;
   toast: (message: string, kind?: "info" | "success" | "error") => void;
 }) {
   const [dashboard, setDashboard] = useState<CampaignDashboardData | null>(null);
@@ -166,6 +173,37 @@ export function CampaignDashboard({
   const openThreads = openThreadCount(threads);
   const checkinSummary = nextSession ? sessionCheckinSummary(nextSession.checkins) : null;
   const ownCheckin = nextSession?.checkins.find((entry) => entry.userId === currentUserId) ?? null;
+  const setupTasks = [
+    {
+      id: "invite",
+      label: "Invite your players",
+      done: memberCount > 1,
+      actionLabel: "Invite",
+      action: onInvite,
+    },
+    {
+      id: "hero",
+      label: "Create a character",
+      done: characters.length > 0,
+      actionLabel: "Create",
+      action: () => onNavigate("party"),
+    },
+    {
+      id: "session",
+      label: "Schedule a session",
+      done: Boolean(nextSession),
+      actionLabel: "Schedule",
+      action: () => onNavigate("sessions"),
+    },
+    {
+      id: "handout",
+      label: "Write a handout",
+      done: journalCount > 0,
+      actionLabel: "Write",
+      action: () => onNavigate("journal"),
+    },
+  ];
+  const setupDone = setupTasks.filter((task) => task.done).length;
 
   const save = async () => {
     setBusy(true);
@@ -592,6 +630,40 @@ export function CampaignDashboard({
             <p className="tiny muted">Last updated {formatDate(dashboard.updatedAt)}</p>
           ) : null}
         </Card>
+
+        {setupDone < setupTasks.length ? (
+          <Card className="dashboard-first-run">
+            <div className="row-between">
+              <div>
+                <PageEyebrow>Table setup</PageEyebrow>
+                <h3>Get ready for the first session</h3>
+              </div>
+              <Badge tone={setupDone ? "gold" : "neutral"}>
+                {setupDone}/{setupTasks.length}
+              </Badge>
+            </div>
+            <ProgressBar
+              value={setupDone}
+              max={setupTasks.length}
+              label={<span>{setupDone} of {setupTasks.length} steps complete</span>}
+            />
+            <div className="dashboard-setup-list">
+              {setupTasks.map((task) => (
+                <div key={task.id} className={`dashboard-setup-step ${task.done ? "is-done" : ""}`}>
+                  <span className="dashboard-setup-check">{task.done ? <Check size={12} /> : null}</span>
+                  <span className="grow">{task.label}</span>
+                  {task.done ? (
+                    <Tag tone="green">Done</Tag>
+                  ) : (
+                    <Button size="sm" variant="ghost" onClick={task.action}>
+                      {task.actionLabel}
+                    </Button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </Card>
+        ) : null}
       </div>
 
       <Modal

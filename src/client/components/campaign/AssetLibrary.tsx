@@ -128,13 +128,13 @@ export function AssetLibrary({
       </div>
 
       <div className="segmented asset-filter">
-        <button type="button" className={filter === "all" ? "is-active" : ""} onClick={() => setFilter("all")}>
+        <button type="button" className={filter === "all" ? "is-active" : ""} aria-pressed={filter === "all"} onClick={() => setFilter("all")}>
           All
         </button>
-        <button type="button" className={filter === "unused" ? "is-active" : ""} onClick={() => setFilter("unused")}>
+        <button type="button" className={filter === "unused" ? "is-active" : ""} aria-pressed={filter === "unused"} onClick={() => setFilter("unused")}>
           Unused
         </button>
-        <button type="button" className={filter === "used" ? "is-active" : ""} onClick={() => setFilter("used")}>
+        <button type="button" className={filter === "used" ? "is-active" : ""} aria-pressed={filter === "used"} onClick={() => setFilter("used")}>
           In use
         </button>
       </div>
