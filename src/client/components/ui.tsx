@@ -1,6 +1,7 @@
 import {
   useEffect,
   useId,
+  useRef,
   type ButtonHTMLAttributes,
   type InputHTMLAttributes,
   type ReactNode,
@@ -323,6 +324,16 @@ export function RichText({ html, className = "" }: { html: string; className?: s
 // ---------------------------------------------------------------------------
 // Modal
 // ---------------------------------------------------------------------------
+const FOCUSABLE_SELECTOR = [
+  "a[href]",
+  "button:not([disabled])",
+  "textarea:not([disabled])",
+  "input:not([disabled])",
+  "select:not([disabled])",
+  "[tabindex]:not([tabindex='-1'])",
+].join(",");
+const modalStack: symbol[] = [];
+
 export function Modal({
   open,
   onClose,
@@ -344,19 +355,76 @@ export function Modal({
   extraWide?: boolean;
   closeOnBackdrop?: boolean;
 }) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
+  const wasOpenRef = useRef(false);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
+  if (open && !wasOpenRef.current) {
+    previousFocusRef.current =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  }
+  wasOpenRef.current = open;
+
   useEffect(() => {
     if (!open) return;
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
-    };
-    const previous = document.body.style.overflow;
+    const dialog = dialogRef.current;
+    const stackEntry = Symbol("modal");
+    const previousFocus = previousFocusRef.current;
+    const previousOverflow = document.body.style.overflow;
+    modalStack.push(stackEntry);
     document.body.style.overflow = "hidden";
+
+    const focusable = () =>
+      dialog
+        ? Array.from(dialog.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)).filter(
+            (element) => element.getClientRects().length > 0,
+          )
+        : [];
+
+    const frame = window.requestAnimationFrame(() => {
+      // Keep a field's own autoFocus from being stolen by the close button.
+      if (dialog?.contains(document.activeElement)) return;
+      (focusable()[0] ?? dialog)?.focus();
+    });
+
+    const onKey = (event: KeyboardEvent) => {
+      if (modalStack[modalStack.length - 1] !== stackEntry) return;
+      if (event.key === "Escape") {
+        event.preventDefault();
+        event.stopPropagation();
+        onCloseRef.current();
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const items = focusable();
+      if (!items.length) {
+        event.preventDefault();
+        dialog?.focus();
+        return;
+      }
+      const first = items[0];
+      const last = items[items.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
     window.addEventListener("keydown", onKey);
     return () => {
-      document.body.style.overflow = previous;
+      window.cancelAnimationFrame(frame);
       window.removeEventListener("keydown", onKey);
+      const index = modalStack.indexOf(stackEntry);
+      if (index >= 0) modalStack.splice(index, 1);
+      document.body.style.overflow = previousOverflow;
+      if (previousFocus && document.contains(previousFocus)) previousFocus.focus();
     };
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open) return null;
   return createPortal(
@@ -367,10 +435,12 @@ export function Modal({
       }}
     >
       <div
+        ref={dialogRef}
         className={`modal ${wide ? "modal-wide" : ""} ${extraWide ? "modal-extra-wide" : ""}`}
         role="dialog"
         aria-modal="true"
         aria-label={typeof title === "string" ? title : "Dialog"}
+        tabIndex={-1}
         onMouseDown={(event) => event.stopPropagation()}
       >
         {(title || subtitle) && (

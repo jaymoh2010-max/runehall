@@ -8,6 +8,7 @@ import "@fontsource/source-sans-3/latin-600.css";
 import "@fontsource/source-sans-3/latin-700.css";
 import "./styles.css";
 import "./styles.pages.css";
+import "./styles.a11y.css";
 import App from "./App";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(

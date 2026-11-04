@@ -26,6 +26,7 @@ Runehall is built for a private group of roughly 4–10 players and a GM. It run
 - Ability boost validation, key ability selection, ancestry/background/class choices, doctrine/bloodline/racket-style subclass selection.
 - Derived HP, AC, saves, perception, class DC, spell DC/attack, skills, lore, attacks, bulk, and wealth.
 - Autosaves every change; portable JSON export/import.
+- Route-level code splitting keeps the initial client small, with a gzip bundle budget in CI checks. Dialogs trap and restore focus, the app has a skip link, and reduced-motion preferences are honored.
 - At-the-table sheet with clickable skill/save/attack/spell rolls, HP, temp HP, hero points, focus points, conditions, and notes.
 
 ### Shared table
@@ -102,7 +103,8 @@ Players join with the GM's invite link or code from their own accounts. They can
 | `npm start` | Run the server and serve the built client |
 | `npm run typecheck` | TypeScript check |
 | `npm test` | Vitest unit tests |
-| `npm run check` | Typecheck, unit tests, and production build in one command |
+| `npm run check` | Typecheck, unit tests, production build, and bundle budget |
+| `npm run check:bundle` | Verify the production entry JS/CSS gzip budgets after a build |
 | `npm run check:full` | `check` plus the two-user smoke test |
 | `npm run smoke` | Two-user GM/player API + socket smoke test against a temporary database |
 | `npm run ingest` | Rebuild the compendium from the Foundry PF2e data clone |
@@ -198,7 +200,7 @@ This is a substantial, playable foundation — not a complete Pathbuilder/Foundr
 1. **Reliability:** campaign revisions, autosave conflict detection, reconnect coverage, and upload/health hardening.
 2. **Character trust:** automation labels, golden-sheet fixtures, and a full level-up wizard.
 3. **Table depth:** AoE templates, condition values, multi-select, scene playlists, and combat-log filters.
-4. **Polish:** code splitting, tablet layouts, accessibility, generated scene thumbnails, and optional hosting adapters.
+4. **Polish:** tablet layouts, remaining keyboard/contrast audits, generated scene thumbnails, and optional hosting adapters.
 
 ---
 

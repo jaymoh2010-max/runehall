@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
 import { BookOpen, ChevronDown, LogOut, Shield, ShieldCheck, Swords, UserRound, Users } from "lucide-react";
 import { useSession } from "../stores";
-import { Avatar, IconButton } from "./ui";
+import { Avatar, IconButton, LoadingScreen } from "./ui";
 
 export function AppShell() {
   const user = useSession((state) => state.user);
@@ -21,6 +21,9 @@ export function AppShell() {
 
   return (
     <div className="app-shell">
+      <a className="skip-link" href="#main-content">
+        Skip to main content
+      </a>
       <header className="topbar">
         <Link to="/campaigns" className="brand">
           <img src="/rune.svg" alt="" />
@@ -90,8 +93,10 @@ export function AppShell() {
           ) : null}
         </div>
       </header>
-      <main className="app-main">
-        <Outlet />
+      <main className="app-main" id="main-content" tabIndex={-1}>
+        <Suspense fallback={<LoadingScreen label="Opening this page…" />}>
+          <Outlet />
+        </Suspense>
       </main>
     </div>
   );

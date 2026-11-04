@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from "react";
+import { lazy, Suspense, useEffect, type ReactNode } from "react";
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { AppShell } from "./components/AppShell";
 import { ErrorBoundary } from "./components/ErrorBoundary";
@@ -8,15 +8,34 @@ import { useSession } from "./stores";
 import { LandingPage } from "./pages/LandingPage";
 import { AuthPage } from "./pages/AuthPage";
 import { JoinCampaignPage } from "./pages/JoinCampaignPage";
-import { DashboardPage } from "./pages/DashboardPage";
-import { CampaignPage } from "./pages/CampaignPage";
-import { CharacterBuilderPage } from "./pages/CharacterBuilderPage";
-import { CharacterSheetPage } from "./pages/CharacterSheetPage";
-import { LibraryPage } from "./pages/LibraryPage";
-import { RulesPage } from "./pages/RulesPage";
-import { AccountPage } from "./pages/AccountPage";
-import { AdminPage } from "./pages/AdminPage";
-import { NotFoundPage } from "./pages/NotFoundPage";
+
+const DashboardPage = lazy(() =>
+  import("./pages/DashboardPage").then((module) => ({ default: module.DashboardPage })),
+);
+const CampaignPage = lazy(() =>
+  import("./pages/CampaignPage").then((module) => ({ default: module.CampaignPage })),
+);
+const CharacterBuilderPage = lazy(() =>
+  import("./pages/CharacterBuilderPage").then((module) => ({ default: module.CharacterBuilderPage })),
+);
+const CharacterSheetPage = lazy(() =>
+  import("./pages/CharacterSheetPage").then((module) => ({ default: module.CharacterSheetPage })),
+);
+const LibraryPage = lazy(() =>
+  import("./pages/LibraryPage").then((module) => ({ default: module.LibraryPage })),
+);
+const RulesPage = lazy(() =>
+  import("./pages/RulesPage").then((module) => ({ default: module.RulesPage })),
+);
+const AccountPage = lazy(() =>
+  import("./pages/AccountPage").then((module) => ({ default: module.AccountPage })),
+);
+const AdminPage = lazy(() =>
+  import("./pages/AdminPage").then((module) => ({ default: module.AdminPage })),
+);
+const NotFoundPage = lazy(() =>
+  import("./pages/NotFoundPage").then((module) => ({ default: module.NotFoundPage })),
+);
 
 function RequireAuth({ children }: { children: ReactNode }) {
   const user = useSession((state) => state.user);
@@ -36,7 +55,8 @@ export default function App() {
   return (
     <BrowserRouter>
       <ErrorBoundary>
-        <Routes>
+        <Suspense fallback={<LoadingScreen label="Opening the hall…" />}>
+          <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<AuthPage mode="login" />} />
         <Route path="/register" element={<AuthPage mode="register" />} />
@@ -58,7 +78,8 @@ export default function App() {
           <Route path="/admin" element={<AdminPage />} />
         </Route>
           <Route path="*" element={<NotFoundPage />} />
-        </Routes>
+          </Routes>
+        </Suspense>
       </ErrorBoundary>
       <Toasts />
     </BrowserRouter>

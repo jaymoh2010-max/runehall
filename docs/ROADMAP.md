@@ -461,12 +461,20 @@ Acceptance: a GM can prepare a full session in Runehall and start it with one â€
 
 **Goal:** make the app fast and comfortable on real tables and tablets.
 
-- [ ] Route-level code splitting; lazy-load the builder and library.
+- [x] **Route-level code splitting**
+  - Campaign, character sheet, builder, library, dashboard, rules, account, admin, and not-found pages load on demand.
+  - The production entry bundle is roughly 122 KB gzip and enforced by a budget check.
 - [ ] Thumbnail/lazy-load maps, token art, and handout galleries.
 - [ ] Mobile/tablet layouts for the table and sheet.
-- [ ] Keyboard-only core loop, focus traps, labels, reduced motion, and contrast pass.
+- [x] **Dialog and motion accessibility**
+  - Modals trap Tab, restore focus on close, and close on Escape without leaking focus to the page.
+  - A skip link targets the main content region.
+  - Reduced-motion preferences disable animations and smooth scrolling.
+- [ ] Full keyboard-only audit, form labeling, and contrast pass.
 - [ ] Better empty states and a first-run checklist.
-- [ ] Bundle-size budget and a lightweight performance check.
+- [x] **Bundle-size budget**
+  - `npm run check:bundle` enforces the entry JavaScript and CSS gzip budgets.
+  - `npm run check` now runs the budget after the production build.
 
 **Acceptance:** initial JS meaningfully smaller; the core loop works keyboard-only and on a tablet.
 
