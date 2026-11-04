@@ -25,19 +25,13 @@ import {
 } from "lucide-react";
 import type {
   CampaignTable,
-  CharacterRecord,
-  CharacterSummary,
-  ChatMessage,
-  InitiativeEntry,
   Monster,
-  PresenceUser,
   PublicUser,
   Scene,
   Token,
 } from "../../../shared/types";
 import { errorMessage, useToasts } from "../../stores";
 import { api } from "../../api";
-import { connectSocket } from "../../socket";
 import { getSocket } from "../../socket";
 import {
   Avatar,
@@ -62,7 +56,7 @@ import { AddTokenModal, SceneEditModal, SceneManagerModal } from "./TableModals"
 import { VttToolbar } from "./VttToolbar";
 import { VttTokenPanel } from "./VttTokenPanel";
 import { BestiaryPalette } from "./BestiaryPalette";
-import { revisionAction } from "../../../shared/revisions";
+import { useCampaignTable } from "./useCampaignTable";
 
 interface VttTableProps {
   initial: CampaignTable;
@@ -73,18 +67,24 @@ interface VttTableProps {
 
 export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
   const toast = useToasts((state) => state.push);
-  const [scenes, setScenes] = useState<Scene[]>(initial.scenes);
-  const [tokens, setTokens] = useState<Token[]>(initial.tokens);
-  const [characters, setCharacters] = useState<CharacterRecord[]>(initial.characters);
-  const [activeSceneId, setActiveSceneId] = useState<string | null>(initial.activeSceneId);
-  const [messages, setMessages] = useState<ChatMessage[]>(initial.messages);
-  const [initiative, setInitiative] = useState<InitiativeEntry[]>(initial.initiative);
-  const [round, setRound] = useState(initial.round);
-  const [turnIndex, setTurnIndex] = useState(initial.turnIndex);
-  const revisionRef = useRef(initial.revision);
-  const refreshingRef = useRef(false);
-  const [presence, setPresence] = useState<PresenceUser[]>([]);
-  const [selectedTokenId, setSelectedTokenId] = useState<string | null>(null);
+  const {
+    scenes,
+    setScenes,
+    tokens,
+    setTokens,
+    characters,
+    activeSceneId,
+    setActiveSceneId,
+    messages,
+    initiative,
+    round,
+    turnIndex,
+    presence,
+    selectedTokenId,
+    setSelectedTokenId,
+    remotePointer,
+    connectionStatus,
+  } = useCampaignTable({ initial, campaignId, toast });
   const [editingTokenId, setEditingTokenId] = useState<string | null>(null);
   const [fogBrush, setFogBrush] = useState<"reveal" | "hide" | null>(null);
   const [brushSize, setBrushSize] = useState(3);
@@ -95,38 +95,9 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
   const [bestiaryOpen, setBestiaryOpen] = useState(false);
   const [leftOpen, setLeftOpen] = useState(true);
   const [rightOpen, setRightOpen] = useState(true);
-  const [remotePointer, setRemotePointer] = useState<{ x: number; y: number; name: string; ts: number } | null>(null);
-  const [connectionStatus, setConnectionStatus] = useState<"connecting" | "online" | "offline">("connecting");
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [theaterMode, setTheaterMode] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
-  const pointerTimer = useRef<number | null>(null);
-  const joined = useRef(false);
-  const wasConnectedOnce = useRef(false);
-
-  const refreshTable = useCallback(async () => {
-    try {
-      const snapshot = await api<CampaignTable>(`/api/campaigns/${campaignId}/table`);
-      setScenes(snapshot.scenes);
-      setTokens(snapshot.tokens);
-      setCharacters(snapshot.characters);
-      setActiveSceneId(snapshot.activeSceneId);
-      setInitiative(snapshot.initiative);
-      setRound(snapshot.round);
-      setTurnIndex(snapshot.turnIndex);
-      revisionRef.current = snapshot.revision;
-      setMessages((current) => {
-        const merged = new globalThis.Map(current.map((message) => [message.id, message]));
-        for (const message of snapshot.messages) merged.set(message.id, message);
-        return [...merged.values()].sort((a, b) => a.createdAt - b.createdAt).slice(-200);
-      });
-      setSelectedTokenId((current) =>
-        current && snapshot.tokens.some((token) => token.id === current) ? current : null,
-      );
-    } catch (error) {
-      toast(`Could not refresh the table: ${errorMessage(error)}`, "error");
-    }
-  }, [campaignId, toast]);
 
   useEffect(() => {
     const onFullscreenChange = () => setIsFullscreen(Boolean(document.fullscreenElement));
@@ -170,171 +141,6 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
     if (window.innerWidth < 1160) setRightOpen(false);
     if (window.innerWidth < 760) setLeftOpen(false);
   }, []);
-
-  useEffect(() => {
-    const socket = connectSocket();
-    const join = () => {
-      setConnectionStatus("connecting");
-      socket.emit("campaign:join", { campaignId }, (ack) => {
-        const result = ack as { ok?: boolean; role?: string } | undefined;
-        if (!result?.ok) {
-          setConnectionStatus("offline");
-          toast("Could not join the live table.", "error");
-          return;
-        }
-        joined.current = true;
-        setConnectionStatus("online");
-        if (wasConnectedOnce.current) {
-          void refreshTable();
-        } else {
-          wasConnectedOnce.current = true;
-        }
-      });
-    };
-    const onDisconnect = () => setConnectionStatus("offline");
-    const onConnectError = () => setConnectionStatus("offline");
-    const onVisibility = () => {
-      if (document.visibilityState === "visible" && socket.connected) void refreshTable();
-    };
-    if (socket.connected) join();
-    socket.on("connect", join);
-    socket.on("disconnect", onDisconnect);
-    socket.on("connect_error", onConnectError);
-    document.addEventListener("visibilitychange", onVisibility);
-
-    const onPresence = (users: PresenceUser[]) => setPresence(users);
-    const onTokenMoved = ({ tokenId, x, y }: { tokenId: string; x: number; y: number }) =>
-      setTokens((current) => current.map((token) => (token.id === tokenId ? { ...token, x, y } : token)));
-    const onTokenCreated = (token: Token) => {
-      setTokens((current) => (current.some((item) => item.id === token.id) ? current : [...current, token]));
-      setSelectedTokenId(token.id);
-    };
-    const onTokenUpdated = (token: Token) =>
-      setTokens((current) => current.map((item) => (item.id === token.id ? token : item)));
-    const onTokenDeleted = ({ tokenId }: { tokenId: string }) => {
-      setTokens((current) => current.filter((token) => token.id !== tokenId));
-      setSelectedTokenId((current) => (current === tokenId ? null : current));
-    };
-    const onFogUpdated = ({ sceneId, cells, mode }: { sceneId: string; cells: string[]; mode: "reveal" | "hide" | "replace" }) => {
-      setScenes((current) =>
-        current.map((scene) => {
-          if (scene.id !== sceneId) return scene;
-          const next = new Set(scene.revealed);
-          if (mode === "replace") next.clear();
-          for (const cell of cells) {
-            if (mode === "hide") next.delete(cell);
-            else next.add(cell);
-          }
-          return { ...scene, revealed: [...next] };
-        }),
-      );
-    };
-    const onSceneActivated = ({ sceneId }: { sceneId: string }) => {
-      setActiveSceneId(sceneId);
-      setSelectedTokenId(null);
-    };
-    const onSceneUpdated = (scene: Scene) =>
-      setScenes((current) => current.map((item) => (item.id === scene.id ? scene : item)));
-    const onSceneCreated = (scene: Scene) => {
-      setScenes((current) => (current.some((item) => item.id === scene.id) ? current : [...current, scene]));
-      setActiveSceneId((current) => current ?? scene.id);
-    };
-    const onSceneDeleted = ({ sceneId }: { sceneId: string }) => {
-      setScenes((current) => {
-        const next = current.filter((scene) => scene.id !== sceneId);
-        setActiveSceneId((active) => (active === sceneId ? next[0]?.id ?? null : active));
-        return next;
-      });
-      setTokens((current) => current.filter((token) => token.sceneId !== sceneId));
-    };
-    const onChatMessage = (message: ChatMessage) =>
-      setMessages((current) => (current.some((item) => item.id === message.id) ? current : [...current, message]));
-    const onInitiativeUpdated = (payload: { entries: InitiativeEntry[]; round: number; turnIndex: number }) => {
-      setInitiative(payload.entries);
-      setRound(payload.round);
-      setTurnIndex(payload.turnIndex);
-    };
-    const onPointer = (payload: { displayName: string; x: number; y: number }) => {
-      setRemotePointer({ x: payload.x, y: payload.y, name: payload.displayName, ts: Date.now() });
-      if (pointerTimer.current) window.clearTimeout(pointerTimer.current);
-      pointerTimer.current = window.setTimeout(() => setRemotePointer(null), 2200);
-    };
-    const onCharacterUpdated = (payload: { characterId: string; summary: CharacterSummary | null; name: string }) => {
-      setCharacters((current) =>
-        current.map((character) =>
-          character.id === payload.characterId
-            ? { ...character, name: payload.name, summary: payload.summary }
-            : character,
-        ),
-      );
-    };
-    const onCharacterCreated = (payload: { character: CharacterRecord }) => {
-      setCharacters((current) =>
-        current.some((character) => character.id === payload.character.id)
-          ? current.map((character) => (character.id === payload.character.id ? payload.character : character))
-          : [...current, payload.character],
-      );
-    };
-    const onRevision = ({ revision }: { revision: number }) => {
-      const action = revisionAction(revisionRef.current, revision);
-      if (action === "ignore") return;
-      if (action === "apply") {
-        revisionRef.current = revision;
-        return;
-      }
-      if (!refreshingRef.current) {
-        refreshingRef.current = true;
-        void refreshTable().finally(() => {
-          refreshingRef.current = false;
-        });
-      }
-    };
-    const onError = (payload: { message: string }) => toast(payload.message, "error");
-
-    socket.on("presence:update", onPresence);
-    socket.on("token:moved", onTokenMoved);
-    socket.on("token:created", onTokenCreated);
-    socket.on("token:updated", onTokenUpdated);
-    socket.on("token:deleted", onTokenDeleted);
-    socket.on("fog:updated", onFogUpdated);
-    socket.on("scene:activated", onSceneActivated);
-    socket.on("scene:updated", onSceneUpdated);
-    socket.on("scene:created", onSceneCreated);
-    socket.on("scene:deleted", onSceneDeleted);
-    socket.on("chat:message", onChatMessage);
-    socket.on("initiative:updated", onInitiativeUpdated);
-    socket.on("pointer:show", onPointer);
-    socket.on("character:updated", onCharacterUpdated);
-    socket.on("character:created", onCharacterCreated);
-    socket.on("campaign:revision", onRevision);
-    socket.on("error:toast", onError);
-
-    return () => {
-      socket.off("connect", join);
-      socket.off("disconnect", onDisconnect);
-      socket.off("connect_error", onConnectError);
-      document.removeEventListener("visibilitychange", onVisibility);
-      socket.off("presence:update", onPresence);
-      socket.off("token:moved", onTokenMoved);
-      socket.off("token:created", onTokenCreated);
-      socket.off("token:updated", onTokenUpdated);
-      socket.off("token:deleted", onTokenDeleted);
-      socket.off("fog:updated", onFogUpdated);
-      socket.off("scene:activated", onSceneActivated);
-      socket.off("scene:updated", onSceneUpdated);
-      socket.off("scene:created", onSceneCreated);
-      socket.off("scene:deleted", onSceneDeleted);
-      socket.off("chat:message", onChatMessage);
-      socket.off("initiative:updated", onInitiativeUpdated);
-      socket.off("pointer:show", onPointer);
-      socket.off("character:updated", onCharacterUpdated);
-      socket.off("character:created", onCharacterCreated);
-      socket.off("campaign:revision", onRevision);
-      socket.off("error:toast", onError);
-      if (joined.current) socket.emit("campaign:leave", { campaignId });
-      if (pointerTimer.current) window.clearTimeout(pointerTimer.current);
-    };
-  }, [campaignId, toast, refreshTable]);
 
   // ---- Actions ------------------------------------------------------------
   const activateScene = (sceneId: string) => {

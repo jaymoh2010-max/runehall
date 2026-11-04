@@ -12,7 +12,7 @@
 
 ### What is still prototype-level
 - **Rules automation is partial.** Feat prerequisites are enforced for mechanical requirements, while complex/story prerequisites are flagged for review; some subclass/feature/item effects are manual; companions and split-caster casting restrictions are not automated. This can make a sheet look correct while missing situational bonuses.
-- **Realtime recovery is revision-aware.** Reconnects refetch the authoritative table, campaign revisions detect missed events, and character saves reject stale writes. The remaining risk is that the table socket/state layer is still embedded in `VttTable` and not independently tested.
+- **Realtime recovery is revision-aware.** Reconnects refetch the authoritative table, campaign revisions detect missed events, character saves reject stale writes, and the table socket/state layer now lives in a tested hook with pure event reducers.
 - **Table polish is thin around tokens and scenes.** No AoE templates, condition values/durations, multi-select, scene playlists, walls, lighting, or robust grid calibration beyond the current first pass.
 - **Content volume needs curation.** The builder exposes 540 backgrounds and 29 classes by default. That is impressive, but overwhelming; not every option has the same automation quality.
 - **Test coverage is unit + smoke + simulation.** Dice, rules math, compendium integrity, content tiers, security, and migrations are unit-tested; the GM/player campaign flow and registration/admin flows have an automated smoke test. Browser-level E2E and upload edge cases still rely on manual checks.
@@ -306,9 +306,10 @@ Acceptance: a GM can prepare a full session in Runehall and start it with one â€
   - Characters carry an optimistic `revision`.
   - Saves may include `expectedRevision`; stale writes return `409` with the current server draft.
   - Builder and sheet show a conflict dialog with **Reload their version** and **Keep my changes**.
-- [ ] **Extract the table socket/state layer**
-  - Move `VttTable` socket handlers and reducer-style state into a testable hook.
-  - Add unit tests for token, fog, initiative, and chat event application.
+- [x] **Extract the table socket/state layer**
+  - `useCampaignTable` owns table state and the Socket.IO subscription.
+  - Pure reducers in `tableEvents.ts` apply token, fog, scene, chat, and character events.
+  - Unit tests cover movement, deduplication, fog modes, scene deletion, chat merging, and character updates.
 - [x] **Reconnect test**
   - The smoke test disconnects a player, mutates the token as the GM, reconnects, and verifies the snapshot position and revision advanced.
   - A pure `revisionAction` helper is unit-tested for stale, next, and gap cases.

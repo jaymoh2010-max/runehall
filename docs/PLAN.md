@@ -65,8 +65,8 @@ The target table size is one GM plus 4–10 players. That means the product shou
 - [x] Character autosave optimistic revisions with a conflict dialog.
 - [x] Upload magic-byte validation and image dimension limits.
 - [x] Readiness health check for SQLite and compendium.
-- [ ] Extracted, tested table socket/state layer.
-- [ ] Forced-disconnect reconnect convergence test.
+- [x] Extracted, tested table socket/state layer (`useCampaignTable` + pure `tableEvents` reducers).
+- [x] Forced-disconnect reconnect convergence test.
 
 ### Phase 5 — Table depth
 - Walls/doors and dynamic light.
