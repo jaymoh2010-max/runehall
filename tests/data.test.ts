@@ -1,0 +1,368 @@
+import fs from "node:fs";
+import path from "node:path";
+import { describe, expect, it } from "vitest";
+import type {
+  Ancestry,
+  Background,
+  ClassData,
+  Deity,
+  Equipment,
+  Feat,
+  Heritage,
+  Monster,
+  Spell,
+} from "../src/shared/types";
+
+function read<T>(file: string): T[] {
+  return JSON.parse(fs.readFileSync(path.resolve("data", "compendium", file), "utf8")) as T[];
+}
+
+const manifest = JSON.parse(
+  fs.readFileSync(path.resolve("data", "compendium", "manifest.json"), "utf8"),
+) as { count: Record<string, number> };
+const ancestries = read<Ancestry>("ancestries.json");
+const heritages = read<Heritage>("heritages.json");
+const backgrounds = read<Background>("backgrounds.json");
+const classes = read<ClassData>("classes.json");
+const feats = read<Feat>("feats.json");
+const spells = read<Spell>("spells.json");
+const equipment = read<Equipment>("equipment.json");
+const deities = read<Deity>("deities.json");
+const monsters = read<Monster>("monsters.json");
+const classFeatures = read<{ name: string; description: string }>("classFeatures.json");
+const actions = read<{ name: string; description: string }>("actions.json");
+
+const byName = <T extends { name: string }>(items: T[], name: string): T => {
+  const found = items.find((item) => item.name === name);
+  if (!found) throw new Error(`Missing ${name}`);
+  return found;
+};
+
+describe("compendium data", () => {
+  it("matches the manifest counts and has no duplicate ids", () => {
+    const files: [string, { id: string }[]][] = [
+      ["ancestries", ancestries],
+      ["heritages", heritages],
+      ["backgrounds", backgrounds],
+      ["classes", classes],
+      ["feats", feats],
+      ["spells", spells],
+      ["equipment", equipment],
+      ["deities", deities],
+      ["monsters", monsters],
+    ];
+    for (const [key, items] of files) {
+      expect(manifest.count[key], `${key} manifest count`).toBe(items.length);
+      expect(new Set(items.map((item) => item.id)).size, `${key} ids`).toBe(items.length);
+    }
+  });
+
+  it("keeps spell damage formulas and heightening data", () => {
+    const fireball = byName(spells, "Fireball");
+    expect(fireball.rank).toBe(3);
+    expect(fireball.traditions.sort()).toEqual(["arcane", "primal"]);
+    expect(fireball.defense).toEqual({ save: "reflex", basic: true });
+    expect(fireball.damage).toEqual([{ formula: "6d6", type: "fire" }]);
+    expect(fireball.heightening?.damage).toEqual([{ formula: "2d6", type: "fire" }]);
+    expect(fireball.damageText).toContain("6d6");
+
+    const electricArc = byName(spells, "Electric Arc");
+    expect(electricArc.damage).toEqual([{ formula: "2d4", type: "electricity" }]);
+    const heal = byName(spells, "Heal");
+    expect(heal.damage).toEqual([{ formula: "1d8", type: "vitality" }]);
+
+    const damaged = spells.filter((spell) => spell.damage?.length);
+    expect(damaged.length).toBeGreaterThan(500);
+    for (const spell of damaged) {
+      for (const part of spell.damage ?? []) {
+        expect(part.formula.trim().length, `${spell.name} damage formula`).toBeGreaterThan(0);
+        expect(part.formula, `${spell.name} unresolved formula`).not.toContain("@");
+        expect(part.type, `${spell.name} damage type`).not.toBe("");
+      }
+    }
+  });
+
+  it("normalizes deity domains, alternate domains, and skill choices", () => {
+    const abadar = byName(deities, "Abadar");
+    expect(abadar.domains).toEqual(["cities", "earth", "travel", "wealth"]);
+    expect(abadar.alternateDomains).toEqual(["creation", "duty", "metal", "toil"]);
+    expect(abadar.skill).toEqual(["society"]);
+    expect(abadar.weapons).toEqual(["crossbow"]);
+    expect(abadar.font.sort()).toEqual(["harm", "heal"]);
+
+    const shelyn = byName(deities, "Shelyn");
+    expect(shelyn.skill).toEqual(["crafting", "performance"]);
+
+    const skillIds = new Set([
+      "acrobatics",
+      "arcana",
+      "athletics",
+      "crafting",
+      "deception",
+      "diplomacy",
+      "intimidation",
+      "medicine",
+      "nature",
+      "occultism",
+      "performance",
+      "religion",
+      "society",
+      "stealth",
+      "survival",
+      "thievery",
+    ]);
+    for (const deity of deities) {
+      expect(Array.isArray(deity.skill), `${deity.name} skill`).toBe(true);
+      expect(Array.isArray(deity.domains), `${deity.name} domains`).toBe(true);
+      for (const skill of deity.skill) {
+        expect(skillIds.has(skill), `${deity.name} skill ${skill}`).toBe(true);
+      }
+    }
+    for (const background of backgrounds) {
+      for (const skill of background.trainedSkills) {
+        expect(skillIds.has(skill), `${background.name} skill ${skill}`).toBe(true);
+      }
+      for (const choice of background.skillChoices) {
+        for (const skill of choice.options) {
+          expect(skillIds.has(skill), `${background.name} choice ${skill}`).toBe(true);
+        }
+      }
+      for (const choice of background.loreChoices) {
+        for (const lore of choice.options) {
+          expect(lore.toLowerCase(), `${background.name} Lore option`).toContain("lore");
+        }
+      }
+    }
+    for (const cls of classes) {
+      for (const group of cls.choiceGroups) {
+        for (const option of group.options) {
+          for (const skill of option.trainedSkills ?? []) {
+            expect(skillIds.has(skill), `${cls.name}/${option.name} skill ${skill}`).toBe(true);
+          }
+        }
+      }
+    }
+  });
+
+  it("marks versatile heritages so every ancestry can select them", () => {
+    const versatile = heritages.filter((heritage) => heritage.versatile);
+    expect(versatile.length).toBeGreaterThanOrEqual(17);
+    const aiuvarin = byName(heritages, "Aiuvarin");
+    expect(aiuvarin.versatile).toBe(true);
+    expect(aiuvarin.ancestry).toBe("");
+
+    const ancestryNames = new Set(ancestries.map((ancestry) => ancestry.name.toLowerCase()));
+    for (const heritage of heritages) {
+      if (heritage.versatile) continue;
+      expect(ancestryNames.has(heritage.ancestry.toLowerCase()), heritage.name).toBe(true);
+    }
+  });
+
+  it("uses official ancestry values", () => {
+    const dwarf = byName(ancestries, "Dwarf");
+    expect(dwarf.hp).toBe(10);
+    expect(dwarf.speed).toBe(20);
+    expect(dwarf.vision).toBe("darkvision");
+    expect(dwarf.boosts.filter((boost) => boost.fixed).flatMap((boost) => boost.from).sort()).toEqual([
+      "con",
+      "wis",
+    ]);
+    expect(dwarf.flaws).toEqual(["cha"]);
+
+    const elf = byName(ancestries, "Elf");
+    expect(elf.hp).toBe(6);
+    expect(elf.speed).toBe(30);
+    expect(elf.vision).toBe("lowLight");
+    expect(elf.flaws).toEqual(["con"]);
+
+    const merfolk = byName(ancestries, "Merfolk");
+    expect(merfolk.otherSpeeds).toContainEqual({ type: "swim", value: 25 });
+    const awakened = byName(ancestries, "Awakened Animal");
+    expect(awakened.speed).toBe(20);
+    const minotaur = byName(ancestries, "Minotaur");
+    expect(minotaur.features.map((feature) => feature.name)).toContain("Horns (Minotaur)");
+
+    expect(ancestries.every((ancestry) => ["normal", "lowLight", "darkvision"].includes(ancestry.vision))).toBe(
+      true,
+    );
+  });
+
+  it("uses official class chassis values", () => {
+    const expected: Record<string, { hp: number; key: string[]; perception: number; saves: [number, number, number] }> = {
+      Alchemist: { hp: 8, key: ["int"], perception: 1, saves: [2, 2, 1] },
+      Barbarian: { hp: 12, key: ["str"], perception: 2, saves: [2, 1, 2] },
+      Cleric: { hp: 8, key: ["wis"], perception: 1, saves: [1, 1, 2] },
+      Fighter: { hp: 10, key: ["dex", "str"], perception: 2, saves: [2, 2, 1] },
+      Monk: { hp: 10, key: ["dex", "str"], perception: 1, saves: [2, 2, 2] },
+      Necromancer: { hp: 8, key: ["int"], perception: 1, saves: [2, 1, 1] },
+      Wizard: { hp: 6, key: ["int"], perception: 1, saves: [1, 1, 2] },
+    };
+    for (const [name, values] of Object.entries(expected)) {
+      const cls = byName(classes, name);
+      expect(cls.hp, `${name} hp`).toBe(values.hp);
+      expect(cls.keyAbility, `${name} key ability`).toEqual(values.key);
+      expect(cls.perception, `${name} perception`).toBe(values.perception);
+      expect(
+        [cls.savingThrows.fortitude, cls.savingThrows.reflex, cls.savingThrows.will],
+        `${name} saves`,
+      ).toEqual(values.saves);
+    }
+
+    const cleric = byName(classes, "Cleric");
+    expect(cleric.trainedSkills).toMatchObject({ value: ["religion"], additional: 2 });
+    expect(cleric.choiceGroups[0].options.map((option) => option.name).sort()).toEqual([
+      "Battle Creed",
+      "Cloistered Cleric",
+      "Warpriest",
+    ]);
+
+    const inventor = byName(classes, "Inventor");
+    expect(inventor.features.find((feature) => feature.name === "Expert Overdrive")?.skillRanks).toEqual({
+      crafting: 2,
+    });
+    expect(inventor.features.find((feature) => feature.name === "Master Overdrive")?.skillRanks).toEqual({
+      crafting: 3,
+    });
+
+    const warpriest = cleric.choiceGroups[0].options.find((option) => option.name === "Warpriest")!;
+    expect(warpriest.grantedFeatures?.some((feature) => feature.name === "First Doctrine (Warpriest)")).toBe(true);
+    expect(
+      warpriest.grantedFeatures?.find((feature) => feature.name === "First Doctrine (Warpriest)")?.proficiencies,
+    ).toMatchObject({ fortitude: { rank: 2 }, light: { rank: 1 }, medium: { rank: 1 } });
+  });
+
+  it("includes subclass-granted skill training", () => {
+    const rogue = byName(classes, "Rogue");
+    const thief = rogue.choiceGroups[0].options.find((option) => option.name === "Thief")!;
+    expect(thief.trainedSkills).toContain("thievery");
+
+    const druid = byName(classes, "Druid");
+    const animal = druid.choiceGroups[0].options.find((option) => option.name === "Animal Order")!;
+    expect(animal.trainedSkills).toContain("athletics");
+
+    const investigator = byName(classes, "Investigator");
+    const forensic = investigator.choiceGroups[0].options.find(
+      (option) => option.name === "Forensic Medicine Methodology",
+    )!;
+    expect(forensic.trainedSkills).toContain("medicine");
+  });
+
+  it("captures background skill choices", () => {
+    const hermit = byName(backgrounds, "Hermit");
+    expect(hermit.skillChoices).toEqual([
+      { prompt: "Select a skill.", options: ["nature", "occultism"], count: 1 },
+    ]);
+
+    const acolyte = byName(backgrounds, "Acolyte");
+    expect(acolyte.trainedSkills).toEqual(["religion"]);
+    expect(acolyte.lore).toEqual(["Scribing Lore"]);
+    expect(acolyte.grantedFeats[0].name).toBe("Student of the Canon");
+
+    const antiThrune = byName(backgrounds, "Anti-Thrune Saboteur");
+    expect(antiThrune.featChoices[0].options.map((option) => option.name).sort()).toEqual([
+      "Dirty Trick",
+      "Lengthy Diversion",
+    ]);
+
+    const timeTraveler = byName(backgrounds, "Time Traveler");
+    expect(timeTraveler.loreChoices).toEqual([
+      { prompt: "Choose three Lore skills from your old time", options: [], count: 3 },
+    ]);
+    const concordance = byName(backgrounds, "Concordance Researcher");
+    expect(concordance.loreChoices[0]).toMatchObject({ count: 4 });
+    expect(concordance.loreChoices[0].options).toContain("Plane of Air Lore");
+
+    const intentionallyEmpty = new Set([
+      "Amnesiac",
+      "Discarded Duplicate",
+      "Harrow-Chosen",
+      "Shielded Fortune",
+    ]);
+    for (const background of backgrounds) {
+      const hasData =
+        background.trainedSkills.length > 0 ||
+        background.skillChoices.length > 0 ||
+        background.lore.length > 0 ||
+        background.loreChoices.length > 0;
+      if (!hasData) {
+        expect(intentionallyEmpty.has(background.name), `${background.name} has skill/Lore data`).toBe(true);
+      }
+      for (const choice of background.loreChoices) {
+        expect(choice.count, `${background.name} Lore choice count`).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it("uses official equipment values", () => {
+    const longsword = byName(equipment, "Longsword");
+    expect(longsword.price.cpTotal).toBe(100);
+    expect(longsword.bulk).toBe(1);
+    expect(longsword.weapon).toMatchObject({
+      category: "martial",
+      damage: { dice: 1, die: "d8", type: "slashing" },
+    });
+
+    const chainMail = byName(equipment, "Chain Mail");
+    expect(chainMail.armor).toMatchObject({
+      category: "medium",
+      acBonus: 4,
+      dexCap: 1,
+      checkPenalty: -2,
+      speedPenalty: -5,
+      strength: 3,
+    });
+
+    const fullPlate = byName(equipment, "Full Plate");
+    expect(fullPlate.armor).toMatchObject({
+      category: "heavy",
+      acBonus: 6,
+      dexCap: 0,
+      checkPenalty: -3,
+      speedPenalty: -10,
+      strength: 4,
+    });
+  });
+
+  it("expands Foundry inline macros into readable text", () => {
+    const textItems = [
+      ...ancestries,
+      ...backgrounds,
+      ...classes,
+      ...classFeatures,
+      ...feats,
+      ...spells,
+      ...equipment,
+      ...deities,
+      ...actions,
+    ];
+    for (const item of textItems) {
+      const description = "description" in item ? String(item.description ?? "") : "";
+      expect(description, `${item.name} inline macro`).not.toContain("[[/");
+      expect(description, `${item.name} UUID macro`).not.toContain("@UUID");
+    }
+  });
+
+  it("uses official bestiary values", () => {
+    const goblin = byName(monsters, "Goblin Warrior");
+    expect(goblin).toMatchObject({
+      level: -1,
+      hp: 6,
+      ac: 16,
+      fortitude: 5,
+      reflex: 7,
+      will: 3,
+      perception: 2,
+    });
+
+    const zombie = byName(monsters, "Zombie Shambler");
+    expect(zombie).toMatchObject({
+      level: -1,
+      hp: 20,
+      ac: 12,
+      fortitude: 6,
+      reflex: 0,
+      will: 2,
+      perception: 0,
+    });
+  });
+});

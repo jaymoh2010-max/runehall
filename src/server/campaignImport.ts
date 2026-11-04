@@ -1,0 +1,505 @@
+import { getUserByUsername } from "./access";
+import { contextForDraft } from "./compendium";
+import { db, transaction } from "./db";
+import { characterSummary, normalizeCharacterDraft } from "../shared/rules";
+import {
+  normalizeCampaignRuleset,
+  normalizeXpMode,
+  rulesetContentMode,
+  rulesetIncludesLegacy,
+} from "../shared/content";
+import { normalizeCampaignThreads } from "../shared/dashboard";
+import { normalizeJournalAttachments, normalizeJournalKind } from "../shared/journal";
+import { normalizeLootItems } from "../shared/loot";
+import {
+  normalizeAttendanceStatus,
+  normalizeSessionStatus,
+} from "../shared/sessions";
+import { clamp, inviteCode, newId, now, safeInt, safeString, sanitizeUserText } from "./util";
+
+type RecordValue = Record<string, unknown>;
+
+export interface CampaignImportStats {
+  characters: number;
+  reassignedCharacters: number;
+  members: number;
+  scenes: number;
+  tokens: number;
+  messages: number;
+  journal: number;
+  encounters: number;
+  loot: number;
+  npcs: number;
+  sessions: number;
+}
+
+export interface CampaignImportResult {
+  campaignId: string;
+  stats: CampaignImportStats;
+}
+
+function record(value: unknown): RecordValue {
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as RecordValue) : {};
+}
+
+function records(value: unknown, max: number, label: string): RecordValue[] {
+  if (value === undefined || value === null) return [];
+  if (!Array.isArray(value)) throw new Error(`The ${label} section is invalid.`);
+  if (value.length > max) throw new Error(`Too many ${label} to import (maximum ${max}).`);
+  return value.filter((entry): entry is RecordValue => Boolean(entry) && typeof entry === "object");
+}
+
+function text(value: unknown, fallback = "", max = 500): string {
+  return safeString(value, fallback, max);
+}
+
+function longText(value: unknown, fallback = "", max = 20_000): string {
+  return value === undefined ? fallback : sanitizeUserText(value, max);
+}
+
+function numberValue(value: unknown, fallback = 0, min = -1_000_000, max = 1_000_000): number {
+  return safeInt(value, fallback, min, max);
+}
+
+function timestamp(value: unknown, fallback = now()): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? Math.round(parsed) : fallback;
+}
+
+function optionalTimestamp(value: unknown): number | null {
+  if (value === null || value === undefined || value === "") return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? Math.round(parsed) : null;
+}
+
+function uniqueInviteCode(): string {
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    const code = inviteCode();
+    if (!db.prepare("SELECT id FROM campaigns WHERE invite_code = ?").get(code)) return code;
+  }
+  return inviteCode();
+}
+
+export function importCampaign(userId: string, raw: unknown): CampaignImportResult {
+  const payload = record(raw);
+  if (payload.format !== "runehall-campaign") {
+    throw new Error("That file is not a Runehall campaign export.");
+  }
+  const version = Number(payload.version);
+  if (Number.isFinite(version) && version > 1) {
+    throw new Error("This export was created by a newer Runehall version.");
+  }
+  const campaignData = record(payload.campaign);
+  const name = text(campaignData.name, "Imported campaign", 80);
+  if (!name) throw new Error("The export does not contain a campaign name.");
+  const description = longText(campaignData.description, "", 2000);
+  const ruleset = normalizeCampaignRuleset(campaignData.ruleset);
+  const xpMode = normalizeXpMode(campaignData.xpMode);
+
+  const stats: CampaignImportStats = {
+    characters: 0,
+    reassignedCharacters: 0,
+    members: 0,
+    scenes: 0,
+    tokens: 0,
+    messages: 0,
+    journal: 0,
+    encounters: 0,
+    loot: 0,
+    npcs: 0,
+    sessions: 0,
+  };
+
+  return transaction(() => {
+    const campaignId = newId("camp");
+    const ts = now();
+    db.prepare(
+      "INSERT INTO campaigns (id, name, description, gm_id, invite_code, ruleset, xp_mode, created_at, updated_at, last_played_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    ).run(
+      campaignId,
+      name,
+      description,
+      userId,
+      uniqueInviteCode(),
+      ruleset,
+      xpMode,
+      ts,
+      ts,
+      ts,
+    );
+    db.prepare(
+      "INSERT INTO campaign_members (campaign_id, user_id, role, joined_at) VALUES (?, ?, 'gm', ?)",
+    ).run(campaignId, userId, ts);
+
+    const memberUserByExportId = new Map<string, string>();
+    const memberIds = new Set<string>([userId]);
+    for (const member of records(payload.members, 50, "members")) {
+      if (member.role !== "player") continue;
+      const username = text(member.username, "", 80);
+      const local = username ? getUserByUsername(username) : null;
+      const exportId = text(member.id, "", 120);
+      if (!local) continue;
+      if (!memberIds.has(local.id)) {
+        db.prepare(
+          "INSERT OR IGNORE INTO campaign_members (campaign_id, user_id, role, joined_at) VALUES (?, ?, 'player', ?)",
+        ).run(campaignId, local.id, ts);
+        memberIds.add(local.id);
+        stats.members += 1;
+      }
+      if (exportId) memberUserByExportId.set(exportId, local.id);
+    }
+
+    const characterMap = new Map<string, string>();
+    for (const character of records(payload.characters, 200, "characters")) {
+      const oldId = text(character.id, "", 120);
+      if (!oldId) continue;
+      try {
+        const draft = normalizeCharacterDraft(character.data, text(character.name, "Imported character", 120));
+        draft.contentMode = rulesetContentMode(ruleset);
+        draft.includeLegacy = rulesetIncludesLegacy(ruleset);
+        const summary = characterSummary(draft, contextForDraft(draft));
+        const exportOwner = text(character.userId, "", 120);
+        const mappedOwner = memberUserByExportId.get(exportOwner);
+        const ownerId = mappedOwner ?? userId;
+        if (!mappedOwner) stats.reassignedCharacters += 1;
+        const characterId = newId("char");
+        db.prepare(
+          "INSERT INTO characters (id, user_id, campaign_id, name, data, summary, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        ).run(
+          characterId,
+          ownerId,
+          campaignId,
+          draft.name,
+          JSON.stringify(draft),
+          JSON.stringify(summary),
+          ts,
+          ts,
+        );
+        characterMap.set(oldId, characterId);
+        stats.characters += 1;
+      } catch {
+        // Skip a malformed character rather than aborting the whole import.
+      }
+    }
+
+    const sceneMap = new Map<string, string>();
+    for (const scene of records(payload.scenes, 200, "scenes")) {
+      const oldId = text(scene.id, "", 120);
+      if (!oldId) continue;
+      const sceneId = newId("scene");
+      db.prepare(
+        `INSERT INTO scenes
+          (id, campaign_id, name, image_url, width, height, grid_size, grid_offset_x, grid_offset_y, fog_enabled, fog_revealed, sort_order, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ).run(
+        sceneId,
+        campaignId,
+        text(scene.name, "Imported scene", 80),
+        scene.imageUrl ? text(scene.imageUrl, "", 500) : null,
+        clamp(numberValue(scene.width, 1600, 100, 10_000), 100, 10_000),
+        clamp(numberValue(scene.height, 1000, 100, 10_000), 100, 10_000),
+        clamp(numberValue(scene.gridSize, 70, 20, 300), 20, 300),
+        clamp(Number(scene.gridOffsetX) || 0, -300, 300),
+        clamp(Number(scene.gridOffsetY) || 0, -300, 300),
+        scene.fogEnabled === false ? 0 : 1,
+        JSON.stringify(
+          Array.isArray(scene.revealed)
+            ? scene.revealed.filter((cell): cell is string => typeof cell === "string").slice(0, 20_000)
+            : [],
+        ),
+        numberValue(scene.sortOrder, sceneMap.size),
+        ts,
+        ts,
+      );
+      sceneMap.set(oldId, sceneId);
+      stats.scenes += 1;
+    }
+    if (!sceneMap.size) {
+      const sceneId = `scene_${newId("")}`;
+      db.prepare(
+        `INSERT INTO scenes
+          (id, campaign_id, name, image_url, width, height, grid_size, grid_offset_x, grid_offset_y, fog_enabled, fog_revealed, sort_order, created_at, updated_at)
+         VALUES (?, ?, 'The First Step', NULL, 1600, 1000, 70, 0, 0, 1, '[]', 0, ?, ?)`,
+      ).run(sceneId, campaignId, ts, ts);
+      sceneMap.set("__default__", sceneId);
+      stats.scenes += 1;
+    }
+
+    const groupMap = new Map<string, string>();
+    const tokenMap = new Map<string, string>();
+    for (const token of records(payload.tokens, 10_000, "tokens")) {
+      const oldId = text(token.id, "", 120);
+      const oldSceneId = text(token.sceneId, "", 120);
+      const sceneId = sceneMap.get(oldSceneId);
+      if (!oldId || !sceneId) continue;
+      const oldGroup = text(token.groupId, "", 80);
+      let groupId: string | null = null;
+      if (oldGroup) {
+        groupId = groupMap.get(oldGroup) ?? newId("grp");
+        groupMap.set(oldGroup, groupId);
+      }
+      const oldCharacter = text(token.characterId, "", 120);
+      const characterId = oldCharacter ? characterMap.get(oldCharacter) ?? null : null;
+      const oldOwner = text(token.ownerId, "", 120);
+      const ownerId = oldOwner && memberIds.has(oldOwner) ? oldOwner : null;
+      const tokenId = newId("tok");
+      db.prepare(
+        `INSERT INTO tokens
+          (id, scene_id, name, image_url, character_id, owner_id, x, y, size, color, hp_current, hp_max, ac, initiative_bonus, group_id, group_name, conditions, hidden, locked, sort_order, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ).run(
+        tokenId,
+        sceneId,
+        text(token.name, "Token", 80),
+        token.imageUrl ? text(token.imageUrl, "", 500) : null,
+        characterId,
+        ownerId,
+        numberValue(token.x, 0),
+        numberValue(token.y, 0),
+        clamp(numberValue(token.size, 1, 1, 6), 1, 6),
+        text(token.color, "#c8a96b", 30),
+        token.hpCurrent === null || token.hpCurrent === undefined ? null : numberValue(token.hpCurrent, 0),
+        token.hpMax === null || token.hpMax === undefined ? null : numberValue(token.hpMax, 0),
+        token.ac === null || token.ac === undefined ? null : numberValue(token.ac, 0, -100, 1000),
+        token.initiativeBonus === null || token.initiativeBonus === undefined
+          ? null
+          : numberValue(token.initiativeBonus, 0, -100, 1000),
+        groupId,
+        groupId ? text(token.groupName, "Group", 80) : null,
+        JSON.stringify(
+          Array.isArray(token.conditions)
+            ? token.conditions.filter((condition): condition is string => typeof condition === "string").slice(0, 20)
+            : [],
+        ),
+        token.hidden ? 1 : 0,
+        token.locked ? 1 : 0,
+        numberValue(token.sortOrder, 0),
+        ts,
+        ts,
+      );
+      tokenMap.set(oldId, tokenId);
+      stats.tokens += 1;
+    }
+
+    const stateData = record(payload.state);
+    const oldActiveScene = text(stateData.activeSceneId, "", 120);
+    const activeSceneId = sceneMap.get(oldActiveScene) ?? [...sceneMap.values()][0] ?? null;
+    const initiative = Array.isArray(stateData.initiative)
+      ? stateData.initiative
+          .filter((entry): entry is RecordValue => Boolean(entry) && typeof entry === "object")
+          .slice(0, 200)
+          .map((entry) => {
+            const oldToken = text(entry.tokenId, "", 120);
+            const oldScene = text(entry.sceneId, "", 120);
+            const oldOwner = text(entry.ownerId, "", 120);
+            const oldGroup = text(entry.groupId, "", 80);
+            return {
+              id: text(entry.id, newId("init"), 80),
+              tokenId: oldToken ? tokenMap.get(oldToken) ?? null : null,
+              name: text(entry.name, "Combatant", 80),
+              initiative: numberValue(entry.initiative, 0, -100, 1000),
+              color: text(entry.color, "#c8a96b", 30),
+              ownerId: oldOwner && memberIds.has(oldOwner) ? oldOwner : null,
+              sceneId: oldScene ? sceneMap.get(oldScene) ?? null : null,
+              groupId: oldGroup ? groupMap.get(oldGroup) ?? null : null,
+            };
+          })
+      : [];
+    db.prepare(
+      "INSERT OR REPLACE INTO campaign_state (campaign_id, active_scene_id, initiative, round, turn_index, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+    ).run(
+      campaignId,
+      activeSceneId,
+      JSON.stringify(initiative),
+      numberValue(stateData.round, 1, 1, 999),
+      numberValue(stateData.turnIndex, 0, 0, 200),
+      ts,
+    );
+
+    for (const message of records(payload.messages, 1000, "messages")) {
+      const oldScene = text(message.sceneId, "", 120);
+      const oldUser = text(message.userId, "", 120);
+      const visibility = message.visibility === "gm" ? "gm" : "all";
+      db.prepare(
+        "INSERT INTO messages (id, campaign_id, scene_id, user_id, author_name, type, content, data, visibility, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      ).run(
+        newId("msg"),
+        campaignId,
+        oldScene ? sceneMap.get(oldScene) ?? null : null,
+        oldUser && memberIds.has(oldUser) ? oldUser : null,
+        text(message.authorName, "Imported user", 80),
+        text(message.type, "chat", 20),
+        longText(message.content, "", 5000),
+        message.data && typeof message.data === "object" ? JSON.stringify(message.data) : null,
+        visibility,
+        timestamp(message.createdAt, ts),
+      );
+      stats.messages += 1;
+    }
+
+    for (const entry of records(payload.journal, 500, "journal")) {
+      db.prepare(
+        `INSERT INTO journal_entries
+          (id, campaign_id, title, content, visible, kind, attachments, created_by, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ).run(
+        newId("journal"),
+        campaignId,
+        text(entry.title, "Imported entry", 140),
+        longText(entry.content, "", 100_000),
+        entry.visible === false ? 0 : 1,
+        normalizeJournalKind(entry.kind),
+        JSON.stringify(normalizeJournalAttachments(entry.attachments)),
+        userId,
+        timestamp(entry.createdAt, ts),
+        timestamp(entry.updatedAt, ts),
+      );
+      stats.journal += 1;
+    }
+
+    for (const encounter of records(payload.encounters, 500, "encounters")) {
+      const encounterId = newId("enc");
+      const oldScene = text(encounter.sceneId, "", 120);
+      db.prepare(
+        "INSERT INTO encounters (id, campaign_id, name, description, scene_id, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+      ).run(
+        encounterId,
+        campaignId,
+        text(encounter.name, "Imported encounter", 100),
+        longText(encounter.description, "", 4000),
+        oldScene ? sceneMap.get(oldScene) ?? null : null,
+        numberValue(encounter.sortOrder, 0),
+        ts,
+        ts,
+      );
+      for (const combatant of records(encounter.combatants, 500, "combatants")) {
+        db.prepare(
+          `INSERT INTO encounter_combatants
+            (id, encounter_id, monster_id, name, level, count, hp, ac, perception, notes, sort_order, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ).run(
+          newId("encm"),
+          encounterId,
+          combatant.monsterId ? text(combatant.monsterId, "", 120) : null,
+          text(combatant.name, "Combatant", 100),
+          numberValue(combatant.level, 1, -1, 30),
+          clamp(numberValue(combatant.count, 1, 1, 50), 1, 50),
+          combatant.hp === null || combatant.hp === undefined ? null : numberValue(combatant.hp, 0),
+          combatant.ac === null || combatant.ac === undefined ? null : numberValue(combatant.ac, 0, -100, 1000),
+          combatant.perception === null || combatant.perception === undefined
+            ? null
+            : numberValue(combatant.perception, 0, -100, 1000),
+          longText(combatant.notes, "", 2000),
+          numberValue(combatant.sortOrder, 0),
+          ts,
+          ts,
+        );
+      }
+      stats.encounters += 1;
+    }
+
+    for (const parcel of records(payload.loot, 300, "loot parcels")) {
+      const oldRecipient = text(parcel.distributedTo, "", 120);
+      db.prepare(
+        `INSERT INTO loot_parcels
+          (id, campaign_id, name, description, items, gp, sp, cp, status, distributed_to, distributed_to_name, distributed_at, sort_order, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ).run(
+        newId("loot"),
+        campaignId,
+        text(parcel.name, "Imported loot", 120),
+        longText(parcel.description, "", 4000),
+        JSON.stringify(normalizeLootItems(parcel.items)),
+        numberValue(parcel.gp, 0, 0, 1_000_000_000),
+        numberValue(parcel.sp, 0, 0, 1_000_000_000),
+        numberValue(parcel.cp, 0, 0, 1_000_000_000),
+        parcel.status === "distributed" ? "distributed" : "open",
+        oldRecipient ? characterMap.get(oldRecipient) ?? null : null,
+        parcel.distributedToName ? text(parcel.distributedToName, "", 120) : null,
+        optionalTimestamp(parcel.distributedAt),
+        numberValue(parcel.sortOrder, 0),
+        ts,
+        ts,
+      );
+      stats.loot += 1;
+    }
+
+    const dashboard = record(payload.dashboard);
+    if (Object.keys(dashboard).length) {
+      db.prepare(
+        "INSERT INTO campaign_dashboard (campaign_id, last_session_summary, next_session_at, next_session_teaser, next_session_notes, threads, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+      ).run(
+        campaignId,
+        longText(dashboard.lastSessionSummary, "", 20_000),
+        optionalTimestamp(dashboard.nextSessionAt),
+        longText(dashboard.nextSessionTeaser, "", 500),
+        longText(dashboard.nextSessionNotes, "", 20_000),
+        JSON.stringify(normalizeCampaignThreads(dashboard.threads)),
+        ts,
+      );
+    }
+
+    for (const npc of records(payload.npcs, 300, "NPCs")) {
+      db.prepare(
+        `INSERT INTO campaign_npcs
+          (id, campaign_id, name, level, hp, ac, perception, size, color, image_url, description, sort_order, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ).run(
+        newId("npc"),
+        campaignId,
+        text(npc.name, "Imported NPC", 120),
+        numberValue(npc.level, 1, -1, 30),
+        npc.hp === null || npc.hp === undefined ? null : numberValue(npc.hp, 0),
+        npc.ac === null || npc.ac === undefined ? null : numberValue(npc.ac, 0, -100, 1000),
+        npc.perception === null || npc.perception === undefined
+          ? null
+          : numberValue(npc.perception, 0, -100, 1000),
+        clamp(numberValue(npc.size, 1, 1, 6), 1, 6),
+        text(npc.color, "#b06767", 30),
+        npc.imageUrl ? text(npc.imageUrl, "", 500) : null,
+        longText(npc.description, "", 20_000),
+        numberValue(npc.sortOrder, 0),
+        ts,
+        ts,
+      );
+      stats.npcs += 1;
+    }
+
+    for (const session of records(payload.sessions, 500, "sessions")) {
+      const sessionId = newId("sess");
+      db.prepare(
+        "INSERT INTO campaign_sessions (id, campaign_id, title, scheduled_at, duration_minutes, notes, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      ).run(
+        sessionId,
+        campaignId,
+        text(session.title, "Imported session", 140),
+        timestamp(session.scheduledAt, ts),
+        clamp(numberValue(session.durationMinutes, 180, 30, 1440), 30, 1440),
+        longText(session.notes, "", 20_000),
+        normalizeSessionStatus(session.status),
+        ts,
+        ts,
+      );
+      for (const attendance of records(session.attendance, 50, "attendance")) {
+        const exportUserId = text(attendance.userId, "", 120);
+        const localUserId = memberUserByExportId.get(exportUserId);
+        if (!localUserId) continue;
+        db.prepare(
+          `INSERT INTO session_attendance (session_id, user_id, status, note, updated_at)
+           VALUES (?, ?, ?, ?, ?)
+           ON CONFLICT(session_id, user_id)
+           DO UPDATE SET status = excluded.status, note = excluded.note, updated_at = excluded.updated_at`,
+        ).run(
+          sessionId,
+          localUserId,
+          normalizeAttendanceStatus(attendance.status),
+          longText(attendance.note, "", 500),
+          ts,
+        );
+      }
+      stats.sessions += 1;
+    }
+
+    return { campaignId, stats };
+  });
+}

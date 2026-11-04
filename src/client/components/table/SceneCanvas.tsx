@@ -1,0 +1,501 @@
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type DragEvent as ReactDragEvent,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
+import { Maximize, Minus, Move, Plus, Ruler } from "lucide-react";
+import type { CharacterRecord, Monster, Scene, Token } from "../../../shared/types";
+import { Tag } from "../ui";
+import { BESTIARY_DRAG_TYPE, type BestiaryDragPayload } from "./bestiaryDrag";
+
+type FogMode = "reveal" | "hide";
+
+interface SceneCanvasProps {
+  scene: Scene;
+  tokens: Token[];
+  characters: CharacterRecord[];
+  isGm: boolean;
+  userId: string;
+  selectedTokenId: string | null;
+  onSelectToken: (id: string | null) => void;
+  onOpenCharacter: (id: string) => void;
+  onEditToken?: (id: string) => void;
+  onMoveToken: (tokenId: string, x: number, y: number) => void;
+  onFog: (cells: string[], mode: FogMode) => void;
+  fogBrush: FogMode | null;
+  brushSize: number;
+  measureMode: boolean;
+  onPing: (x: number, y: number) => void;
+  remotePointer: { x: number; y: number; name: string; ts: number } | null;
+  onDropMonster?: (monster: Monster, count: number, x: number, y: number) => void;
+}
+
+interface Pan {
+  x: number;
+  y: number;
+}
+
+export function SceneCanvas({
+  scene,
+  tokens,
+  characters,
+  isGm,
+  userId,
+  selectedTokenId,
+  onSelectToken,
+  onOpenCharacter,
+  onEditToken,
+  onMoveToken,
+  onFog,
+  fogBrush,
+  brushSize,
+  measureMode,
+  onPing,
+  remotePointer,
+  onDropMonster,
+}: SceneCanvasProps) {
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const surfaceRef = useRef<HTMLDivElement>(null);
+  const fogCanvasRef = useRef<HTMLCanvasElement>(null);
+  const [zoom, setZoom] = useState(0.5);
+  const [pan, setPan] = useState<Pan>({ x: 40, y: 40 });
+  const [dragging, setDragging] = useState<{
+    tokenId: string;
+    positions: Record<string, { x: number; y: number }>;
+  } | null>(null);
+  const [panning, setPanning] = useState<{ startX: number; startY: number; panX: number; panY: number } | null>(null);
+  const [measuring, setMeasuring] = useState<{ startX: number; startY: number; x: number; y: number } | null>(null);
+  const [fogPreview, setFogPreview] = useState<Set<string>>(() => new Set(scene.revealed));
+  const painting = useRef<{ mode: FogMode; cells: Set<string> } | null>(null);
+  const fittedScene = useRef<string | null>(null);
+
+  const cols = Math.max(1, Math.ceil(scene.width / scene.gridSize));
+  const rows = Math.max(1, Math.ceil(scene.height / scene.gridSize));
+  const portraitMap = useMemo(() => {
+    const map = new Map<string, string | null>();
+    for (const character of characters) map.set(character.id, character.summary?.portraitUrl ?? null);
+    return map;
+  }, [characters]);
+
+  useEffect(() => {
+    setFogPreview(new Set(scene.revealed));
+  }, [scene.revealed]);
+
+  const fit = useCallback(() => {
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+    const rect = viewport.getBoundingClientRect();
+    const scale = Math.min((rect.width - 40) / scene.width, (rect.height - 40) / scene.height);
+    const nextZoom = Math.max(0.08, Math.min(2.5, scale));
+    setZoom(nextZoom);
+    setPan({
+      x: (rect.width - scene.width * nextZoom) / 2,
+      y: (rect.height - scene.height * nextZoom) / 2,
+    });
+  }, [scene.width, scene.height]);
+
+  useEffect(() => {
+    if (fittedScene.current === scene.id) return;
+    fittedScene.current = scene.id;
+    const timer = window.setTimeout(fit, 30);
+    return () => window.clearTimeout(timer);
+  }, [scene.id, fit]);
+
+  useEffect(() => {
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+    const observer = new ResizeObserver(() => {
+      if (fittedScene.current === scene.id) {
+        // keep the current view; only refit when the scene changes
+      }
+    });
+    observer.observe(viewport);
+    return () => observer.disconnect();
+  }, [scene.id]);
+
+  useEffect(() => {
+    const canvas = fogCanvasRef.current;
+    if (!canvas) return;
+    // Render the mask at up to 2048px on the long edge. Using a scene-
+    // resolution canvas (rather than one pixel per grid cell) is what lets
+    // revealed cells align correctly when the grid has a non-zero offset.
+    const fogScale = Math.min(1, 2048 / Math.max(scene.width, scene.height));
+    const width = Math.max(1, Math.ceil(scene.width * fogScale));
+    const height = Math.max(1, Math.ceil(scene.height * fogScale));
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext("2d");
+    if (!context) return;
+    context.clearRect(0, 0, width, height);
+    if (!scene.fogEnabled) return;
+    context.fillStyle = isGm ? "rgba(5, 7, 11, 0.78)" : "rgba(5, 7, 11, 0.985)";
+    context.fillRect(0, 0, width, height);
+    const cellSize = scene.gridSize * fogScale;
+    for (const cell of fogPreview) {
+      const [cx, cy] = cell.split(",").map(Number);
+      if (!Number.isFinite(cx) || !Number.isFinite(cy)) continue;
+      context.clearRect(
+        (scene.gridOffsetX + cx * scene.gridSize) * fogScale,
+        (scene.gridOffsetY + cy * scene.gridSize) * fogScale,
+        cellSize,
+        cellSize,
+      );
+    }
+  }, [fogPreview, isGm, scene.width, scene.height, scene.gridSize, scene.gridOffsetX, scene.gridOffsetY, scene.fogEnabled]);
+
+  const scenePoint = (clientX: number, clientY: number) => {
+    const rect = surfaceRef.current?.getBoundingClientRect();
+    if (!rect) return { x: 0, y: 0 };
+    return {
+      x: (clientX - rect.left) / zoom,
+      y: (clientY - rect.top) / zoom,
+    };
+  };
+
+  const snap = (value: number, offset: number) => {
+    const cell = Math.round((value - offset - scene.gridSize / 2) / scene.gridSize);
+    return offset + cell * scene.gridSize + scene.gridSize / 2;
+  };
+
+  const onViewportDragOver = (event: ReactDragEvent<HTMLDivElement>) => {
+    if (!onDropMonster) return;
+    if (!Array.from(event.dataTransfer.types).includes(BESTIARY_DRAG_TYPE)) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "copy";
+  };
+
+  const onViewportDrop = (event: ReactDragEvent<HTMLDivElement>) => {
+    if (!onDropMonster) return;
+    const raw = event.dataTransfer.getData(BESTIARY_DRAG_TYPE);
+    if (!raw) return;
+    event.preventDefault();
+    try {
+      const payload = JSON.parse(raw) as BestiaryDragPayload;
+      if (!payload?.monster?.id) return;
+      const count = Math.max(1, Math.min(20, Math.round(Number(payload.count) || 1)));
+      const cells = Math.max(1, Math.round(Number(payload.monster.sizeCells) || 1));
+      const point = scenePoint(event.clientX, event.clientY);
+      const half = (cells * scene.gridSize) / 2;
+      const x = snap(Math.max(half, Math.min(scene.width - half, point.x)), scene.gridOffsetX);
+      const y = snap(Math.max(half, Math.min(scene.height - half, point.y)), scene.gridOffsetY);
+      onDropMonster(payload.monster, count, x, y);
+    } catch {
+      // Ignore malformed drag payloads.
+    }
+  };
+
+  const onWheel = (event: React.WheelEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+    const rect = viewport.getBoundingClientRect();
+    const mx = event.clientX - rect.left;
+    const my = event.clientY - rect.top;
+    const sceneX = (mx - pan.x) / zoom;
+    const sceneY = (my - pan.y) / zoom;
+    const factor = event.deltaY < 0 ? 1.12 : 0.89;
+    const next = Math.max(0.08, Math.min(4, zoom * factor));
+    setZoom(next);
+    setPan({ x: mx - sceneX * next, y: my - sceneY * next });
+  };
+
+  const onViewportPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0) return;
+    const target = event.target as HTMLElement;
+    if (target.closest(".scene-token")) return;
+    if (fogBrush && isGm) {
+      const point = scenePoint(event.clientX, event.clientY);
+      const cx = Math.floor((point.x - scene.gridOffsetX) / scene.gridSize);
+      const cy = Math.floor((point.y - scene.gridOffsetY) / scene.gridSize);
+      const cells = new Set<string>();
+      const radius = Math.floor((brushSize - 1) / 2);
+      for (let x = cx - radius; x <= cx + radius; x++) {
+        for (let y = cy - radius; y <= cy + radius; y++) {
+          if (x >= 0 && y >= 0 && x < cols && y < rows) cells.add(`${x},${y}`);
+        }
+      }
+      painting.current = { mode: fogBrush, cells };
+      setFogPreview((current) => {
+        const next = new Set(current);
+        for (const cell of cells) {
+          if (fogBrush === "reveal") next.add(cell);
+          else next.delete(cell);
+        }
+        return next;
+      });
+      viewportRef.current?.setPointerCapture(event.pointerId);
+      return;
+    }
+    if (measureMode) {
+      const point = scenePoint(event.clientX, event.clientY);
+      setMeasuring({ startX: point.x, startY: point.y, x: point.x, y: point.y });
+      viewportRef.current?.setPointerCapture(event.pointerId);
+      return;
+    }
+    setPanning({
+      startX: event.clientX,
+      startY: event.clientY,
+      panX: pan.x,
+      panY: pan.y,
+    });
+    viewportRef.current?.setPointerCapture(event.pointerId);
+  };
+
+  const onViewportPointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (painting.current) {
+      const point = scenePoint(event.clientX, event.clientY);
+      const cx = Math.floor((point.x - scene.gridOffsetX) / scene.gridSize);
+      const cy = Math.floor((point.y - scene.gridOffsetY) / scene.gridSize);
+      const radius = Math.floor((brushSize - 1) / 2);
+      const cells: string[] = [];
+      for (let x = cx - radius; x <= cx + radius; x++) {
+        for (let y = cy - radius; y <= cy + radius; y++) {
+          if (x >= 0 && y >= 0 && x < cols && y < rows) cells.push(`${x},${y}`);
+        }
+      }
+      for (const cell of cells) painting.current.cells.add(cell);
+      setFogPreview((current) => {
+        const next = new Set(current);
+        for (const cell of cells) {
+          if (painting.current?.mode === "reveal") next.add(cell);
+          else next.delete(cell);
+        }
+        return next;
+      });
+      return;
+    }
+    if (panning) {
+      setPan({
+        x: panning.panX + event.clientX - panning.startX,
+        y: panning.panY + event.clientY - panning.startY,
+      });
+      return;
+    }
+    if (measuring) {
+      const point = scenePoint(event.clientX, event.clientY);
+      setMeasuring((current) => (current ? { ...current, x: point.x, y: point.y } : current));
+    }
+  };
+
+  const onViewportPointerUp = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (painting.current) {
+      const painted = painting.current;
+      painting.current = null;
+      onFog([...painted.cells], painted.mode);
+      viewportRef.current?.releasePointerCapture(event.pointerId);
+      return;
+    }
+    if (panning) {
+      setPanning(null);
+      viewportRef.current?.releasePointerCapture(event.pointerId);
+    }
+    if (measuring) {
+      viewportRef.current?.releasePointerCapture(event.pointerId);
+    }
+  };
+
+  const onTokenPointerDown = (event: ReactPointerEvent<HTMLDivElement>, token: Token) => {
+    event.stopPropagation();
+    onSelectToken(token.id);
+    if (event.button !== 0) return;
+    if (!isGm && (token.ownerId !== userId || token.locked)) return;
+    const point = scenePoint(event.clientX, event.clientY);
+    setDragging({ tokenId: token.id, positions: { [token.id]: { x: point.x, y: point.y } } });
+    (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+  };
+
+  const onTokenPointerMove = (event: ReactPointerEvent<HTMLDivElement>, token: Token) => {
+    if (dragging?.tokenId !== token.id) return;
+    const point = scenePoint(event.clientX, event.clientY);
+    const half = (token.size * scene.gridSize) / 2;
+    const nextX = snap(
+      Math.max(half, Math.min(scene.width - half, point.x)),
+      scene.gridOffsetX,
+    );
+    const nextY = snap(
+      Math.max(half, Math.min(scene.height - half, point.y)),
+      scene.gridOffsetY,
+    );
+    const dx = nextX - token.x;
+    const dy = nextY - token.y;
+    const members = token.groupId
+      ? tokens.filter((entry) => entry.groupId === token.groupId)
+      : [token];
+    const positions: Record<string, { x: number; y: number }> = {};
+    for (const member of members) {
+      const memberHalf = (member.size * scene.gridSize) / 2;
+      positions[member.id] = {
+        x: Math.max(memberHalf, Math.min(scene.width - memberHalf, member.x + dx)),
+        y: Math.max(memberHalf, Math.min(scene.height - memberHalf, member.y + dy)),
+      };
+    }
+    setDragging({ tokenId: token.id, positions });
+  };
+
+  const onTokenPointerUp = (event: ReactPointerEvent<HTMLDivElement>, token: Token) => {
+    if (dragging?.tokenId !== token.id) return;
+    for (const [tokenId, position] of Object.entries(dragging.positions)) {
+      onMoveToken(tokenId, position.x, position.y);
+    }
+    setDragging(null);
+    (event.currentTarget as HTMLElement).releasePointerCapture(event.pointerId);
+  };
+
+  const dragPosition = (token: Token) =>
+    dragging?.positions[token.id] ?? { x: token.x, y: token.y };
+
+  const measureDistance = measuring
+    ? Math.max(Math.abs(measuring.x - measuring.startX), Math.abs(measuring.y - measuring.startY))
+    : 0;
+  const measureSquares = measureDistance / scene.gridSize;
+  const measureFeet = Math.round(measureSquares * 5);
+
+  return (
+    <div
+      ref={viewportRef}
+      className={`scene-viewport ${fogBrush ? "is-fogging" : ""} ${measureMode ? "is-measuring" : ""}`}
+      onWheel={onWheel}
+      onPointerDown={onViewportPointerDown}
+      onPointerMove={onViewportPointerMove}
+      onPointerUp={onViewportPointerUp}
+      onPointerCancel={onViewportPointerUp}
+      onDragOver={onViewportDragOver}
+      onDrop={onViewportDrop}
+      onContextMenu={(event) => {
+        event.preventDefault();
+        const point = scenePoint(event.clientX, event.clientY);
+        onPing(point.x, point.y);
+      }}
+    >
+      <div
+        ref={surfaceRef}
+        className="scene-surface"
+        style={{
+          width: scene.width,
+          height: scene.height,
+          transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+        }}
+      >
+        {scene.imageUrl ? (
+          <img className="scene-map-img" src={scene.imageUrl} alt="" draggable={false} />
+        ) : (
+          <div className="scene-blank" />
+        )}
+        <div
+          className="scene-grid"
+          style={{
+            backgroundSize: `${scene.gridSize}px ${scene.gridSize}px`,
+            backgroundPosition: `${scene.gridOffsetX}px ${scene.gridOffsetY}px`,
+          }}
+        />
+        {tokens.map((token) => {
+          const size = token.size * scene.gridSize;
+          const position = dragPosition(token);
+          const portrait = token.imageUrl || (token.characterId ? portraitMap.get(token.characterId) : null);
+          const canDrag = isGm || (token.ownerId === userId && !token.locked);
+          const isSelected = selectedTokenId === token.id;
+          return (
+            <div
+              key={token.id}
+              className={`scene-token ${isSelected ? "is-selected" : ""} ${canDrag ? "can-drag" : ""} ${token.hidden && isGm ? "is-hidden" : ""}`}
+              style={{
+                width: size,
+                height: size,
+                left: position.x - size / 2,
+                top: position.y - size / 2,
+                borderColor: token.color,
+              }}
+              onPointerDown={(event) => onTokenPointerDown(event, token)}
+              onPointerMove={(event) => onTokenPointerMove(event, token)}
+              onPointerUp={(event) => onTokenPointerUp(event, token)}
+              onPointerCancel={(event) => onTokenPointerUp(event, token)}
+              onDoubleClick={() => token.characterId && onOpenCharacter(token.characterId)}
+              onContextMenu={(event) => {
+                if (!onEditToken) return;
+                event.preventDefault();
+                event.stopPropagation();
+                onSelectToken(token.id);
+                onEditToken(token.id);
+              }}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  onSelectToken(token.id);
+                }
+              }}
+              tabIndex={0}
+              role="button"
+              aria-label={`${token.name}${token.characterId ? ", character token" : ""}${isGm ? ", right-click to edit" : ""}`}
+              title={isGm ? `${token.name} · right-click to edit` : token.name}
+            >
+              {portrait ? (
+                <img src={portrait} alt="" draggable={false} />
+              ) : (
+                <span style={{ background: `linear-gradient(145deg, ${token.color}33, #11161f)` }}>
+                  {token.name.slice(0, 2).toUpperCase()}
+                </span>
+              )}
+              <span className="scene-token-name">{token.name}</span>
+              {token.hpMax !== null && token.hpCurrent !== null ? (
+                <span className="token-hp"><span style={{ width: `${Math.max(0, Math.min(100, (token.hpCurrent / Math.max(1, token.hpMax)) * 100))}%` }} /></span>
+              ) : null}
+              {token.locked ? <span className="token-lock" title="Locked"></span> : null}
+            </div>
+          );
+        })}
+        {measuring ? (
+          <svg className="measure-layer" width={scene.width} height={scene.height}>
+            <line
+              x1={measuring.startX}
+              y1={measuring.startY}
+              x2={measuring.x}
+              y2={measuring.y}
+              stroke="#e5ca91"
+              strokeWidth={2 / Math.max(zoom, 0.4)}
+              strokeDasharray={`${8 / Math.max(zoom, 0.4)} ${5 / Math.max(zoom, 0.4)}`}
+            />
+            <circle cx={measuring.startX} cy={measuring.startY} r={4 / Math.max(zoom, 0.4)} fill="#e5ca91" />
+            <circle cx={measuring.x} cy={measuring.y} r={4 / Math.max(zoom, 0.4)} fill="#e5ca91" />
+          </svg>
+        ) : null}
+        {remotePointer ? (
+          <div className="scene-ping" style={{ left: remotePointer.x, top: remotePointer.y }}>
+            <span />
+            <em>{remotePointer.name}</em>
+          </div>
+        ) : null}
+        {scene.fogEnabled ? (
+          <canvas
+            ref={fogCanvasRef}
+            className={`fog-canvas ${fogBrush && isGm ? "is-brush" : ""}`}
+            style={{ width: scene.width, height: scene.height }}
+          />
+        ) : null}
+        {measuring ? (
+          <div
+            className="measure-label"
+            style={{ left: (measuring.startX + measuring.x) / 2, top: (measuring.startY + measuring.y) / 2 - 8 }}
+          >
+            {Math.max(1, Math.round(measureSquares))} sq · {Math.max(5, measureFeet)} ft.
+          </div>
+        ) : null}
+      </div>
+
+      <div className="scene-zoom" onPointerDown={(event) => event.stopPropagation()}>
+        <button type="button" onClick={() => setZoom((current) => Math.max(0.08, current - 0.1))} title="Zoom out"><Minus size={14} /></button>
+        <span>{Math.round(zoom * 100)}%</span>
+        <button type="button" onClick={() => setZoom((current) => Math.min(4, current + 0.1))} title="Zoom in"><Plus size={14} /></button>
+        <button type="button" onClick={fit} title="Fit scene"><Maximize size={14} /></button>
+      </div>
+      <div className="scene-hints">
+        {fogBrush ? <Tag tone="gold"><Move size={11} /> Painting fog ({brushSize === 1 ? "1" : brushSize === 3 ? "3×3" : "5×5"})</Tag> : null}
+        {measureMode ? <Tag tone="gold"><Ruler size={11} /> Measuring</Tag> : null}
+        {!fogBrush && !measureMode ? <span>Drag to pan · wheel to zoom · right-click to ping</span> : null}
+      </div>
+    </div>
+  );
+}

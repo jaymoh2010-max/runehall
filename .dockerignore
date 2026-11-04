@@ -1,0 +1,14 @@
+node_modules
+dist
+.git
+.gitignore
+.env
+.env.*
+!.env.example
+backups
+data/*.db
+data/*.db-*
+data/uploads/*
+!data/uploads/.gitkeep
+*.log
+coverage

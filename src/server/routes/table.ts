@@ -1,0 +1,318 @@
+import type { FastifyInstance } from "fastify";
+import {
+  campaignCharacters,
+  campaignMembers,
+  canEditCharacter,
+  getCampaign,
+  getCampaignRole,
+  getMembership,
+  getUser,
+} from "../access";
+import { campaignMemberCount, campaignCharacterCount } from "../access";
+import { db, type CampaignRow, type MessageRow, type SceneRow, type TokenRow } from "../db";
+import {
+  serializeCampaignSummary,
+  serializeCharacter,
+  serializeInitiative,
+  serializeJournal,
+  serializeMember,
+  serializeMessage,
+  serializeScene,
+  serializeToken,
+  touchCampaign,
+} from "../serialize";
+import { clamp, now, safeInt, safeString } from "../util";
+
+function ensureState(campaignId: string) {
+  const state = db.prepare("SELECT * FROM campaign_state WHERE campaign_id = ?").get(campaignId) as
+    | {
+        campaign_id: string;
+        active_scene_id: string | null;
+        initiative: string;
+        round: number;
+        turn_index: number;
+      }
+    | undefined;
+  if (state) return state;
+  const firstScene = db
+    .prepare("SELECT id FROM scenes WHERE campaign_id = ? ORDER BY sort_order ASC, created_at ASC LIMIT 1")
+    .get(campaignId) as { id: string } | undefined;
+  db.prepare(
+    "INSERT INTO campaign_state (campaign_id, active_scene_id, initiative, round, turn_index, updated_at) VALUES (?, ?, '[]', 1, 0, ?)",
+  ).run(campaignId, firstScene?.id ?? null, now());
+  return db.prepare("SELECT * FROM campaign_state WHERE campaign_id = ?").get(campaignId) as {
+    campaign_id: string;
+    active_scene_id: string | null;
+    initiative: string;
+    round: number;
+    turn_index: number;
+  };
+}
+
+function campaignSummaryFor(row: CampaignRow, userId: string) {
+  const role = getCampaignRole(row.id, userId);
+  if (!role) return null;
+  const gm = getUser(row.gm_id);
+  return serializeCampaignSummary(
+    row,
+    role,
+    {
+      memberCount: campaignMemberCount(row.id),
+      characterCount: campaignCharacterCount(row.id),
+    },
+    gm?.display_name ?? "",
+  );
+}
+
+export async function registerTableRoutes(app: FastifyInstance): Promise<void> {
+  app.get("/api/campaigns/:id/table", async (request, reply) => {
+    if (!request.user) return reply.code(401).send({ error: "Sign in to continue." });
+    const { id } = request.params as { id: string };
+    const campaign = getCampaign(id);
+    if (!campaign) return reply.code(404).send({ error: "Campaign not found." });
+    const role = getCampaignRole(id, request.user.id);
+    if (!role) return reply.code(403).send({ error: "You're not a member of that campaign." });
+
+    const state = ensureState(id);
+    const scenes = db
+      .prepare("SELECT * FROM scenes WHERE campaign_id = ? ORDER BY sort_order ASC, created_at ASC")
+      .all(id) as SceneRow[];
+    const sceneIds = new Set(scenes.map((scene) => scene.id));
+    const tokenRows = scenes.length
+      ? (db
+          .prepare(
+            `SELECT t.*, u.display_name AS owner_name FROM tokens t
+             LEFT JOIN users u ON u.id = t.owner_id
+             WHERE t.scene_id IN (${scenes.map(() => "?").join(",")})
+             ${role === "player" ? "AND t.hidden = 0" : ""}
+             ORDER BY t.sort_order ASC, t.created_at ASC`,
+          )
+          .all(...scenes.map((scene) => scene.id)) as (TokenRow & { owner_name: string | null })[])
+      : [];
+    const messageRows = db
+      .prepare(
+        `SELECT * FROM messages WHERE campaign_id = ?
+         ${role === "player" ? "AND (visibility = 'all' OR user_id = ?)" : ""}
+         ORDER BY created_at DESC LIMIT 120`,
+      )
+      .all(...(role === "player" ? [id, request.user.id] : [id])) as MessageRow[];
+    const journalRows = db
+      .prepare(
+        `SELECT j.*, u.display_name AS author_name FROM journal_entries j
+         LEFT JOIN users u ON u.id = j.created_by
+         WHERE j.campaign_id = ? ${role === "player" ? "AND j.visible = 1" : ""}
+         ORDER BY j.updated_at DESC`,
+      )
+      .all(id) as (import("../db").JournalRow & { author_name: string | null })[];
+
+    const memberCharacters = campaignCharacters(id).map((character) =>
+      serializeCharacter(character, character.owner_name, {
+        canEdit: canEditCharacter(character, request.user!.id),
+        canView: true,
+      }),
+    );
+
+    return reply.send({
+      campaign: {
+        ...campaignSummaryFor(campaign, request.user.id)!,
+        inviteCode: role === "gm" ? campaign.invite_code : "",
+      },
+      members: campaignMembers(id).map((member) =>
+        serializeMember(member, member.role, member.joined_at),
+      ),
+      characters: memberCharacters,
+      scenes: scenes.map(serializeScene),
+      tokens: tokenRows.map((token) => serializeToken(token, token.owner_name ?? undefined)),
+      activeSceneId: state.active_scene_id && sceneIds.has(state.active_scene_id) ? state.active_scene_id : scenes[0]?.id ?? null,
+      initiative: serializeInitiative(JSON.parse(state.initiative || "[]")),
+      round: state.round,
+      turnIndex: state.turn_index,
+      messages: messageRows.reverse().map(serializeMessage),
+      journal: journalRows.map(serializeJournal),
+    });
+  });
+
+  app.post("/api/campaigns/:id/scenes", async (request, reply) => {
+    if (!request.user) return reply.code(401).send({ error: "Sign in to continue." });
+    const { id } = request.params as { id: string };
+    if (getCampaignRole(id, request.user.id) !== "gm") {
+      return reply.code(403).send({ error: "Only the GM can create scenes." });
+    }
+    const body = (request.body ?? {}) as Record<string, unknown>;
+    const name = safeString(body.name, "New Scene", 80);
+    const imageUrl = body.imageUrl ? safeString(body.imageUrl, "", 500) : null;
+    const width = clamp(safeInt(body.width, 1600, 100, 10_000), 100, 10_000);
+    const height = clamp(safeInt(body.height, 1000, 100, 10_000), 100, 10_000);
+    const gridSize = clamp(safeInt(body.gridSize, 70, 20, 300), 20, 300);
+    const gridOffsetX = clamp(Number(body.gridOffsetX) || 0, -gridSize, gridSize);
+    const gridOffsetY = clamp(Number(body.gridOffsetY) || 0, -gridSize, gridSize);
+    const order = db
+      .prepare("SELECT COALESCE(MAX(sort_order), 0) + 1 AS next FROM scenes WHERE campaign_id = ?")
+      .get(id) as { next: number };
+    const sceneId = `scene_${Math.random().toString(16).slice(2, 14)}${Date.now().toString(16)}`;
+    const ts = now();
+    db.prepare(
+      `INSERT INTO scenes (id, campaign_id, name, image_url, width, height, grid_size, grid_offset_x, grid_offset_y, fog_enabled, fog_revealed, sort_order, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, '[]', ?, ?, ?)`,
+    ).run(
+      sceneId,
+      id,
+      name,
+      imageUrl,
+      width,
+      height,
+      gridSize,
+      gridOffsetX,
+      gridOffsetY,
+      order.next,
+      ts,
+      ts,
+    );
+    const row = db.prepare("SELECT * FROM scenes WHERE id = ?").get(sceneId) as SceneRow;
+    const scene = serializeScene(row);
+    app.broadcastCampaign(id, "scene:created", scene);
+    touchCampaign(id);
+    return reply.code(201).send({ scene });
+  });
+
+  app.post("/api/scenes/:id/duplicate", async (request, reply) => {
+    if (!request.user) return reply.code(401).send({ error: "Sign in to continue." });
+    const { id } = request.params as { id: string };
+    const source = db.prepare("SELECT * FROM scenes WHERE id = ?").get(id) as SceneRow | undefined;
+    if (!source) return reply.code(404).send({ error: "Scene not found." });
+    if (getCampaignRole(source.campaign_id, request.user.id) !== "gm") {
+      return reply.code(403).send({ error: "Only the GM can duplicate scenes." });
+    }
+    const order = db
+      .prepare("SELECT COALESCE(MAX(sort_order), 0) + 1 AS next FROM scenes WHERE campaign_id = ?")
+      .get(source.campaign_id) as { next: number };
+    const sceneId = `scene_${Math.random().toString(16).slice(2, 14)}${Date.now().toString(16)}`;
+    const ts = now();
+    const name = `${source.name} (copy)`.slice(0, 80);
+    db.prepare(
+      `INSERT INTO scenes (id, campaign_id, name, image_url, width, height, grid_size, grid_offset_x, grid_offset_y, fog_enabled, fog_revealed, sort_order, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run(
+      sceneId,
+      source.campaign_id,
+      name,
+      source.image_url,
+      source.width,
+      source.height,
+      source.grid_size,
+      source.grid_offset_x,
+      source.grid_offset_y,
+      source.fog_enabled,
+      source.fog_revealed,
+      order.next,
+      ts,
+      ts,
+    );
+    const sourceTokens = db.prepare("SELECT * FROM tokens WHERE scene_id = ?").all(id) as TokenRow[];
+    for (const token of sourceTokens) {
+      db.prepare(
+        `INSERT INTO tokens (id, scene_id, name, image_url, character_id, owner_id, x, y, size, color, hp_current, hp_max, ac, initiative_bonus, group_id, group_name, conditions, hidden, locked, sort_order, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ).run(
+        `tok_${Math.random().toString(16).slice(2, 14)}${Date.now().toString(16)}`,
+        sceneId,
+        token.name,
+        token.image_url,
+        token.character_id,
+        token.owner_id,
+        token.x,
+        token.y,
+        token.size,
+        token.color,
+        token.hp_current,
+        token.hp_max,
+        token.ac,
+        token.initiative_bonus,
+        token.group_id,
+        token.group_name,
+        token.conditions,
+        token.hidden,
+        token.locked,
+        token.sort_order,
+        ts,
+        ts,
+      );
+    }
+    const row = db.prepare("SELECT * FROM scenes WHERE id = ?").get(sceneId) as SceneRow;
+    const scene = serializeScene(row);
+    app.broadcastCampaign(source.campaign_id, "scene:created", scene);
+    touchCampaign(source.campaign_id);
+    return reply.code(201).send({ scene });
+  });
+
+  app.patch("/api/scenes/:id", async (request, reply) => {
+    if (!request.user) return reply.code(401).send({ error: "Sign in to continue." });
+    const { id } = request.params as { id: string };
+    const row = db.prepare("SELECT * FROM scenes WHERE id = ?").get(id) as SceneRow | undefined;
+    if (!row) return reply.code(404).send({ error: "Scene not found." });
+    if (getCampaignRole(row.campaign_id, request.user.id) !== "gm") {
+      return reply.code(403).send({ error: "Only the GM can edit scenes." });
+    }
+    const body = (request.body ?? {}) as Record<string, unknown>;
+    const name = body.name === undefined ? row.name : safeString(body.name, row.name, 80);
+    const imageUrl = body.imageUrl === undefined ? row.image_url : body.imageUrl ? safeString(body.imageUrl, "", 500) : null;
+    const width = body.width === undefined ? row.width : clamp(safeInt(body.width, row.width, 100, 10_000), 100, 10_000);
+    const height = body.height === undefined ? row.height : clamp(safeInt(body.height, row.height, 100, 10_000), 100, 10_000);
+    const gridSize = body.gridSize === undefined ? row.grid_size : clamp(safeInt(body.gridSize, row.grid_size, 20, 300), 20, 300);
+    const gridOffsetX = body.gridOffsetX === undefined ? row.grid_offset_x : clamp(Number(body.gridOffsetX) || 0, -gridSize, gridSize);
+    const gridOffsetY = body.gridOffsetY === undefined ? row.grid_offset_y : clamp(Number(body.gridOffsetY) || 0, -gridSize, gridSize);
+    const fogEnabled = body.fogEnabled === undefined ? row.fog_enabled : body.fogEnabled ? 1 : 0;
+    db.prepare(
+      `UPDATE scenes SET name = ?, image_url = ?, width = ?, height = ?, grid_size = ?, grid_offset_x = ?, grid_offset_y = ?, fog_enabled = ?, updated_at = ? WHERE id = ?`,
+    ).run(name, imageUrl, width, height, gridSize, gridOffsetX, gridOffsetY, fogEnabled, now(), id);
+    const updated = db.prepare("SELECT * FROM scenes WHERE id = ?").get(id) as SceneRow;
+    const scene = serializeScene(updated);
+    app.broadcastCampaign(row.campaign_id, "scene:updated", scene);
+    touchCampaign(row.campaign_id);
+    return reply.send({ scene });
+  });
+
+  app.post("/api/scenes/:id/activate", async (request, reply) => {
+    if (!request.user) return reply.code(401).send({ error: "Sign in to continue." });
+    const { id } = request.params as { id: string };
+    const row = db.prepare("SELECT * FROM scenes WHERE id = ?").get(id) as SceneRow | undefined;
+    if (!row) return reply.code(404).send({ error: "Scene not found." });
+    if (getCampaignRole(row.campaign_id, request.user.id) !== "gm") {
+      return reply.code(403).send({ error: "Only the GM can change scenes." });
+    }
+    ensureState(row.campaign_id);
+    db.prepare("UPDATE campaign_state SET active_scene_id = ?, updated_at = ? WHERE campaign_id = ?").run(
+      id,
+      now(),
+      row.campaign_id,
+    );
+    app.broadcastCampaign(row.campaign_id, "scene:activated", { sceneId: id });
+    touchCampaign(row.campaign_id);
+    return reply.send({ ok: true });
+  });
+
+  app.delete("/api/scenes/:id", async (request, reply) => {
+    if (!request.user) return reply.code(401).send({ error: "Sign in to continue." });
+    const { id } = request.params as { id: string };
+    const row = db.prepare("SELECT * FROM scenes WHERE id = ?").get(id) as SceneRow | undefined;
+    if (!row) return reply.code(404).send({ error: "Scene not found." });
+    if (getCampaignRole(row.campaign_id, request.user.id) !== "gm") {
+      return reply.code(403).send({ error: "Only the GM can delete scenes." });
+    }
+    db.prepare("DELETE FROM scenes WHERE id = ?").run(id);
+    const remaining = db
+      .prepare("SELECT id FROM scenes WHERE campaign_id = ? ORDER BY sort_order ASC LIMIT 1")
+      .get(row.campaign_id) as { id: string } | undefined;
+    const state = ensureState(row.campaign_id);
+    if (state.active_scene_id === id) {
+      db.prepare("UPDATE campaign_state SET active_scene_id = ?, updated_at = ? WHERE campaign_id = ?").run(
+        remaining?.id ?? null,
+        now(),
+        row.campaign_id,
+      );
+      if (remaining) app.broadcastCampaign(row.campaign_id, "scene:activated", { sceneId: remaining.id });
+    }
+    app.broadcastCampaign(row.campaign_id, "scene:deleted", { sceneId: id });
+    return reply.send({ ok: true });
+  });
+}

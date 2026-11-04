@@ -1,0 +1,24 @@
+services:
+  runehall:
+    build:
+      context: .
+    image: runehall:local
+    init: true
+    restart: unless-stopped
+    ports:
+      - "${RUNEHALL_PORT:-3001}:3001"
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      HOST: 0.0.0.0
+      DATA_DIR: /app/data
+      COOKIE_SECURE: "${COOKIE_SECURE:-0}"
+      ENABLE_CSP: "${ENABLE_CSP:-1}"
+      REGISTRATION_MODE: "${REGISTRATION_MODE:-open}"
+      LOG_LEVEL: "${LOG_LEVEL:-info}"
+      AUTH_RATE_LIMIT_MAX: "${AUTH_RATE_LIMIT_MAX:-30}"
+      UPLOAD_RATE_LIMIT_MAX: "${UPLOAD_RATE_LIMIT_MAX:-60}"
+      TRUSTED_ORIGINS: "${TRUSTED_ORIGINS:-}"
+    volumes:
+      - ./data:/app/data
+      - ./backups:/app/backups

@@ -1,0 +1,771 @@
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from "react";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import {
+  ArrowLeft,
+  ArrowRight,
+  Backpack,
+  BookOpen,
+  Check,
+  CheckCircle2,
+  ChevronDown,
+  ChevronUp,
+  CircleAlert,
+  Coins,
+  Dice5,
+  Download,
+  Dna,
+  FileUp,
+  FlaskConical,
+  Heart,
+  Loader2,
+  Minus,
+  Plus,
+  ScrollText,
+  Shield,
+  Sparkles,
+  Swords,
+  Trash2,
+  TrendingUp,
+  Upload,
+  UserRound,
+  Users,
+} from "lucide-react";
+import {
+  ABILITIES,
+  ABILITY_DESCRIPTIONS,
+  ABILITY_LABELS,
+  ABILITY_SHORT,
+  PROFICIENCY_NAMES,
+  SIZES,
+  SKILLS,
+  SKILL_BY_ID,
+  VISION_LABELS,
+  type AbilityKey,
+  type Ancestry,
+  type Background,
+  type CampaignRuleset,
+  type CharacterContext,
+  type CharacterDraft,
+  type CharacterRecord,
+  type ClassData,
+  type ContentMode,
+  type Deity,
+  type DerivedCharacter,
+  type Equipment,
+  type Feat,
+  type Heritage,
+  type SkillId,
+  type Spell,
+} from "../../shared/types";
+import {
+  abilityMod,
+  applicableChoiceGroups,
+  casterInfo,
+  classKeyOptions,
+  computeCharacter,
+  deitySkillOptions,
+  emptyCharacterDraft,
+  featSlotsFor,
+  flexibleBoosts,
+  grantedTrainedSkills,
+  normalizeCharacterDraft,
+  requiredExtraSkills,
+  selectedChoiceOptions,
+  selectedDeitySkill,
+  signed,
+  skillRankCap,
+  spellRepertoireLimits,
+  spellSlotsFor,
+  startingWealthCp,
+  titleCase,
+  traitLabel,
+  weaponDamageLabel,
+} from "../../shared/rules";
+import { api, formatCp, uploadImage } from "../api";
+import { errorMessage } from "../stores";
+import { useToasts } from "../stores";
+import {
+  Avatar,
+  Badge,
+  Button,
+  Card,
+  EmptyState,
+  Field,
+  IconButton,
+  Input,
+  Modal,
+  PageEyebrow,
+  ProgressBar,
+  RichText,
+  Select,
+  Spinner,
+  Stat,
+  Tag,
+  Textarea,
+  Toggle,
+} from "../components/ui";
+import {
+  DeityPicker,
+  EquipmentPicker,
+  FeatPicker,
+  SpellPicker,
+} from "../components/builder/pickers";
+import { ContentSourceToggle } from "../components/builder/ContentSourceToggle";
+import { RunePicker } from "../components/builder/RunePicker";
+import { STEPS, type BuilderProps, type Picker, type StaticData, type StepId } from "../components/builder/shared";
+import { AncestryStep } from "../components/builder/steps/AncestryStep";
+import { HeritageStep } from "../components/builder/steps/HeritageStep";
+import { BackgroundStep } from "../components/builder/steps/BackgroundStep";
+import { ClassStep } from "../components/builder/steps/ClassStep";
+import { AbilitiesStep } from "../components/builder/steps/AbilitiesStep";
+import { SkillsStep } from "../components/builder/steps/SkillsStep";
+import { FeatsStep } from "../components/builder/steps/FeatsStep";
+import { SpellsStep } from "../components/builder/steps/SpellsStep";
+import { GearStep } from "../components/builder/steps/GearStep";
+import { DetailsStep } from "../components/builder/steps/DetailsStep";
+import { ReviewStep } from "../components/builder/steps/ReviewStep";
+import {
+  isCoreSource,
+  rulesetContentMode,
+  rulesetIncludesLegacy,
+  rulesetLabel,
+} from "../../shared/content";
+import { summarizeRunes } from "../../shared/runes";
+
+export function CharacterBuilderPage() {
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const toast = useToasts((state) => state.push);
+  const [character, setCharacter] = useState<CharacterRecord | null>(null);
+  const [draft, setDraft] = useState<CharacterDraft | null>(null);
+  const [context, setContext] = useState<CharacterContext>({ feats: {}, spells: {}, equipment: {} });
+  const [staticData, setStaticData] = useState<StaticData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [step, setStep] = useState<StepId>("ancestry");
+  const [picker, setPicker] = useState<Picker>(null);
+  const [levelUpOpen, setLevelUpOpen] = useState(false);
+  const [saveState, setSaveState] = useState<"saved" | "saving" | "dirty" | "error">("saved");
+  const initialized = useRef(false);
+  const skipInitialSave = useRef(true);
+  const saveSeq = useRef(0);
+  const draftRef = useRef<CharacterDraft | null>(null);
+  const dirtyRef = useRef(false);
+  const portraitRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!id) return;
+    let cancelled = false;
+    setLoading(true);
+    setError("");
+    (async () => {
+      try {
+        const [ancestries, heritages, backgrounds, classes, characterResult] = await Promise.all([
+          api<{ items: Ancestry[] }>("/api/compendium/ancestries"),
+          api<{ items: Heritage[] }>("/api/compendium/heritages"),
+          api<{ items: Background[] }>("/api/compendium/backgrounds"),
+          api<{ items: ClassData[] }>("/api/compendium/classes"),
+          api<{ character: CharacterRecord }>(`/api/characters/${id}`),
+        ]);
+        if (cancelled) return;
+        const normalized = normalizeCharacterDraft(characterResult.character.data, characterResult.character.name);
+        const contextResult = await api<{ context: CharacterContext }>(`/api/characters/${id}/context`, {
+          method: "POST",
+          body: { draft: normalized },
+        });
+        if (cancelled) return;
+        if (characterResult.character.permissions?.canEdit === false) {
+          navigate(`/characters/${id}`, { replace: true });
+          return;
+        }
+        setStaticData({
+          ancestries: ancestries.items,
+          heritages: heritages.items,
+          backgrounds: backgrounds.items,
+          classes: classes.items,
+        });
+        setCharacter(characterResult.character);
+        setDraft(normalized);
+        setContext(contextResult.context);
+        initialized.current = true;
+        document.title = `${normalized.name} · Runehall`;
+        // Start on the first chapter that still has an unresolved error.
+        const initialDerived = computeCharacter(normalized, contextResult.context);
+        const firstIssue = initialDerived.validation.find(
+          (issue) =>
+            issue.severity === "error" &&
+            issue.step &&
+            STEPS.some((entry) => entry.id === issue.step),
+        );
+        setStep((firstIssue?.step as StepId | undefined) ?? "review");
+      } catch (err) {
+        if (!cancelled) setError(errorMessage(err));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [id, navigate]);
+
+  const derived = useMemo(
+    () => (draft ? computeCharacter(draft, context) : null),
+    [draft, context],
+  );
+
+  useEffect(() => {
+    draftRef.current = draft;
+  }, [draft]);
+
+  useEffect(() => {
+    return () => {
+      if (!dirtyRef.current || !id || !draftRef.current) return;
+      // A route change unmounts the builder before the 650ms autosave timer
+      // fires. Send the latest draft with keepalive so a quick "Sheet" click
+      // cannot discard the edit.
+      void fetch(`/api/characters/${id}`, {
+        method: "PUT",
+        credentials: "include",
+        keepalive: true,
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ data: draftRef.current }),
+      });
+    };
+  }, [id]);
+
+  useEffect(() => {
+    if (!draft || !initialized.current || !id) return;
+    if (skipInitialSave.current) return;
+    setSaveState("dirty");
+    const seq = ++saveSeq.current;
+    const timer = window.setTimeout(async () => {
+      setSaveState("saving");
+      try {
+        const [contextResult, saveResult] = await Promise.all([
+          api<{ context: CharacterContext }>(`/api/characters/${id}/context`, {
+            method: "POST",
+            body: { draft },
+          }),
+          api<{ character: CharacterRecord }>(`/api/characters/${id}`, {
+            method: "PUT",
+            body: { data: draft },
+          }),
+        ]);
+        if (seq !== saveSeq.current) return;
+        setContext(contextResult.context);
+        setCharacter(saveResult.character);
+        setSaveState("saved");
+        dirtyRef.current = false;
+        document.title = `${draft.name} · Runehall`;
+      } catch (err) {
+        if (seq !== saveSeq.current) return;
+        setSaveState("error");
+        toast(errorMessage(err), "error");
+      }
+    }, 650);
+    return () => window.clearTimeout(timer);
+  }, [draft, id, toast]);
+
+  const update = (updater: (current: CharacterDraft) => CharacterDraft) => {
+    skipInitialSave.current = false;
+    dirtyRef.current = true;
+    setDraft((current) => {
+      if (!current) return current;
+      const next = updater(current);
+      draftRef.current = next;
+      return next;
+    });
+  };
+
+  const portrait = async (file: File) => {
+    try {
+      const result = await uploadImage(file);
+      update((current) => ({ ...current, portraitUrl: result.url }));
+      toast("Portrait updated.", "success");
+    } catch (err) {
+      toast(errorMessage(err), "error");
+    }
+  };
+
+  const exportJson = () => {
+    if (!draft) return;
+    const blob = new Blob(
+      [JSON.stringify({ format: "runehall-character", version: 1, exportedAt: new Date().toISOString(), data: draft }, null, 2)],
+      { type: "application/json" },
+    );
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `${draft.name.replace(/[^a-z0-9-_ ]/gi, "").trim() || "character"}.runehall.json`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const importJson = async (file: File) => {
+    try {
+      const parsed = JSON.parse(await file.text());
+      const raw = parsed?.data ?? parsed;
+      const normalized = normalizeCharacterDraft(raw, file.name.replace(/\.json$/i, ""));
+      update((current) => ({ ...normalized, portraitUrl: current.portraitUrl ?? normalized.portraitUrl }));
+      toast("Character imported. Review the choices before your next session.", "success");
+      setStep("review");
+    } catch (err) {
+      toast(`Could not import that file: ${errorMessage(err)}`, "error");
+    }
+  };
+
+  const removeCharacter = async () => {
+    if (!draft) return;
+    if (!window.confirm(`Delete ${draft.name}? This cannot be undone.`)) return;
+    try {
+      await api(`/api/characters/${id}`, { method: "DELETE" });
+      toast("Character deleted.", "success");
+      navigate("/campaigns");
+    } catch (err) {
+      toast(errorMessage(err), "error");
+    }
+  };
+
+  if (loading) return <div className="builder-loading"><Spinner label="Opening the character forge…" /></div>;
+  if (error) {
+    return (
+      <div className="page">
+        <EmptyState
+          icon={<CircleAlert size={28} />}
+          title="Could not open that character"
+          description={error}
+          action={<Button onClick={() => navigate("/campaigns")}>Back to campaigns</Button>}
+        />
+      </div>
+    );
+  }
+  if (!draft || !derived || !staticData) return null;
+
+  const campaignRuleset = character?.campaignRuleset ?? null;
+  const contentMode = campaignRuleset ? rulesetContentMode(campaignRuleset) : draft.contentMode;
+  const contentModeLocked = Boolean(campaignRuleset);
+  const legacyDefault = campaignRuleset ? rulesetIncludesLegacy(campaignRuleset) : draft.includeLegacy;
+  const legacyLocked = Boolean(campaignRuleset);
+  const nextLevel = Math.min(20, draft.level + 1);
+  const levelUpItems: { label: string; detail: string; step: StepId }[] = [];
+  if (nextLevel !== draft.level) {
+    for (const milestone of [5, 10, 15, 20]) {
+      if (nextLevel === milestone) {
+        levelUpItems.push({
+          label: "Ability boosts",
+          detail: "Choose four ability boosts for this milestone.",
+          step: "abilities",
+        });
+      }
+    }
+    for (const level of context.classData?.skillIncreaseLevels ?? []) {
+      if (level === nextLevel) {
+        levelUpItems.push({
+          label: "Skill increase",
+          detail: "Raise one skill’s proficiency rank.",
+          step: "skills",
+        });
+      }
+    }
+    const newFeatSlots = featSlotsFor(context.classData, nextLevel).filter(
+      (slot) => slot.level === nextLevel,
+    );
+    for (const slot of newFeatSlots) {
+      levelUpItems.push({
+        label: `${slot.category === "class" ? "Class" : slot.category === "ancestry" ? "Ancestry" : slot.category === "skill" ? "Skill" : "General"} feat`,
+        detail: `Choose a level ${slot.level} feat for this slot.`,
+        step: "feats",
+      });
+    }
+    const currentCaster = casterInfo(context.classData);
+    if (currentCaster.progression !== "none") {
+      const currentRank = derived.maxSpellRank;
+      const newSlots = spellSlotsFor(nextLevel, currentCaster.progression, context.classData?.name);
+      const newRank = newSlots?.length ?? currentRank;
+      if (newRank > currentRank) {
+        levelUpItems.push({
+          label: `Rank ${newRank} spells`,
+          detail: "Your highest spell rank increases. Review your spellbook and slots.",
+          step: "spells",
+        });
+      }
+    }
+    for (const feature of context.classData?.features ?? []) {
+      if (feature.level === nextLevel) {
+        levelUpItems.push({
+          label: feature.name,
+          detail: "New class feature.",
+          step: "class",
+        });
+      }
+    }
+  }
+  const issues = derived.validation;
+  const stepErrors = (stepId: StepId) => issues.filter((issue) => issue.step === stepId && issue.severity === "error");
+  const stepStatus = (stepId: StepId): "done" | "error" | "pending" | "optional" => {
+    if (stepId === "spells" && casterInfo(context.classData).progression === "none") return "optional";
+    if (stepErrors(stepId).length) return "error";
+    const done =
+      stepId === "ancestry" ? Boolean(draft.ancestryId) :
+      stepId === "heritage" ? Boolean(draft.heritageId) :
+      stepId === "background" ? Boolean(draft.backgroundId) :
+      stepId === "class" ? Boolean(draft.classId) && !issues.some((i) => i.step === "class") :
+      stepId === "abilities" ? !issues.some((i) => i.step === "abilities") :
+      stepId === "skills" ? !issues.some((i) => i.step === "skills") :
+      stepId === "feats" ? !issues.some((i) => i.step === "feats") :
+      stepId === "spells" ? !issues.some((i) => i.step === "spells") :
+      stepId === "gear" ? true :
+      stepId === "details" ? Boolean(draft.name.trim()) :
+      !issues.some((i) => i.severity === "error");
+    return done ? "done" : "pending";
+  };
+  const errors = issues.filter((issue) => issue.severity === "error");
+  const warnings = issues.filter((issue) => issue.severity === "warning");
+  const stepIndex = STEPS.findIndex((entry) => entry.id === step);
+  const go = (direction: -1 | 1) => {
+    const next = STEPS[stepIndex + direction];
+    if (next) setStep(next.id);
+  };
+  const completeLevelUp = (targetStep?: StepId) => {
+    if (nextLevel === draft.level) return;
+    update((current) => ({ ...current, level: nextLevel }));
+    setLevelUpOpen(false);
+    setStep(targetStep ?? levelUpItems[0]?.step ?? "review");
+    toast(`Level ${nextLevel} reached. Review the new choices.`, "success");
+  };
+
+  const renderStep = () => {
+    const props: BuilderProps = {
+      draft,
+      update,
+      derived,
+      context,
+      staticData,
+      campaignRuleset,
+      contentMode,
+      contentModeLocked,
+      legacyDefault,
+      legacyLocked,
+      openPicker: setPicker,
+      onPortrait: portrait,
+      setStep,
+    };
+    switch (step) {
+      case "ancestry": return <AncestryStep {...props} />;
+      case "heritage": return <HeritageStep {...props} />;
+      case "background": return <BackgroundStep {...props} />;
+      case "class": return <ClassStep {...props} />;
+      case "abilities": return <AbilitiesStep {...props} />;
+      case "skills": return <SkillsStep {...props} />;
+      case "feats": return <FeatsStep {...props} />;
+      case "spells": return <SpellsStep {...props} />;
+      case "gear": return <GearStep {...props} />;
+      case "details": return <DetailsStep {...props} />;
+      case "review": return <ReviewStep {...props} onExport={exportJson} onImport={importJson} onDelete={removeCharacter} />;
+    }
+  };
+
+  return (
+    <div className="builder-page">
+      <header className="builder-header">
+        <div className="builder-header-left">
+          <Link to={character?.campaignId ? `/campaigns/${character.campaignId}` : "/campaigns"} className="icon-btn" title="Back to campaigns">
+            <ArrowLeft size={18} />
+          </Link>
+          <div className="builder-title">
+            <Input
+              className="builder-name-input"
+              value={draft.name}
+              onChange={(event) => update((current) => ({ ...current, name: event.target.value }))}
+              aria-label="Character name"
+              maxLength={120}
+            />
+            <span className="tiny muted">
+              {saveState === "saved" ? "Saved" : saveState === "saving" ? "Saving…" : saveState === "error" ? "Save failed" : "Unsaved changes"}
+            </span>
+            {campaignRuleset ? (
+              <Badge tone="gold">{rulesetLabel(campaignRuleset)}</Badge>
+            ) : null}
+          </div>
+        </div>
+        <div className="builder-header-actions">
+          <Field label="Level">
+            <Select
+              value={draft.level}
+              onChange={(event) => update((current) => ({ ...current, level: Number(event.target.value) }))}
+              className="level-select"
+            >
+              {Array.from({ length: 20 }, (_, index) => index + 1).map((level) => (
+                <option key={level} value={level}>Level {level}</option>
+              ))}
+            </Select>
+          </Field>
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={<TrendingUp size={15} />}
+            onClick={() => setLevelUpOpen(true)}
+            disabled={draft.level >= 20}
+          >
+            Level up
+          </Button>
+          <Link to={`/characters/${id}`} className="btn btn-secondary btn-sm"><ScrollText size={15} /> Sheet</Link>
+          <Button variant="ghost" size="sm" icon={<FileUp size={15} />} onClick={() => document.getElementById("builder-import")?.click()}>Import</Button>
+          <input
+            id="builder-import"
+            type="file"
+            accept="application/json,.json"
+            hidden
+            onChange={(event: ChangeEvent<HTMLInputElement>) => {
+              const file = event.target.files?.[0];
+              if (file) void importJson(file);
+              event.target.value = "";
+            }}
+          />
+        </div>
+      </header>
+
+      <div className="builder-shell">
+        <aside className="builder-steps">
+          <div className="builder-steps-title">Chapters</div>
+          {STEPS.map((entry, index) => {
+            const status = stepStatus(entry.id);
+            return (
+              <button
+                key={entry.id}
+                type="button"
+                className={`builder-step ${step === entry.id ? "is-active" : ""} is-${status}`}
+                onClick={() => setStep(entry.id)}
+              >
+                <span className="builder-step-num">{status === "done" ? <Check size={13} /> : index + 1}</span>
+                <span className="builder-step-icon">{entry.icon}</span>
+                <span className="builder-step-label">{entry.short}</span>
+                {status === "error" ? <span className="builder-step-dot" /> : null}
+                {status === "optional" ? <span className="tiny muted">opt</span> : null}
+              </button>
+            );
+          })}
+          <div className="builder-steps-help">
+            <BookOpen size={14} />
+            <span>Every choice autosaves.</span>
+          </div>
+        </aside>
+
+        <main className="builder-content">
+          {renderStep()}
+          <div className="builder-nav-mobile">
+            <Button variant="ghost" onClick={() => go(-1)} disabled={stepIndex <= 0}><ArrowLeft size={15} /> Back</Button>
+            <span className="tiny muted">{stepIndex + 1} / {STEPS.length}</span>
+            <Button variant="secondary" onClick={() => go(1)} disabled={stepIndex >= STEPS.length - 1}>Next <ArrowRight size={15} /></Button>
+          </div>
+        </main>
+
+        <aside className="builder-summary">
+          <Card className="summary-hero">
+            <div className="summary-avatar-wrap">
+              <Avatar name={draft.name} src={draft.portraitUrl} size={70} />
+              <button type="button" className="summary-portrait-edit" title="Upload portrait" onClick={() => portraitRef.current?.click()}>
+                <Upload size={13} />
+              </button>
+              <input
+                ref={portraitRef}
+                type="file"
+                hidden
+                accept="image/png,image/jpeg,image/webp,image/gif,image/avif"
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  if (file) void portrait(file);
+                  event.target.value = "";
+                }}
+              />
+            </div>
+            <h2>{draft.name || "Unnamed Hero"}</h2>
+            <p className="muted small">
+              Level {draft.level}
+              {context.classData ? ` · ${context.classData.name}` : ""}
+            </p>
+            <p className="tiny muted">
+              {[context.ancestry?.name, context.heritage?.name, context.background?.name].filter(Boolean).join(" · ") || "Choose an ancestry, heritage, and background."}
+            </p>
+            <div className="summary-ability-row">
+              {ABILITIES.map((ability) => (
+                <div key={ability}>
+                  <span>{ABILITY_SHORT[ability]}</span>
+                  <strong>{derived.abilities[ability]}</strong>
+                  <em>{signed(derived.abilityMods[ability])}</em>
+                </div>
+              ))}
+            </div>
+            <div className="summary-stat-grid">
+              <Stat label="HP" value={derived.maxHp} tone="red" />
+              <Stat label="AC" value={derived.ac} tone="gold" />
+              <Stat label="Speed" value={`${derived.speed}'`} />
+              <Stat label="Perception" value={signed(derived.perception)} />
+            </div>
+            <div className="summary-issues">
+              {errors.length ? (
+                <span className="danger-text"><CircleAlert size={14} /> {errors.length} to fix</span>
+              ) : (
+                <span className="gold-text"><CheckCircle2 size={14} /> Ready</span>
+              )}
+              {warnings.length ? <span className="muted tiny">{warnings.length} warning{warnings.length === 1 ? "" : "s"}</span> : null}
+            </div>
+            <Link to={`/characters/${id}`} className="btn btn-gold btn-sm btn-block" style={{ marginTop: 11 }}>
+              <ScrollText size={14} /> Open character sheet
+            </Link>
+          </Card>
+          <Card className="summary-wealth">
+            <div className="row-between"><span className="tiny muted">Gear budget</span><strong className="tiny">{formatCp(derived.wealth.remaining)} left</strong></div>
+            <ProgressBar value={Math.min(derived.wealth.spent, derived.wealth.budget)} max={Math.max(1, derived.wealth.budget)} />
+            <div className="row-between" style={{ marginTop: 8 }}><span className="tiny muted">Bulk</span><strong className="tiny">{derived.bulk.total} / {derived.bulk.capacity}</strong></div>
+          </Card>
+          <div className="summary-links">
+            <button type="button" onClick={() => setStep("review")}><CheckCircle2 size={14} /> Review &amp; export</button>
+            <button type="button" onClick={() => { void removeCharacter(); }} className="danger-text"><Trash2 size={14} /> Delete character</button>
+          </div>
+        </aside>
+      </div>
+
+      {picker?.kind === "feat" ? (
+        <FeatPicker
+          open
+          onClose={() => setPicker(null)}
+          category={picker.category}
+          slotLevel={picker.level}
+          ancestryTrait={context.ancestry?.name.toLowerCase().replace(/\s+/g, "-")}
+          classTrait={context.classData?.name.toLowerCase()}
+          draft={draft}
+          context={context}
+          expanded={contentMode === "expanded"}
+          onExpandedChange={(mode) => update((current) => ({ ...current, contentMode: mode }))}
+          contentModeLocked={contentModeLocked}
+          legacyDefault={legacyDefault}
+          legacyLocked={legacyLocked}
+          onLegacyChange={(value) => update((current) => ({ ...current, includeLegacy: value }))}
+          onSelect={(feat) =>
+            update((current) => ({
+              ...current,
+              feats: {
+                ...current.feats,
+                [picker.category]: { ...current.feats[picker.category], [String(picker.level)]: feat.id },
+              },
+            }))
+          }
+        />
+      ) : null}
+      {picker?.kind === "spell" ? (
+        <SpellPicker
+          open
+          onClose={() => setPicker(null)}
+          rank={Number.isFinite(picker.rank) ? picker.rank : null}
+          maxRank={picker.focus ? Math.max(1, Math.ceil(draft.level / 2)) : null}
+          tradition={derived.casterTradition}
+          focus={picker.focus}
+          classTrait={context.classData?.name.toLowerCase()}
+          expanded={contentMode === "expanded"}
+          onExpandedChange={(mode) => update((current) => ({ ...current, contentMode: mode }))}
+          contentModeLocked={contentModeLocked}
+          legacyDefault={legacyDefault}
+          legacyLocked={legacyLocked}
+          onLegacyChange={(value) => update((current) => ({ ...current, includeLegacy: value }))}
+          onSelect={(spell) =>
+            update((current) => {
+              if (picker.target === "cantrips" && spell.rank !== 0) return current;
+              if (current.spells[picker.target].includes(spell.id)) return current;
+              return {
+                ...current,
+                spells: { ...current.spells, [picker.target]: [...current.spells[picker.target], spell.id] },
+              };
+            })
+          }
+        />
+      ) : null}
+      {picker?.kind === "equipment" ? (
+        <EquipmentPicker
+          open
+          onClose={() => setPicker(null)}
+          level={draft.level}
+          expanded={contentMode === "expanded"}
+          onExpandedChange={(mode) => update((current) => ({ ...current, contentMode: mode }))}
+          contentModeLocked={contentModeLocked}
+          legacyDefault={legacyDefault}
+          legacyLocked={legacyLocked}
+          onLegacyChange={(value) => update((current) => ({ ...current, includeLegacy: value }))}
+          onSelect={(item) =>
+            update((current) => {
+              const existing = current.equipment.find((entry) => entry.itemId === item.id);
+              if (existing) {
+                return {
+                  ...current,
+                  equipment: current.equipment.map((entry) =>
+                    entry.itemId === item.id ? { ...entry, quantity: entry.quantity + 1 } : entry,
+                  ),
+                };
+              }
+              return {
+                ...current,
+                equipment: [...current.equipment, { itemId: item.id, quantity: 1, equipped: Boolean(item.weapon || item.armor || item.shield) }],
+              };
+            })
+          }
+        />
+      ) : null}
+      {picker?.kind === "deity" ? (
+        <DeityPicker
+          open
+          onClose={() => setPicker(null)}
+          expanded={contentMode === "expanded"}
+          onExpandedChange={(mode) => update((current) => ({ ...current, contentMode: mode }))}
+          contentModeLocked={contentModeLocked}
+          legacyDefault={legacyDefault}
+          legacyLocked={legacyLocked}
+          onLegacyChange={(value) => update((current) => ({ ...current, includeLegacy: value }))}
+          onSelect={(deity) => update((current) => ({ ...current, deityId: deity.id, deitySkill: null }))}
+        />
+      ) : null}
+      <Modal
+        open={levelUpOpen}
+        onClose={() => setLevelUpOpen(false)}
+        title={`Level ${draft.level} → ${nextLevel}`}
+        subtitle="Review what changes, then jump straight into each new choice."
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setLevelUpOpen(false)}>Cancel</Button>
+            <Button variant="primary" icon={<TrendingUp size={15} />} onClick={() => completeLevelUp()}>
+              Level up
+            </Button>
+          </>
+        }
+      >
+        <div className="levelup-summary">
+          <div className="levelup-hp">
+            <Heart size={15} />
+            <span>
+              Hit points increase by{" "}
+              <strong>{Math.max(1, (context.classData?.hp ?? 0) + derived.abilityMods.con)}</strong>.
+            </span>
+          </div>
+          {levelUpItems.length ? (
+            levelUpItems.map((item, index) => (
+              <button
+                key={`${item.label}-${index}`}
+                type="button"
+                className="levelup-item"
+                onClick={() => completeLevelUp(item.step)}
+              >
+                <span>
+                  <strong>{item.label}</strong>
+                  <span className="tiny muted">{item.detail}</span>
+                </span>
+                <ArrowRight size={15} />
+              </button>
+            ))
+          ) : (
+            <p className="muted small">No new feat, skill, spell, or ability choices at this level. Review the sheet after leveling.</p>
+          )}
+        </div>
+      </Modal>
+    </div>
+  );
+}
