@@ -100,13 +100,26 @@ Then sync the newest archive with rsync, rclone, restic, a NAS share, or your cl
 
 Do this once after setup and whenever the host changes:
 
+Docker:
+
+```bash
+docker compose stop
+docker compose run --rm runehall npm run restore -- --from /app/backups/<archive> --yes
+docker compose start
+```
+
+Native install:
+
 1. Stop the server.
 2. Move the current `data/` directory aside.
 3. Restore the newest archive with `npm run restore -- --from <archive> --yes`.
 4. Start the server and open `/api/health`.
-5. Sign in, open a campaign, a character sheet, and a scene with an uploaded map.
-6. Check that recent audit entries and handout images are present.
-7. Remove the moved-aside directory only after the check passes.
+
+After either flow:
+
+1. Sign in, open a campaign, a character sheet, and a scene with an uploaded map.
+2. Check that recent audit entries and handout images are present.
+3. Remove any moved-aside directory only after the check passes.
 
 ## 2. GM campaign export (portable JSON)
 

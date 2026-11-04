@@ -23,7 +23,8 @@ COPY --from=build /app/src ./src
 COPY --from=build /app/scripts ./scripts
 COPY --from=build /app/tsconfig.json ./
 COPY --from=build /app/data/compendium ./data/compendium
-RUN mkdir -p /app/data/uploads /app/backups && chown -R node:node /app
+RUN mkdir -p /app/data/uploads /app/backups \
+    && chown node:node /app/data /app/data/uploads /app/backups
 USER node
 EXPOSE 3001
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \

@@ -24,6 +24,8 @@ Open `http://localhost:3001`. The compose file uses `./data` for the SQLite data
 mkdir -p data/uploads backups
 ```
 
+The production image is built and health-checked in CI. It uses Node 26 Alpine, runs as the non-root `node` user, writes only to `/app/data` and `/app/backups`, and serves the compiled client and API from one process.
+
 Useful commands:
 
 ```bash
@@ -206,13 +208,26 @@ Then copy the newest archive off the machine with your normal tool (rsync, rclon
 
 Run this at least once after setup and before trusting the deployment:
 
-1. Stop the server (`docker compose stop` or stop `npm start`).
+Docker flow:
+
+```bash
+docker compose stop
+docker compose run --rm runehall npm run restore -- --from /app/backups/<archive> --yes
+docker compose start
+```
+
+Native flow:
+
+1. Stop the server (`npm start`).
 2. Move the current `data/` directory aside.
 3. Restore the newest archive with `npm run restore -- --from <archive> --yes`.
 4. Start the server and check `/api/health`.
-5. Sign in, open a campaign, open a character sheet, and open a scene with an uploaded map.
-6. Confirm the newest audit entries and journal handout images are present.
-7. Delete the moved-aside directory only after the check passes.
+
+Then complete the same checks for either flow:
+
+1. Sign in, open a campaign, open a character sheet, and open a scene with an uploaded map.
+2. Confirm the newest audit entries and journal handout images are present.
+3. Delete the moved-aside directory only after the check passes.
 
 ## Compendium version pinning
 

@@ -133,7 +133,7 @@ Or run the container:
 docker compose up -d --build
 ```
 
-The compose path keeps SQLite, the compendium, uploads, and backups in `./data` and `./backups`. Put Caddy or Nginx in front for HTTPS, then set `COOKIE_SECURE=1`. Security headers, CSP, origin checks, and auth/upload rate limits are built in.
+The compose path keeps SQLite, the compendium, uploads, and backups in `./data` and `./backups`. Put Caddy or Nginx in front for HTTPS, then set `COOKIE_SECURE=1`. Security headers, CSP, origin checks, and auth/upload rate limits are built in. The production image is built and health-checked in CI, and has been verified locally with persistence, backups, and restore.
 
 See [docs/DEPLOY.md](docs/DEPLOY.md) for the full deployment checklist, reverse-proxy examples, updates, and current hosting gaps.
 
@@ -201,7 +201,7 @@ This is a substantial, playable foundation — not a complete Pathbuilder/Foundr
 - **Some upstream entries have no separate rules text.** About 189 generic treasure/gear items and seven creatures have empty descriptions in the Foundry source export; the library shows their statistics and an explicit fallback rather than inventing text. Thirteen recovered entries use GM-facing source text and are labeled **GM source text**. Twenty-eight control attacks legitimately have no damage, and 716 spells have no tradition because they are focus, ritual, or class-locked.
 
 ### Good next steps
-1. **Hosting and scale:** verify the Docker image in CI or a Docker host, add off-machine backup shipping, and run a clean-machine restore drill.
+1. **Backup operations:** add off-machine backup shipping with checksums and run the restore drill on a clean machine.
 2. **Browser E2E:** automate the GM/player campaign, table, modal, and lazy-route flows.
 3. **Rules automation:** close the remaining subclass, feat, and item effect gaps.
 4. **Optional scale:** Postgres/S3 adapters and OAuth only when the local deployment is proven.

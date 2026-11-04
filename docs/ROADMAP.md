@@ -489,7 +489,11 @@ Acceptance: a GM can prepare a full session in Runehall and start it with one â€
 
 ## Sprint 12 â€” Hosting and scale (only when needed)
 
-- [ ] Verify the Docker build and run in CI or on a Docker host.
+- [x] **Verify the Docker build and run in CI or on a Docker host**
+  - Built and ran the Node 26 Alpine image on Windows Docker Desktop.
+  - Verified health, registration, campaign/character data, uploads, backup, restore, and restart persistence.
+  - Reduced the image from about 675 MB to 456 MB by avoiding a recursive `/app` chown.
+  - Added a CI job that builds the image and waits for `/api/health`.
 - [ ] Off-machine backup shipping with checksum verification.
 - [ ] Audit retention and export.
 - [ ] Only then consider Postgres/S3 adapters or OAuth.

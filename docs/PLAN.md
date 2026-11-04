@@ -63,7 +63,7 @@ The target table size is one GM plus 4–10 players. That means the product shou
 - Persistent bestiary palette with drag-to-map group placement.
 - GM screen with level/simple DCs, condition lookup, secret rolls, and player roll requests.
 - Campaign import with ID remapping and player-account matching, plus a dry-run-first unused-asset cleanup command for legacy files.
-- Next: remaining polish and optional hosting adapters.
+- Next: off-machine backup shipping and optional scale adapters.
 
 ### Phase 4 — Reliability and trust (in progress)
 - [x] Per-campaign revisions, `campaign:revision` socket events, gap detection, and reconnect snapshot refresh.
@@ -83,7 +83,7 @@ The target table size is one GM plus 4–10 players. That means the product shou
 - Initiative delay/ready states, manual readied-action triggers, automatic ready expiry, and Perception-based tie ordering are built.
 
 ### Phase 6 — Hosting and durability
-- Docker image, Compose deployment, HTTPS reverse-proxy guide, security headers, CSP, origin checks, and auth/upload rate limits are built.
+- Docker image, Compose deployment, HTTPS reverse-proxy guide, security headers, CSP, origin checks, and auth/upload rate limits are built. The Node 26 Alpine image is built and health-checked in CI and was verified locally with a clean volume, uploads, backup, restore, and restart persistence.
 - Configurable registration (open, invite-only, closed), first-user administrator bootstrap, invite codes, local password recovery, self-service password change, and an audit log are built.
 - Backups support retention pruning and documented cron/systemd/Task Scheduler automation plus a restore drill.
 - The compendium manifest is pinned to the source commit.
