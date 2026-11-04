@@ -14,10 +14,13 @@ export default defineConfig({
     host: true,
     port: 5173,
     proxy: {
-      "/api": "http://localhost:3001",
-      "/uploads": "http://localhost:3001",
+      // Use an explicit IPv4 loopback target. On some Windows/Node setups
+      // "localhost" resolves to ::1 while the API listens on 0.0.0.0, which
+      // makes Vite return 502 Bad Gateway for every proxied request.
+      "/api": "http://127.0.0.1:3001",
+      "/uploads": "http://127.0.0.1:3001",
       "/socket.io": {
-        target: "http://localhost:3001",
+        target: "http://127.0.0.1:3001",
         ws: true,
       },
     },
