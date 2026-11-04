@@ -950,6 +950,14 @@ export interface Scene {
   updatedAt: number;
 }
 
+export interface TokenCondition {
+  name: string;
+  /** Numeric value for conditions such as Frightened 2 or Clumsy 1. */
+  value?: number | null;
+  /** Remaining duration in rounds, when tracked. */
+  duration?: number | null;
+}
+
 export interface Token {
   id: string;
   sceneId: string;
@@ -970,7 +978,7 @@ export interface Token {
   /** Tokens with the same group id move and roll initiative together. */
   groupId?: string | null;
   groupName?: string | null;
-  conditions: string[];
+  conditions: TokenCondition[];
   hidden: boolean;
   locked: boolean;
   sortOrder: number;

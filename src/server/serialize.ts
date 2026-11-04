@@ -40,6 +40,7 @@ import {
 } from "./db";
 import { parseJson } from "./util";
 import { bumpCampaign } from "./revisions";
+import { normalizeTokenConditions } from "../shared/tokens";
 
 export function serializeCampaignSummary(
   campaign: CampaignRow,
@@ -144,7 +145,7 @@ export function serializeToken(row: TokenRow, ownerName?: string): Token {
     initiativeBonus: row.initiative_bonus ?? null,
     groupId: row.group_id ?? null,
     groupName: row.group_name ?? null,
-    conditions: parseJson<string[]>(row.conditions, []),
+    conditions: normalizeTokenConditions(parseJson(row.conditions, [])),
     hidden: Boolean(row.hidden),
     locked: Boolean(row.locked),
     sortOrder: row.sort_order,

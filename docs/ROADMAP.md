@@ -365,8 +365,16 @@ Acceptance: a GM can prepare a full session in Runehall and start it with one �
 
 **Goal:** run a full combat without another VTT.
 
-- [ ] AoE templates with measurement and an optional save/roll card.
-- [ ] Conditions with values and durations, plus quick apply/remove.
+- [x] **Area templates (first pass)**
+  - Burst, emanation, cone, and line templates with size in feet.
+  - Click-drag placement on the map, with a live preview and a size label.
+  - Templates are a local GM overlay for now; they are not persisted or shared with players.
+  - Remaining: rotate handles, persistent/shared templates, and save/roll cards.
+- [x] **Conditions with values and durations**
+  - Token conditions now store name, optional value, and optional duration in rounds.
+  - Legacy string conditions are normalized automatically on load.
+  - The token editor, token panel, and initiative tooltip show labels such as “Frightened 2 (3r)”.
+  - Remaining: one-click decrement at turn end and character-sheet duration tracking.
 - [ ] Multi-select tokens and group drag beyond bestiary formations.
 - [ ] Scene playlists, reordering, activate-on-create, thumbnails, and player-safe preview.
 - [ ] Filterable combat log, group checks, delay/ready actions, and tie handling.

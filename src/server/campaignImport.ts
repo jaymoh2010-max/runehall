@@ -11,6 +11,7 @@ import {
 import { normalizeCampaignThreads } from "../shared/dashboard";
 import { normalizeJournalAttachments, normalizeJournalKind } from "../shared/journal";
 import { normalizeLootItems } from "../shared/loot";
+import { normalizeTokenConditions } from "../shared/tokens";
 import {
   normalizeAttendanceStatus,
   normalizeSessionStatus,
@@ -266,11 +267,7 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
           : numberValue(token.initiativeBonus, 0, -100, 1000),
         groupId,
         groupId ? text(token.groupName, "Group", 80) : null,
-        JSON.stringify(
-          Array.isArray(token.conditions)
-            ? token.conditions.filter((condition): condition is string => typeof condition === "string").slice(0, 20)
-            : [],
-        ),
+        JSON.stringify(normalizeTokenConditions(token.conditions)),
         token.hidden ? 1 : 0,
         token.locked ? 1 : 0,
         numberValue(token.sortOrder, 0),

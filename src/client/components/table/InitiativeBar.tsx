@@ -2,7 +2,7 @@ import { ChevronLeft, ChevronRight, Dices, RefreshCw, RotateCcw, Sparkles, Sword
 import type { InitiativeEntry, Token } from "../../../shared/types";
 import { Badge, Button, IconButton } from "../ui";
 import { signed } from "../../../shared/rules";
-import { groupHp } from "../../../shared/tokens";
+import { groupHp, tokenConditionLabel } from "../../../shared/tokens";
 
 export function InitiativeBar({
   entries,
@@ -57,8 +57,8 @@ export function InitiativeBar({
                 ? (token.hpCurrent / token.hpMax) * 100
                 : null;
             const conditions = group
-              ? [...new Set(groupTokens.flatMap((item) => item.conditions))]
-              : token?.conditions ?? [];
+              ? [...new Set(groupTokens.flatMap((item) => item.conditions.map(tokenConditionLabel)))]
+              : (token?.conditions ?? []).map(tokenConditionLabel);
             const hpLabel = group
               ? group.max > 0
                 ? `${group.current} / ${group.max} HP`

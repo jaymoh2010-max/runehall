@@ -11,6 +11,7 @@ import { userFromCookieHeader } from "./auth";
 import { now, newId, safeInt, safeString, parseJson, clamp, sanitizeUserText } from "./util";
 import { characterSummary, computeCharacter, normalizeCharacterDraft } from "../shared/rules";
 import { rollFormula, validateFormula } from "../shared/dice";
+import { normalizeTokenConditions } from "../shared/tokens";
 import type {
   ClientToServerEvents,
   InitiativeEntry,
@@ -282,7 +283,7 @@ function createToken(
     initiativeBonus,
     groupId,
     groupName,
-    JSON.stringify(Array.isArray(incoming.conditions) ? incoming.conditions.filter((c): c is string => typeof c === "string").slice(0, 20) : []),
+    JSON.stringify(normalizeTokenConditions(incoming.conditions)),
     incoming.hidden ? 1 : 0,
     incoming.locked ? 1 : 0,
     Date.now(),
@@ -428,11 +429,8 @@ export function registerSocketServer(io: TypedServer): void {
       if (token.hpCurrent !== undefined) {
         add("hp_current", token.hpCurrent === null ? null : safeInt(token.hpCurrent, 0, -1_000_000, 1_000_000));
       }
-      if (token.conditions !== undefined && Array.isArray(token.conditions)) {
-        add(
-          "conditions",
-          JSON.stringify(token.conditions.filter((c): c is string => typeof c === "string").slice(0, 20)),
-        );
+      if (token.conditions !== undefined) {
+        add("conditions", JSON.stringify(normalizeTokenConditions(token.conditions)));
       }
       if (!updates.length) return;
       values.push(now(), token.id);

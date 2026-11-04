@@ -6,11 +6,19 @@ import {
   useState,
   type DragEvent as ReactDragEvent,
   type PointerEvent as ReactPointerEvent,
+  type ReactElement,
 } from "react";
 import { Maximize, Minus, Move, Plus, Ruler } from "lucide-react";
 import type { CharacterRecord, Monster, Scene, Token } from "../../../shared/types";
 import { Tag } from "../ui";
 import { BESTIARY_DRAG_TYPE, type BestiaryDragPayload } from "./bestiaryDrag";
+import {
+  templateLabel,
+  templateRadiusPx,
+  TEMPLATE_LABELS,
+  type AoeTemplate,
+  type TemplateKind,
+} from "../../../shared/templates";
 
 type FogMode = "reveal" | "hide";
 
@@ -32,6 +40,10 @@ interface SceneCanvasProps {
   onPing: (x: number, y: number) => void;
   remotePointer: { x: number; y: number; name: string; ts: number } | null;
   onDropMonster?: (monster: Monster, count: number, x: number, y: number) => void;
+  templateKind: TemplateKind | null;
+  templateSize: number;
+  template: AoeTemplate | null;
+  onTemplate: (template: AoeTemplate) => void;
 }
 
 interface Pan {
@@ -57,6 +69,10 @@ export function SceneCanvas({
   onPing,
   remotePointer,
   onDropMonster,
+  templateKind,
+  templateSize,
+  template,
+  onTemplate,
 }: SceneCanvasProps) {
   const viewportRef = useRef<HTMLDivElement>(null);
   const surfaceRef = useRef<HTMLDivElement>(null);
@@ -70,6 +86,8 @@ export function SceneCanvas({
   const [panning, setPanning] = useState<{ startX: number; startY: number; panX: number; panY: number } | null>(null);
   const [measuring, setMeasuring] = useState<{ startX: number; startY: number; x: number; y: number } | null>(null);
   const [fogPreview, setFogPreview] = useState<Set<string>>(() => new Set(scene.revealed));
+  const [templateDraft, setTemplateDraft] = useState<{ x: number; y: number; direction: number } | null>(null);
+  const templateDraftRef = useRef<{ x: number; y: number; direction: number } | null>(null);
   const painting = useRef<{ mode: FogMode; cells: Set<string> } | null>(null);
   const fittedScene = useRef<string | null>(null);
 
@@ -207,6 +225,18 @@ export function SceneCanvas({
     if (event.button !== 0) return;
     const target = event.target as HTMLElement;
     if (target.closest(".scene-token")) return;
+    if (templateKind && isGm) {
+      const point = scenePoint(event.clientX, event.clientY);
+      const draft = {
+        x: snap(point.x, scene.gridOffsetX),
+        y: snap(point.y, scene.gridOffsetY),
+        direction: 0,
+      };
+      templateDraftRef.current = draft;
+      setTemplateDraft(draft);
+      viewportRef.current?.setPointerCapture(event.pointerId);
+      return;
+    }
     if (fogBrush && isGm) {
       const point = scenePoint(event.clientX, event.clientY);
       const cx = Math.floor((point.x - scene.gridOffsetX) / scene.gridSize);
@@ -246,6 +276,17 @@ export function SceneCanvas({
   };
 
   const onViewportPointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (templateDraftRef.current) {
+      const point = scenePoint(event.clientX, event.clientY);
+      const draft = templateDraftRef.current;
+      const next = {
+        ...draft,
+        direction: Math.atan2(point.y - draft.y, point.x - draft.x),
+      };
+      templateDraftRef.current = next;
+      setTemplateDraft(next);
+      return;
+    }
     if (painting.current) {
       const point = scenePoint(event.clientX, event.clientY);
       const cx = Math.floor((point.x - scene.gridOffsetX) / scene.gridSize);
@@ -282,6 +323,16 @@ export function SceneCanvas({
   };
 
   const onViewportPointerUp = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (templateDraftRef.current) {
+      const draft = templateDraftRef.current;
+      templateDraftRef.current = null;
+      setTemplateDraft(null);
+      if (templateKind) {
+        onTemplate({ kind: templateKind, size: templateSize, x: draft.x, y: draft.y, direction: draft.direction });
+      }
+      viewportRef.current?.releasePointerCapture(event.pointerId);
+      return;
+    }
     if (painting.current) {
       const painted = painting.current;
       painting.current = null;
@@ -353,11 +404,63 @@ export function SceneCanvas({
     : 0;
   const measureSquares = measureDistance / scene.gridSize;
   const measureFeet = Math.round(measureSquares * 5);
+  const shownTemplate: AoeTemplate | null =
+    templateDraft && templateKind
+      ? { kind: templateKind, size: templateSize, ...templateDraft }
+      : template;
+  const templateRadius = shownTemplate ? templateRadiusPx(shownTemplate.size, scene.gridSize) : 0;
+  const templateStroke = 2 / Math.max(zoom, 0.4);
+  const templateFill = templateDraft ? "rgba(240,217,168,0.2)" : "rgba(200,169,107,0.14)";
+  let templateShape: ReactElement | null = null;
+  if (shownTemplate) {
+    if (shownTemplate.kind === "burst" || shownTemplate.kind === "emanation") {
+      templateShape = (
+        <circle
+          cx={shownTemplate.x}
+          cy={shownTemplate.y}
+          r={templateRadius}
+          fill={templateFill}
+          stroke="#e5ca91"
+          strokeWidth={templateStroke}
+        />
+      );
+    } else if (shownTemplate.kind === "cone") {
+      const spread = Math.PI / 2;
+      const a1 = shownTemplate.direction - spread / 2;
+      const a2 = shownTemplate.direction + spread / 2;
+      const p1x = shownTemplate.x + Math.cos(a1) * templateRadius;
+      const p1y = shownTemplate.y + Math.sin(a1) * templateRadius;
+      const p2x = shownTemplate.x + Math.cos(a2) * templateRadius;
+      const p2y = shownTemplate.y + Math.sin(a2) * templateRadius;
+      templateShape = (
+        <path
+          d={`M ${shownTemplate.x} ${shownTemplate.y} L ${p1x} ${p1y} A ${templateRadius} ${templateRadius} 0 0 1 ${p2x} ${p2y} Z`}
+          fill={templateFill}
+          stroke="#e5ca91"
+          strokeWidth={templateStroke}
+        />
+      );
+    } else {
+      const half = scene.gridSize / 2;
+      const px = Math.cos(shownTemplate.direction + Math.PI / 2) * half;
+      const py = Math.sin(shownTemplate.direction + Math.PI / 2) * half;
+      const ex = shownTemplate.x + Math.cos(shownTemplate.direction) * templateRadius;
+      const ey = shownTemplate.y + Math.sin(shownTemplate.direction) * templateRadius;
+      templateShape = (
+        <polygon
+          points={`${shownTemplate.x + px},${shownTemplate.y + py} ${ex + px},${ey + py} ${ex - px},${ey - py} ${shownTemplate.x - px},${shownTemplate.y - py}`}
+          fill={templateFill}
+          stroke="#e5ca91"
+          strokeWidth={templateStroke}
+        />
+      );
+    }
+  }
 
   return (
     <div
       ref={viewportRef}
-      className={`scene-viewport ${fogBrush ? "is-fogging" : ""} ${measureMode ? "is-measuring" : ""}`}
+      className={`scene-viewport ${fogBrush ? "is-fogging" : ""} ${measureMode ? "is-measuring" : ""} ${templateKind ? "is-templating" : ""}`}
       onWheel={onWheel}
       onPointerDown={onViewportPointerDown}
       onPointerMove={onViewportPointerMove}
@@ -475,6 +578,20 @@ export function SceneCanvas({
             style={{ width: scene.width, height: scene.height }}
           />
         ) : null}
+        {shownTemplate ? (
+          <svg className="template-layer" width={scene.width} height={scene.height}>
+            {templateShape}
+            <text
+              x={shownTemplate.x + 8}
+              y={shownTemplate.y - 8}
+              fill="#f0d9a8"
+              fontSize={14 / Math.max(zoom, 0.4)}
+              fontWeight={600}
+            >
+              {templateLabel(shownTemplate)}
+            </text>
+          </svg>
+        ) : null}
         {measuring ? (
           <div
             className="measure-label"
@@ -494,7 +611,8 @@ export function SceneCanvas({
       <div className="scene-hints">
         {fogBrush ? <Tag tone="gold"><Move size={11} /> Painting fog ({brushSize === 1 ? "1" : brushSize === 3 ? "3×3" : "5×5"})</Tag> : null}
         {measureMode ? <Tag tone="gold"><Ruler size={11} /> Measuring</Tag> : null}
-        {!fogBrush && !measureMode ? <span>Drag to pan · wheel to zoom · right-click to ping</span> : null}
+        {templateKind ? <Tag tone="gold"><Move size={11} /> {TEMPLATE_LABELS[templateKind]} template · click and drag</Tag> : null}
+        {!fogBrush && !measureMode && !templateKind ? <span>Drag to pan · wheel to zoom · right-click to ping</span> : null}
       </div>
     </div>
   );

@@ -73,7 +73,9 @@ The target table size is one GM plus 4–10 players. That means the product shou
 
 ### Phase 5 — Table depth
 - Walls/doors and dynamic light.
-- Templates, auras, condition values/durations, multi-select, and a proper token context menu.
+- Area templates (burst, emanation, cone, line) with local GM overlays; shared/persistent templates remain.
+- Token conditions with values and round durations; turn-end decrement remains.
+- Auras, multi-select, and a proper token context menu.
 - Player-side group checks, combat-log filters, delay/ready actions.
 - Scene playlists and GM-only preview.
 

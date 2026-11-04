@@ -1744,6 +1744,7 @@
 }
 .scene-viewport.is-fogging { cursor: crosshair; }
 .scene-viewport.is-measuring { cursor: crosshair; }
+.scene-viewport.is-templating { cursor: crosshair; }
 .scene-surface { position: absolute; transform-origin: 0 0; user-select: none; }
 .scene-map-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill; pointer-events: none; }
 .scene-blank {
@@ -1828,6 +1829,7 @@
 .fog-canvas { position: absolute; left: 0; top: 0; z-index: 5; pointer-events: none; image-rendering: auto; }
 .fog-canvas.is-brush { pointer-events: auto; }
 .measure-layer { position: absolute; inset: 0; z-index: 6; pointer-events: none; overflow: visible; }
+.template-layer { position: absolute; inset: 0; z-index: 7; pointer-events: none; overflow: visible; }
 .measure-label {
   position: absolute;
   z-index: 7;

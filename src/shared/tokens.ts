@@ -1,10 +1,48 @@
-import type { Token } from "./types";
+import type { Token, TokenCondition } from "./types";
 
 export interface GroupHp {
   count: number;
   current: number;
   max: number;
   percent: number | null;
+}
+
+export function normalizeTokenCondition(value: unknown): TokenCondition | null {
+  if (typeof value === "string") {
+    const name = value.trim().slice(0, 60);
+    return name ? { name, value: null, duration: null } : null;
+  }
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const record = value as Record<string, unknown>;
+  const name = typeof record.name === "string" ? record.name.trim().slice(0, 60) : "";
+  if (!name) return null;
+  const numeric = (input: unknown): number | null =>
+    typeof input === "number" && Number.isFinite(input) ? Math.max(0, Math.round(input)) : null;
+  return {
+    name,
+    value: numeric(record.value),
+    duration: numeric(record.duration),
+  };
+}
+
+export function normalizeTokenConditions(value: unknown): TokenCondition[] {
+  if (!Array.isArray(value)) return [];
+  const conditions: TokenCondition[] = [];
+  for (const entry of value.slice(0, 20)) {
+    const condition = normalizeTokenCondition(entry);
+    if (condition) conditions.push(condition);
+  }
+  return conditions;
+}
+
+export function tokenConditionLabel(condition: TokenCondition): string {
+  const value = condition.value && condition.value > 0 ? ` ${condition.value}` : "";
+  const duration = condition.duration && condition.duration > 0 ? ` (${condition.duration}r)` : "";
+  return `${condition.name}${value}${duration}`;
+}
+
+export function tokenConditionSummary(conditions: TokenCondition[]): string {
+  return conditions.map(tokenConditionLabel).join(", ");
 }
 
 /**

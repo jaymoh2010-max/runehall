@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { groupHp } from "../src/shared/tokens";
+import {
+  groupHp,
+  normalizeTokenConditions,
+  tokenConditionLabel,
+} from "../src/shared/tokens";
 
 describe("token group HP", () => {
   it("sums current and maximum HP across members", () => {
@@ -37,5 +41,24 @@ describe("token group HP", () => {
       max: 20,
       percent: 50,
     });
+  });
+});
+
+describe("token conditions", () => {
+  it("normalizes legacy string conditions and structured values", () => {
+    expect(
+      normalizeTokenConditions(["Frightened", { name: "Clumsy", value: 2, duration: 3 }, null]),
+    ).toEqual([
+      { name: "Frightened", value: null, duration: null },
+      { name: "Clumsy", value: 2, duration: 3 },
+    ]);
+  });
+
+  it("formats condition values and durations", () => {
+    expect(tokenConditionLabel({ name: "Frightened", value: 2, duration: 3 })).toBe(
+      "Frightened 2 (3r)",
+    );
+    expect(tokenConditionLabel({ name: "Prone" })).toBe("Prone");
+    expect(tokenConditionLabel({ name: "Clumsy", value: 0, duration: null })).toBe("Clumsy");
   });
 });

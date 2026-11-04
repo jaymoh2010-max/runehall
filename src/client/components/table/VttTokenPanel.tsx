@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Dices, EyeOff, Lock, Minus, MousePointer2, Plus, Swords, Trash2, X } from "lucide-react";
 import type { CharacterRecord, PublicUser, Scene, Token } from "../../../shared/types";
-import { groupHp } from "../../../shared/tokens";
+import { groupHp, tokenConditionLabel } from "../../../shared/tokens";
 import { Avatar, Badge, Button, Field, IconButton, Input, ProgressBar, Select, Stat, Tag, Toggle } from "../ui";
 
 export function VttTokenPanel({
@@ -233,7 +233,7 @@ export function VttTokenPanel({
           )}
           {selectedToken.conditions.length ? (
             <div className="chip-row" style={{ marginTop: 10 }}>
-              {selectedToken.conditions.map((condition) => <Tag key={condition} tone="red">{condition}</Tag>)}
+              {selectedToken.conditions.map((condition) => <Tag key={condition.name} tone="red">{tokenConditionLabel(condition)}</Tag>)}
             </div>
           ) : null}
         </div>

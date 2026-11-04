@@ -57,6 +57,7 @@ import { VttToolbar } from "./VttToolbar";
 import { VttTokenPanel } from "./VttTokenPanel";
 import { BestiaryPalette } from "./BestiaryPalette";
 import { useCampaignTable } from "./useCampaignTable";
+import type { AoeTemplate, TemplateKind } from "../../../shared/templates";
 
 interface VttTableProps {
   initial: CampaignTable;
@@ -93,6 +94,9 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
   const [editingScene, setEditingScene] = useState<Scene | null>(null);
   const [addTokenOpen, setAddTokenOpen] = useState(false);
   const [bestiaryOpen, setBestiaryOpen] = useState(false);
+  const [templateKind, setTemplateKind] = useState<TemplateKind | null>(null);
+  const [templateSize, setTemplateSize] = useState(20);
+  const [template, setTemplate] = useState<AoeTemplate | null>(null);
   const [leftOpen, setLeftOpen] = useState(true);
   const [rightOpen, setRightOpen] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -135,6 +139,10 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
   );
   const selectedToken = sceneTokens.find((token) => token.id === selectedTokenId) ?? null;
   const editingToken = tokens.find((token) => token.id === editingTokenId) ?? null;
+
+  useEffect(() => {
+    setTemplate(null);
+  }, [activeSceneId]);
 
   // ---- Realtime -----------------------------------------------------------
   useEffect(() => {
@@ -355,6 +363,8 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
         setMeasureMode(false);
         setSelectedTokenId(null);
         setTheaterMode(false);
+        setTemplate(null);
+        setTemplateKind(null);
         return;
       }
       if (key === "f") {
@@ -366,6 +376,13 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
         event.preventDefault();
         setMeasureMode((current) => !current);
         setFogBrush(null);
+        return;
+      }
+      if (key === "a" && isGm) {
+        event.preventDefault();
+        setTemplateKind((current) => (current ? null : "burst"));
+        setFogBrush(null);
+        setMeasureMode(false);
         return;
       }
       if (key === "c") {
@@ -480,6 +497,12 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
         setAddTokenOpen={setAddTokenOpen}
         bestiaryOpen={bestiaryOpen}
         setBestiaryOpen={setBestiaryOpen}
+        templateKind={templateKind}
+        setTemplateKind={setTemplateKind}
+        templateSize={templateSize}
+        setTemplateSize={setTemplateSize}
+        hasTemplate={Boolean(template)}
+        onClearTemplate={() => setTemplate(null)}
         connectionStatus={connectionStatus}
         presence={presence}
         leftOpen={leftOpen}
@@ -542,6 +565,10 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
             onPing={(x, y) => getSocket().emit("pointer", { campaignId, sceneId: activeScene.id, x, y })}
             remotePointer={remotePointer}
             onDropMonster={placeMonster}
+            templateKind={templateKind}
+            templateSize={templateSize}
+            template={template}
+            onTemplate={setTemplate}
           />
           {isGm && bestiaryOpen ? (
             <BestiaryPalette

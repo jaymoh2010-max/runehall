@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ImagePlus, Minus, Plus, Shield, Swords, Trash2, Upload, UserRound } from "lucide-react";
-import type { CampaignMember, CharacterRecord, Token } from "../../../shared/types";
+import type { CampaignMember, CharacterRecord, Token, TokenCondition } from "../../../shared/types";
+import { tokenConditionLabel } from "../../../shared/tokens";
 import { uploadImage } from "../../api";
 import { errorMessage, useToasts } from "../../stores";
 import { Avatar, Button, Field, Input, Modal, Select, Tag, Toggle } from "../ui";
@@ -38,8 +39,10 @@ export function TokenEditModal({
   const [ownerId, setOwnerId] = useState("");
   const [hidden, setHidden] = useState(false);
   const [locked, setLocked] = useState(false);
-  const [conditions, setConditions] = useState<string[]>([]);
+  const [conditions, setConditions] = useState<TokenCondition[]>([]);
   const [conditionInput, setConditionInput] = useState("");
+  const [conditionValue, setConditionValue] = useState("");
+  const [conditionDuration, setConditionDuration] = useState("");
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
 
@@ -55,8 +58,10 @@ export function TokenEditModal({
     setOwnerId(token.ownerId ?? "");
     setHidden(token.hidden);
     setLocked(token.locked);
-    setConditions([...token.conditions]);
+    setConditions(token.conditions.map((condition) => ({ ...condition })));
     setConditionInput("");
+    setConditionValue("");
+    setConditionDuration("");
     setError("");
   }, [open, token?.id]);
 
@@ -79,10 +84,19 @@ export function TokenEditModal({
   };
 
   const addCondition = () => {
-    const value = conditionInput.trim();
-    if (!value) return;
-    setConditions((current) => (current.includes(value) ? current : [...current, value]));
+    const name = conditionInput.trim();
+    if (!name) return;
+    const value = conditionValue === "" ? null : Math.max(0, Math.round(Number(conditionValue)));
+    const duration =
+      conditionDuration === "" ? null : Math.max(0, Math.round(Number(conditionDuration)));
+    setConditions((current) =>
+      current.some((condition) => condition.name.toLowerCase() === name.toLowerCase())
+        ? current
+        : [...current, { name, value, duration }],
+    );
     setConditionInput("");
+    setConditionValue("");
+    setConditionDuration("");
   };
 
   const save = () => {
@@ -229,28 +243,54 @@ export function TokenEditModal({
           <div className="token-conditions-editor">
             <div className="row-between">
               <span className="field-label">Conditions</span>
-              <span className="tiny muted">Include a value, e.g. “Frightened 2”</span>
+              <span className="tiny muted">Value and duration are optional</span>
             </div>
             <div className="chip-row">
-              {conditions.map((condition) => (
-                <Tag key={condition} tone="red">
-                  {condition}
-                  <button type="button" className="tag-remove" onClick={() => setConditions((current) => current.filter((entry) => entry !== condition))}>×</button>
+              {conditions.map((condition, index) => (
+                <Tag key={`${condition.name}-${index}`} tone="red">
+                  {tokenConditionLabel(condition)}
+                  <button
+                    type="button"
+                    className="tag-remove"
+                    onClick={() => setConditions((current) => current.filter((_, i) => i !== index))}
+                  >
+                    ×
+                  </button>
                 </Tag>
               ))}
               {!conditions.length ? <span className="tiny muted">No active conditions.</span> : null}
             </div>
-            <div className="row" style={{ marginTop: 7 }}>
+            <div className="row" style={{ marginTop: 7, gap: 6 }}>
               <Input
                 value={conditionInput}
                 onChange={(event) => setConditionInput(event.target.value)}
-                placeholder="e.g. Frightened 2"
+                placeholder="Condition"
                 onKeyDown={(event) => {
                   if (event.key === "Enter") {
                     event.preventDefault();
                     addCondition();
                   }
                 }}
+              />
+              <Input
+                type="number"
+                min={0}
+                max={99}
+                value={conditionValue}
+                onChange={(event) => setConditionValue(event.target.value)}
+                placeholder="Value"
+                style={{ maxWidth: 78 }}
+                title="Condition value, e.g. 2 for Frightened 2"
+              />
+              <Input
+                type="number"
+                min={0}
+                max={999}
+                value={conditionDuration}
+                onChange={(event) => setConditionDuration(event.target.value)}
+                placeholder="Rounds"
+                style={{ maxWidth: 84 }}
+                title="Remaining duration in rounds"
               />
               <Button size="sm" icon={<Plus size={13} />} onClick={addCondition}>Add</Button>
             </div>

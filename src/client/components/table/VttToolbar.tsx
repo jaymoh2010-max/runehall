@@ -11,8 +11,10 @@ import {
   Plus,
   Ruler,
   Users,
+  X,
 } from "lucide-react";
 import type { PresenceUser, Scene } from "../../../shared/types";
+import { TEMPLATE_LABELS, TEMPLATE_SIZES, type TemplateKind } from "../../../shared/templates";
 import { Avatar, Button, IconButton, Select } from "../ui";
 
 export function VttToolbar({
@@ -31,6 +33,12 @@ export function VttToolbar({
   setAddTokenOpen,
   bestiaryOpen,
   setBestiaryOpen,
+  templateKind,
+  setTemplateKind,
+  templateSize,
+  setTemplateSize,
+  hasTemplate,
+  onClearTemplate,
   connectionStatus,
   presence,
   leftOpen,
@@ -56,6 +64,12 @@ export function VttToolbar({
   setAddTokenOpen: (open: boolean) => void;
   bestiaryOpen: boolean;
   setBestiaryOpen: (open: boolean | ((current: boolean) => boolean)) => void;
+  templateKind: TemplateKind | null;
+  setTemplateKind: (kind: TemplateKind | null) => void;
+  templateSize: number;
+  setTemplateSize: (size: number) => void;
+  hasTemplate: boolean;
+  onClearTemplate: () => void;
   connectionStatus: "connecting" | "online" | "offline";
   presence: PresenceUser[];
   leftOpen: boolean;
@@ -119,6 +133,32 @@ export function VttToolbar({
             >
               Bestiary
             </Button>
+            <Select
+              value={templateKind ?? ""}
+              onChange={(event) => setTemplateKind((event.target.value || null) as TemplateKind | null)}
+              className="template-select"
+              title="Area template"
+            >
+              <option value="">Template</option>
+              {(Object.keys(TEMPLATE_LABELS) as TemplateKind[]).map((kind) => (
+                <option key={kind} value={kind}>{TEMPLATE_LABELS[kind]}</option>
+              ))}
+            </Select>
+            {templateKind ? (
+              <Select
+                value={templateSize}
+                onChange={(event) => setTemplateSize(Number(event.target.value))}
+                className="brush-select"
+                title="Template size"
+              >
+                {TEMPLATE_SIZES.map((size) => <option key={size} value={size}>{size} ft.</option>)}
+              </Select>
+            ) : null}
+            {hasTemplate ? (
+              <Button size="sm" variant="ghost" icon={<X size={14} />} onClick={onClearTemplate} title="Clear area template">
+                Clear
+              </Button>
+            ) : null}
           </>
         ) : null}
         <Button
@@ -175,7 +215,7 @@ export function VttToolbar({
           label="Keyboard shortcuts"
           onClick={() =>
             toast(
-              "Shortcuts: R reveal · H hide · M measure · T token · E edit · I initiative · ←/→ turn · F full screen · C chat · P party · Esc clear",
+              "Shortcuts: R reveal · H hide · M measure · A area · T token · E edit · I initiative · ←/→ turn · F full screen · C chat · P party · Esc clear",
               "info",
             )
           }
