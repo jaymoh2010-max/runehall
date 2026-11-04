@@ -33,6 +33,7 @@ The target table size is one GM plus 4–10 players. That means the product shou
 - Class choice groups (doctrines, bloodlines, rackets, schools, instincts, etc.) driven by Foundry choice tags.
 - Autosave, export/import, at-the-table sheet, local and campaign rolls.
 - Known gaps: complex/story prerequisites, all feat/item effects, companions, and exact split-caster casting restrictions.
+- Feat and equipment pickers now show conservative automation badges, and level-1 fighter/wizard/rogue golden fixtures pin the derived math.
 
 ### Phase 2 — Shared table (built, with known gaps)
 - Scene upload, grid sizing, pan/zoom/fit, token drag/snap, hidden/locked/owned tokens.

@@ -327,12 +327,13 @@ Acceptance: a GM can prepare a full session in Runehall and start it with one â€
 
 **Goal:** make the sheetâ€™s numbers and the level-up path trustworthy.
 
-- [ ] **Automation coverage registry**
-  - Label every feat/item/subclass as full, partial, or manual automation.
-  - Surface the label in pickers and on the sheet.
-- [ ] **Golden-sheet regression fixtures**
-  - Representative classes at levels 1, 5, 10, 15, and 20.
-  - Expected HP, AC, saves, perception, skills, attacks, DCs, and slots.
+- [x] **Automation coverage labels**
+  - Conservative `full` / `partial` / `manual` labels for feats and equipment.
+  - Labels are shown in the feat and equipment pickers with a legend explaining manual tracking.
+  - Feat labels are text-based until a curated override list grows; equipment labels distinguish base gear from magic and other items.
+- [x] **Golden-sheet regression fixtures**
+  - Level-1 fighter, wizard, and rogue fixtures pin abilities, HP, AC, saves, perception, DCs, attacks, and key skills.
+  - Build legality remains covered separately by the existing rules tests.
 - [ ] **Guided level-up wizard**
   - Step-by-step choices, before/after diff, prerequisite explanations, and validation.
 - [ ] **Casting presentation**

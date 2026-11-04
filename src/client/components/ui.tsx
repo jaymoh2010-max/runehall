@@ -9,6 +9,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { Loader2, X } from "lucide-react";
+import { AUTOMATION_HINTS, AUTOMATION_LABELS, type AutomationLevel } from "../../shared/automation";
 
 // ---------------------------------------------------------------------------
 // Buttons
@@ -94,6 +95,15 @@ export function Tag({
 export function RarityTag({ rarity }: { rarity: string }) {
   const tone = rarity === "rare" || rarity === "unique" ? "violet" : rarity === "uncommon" ? "blue" : "neutral";
   return <Tag tone={tone}>{rarity}</Tag>;
+}
+
+export function AutomationTag({ level }: { level: AutomationLevel }) {
+  const tone = level === "full" ? "green" : level === "partial" ? "gold" : "neutral";
+  return (
+    <Tag tone={tone} title={AUTOMATION_HINTS[level]}>
+      {AUTOMATION_LABELS[level]}
+    </Tag>
+  );
 }
 
 // ---------------------------------------------------------------------------

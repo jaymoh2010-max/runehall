@@ -20,10 +20,12 @@ import type {
   Spell,
 } from "../../../shared/types";
 import { isCoreSource } from "../../../shared/content";
+import { automationForEquipment, automationForFeat } from "../../../shared/automation";
 import { ContentSourceToggle, ContentTierTag } from "./ContentSourceToggle";
 import { api } from "../../api";
 import { errorMessage, useToasts } from "../../stores";
 import {
+  AutomationTag,
   Badge,
   Button,
   Field,
@@ -282,6 +284,9 @@ export function FeatPicker({
                 Expanded sources can include options with effects that need manual tracking.
               </p>
             ) : null}
+            <p className="tiny muted picker-prereq-note">
+              Automation badges are conservative. Manual means Runehall does not apply that effect for you.
+            </p>
             {hiddenCount ? (
               <p className="tiny muted picker-prereq-note">
                 {hiddenCount} feat{hiddenCount === 1 ? "" : "s"} hidden because prerequisites are not met.
@@ -304,6 +309,7 @@ export function FeatPicker({
                   </span>
                 </div>
                 <div className="picker-item-tags">
+                  <AutomationTag level={automationForFeat(feat).level} />
                   {feat.rarity !== "common" ? <RarityTag rarity={feat.rarity} /> : null}
                   {statusById[feat.id]?.status === "unknown" ? <Tag tone="gold">Check prereqs</Tag> : null}
                   {feat.traits.slice(0, 3).map((trait) => (
@@ -339,6 +345,7 @@ export function FeatPicker({
                 <div className="chip-row">
                   <ContentTierTag source={selected.source} />
                   <RarityTag rarity={selected.rarity} />
+                  <AutomationTag level={automationForFeat(selected).level} />
                 </div>
               </div>
               <div className="chip-row" style={{ marginBottom: 12 }}>
@@ -525,6 +532,9 @@ export function SpellPicker({
                 Expanded sources can include options with effects that need manual tracking.
               </p>
             ) : null}
+            <p className="tiny muted picker-prereq-note">
+              Automation badges are conservative. Manual means Runehall does not apply that effect for you.
+            </p>
             {filtered.map((spell) => (
               <button
                 type="button"
@@ -722,6 +732,9 @@ export function EquipmentPicker({
                 Expanded sources can include options with effects that need manual tracking.
               </p>
             ) : null}
+            <p className="tiny muted picker-prereq-note">
+              Automation badges are conservative. Manual means Runehall does not apply that effect for you.
+            </p>
             {items.map((item) => (
               <button
                 type="button"
@@ -737,6 +750,7 @@ export function EquipmentPicker({
                   </span>
                 </div>
                 <div className="picker-item-tags">
+                  <AutomationTag level={automationForEquipment(item).level} />
                   {item.rarity !== "common" ? <RarityTag rarity={item.rarity} /> : null}
                   {item.traits.slice(0, 3).map((trait) => (
                     <Tag key={trait}>{trait}</Tag>
@@ -766,6 +780,7 @@ export function EquipmentPicker({
                 <div className="chip-row">
                   <ContentTierTag source={selected.source} />
                   <RarityTag rarity={selected.rarity} />
+                  <AutomationTag level={automationForEquipment(selected).level} />
                 </div>
               </div>
               <div className="chip-row" style={{ marginBottom: 12 }}>
