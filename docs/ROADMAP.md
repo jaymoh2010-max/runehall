@@ -12,7 +12,7 @@
 
 ### What is still prototype-level
 - **Rules automation is partial.** Feat prerequisites are enforced for mechanical requirements, while complex/story prerequisites are flagged for review; some subclass/feature/item effects are manual; companions and split-caster casting restrictions are not automated. This can make a sheet look correct while missing situational bonuses.
-- **Realtime recovery works by snapshot, but ordering is not versioned.** On reconnect the client refetches the table; there is still no per-campaign revision number, so rapid concurrent events can arrive out of order or be missed while connected, and character autosave has no conflict detection.
+- **Realtime recovery is revision-aware.** Reconnects refetch the authoritative table, campaign revisions detect missed events, and character saves reject stale writes. The remaining risk is that the table socket/state layer is still embedded in `VttTable` and not independently tested.
 - **Table polish is thin around tokens and scenes.** No AoE templates, condition values/durations, multi-select, scene playlists, walls, lighting, or robust grid calibration beyond the current first pass.
 - **Content volume needs curation.** The builder exposes 540 backgrounds and 29 classes by default. That is impressive, but overwhelming; not every option has the same automation quality.
 - **Test coverage is unit + smoke + simulation.** Dice, rules math, compendium integrity, content tiers, security, and migrations are unit-tested; the GM/player campaign flow and registration/admin flows have an automated smoke test. Browser-level E2E and upload edge cases still rely on manual checks.
@@ -298,22 +298,25 @@ Acceptance: a GM can prepare a full session in Runehall and start it with one �
 
 **Goal:** trust the table through disconnects, reconnects, and concurrent edits.
 
-- [ ] **Versioned campaign state**
-  - Add a per-campaign monotonic `revision` counter, bumped on every persisted table mutation.
-  - Include the revision in REST snapshots and socket events.
-  - Client ignores stale/duplicate events and refetches when it detects a gap.
-- [ ] **Character conflict detection**
-  - Save the character `updated_at` or a draft revision with each autosave.
-  - Reject a stale save with a clear “someone else changed this sheet” path.
+- [x] **Versioned campaign state**
+  - Per-campaign monotonic `revision` counter, bumped on every persisted table mutation through `touchCampaign`/`bumpCampaign`.
+  - REST snapshots return the revision; socket clients receive `campaign:revision`.
+  - The table ignores stale revisions and refetches the snapshot when it detects a gap.
+- [x] **Character conflict detection**
+  - Characters carry an optimistic `revision`.
+  - Saves may include `expectedRevision`; stale writes return `409` with the current server draft.
+  - Builder and sheet show a conflict dialog with **Reload their version** and **Keep my changes**.
 - [ ] **Extract the table socket/state layer**
   - Move `VttTable` socket handlers and reducer-style state into a testable hook.
   - Add unit tests for token, fog, initiative, and chat event application.
-- [ ] **Reconnect test**
-  - Two clients, one forced disconnect, concurrent token/initiative changes, then reconnect and converge.
-- [ ] **Upload hardening**
-  - Verify image magic bytes, not just MIME, and cap pixel dimensions.
-- [ ] **Readiness health check**
-  - `/api/health` reports SQLite and compendium readiness, not just `ok`.
+- [x] **Reconnect test**
+  - The smoke test disconnects a player, mutates the token as the GM, reconnects, and verifies the snapshot position and revision advanced.
+  - A pure `revisionAction` helper is unit-tested for stale, next, and gap cases.
+- [x] **Upload hardening**
+  - Image signatures are checked against the declared MIME type before a file is accepted.
+  - PNG/GIF/JPEG/WebP dimensions are validated against a 12,000 px / 100 MP ceiling.
+- [x] **Readiness health check**
+  - `/api/health` now reports database and compendium readiness plus counts, and returns `503` when either is unavailable.
 
 **Acceptance:** a forced disconnect and concurrent edits converge on both clients with no stale HP, token, fog, or initiative.
 

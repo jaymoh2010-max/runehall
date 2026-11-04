@@ -17,7 +17,7 @@ import {
 } from "../../shared/content";
 import { contextForDraft } from "../compendium";
 import { db, type TokenRow } from "../db";
-import { serializeCharacter, serializeToken } from "../serialize";
+import { serializeCharacter, serializeToken, touchCampaign } from "../serialize";
 import { newId, now, parseJson, safeString } from "../util";
 
 function parseDraft(raw: unknown, fallbackName = "New Hero"): CharacterDraft {
@@ -130,6 +130,21 @@ export async function registerCharacterRoutes(app: FastifyInstance): Promise<voi
       return reply.code(403).send({ error: "You can't edit that character." });
     }
     const body = (request.body ?? {}) as Record<string, unknown>;
+    const expectedRevision =
+      typeof body.expectedRevision === "number" && Number.isFinite(body.expectedRevision)
+        ? Math.round(body.expectedRevision)
+        : null;
+    const force = body.force === true;
+    if (!force && expectedRevision !== null && Number(row.revision) !== expectedRevision) {
+      const owner = getUser(row.user_id);
+      return reply.code(409).send({
+        error: "This character changed somewhere else. Reload before saving.",
+        character: serializeCharacter(row, owner?.display_name ?? "", {
+          canEdit: true,
+          canView: true,
+        }),
+      });
+    }
     const draft = parseDraft(body.data, row.name);
     if (row.campaign_id) {
       const campaign = getCampaign(row.campaign_id);
@@ -140,13 +155,30 @@ export async function registerCharacterRoutes(app: FastifyInstance): Promise<voi
       }
     }
     const summary = summarize(draft);
-    db.prepare("UPDATE characters SET name = ?, data = ?, summary = ?, updated_at = ? WHERE id = ?").run(
-      draft.name,
-      JSON.stringify(draft),
-      JSON.stringify(summary),
-      now(),
-      id,
-    );
+    const updatedAt = now();
+    const update =
+      !force && expectedRevision !== null
+        ? db
+            .prepare(
+              "UPDATE characters SET name = ?, data = ?, summary = ?, updated_at = ?, revision = revision + 1 WHERE id = ? AND revision = ?",
+            )
+            .run(draft.name, JSON.stringify(draft), JSON.stringify(summary), updatedAt, id, expectedRevision)
+        : db
+            .prepare(
+              "UPDATE characters SET name = ?, data = ?, summary = ?, updated_at = ?, revision = revision + 1 WHERE id = ?",
+            )
+            .run(draft.name, JSON.stringify(draft), JSON.stringify(summary), updatedAt, id);
+    if (Number(update.changes ?? 0) === 0 && !force && expectedRevision !== null) {
+      const current = getCharacter(id) ?? row;
+      const owner = getUser(current.user_id);
+      return reply.code(409).send({
+        error: "This character changed somewhere else. Reload before saving.",
+        character: serializeCharacter(current, owner?.display_name ?? "", {
+          canEdit: true,
+          canView: true,
+        }),
+      });
+    }
     const updated = getCharacter(id);
     const owner = getUser(updated!.user_id);
     if (row.campaign_id) {
@@ -171,6 +203,7 @@ export async function registerCharacterRoutes(app: FastifyInstance): Promise<voi
         summary,
         name: draft.name,
       });
+      touchCampaign(row.campaign_id);
     }
     return reply.send({
       character: serializeCharacter(updated!, owner?.display_name ?? "", {

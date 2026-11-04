@@ -62,6 +62,7 @@ import { AddTokenModal, SceneEditModal, SceneManagerModal } from "./TableModals"
 import { VttToolbar } from "./VttToolbar";
 import { VttTokenPanel } from "./VttTokenPanel";
 import { BestiaryPalette } from "./BestiaryPalette";
+import { revisionAction } from "../../../shared/revisions";
 
 interface VttTableProps {
   initial: CampaignTable;
@@ -80,6 +81,8 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
   const [initiative, setInitiative] = useState<InitiativeEntry[]>(initial.initiative);
   const [round, setRound] = useState(initial.round);
   const [turnIndex, setTurnIndex] = useState(initial.turnIndex);
+  const revisionRef = useRef(initial.revision);
+  const refreshingRef = useRef(false);
   const [presence, setPresence] = useState<PresenceUser[]>([]);
   const [selectedTokenId, setSelectedTokenId] = useState<string | null>(null);
   const [editingTokenId, setEditingTokenId] = useState<string | null>(null);
@@ -111,6 +114,7 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
       setInitiative(snapshot.initiative);
       setRound(snapshot.round);
       setTurnIndex(snapshot.turnIndex);
+      revisionRef.current = snapshot.revision;
       setMessages((current) => {
         const merged = new globalThis.Map(current.map((message) => [message.id, message]));
         for (const message of snapshot.messages) merged.set(message.id, message);
@@ -271,6 +275,20 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
           : [...current, payload.character],
       );
     };
+    const onRevision = ({ revision }: { revision: number }) => {
+      const action = revisionAction(revisionRef.current, revision);
+      if (action === "ignore") return;
+      if (action === "apply") {
+        revisionRef.current = revision;
+        return;
+      }
+      if (!refreshingRef.current) {
+        refreshingRef.current = true;
+        void refreshTable().finally(() => {
+          refreshingRef.current = false;
+        });
+      }
+    };
     const onError = (payload: { message: string }) => toast(payload.message, "error");
 
     socket.on("presence:update", onPresence);
@@ -288,6 +306,7 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
     socket.on("pointer:show", onPointer);
     socket.on("character:updated", onCharacterUpdated);
     socket.on("character:created", onCharacterCreated);
+    socket.on("campaign:revision", onRevision);
     socket.on("error:toast", onError);
 
     return () => {
@@ -310,6 +329,7 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
       socket.off("pointer:show", onPointer);
       socket.off("character:updated", onCharacterUpdated);
       socket.off("character:created", onCharacterCreated);
+      socket.off("campaign:revision", onRevision);
       socket.off("error:toast", onError);
       if (joined.current) socket.emit("campaign:leave", { campaignId });
       if (pointerTimer.current) window.clearTimeout(pointerTimer.current);

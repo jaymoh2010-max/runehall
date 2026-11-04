@@ -239,7 +239,7 @@ export async function registerLootRoutes(app: FastifyInstance): Promise<void> {
     const ts = now();
 
     const updatedTokens = transaction(() => {
-      db.prepare("UPDATE characters SET data = ?, summary = ?, updated_at = ? WHERE id = ?").run(
+      db.prepare("UPDATE characters SET data = ?, summary = ?, updated_at = ?, revision = revision + 1 WHERE id = ?").run(
         JSON.stringify(draft),
         JSON.stringify(summary),
         ts,

@@ -1,8 +1,10 @@
 export class ApiError extends Error {
   status: number;
-  constructor(message: string, status = 500) {
+  payload: unknown;
+  constructor(message: string, status = 500, payload: unknown = null) {
     super(message);
     this.status = status;
+    this.payload = payload;
     this.name = "ApiError";
   }
 }
@@ -40,7 +42,7 @@ export async function api<T>(path: string, options: ApiOptions = {}): Promise<T>
       payload && typeof payload === "object" && "error" in payload
         ? String((payload as { error: unknown }).error)
         : `Request failed (${response.status}).`;
-    throw new ApiError(message, response.status);
+    throw new ApiError(message, response.status, payload);
   }
   return payload as T;
 }

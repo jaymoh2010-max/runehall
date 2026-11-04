@@ -21,6 +21,9 @@ import { registerSystemRoutes } from "./routes/system";
 import { registerTableRoutes } from "./routes/table";
 import { registerUploadRoutes } from "./routes/uploads";
 import { registerSecurity } from "./security";
+import { setRevisionBroadcaster } from "./revisions";
+import { compendiumCounts } from "./compendium";
+import { db } from "./db";
 import { registerSocketServer, type TypedServer } from "./socket";
 import { uploadsDir } from "./util";
 
@@ -71,6 +74,10 @@ app.decorate(
   },
 );
 
+setRevisionBroadcaster((campaignId, revision) => {
+  app.broadcastCampaign(campaignId, "campaign:revision", { revision });
+});
+
 await app.register(cookie);
 await app.register(multipart, {
   limits: { fileSize: 15 * 1024 * 1024, files: 1, fields: 10 },
@@ -82,11 +89,24 @@ app.addHook("preHandler", async (request) => {
   attachUser(request);
 });
 
-app.get("/api/health", async () => ({
-  ok: true,
-  name: "Runehall",
-  time: Date.now(),
-}));
+app.get("/api/health", async (_request, reply) => {
+  let database: "ok" | "error" = "ok";
+  try {
+    db.prepare("SELECT 1").get();
+  } catch {
+    database = "error";
+  }
+  const compendiumReady = compendiumCounts.feats > 0 && compendiumCounts.monsters > 0;
+  const ok = database === "ok" && compendiumReady;
+  return reply.code(ok ? 200 : 503).send({
+    ok,
+    name: "Runehall",
+    time: Date.now(),
+    database,
+    compendium: compendiumReady ? "ok" : "missing",
+    counts: { feats: compendiumCounts.feats, monsters: compendiumCounts.monsters },
+  });
+});
 
 await registerAuthRoutes(app);
 await registerAdminRoutes(app);

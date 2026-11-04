@@ -316,6 +316,40 @@ async function main() {
   if (!playerCharacter) throw new Error("Player character missing from GM table snapshot");
   log("GM table snapshot contains the player's character");
 
+  if (typeof table.payload.revision !== "number") {
+    throw new Error("Table snapshot did not include a campaign revision");
+  }
+  const saveBase = playerCharacter;
+  const savedSheet = await api(`/api/characters/${character.id}`, {
+    method: "PUT",
+    cookie: playerCookie,
+    body: { data: saveBase.data, expectedRevision: saveBase.revision },
+  });
+  if (savedSheet.payload.character.revision !== saveBase.revision + 1) {
+    throw new Error("Character revision did not increment after a save");
+  }
+  const staleSave = await fetch(`${base}/api/characters/${character.id}`, {
+    method: "PUT",
+    headers: { "content-type": "application/json", cookie: playerCookie },
+    body: JSON.stringify({ data: saveBase.data, expectedRevision: saveBase.revision }),
+  });
+  if (staleSave.status !== 409) {
+    throw new Error(`A stale character save was not rejected (${staleSave.status})`);
+  }
+  const forcedSave = await api(`/api/characters/${character.id}`, {
+    method: "PUT",
+    cookie: playerCookie,
+    body: { data: saveBase.data, force: true },
+  });
+  if (!forcedSave.payload.character.revision) {
+    throw new Error("Forced character overwrite did not return a revision");
+  }
+  const revisedTable = await api(`/api/campaigns/${campaign.id}/table`, { cookie: gmCookie });
+  if (revisedTable.payload.revision <= table.payload.revision) {
+    throw new Error("Campaign revision did not advance after a character save");
+  }
+  log("character saves use optimistic revisions and reject stale writes");
+
   const exported = await api(`/api/campaigns/${campaign.id}/export`, { cookie: gmCookie });
   if (exported.payload.format !== "runehall-campaign" || !exported.payload.characters?.length) {
     throw new Error("Campaign export did not contain the expected data");
@@ -542,6 +576,11 @@ async function main() {
     },
   });
   if (!token) throw new Error("GM could not create a character token");
+  const revisionPromise = waitForEvent(
+    gmSocket,
+    "campaign:revision",
+    (payload) => typeof payload.revision === "number",
+  );
   playerSocket.emit("token:move", {
     campaignId: campaign.id,
     sceneId: scene.id,
@@ -550,6 +589,10 @@ async function main() {
     y: 180,
   });
   await movedPromise;
+  const revisionEvent = await revisionPromise;
+  if (revisionEvent.revision <= revisedTable.payload.revision) {
+    throw new Error("Campaign revision did not advance for a token move");
+  }
   log("player moved their own token and GM received the update");
 
   const chatPromise = waitForEvent(
@@ -677,6 +720,35 @@ async function main() {
     throw new Error("Grouped monsters did not share one initiative entry");
   }
   log("monster groups shared one initiative roll");
+
+  const beforeReconnect = await api(`/api/campaigns/${campaign.id}/table`, { cookie: playerCookie });
+  playerSocket.disconnect();
+  await delay(150);
+  const offlineMove = waitForEvent(
+    gmSocket,
+    "token:moved",
+    (event) => event.tokenId === token.id && event.x === 420 && event.y === 360,
+  );
+  gmSocket.emit("token:move", {
+    campaignId: campaign.id,
+    sceneId: scene.id,
+    tokenId: token.id,
+    x: 420,
+    y: 360,
+  });
+  await offlineMove;
+  const reconnectedPlayer = await connectSocket(playerCookie);
+  await emitAck(reconnectedPlayer, "campaign:join", { campaignId: campaign.id });
+  const reconnectedTable = await api(`/api/campaigns/${campaign.id}/table`, { cookie: playerCookie });
+  const reconnectedToken = reconnectedTable.payload.tokens.find((entry) => entry.id === token.id);
+  if (!reconnectedToken || reconnectedToken.x !== 420 || reconnectedToken.y !== 360) {
+    throw new Error("Reconnected client did not receive the authoritative token position");
+  }
+  if (reconnectedTable.payload.revision <= beforeReconnect.payload.revision) {
+    throw new Error("Reconnect snapshot did not advance the campaign revision");
+  }
+  reconnectedPlayer.close();
+  log("disconnected client caught up from the authoritative snapshot");
 
   gmSocket.close();
   playerSocket.close();

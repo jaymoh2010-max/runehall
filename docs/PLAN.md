@@ -60,11 +60,13 @@ The target table size is one GM plus 4–10 players. That means the product shou
 - Campaign import with ID remapping and player-account matching, plus a dry-run-first unused-asset cleanup command.
 - Next: optional automatic XP tracking, scene playlists, and hosting hardening.
 
-### Phase 4 — Reliability and trust (next)
-- Per-campaign revisions, stale-event rejection, and reconnect convergence.
-- Character autosave conflict detection.
-- Extracted, tested table socket/state layer.
-- Upload magic-byte validation and a readiness health check.
+### Phase 4 — Reliability and trust (in progress)
+- [x] Per-campaign revisions, `campaign:revision` socket events, gap detection, and reconnect snapshot refresh.
+- [x] Character autosave optimistic revisions with a conflict dialog.
+- [x] Upload magic-byte validation and image dimension limits.
+- [x] Readiness health check for SQLite and compendium.
+- [ ] Extracted, tested table socket/state layer.
+- [ ] Forced-disconnect reconnect convergence test.
 
 ### Phase 5 — Table depth
 - Walls/doors and dynamic light.

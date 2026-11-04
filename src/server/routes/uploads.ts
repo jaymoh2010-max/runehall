@@ -4,6 +4,7 @@ import path from "node:path";
 import { pipeline } from "node:stream/promises";
 import type { FastifyInstance } from "fastify";
 import { uploadsDir } from "../util";
+import { inspectImage } from "../imageMeta";
 import crypto from "node:crypto";
 
 const MIME_EXT: Record<string, string> = {
@@ -13,6 +14,9 @@ const MIME_EXT: Record<string, string> = {
   "image/gif": ".gif",
   "image/avif": ".avif",
 };
+const MAX_DIMENSION = 12_000;
+const MAX_PIXELS = 100_000_000;
+const MAX_HEADER_BYTES = 2 * 1024 * 1024;
 
 export async function registerUploadRoutes(app: FastifyInstance): Promise<void> {
   app.post("/api/uploads", async (request, reply) => {
@@ -29,23 +33,50 @@ export async function registerUploadRoutes(app: FastifyInstance): Promise<void> 
     if (!ext) return reply.code(415).send({ error: "Use a PNG, JPG, WebP, GIF, or AVIF image." });
     const filename = `${Date.now().toString(36)}-${crypto.randomBytes(8).toString("hex")}${ext}`;
     const destination = path.join(uploadsDir(), filename);
-    try {
-      await pipeline(file.file, createWriteStream(destination));
-      if (file.file.truncated) {
-        fs.unlinkSync(destination);
-        return reply.code(413).send({ error: "Image is too large (max 15 MB)." });
-      }
-    } catch {
+    const reject = (code: number, error: string) => {
       try {
         if (fs.existsSync(destination)) fs.unlinkSync(destination);
       } catch {}
-      return reply.code(500).send({ error: "Could not save the image." });
+      return reply.code(code).send({ error });
+    };
+    try {
+      await pipeline(file.file, createWriteStream(destination));
+      if (file.file.truncated) {
+        return reject(413, "Image is too large (max 15 MB).");
+      }
+    } catch {
+      return reject(500, "Could not save the image.");
     }
     const size = fs.statSync(destination).size;
     if (size === 0) {
-      fs.unlinkSync(destination);
-      return reply.code(400).send({ error: "The image was empty." });
+      return reject(400, "The image was empty.");
     }
-    return reply.send({ url: `/uploads/${filename}`, filename, size, mimeType: file.mimetype });
+
+    const header = Buffer.alloc(Math.min(MAX_HEADER_BYTES, size));
+    try {
+      const fd = fs.openSync(destination, "r");
+      fs.readSync(fd, header, 0, header.length, 0);
+      fs.closeSync(fd);
+    } catch {
+      return reject(500, "Could not inspect the image.");
+    }
+    const metadata = inspectImage(header);
+    if (!metadata.mime) {
+      return reject(415, "That file is not a valid image. Use PNG, JPG, WebP, GIF, or AVIF.");
+    }
+    if (metadata.mime !== file.mimetype) {
+      return reject(415, "The image contents do not match the declared file type.");
+    }
+    if (
+      metadata.width !== null &&
+      metadata.height !== null &&
+      (metadata.width > MAX_DIMENSION ||
+        metadata.height > MAX_DIMENSION ||
+        metadata.width * metadata.height > MAX_PIXELS)
+    ) {
+      return reject(413, "That image is too large. Keep it under 12,000 pixels per side and 100 megapixels.");
+    }
+
+    return reply.send({ url: `/uploads/${filename}`, filename, size, mimeType: metadata.mime });
   });
 }

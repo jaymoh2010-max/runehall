@@ -38,7 +38,8 @@ import {
   type TokenRow,
   type UserRow,
 } from "./db";
-import { now, parseJson } from "./util";
+import { parseJson } from "./util";
+import { bumpCampaign } from "./revisions";
 
 export function serializeCampaignSummary(
   campaign: CampaignRow,
@@ -99,6 +100,7 @@ export function serializeCharacter(
     campaignRuleset,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    revision: Number(row.revision ?? 1),
     ownerName,
     permissions,
   };
@@ -314,7 +316,6 @@ export function serializeInitiative(value: unknown): InitiativeEntry[] {
   });
 }
 
-export function touchCampaign(campaignId: string): void {
-  const ts = now();
-  db.prepare("UPDATE campaigns SET updated_at = ?, last_played_at = ? WHERE id = ?").run(ts, ts, campaignId);
+export function touchCampaign(campaignId: string): number {
+  return bumpCampaign(campaignId);
 }

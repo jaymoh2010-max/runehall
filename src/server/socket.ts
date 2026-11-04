@@ -368,6 +368,7 @@ export function registerSocketServer(io: TypedServer): void {
       const ny = clamp(Number(y) || 0, 0, scene.height);
       db.prepare("UPDATE tokens SET x = ?, y = ?, updated_at = ? WHERE id = ?").run(nx, ny, now(), tokenId);
       io.to(room(campaignId)).emit("token:moved", { tokenId, sceneId, x: nx, y: ny });
+      touchCampaign(campaignId);
     });
 
     socket.on("token:create", ({ campaignId, sceneId, token }, ack) => {
@@ -450,7 +451,7 @@ export function registerSocketServer(io: TypedServer): void {
                 ? null
                 : Math.max(0, Math.min(1_000_000, Number(updated.hp_current)));
             const summary = characterSummary(draft, contextForDraft(draft));
-            db.prepare("UPDATE characters SET data = ?, summary = ?, updated_at = ? WHERE id = ?").run(
+            db.prepare("UPDATE characters SET data = ?, summary = ?, updated_at = ?, revision = revision + 1 WHERE id = ?").run(
               JSON.stringify(draft),
               JSON.stringify(summary),
               now(),
@@ -534,6 +535,7 @@ export function registerSocketServer(io: TypedServer): void {
       );
       const updated = db.prepare("SELECT * FROM scenes WHERE id = ?").get(scene.id) as SceneRow;
       io.to(room(campaignId)).emit("scene:updated", serializeScene(updated));
+      touchCampaign(campaignId);
     });
 
     socket.on("scene:create", ({ campaignId, scene }, ack) => {
@@ -568,6 +570,7 @@ export function registerSocketServer(io: TypedServer): void {
       const serialized = serializeScene(row);
       io.to(room(campaignId)).emit("scene:created", serialized);
       ack?.(serialized);
+      touchCampaign(campaignId);
     });
 
     socket.on("scene:delete", ({ campaignId, sceneId }) => {
@@ -588,6 +591,7 @@ export function registerSocketServer(io: TypedServer): void {
         if (remaining) io.to(room(campaignId)).emit("scene:activated", { sceneId: remaining.id });
       }
       io.to(room(campaignId)).emit("scene:deleted", { sceneId });
+      touchCampaign(campaignId);
     });
 
     socket.on("chat:send", ({ campaignId, content, visibility }, ack) => {
@@ -738,6 +742,7 @@ export function registerSocketServer(io: TypedServer): void {
         campaignId,
       );
       broadcastInitiative(io, campaignId, ensureState(campaignId));
+      touchCampaign(campaignId);
     });
 
     socket.on("initiative:next", ({ campaignId, direction }) => {
@@ -762,6 +767,7 @@ export function registerSocketServer(io: TypedServer): void {
         campaignId,
       );
       broadcastInitiative(io, campaignId, ensureState(campaignId));
+      touchCampaign(campaignId);
     });
 
     socket.on("initiative:add", ({ campaignId, tokenId, value }) => {
@@ -789,6 +795,7 @@ export function registerSocketServer(io: TypedServer): void {
         campaignId,
       );
       broadcastInitiative(io, campaignId, ensureState(campaignId));
+      touchCampaign(campaignId);
     });
 
     socket.on("initiative:reroll", ({ campaignId, entryId }) => {
@@ -817,6 +824,7 @@ export function registerSocketServer(io: TypedServer): void {
         "UPDATE campaign_state SET initiative = ?, turn_index = ?, updated_at = ? WHERE campaign_id = ?",
       ).run(JSON.stringify(entries), nextTurn, now(), campaignId);
       broadcastInitiative(io, campaignId, ensureState(campaignId));
+      touchCampaign(campaignId);
     });
 
     socket.on("initiative:remove", ({ campaignId, entryId }) => {
@@ -831,6 +839,7 @@ export function registerSocketServer(io: TypedServer): void {
         campaignId,
       );
       broadcastInitiative(io, campaignId, ensureState(campaignId));
+      touchCampaign(campaignId);
     });
 
     socket.on("pointer", ({ campaignId, sceneId, x, y }) => {

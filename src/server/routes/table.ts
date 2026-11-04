@@ -129,6 +129,7 @@ export async function registerTableRoutes(app: FastifyInstance): Promise<void> {
       turnIndex: state.turn_index,
       messages: messageRows.reverse().map(serializeMessage),
       journal: journalRows.map(serializeJournal),
+      revision: Number(campaign.revision ?? 0),
     });
   });
 
@@ -313,6 +314,7 @@ export async function registerTableRoutes(app: FastifyInstance): Promise<void> {
       if (remaining) app.broadcastCampaign(row.campaign_id, "scene:activated", { sceneId: remaining.id });
     }
     app.broadcastCampaign(row.campaign_id, "scene:deleted", { sceneId: id });
+    touchCampaign(row.campaign_id);
     return reply.send({ ok: true });
   });
 }

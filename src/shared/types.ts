@@ -642,6 +642,8 @@ export interface CharacterRecord {
   campaignRuleset?: CampaignRuleset | null;
   createdAt: number;
   updatedAt: number;
+  /** Optimistic-lock version, incremented on every save. */
+  revision: number;
   ownerName?: string;
   permissions?: { canEdit: boolean; canView: boolean };
 }
@@ -1021,6 +1023,8 @@ export interface CampaignTable {
   turnIndex: number;
   messages: ChatMessage[];
   journal: JournalEntry[];
+  /** Monotonic campaign revision for detecting missed socket events. */
+  revision: number;
 }
 
 export type DegreeOfSuccess =
@@ -1118,6 +1122,7 @@ export interface ServerToClientEvents {
   "pointer:show": (payload: { userId: string; displayName: string; sceneId: string; x: number; y: number }) => void;
   "character:updated": (payload: { characterId: string; summary: CharacterSummary | null; name: string }) => void;
   "character:created": (payload: { character: CharacterRecord }) => void;
+  "campaign:revision": (payload: { revision: number }) => void;
   "error:toast": (payload: { message: string }) => void;
 }
 

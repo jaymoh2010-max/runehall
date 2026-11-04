@@ -124,6 +124,7 @@ export interface CampaignRow {
   invite_code: string;
   ruleset: string;
   xp_mode: string;
+  revision: number;
   created_at: number;
   updated_at: number;
   last_played_at: number | null;
@@ -136,6 +137,7 @@ export interface CharacterRow {
   name: string;
   data: string;
   summary: string | null;
+  revision: number;
   created_at: number;
   updated_at: number;
 }

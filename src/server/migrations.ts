@@ -354,4 +354,15 @@ export const migrations: Migration[] = [
       CREATE INDEX IF NOT EXISTS idx_audit_action ON audit_log(action, created_at DESC);
     `,
   },
+  {
+    version: 12,
+    name: "campaign_and_character_revisions",
+    sql: `
+      ALTER TABLE campaigns ADD COLUMN revision INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE characters ADD COLUMN revision INTEGER NOT NULL DEFAULT 1;
+
+      CREATE INDEX IF NOT EXISTS idx_campaigns_revision ON campaigns(id, revision);
+      CREATE INDEX IF NOT EXISTS idx_characters_revision ON characters(id, revision);
+    `,
+  },
 ];

@@ -414,7 +414,7 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
           const draft = JSON.parse(character.data) as Record<string, unknown>;
           draft.contentMode = contentMode;
           draft.includeLegacy = legacyAllowed;
-          db.prepare("UPDATE characters SET data = ?, updated_at = ? WHERE id = ?").run(
+          db.prepare("UPDATE characters SET data = ?, updated_at = ?, revision = revision + 1 WHERE id = ?").run(
             JSON.stringify(draft),
             now(),
             character.id,
@@ -536,7 +536,7 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
       const after = characterSummary(draft, contextForDraft(draft));
       draft.play.hp = wasFull ? null : Math.min(draft.play.hp ?? after.hp, after.hp);
       const summary = characterSummary(draft, contextForDraft(draft));
-      db.prepare("UPDATE characters SET data = ?, summary = ?, updated_at = ? WHERE id = ?").run(
+      db.prepare("UPDATE characters SET data = ?, summary = ?, updated_at = ?, revision = revision + 1 WHERE id = ?").run(
         JSON.stringify(draft),
         JSON.stringify(summary),
         now(),

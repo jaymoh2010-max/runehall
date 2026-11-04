@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft,
@@ -45,7 +45,7 @@ import {
   titleCase,
 } from "../../shared/rules";
 import { DEGREE_LABELS, mod, rollFormula } from "../../shared/dice";
-import { api, formatCp } from "../api";
+import { api, ApiError, formatCp } from "../api";
 import { errorMessage } from "../stores";
 import { useToasts } from "../stores";
 import { connectSocket } from "../socket";
@@ -59,6 +59,7 @@ import {
   IconButton,
   Input,
   LoadingScreen,
+  Modal,
   PageEyebrow,
   ProgressBar,
   RichText,
@@ -109,9 +110,14 @@ export function CharacterSheetPage() {
   const [rollLog, setRollLog] = useState<RollResult | null>(null);
   const [conditionName, setConditionName] = useState("");
   const [conditions, setConditions] = useState<ConditionRef[]>([]);
+  const [conflict, setConflict] = useState<CharacterRecord | null>(null);
   const initialized = useRef(false);
   const skipInitialSave = useRef(true);
-  const saveSeq = useRef(0);
+  const characterRef = useRef<CharacterRecord | null>(null);
+  const draftRef = useRef<CharacterDraft | null>(null);
+  const saveInFlight = useRef(false);
+  const saveQueued = useRef(false);
+  const conflictRef = useRef(false);
 
   useEffect(() => {
     if (!id) return;
@@ -130,7 +136,9 @@ export function CharacterSheetPage() {
         });
         if (cancelled) return;
         setCharacter(result.character);
+        characterRef.current = result.character;
         setDraft(normalized);
+        draftRef.current = normalized;
         setContext(contextResult.context);
         setConditions(conditionResult.items);
         initialized.current = true;
@@ -149,33 +157,103 @@ export function CharacterSheetPage() {
   const derived = useMemo(() => (draft ? computeCharacter(draft, context) : null), [draft, context]);
   const canEdit = Boolean(character?.permissions?.canEdit);
 
+  const saveDraft = useCallback(
+    async (force = false) => {
+      if (!id || !canEdit) return;
+      if (saveInFlight.current) {
+        saveQueued.current = true;
+        return;
+      }
+      saveInFlight.current = true;
+      try {
+        let forceOnce = force;
+        let currentDraft: CharacterDraft | null = null;
+        do {
+          saveQueued.current = false;
+          currentDraft = draftRef.current;
+          if (!currentDraft) break;
+          setSaveState("saving");
+          try {
+            const result = await api<{ character: CharacterRecord }>(`/api/characters/${id}`, {
+              method: "PUT",
+              body: forceOnce
+                ? { data: currentDraft, force: true }
+                : { data: currentDraft, expectedRevision: characterRef.current?.revision },
+            });
+            forceOnce = false;
+            characterRef.current = result.character;
+            setCharacter(result.character);
+            setConflict(null);
+            conflictRef.current = false;
+            if (draftRef.current === currentDraft) setSaveState("saved");
+          } catch (err) {
+            if (err instanceof ApiError && err.status === 409) {
+              const payload = err.payload as { character?: CharacterRecord } | null;
+              if (payload?.character) {
+                setConflict(payload.character);
+                conflictRef.current = true;
+              }
+            } else {
+              toast(errorMessage(err), "error");
+            }
+            setSaveState("error");
+            break;
+          }
+        } while (saveQueued.current || draftRef.current !== currentDraft);
+      } finally {
+        saveInFlight.current = false;
+      }
+    },
+    [id, canEdit, toast],
+  );
+
   useEffect(() => {
     if (!draft || !id || !canEdit || !initialized.current) return;
-    if (skipInitialSave.current) return;
+    if (skipInitialSave.current || conflictRef.current) return;
     setSaveState("saving");
-    const seq = ++saveSeq.current;
-    const timer = window.setTimeout(async () => {
-      try {
-        const result = await api<{ character: CharacterRecord }>(`/api/characters/${id}`, {
-          method: "PUT",
-          body: { data: draft },
-        });
-        if (seq !== saveSeq.current) return;
-        setCharacter(result.character);
-        setSaveState("saved");
-      } catch (err) {
-        if (seq !== saveSeq.current) return;
-        setSaveState("error");
-        toast(errorMessage(err), "error");
-      }
-    }, 500);
+    const timer = window.setTimeout(() => void saveDraft(), 500);
     return () => window.clearTimeout(timer);
-  }, [draft, id, canEdit, toast]);
+  }, [draft, id, canEdit, saveDraft]);
+
+  const applyServerVersion = async () => {
+    if (!conflict) return;
+    const normalized = normalizeCharacterDraft(conflict.data, conflict.name);
+    characterRef.current = conflict;
+    setCharacter(conflict);
+    skipInitialSave.current = true;
+    setDraft(normalized);
+    draftRef.current = normalized;
+    conflictRef.current = false;
+    setConflict(null);
+    setSaveState("saved");
+    document.title = `${normalized.name} · Runehall`;
+    try {
+      const result = await api<{ context: CharacterContext }>(`/api/characters/${id}/context`, {
+        method: "POST",
+        body: { draft: normalized },
+      });
+      setContext(result.context);
+    } catch {
+      // The server draft remains usable; context refreshes on the next save.
+    }
+  };
+
+  const overwriteConflict = () => {
+    conflictRef.current = false;
+    setConflict(null);
+    setSaveState("saving");
+    void saveDraft(true);
+  };
 
   const update = (updater: (current: CharacterDraft) => CharacterDraft) => {
     if (!canEdit) return;
     skipInitialSave.current = false;
-    setDraft((current) => (current ? updater(current) : current));
+    setDraft((current) => {
+      if (!current) return current;
+      const next = updater(current);
+      draftRef.current = next;
+      return next;
+    });
   };
 
   const roll = (formula: string, label: string, dc?: number | null) => {
@@ -760,6 +838,33 @@ export function CharacterSheetPage() {
           {draft.play.conditions.map((condition) => <Badge key={condition.name} tone="red">{condition.name}</Badge>)}
         </div>
       )}
+
+      <Modal
+        open={Boolean(conflict)}
+        onClose={() => void applyServerVersion()}
+        closeOnBackdrop={false}
+        title="This sheet changed elsewhere"
+        subtitle="Another tab, device, or the GM saved this character while you were editing."
+        footer={
+          <>
+            <Button variant="ghost" onClick={applyServerVersion}>
+              Reload their version
+            </Button>
+            <Button variant="primary" icon={<CircleAlert size={15} />} onClick={overwriteConflict}>
+              Keep my changes
+            </Button>
+          </>
+        }
+      >
+        <div className="settings-note">
+          <CircleAlert size={16} />
+          <span>
+            Reloading replaces your unsaved changes with the version from{" "}
+            <strong>{conflict ? new Date(conflict.updatedAt).toLocaleString() : "the server"}</strong>.
+            Keeping your changes overwrites that newer save.
+          </span>
+        </div>
+      </Modal>
     </div>
   );
 }

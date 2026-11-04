@@ -53,6 +53,26 @@ describe("migrations", () => {
     expect(migration).toBeDefined();
     db.exec(migration!.sql);
 
+    db.prepare(
+      "INSERT INTO campaigns (id, name, description, gm_id, invite_code, ruleset, xp_mode, created_at, updated_at, last_played_at) VALUES (?, ?, '', ?, ?, 'core', 'milestone', ?, ?, ?)",
+    ).run("camp_one", "Test Campaign", "usr_first", "TESTCODE", 1_000, 1_000, 1_000);
+    db.prepare(
+      "INSERT INTO characters (id, user_id, campaign_id, name, data, summary, created_at, updated_at) VALUES (?, ?, NULL, ?, '{}', NULL, ?, ?)",
+    ).run("char_one", "usr_first", "Test Hero", 1_000, 1_000);
+
+    const revisionMigration = migrations.find((entry) => entry.version === 12);
+    expect(revisionMigration).toBeDefined();
+    db.exec(revisionMigration!.sql);
+
+    const campaignRevision = db
+      .prepare("SELECT revision FROM campaigns WHERE id = ?")
+      .get("camp_one") as { revision: number };
+    const characterRevision = db
+      .prepare("SELECT revision FROM characters WHERE id = ?")
+      .get("char_one") as { revision: number };
+    expect(campaignRevision.revision).toBe(0);
+    expect(characterRevision.revision).toBe(1);
+
     const columns = db.prepare("PRAGMA table_info(users)").all() as { name: string }[];
     expect(columns.map((column) => column.name)).toContain("is_admin");
 
