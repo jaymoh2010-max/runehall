@@ -5,7 +5,9 @@ import { campaignSessionsFor } from "../sessionData";
 import { touchCampaign } from "../serialize";
 import {
   isAttendanceStatus,
+  isSessionCheckinStatus,
   isSessionStatus,
+  normalizeSessionAgenda,
   normalizeSessionStatus,
 } from "../../shared/sessions";
 import { clamp, newId, now, safeString, sanitizeUserText } from "../util";
@@ -19,17 +21,18 @@ function getSession(campaignId: string, sessionId: string): CampaignSessionRow |
 }
 
 function syncDashboardNextSession(campaignId: string): void {
+  const ts = now();
   const next = db
     .prepare(
-      "SELECT scheduled_at FROM campaign_sessions WHERE campaign_id = ? AND status = 'scheduled' ORDER BY scheduled_at ASC LIMIT 1",
+      "SELECT scheduled_at FROM campaign_sessions WHERE campaign_id = ? AND status = 'scheduled' AND scheduled_at >= ? ORDER BY scheduled_at ASC LIMIT 1",
     )
-    .get(campaignId) as { scheduled_at: number } | undefined;
+    .get(campaignId, ts) as { scheduled_at: number } | undefined;
   db.prepare(
     "INSERT OR IGNORE INTO campaign_dashboard (campaign_id, updated_at) VALUES (?, ?)",
-  ).run(campaignId, now());
+  ).run(campaignId, ts);
   db.prepare(
     "UPDATE campaign_dashboard SET next_session_at = ?, updated_at = ? WHERE campaign_id = ?",
-  ).run(next?.scheduled_at ?? null, now(), campaignId);
+  ).run(next?.scheduled_at ?? null, ts, campaignId);
 }
 
 function sessionFor(campaignId: string, sessionId: string) {
@@ -65,10 +68,11 @@ export async function registerSessionRoutes(app: FastifyInstance): Promise<void>
     }
     const sessionId = newId("sess");
     const ts = now();
+    const agenda = normalizeSessionAgenda(body.agenda);
     db.prepare(
       `INSERT INTO campaign_sessions
-        (id, campaign_id, title, scheduled_at, duration_minutes, notes, status, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        (id, campaign_id, title, scheduled_at, duration_minutes, notes, agenda, status, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).run(
       sessionId,
       id,
@@ -76,6 +80,7 @@ export async function registerSessionRoutes(app: FastifyInstance): Promise<void>
       Math.round(scheduledAt),
       clamp(Number(body.durationMinutes) || 180, 30, 1440),
       sanitizeUserText(body.notes, 20_000),
+      JSON.stringify(agenda),
       body.status === undefined ? "scheduled" : normalizeSessionStatus(body.status),
       ts,
       ts,
@@ -108,7 +113,7 @@ export async function registerSessionRoutes(app: FastifyInstance): Promise<void>
     }
     db.prepare(
       `UPDATE campaign_sessions
-       SET title = ?, scheduled_at = ?, duration_minutes = ?, notes = ?, status = ?, updated_at = ?
+       SET title = ?, scheduled_at = ?, duration_minutes = ?, notes = ?, agenda = ?, status = ?, updated_at = ?
        WHERE id = ?`,
     ).run(
       body.title === undefined ? existing.title : safeString(body.title, existing.title, 140),
@@ -117,6 +122,9 @@ export async function registerSessionRoutes(app: FastifyInstance): Promise<void>
         ? existing.duration_minutes
         : clamp(Number(body.durationMinutes) || existing.duration_minutes, 30, 1440),
       body.notes === undefined ? existing.notes : sanitizeUserText(body.notes, 20_000),
+      body.agenda === undefined
+        ? existing.agenda
+        : JSON.stringify(normalizeSessionAgenda(body.agenda)),
       body.status === undefined ? normalizeSessionStatus(existing.status) : normalizeSessionStatus(body.status),
       now(),
       sessionId,
@@ -177,4 +185,35 @@ export async function registerSessionRoutes(app: FastifyInstance): Promise<void>
       return reply.send({ session: sessionFor(id, sessionId) });
     },
   );
+
+  app.put("/api/campaigns/:id/sessions/:sessionId/checkin", async (request, reply) => {
+    if (!request.user) return reply.code(401).send({ error: "Sign in to continue." });
+    const { id, sessionId } = request.params as { id: string; sessionId: string };
+    if (!getCampaign(id)) return reply.code(404).send({ error: "Campaign not found." });
+    const role = getCampaignRole(id, request.user.id);
+    if (!role) return reply.code(403).send({ error: "You're not a member of that campaign." });
+    if (!getSession(id, sessionId)) return reply.code(404).send({ error: "Session not found." });
+    const body = (request.body ?? {}) as Record<string, unknown>;
+    if (!isSessionCheckinStatus(body.status)) {
+      return reply.code(400).send({ error: "Choose a valid check-in status." });
+    }
+    if (body.status === "unanswered") {
+      db.prepare("DELETE FROM session_checkins WHERE session_id = ? AND user_id = ?").run(
+        sessionId,
+        request.user.id,
+      );
+    } else {
+      db.prepare(
+        `INSERT INTO session_checkins (session_id, user_id, status, updated_at)
+         VALUES (?, ?, ?, ?)
+         ON CONFLICT(session_id, user_id)
+         DO UPDATE SET status = excluded.status, updated_at = excluded.updated_at`,
+      ).run(sessionId, request.user.id, body.status, now());
+    }
+    touchCampaign(id);
+    const session = campaignSessionsFor(id, role, request.user.id).find(
+      (entry) => entry.id === sessionId,
+    );
+    return reply.send({ session });
+  });
 }

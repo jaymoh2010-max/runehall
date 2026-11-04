@@ -692,6 +692,7 @@ export function CampaignPage() {
           <CampaignDashboard
             campaignId={campaign.id}
             isGm={isGm}
+            currentUserId={user?.id ?? ""}
             characters={characters}
             onNavigate={(next) => setTab(next)}
             onJournalCreated={(entry) => {
@@ -775,6 +776,7 @@ export function CampaignPage() {
           <SessionsPage
             campaignId={campaign.id}
             isGm={isGm}
+            currentUserId={user?.id ?? ""}
             toast={toast}
           />
         ) : null}

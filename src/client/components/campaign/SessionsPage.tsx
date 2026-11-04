@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   CalendarClock,
   Check,
+  ListChecks,
   Pencil,
   Plus,
   Trash2,
@@ -9,12 +10,16 @@ import {
 } from "lucide-react";
 import type {
   CampaignSession,
+  SessionAgendaItem,
   SessionAttendanceStatus,
+  SessionCheckinStatus,
   SessionStatus,
 } from "../../../shared/types";
 import {
   ATTENDANCE_STATUS_LABELS,
+  SESSION_CHECKIN_LABELS,
   SESSION_STATUS_LABELS,
+  sessionCheckinSummary,
 } from "../../../shared/sessions";
 import { api } from "../../api";
 import { errorMessage } from "../../stores";
@@ -78,10 +83,12 @@ function formatSessionDay(timestamp: number): string {
 export function SessionsPage({
   campaignId,
   isGm,
+  currentUserId,
   toast,
 }: {
   campaignId: string;
   isGm: boolean;
+  currentUserId: string;
   toast: (message: string, kind?: "info" | "success" | "error") => void;
 }) {
   const [sessions, setSessions] = useState<CampaignSession[]>([]);
@@ -89,6 +96,7 @@ export function SessionsPage({
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [attendanceBusy, setAttendanceBusy] = useState<string | null>(null);
+  const [checkinBusy, setCheckinBusy] = useState<string | null>(null);
   const [editor, setEditor] = useState<CampaignSession | "new" | null>(null);
 
   useEffect(() => {
@@ -149,6 +157,22 @@ export function SessionsPage({
     }
   };
 
+  const setCheckin = async (session: CampaignSession, status: SessionCheckinStatus) => {
+    const key = `${session.id}:${currentUserId}`;
+    setCheckinBusy(key);
+    try {
+      const result = await api<{ session: CampaignSession }>(
+        `/api/campaigns/${campaignId}/sessions/${session.id}/checkin`,
+        { method: "PUT", body: { status } },
+      );
+      replaceSession(result.session);
+    } catch (err) {
+      toast(errorMessage(err), "error");
+    } finally {
+      setCheckinBusy(null);
+    }
+  };
+
   const markPlayed = async (session: CampaignSession) => {
     setBusy(true);
     try {
@@ -183,6 +207,8 @@ export function SessionsPage({
     const ownAttendance = session.attendance[0] ?? null;
     const attended = session.attendance.filter((entry) => entry.status === "attended").length;
     const late = session.attendance.filter((entry) => entry.status === "late").length;
+    const checkinSummary = sessionCheckinSummary(session.checkins);
+    const showCheckins = !isPast && session.status === "scheduled";
     return (
       <Card key={session.id} className="session-card">
         <div className="session-date">
@@ -229,6 +255,74 @@ export function SessionsPage({
           </div>
 
           {isGm && session.notes ? <p className="session-notes">{session.notes}</p> : null}
+
+          {isGm && session.agenda.length ? (
+            <div className="session-agenda">
+              <div className="row-between">
+                <span className="field-label"><ListChecks size={13} /> Agenda</span>
+                <span className="tiny muted">
+                  {session.agenda.filter((item) => item.done).length}/{session.agenda.length} done
+                </span>
+              </div>
+              {session.agenda.map((item) => (
+                <div key={item.id} className={`session-agenda-item ${item.done ? "is-done" : ""}`}>
+                  <span className="session-agenda-check">{item.done ? <Check size={11} /> : null}</span>
+                  <span>{item.text}</span>
+                </div>
+              ))}
+            </div>
+          ) : null}
+
+          {showCheckins ? (
+            <div className="session-checkins">
+              <div className="row-between">
+                <span className="field-label"><Users size={13} /> Check-in</span>
+                <span className="tiny muted">
+                  {checkinSummary.yes} in · {checkinSummary.maybe} maybe ·{" "}
+                  {checkinSummary.unanswered} no reply
+                </span>
+              </div>
+              {session.checkins.map((entry) => {
+                const own = entry.userId === currentUserId;
+                const busyKey = `${session.id}:${entry.userId}`;
+                return (
+                  <div key={entry.userId} className={`session-checkin-row ${own ? "is-self" : ""}`}>
+                    <Avatar name={entry.displayName} src={entry.avatarUrl} size={26} />
+                    <span className="grow">{entry.displayName}{own ? " (you)" : ""}</span>
+                    {own ? (
+                      <div className="session-checkin-actions">
+                        {(["yes", "maybe", "no"] as const).map((status) => (
+                          <Button
+                            key={status}
+                            size="sm"
+                            variant={entry.status === status ? "primary" : "ghost"}
+                            loading={checkinBusy === busyKey}
+                            onClick={() => void setCheckin(session, status)}
+                          >
+                            {status === "yes" ? "I'm in" : status === "maybe" ? "Maybe" : "Can't"}
+                          </Button>
+                        ))}
+                      </div>
+                    ) : (
+                      <Tag
+                        tone={
+                          entry.status === "yes"
+                            ? "green"
+                            : entry.status === "maybe"
+                              ? "gold"
+                              : entry.status === "no"
+                                ? "red"
+                                : "neutral"
+                        }
+                      >
+                        {SESSION_CHECKIN_LABELS[entry.status]}
+                      </Tag>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ) : null}
 
           {isGm ? (
             <div className="session-attendance">
@@ -376,6 +470,8 @@ function SessionEditor({
   const [duration, setDuration] = useState("180");
   const [status, setStatus] = useState<SessionStatus>("scheduled");
   const [notes, setNotes] = useState("");
+  const [agenda, setAgenda] = useState<SessionAgendaItem[]>([]);
+  const [agendaText, setAgendaText] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -386,8 +482,34 @@ function SessionEditor({
     setDuration(String(editing?.durationMinutes ?? 180));
     setStatus(editing?.status ?? "scheduled");
     setNotes(editing?.notes ?? "");
+    setAgenda(editing?.agenda ?? []);
+    setAgendaText("");
     setError("");
   }, [open, editing?.id]);
+
+  const addAgendaItem = () => {
+    const text = agendaText.trim();
+    if (!text) return;
+    setAgenda((current) => [
+      ...current,
+      {
+        id: `agenda_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`,
+        text: text.slice(0, 200),
+        done: false,
+      },
+    ]);
+    setAgendaText("");
+  };
+
+  const toggleAgendaItem = (id: string) => {
+    setAgenda((current) =>
+      current.map((item) => (item.id === id ? { ...item, done: !item.done } : item)),
+    );
+  };
+
+  const removeAgendaItem = (id: string) => {
+    setAgenda((current) => current.filter((item) => item.id !== id));
+  };
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -408,6 +530,7 @@ function SessionEditor({
         durationMinutes: Number(duration) || 180,
         status,
         notes,
+        agenda,
       };
       const result = editing
         ? await api<{ session: CampaignSession }>(`/api/campaigns/${campaignId}/sessions/${editing.id}`, {
@@ -470,6 +593,43 @@ function SessionEditor({
             onChange={(event) => setNotes(event.target.value)}
             placeholder="Open on the ferryman's bargain. Have the vault map ready."
           />
+        </Field>
+        <Field label="Agenda" hint="A GM-only checklist for this session.">
+          <div className="session-agenda-editor">
+            {agenda.map((item) => (
+              <div key={item.id} className={`session-agenda-edit-row ${item.done ? "is-done" : ""}`}>
+                <button
+                  type="button"
+                  className={`session-agenda-check ${item.done ? "is-done" : ""}`}
+                  aria-label={item.done ? "Reopen agenda item" : "Mark agenda item done"}
+                  onClick={() => toggleAgendaItem(item.id)}
+                >
+                  {item.done ? <Check size={11} /> : null}
+                </button>
+                <span className="grow">{item.text}</span>
+                <IconButton label="Remove agenda item" type="button" onClick={() => removeAgendaItem(item.id)}>
+                  <Trash2 size={13} />
+                </IconButton>
+              </div>
+            ))}
+            <div className="session-agenda-add">
+              <Input
+                value={agendaText}
+                onChange={(event) => setAgendaText(event.target.value)}
+                placeholder="Open on the ferryman's bargain"
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    addAgendaItem();
+                  }
+                }}
+              />
+              <Button type="button" size="sm" variant="secondary" icon={<Plus size={13} />} onClick={addAgendaItem} disabled={!agendaText.trim()}>
+                Add
+              </Button>
+            </div>
+            {!agenda.length ? <p className="muted small">No agenda items yet.</p> : null}
+          </div>
         </Field>
       </form>
     </Modal>

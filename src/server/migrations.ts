@@ -397,4 +397,21 @@ export const migrations: Migration[] = [
       CREATE INDEX IF NOT EXISTS idx_uploaded_assets_campaign ON uploaded_assets(campaign_id);
     `,
   },
+  {
+    version: 16,
+    name: "session_agenda_and_checkins",
+    sql: `
+      ALTER TABLE campaign_sessions ADD COLUMN agenda TEXT NOT NULL DEFAULT '[]';
+
+      CREATE TABLE IF NOT EXISTS session_checkins (
+        session_id TEXT NOT NULL REFERENCES campaign_sessions(id) ON DELETE CASCADE,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        status TEXT NOT NULL CHECK (status IN ('yes', 'maybe', 'no')),
+        updated_at INTEGER NOT NULL,
+        PRIMARY KEY (session_id, user_id)
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_session_checkins_session ON session_checkins(session_id);
+    `,
+  },
 ];

@@ -885,6 +885,21 @@ export type SessionAttendanceStatus =
   | "excused"
   | "unmarked";
 
+export interface SessionAgendaItem {
+  id: string;
+  text: string;
+  done: boolean;
+}
+
+export type SessionCheckinStatus = "yes" | "maybe" | "no" | "unanswered";
+
+export interface SessionCheckin {
+  userId: string;
+  displayName: string;
+  avatarUrl: string | null;
+  status: SessionCheckinStatus;
+}
+
 export interface SessionAttendance {
   userId: string;
   displayName: string;
@@ -901,8 +916,11 @@ export interface CampaignSession {
   durationMinutes: number;
   /** GM-only session notes. */
   notes: string;
+  /** GM-only prep checklist. */
+  agenda: SessionAgendaItem[];
   status: SessionStatus;
   attendance: SessionAttendance[];
+  checkins: SessionCheckin[];
   createdAt: number;
   updatedAt: number;
 }

@@ -603,10 +603,57 @@ async function main() {
     `/api/campaigns/${campaign.id}/sessions/${smokeSession.id}/attendance/${player.id}`,
     { method: "PUT", cookie: gmCookie, body: { status: "attended" } },
   );
+  const agendaResult = await api(
+    `/api/campaigns/${campaign.id}/sessions/${smokeSession.id}`,
+    {
+      method: "PATCH",
+      cookie: gmCookie,
+      body: {
+        agenda: [
+          { id: "a1", text: "Open on the ferryman's bargain", done: false },
+          { id: "a2", text: "Have the vault map ready", done: true },
+        ],
+      },
+    },
+  );
+  if (agendaResult.payload.session.agenda.length !== 2) {
+    throw new Error("Session agenda was not saved");
+  }
+  const checkin = await api(
+    `/api/campaigns/${campaign.id}/sessions/${smokeSession.id}/checkin`,
+    { method: "PUT", cookie: playerCookie, body: { status: "yes" } },
+  );
+  if (checkin.payload.session.checkins.find((entry) => entry.userId === player.id)?.status !== "yes") {
+    throw new Error("Player check-in was not saved");
+  }
   const playerSessions = await api(`/api/campaigns/${campaign.id}/sessions`, { cookie: playerCookie });
   const playerSession = playerSessions.payload.sessions.find((session) => session.id === smokeSession.id);
   if (!playerSession || playerSession.attendance[0]?.status !== "attended") {
     throw new Error("Player attendance was not reflected in their session view");
+  }
+  if (playerSession.agenda.length) throw new Error("Player received the GM-only agenda");
+  if (
+    playerSession.checkins.length < 2 ||
+    playerSession.checkins.find((entry) => entry.userId === player.id)?.status !== "yes"
+  ) {
+    throw new Error("Player check-in summary was not shared");
+  }
+  const gmSessions = await api(`/api/campaigns/${campaign.id}/sessions`, { cookie: gmCookie });
+  const gmSession = gmSessions.payload.sessions.find((session) => session.id === smokeSession.id);
+  if (!gmSession || gmSession.agenda.length !== 2) {
+    throw new Error("GM session view did not include the agenda");
+  }
+  if (gmSession.checkins.find((entry) => entry.userId === player.id)?.status !== "yes") {
+    throw new Error("GM session view did not include the player check-in");
+  }
+  await api(
+    `/api/campaigns/${campaign.id}/sessions/${smokeSession.id}/checkin`,
+    { method: "PUT", cookie: playerCookie, body: { status: "unanswered" } },
+  );
+  const clearedCheckin = await api(`/api/campaigns/${campaign.id}/sessions`, { cookie: gmCookie });
+  const clearedSession = clearedCheckin.payload.sessions.find((session) => session.id === smokeSession.id);
+  if (clearedSession.checkins.find((entry) => entry.userId === player.id)?.status !== "unanswered") {
+    throw new Error("Player check-in could not be cleared");
   }
   if (playerSession.notes) throw new Error("Player received GM-only session notes");
   const playerSessionCreate = await fetch(`${base}/api/campaigns/${campaign.id}/sessions`, {
@@ -615,6 +662,7 @@ async function main() {
     body: JSON.stringify({ title: "Hacked", scheduledAt }),
   });
   if (playerSessionCreate.status !== 403) throw new Error("Player could schedule a session");
+  log("session agenda and check-ins are shared safely");
   const dashboardAfterSession = await api(`/api/campaigns/${campaign.id}/dashboard`, {
     cookie: playerCookie,
   });

@@ -29,6 +29,7 @@ if (!fs.existsSync(databasePath)) {
 }
 
 const tables = [
+  "users",
   "scenes",
   "tokens",
   "characters",
@@ -62,6 +63,7 @@ for (const table of tables) {
     }
   }
 }
+db.close();
 
 const files = fs.existsSync(uploadsDir)
   ? fs

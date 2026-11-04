@@ -20,7 +20,12 @@ import { normalizeCampaignRuleset, normalizeXpMode } from "../shared/content";
 import { normalizeLootItems } from "../shared/loot";
 import { normalizeJournalAttachments, normalizeJournalKind } from "../shared/journal";
 import { normalizeCampaignThreads } from "../shared/dashboard";
-import { normalizeAttendanceStatus, normalizeSessionStatus } from "../shared/sessions";
+import {
+  isSessionCheckinStatus,
+  normalizeAttendanceStatus,
+  normalizeSessionAgenda,
+  normalizeSessionStatus,
+} from "../shared/sessions";
 import {
   db,
   type CampaignDashboardRow,
@@ -34,6 +39,7 @@ import {
   type LootParcelRow,
   type MessageRow,
   type SessionAttendanceRow,
+  type SessionCheckinRow,
   type SceneRow,
   type TokenRow,
   type UserRow,
@@ -229,10 +235,12 @@ export function serializeCampaignSession(
   row: CampaignSessionRow,
   members: { id: string; display_name: string; avatar_url: string | null }[],
   attendanceRows: SessionAttendanceRow[],
+  checkinRows: SessionCheckinRow[],
   role: "gm" | "player",
   userId: string,
 ): CampaignSession {
   const attendanceByUser = new Map(attendanceRows.map((entry) => [entry.user_id, entry]));
+  const checkinByUser = new Map(checkinRows.map((entry) => [entry.user_id, entry]));
   const visibleMembers =
     role === "gm" ? members : members.filter((member) => member.id === userId);
   return {
@@ -242,6 +250,7 @@ export function serializeCampaignSession(
     scheduledAt: row.scheduled_at,
     durationMinutes: row.duration_minutes,
     notes: role === "gm" ? row.notes : "",
+    agenda: role === "gm" ? normalizeSessionAgenda(parseJson(row.agenda, [])) : [],
     status: normalizeSessionStatus(row.status),
     attendance: visibleMembers.map((member) => {
       const attendance = attendanceByUser.get(member.id);
@@ -251,6 +260,15 @@ export function serializeCampaignSession(
         avatarUrl: member.avatar_url,
         status: normalizeAttendanceStatus(attendance?.status),
         note: attendance?.note ?? "",
+      };
+    }),
+    checkins: members.map((member) => {
+      const checkin = checkinByUser.get(member.id);
+      return {
+        userId: member.id,
+        displayName: member.display_name,
+        avatarUrl: member.avatar_url,
+        status: isSessionCheckinStatus(checkin?.status) ? checkin.status : "unanswered",
       };
     }),
     createdAt: row.created_at,

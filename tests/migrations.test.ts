@@ -86,6 +86,11 @@ describe("migrations", () => {
       .prepare("SELECT name FROM sqlite_master WHERE type = 'table'")
       .all() as { name: string }[];
     expect(tablesAfterAssets.map((table) => table.name)).toContain("uploaded_assets");
+    expect(tablesAfterAssets.map((table) => table.name)).toContain("session_checkins");
+    const sessionColumns = db.prepare("PRAGMA table_info(campaign_sessions)").all() as {
+      name: string;
+    }[];
+    expect(sessionColumns.map((column) => column.name)).toContain("agenda");
 
     const columns = db.prepare("PRAGMA table_info(users)").all() as { name: string }[];
     expect(columns.map((column) => column.name)).toContain("is_admin");

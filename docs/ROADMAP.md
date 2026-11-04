@@ -431,7 +431,11 @@ Acceptance: a GM can prepare a full session in Runehall and start it with one â€
   - It draws on shared rolls, visible journal entries and handouts, loot parcels, the played session, and open shared threads.
   - GM-only chat, hidden handouts, and GM-only threads are excluded.
   - The draft can be saved as the dashboard session summary or as a shared handout.
-- [ ] Session agenda and check-in reminders.
+- [x] **Session agenda and check-in reminders**
+  - Each session can carry a GM-only agenda checklist with done state.
+  - Players and the GM can check in as in, maybe, or can't make it.
+  - Check-ins are shared with the table; GM notes and the agenda stay private.
+  - The Overview shows a next-session check-in reminder and outstanding replies.
 - [x] **Reusable handouts**
   - The GM can duplicate any journal entry or handout in one click.
   - Duplicates preserve content, kind, visibility, and attachments.

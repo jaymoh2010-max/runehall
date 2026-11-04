@@ -6,6 +6,7 @@ import type { CampaignAsset } from "../shared/types";
 
 const UPLOAD_PATTERN = /\/uploads\/([A-Za-z0-9._-]+)/g;
 const GLOBAL_TABLES = [
+  "users",
   "scenes",
   "tokens",
   "characters",

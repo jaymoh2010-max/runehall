@@ -13,7 +13,9 @@ import { normalizeJournalAttachments, normalizeJournalKind } from "../shared/jou
 import { normalizeLootItems } from "../shared/loot";
 import { normalizeTokenConditions } from "../shared/tokens";
 import {
+  isSessionCheckinStatus,
   normalizeAttendanceStatus,
+  normalizeSessionAgenda,
   normalizeSessionStatus,
 } from "../shared/sessions";
 import { clamp, inviteCode, newId, now, safeInt, safeString, sanitizeUserText } from "./util";
@@ -466,7 +468,7 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
     for (const session of records(payload.sessions, 500, "sessions")) {
       const sessionId = newId("sess");
       db.prepare(
-        "INSERT INTO campaign_sessions (id, campaign_id, title, scheduled_at, duration_minutes, notes, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO campaign_sessions (id, campaign_id, title, scheduled_at, duration_minutes, notes, agenda, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
       ).run(
         sessionId,
         campaignId,
@@ -474,6 +476,7 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
         timestamp(session.scheduledAt, ts),
         clamp(numberValue(session.durationMinutes, 180, 30, 1440), 30, 1440),
         longText(session.notes, "", 20_000),
+        JSON.stringify(normalizeSessionAgenda(session.agenda)),
         normalizeSessionStatus(session.status),
         ts,
         ts,
@@ -494,6 +497,18 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
           longText(attendance.note, "", 500),
           ts,
         );
+      }
+      for (const checkin of records(session.checkins, 100, "checkins")) {
+        if (!isSessionCheckinStatus(checkin.status) || checkin.status === "unanswered") continue;
+        const exportUserId = text(checkin.userId, "", 120);
+        const localUserId = memberUserByExportId.get(exportUserId);
+        if (!localUserId) continue;
+        db.prepare(
+          `INSERT INTO session_checkins (session_id, user_id, status, updated_at)
+           VALUES (?, ?, ?, ?)
+           ON CONFLICT(session_id, user_id)
+           DO UPDATE SET status = excluded.status, updated_at = excluded.updated_at`,
+        ).run(sessionId, localUserId, checkin.status, ts);
       }
       stats.sessions += 1;
     }

@@ -59,11 +59,11 @@ The target table size is one GM plus 4–10 players. That means the product shou
 - Campaign Overview with last-session summary, next-session details, party status, and shared or GM-only clue threads. The GM can generate an editable recap from shared rolls, visible handouts, loot, and open threads, then save it as the summary or a shared handout.
 - Grouped bestiary tokens with formation dragging, aggregate group HP, and one initiative roll per group.
 - GM-only NPC statblock library with optional art and one-click token placement.
-- Shared session schedule with GM-managed attendance and automatic Overview date sync.
+- Shared session schedule with GM-managed attendance, GM-only agenda checklists, player check-ins, and automatic Overview date/check-in reminders.
 - Persistent bestiary palette with drag-to-map group placement.
 - GM screen with level/simple DCs, condition lookup, secret rolls, and player roll requests.
 - Campaign import with ID remapping and player-account matching, plus a dry-run-first unused-asset cleanup command for legacy files.
-- Next: session agendas and check-in reminders.
+- Next: remaining polish and optional hosting adapters.
 
 ### Phase 4 — Reliability and trust (in progress)
 - [x] Per-campaign revisions, `campaign:revision` socket events, gap detection, and reconnect snapshot refresh.

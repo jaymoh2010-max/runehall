@@ -246,8 +246,16 @@ export interface CampaignSessionRow {
   scheduled_at: number;
   duration_minutes: number;
   notes: string;
+  agenda: string;
   status: string;
   created_at: number;
+  updated_at: number;
+}
+
+export interface SessionCheckinRow {
+  session_id: string;
+  user_id: string;
+  status: string;
   updated_at: number;
 }
 

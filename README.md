@@ -183,7 +183,7 @@ This is a substantial, playable foundation — not a complete Pathbuilder/Foundr
 - **The bestiary palette is a table tool, not a modal.** The GM can keep it open, search and filter creatures, set a count, then drag a group directly onto the map or press Add to place it at the center.
 - **The GM screen is a fast reference, not a second rules engine.** It provides standard level/simple DCs, condition text, GM-only secret rolls, and shared roll requests. Complex modifiers and situational bonuses remain the GM’s call.
 - **NPC statblocks are a GM-only library.** Save recurring allies, villains, and custom creatures with combat basics, optional art, and notes, then place a token on any scene. Players only see the resulting token, never the prep library.
-- **Sessions are shared; attendance is GM-managed.** The GM schedules sessions and records attendance. Players see the schedule and their own attendance, never GM session notes. The next scheduled session updates the Overview date, but XP is still not awarded automatically.
+- **Sessions are shared; attendance is GM-managed.** The GM schedules sessions, keeps a private agenda checklist, and records attendance. Players see the schedule, their own attendance, and everyone's check-in status, but never GM notes or the agenda. The next scheduled session updates the Overview date, and the Overview reminds players to check in and the GM who is still outstanding. XP is still not awarded automatically.
 - **Campaign import creates a new campaign, not a merge.** It remaps content IDs and matches player accounts by username; characters whose owners are not local are assigned to the importing GM. Uploaded images are referenced, not copied.
 - **Unused uploads are cleaned up deliberately.** Deleting a scene, handout, token, or NPC does not immediately delete its image file. Campaign uploads appear in the GM-only **Assets** tab with usage labels; unreferenced campaign images can be deleted there. Run `npm run cleanup-assets` to review legacy or orphaned files outside a campaign, and add `--delete` to remove them.
 - **Only images are uploaded.** No audio, video, PDFs, or animated token frames. Uploads are checked by file signature, not just the browser-provided MIME type, and oversized images are rejected.
@@ -198,8 +198,7 @@ This is a substantial, playable foundation — not a complete Pathbuilder/Foundr
 1. **Reliability:** campaign revisions, autosave conflict detection, reconnect coverage, and upload/health hardening.
 2. **Character trust:** automation labels, golden-sheet fixtures, and a full level-up wizard.
 3. **Table depth:** AoE templates, condition values, multi-select, scene playlists, and combat-log filters.
-4. **GM continuity:** session agendas and check-in reminders.
-5. **Polish:** code splitting, tablet layouts, accessibility, and optional hosting adapters.
+4. **Polish:** code splitting, tablet layouts, accessibility, generated scene thumbnails, and optional hosting adapters.
 
 ---
 

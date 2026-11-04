@@ -18,12 +18,14 @@ import {
 } from "lucide-react";
 import type {
   CampaignDashboard as CampaignDashboardData,
+  CampaignSession,
   CampaignThread,
   CharacterRecord,
   JournalEntry,
   SessionRecap,
 } from "../../../shared/types";
 import { openThreadCount } from "../../../shared/dashboard";
+import { sessionCheckinSummary } from "../../../shared/sessions";
 import { api, formatDate } from "../../api";
 import { errorMessage } from "../../stores";
 import { JournalBody } from "../JournalBody";
@@ -43,7 +45,7 @@ import {
   Textarea,
 } from "../ui";
 
-type DashboardTab = "table" | "party" | "journal" | "encounters" | "loot";
+type DashboardTab = "table" | "party" | "sessions" | "journal" | "encounters" | "loot";
 
 function toDateTimeLocal(timestamp: number | null): string {
   if (!timestamp) return "";
@@ -71,6 +73,7 @@ function newThreadId(): string {
 export function CampaignDashboard({
   campaignId,
   isGm,
+  currentUserId,
   characters,
   onNavigate,
   onJournalCreated,
@@ -78,6 +81,7 @@ export function CampaignDashboard({
 }: {
   campaignId: string;
   isGm: boolean;
+  currentUserId: string;
   characters: CharacterRecord[];
   onNavigate: (tab: DashboardTab) => void;
   onJournalCreated: (entry: JournalEntry) => void;
@@ -93,6 +97,7 @@ export function CampaignDashboard({
   const [notes, setNotes] = useState("");
   const [threads, setThreads] = useState<CampaignThread[]>([]);
   const [newThread, setNewThread] = useState("");
+  const [nextSession, setNextSession] = useState<CampaignSession | null>(null);
   const [recapOpen, setRecapOpen] = useState(false);
   const [sessionRecap, setSessionRecap] = useState<SessionRecap | null>(null);
   const [recapDraft, setRecapDraft] = useState("");
@@ -128,6 +133,25 @@ export function CampaignDashboard({
     };
   }, [campaignId]);
 
+  useEffect(() => {
+    let cancelled = false;
+    api<{ sessions: CampaignSession[] }>(`/api/campaigns/${campaignId}/sessions`)
+      .then((result) => {
+        if (cancelled) return;
+        const scheduled = result.sessions
+          .filter((session) => session.status === "scheduled")
+          .sort((a, b) => a.scheduledAt - b.scheduledAt);
+        const now = Date.now();
+        setNextSession(scheduled.find((session) => session.scheduledAt >= now) ?? null);
+      })
+      .catch(() => {
+        // The check-in reminder is optional; the dashboard remains usable without it.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [campaignId]);
+
   const completed = useMemo(
     () => characters.filter((character) => character.summary),
     [characters],
@@ -140,6 +164,8 @@ export function CampaignDashboard({
     : null;
   const incomplete = characters.length - completed.length;
   const openThreads = openThreadCount(threads);
+  const checkinSummary = nextSession ? sessionCheckinSummary(nextSession.checkins) : null;
+  const ownCheckin = nextSession?.checkins.find((entry) => entry.userId === currentUserId) ?? null;
 
   const save = async () => {
     setBusy(true);
@@ -372,6 +398,50 @@ export function CampaignDashboard({
                 placeholder="Open on the ferryman's reaction, then the vault guardian."
               />
             </Field>
+          ) : null}
+          {nextSession && checkinSummary ? (
+            <div className="dashboard-checkin">
+              <div className="row-between">
+                <span className="tiny muted">
+                  <Users size={12} /> Check-in
+                </span>
+                <Tag
+                  tone={
+                    checkinSummary.unanswered || checkinSummary.no || checkinSummary.maybe
+                      ? "gold"
+                      : "green"
+                  }
+                >
+                  {checkinSummary.yes}/{nextSession.checkins.length} in
+                </Tag>
+              </div>
+              <p className="tiny muted">
+                {[
+                  checkinSummary.unanswered
+                    ? `${checkinSummary.unanswered} ${
+                        checkinSummary.unanswered === 1 ? "person hasn't" : "people haven't"
+                      } replied.`
+                    : "",
+                  checkinSummary.maybe
+                    ? `${checkinSummary.maybe} ${checkinSummary.maybe === 1 ? "person is" : "people are"} maybe.`
+                    : "",
+                  checkinSummary.no
+                    ? `${checkinSummary.no} ${checkinSummary.no === 1 ? "person can't" : "people can't"} make it.`
+                    : "",
+                ].filter(Boolean).join(" ") || "Everyone checked in."}
+                {ownCheckin?.status === "unanswered" ? " Your check-in is missing." : ""}
+              </p>
+              {ownCheckin?.status === "unanswered" ? (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  icon={<Users size={13} />}
+                  onClick={() => onNavigate("sessions")}
+                >
+                  Check in
+                </Button>
+              ) : null}
+            </div>
           ) : null}
           <div className="dashboard-quick">
             <Button size="sm" variant="secondary" icon={<Map size={14} />} onClick={() => onNavigate("table")}>
