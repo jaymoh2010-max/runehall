@@ -918,6 +918,29 @@ export interface CampaignDashboard {
   updatedAt: number;
 }
 
+export interface SessionRecapStats {
+  messages: number;
+  rolls: number;
+  successes: number;
+  failures: number;
+  criticalSuccesses: number;
+  criticalFailures: number;
+  journalEntries: number;
+  handouts: number;
+  lootParcels: number;
+  openThreads: number;
+}
+
+export interface SessionRecap {
+  campaignId: string;
+  from: number;
+  to: number;
+  sessionTitle: string | null;
+  sessionAt: number | null;
+  stats: SessionRecapStats;
+  draft: string;
+}
+
 export type EncounterDifficulty = "trivial" | "low" | "moderate" | "severe" | "extreme" | "beyond";
 
 export interface EncounterBudget {

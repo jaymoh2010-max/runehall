@@ -686,6 +686,45 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
     return reply.send({ entry: serializeJournal(row) });
   });
 
+  app.post("/api/campaigns/:id/journal/:entryId/duplicate", async (request, reply) => {
+    if (!request.user) return reply.code(401).send({ error: "Sign in to continue." });
+    const { id, entryId } = request.params as { id: string; entryId: string };
+    const role = getMembership(id, request.user.id)?.role;
+    if (role !== "gm") {
+      return reply.code(403).send({ error: "Only the GM can duplicate journal entries." });
+    }
+    const existing = db
+      .prepare("SELECT * FROM journal_entries WHERE id = ? AND campaign_id = ?")
+      .get(entryId, id) as JournalRow | undefined;
+    if (!existing) return reply.code(404).send({ error: "Journal entry not found." });
+    const duplicateId = newId("journal");
+    const ts = now();
+    db.prepare(
+      `INSERT INTO journal_entries
+        (id, campaign_id, title, content, visible, kind, attachments, created_by, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run(
+      duplicateId,
+      id,
+      `${existing.title} (copy)`.slice(0, 140),
+      existing.content,
+      existing.visible,
+      normalizeJournalKind(existing.kind),
+      existing.attachments,
+      request.user.id,
+      ts,
+      ts,
+    );
+    const row = db
+      .prepare(
+        `SELECT j.*, u.display_name AS author_name FROM journal_entries j
+         LEFT JOIN users u ON u.id = j.created_by WHERE j.id = ?`,
+      )
+      .get(duplicateId) as JournalRow & { author_name: string | null };
+    touchCampaign(id);
+    return reply.code(201).send({ entry: serializeJournal(row) });
+  });
+
   app.delete("/api/campaigns/:id/journal/:entryId", async (request, reply) => {
     if (!request.user) return reply.code(401).send({ error: "Sign in to continue." });
     const { id, entryId } = request.params as { id: string; entryId: string };

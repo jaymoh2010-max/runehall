@@ -1163,6 +1163,7 @@
 .dashboard-grid h3 { font-size: 1.05rem; margin-top: 3px; }
 .dashboard-grid .field { margin-top: 0; }
 .dashboard-prose { white-space: pre-wrap; color: var(--text-2); line-height: 1.6; font-size: 0.9rem; }
+.dashboard-prose.journal-body { white-space: normal; }
 .dashboard-quick { display: flex; flex-wrap: wrap; gap: 6px; margin-top: auto; padding-top: 10px; border-top: 1px solid var(--line); }
 .dashboard-party-grid { display: flex; flex-direction: column; gap: 6px; }
 .dashboard-hero { display: flex; align-items: center; gap: 9px; border: 1px solid var(--line); border-radius: 8px; padding: 8px 9px; background: rgba(255,255,255,0.015); color: var(--text-2); }

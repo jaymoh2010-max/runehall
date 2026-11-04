@@ -420,8 +420,16 @@ Acceptance: a GM can prepare a full session in Runehall and start it with one â€
 
 **Goal:** make session prep and between-session continuity excellent.
 
-- [ ] Encounter improvements: duplicate, waves, party-size presets, launch preview.
-- [ ] Session agenda and an automatic recap draft from chat, rolls, and handouts.
+- [ ] Encounter improvements: duplicate, waves, party-size presets, and launch preview remain.
+- [x] **Session recap draft**
+  - The GM can generate an editable recap from the selected time window.
+  - It draws on shared rolls, visible journal entries and handouts, loot parcels, the played session, and open shared threads.
+  - GM-only chat, hidden handouts, and GM-only threads are excluded.
+  - The draft can be saved as the dashboard session summary or as a shared handout.
+- [ ] Session agenda and check-in reminders.
+- [x] **Reusable handouts**
+  - The GM can duplicate any journal entry or handout in one click.
+  - Duplicates preserve content, kind, visibility, and attachments.
 - [ ] Player-facing inventory/currency ledger and item transfer.
 - [ ] Reusable handout/asset library tied into cleanup.
 - [ ] Optional automatic XP only if it still matters after milestone play.

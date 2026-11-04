@@ -670,6 +670,65 @@ async function main() {
   if (playerSawSecret) throw new Error("Player received a GM-only secret roll");
   log("GM secret roll stayed out of the player chat");
 
+  await api(`/api/campaigns/${campaign.id}/sessions`, {
+    method: "POST",
+    cookie: gmCookie,
+    body: {
+      title: "Smoke Recap Session",
+      scheduledAt: Date.now() - 2 * 60 * 60 * 1000,
+      durationMinutes: 180,
+      status: "played",
+      notes: "Recap fixture.",
+    },
+  });
+  const recapWindow = {
+    from: Date.now() - 24 * 60 * 60 * 1000,
+    to: Date.now() + 60_000,
+  };
+  const recapResult = await api(
+    `/api/campaigns/${campaign.id}/recap?from=${recapWindow.from}&to=${recapWindow.to}`,
+    { cookie: gmCookie },
+  );
+  const recap = recapResult.payload.recap;
+  if (!recap?.draft?.includes("Smoke Recap Session")) {
+    throw new Error("Recap did not include the played session");
+  }
+  if (!recap.draft.includes("Group Stealth") || recap.stats.rolls < 1) {
+    throw new Error("Recap did not include shared rolls");
+  }
+  if (!recap.draft.includes("Smoke Handout") || !recap.draft.includes("Smoke Loot")) {
+    throw new Error("Recap did not include shared handouts or loot");
+  }
+  if (recap.draft.includes("Smoke Secret") || recap.draft.includes("Smoke Secret Handout")) {
+    throw new Error("Recap leaked GM-only records");
+  }
+  if (recap.draft.includes("Secret GM thread")) {
+    throw new Error("Recap leaked a GM-only dashboard thread");
+  }
+  const playerRecap = await fetch(
+    `${base}/api/campaigns/${campaign.id}/recap?from=${recapWindow.from}&to=${recapWindow.to}`,
+    { headers: { cookie: playerCookie } },
+  );
+  if (playerRecap.status !== 403) throw new Error("Player could generate a GM recap");
+  log("session recap assembled player-safe records for the GM");
+
+  const duplicateResult = await api(
+    `/api/campaigns/${campaign.id}/journal/${sharedHandout.id}/duplicate`,
+    { method: "POST", cookie: gmCookie },
+  );
+  if (duplicateResult.payload.entry?.title !== "Smoke Handout (copy)") {
+    throw new Error("Journal entry was not duplicated");
+  }
+  if (duplicateResult.payload.entry.attachments.length !== 1) {
+    throw new Error("Duplicated handout lost its attachments");
+  }
+  const playerDuplicate = await fetch(
+    `${base}/api/campaigns/${campaign.id}/journal/${sharedHandout.id}/duplicate`,
+    { method: "POST", headers: { cookie: playerCookie } },
+  );
+  if (playerDuplicate.status !== 403) throw new Error("Player could duplicate a journal entry");
+  log("journal handouts can be duplicated by the GM only");
+
   const initiativePromise = waitForEvent(
     playerSocket,
     "initiative:updated",

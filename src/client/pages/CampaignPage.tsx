@@ -76,6 +76,7 @@ import { CampaignDashboard } from "../components/campaign/CampaignDashboard";
 import { NpcLibrary } from "../components/campaign/NpcLibrary";
 import { SessionsPage } from "../components/campaign/SessionsPage";
 import { GmScreen } from "../components/campaign/GmScreen";
+import { JournalBody } from "../components/JournalBody";
 
 type Tab =
   | "table"
@@ -361,6 +362,29 @@ export function CampaignPage() {
     }
   };
 
+  const duplicateJournal = async (entry: JournalEntry) => {
+    if (!id) return;
+    setJournalBusy(true);
+    try {
+      const result = await api<{ entry: JournalEntry }>(
+        `/api/campaigns/${id}/journal/${entry.id}/duplicate`,
+        { method: "POST" },
+      );
+      setTableData((current) =>
+        current
+          ? { ...current, journal: [result.entry, ...current.journal] }
+          : current,
+      );
+      setSelectedJournalId(result.entry.id);
+      setJournalFilter("all");
+      toast("Journal entry duplicated.", "success");
+    } catch (err) {
+      toast(errorMessage(err), "error");
+    } finally {
+      setJournalBusy(false);
+    }
+  };
+
   const saveSettings = async (event: FormEvent) => {
     event.preventDefault();
     if (!id || !campaign) return;
@@ -621,6 +645,14 @@ export function CampaignPage() {
             isGm={isGm}
             characters={characters}
             onNavigate={(next) => setTab(next)}
+            onJournalCreated={(entry) => {
+              setTableData((current) =>
+                current
+                  ? { ...current, journal: [entry, ...current.journal] }
+                  : current,
+              );
+              setSelectedJournalId(entry.id);
+            }}
             toast={toast}
           />
         ) : null}
@@ -791,6 +823,7 @@ export function CampaignPage() {
                     {isGm ? (
                       <div className="row" style={{ gap: 6 }}>
                         <Button size="sm" variant="ghost" icon={<Pencil size={13} />} onClick={() => setJournalEditor(selectedJournal)}>Edit</Button>
+                        <Button size="sm" variant="ghost" icon={<Copy size={13} />} loading={journalBusy} onClick={() => duplicateJournal(selectedJournal)}>Duplicate</Button>
                         <button className="icon-btn" title="Delete entry" onClick={() => deleteJournal(selectedJournal)}><Trash2 size={14} /></button>
                       </div>
                     ) : null}
@@ -810,7 +843,7 @@ export function CampaignPage() {
                       ))}
                     </div>
                   ) : null}
-                  <div className="journal-body">{renderJournal(selectedJournal.content)}</div>
+                  <JournalBody content={selectedJournal.content} className="journal-body" />
                 </>
               ) : (
                 <EmptyState icon={<ScrollText size={28} />} title="The page is blank" description="Choose an entry or write a new one." />
@@ -1096,23 +1129,4 @@ export function CampaignPage() {
       </Modal>
     </div>
   );
-}
-
-function renderJournal(content: string) {
-  const lines = content.split("\n");
-  return lines.map((line, index) => {
-    const escaped = line
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-      .replace(/\*(.+?)\*/g, "<em>$1</em>");
-    if (line.startsWith("# ")) return <h2 key={index}>{line.slice(2)}</h2>;
-    if (line.startsWith("## ")) return <h3 key={index}>{line.slice(3)}</h3>;
-    if (line.startsWith("- ")) {
-      return <p key={index} className="journal-list-line" dangerouslySetInnerHTML={{ __html: `• ${escaped.slice(2)}` }} />;
-    }
-    if (!line.trim()) return <div key={index} className="journal-spacer" />;
-    return <p key={index} dangerouslySetInnerHTML={{ __html: escaped }} />;
-  });
 }

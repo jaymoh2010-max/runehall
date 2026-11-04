@@ -8,8 +8,10 @@ import {
   EyeOff,
   Map,
   Plus,
+  RefreshCw,
   ScrollText,
   Skull,
+  Sparkles,
   Swords,
   Trash2,
   Users,
@@ -18,10 +20,13 @@ import type {
   CampaignDashboard as CampaignDashboardData,
   CampaignThread,
   CharacterRecord,
+  JournalEntry,
+  SessionRecap,
 } from "../../../shared/types";
 import { openThreadCount } from "../../../shared/dashboard";
 import { api, formatDate } from "../../api";
 import { errorMessage } from "../../stores";
+import { JournalBody } from "../JournalBody";
 import {
   Avatar,
   Badge,
@@ -31,6 +36,7 @@ import {
   Field,
   IconButton,
   Input,
+  Modal,
   PageEyebrow,
   Spinner,
   Tag,
@@ -67,12 +73,14 @@ export function CampaignDashboard({
   isGm,
   characters,
   onNavigate,
+  onJournalCreated,
   toast,
 }: {
   campaignId: string;
   isGm: boolean;
   characters: CharacterRecord[];
   onNavigate: (tab: DashboardTab) => void;
+  onJournalCreated: (entry: JournalEntry) => void;
   toast: (message: string, kind?: "info" | "success" | "error") => void;
 }) {
   const [dashboard, setDashboard] = useState<CampaignDashboardData | null>(null);
@@ -85,6 +93,16 @@ export function CampaignDashboard({
   const [notes, setNotes] = useState("");
   const [threads, setThreads] = useState<CampaignThread[]>([]);
   const [newThread, setNewThread] = useState("");
+  const [recapOpen, setRecapOpen] = useState(false);
+  const [sessionRecap, setSessionRecap] = useState<SessionRecap | null>(null);
+  const [recapDraft, setRecapDraft] = useState("");
+  const [recapFrom, setRecapFrom] = useState("");
+  const [recapTo, setRecapTo] = useState("");
+  const [recapBusy, setRecapBusy] = useState(false);
+  const [recapSaving, setRecapSaving] = useState(false);
+  const [recapError, setRecapError] = useState("");
+  const [recapHandoutSaved, setRecapHandoutSaved] = useState(false);
+  const [recapSummarySaved, setRecapSummarySaved] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -149,6 +167,96 @@ export function CampaignDashboard({
     }
   };
 
+  const generateRecap = async (fromValue: string, toValue: string) => {
+    setRecapBusy(true);
+    setRecapError("");
+    try {
+      const params = new URLSearchParams();
+      const fromTimestamp = fromValue ? new Date(fromValue).getTime() : NaN;
+      const toTimestamp = toValue ? new Date(toValue).getTime() : NaN;
+      if (Number.isFinite(fromTimestamp)) params.set("from", String(fromTimestamp));
+      if (Number.isFinite(toTimestamp)) params.set("to", String(toTimestamp));
+      const query = params.toString();
+      const result = await api<{ recap: SessionRecap }>(
+        `/api/campaigns/${campaignId}/recap${query ? `?${query}` : ""}`,
+      );
+      setSessionRecap(result.recap);
+      setRecapDraft(result.recap.draft);
+      setRecapFrom(toDateTimeLocal(result.recap.from));
+      setRecapTo(toDateTimeLocal(result.recap.to));
+      setRecapHandoutSaved(false);
+      setRecapSummarySaved(false);
+    } catch (err) {
+      setRecapError(errorMessage(err));
+    } finally {
+      setRecapBusy(false);
+    }
+  };
+
+  const openRecap = () => {
+    setRecapOpen(true);
+    setSessionRecap(null);
+    setRecapDraft("");
+    setRecapFrom("");
+    setRecapTo("");
+    setRecapError("");
+    setRecapHandoutSaved(false);
+    setRecapSummarySaved(false);
+    void generateRecap("", "");
+  };
+
+  const useRecapAsSummary = async () => {
+    const text = recapDraft.trim();
+    if (!text) return;
+    setRecapSaving(true);
+    setRecapError("");
+    try {
+      const result = await api<{ dashboard: CampaignDashboardData }>(
+        `/api/campaigns/${campaignId}/dashboard`,
+        { method: "PATCH", body: { lastSessionSummary: text } },
+      );
+      setDashboard(result.dashboard);
+      setLastSummary(result.dashboard.lastSessionSummary);
+      setRecapSummarySaved(true);
+      toast("Session summary updated from the recap.", "success");
+    } catch (err) {
+      setRecapError(errorMessage(err));
+    } finally {
+      setRecapSaving(false);
+    }
+  };
+
+  const saveRecapHandout = async () => {
+    const text = recapDraft.trim();
+    if (!text) return;
+    setRecapSaving(true);
+    setRecapError("");
+    try {
+      const title = sessionRecap?.sessionTitle
+        ? `Session recap — ${sessionRecap.sessionTitle}`
+        : `Session recap — ${new Date().toLocaleDateString()}`;
+      const result = await api<{ entry: JournalEntry }>(
+        `/api/campaigns/${campaignId}/journal`,
+        {
+          method: "POST",
+          body: {
+            title: title.slice(0, 140),
+            content: text,
+            visible: true,
+            kind: "handout",
+          },
+        },
+      );
+      onJournalCreated(result.entry);
+      setRecapHandoutSaved(true);
+      toast("Recap saved as a shared handout.", "success");
+    } catch (err) {
+      setRecapError(errorMessage(err));
+    } finally {
+      setRecapSaving(false);
+    }
+  };
+
   const addThread = () => {
     const text = newThread.trim();
     if (!text) return;
@@ -200,7 +308,19 @@ export function CampaignDashboard({
               <PageEyebrow>Last session</PageEyebrow>
               <h3>What happened?</h3>
             </div>
-            <Tag tone={lastSummary ? "gold" : "neutral"}>{lastSummary ? "Recorded" : "Empty"}</Tag>
+            <div className="row" style={{ gap: 7 }}>
+              {isGm ? (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  icon={<Sparkles size={13} />}
+                  onClick={openRecap}
+                >
+                  Generate recap
+                </Button>
+              ) : null}
+              <Tag tone={lastSummary ? "gold" : "neutral"}>{lastSummary ? "Recorded" : "Empty"}</Tag>
+            </div>
           </div>
           {isGm ? (
             <Field label="Session summary" hint="Shared with players on this overview.">
@@ -212,7 +332,7 @@ export function CampaignDashboard({
               />
             </Field>
           ) : lastSummary ? (
-            <p className="dashboard-prose">{lastSummary}</p>
+            <JournalBody content={lastSummary} className="dashboard-prose journal-body" />
           ) : (
             <p className="muted small">The GM hasn't written the last session summary yet.</p>
           )}
@@ -403,6 +523,99 @@ export function CampaignDashboard({
           ) : null}
         </Card>
       </div>
+
+      <Modal
+        open={recapOpen}
+        onClose={() => setRecapOpen(false)}
+        title="Generate session recap"
+        subtitle="Built from shared rolls, visible journal entries, loot, and open threads. GM-only chat and hidden handouts stay out."
+        wide
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setRecapOpen(false)}>
+              Done
+            </Button>
+            <Button
+              variant="secondary"
+              icon={<ScrollText size={14} />}
+              loading={recapSaving}
+              onClick={saveRecapHandout}
+              disabled={!recapDraft.trim() || recapHandoutSaved}
+            >
+              Save as handout
+            </Button>
+            <Button
+              variant="primary"
+              icon={<Check size={14} />}
+              loading={recapSaving}
+              onClick={useRecapAsSummary}
+              disabled={!recapDraft.trim()}
+            >
+              Use as summary
+            </Button>
+          </>
+        }
+      >
+        {recapError ? <div className="auth-error">{recapError}</div> : null}
+        <div className="form-grid two">
+          <Field label="From">
+            <Input
+              type="datetime-local"
+              value={recapFrom}
+              onChange={(event) => setRecapFrom(event.target.value)}
+            />
+          </Field>
+          <Field label="To">
+            <Input
+              type="datetime-local"
+              value={recapTo}
+              onChange={(event) => setRecapTo(event.target.value)}
+            />
+          </Field>
+        </div>
+        <div className="row wrap" style={{ gap: 7, alignItems: "center" }}>
+          <Button
+            size="sm"
+            variant="ghost"
+            icon={<RefreshCw size={13} />}
+            loading={recapBusy}
+            onClick={() => void generateRecap(recapFrom, recapTo)}
+          >
+            Rebuild draft
+          </Button>
+          {sessionRecap ? (
+            <span className="tiny muted">
+              {sessionRecap.stats.rolls} rolls · {sessionRecap.stats.journalEntries} journal{" "}
+              {sessionRecap.stats.journalEntries === 1 ? "entry" : "entries"} ·{" "}
+              {sessionRecap.stats.lootParcels} loot{" "}
+              {sessionRecap.stats.lootParcels === 1 ? "parcel" : "parcels"} ·{" "}
+              {sessionRecap.stats.openThreads} open{" "}
+              {sessionRecap.stats.openThreads === 1 ? "thread" : "threads"}
+            </span>
+          ) : null}
+          {recapSummarySaved ? <Tag tone="green">Summary updated</Tag> : null}
+          {recapHandoutSaved ? <Tag tone="green">Handout saved</Tag> : null}
+        </div>
+        {sessionRecap || !recapBusy ? (
+          <Field
+            label="Draft"
+            hint="Edit anything before saving. GM-only chat and hidden handouts are never included."
+          >
+            <Textarea
+              rows={16}
+              value={recapDraft}
+              onChange={(event) => {
+                setRecapDraft(event.target.value);
+                setRecapHandoutSaved(false);
+                setRecapSummarySaved(false);
+              }}
+              placeholder="Generate a draft to start from the shared records."
+            />
+          </Field>
+        ) : (
+          <Spinner label="Gathering shared records…" />
+        )}
+      </Modal>
     </div>
   );
 }
