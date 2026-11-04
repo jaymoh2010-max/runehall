@@ -7,6 +7,7 @@ import {
   casterInfo,
   checkFeatPrerequisite,
   computeCharacter,
+  divineFontInfo,
   emptyCharacterDraft,
   featAvailability,
   featPrerequisiteStatus,
@@ -99,6 +100,8 @@ describe("PF2e character rules", () => {
     expect(derived.classDc).toBe(17);
     expect(derived.spellDc).toBe(17);
     expect(derived.spellAttack).toBe(7);
+    expect(derived.divineFontSlots).toBe(4);
+    expect(derived.divineFontRank).toBe(1);
     expect(derived.validation.filter((issue) => issue.severity === "error")).toEqual([]);
   });
 
@@ -126,6 +129,8 @@ describe("PF2e character rules", () => {
     expect(fullCasterSlots(5)).toEqual([3, 3, 2]);
     // Cleric: 3/3/2 base plus 5 divine font slots at the highest rank.
     expect(derived.spellSlots).toEqual([3, 3, 7]);
+    expect(derived.divineFontSlots).toBe(5);
+    expect(derived.divineFontRank).toBe(3);
     expect(derived.attacks.find((attack) => attack.name === "Fist")?.attackBonus).toBe(10);
   });
 
@@ -345,6 +350,14 @@ describe("PF2e character rules", () => {
     expect(spellSlotsFor(19, "bounded", "Psychic")).toEqual([2, 2, 2, 2, 2, 2, 2, 2, 2, 1]);
     expect(spellSlotsFor(19, "bounded", "Necromancer")).toEqual([2, 2, 2, 2, 2, 2, 2, 2, 2, 1]);
     expect(spellSlotsFor(19, "bounded", "Magus")).toEqual([2, 2, 2, 2, 2, 2, 2, 2, 2]);
+  });
+
+  it("tracks cleric divine font separately from ordinary slots", () => {
+    expect(divineFontInfo(1, "Cleric")).toEqual({ slots: 4, rank: 1 });
+    expect(divineFontInfo(5, "Cleric")).toEqual({ slots: 5, rank: 3 });
+    expect(divineFontInfo(15, "Cleric")).toEqual({ slots: 6, rank: 8 });
+    expect(divineFontInfo(19, "Cleric")).toEqual({ slots: 6, rank: 9 });
+    expect(divineFontInfo(10, "Wizard")).toBeNull();
   });
 
   it("treats a deity's favored weapon as proficient", () => {

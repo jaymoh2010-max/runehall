@@ -598,6 +598,8 @@ export interface CharacterDraft {
     /** Spell IDs prepared for the day by prepared casters. */
     prepared: string[];
     focus: string[];
+    /** Divine font pips spent today (cleric heal/harm slots). */
+    divineFontUsed: number;
     slotsUsed: Record<string, number>;
   };
   equipment: CharacterEquipment[];
@@ -739,6 +741,9 @@ export interface DerivedCharacter {
   attacks: DerivedAttack[];
   spellSlots: number[] | null;
   spellSlotsNote: string | null;
+  /** Cleric divine font slots, tracked separately from ordinary slots. */
+  divineFontSlots: number | null;
+  divineFontRank: number | null;
   focusPointsMax: number;
   size: string;
   languages: string[];

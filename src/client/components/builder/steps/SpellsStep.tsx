@@ -68,6 +68,7 @@ import {
   featSlotsFor,
   flexibleBoosts,
   grantedTrainedSkills,
+  isPreparedCasterClass,
   normalizeCharacterDraft,
   requiredExtraSkills,
   selectedChoiceOptions,
@@ -136,11 +137,11 @@ export function SpellsStep({ draft, update, derived, context, setStep, openPicke
   const known = draft.spells.known.map((id) => context.spells[id]).filter((spell): spell is Spell => Boolean(spell));
   const focus = draft.spells.focus.map((id) => context.spells[id]).filter((spell): spell is Spell => Boolean(spell));
   const slots = derived.spellSlots;
+  const fontSlots = derived.divineFontSlots;
+  const fontRank = derived.divineFontRank;
   const isFocusCaster = caster.progression === "focus";
   const repertoire = spellRepertoireLimits(classData, draft.level);
-  const isPreparedCaster = ["animist", "cleric", "druid", "magus", "necromancer", "witch", "wizard"].includes(
-    classData?.name.toLowerCase() ?? "",
-  );
+  const isPreparedCaster = isPreparedCasterClass(classData?.name);
   const preparedCounts = new Map<string, number>();
   for (const id of draft.spells.prepared) preparedCounts.set(id, (preparedCounts.get(id) ?? 0) + 1);
   const preparedByRank = new Map<number, number>();
@@ -236,11 +237,15 @@ export function SpellsStep({ draft, update, derived, context, setStep, openPicke
                 size="sm"
                 variant="ghost"
                 onClick={() =>
-                  update((current) => ({ ...current, spells: { ...current.spells, slotsUsed: {} } }))
+                  update((current) => ({
+                    ...current,
+                    spells: { ...current.spells, slotsUsed: {}, divineFontUsed: 0 },
+                  }))
                 }
               >
                 Reset slots
               </Button>
+              <Badge tone="blue">{isPreparedCaster ? "Prepared" : "Spontaneous"}</Badge>
               <Badge tone="gold">
                 {caster.progression === "bounded" ? "Bounded caster" : "Full caster"}
               </Badge>
@@ -253,29 +258,60 @@ export function SpellsStep({ draft, update, derived, context, setStep, openPicke
             {slots.map((count, index) => {
               const rank = index + 1;
               const used = draft.spells.slotsUsed[String(rank)] ?? 0;
+              const regularCount = fontRank === rank ? Math.max(0, count - (fontSlots ?? 0)) : count;
+              const fontUsed = Math.max(0, Math.min(fontSlots ?? 0, draft.spells.divineFontUsed ?? 0));
               return (
-                <div key={rank} className="slot-row">
-                  <span className="slot-rank">Rank {rank}</span>
-                  <div className="slot-pips">
-                    {Array.from({ length: count }).map((_, pip) => (
-                      <button
-                        key={pip}
-                        type="button"
-                        className={`slot-pip ${pip < used ? "is-used" : ""}`}
-                        title={pip < used ? "Restore slot" : "Spend slot"}
-                        onClick={() =>
-                          update((current) => ({
-                            ...current,
-                            spells: {
-                              ...current.spells,
-                              slotsUsed: { ...current.spells.slotsUsed, [String(rank)]: pip < used ? pip : pip + 1 },
-                            },
-                          }))
-                        }
-                      />
-                    ))}
+                <div key={rank}>
+                  <div className="slot-row">
+                    <span className="slot-rank">Rank {rank}</span>
+                    <div className="slot-pips">
+                      {Array.from({ length: regularCount }).map((_, pip) => (
+                        <button
+                          key={pip}
+                          type="button"
+                          className={`slot-pip ${pip < used ? "is-used" : ""}`}
+                          title={pip < used ? "Restore slot" : "Spend slot"}
+                          onClick={() =>
+                            update((current) => ({
+                              ...current,
+                              spells: {
+                                ...current.spells,
+                                slotsUsed: { ...current.spells.slotsUsed, [String(rank)]: pip < used ? pip : pip + 1 },
+                              },
+                            }))
+                          }
+                        />
+                      ))}
+                    </div>
+                    <span className="tiny muted">{Math.max(0, regularCount - used)} of {regularCount} left</span>
                   </div>
-                  <span className="tiny muted">{count - used} of {count} left</span>
+                  {fontRank === rank && fontSlots ? (
+                    <div className="slot-row slot-row-font">
+                      <span className="slot-rank">Divine font · Rank {rank}</span>
+                      <div className="slot-pips">
+                        {Array.from({ length: fontSlots }).map((_, pip) => (
+                          <button
+                            key={pip}
+                            type="button"
+                            className={`slot-pip is-font ${pip < fontUsed ? "is-used" : ""}`}
+                            title={pip < fontUsed ? "Restore font slot" : "Spend font slot"}
+                            onClick={() =>
+                              update((current) => ({
+                                ...current,
+                                spells: {
+                                  ...current.spells,
+                                  divineFontUsed: pip < fontUsed ? pip : pip + 1,
+                                },
+                              }))
+                            }
+                          />
+                        ))}
+                      </div>
+                      <span className="tiny muted">
+                        {fontSlots - fontUsed} of {fontSlots} left · heal or harm
+                      </span>
+                    </div>
+                  ) : null}
                 </div>
               );
             })}
@@ -328,12 +364,13 @@ export function SpellsStep({ draft, update, derived, context, setStep, openPicke
           <Card key={rank} className="spell-section">
             <div className="row-between">
               <div>
-                <h3>Rank {rank} spells</h3>
+                <h3>Rank {rank} {isPreparedCaster ? "spellbook" : "repertoire"}</h3>
                 <p className="muted small">
                   {spells.length}
-                  {repertoire ? ` / ${repertoire.ranks[rank - 1] ?? 0}` : ""} chosen
+                  {repertoire ? ` / ${repertoire.ranks[rank - 1] ?? 0}` : ""}{" "}
+                  {isPreparedCaster ? "in spellbook" : "known"}
                   {isPreparedCaster
-                    ? ` · ${preparedForRank} / ${rankSlots} prepared`
+                    ? ` · ${preparedForRank} / ${rankSlots} prepared${fontRank === rank ? " (includes font)" : ""}`
                     : ""}
                 </p>
               </div>
@@ -425,8 +462,9 @@ export function SpellsStep({ draft, update, derived, context, setStep, openPicke
         <BookOpen size={16} />
         <p>
           Prepared casters can prepare up to their available slots for each rank; the Prepare button stops when that
-          rank is full. Spontaneous repertoire limits are checked for bards, oracles, sorcerers, and summoners. Slot
-          pips are a table aid and reset between sessions.
+          rank is full. Spontaneous repertoire limits are checked for bards, oracles, sorcerers, and summoners. Divine
+          font pips are tracked separately, but the prepared counter includes them. Slot pips are a table aid and reset
+          between sessions.
         </p>
       </div>
       <ValidationNote issues={issues} />

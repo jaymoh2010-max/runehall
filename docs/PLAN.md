@@ -174,7 +174,7 @@ The character draft is a versioned JSON document (`CharacterDraft.version = 1`).
 ### Deliberately manual / future
 - Story/campaign prerequisites and unusual feat prerequisites that depend on unmodeled fiction, access, or affiliations.
 - Automatic conditional bonuses and item rune effects.
-- Prepared-vs-spontaneous slot enforcement (animist apparition slots and cleric divine font slots are counted, but their casting restrictions are not enforced).
+- Prepared-vs-spontaneous slot enforcement (animist apparition slots and cleric divine font slots are counted, and divine font now has separate pips, but heal-or-harm casting restrictions are not enforced).
 - Exact prepared-vs-spontaneous restrictions for split casters such as the animist.
 - Psychic amps, focus-spell maximums from every feat, and focus spell selection restricted by class.
 - Animist apparitions, animal companions, eidolons, familiars, constructs, and summon stat blocks.

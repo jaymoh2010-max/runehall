@@ -341,8 +341,11 @@ Acceptance: a GM can prepare a full session in Runehall and start it with one â€
 - [ ] **Full guided level-up wizard**
   - Gate level-up when the current level still has unresolved required choices.
   - Add a step-by-step next/back flow with before/after explanations.
-- [ ] **Casting presentation**
-  - Separate divine-font tracking and clearer spellbook-vs-known presentation.
+- [x] **Casting presentation**
+  - Cleric divine font slots are tracked with their own pips, separate from ordinary rank slots.
+  - Prepared casters label their spell lists as **spellbook** and show prepared counts; spontaneous casters use **repertoire**.
+  - The sheet shows the same separation and labels.
+  - Remaining: enforce heal-or-harm on font preparations and fully separate spellbook from known lists for every prepared class.
 - [ ] **Companion support**
   - Bestiary-linked statblocks or a clear actor-lite sheet for companions, familiars, and eidolons.
 - [ ] **Content curation**

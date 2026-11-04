@@ -39,6 +39,7 @@ import {
 import {
   casterInfo,
   computeCharacter,
+  isPreparedCasterClass,
   normalizeCharacterDraft,
   selectedChoiceOptions,
   signed,
@@ -524,38 +525,71 @@ export function CharacterSheetPage() {
               </div>
               {derived.spellSlots ? (
                 <div className="sheet-slots">
-                  {derived.spellSlots.map((count, index) => (
-                    <div key={index} className="sheet-slot-row">
-                      <span>Rank {index + 1}</span>
-                      <div className="slot-pips">
-                        {Array.from({ length: count }).map((_, pip) => {
-                          const rankKey = String(index + 1);
-                          const used = draft.spells.slotsUsed[rankKey] ?? 0;
-                          return (
-                            <button
-                              key={pip}
-                              type="button"
-                              className={`slot-pip ${pip < used ? "is-used" : ""}`}
-                              title={pip < used ? "Restore slot" : "Spend slot"}
-                              disabled={!canEdit}
-                              onClick={() =>
-                                update((current) => ({
-                                  ...current,
-                                  spells: {
-                                    ...current.spells,
-                                    slotsUsed: {
-                                      ...current.spells.slotsUsed,
-                                      [rankKey]: pip < used ? pip : pip + 1,
+                  {derived.spellSlots.map((count, index) => {
+                    const rank = index + 1;
+                    const fontRank = derived.divineFontRank;
+                    const fontSlots = derived.divineFontSlots ?? 0;
+                    const regularCount = fontRank === rank ? Math.max(0, count - fontSlots) : count;
+                    const used = draft.spells.slotsUsed[String(rank)] ?? 0;
+                    const fontUsed = Math.max(0, Math.min(fontSlots, draft.spells.divineFontUsed ?? 0));
+                    return (
+                      <div key={index}>
+                        <div className="sheet-slot-row">
+                          <span>Rank {rank}</span>
+                          <div className="slot-pips">
+                            {Array.from({ length: regularCount }).map((_, pip) => (
+                              <button
+                                key={pip}
+                                type="button"
+                                className={`slot-pip ${pip < used ? "is-used" : ""}`}
+                                title={pip < used ? "Restore slot" : "Spend slot"}
+                                disabled={!canEdit}
+                                onClick={() =>
+                                  update((current) => ({
+                                    ...current,
+                                    spells: {
+                                      ...current.spells,
+                                      slotsUsed: {
+                                        ...current.spells.slotsUsed,
+                                        [String(rank)]: pip < used ? pip : pip + 1,
+                                      },
                                     },
-                                  },
-                                }))
-                              }
-                            />
-                          );
-                        })}
+                                  }))
+                                }
+                              />
+                            ))}
+                          </div>
+                          <span className="tiny muted">{Math.max(0, regularCount - used)} / {regularCount}</span>
+                        </div>
+                        {fontRank === rank && fontSlots ? (
+                          <div className="sheet-slot-row slot-row-font">
+                            <span>Divine font · {rank}</span>
+                            <div className="slot-pips">
+                              {Array.from({ length: fontSlots }).map((_, pip) => (
+                                <button
+                                  key={pip}
+                                  type="button"
+                                  className={`slot-pip is-font ${pip < fontUsed ? "is-used" : ""}`}
+                                  title={pip < fontUsed ? "Restore font slot" : "Spend font slot"}
+                                  disabled={!canEdit}
+                                  onClick={() =>
+                                    update((current) => ({
+                                      ...current,
+                                      spells: {
+                                        ...current.spells,
+                                        divineFontUsed: pip < fontUsed ? pip : pip + 1,
+                                      },
+                                    }))
+                                  }
+                                />
+                              ))}
+                            </div>
+                            <span className="tiny muted">{fontSlots - fontUsed} / {fontSlots} · heal or harm</span>
+                          </div>
+                        ) : null}
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               ) : null}
               {derived.spellSlotsNote ? <p className="muted small">{derived.spellSlotsNote}</p> : null}
@@ -888,6 +922,7 @@ function SpellGroups({
   const focus = draft.spells.focus.map((id) => context.spells[id]).filter(Boolean);
   const prepared = new Map<string, number>();
   for (const id of draft.spells.prepared) prepared.set(id, (prepared.get(id) ?? 0) + 1);
+  const preparedCaster = isPreparedCasterClass(context.classData?.name);
   const grouped = new Map<number, typeof known>();
   for (const spell of known) {
     const list = grouped.get(spell.rank) ?? [];
@@ -904,7 +939,7 @@ function SpellGroups({
       ) : null}
       {[...grouped.entries()].sort((a, b) => a[0] - b[0]).map(([rank, spells]) => (
         <div key={rank} className="spell-group">
-          <h4>Rank {rank}</h4>
+          <h4>Rank {rank} {preparedCaster ? "spellbook" : "repertoire"}</h4>
           {spells.map((spell) => (
             <SpellRow
               key={spell.id}

@@ -64,6 +64,10 @@ const PREPARED_CASTER_CLASSES = new Set([
   "wizard",
 ]);
 
+export function isPreparedCasterClass(className?: string): boolean {
+  return PREPARED_CASTER_CLASSES.has(className?.toLowerCase() ?? "");
+}
+
 interface CasterInfo {
   progression: CasterProgression;
   tradition: SpellTradition | null;
@@ -224,11 +228,21 @@ export function wizardSlots(level: number): number[] {
 }
 
 /** Clerics add divine font slots of their highest regular rank (heal or harm only). */
+export function divineFontInfo(
+  level: number,
+  className?: string,
+): { slots: number; rank: number } | null {
+  if (className?.toLowerCase() !== "cleric") return null;
+  return {
+    slots: level >= 15 ? 6 : level >= 5 ? 5 : 4,
+    rank: Math.min(9, Math.max(1, Math.ceil(level / 2))),
+  };
+}
+
 export function clericSlots(level: number): number[] {
   const slots = fullCasterSlots(level);
-  const font = level >= 15 ? 6 : level >= 5 ? 5 : 4;
-  const fontIndex = Math.min(slots.length - 1, 8); // 9th rank, never the 10th-rank capstone
-  slots[fontIndex] += font;
+  const font = divineFontInfo(level, "cleric")!;
+  slots[font.rank - 1] += font.slots;
   return slots;
 }
 
@@ -344,6 +358,7 @@ export function emptyCharacterDraft(name = "New Hero"): CharacterDraft {
       known: [],
       prepared: [],
       focus: [],
+      divineFontUsed: 0,
       slotsUsed: {},
     },
     equipment: [],
@@ -489,6 +504,7 @@ export function normalizeCharacterDraft(input: unknown, fallbackName = "New Hero
       known: arr<string>(spells.known).filter((x) => typeof x === "string"),
       prepared: arr<string>(spells.prepared).filter((x) => typeof x === "string"),
       focus: arr<string>(spells.focus).filter((x) => typeof x === "string"),
+      divineFontUsed: Math.max(0, Math.min(10, Math.round(num(spells.divineFontUsed, 0)))),
       slotsUsed: Object.fromEntries(
         Object.entries(obj(spells.slotsUsed)).filter(([, value]) => typeof value === "number"),
       ) as Record<string, number>,
@@ -2018,14 +2034,16 @@ export function computeCharacter(draft: CharacterDraft, context: CharacterContex
   const senses = ancestry?.vision && ancestry.vision !== "normal" ? [ancestry.vision] : [];
 
   const className = classData?.name.toLowerCase();
-  const fontSlots = draft.level >= 15 ? 6 : draft.level >= 5 ? 5 : 4;
+  const font = divineFontInfo(draft.level, classData?.name);
+  const divineFontSlots = font?.slots ?? null;
+  const divineFontRank = font?.rank ?? null;
   const spellSlotsNote =
     caster.progression === "focus"
       ? "Focus spells only. Champions use Charisma for spell attack rolls and spell DCs."
       : className === "animist"
         ? "Animist slots combine prepared animist spells and spontaneous apparition slots; the tracker shows the total per rank."
         : className === "cleric"
-          ? `Includes ${fontSlots} divine font slots of the highest rank (heal or harm only).`
+          ? `Divine font: ${font?.slots ?? 0} rank ${font?.rank ?? 1} heal-or-harm slots, tracked separately from ordinary slots.`
           : className === "wizard"
             ? "Includes one extra curriculum spell slot at each rank."
             : null;
@@ -2053,6 +2071,8 @@ export function computeCharacter(draft: CharacterDraft, context: CharacterContex
     attacks,
     spellSlots: slots,
     spellSlotsNote,
+    divineFontSlots,
+    divineFontRank,
     focusPointsMax,
     size: ancestry?.size ?? "med",
     languages,
