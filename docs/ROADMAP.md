@@ -394,6 +394,12 @@ Acceptance: a GM can prepare a full session in Runehall and start it with one â€
   - GM Screen can mark a roll request as a **Group check**.
   - Group check cards are labeled in the shared chat and still open the prefilled dice tray.
   - Remaining: per-player response tracking and automated group-check summaries.
+- [x] **Delay, ready, and initiative ties**
+  - The active combatant can **Delay** their turn, moving to the end of the order with a Delayed badge.
+  - **Ready** marks the readied state and advances the turn (and round when needed).
+  - Delayed/ready state can be cleared from the chip.
+  - Tied entries can be reordered up/down with explicit tie-break ordering.
+  - Remaining: automatic ready-action triggers and tie-break by Perception.
 - [ ] Decide the token HP â†” sheet HP source of truth, or make sync explicitly two-way.
 - [ ] Optional first pass at walls/doors with manual reveal before dynamic lighting.
 

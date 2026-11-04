@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import type {
   CampaignTable,
+  InitiativeEntry,
   Monster,
   PublicUser,
   Scene,
@@ -374,6 +375,58 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
     getSocket().emit("initiative:update", { campaignId, entries: [], round: 1, turnIndex: 0 });
   };
 
+  const emitInitiative = (entries: InitiativeEntry[], nextRound = round, nextTurn = turnIndex) => {
+    getSocket().emit("initiative:update", {
+      campaignId,
+      entries,
+      round: nextRound,
+      turnIndex: nextTurn,
+    });
+  };
+
+  const delayEntry = (entryId: string) => {
+    const index = initiative.findIndex((entry) => entry.id === entryId);
+    if (index < 0) return;
+    const entry = { ...initiative[index], delayed: true, readied: false };
+    const next = [...initiative.filter((item) => item.id !== entryId), entry];
+    emitInitiative(next, round, Math.min(index, Math.max(0, next.length - 1)));
+  };
+
+  const readyEntry = (entryId: string) => {
+    const next = initiative.map((entry) =>
+      entry.id === entryId ? { ...entry, readied: true, delayed: false } : entry,
+    );
+    let nextTurn = turnIndex + 1;
+    let nextRound = round;
+    if (nextTurn >= next.length) {
+      nextTurn = 0;
+      nextRound += 1;
+    }
+    emitInitiative(next, nextRound, nextTurn);
+  };
+
+  const clearInitiativeState = (entryId: string) => {
+    emitInitiative(
+      initiative.map((entry) =>
+        entry.id === entryId ? { ...entry, delayed: false, readied: false } : entry,
+      ),
+    );
+  };
+
+  const moveInitiativeEntry = (entryId: string, direction: -1 | 1) => {
+    const index = initiative.findIndex((entry) => entry.id === entryId);
+    const target = index + direction;
+    if (index < 0 || target < 0 || target >= initiative.length) return;
+    if (initiative[target].initiative !== initiative[index].initiative) return;
+    const next = [...initiative];
+    [next[index], next[target]] = [next[target], next[index]];
+    const normalized = next.map((entry, order) => ({ ...entry, tieBreak: order }));
+    let nextTurn = turnIndex;
+    if (turnIndex === index) nextTurn = target;
+    else if (turnIndex === target) nextTurn = index;
+    emitInitiative(normalized, round, nextTurn);
+  };
+
   const addSelectedToInitiative = () => {
     if (!selectedToken) return;
     getSocket().emit("initiative:add", { campaignId, tokenId: selectedToken.id });
@@ -650,6 +703,10 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
             onClear={clearInitiative}
             onRemove={(entryId) => getSocket().emit("initiative:remove", { campaignId, entryId })}
             onReroll={(entryId) => getSocket().emit("initiative:reroll", { campaignId, entryId })}
+            onDelay={delayEntry}
+            onReady={readyEntry}
+            onClearState={clearInitiativeState}
+            onMove={moveInitiativeEntry}
             onSelectToken={setSelectedTokenId}
           />
         </div>

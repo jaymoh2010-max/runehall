@@ -1,4 +1,18 @@
-import { ChevronLeft, ChevronRight, Dices, RefreshCw, RotateCcw, Sparkles, Swords, Trash2 } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  Dices,
+  Flag,
+  RefreshCw,
+  RotateCcw,
+  Sparkles,
+  Swords,
+  Trash2,
+  X,
+} from "lucide-react";
 import type { InitiativeEntry, Token } from "../../../shared/types";
 import { Badge, Button, IconButton } from "../ui";
 import { signed } from "../../../shared/rules";
@@ -17,6 +31,10 @@ export function InitiativeBar({
   onClear,
   onRemove,
   onReroll,
+  onDelay,
+  onReady,
+  onClearState,
+  onMove,
   onSelectToken,
 }: {
   entries: InitiativeEntry[];
@@ -31,6 +49,10 @@ export function InitiativeBar({
   onClear: () => void;
   onRemove: (entryId: string) => void;
   onReroll: (entryId: string) => void;
+  onDelay: (entryId: string) => void;
+  onReady: (entryId: string) => void;
+  onClearState: (entryId: string) => void;
+  onMove: (entryId: string, direction: -1 | 1) => void;
   onSelectToken: (tokenId: string) => void;
 }) {
   const active = entries[turnIndex] ?? null;
@@ -97,8 +119,110 @@ export function InitiativeBar({
                   </span>
                 ) : null}
                 {index === turnIndex ? <Badge tone="gold">Turn</Badge> : null}
+                {entry.delayed ? <Badge tone="blue">Delayed</Badge> : null}
+                {entry.readied ? <Badge tone="gold">Ready</Badge> : null}
                 {isGm ? (
                   <>
+                    {index > 0 && entries[index - 1].initiative === entry.initiative ? (
+                      <span
+                        className="initiative-reroll"
+                        role="button"
+                        tabIndex={0}
+                        title="Move up within the tie"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onMove(entry.id, -1);
+                        }}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter") {
+                            event.stopPropagation();
+                            onMove(entry.id, -1);
+                          }
+                        }}
+                      >
+                        <ArrowUp size={10} />
+                      </span>
+                    ) : null}
+                    {index < entries.length - 1 && entries[index + 1].initiative === entry.initiative ? (
+                      <span
+                        className="initiative-reroll"
+                        role="button"
+                        tabIndex={0}
+                        title="Move down within the tie"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onMove(entry.id, 1);
+                        }}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter") {
+                            event.stopPropagation();
+                            onMove(entry.id, 1);
+                          }
+                        }}
+                      >
+                        <ArrowDown size={10} />
+                      </span>
+                    ) : null}
+                    {index === turnIndex ? (
+                      <>
+                        <span
+                          className="initiative-reroll"
+                          role="button"
+                          tabIndex={0}
+                          title="Delay this turn"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            onDelay(entry.id);
+                          }}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter") {
+                              event.stopPropagation();
+                              onDelay(entry.id);
+                            }
+                          }}
+                        >
+                          <Clock size={10} />
+                        </span>
+                        <span
+                          className="initiative-reroll"
+                          role="button"
+                          tabIndex={0}
+                          title="Ready an action and end this turn"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            onReady(entry.id);
+                          }}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter") {
+                              event.stopPropagation();
+                              onReady(entry.id);
+                            }
+                          }}
+                        >
+                          <Flag size={10} />
+                        </span>
+                      </>
+                    ) : null}
+                    {entry.delayed || entry.readied ? (
+                      <span
+                        className="initiative-reroll"
+                        role="button"
+                        tabIndex={0}
+                        title="Clear delayed/ready state"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onClearState(entry.id);
+                        }}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter") {
+                            event.stopPropagation();
+                            onClearState(entry.id);
+                          }
+                        }}
+                      >
+                        <X size={10} />
+                      </span>
+                    ) : null}
                     <span
                       className="initiative-reroll"
                       role="button"

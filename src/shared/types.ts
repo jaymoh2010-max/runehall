@@ -998,6 +998,12 @@ export interface InitiativeEntry {
   sceneId: string | null;
   /** Set when one initiative entry represents a whole token group. */
   groupId?: string | null;
+  /** Manual ordering within an initiative tie. */
+  tieBreak?: number;
+  /** The combatant chose to delay their turn. */
+  delayed?: boolean;
+  /** The combatant readied an action. */
+  readied?: boolean;
 }
 
 export type JournalKind = "note" | "handout";

@@ -18,6 +18,7 @@ import {
 } from "../serialize";
 import type { InitiativeEntry } from "../../shared/types";
 import { rollFormula } from "../../shared/dice";
+import { sortInitiativeEntries } from "../../shared/initiative";
 import { clamp, newId, now, safeInt, safeString, sanitizeUserText } from "../util";
 
 function gmRequires(
@@ -111,7 +112,7 @@ function initiativeEntryForToken(token: TokenRow): InitiativeEntry {
 }
 
 function sortInitiative(entries: InitiativeEntry[]): InitiativeEntry[] {
-  return [...entries].sort((a, b) => b.initiative - a.initiative || a.name.localeCompare(b.name));
+  return sortInitiativeEntries(entries);
 }
 
 function nextSortOrder(table: "encounters" | "encounter_combatants", column: string, id: string): number {

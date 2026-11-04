@@ -12,6 +12,7 @@ import { now, newId, safeInt, safeString, parseJson, clamp, sanitizeUserText } f
 import { characterSummary, computeCharacter, normalizeCharacterDraft } from "../shared/rules";
 import { rollFormula, validateFormula } from "../shared/dice";
 import { normalizeTokenConditions, tickTokenConditions } from "../shared/tokens";
+import { sortInitiativeEntries } from "../shared/initiative";
 import { normalizeAoeTemplate, normalizeAoeTemplates } from "../shared/templates";
 import type {
   ClientToServerEvents,
@@ -240,7 +241,7 @@ function initiativeEntriesForTokens(tokens: TokenRow[]): InitiativeEntry[] {
 }
 
 function sortInitiative(entries: InitiativeEntry[]): InitiativeEntry[] {
-  return [...entries].sort((a, b) => b.initiative - a.initiative || a.name.localeCompare(b.name));
+  return sortInitiativeEntries(entries);
 }
 
 function createToken(
@@ -811,6 +812,9 @@ export function registerSocketServer(io: TypedServer): void {
               ownerId: typeof entry.ownerId === "string" ? entry.ownerId : null,
               sceneId: typeof entry.sceneId === "string" ? entry.sceneId : null,
               groupId: typeof entry.groupId === "string" ? entry.groupId : null,
+              tieBreak: typeof entry.tieBreak === "number" ? safeInt(entry.tieBreak, 0, -10_000, 10_000) : 0,
+              delayed: entry.delayed === true,
+              readied: entry.readied === true,
             }))
         : [];
       const current = ensureState(campaignId);
