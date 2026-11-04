@@ -388,7 +388,12 @@ Acceptance: a GM can prepare a full session in Runehall and start it with one â€
   - Creating a scene can activate it immediately.
   - The GM can preview any scene as players see it without changing the active scene.
   - Remaining: drag-and-drop reordering and player-facing preview controls.
-- [ ] Filterable combat log, group checks, delay/ready actions, and tie handling.
+- [x] **Combat-log filters and group checks**
+  - Chat log filters for All, Talk, Rolls, Requests, and GM-only messages.
+  - Empty-filter states explain when nothing matches.
+  - GM Screen can mark a roll request as a **Group check**.
+  - Group check cards are labeled in the shared chat and still open the prefilled dice tray.
+  - Remaining: per-player response tracking and automated group-check summaries.
 - [ ] Decide the token HP â†” sheet HP source of truth, or make sync explicitly two-way.
 - [ ] Optional first pass at walls/doors with manual reveal before dynamic lighting.
 

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Dices, EyeOff, Loader2, Megaphone, MessageSquare, Send, Sparkles, Swords } from "lucide-react";
 import type { ChatMessage, PublicUser, RollRequest, RollResult, PresenceUser } from "../../../shared/types";
 import { DEGREE_LABELS, validateFormula } from "../../../shared/dice";
+import { filterChatMessages, type ChatFilter } from "../../../shared/chat";
 import { formatTime } from "../../api";
 import { Avatar, Badge, Button, Input, Tag } from "../ui";
 
@@ -18,6 +19,7 @@ interface ChatPanelProps {
 
 export function ChatPanel({ messages, presence, user, isGm, onSend, onRoll, onRequest, disabled }: ChatPanelProps) {
   const [tab, setTab] = useState<"chat" | "dice">("chat");
+  const [filter, setFilter] = useState<ChatFilter>("all");
   const [text, setText] = useState("");
   const [formula, setFormula] = useState("1d20+5");
   const [label, setLabel] = useState("Check");
@@ -25,12 +27,13 @@ export function ChatPanel({ messages, presence, user, isGm, onSend, onRoll, onRe
   const [gmOnly, setGmOnly] = useState(false);
   const [rollError, setRollError] = useState("");
   const listRef = useRef<HTMLDivElement>(null);
+  const filteredMessages = filterChatMessages(messages, filter);
 
   useEffect(() => {
     const element = listRef.current;
     if (!element) return;
     element.scrollTop = element.scrollHeight;
-  }, [messages.length, tab]);
+  }, [filteredMessages.length, tab, filter]);
 
   const send = (event: FormEvent) => {
     event.preventDefault();
@@ -143,21 +146,41 @@ export function ChatPanel({ messages, presence, user, isGm, onSend, onRoll, onRe
           ) : null}
         </div>
       ) : (
-        <div className="chat-messages" ref={listRef}>
-          {messages.length === 0 ? (
-            <div className="chat-empty">
-              <MessageSquare size={24} />
-              <p>No messages yet. Say hello to the table.</p>
-            </div>
-          ) : null}
-          {messages.map((message) => (
-            <ChatMessageRow
-              key={message.id}
-              message={message}
-              self={message.userId === user.id}
-              onUseRequest={applyRequest}
-            />
-          ))}
+        <div className="chat-log">
+          <div className="chat-filters">
+            {([
+              ["all", "All"],
+              ["talk", "Talk"],
+              ["rolls", "Rolls"],
+              ["requests", "Requests"],
+              ["private", "GM only"],
+            ] as const).map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                className={filter === value ? "is-active" : ""}
+                onClick={() => setFilter(value)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <div className="chat-messages" ref={listRef}>
+            {filteredMessages.length === 0 ? (
+              <div className="chat-empty">
+                <MessageSquare size={24} />
+                <p>{messages.length === 0 ? "No messages yet. Say hello to the table." : "No messages match this filter."}</p>
+              </div>
+            ) : null}
+            {filteredMessages.map((message) => (
+              <ChatMessageRow
+                key={message.id}
+                message={message}
+                self={message.userId === user.id}
+                onUseRequest={applyRequest}
+              />
+            ))}
+          </div>
         </div>
       )}
 
@@ -249,8 +272,11 @@ function RequestCard({ data, onUse }: { data: RollRequest; onUse: () => void }) 
   return (
     <div className="roll-request-card">
       <div className="roll-request-head">
-        <span><Megaphone size={12} /> Roll requested</span>
-        {data.dc !== null ? <Badge tone="gold">DC {data.dc}</Badge> : null}
+        <span><Megaphone size={12} /> {data.group ? "Group check requested" : "Roll requested"}</span>
+        <span className="row" style={{ gap: 5 }}>
+          {data.group ? <Badge tone="gold">Group check</Badge> : null}
+          {data.dc !== null ? <Badge tone="gold">DC {data.dc}</Badge> : null}
+        </span>
       </div>
       <div className="roll-request-body">
         <div>

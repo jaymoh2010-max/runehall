@@ -1080,6 +1080,8 @@ export interface RollRequest {
   formula: string;
   label: string;
   dc: number | null;
+  /** True when the GM asked the whole table for the same check. */
+  group?: boolean;
 }
 
 export interface ChatMessage {
@@ -1120,7 +1122,7 @@ export interface ClientToServerEvents {
   "template:clear": (payload: { campaignId: string; sceneId: string }) => void;
   "chat:send": (payload: { campaignId: string; content: string; visibility?: "all" | "gm" }, ack?: (message: ChatMessage | null) => void) => void;
   "dice:roll": (payload: { campaignId: string; formula: string; label?: string; dc?: number | null; visibility?: "all" | "gm"; characterId?: string | null }, ack?: (message: ChatMessage | null) => void) => void;
-  "dice:request": (payload: { campaignId: string; formula: string; label?: string; dc?: number | null }, ack?: (message: ChatMessage | null) => void) => void;
+  "dice:request": (payload: { campaignId: string; formula: string; label?: string; dc?: number | null; group?: boolean }, ack?: (message: ChatMessage | null) => void) => void;
   "initiative:roll": (payload: { campaignId: string; sceneId: string; tokenIds?: string[] }) => void;
   "initiative:update": (payload: { campaignId: string; entries: InitiativeEntry[]; round?: number; turnIndex?: number }) => void;
   "initiative:next": (payload: { campaignId: string; direction?: 1 | -1 }) => void;

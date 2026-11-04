@@ -22,6 +22,7 @@ import {
   RichText,
   Spinner,
   Tag,
+  Toggle,
 } from "../ui";
 
 function partyLevel(characters: CharacterRecord[]): number {
@@ -52,6 +53,7 @@ export function GmScreen({
   const [label, setLabel] = useState("Secret check");
   const [dc, setDc] = useState("");
   const [rollBusy, setRollBusy] = useState(false);
+  const [groupCheck, setGroupCheck] = useState(false);
   const [lastRoll, setLastRoll] = useState<{ label: string; total: number; degree: string | null } | null>(null);
   const [connected, setConnected] = useState(false);
 
@@ -154,6 +156,7 @@ export function GmScreen({
         formula: formula.trim(),
         label: label.trim() || "Roll request",
         dc: parsedDc !== null && Number.isFinite(parsedDc) ? parsedDc : null,
+        group: groupCheck,
       },
       (message) => {
         toast(message ? "Roll request sent to the table." : "Could not send the roll request.", message ? "success" : "error");
@@ -203,15 +206,22 @@ export function GmScreen({
             </Field>
           </div>
           <div className="gm-roll-actions">
+            <Toggle
+              checked={groupCheck}
+              onChange={setGroupCheck}
+              label="Group check"
+              title="Ask every player for the same check."
+            />
             <Button variant="primary" icon={<Dices size={15} />} loading={rollBusy} onClick={secretRoll}>
               Secret roll
             </Button>
             <Button variant="secondary" icon={<Sparkles size={15} />} onClick={requestRoll}>
-              Request from players
+              {groupCheck ? "Request group check" : "Request from players"}
             </Button>
           </div>
           <p className="tiny muted">
             Secret rolls are posted only to the GM chat. Requests appear in the shared chat with a prefilled dice tray.
+            Group checks are marked as a table-wide request.
           </p>
           {lastRoll ? (
             <div className="gm-last-roll">

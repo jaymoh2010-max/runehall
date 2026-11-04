@@ -747,7 +747,7 @@ export function registerSocketServer(io: TypedServer): void {
       }
     });
 
-    socket.on("dice:request", ({ campaignId, formula, label, dc }, ack) => {
+    socket.on("dice:request", ({ campaignId, formula, label, dc, group }, ack) => {
       if (!requireGm(socket, campaignId)) {
         ack?.(null);
         return;
@@ -766,6 +766,7 @@ export function registerSocketServer(io: TypedServer): void {
           typeof dc === "number" && Number.isFinite(dc)
             ? Math.max(-100, Math.min(1000, Math.round(dc)))
             : null,
+        group: group === true,
       };
       const id = newId("msg");
       const ts = now();
