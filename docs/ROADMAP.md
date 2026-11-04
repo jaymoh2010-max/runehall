@@ -12,18 +12,18 @@
 
 ### What is still prototype-level
 - **Rules automation is partial.** Feat prerequisites are enforced for mechanical requirements, while complex/story prerequisites are flagged for review; some subclass/feature/item effects are manual; companions and split-caster casting restrictions are not automated. This can make a sheet look correct while missing situational bonuses.
-- **Realtime recovery is incomplete.** On a socket reconnect the client rejoins the room but does not replay events missed while offline. Tokens, fog, chat, or initiative can become stale after a laptop sleeps or Wi-Fi drops.
-- **No migrations, backup, or restore workflow.** The database only uses `CREATE TABLE IF NOT EXISTS`; future schema changes will not upgrade existing campaign databases. There is no one-command backup for SQLite + uploads.
-- **Table polish is thin around tokens and scenes.** No token context menu, token image upload/edit, conditions with values on tokens, attack/damage shortcuts, templates, walls, lighting, or robust grid calibration.
+- **Realtime recovery works by snapshot, but ordering is not versioned.** On reconnect the client refetches the table; there is still no per-campaign revision number, so rapid concurrent events can arrive out of order or be missed while connected, and character autosave has no conflict detection.
+- **Table polish is thin around tokens and scenes.** No AoE templates, condition values/durations, multi-select, scene playlists, walls, lighting, or robust grid calibration beyond the current first pass.
 - **Content volume needs curation.** The builder exposes 540 backgrounds and 29 classes by default. That is impressive, but overwhelming; not every option has the same automation quality.
-- **Test coverage is now unit + smoke + simulation.** Dice, rules math, compendium integrity, and content tiers are unit-tested; the GM/player campaign flow has an automated smoke test; `npm run simulate` generates valid characters across the matrix. Upload and edge-case auth coverage still rely on manual checks.
-- **Large UI files are becoming bottlenecks.** `CharacterBuilderPage.tsx` and `VttTable.tsx` carry a lot of responsibility. Any major builder or table feature should include a split into smaller components.
+- **Test coverage is unit + smoke + simulation.** Dice, rules math, compendium integrity, content tiers, security, and migrations are unit-tested; the GM/player campaign flow and registration/admin flows have an automated smoke test. Browser-level E2E and upload edge cases still rely on manual checks.
+- **Code health needs guardrails.** The production bundle is ~741 KB (204 KB gzip) with no route-level splitting, and several files are still 700–1,000 lines. There is now a baseline commit, CI, and `npm run check`, but no lint/format step yet.
+- **Operations are not fully proven.** Docker has not been built or run in this environment, `/api/health` is shallow, uploads validate MIME instead of file bytes, and the audit log has no automatic retention.
 
 ### Highest-risk issues (fix before adding lots of features)
 1. Losing campaign data or failing to upgrade a database.
-2. A long session going stale after a disconnect.
+2. A long session going stale or diverging after concurrent edits or a disconnect.
 3. A player trusting a sheet number that is wrong because a feat/item/subclass effect was not applied.
-4. Accumulating gameplay bugs with no E2E safety net around the GM/player loop.
+4. Accumulating gameplay bugs with no browser E2E safety net around the GM/player loop.
 
 ---
 
@@ -59,7 +59,7 @@ The character builder is already good enough for a core campaign at low levels. 
 
 ---
 
-## Sprint 2 — Trust, recovery, and test harness (in progress)
+## Sprint 2 — Trust, recovery, and test harness (completed)
 
 **Goal:** make the current app safe enough for an ongoing campaign.
 
@@ -294,6 +294,110 @@ Acceptance: a GM can prepare a full session in Runehall and start it with one �
 
 ---
 
+## Sprint 7 — Realtime correctness and data integrity
+
+**Goal:** trust the table through disconnects, reconnects, and concurrent edits.
+
+- [ ] **Versioned campaign state**
+  - Add a per-campaign monotonic `revision` counter, bumped on every persisted table mutation.
+  - Include the revision in REST snapshots and socket events.
+  - Client ignores stale/duplicate events and refetches when it detects a gap.
+- [ ] **Character conflict detection**
+  - Save the character `updated_at` or a draft revision with each autosave.
+  - Reject a stale save with a clear “someone else changed this sheet” path.
+- [ ] **Extract the table socket/state layer**
+  - Move `VttTable` socket handlers and reducer-style state into a testable hook.
+  - Add unit tests for token, fog, initiative, and chat event application.
+- [ ] **Reconnect test**
+  - Two clients, one forced disconnect, concurrent token/initiative changes, then reconnect and converge.
+- [ ] **Upload hardening**
+  - Verify image magic bytes, not just MIME, and cap pixel dimensions.
+- [ ] **Readiness health check**
+  - `/api/health` reports SQLite and compendium readiness, not just `ok`.
+
+**Acceptance:** a forced disconnect and concurrent edits converge on both clients with no stale HP, token, fog, or initiative.
+
+---
+
+## Sprint 8 — Character trust and level-up
+
+**Goal:** make the sheet’s numbers and the level-up path trustworthy.
+
+- [ ] **Automation coverage registry**
+  - Label every feat/item/subclass as full, partial, or manual automation.
+  - Surface the label in pickers and on the sheet.
+- [ ] **Golden-sheet regression fixtures**
+  - Representative classes at levels 1, 5, 10, 15, and 20.
+  - Expected HP, AC, saves, perception, skills, attacks, DCs, and slots.
+- [ ] **Guided level-up wizard**
+  - Step-by-step choices, before/after diff, prerequisite explanations, and validation.
+- [ ] **Casting presentation**
+  - Separate divine-font tracking and clearer spellbook-vs-known presentation.
+- [ ] **Companion support**
+  - Bestiary-linked statblocks or a clear actor-lite sheet for companions, familiars, and eidolons.
+- [ ] **Content curation**
+  - “Recommended core” filter and search ranking.
+
+**Acceptance:** level-up cannot skip required choices; golden fixtures match; manual effects are visibly flagged.
+
+---
+
+## Sprint 9 — Table depth
+
+**Goal:** run a full combat without another VTT.
+
+- [ ] AoE templates with measurement and an optional save/roll card.
+- [ ] Conditions with values and durations, plus quick apply/remove.
+- [ ] Multi-select tokens and group drag beyond bestiary formations.
+- [ ] Scene playlists, reordering, activate-on-create, thumbnails, and player-safe preview.
+- [ ] Filterable combat log, group checks, delay/ready actions, and tie handling.
+- [ ] Decide the token HP ↔ sheet HP source of truth, or make sync explicitly two-way.
+- [ ] Optional first pass at walls/doors with manual reveal before dynamic lighting.
+
+**Acceptance:** a complete combat with an AoE template, condition values, multiple selected tokens, and a filtered log needs no other tool.
+
+---
+
+## Sprint 10 — GM prep and continuity
+
+**Goal:** make session prep and between-session continuity excellent.
+
+- [ ] Encounter improvements: duplicate, waves, party-size presets, launch preview.
+- [ ] Session agenda and an automatic recap draft from chat, rolls, and handouts.
+- [ ] Player-facing inventory/currency ledger and item transfer.
+- [ ] Reusable handout/asset library tied into cleanup.
+- [ ] Optional automatic XP only if it still matters after milestone play.
+
+**Acceptance:** prep a three-scene session with encounters, loot, handouts, and a recap in one flow.
+
+---
+
+## Sprint 11 — Performance, accessibility, and polish
+
+**Goal:** make the app fast and comfortable on real tables and tablets.
+
+- [ ] Route-level code splitting; lazy-load the builder and library.
+- [ ] Thumbnail/lazy-load maps, token art, and handout galleries.
+- [ ] Mobile/tablet layouts for the table and sheet.
+- [ ] Keyboard-only core loop, focus traps, labels, reduced motion, and contrast pass.
+- [ ] Better empty states and a first-run checklist.
+- [ ] Bundle-size budget and a lightweight performance check.
+
+**Acceptance:** initial JS meaningfully smaller; the core loop works keyboard-only and on a tablet.
+
+---
+
+## Sprint 12 — Hosting and scale (only when needed)
+
+- [ ] Verify the Docker build and run in CI or on a Docker host.
+- [ ] Off-machine backup shipping with checksum verification.
+- [ ] Audit retention and export.
+- [ ] Only then consider Postgres/S3 adapters or OAuth.
+
+**Acceptance:** clean-machine deploy and restore drill pass end to end.
+
+---
+
 ## Content strategy recommendation
 
 Do not claim full Pathbuilder parity until the Tier 1 list is genuinely automated. It is better to say:
@@ -316,12 +420,12 @@ That is more trustworthy than silently showing a number that may be missing a +1
 
 ## Recommended next session
 
-Sprint 3’s core table workflow is complete. Before Sprint 4:
+Sprint 6 is complete. Start Sprint 7:
 
-1. add bestiary-linked companion/familiar/eidolon stat blocks,
-2. separate divine-font slot tracking and finish spellbook-vs-known presentation,
-3. expand the guided level-up into a full step-by-step wizard,
-4. extract `VttTable`’s socket/state hook and modal layer when table work resumes,
-5. finish the small table-polish leftovers: filterable combat log, group checks, scene reordering, and party-card quick actions.
+1. commit the baseline and keep `npm run check` green,
+2. add campaign revisions and autosave conflict detection,
+3. extract the table socket/state hook and add reconnect coverage,
+4. harden uploads and the health check,
+5. then choose builder trust (Sprint 8) or table depth (Sprint 9).
 
 Keep the two-user smoke test green as new socket events are added.

@@ -100,6 +100,8 @@ Players join with the GM's invite link or code from their own accounts. They can
 | `npm start` | Run the server and serve the built client |
 | `npm run typecheck` | TypeScript check |
 | `npm test` | Vitest unit tests |
+| `npm run check` | Typecheck, unit tests, and production build in one command |
+| `npm run check:full` | `check` plus the two-user smoke test |
 | `npm run smoke` | Two-user GM/player API + socket smoke test against a temporary database |
 | `npm run ingest` | Rebuild the compendium from the Foundry PF2e data clone |
 | `npm run simulate` | Generate valid characters across classes, levels, ancestries, backgrounds, subclass options, feats, spells, and gear; report rule/math problems |
@@ -158,6 +160,7 @@ See [docs/PLAN.md](docs/PLAN.md) for the product/architecture plan, [docs/ROADMA
 
 This is a substantial, playable foundation — not a complete Pathbuilder/Foundry replacement yet.
 
+- **Realtime recovery is snapshot-based.** Reconnecting or returning to the tab refetches the authoritative table, and chat merges by message ID. Events are not yet revision-numbered, so rapid concurrent edits can still arrive out of order.
 - **Rules automation is intentionally pragmatic.** Ability boosts (including partial boosts above +4), HP, AC, saves, perception, skills, attacks, spell DCs, and full/bounded slot tables are live. Feat prerequisites are checked for common mechanical requirements (abilities, proficiencies, feats, class features, heritage, deity, and age); story/campaign prerequisites are flagged for manual review. Feat/item effects that alter statistics (for example, conditional bonuses) are not all applied automatically.
 - **Spell repertoire/slot enforcement is a table aid.** You can add the spells your character knows, and full casters, bounded casters (magus/summoner/necromancer/psychic), and focus casters get slot or focus trackers. Animist slots are shown as a per-rank total of animist and apparition slots, and cleric divine font slots are included in the highest-rank count; the tracker does not enforce those restrictions. Spontaneous repertoire limits are checked for bards, oracles, sorcerers, and summoners, and prepared casters can mark their daily spells with slot-limit validation.
 - **Companion-style subsystems are table aids.** Animist apparitions, animal companions, eidolons, familiars, and similar allies are not automated as separate actors.
@@ -183,11 +186,11 @@ This is a substantial, playable foundation — not a complete Pathbuilder/Foundr
 - **No full rules search engine.** The library and compendium endpoints are searchable, but there is no natural-language rules lookup.
 
 ### Good next steps
-1. **GM prep tools:** multi-scene playlists, scene reordering, and player-safe scene previews.
-2. **Table depth:** walls/doors, light and vision, drag-and-drop conditions, token auras, templates, and measurement presets.
-3. **Builder depth:** automatic feat/item effects, animal companions/eidolons/familiars as actors, formula books, and prepared-vs-spontaneous slot enforcement.
-4. **Campaign continuity:** optional automatic XP tracking, scene playlists, and richer scheduling.
-5. **Hosting:** optional Postgres/S3 adapters and off-machine backup shipping.
+1. **Reliability:** campaign revisions, autosave conflict detection, reconnect coverage, and upload/health hardening.
+2. **Character trust:** automation labels, golden-sheet fixtures, and a full level-up wizard.
+3. **Table depth:** AoE templates, condition values, multi-select, scene playlists, and combat-log filters.
+4. **GM continuity:** encounter waves, session recaps, player inventory, and reusable handouts.
+5. **Polish:** code splitting, tablet layouts, accessibility, and optional hosting adapters.
 
 ---
 

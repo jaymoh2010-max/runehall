@@ -60,14 +60,19 @@ The target table size is one GM plus 4–10 players. That means the product shou
 - Campaign import with ID remapping and player-account matching, plus a dry-run-first unused-asset cleanup command.
 - Next: optional automatic XP tracking, scene playlists, and hosting hardening.
 
-### Phase 4 — Table depth (next)
+### Phase 4 — Reliability and trust (next)
+- Per-campaign revisions, stale-event rejection, and reconnect convergence.
+- Character autosave conflict detection.
+- Extracted, tested table socket/state layer.
+- Upload magic-byte validation and a readiness health check.
+
+### Phase 5 — Table depth
 - Walls/doors and dynamic light.
-- Bestiary token groups and group HP tracking (encounter builder and single-monster tokens are built).
-- Templates, auras, conditions on tokens, and a proper token context menu.
-- Player-side "request roll" and group checks.
+- Templates, auras, condition values/durations, multi-select, and a proper token context menu.
+- Player-side group checks, combat-log filters, delay/ready actions.
 - Scene playlists and GM-only preview.
 
-### Phase 5 — Hosting and durability
+### Phase 6 — Hosting and durability
 - Docker image, Compose deployment, HTTPS reverse-proxy guide, security headers, CSP, origin checks, and auth/upload rate limits are built.
 - Configurable registration (open, invite-only, closed), first-user administrator bootstrap, invite codes, local password recovery, self-service password change, and an audit log are built.
 - Backups support retention pruning and documented cron/systemd/Task Scheduler automation plus a restore drill.

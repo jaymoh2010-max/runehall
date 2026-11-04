@@ -6,6 +6,8 @@ Runehall generates its local compendium from the [Foundry VTT PF2e system](https
 
 The generated files live in `data/compendium/`. They are committed/generated separately from the SQLite database so they can be rebuilt without touching user data.
 
+The generated compendium is currently tracked in Git so a fresh clone is runnable without a data download (about 28 MB). Re-running ingest replaces those files and can grow repository history; regenerate only when the source commit or normalization changes, or move the folder to Git LFS / a release artifact if history size becomes a problem.
+
 ### Packs used
 - `ancestries`, `heritages`, `ancestry-features`
 - `backgrounds`
