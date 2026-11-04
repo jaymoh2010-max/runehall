@@ -46,6 +46,7 @@ import {
   titleCase,
 } from "../../shared/rules";
 import { DEGREE_LABELS, mod, rollFormula } from "../../shared/dice";
+import { conditionLabel } from "../../shared/tokens";
 import { api, ApiError, formatCp } from "../api";
 import { errorMessage } from "../stores";
 import { useToasts } from "../stores";
@@ -110,6 +111,8 @@ export function CharacterSheetPage() {
   const [saveState, setSaveState] = useState<"saved" | "saving" | "error">("saved");
   const [rollLog, setRollLog] = useState<RollResult | null>(null);
   const [conditionName, setConditionName] = useState("");
+  const [conditionValue, setConditionValue] = useState("");
+  const [conditionDuration, setConditionDuration] = useState("");
   const [conditions, setConditions] = useState<ConditionRef[]>([]);
   const [conflict, setConflict] = useState<CharacterRecord | null>(null);
   const initialized = useRef(false);
@@ -308,10 +311,20 @@ export function CharacterSheetPage() {
       ...current,
       play: {
         ...current.play,
-        conditions: [...current.play.conditions, { name: clean, value: null }],
+        conditions: [
+          ...current.play.conditions,
+          {
+            name: clean,
+            value: conditionValue === "" ? null : Math.max(0, Math.round(Number(conditionValue))),
+            duration:
+              conditionDuration === "" ? null : Math.max(0, Math.round(Number(conditionDuration))),
+          },
+        ],
       },
     }));
     setConditionName("");
+    setConditionValue("");
+    setConditionDuration("");
   };
 
   if (loading) return <LoadingScreen label="Opening the character sheet…" />;
@@ -827,7 +840,35 @@ export function CharacterSheetPage() {
               <div className="conditions-list">
                 {draft.play.conditions.map((condition, index) => (
                   <Tag key={`${condition.name}-${index}`} tone="red">
-                    {condition.name}
+                    {conditionLabel(condition)}
+                    {canEdit && condition.duration ? (
+                      <button
+                        type="button"
+                        className="tag-remove"
+                        title="Reduce duration by one round"
+                        onClick={() =>
+                          update((current) => ({
+                            ...current,
+                            play: {
+                              ...current.play,
+                              conditions: current.play.conditions.map((entry, i) =>
+                                i === index
+                                  ? {
+                                      ...entry,
+                                      duration:
+                                        entry.duration && entry.duration > 1
+                                          ? entry.duration - 1
+                                          : null,
+                                    }
+                                  : entry,
+                              ),
+                            },
+                          }))
+                        }
+                      >
+                        −1
+                      </button>
+                    ) : null}
                     {canEdit ? (
                       <button type="button" className="tag-remove" onClick={() => update((current) => ({ ...current, play: { ...current.play, conditions: current.play.conditions.filter((_, i) => i !== index) } }))}>×</button>
                     ) : null}
@@ -859,6 +900,24 @@ export function CharacterSheetPage() {
                         addCondition(conditionName);
                       }
                     }}
+                  />
+                  <Input
+                    type="number"
+                    min={0}
+                    value={conditionValue}
+                    onChange={(event) => setConditionValue(event.target.value)}
+                    placeholder="Value"
+                    style={{ maxWidth: 74 }}
+                    title="Condition value, e.g. 2 for Frightened 2"
+                  />
+                  <Input
+                    type="number"
+                    min={0}
+                    value={conditionDuration}
+                    onChange={(event) => setConditionDuration(event.target.value)}
+                    placeholder="Rounds"
+                    style={{ maxWidth: 82 }}
+                    title="Remaining duration in rounds"
                   />
                 </div>
               ) : null}
@@ -902,7 +961,7 @@ export function CharacterSheetPage() {
 
       {!draft.play.conditions.length ? null : (
         <div className="sheet-condition-ribbon">
-          {draft.play.conditions.map((condition) => <Badge key={condition.name} tone="red">{condition.name}</Badge>)}
+          {draft.play.conditions.map((condition) => <Badge key={condition.name} tone="red">{conditionLabel(condition)}</Badge>)}
         </div>
       )}
 

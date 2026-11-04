@@ -35,10 +35,18 @@ export function normalizeTokenConditions(value: unknown): TokenCondition[] {
   return conditions;
 }
 
-export function tokenConditionLabel(condition: TokenCondition): string {
+export function conditionLabel(condition: {
+  name: string;
+  value?: number | null;
+  duration?: number | null;
+}): string {
   const value = condition.value && condition.value > 0 ? ` ${condition.value}` : "";
   const duration = condition.duration && condition.duration > 0 ? ` (${condition.duration}r)` : "";
   return `${condition.name}${value}${duration}`;
+}
+
+export function tokenConditionLabel(condition: TokenCondition): string {
+  return conditionLabel(condition);
 }
 
 export function tokenConditionSummary(conditions: TokenCondition[]): string {

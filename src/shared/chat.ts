@@ -9,3 +9,16 @@ export function filterChatMessages(messages: ChatMessage[], filter: ChatFilter):
   if (filter === "requests") return messages.filter((message) => message.type === "request");
   return messages.filter((message) => message.visibility === "gm");
 }
+
+export function rollResponsesForRequest(
+  messages: ChatMessage[],
+  requestId: string,
+): ChatMessage[] {
+  return messages.filter(
+    (message) =>
+      message.type === "roll" &&
+      message.data !== null &&
+      "total" in message.data &&
+      message.data.requestId === requestId,
+  );
+}

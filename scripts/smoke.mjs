@@ -625,6 +625,28 @@ async function main() {
   await requestPromise;
   log("GM roll request reached the player");
 
+  const groupRequest = await emitAck(gmSocket, "dice:request", {
+    campaignId: campaign.id,
+    formula: "1d20+3",
+    label: "Group Stealth",
+    dc: 15,
+    group: true,
+  });
+  if (!groupRequest?.data?.group || !groupRequest.data.requestId) {
+    throw new Error("Group roll request did not include a response id");
+  }
+  const groupResponse = await emitAck(playerSocket, "dice:roll", {
+    campaignId: campaign.id,
+    formula: "1d20+3",
+    label: "Group Stealth",
+    dc: 15,
+    requestId: groupRequest.data.requestId,
+  });
+  if (groupResponse?.data?.requestId !== groupRequest.data.requestId) {
+    throw new Error("Group check response was not linked to the request");
+  }
+  log("group check responses are linked to the request");
+
   let playerSawSecret = false;
   const secretLeakHandler = (message) => {
     if (message.type === "roll" && message.content === "Smoke Secret") playerSawSecret = true;

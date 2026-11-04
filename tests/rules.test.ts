@@ -152,6 +152,17 @@ describe("PF2e character rules", () => {
     expect(draft.details.notes).toBe("Hello");
   });
 
+  it("normalizes character condition values and durations", () => {
+    const draft = normalizeCharacterDraft(
+      {
+        name: "Condition Test",
+        play: { conditions: [{ name: "Frightened", value: 2, duration: 3 }] },
+      },
+      "Fallback",
+    );
+    expect(draft.play.conditions[0]).toEqual({ name: "Frightened", value: 2, duration: 3 });
+  });
+
   it("preserves companion bestiary links when normalizing", () => {
     const draft = normalizeCharacterDraft(
       {

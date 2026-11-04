@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { ChatMessage } from "../src/shared/types";
-import { filterChatMessages } from "../src/shared/chat";
+import type { ChatMessage, RollResult } from "../src/shared/types";
+import { filterChatMessages, rollResponsesForRequest } from "../src/shared/chat";
 
 function message(id: string, overrides: Partial<ChatMessage>): ChatMessage {
   return {
@@ -38,5 +38,30 @@ describe("chat filters", () => {
 
   it("filters GM-only messages", () => {
     expect(filterChatMessages(messages, "private").map((entry) => entry.id)).toEqual(["secret"]);
+  });
+});
+
+describe("roll responses", () => {
+  it("links rolls to the request they answer", () => {
+    const roll: RollResult = {
+      formula: "1d20",
+      total: 17,
+      terms: [],
+      constants: [],
+      breakdown: "17",
+      d20: 17,
+      dc: 15,
+      degree: "success",
+      label: "Group Stealth",
+      requestId: "request-one",
+    };
+    const responses = [
+      message("one", { type: "roll", data: roll }),
+      message("two", { type: "roll", data: { ...roll, requestId: "other" } }),
+      message("three", { type: "roll", data: { ...roll, requestId: null } }),
+    ];
+    expect(rollResponsesForRequest(responses, "request-one").map((entry) => entry.id)).toEqual([
+      "one",
+    ]);
   });
 });

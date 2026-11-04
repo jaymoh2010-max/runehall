@@ -2079,6 +2079,10 @@
 .roll-request-body > div { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
 .roll-request-body strong { font-size: 0.86rem; overflow-wrap: anywhere; }
 .roll-request-body .btn { flex: 0 0 auto; }
+.roll-request-responses { display: flex; flex-wrap: wrap; gap: 5px; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 7px; margin-top: 7px; }
+.roll-request-response { display: inline-flex; align-items: center; gap: 5px; border: 1px solid var(--line); border-radius: 999px; background: rgba(255,255,255,0.03); padding: 2px 7px; font-size: 0.7rem; }
+.roll-request-response strong { color: var(--text); }
+.roll-request-response > span:nth-child(2) { color: var(--gold-bright); font-weight: 700; }
 
 /* ==========================================================================
    Print / PDF sheet

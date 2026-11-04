@@ -563,7 +563,11 @@ export function normalizeCharacterDraft(input: unknown, fallbackName = "New Hero
       focusPoints: Math.max(0, Math.min(3, Math.floor(num(play.focusPoints, 1)))),
       conditions: arr<Record<string, unknown>>(play.conditions)
         .filter((c) => c && typeof c.name === "string")
-        .map((c) => ({ name: String(c.name), value: typeof c.value === "number" ? c.value : null })),
+        .map((c) => ({
+          name: String(c.name),
+          value: typeof c.value === "number" ? c.value : null,
+          duration: typeof c.duration === "number" ? c.duration : null,
+        })),
       xp: Math.max(0, num(play.xp, 0)),
       shieldRaised: Boolean(play.shieldRaised),
     },
@@ -2172,8 +2176,9 @@ export function characterSummary(draft: CharacterDraft, context: CharacterContex
     spellDc: derived.spellDc,
     heroPoints: draft.play.heroPoints,
     focusPoints: draft.play.focusPoints,
-    conditions: draft.play.conditions.map((condition) =>
-      condition.value ? `${condition.name} ${condition.value}` : condition.name,
+    conditions: draft.play.conditions.map(
+      (condition) =>
+        `${condition.name}${condition.value ? ` ${condition.value}` : ""}${condition.duration ? ` (${condition.duration}r)` : ""}`,
     ),
     portraitUrl: draft.portraitUrl,
   };

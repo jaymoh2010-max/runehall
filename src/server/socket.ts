@@ -705,7 +705,7 @@ export function registerSocketServer(io: TypedServer): void {
       ack?.(message);
     });
 
-    socket.on("dice:roll", ({ campaignId, formula, label, dc, visibility, characterId }, ack) => {
+    socket.on("dice:roll", ({ campaignId, formula, label, dc, visibility, characterId, requestId }, ack) => {
       if (!getMembership(campaignId, socket.data.user.id)) {
         sendError(socket, "You're not a member of that campaign.");
         ack?.(null);
@@ -728,7 +728,11 @@ export function registerSocketServer(io: TypedServer): void {
           socket.data.user.id,
           socket.data.user.displayName,
           content,
-          JSON.stringify({ ...result, characterId: characterId ?? null }),
+          JSON.stringify({
+            ...result,
+            characterId: characterId ?? null,
+            requestId: safeString(requestId, "", 80) || null,
+          }),
           vis,
           ts,
         );
@@ -760,6 +764,7 @@ export function registerSocketServer(io: TypedServer): void {
         ack?.(null);
         return;
       }
+      const id = newId("msg");
       const request = {
         formula: cleanFormula,
         label: safeString(label, "Roll", 120).trim() || "Roll",
@@ -768,8 +773,8 @@ export function registerSocketServer(io: TypedServer): void {
             ? Math.max(-100, Math.min(1000, Math.round(dc)))
             : null,
         group: group === true,
+        requestId: id,
       };
-      const id = newId("msg");
       const ts = now();
       db.prepare(
         "INSERT INTO messages (id, campaign_id, scene_id, user_id, author_name, type, content, data, visibility, created_at) VALUES (?, ?, NULL, ?, ?, 'request', ?, ?, 'all', ?)",

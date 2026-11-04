@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Dices, EyeOff, Loader2, Megaphone, MessageSquare, Send, Sparkles, Swords } from "lucide-react";
 import type { ChatMessage, PublicUser, RollRequest, RollResult, PresenceUser } from "../../../shared/types";
 import { DEGREE_LABELS, validateFormula } from "../../../shared/dice";
-import { filterChatMessages, type ChatFilter } from "../../../shared/chat";
+import { filterChatMessages, rollResponsesForRequest, type ChatFilter } from "../../../shared/chat";
 import { formatTime } from "../../api";
 import { Avatar, Badge, Button, Input, Tag } from "../ui";
 
@@ -12,7 +12,7 @@ interface ChatPanelProps {
   user: PublicUser;
   isGm: boolean;
   onSend: (text: string, gmOnly: boolean) => void;
-  onRoll: (formula: string, label: string, dc: number | null, gmOnly: boolean) => void;
+  onRoll: (formula: string, label: string, dc: number | null, gmOnly: boolean, requestId?: string | null) => void;
   onRequest: (formula: string, label: string, dc: number | null) => void;
   disabled?: boolean;
 }
@@ -26,6 +26,7 @@ export function ChatPanel({ messages, presence, user, isGm, onSend, onRoll, onRe
   const [dc, setDc] = useState("");
   const [gmOnly, setGmOnly] = useState(false);
   const [rollError, setRollError] = useState("");
+  const [activeRequestId, setActiveRequestId] = useState<string | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const filteredMessages = filterChatMessages(messages, filter);
 
@@ -55,7 +56,8 @@ export function ChatPanel({ messages, presence, user, isGm, onSend, onRoll, onRe
 
   const roll = () => {
     if (!validate()) return;
-    onRoll(formula.trim(), label.trim() || "Roll", dc.trim() ? Number(dc) : null, gmOnly);
+    onRoll(formula.trim(), label.trim() || "Roll", dc.trim() ? Number(dc) : null, gmOnly, activeRequestId);
+    setActiveRequestId(null);
   };
 
   const requestRoll = () => {
@@ -63,10 +65,11 @@ export function ChatPanel({ messages, presence, user, isGm, onSend, onRoll, onRe
     onRequest(formula.trim(), label.trim() || "Roll", dc.trim() ? Number(dc) : null);
   };
 
-  const applyRequest = (request: RollRequest) => {
+  const applyRequest = (request: RollRequest, requestId: string) => {
     setFormula(request.formula);
     setLabel(request.label);
     setDc(request.dc === null ? "" : String(request.dc));
+    setActiveRequestId(requestId);
     setRollError("");
     setTab("dice");
   };
@@ -177,6 +180,7 @@ export function ChatPanel({ messages, presence, user, isGm, onSend, onRoll, onRe
                 key={message.id}
                 message={message}
                 self={message.userId === user.id}
+                responses={rollResponsesForRequest(messages, message.id)}
                 onUseRequest={applyRequest}
               />
             ))}
@@ -223,11 +227,13 @@ export function ChatPanel({ messages, presence, user, isGm, onSend, onRoll, onRe
 function ChatMessageRow({
   message,
   self,
+  responses,
   onUseRequest,
 }: {
   message: ChatMessage;
   self: boolean;
-  onUseRequest: (request: RollRequest) => void;
+  responses: ChatMessage[];
+  onUseRequest: (request: RollRequest, requestId: string) => void;
 }) {
   const data = message.data;
   if (message.type === "request" && data && !("total" in data)) {
@@ -238,7 +244,7 @@ function ChatMessageRow({
           <strong>{message.authorName}</strong>
           <span className="tiny muted">{formatTime(message.createdAt)}</span>
         </div>
-        <RequestCard data={data} onUse={() => onUseRequest(data)} />
+        <RequestCard data={data} responses={responses} onUse={() => onUseRequest(data, message.id)} />
       </div>
     );
   }
@@ -268,7 +274,16 @@ function ChatMessageRow({
   );
 }
 
-function RequestCard({ data, onUse }: { data: RollRequest; onUse: () => void }) {
+function RequestCard({
+  data,
+  responses,
+  onUse,
+}: {
+  data: RollRequest;
+  responses: ChatMessage[];
+  onUse: () => void;
+}) {
+  const completed = responses.filter((message) => message.data && "total" in message.data);
   return (
     <div className="roll-request-card">
       <div className="roll-request-head">
@@ -276,6 +291,7 @@ function RequestCard({ data, onUse }: { data: RollRequest; onUse: () => void }) 
         <span className="row" style={{ gap: 5 }}>
           {data.group ? <Badge tone="gold">Group check</Badge> : null}
           {data.dc !== null ? <Badge tone="gold">DC {data.dc}</Badge> : null}
+          {completed.length ? <Badge tone="green">{completed.length} response{completed.length === 1 ? "" : "s"}</Badge> : null}
         </span>
       </div>
       <div className="roll-request-body">
@@ -287,6 +303,22 @@ function RequestCard({ data, onUse }: { data: RollRequest; onUse: () => void }) 
           Open dice tray
         </Button>
       </div>
+      {completed.length ? (
+        <div className="roll-request-responses">
+          {completed.map((message) => {
+            const result = message.data as RollResult;
+            return (
+              <span key={message.id} className="roll-request-response">
+                <strong>{message.authorName}</strong>
+                <span>{result.total}</span>
+                {result.degree ? (
+                  <span className="tiny muted">{DEGREE_LABELS[result.degree]}</span>
+                ) : null}
+              </span>
+            );
+          })}
+        </div>
+      ) : null}
     </div>
   );
 }

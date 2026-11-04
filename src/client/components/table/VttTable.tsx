@@ -389,10 +389,10 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
     getSocket().emit("chat:send", { campaignId, content, visibility: gmOnly ? "gm" : "all" });
   };
 
-  const roll = (formula: string, label: string, dc: number | null, gmOnly: boolean) => {
+  const roll = (formula: string, label: string, dc: number | null, gmOnly: boolean, requestId?: string | null) => {
     getSocket().emit(
       "dice:roll",
-      { campaignId, formula, label, dc, visibility: gmOnly ? "gm" : "all" },
+      { campaignId, formula, label, dc, visibility: gmOnly ? "gm" : "all", requestId: requestId ?? null },
       (message) => {
         if (!message) toast("That roll could not be made. Check the formula.", "error");
         else if (message.data && "total" in message.data) toast(`${label}: ${message.data.total}${message.data.degree ? ` · ${message.data.degree.replace("-", " ")}` : ""}`, "success");

@@ -375,7 +375,8 @@ Acceptance: a GM can prepare a full session in Runehall and start it with one �
   - Legacy string conditions are normalized automatically on load.
   - The token editor, token panel, and initiative tooltip show labels such as “Frightened 2 (3r)”.
   - Advancing initiative ticks the active entry’s timed conditions and removes expired ones.
-  - Remaining: character-sheet duration tracking and a manual tick button.
+  - Character-sheet conditions also track value and round duration, with a one-click −1 duration button.
+  - Remaining: automatic character-sheet ticking when the character’s turn ends.
 - [x] **Multi-select, marquee, and group drag**
   - Shift/Ctrl/Cmd-click toggles tokens in the selection; a plain click selects one token.
   - Shift-drag on empty map space draws a marquee and selects every token inside it.
@@ -398,7 +399,8 @@ Acceptance: a GM can prepare a full session in Runehall and start it with one �
   - Empty-filter states explain when nothing matches.
   - GM Screen can mark a roll request as a **Group check**.
   - Group check cards are labeled in the shared chat and still open the prefilled dice tray.
-  - Remaining: per-player response tracking and automated group-check summaries.
+  - Player rolls made from a request are linked back to it, and the request card shows each responder, total, and degree of success.
+  - Remaining: automated summary/tally cards and GM-only response filtering.
 - [x] **Delay, ready, and initiative ties**
   - The active combatant can **Delay** their turn, moving to the end of the order with a Delayed badge.
   - **Ready** marks the readied state and advances the turn (and round when needed).
