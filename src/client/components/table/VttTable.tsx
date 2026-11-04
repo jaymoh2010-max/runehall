@@ -439,6 +439,15 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
     emitInitiative(next, nextRound, nextTurn);
   };
 
+  const triggerReady = (entryId: string) => {
+    const entry = initiative.find((item) => item.id === entryId);
+    if (!entry?.readied) return;
+    emitInitiative(
+      initiative.map((item) => (item.id === entryId ? { ...item, readied: false } : item)),
+    );
+    sendChat(`${entry.name}'s readied action triggers.`, false);
+  };
+
   const clearInitiativeState = (entryId: string) => {
     emitInitiative(
       initiative.map((entry) =>
@@ -746,6 +755,7 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
             onReady={readyEntry}
             onClearState={clearInitiativeState}
             onMove={moveInitiativeEntry}
+            onTriggerReady={triggerReady}
             onSelectToken={setSelectedTokenId}
           />
         </div>

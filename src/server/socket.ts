@@ -163,6 +163,7 @@ function initiativeEntryForToken(row: TokenRow, value?: number): InitiativeEntry
     ownerId: row.owner_id,
     sceneId: row.scene_id,
     groupId: row.group_id,
+    perception: bonus,
   };
 }
 
@@ -180,6 +181,7 @@ function initiativeEntryForGroup(rows: TokenRow[]): InitiativeEntry {
     ownerId: anchor.owner_id,
     sceneId: anchor.scene_id,
     groupId: anchor.group_id,
+    perception: bonus,
   };
 }
 
@@ -818,6 +820,10 @@ export function registerSocketServer(io: TypedServer): void {
               sceneId: typeof entry.sceneId === "string" ? entry.sceneId : null,
               groupId: typeof entry.groupId === "string" ? entry.groupId : null,
               tieBreak: typeof entry.tieBreak === "number" ? safeInt(entry.tieBreak, 0, -10_000, 10_000) : 0,
+              perception:
+                typeof entry.perception === "number"
+                  ? safeInt(entry.perception, 0, -100, 1000)
+                  : undefined,
               delayed: entry.delayed === true,
               readied: entry.readied === true,
             }))
@@ -852,12 +858,12 @@ export function registerSocketServer(io: TypedServer): void {
         turn = entries.length - 1;
         round = Math.max(1, round - 1);
       }
-      db.prepare("UPDATE campaign_state SET turn_index = ?, round = ?, updated_at = ? WHERE campaign_id = ?").run(
-        turn,
-        round,
-        now(),
-        campaignId,
-      );
+      if (entries[turn]?.readied) {
+        entries[turn] = { ...entries[turn], readied: false };
+      }
+      db.prepare(
+        "UPDATE campaign_state SET initiative = ?, turn_index = ?, round = ?, updated_at = ? WHERE campaign_id = ?",
+      ).run(JSON.stringify(entries), turn, round, now(), campaignId);
       broadcastInitiative(io, campaignId, ensureState(campaignId));
       touchCampaign(campaignId);
     });

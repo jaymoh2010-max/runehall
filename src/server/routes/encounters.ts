@@ -108,6 +108,7 @@ function initiativeEntryForToken(token: TokenRow): InitiativeEntry {
     color: token.color,
     ownerId: token.owner_id,
     sceneId: token.scene_id,
+    perception: tokenInitiativeBonus(token),
   };
 }
 

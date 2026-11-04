@@ -1002,6 +1002,8 @@ export interface InitiativeEntry {
   groupId?: string | null;
   /** Manual ordering within an initiative tie. */
   tieBreak?: number;
+  /** Perception modifier used as the default tie break. */
+  perception?: number;
   /** The combatant chose to delay their turn. */
   delayed?: boolean;
   /** The combatant readied an action. */

@@ -404,9 +404,10 @@ Acceptance: a GM can prepare a full session in Runehall and start it with one â€
 - [x] **Delay, ready, and initiative ties**
   - The active combatant can **Delay** their turn, moving to the end of the order with a Delayed badge.
   - **Ready** marks the readied state and advances the turn (and round when needed).
-  - Delayed/ready state can be cleared from the chip.
-  - Tied entries can be reordered up/down with explicit tie-break ordering.
-  - Remaining: automatic ready-action triggers and tie-break by Perception.
+  - A readied action can be **triggered** from the chip, posting a table message and clearing the state.
+  - Readied state expires automatically when that combatant's next turn begins.
+  - Tied entries use Perception as the default tie break and can still be reordered manually.
+  - Remaining: ready-trigger text/conditions and full PF2e Perception tie automation.
 - [ ] Decide the token HP â†” sheet HP source of truth, or make sync explicitly two-way.
 - [ ] Optional first pass at walls/doors with manual reveal before dynamic lighting.
 

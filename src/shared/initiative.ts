@@ -4,6 +4,7 @@ export function compareInitiative(a: InitiativeEntry, b: InitiativeEntry): numbe
   return (
     b.initiative - a.initiative ||
     (a.tieBreak ?? 0) - (b.tieBreak ?? 0) ||
+    (b.perception ?? 0) - (a.perception ?? 0) ||
     a.name.localeCompare(b.name)
   );
 }

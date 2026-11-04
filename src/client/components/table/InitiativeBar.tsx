@@ -12,6 +12,7 @@ import {
   Swords,
   Trash2,
   X,
+  Zap,
 } from "lucide-react";
 import type { InitiativeEntry, Token } from "../../../shared/types";
 import { Badge, Button, IconButton } from "../ui";
@@ -35,6 +36,7 @@ export function InitiativeBar({
   onReady,
   onClearState,
   onMove,
+  onTriggerReady,
   onSelectToken,
 }: {
   entries: InitiativeEntry[];
@@ -53,6 +55,7 @@ export function InitiativeBar({
   onReady: (entryId: string) => void;
   onClearState: (entryId: string) => void;
   onMove: (entryId: string, direction: -1 | 1) => void;
+  onTriggerReady: (entryId: string) => void;
   onSelectToken: (tokenId: string) => void;
 }) {
   const active = entries[turnIndex] ?? null;
@@ -202,6 +205,26 @@ export function InitiativeBar({
                           <Flag size={10} />
                         </span>
                       </>
+                    ) : null}
+                    {entry.readied ? (
+                      <span
+                        className="initiative-reroll"
+                        role="button"
+                        tabIndex={0}
+                        title="Trigger readied action"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onTriggerReady(entry.id);
+                        }}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter") {
+                            event.stopPropagation();
+                            onTriggerReady(entry.id);
+                          }
+                        }}
+                      >
+                        <Zap size={10} />
+                      </span>
                     ) : null}
                     {entry.delayed || entry.readied ? (
                       <span
