@@ -17,7 +17,7 @@ runehall-2026-11-03T19-42-05-738Z/
   runehall.db              consistent SQLite snapshot
   uploads/                 uploaded maps, portraits, token art
   compendium-manifest.json data version
-  backup.json              manifest and file list
+  backup.json              manifest, per-file SHA-256 hashes, and archive digest
 ```
 
 Optional flags:
@@ -30,7 +30,30 @@ npm run backup -- --keep 14
 
 `--keep N` keeps the newest N `runehall-*` archives in the backup directory and removes older ones after a successful snapshot. The fresh snapshot is never pruned.
 
-The snapshot is created with SQLite `VACUUM INTO`, so it is safe to run while the server is active. Copy the entire backup folder somewhere off the machine (external drive, NAS, cloud drive).
+The snapshot is created with SQLite `VACUUM INTO`, so it is safe to run while the server is active. Every file is hashed into `backup.json`, and the manifest digest covers the sorted file list.
+
+### Off-machine shipping
+
+Copy the newest archive to another disk, NAS mount, OneDrive folder, or other filesystem path:
+
+```bash
+npm run ship-backup -- --to "D:\RunehallBackups" --keep 14
+BACKUP_SHIP_DIR=/mnt/nas/runehall npm run ship-backup -- --keep 14
+```
+
+Shipping verifies the source manifest, copies into a temporary folder, verifies every destination file, and only then moves the archive into place. Existing verified archives are reused. `--keep N` prunes older off-machine archives; `--keep 0` keeps all. For APIs that are not mounted as a filesystem, use rclone/restic after creating the local backup.
+
+If Runehall runs in Docker, run shipping from the host against the bind-mounted backup folder:
+
+```bash
+BACKUP_DIR=./backups npm run ship-backup -- --to /mnt/nas/runehall --keep 14
+```
+
+The image also prepares `/app/shipped` as a writable mount point. To ship from inside the container, mount an off-machine folder there and run:
+
+```bash
+docker compose exec -T runehall npm run ship-backup -- --to /app/shipped --keep 14
+```
 
 ### Restore
 
@@ -41,9 +64,12 @@ npm run restore -- --from "backups/runehall-2026-11-03T19-42-05-738Z" --yes
 ```
 
 Restore:
+- verifies the archive's SHA-256 manifest before changing anything; corrupted archives are refused,
 - keeps a safety copy of the current database and uploads under `backups/pre-restore-<timestamp>/`,
 - replaces `data/runehall.db`,
 - replaces `data/uploads/`.
+
+Legacy archives without checksums require explicit `--allow-unverified`. Use that only after inspecting the archive manually.
 
 Then start the server again:
 
@@ -94,7 +120,7 @@ Docker:
 docker compose exec -T runehall npm run backup -- --keep 14
 ```
 
-Then sync the newest archive with rsync, rclone, restic, a NAS share, or your cloud drive. A copy on the same disk does not survive disk failure.
+Use `npm run ship-backup` for filesystem destinations. For cloud APIs without a mounted filesystem, run rclone, restic, or your normal sync tool after the local backup. A copy on the same disk does not survive disk failure.
 
 ### Restore drill
 

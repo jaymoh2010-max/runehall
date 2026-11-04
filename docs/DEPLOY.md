@@ -24,7 +24,7 @@ Open `http://localhost:3001`. The compose file uses `./data` for the SQLite data
 mkdir -p data/uploads backups
 ```
 
-The production image is built and health-checked in CI. It uses Node 26 Alpine, runs as the non-root `node` user, writes only to `/app/data` and `/app/backups`, and serves the compiled client and API from one process.
+The production image is built and health-checked in CI. It uses Node 26 Alpine, runs as the non-root `node` user, writes only to `/app/data`, `/app/backups`, and an optional `/app/shipped` mount, and serves the compiled client and API from one process.
 
 Useful commands:
 
@@ -200,9 +200,10 @@ For Docker, run the same command from the host schedule:
 
 ```bash
 docker compose exec -T runehall npm run backup -- --keep 14
+BACKUP_DIR=./backups npm run ship-backup -- --to /mnt/nas/runehall --keep 14
 ```
 
-Then copy the newest archive off the machine with your normal tool (rsync, rclone, restic, a NAS sync, or cloud drive). A backup that only exists on the same disk is not a backup.
+`ship-backup` verifies the archive checksums, copies it, verifies the destination, and prunes old off-machine generations. For cloud APIs without a mounted filesystem, use rclone/restic or your normal sync tool after the local backup. A backup that only exists on the same disk is not a backup.
 
 ### Restore drill
 

@@ -12,6 +12,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
+import { manifestDigest, sha256File } from "./backup-lib.mjs";
 
 const args = process.argv.slice(2);
 const dirArg = args.indexOf("--dir");
@@ -80,22 +81,31 @@ const walk = (directory) => {
   for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
     const full = path.join(directory, entry.name);
     if (entry.isDirectory()) walk(full);
-    else files.push({ path: path.relative(destination, full), bytes: fs.statSync(full).size });
+    else {
+      files.push({
+        path: path.relative(destination, full).split(path.sep).join("/"),
+        bytes: fs.statSync(full).size,
+        sha256: sha256File(full),
+      });
+    }
   }
 };
 walk(destination);
+files.sort((a, b) => a.path.localeCompare(b.path));
 const totalBytes = files.reduce((sum, file) => sum + file.bytes, 0);
+const digest = manifestDigest(files);
 
 fs.writeFileSync(
   path.join(destination, "backup.json"),
   JSON.stringify(
     {
       format: "runehall-backup",
-      version: 1,
+      version: 2,
       createdAt: new Date().toISOString(),
       appVersion: packageVersion,
       source: { dataDir, databasePath, uploadsDir },
       totalBytes,
+      digest,
       files,
     },
     null,
@@ -106,6 +116,7 @@ fs.writeFileSync(
 console.log(`Runehall backup created:`);
 console.log(`  ${destination}`);
 console.log(`  ${(totalBytes / 1024 / 1024).toFixed(1)} MB, ${files.length} files`);
+console.log(`  manifest ${digest.slice(0, 16)}…`);
 
 if (keep > 0) {
   const archives = fs

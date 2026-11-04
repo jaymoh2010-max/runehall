@@ -494,7 +494,14 @@ Acceptance: a GM can prepare a full session in Runehall and start it with one â€
   - Verified health, registration, campaign/character data, uploads, backup, restore, and restart persistence.
   - Reduced the image from about 675 MB to 456 MB by avoiding a recursive `/app` chown.
   - Added a CI job that builds the image and waits for `/api/health`.
-- [ ] Off-machine backup shipping with checksum verification.
+- [x] **Off-machine backup shipping with checksum verification**
+  - `backup.json` now records per-file SHA-256 hashes and a deterministic archive digest.
+  - `npm run ship-backup` verifies the source, copies to a temporary destination folder, verifies every file again, then renames the archive into place.
+  - Remote retention keeps a configurable number of off-machine generations.
+  - Restore verifies the manifest before changing live data and refuses corrupted archives.
+  - Docker exposes `/app/shipped` as a writable off-machine mount; backup and shipping were verified inside the container.
+  - Legacy archives require explicit `--allow-unverified`.
+- [ ] Run the restore drill on a clean machine.
 - [ ] Audit retention and export.
 - [ ] Only then consider Postgres/S3 adapters or OAuth.
 

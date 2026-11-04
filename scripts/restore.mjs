@@ -4,20 +4,25 @@
  *
  * Usage:
  *   npm run restore -- --from backups/runehall-2026-01-01T12-00-00-000Z --yes
+ *   npm run restore -- --from <dir> --yes --allow-unverified
  *
  * The server must be stopped first. The script refuses to restore if the API
- * port is accepting connections, and keeps a safety copy of the current DB.
+ * port is accepting connections, keeps a safety copy of the current DB, and
+ * verifies the backup manifest checksums before changing anything.
  */
 import fs from "node:fs";
 import net from "node:net";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
+import { readManifest, verifyBackupManifest } from "./backup-lib.mjs";
 
 const args = process.argv.slice(2);
 const fromIndex = args.indexOf("--from");
 const fromArg = fromIndex >= 0 ? args[fromIndex + 1] : args.find((arg) => !arg.startsWith("--"));
 const assumeYes = args.includes("--yes");
+const allowUnverified = args.includes("--allow-unverified");
 const dataDir = path.resolve(process.env.DATA_DIR || "data");
+const backupRoot = path.resolve(process.env.BACKUP_DIR || "backups");
 const databasePath = process.env.DATABASE_PATH
   ? path.resolve(process.env.DATABASE_PATH)
   : path.join(dataDir, "runehall.db");
@@ -38,6 +43,29 @@ if (!assumeYes) {
   console.error("Refusing to overwrite live data without --yes.");
   console.error(`Re-run with: npm run restore -- --from "${backupDir}" --yes`);
   process.exit(1);
+}
+
+const manifest = readManifest(backupDir);
+if (!manifest) {
+  if (!allowUnverified) {
+    console.error(`No valid backup.json found in ${backupDir}.`);
+    console.error("Refusing to restore an unverifiable archive. Add --allow-unverified only for a manually inspected backup.");
+    process.exit(1);
+  }
+  console.warn("WARNING: restoring an archive without backup.json; checksums cannot be verified.");
+} else {
+  const verification = verifyBackupManifest(backupDir, manifest);
+  if (!verification.ok) {
+    console.error("Backup integrity check failed:");
+    for (const error of verification.errors) console.error(`  - ${error}`);
+    console.error("Nothing was changed.");
+    process.exit(1);
+  }
+  if (verification.legacy) {
+    console.warn("WARNING: this is a legacy backup without per-file checksums.");
+  } else {
+    console.log(`Verified ${verification.checked} files against the backup manifest.`);
+  }
 }
 
 function portIsOpen() {
@@ -61,7 +89,7 @@ if (await portIsOpen()) {
 }
 
 const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-const safetyDir = path.resolve("backups", `pre-restore-${stamp}`);
+const safetyDir = path.join(backupRoot, `pre-restore-${stamp}`);
 fs.mkdirSync(safetyDir, { recursive: true });
 if (fs.existsSync(databasePath)) {
   // Use the same consistent snapshot mechanism as the backup command; a plain

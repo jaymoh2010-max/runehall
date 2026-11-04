@@ -22,3 +22,5 @@ services:
     volumes:
       - ./data:/app/data
       - ./backups:/app/backups
+      # Optional: mount an off-machine backup folder here for ship-backup.
+      # - /mnt/nas/runehall:/app/shipped

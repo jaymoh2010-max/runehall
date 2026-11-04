@@ -113,6 +113,7 @@ Players join with the GM's invite link or code from their own accounts. They can
 | `npm run verify:data` | Validate compendium counts, required fields, cross-references, inline macros, SQLite integrity, and foreign keys |
 | `npm run simulate` | Generate valid characters across classes, levels, ancestries, backgrounds, subclass options, feats, spells, and gear; report rule/math problems |
 | `npm run backup` | Snapshot SQLite + uploaded assets into `backups/` |
+| `npm run ship-backup` | Verify and copy the newest backup to another folder or NAS mount |
 | `npm run restore -- --from <dir> --yes` | Restore a backup (server must be stopped) |
 | `npm run reset-password -- --username <name>` | Issue a temporary password and sign out that account everywhere |
 | `npm run cleanup-assets` | Dry-run scan for unused uploaded files; add `-- --delete` to remove them |
@@ -133,7 +134,7 @@ Or run the container:
 docker compose up -d --build
 ```
 
-The compose path keeps SQLite, the compendium, uploads, and backups in `./data` and `./backups`. Put Caddy or Nginx in front for HTTPS, then set `COOKIE_SECURE=1`. Security headers, CSP, origin checks, and auth/upload rate limits are built in. The production image is built and health-checked in CI, and has been verified locally with persistence, backups, and restore.
+The compose path keeps SQLite, the compendium, uploads, and backups in `./data` and `./backups`. Put Caddy or Nginx in front for HTTPS, then set `COOKIE_SECURE=1`. Security headers, CSP, origin checks, and auth/upload rate limits are built in. The production image is built and health-checked in CI, and has been verified locally with persistence, backups, and restore. It also prepares `/app/shipped` for an optional off-machine backup mount.
 
 See [docs/DEPLOY.md](docs/DEPLOY.md) for the full deployment checklist, reverse-proxy examples, updates, and current hosting gaps.
 
@@ -196,12 +197,12 @@ This is a substantial, playable foundation — not a complete Pathbuilder/Foundr
 - **Registration is controllable.** The first account on a fresh install becomes the instance administrator. From **Admin → Hall controls**, that account can leave registration open, switch to invite-only single-use codes, or close it entirely. Open registration remains the default for local use.
 - **The audit log is local.** Sign-ins, failed sign-ins, password changes, campaign creation/deletion, member removal, party level-ups, and administrative actions are recorded in SQLite. There is no shipping or automatic retention pipeline yet.
 - **Password recovery is local.** Signed-in users can change their password in **Account & security**. A host with shell access can run `npm run reset-password -- --username <name>` to issue a temporary password or grant administrator access; there is no email reset.
-- **Backups can be scheduled.** `npm run backup -- --keep N` prunes older archives. Use cron, a systemd timer, or Windows Task Scheduler, then copy the archive off the machine.
+- **Backups can be scheduled and shipped off-machine.** `npm run backup -- --keep N` prunes older archives, and `npm run ship-backup -- --to <folder> --keep N` verifies and copies the newest archive to another disk, NAS mount, or synced folder. Backups include per-file SHA-256 hashes, and restore refuses corrupted archives.
 - **Search is keyword-based, not natural-language.** The global search bar and library cover every compendium entry type, but there is no semantic rules lookup or question answering over rules text.
 - **Some upstream entries have no separate rules text.** About 189 generic treasure/gear items and seven creatures have empty descriptions in the Foundry source export; the library shows their statistics and an explicit fallback rather than inventing text. Thirteen recovered entries use GM-facing source text and are labeled **GM source text**. Twenty-eight control attacks legitimately have no damage, and 716 spells have no tradition because they are focus, ritual, or class-locked.
 
 ### Good next steps
-1. **Backup operations:** add off-machine backup shipping with checksums and run the restore drill on a clean machine.
+1. **Hosting verification:** run the restore drill on a clean machine and add audit-log retention/export.
 2. **Browser E2E:** automate the GM/player campaign, table, modal, and lazy-route flows.
 3. **Rules automation:** close the remaining subclass, feat, and item effect gaps.
 4. **Optional scale:** Postgres/S3 adapters and OAuth only when the local deployment is proven.
