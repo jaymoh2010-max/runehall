@@ -172,6 +172,15 @@ export async function registerTableRoutes(app: FastifyInstance): Promise<void> {
     const row = db.prepare("SELECT * FROM scenes WHERE id = ?").get(sceneId) as SceneRow;
     const scene = serializeScene(row);
     app.broadcastCampaign(id, "scene:created", scene);
+    if (body.activate === true) {
+      ensureState(id);
+      db.prepare("UPDATE campaign_state SET active_scene_id = ?, updated_at = ? WHERE campaign_id = ?").run(
+        sceneId,
+        now(),
+        id,
+      );
+      app.broadcastCampaign(id, "scene:activated", { sceneId });
+    }
     touchCampaign(id);
     return reply.code(201).send({ scene });
   });

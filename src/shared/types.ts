@@ -1115,6 +1115,7 @@ export interface ClientToServerEvents {
   "scene:update": (payload: { campaignId: string; scene: Partial<Scene> & { id: string } }) => void;
   "scene:create": (payload: { campaignId: string; scene: Partial<Scene> }, ack?: (scene: Scene | null) => void) => void;
   "scene:delete": (payload: { campaignId: string; sceneId: string }) => void;
+  "scene:reorder": (payload: { campaignId: string; sceneIds: string[] }) => void;
   "template:add": (payload: { campaignId: string; sceneId: string; template: AoeTemplate }) => void;
   "template:clear": (payload: { campaignId: string; sceneId: string }) => void;
   "chat:send": (payload: { campaignId: string; content: string; visibility?: "all" | "gm" }, ack?: (message: ChatMessage | null) => void) => void;
@@ -1140,6 +1141,7 @@ export interface ServerToClientEvents {
   "scene:updated": (scene: Scene) => void;
   "scene:created": (scene: Scene) => void;
   "scene:deleted": (payload: { sceneId: string }) => void;
+  "scenes:reordered": (scenes: Scene[]) => void;
   "scene:templates": (payload: { sceneId: string; templates: AoeTemplate[] }) => void;
   "chat:message": (message: ChatMessage) => void;
   "initiative:updated": (payload: { entries: InitiativeEntry[]; round: number; turnIndex: number }) => void;

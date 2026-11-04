@@ -1467,6 +1467,10 @@
 }
 .vtt-toolbar-left, .vtt-toolbar-right { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .vtt-toolbar .btn.is-active { color: var(--gold-bright); background: rgba(200,169,107,0.1); border-color: rgba(200,169,107,0.35); }
+.vtt-preview-banner { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; border-bottom: 1px solid rgba(105,150,200,0.3); background: rgba(80,120,170,0.12); color: var(--text-2); padding: 7px 13px; font-size: 0.79rem; }
+.vtt-preview-banner svg { color: #9db8dc; flex: none; }
+.vtt-preview-banner strong { color: var(--gold-bright); }
+.vtt-preview-banner .btn { margin-left: auto; }
 .toolbar-sep { width: 1px; height: 22px; background: var(--line); margin: 0 3px; }
 .scene-select { width: 180px; padding-top: 6px; padding-bottom: 6px; font-size: 0.83rem; }
 .brush-select { width: 72px; padding-top: 6px; padding-bottom: 6px; font-size: 0.8rem; }

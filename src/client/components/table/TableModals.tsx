@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import {
+  ArrowDown,
+  ArrowUp,
   Check,
+  Eye,
   ImagePlus,
   Map,
   Plus,
@@ -20,6 +23,7 @@ import {
   Badge,
   Button,
   Field,
+  IconButton,
   Input,
   Modal,
   RarityTag,
@@ -322,9 +326,12 @@ export function SceneManagerModal({
   campaignId,
   scenes,
   activeSceneId,
+  previewSceneId,
   onActivate,
   onDelete,
   onDuplicate,
+  onReorder,
+  onPreview,
   onCreated,
   onEdit,
 }: {
@@ -333,9 +340,12 @@ export function SceneManagerModal({
   campaignId: string;
   scenes: Scene[];
   activeSceneId: string | null;
+  previewSceneId: string | null;
   onActivate: (sceneId: string) => void;
   onDelete: (sceneId: string) => void;
   onDuplicate: (sceneId: string) => void;
+  onReorder: (sceneIds: string[]) => void;
+  onPreview: (sceneId: string) => void;
   onCreated: (scene: Scene) => void;
   onEdit: (scene: Scene) => void;
 }) {
@@ -343,6 +353,7 @@ export function SceneManagerModal({
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState("");
   const [gridSize, setGridSize] = useState("70");
+  const [activateOnCreate, setActivateOnCreate] = useState(true);
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [dimensions, setDimensions] = useState({ width: 1600, height: 1000 });
@@ -354,6 +365,7 @@ export function SceneManagerModal({
     if (!open) {
       setCreating(false);
       setName("");
+      setActivateOnCreate(true);
       setFile(null);
       setPreview(null);
       setError("");
@@ -396,6 +408,7 @@ export function SceneManagerModal({
           width: dimensions.width,
           height: dimensions.height,
           gridSize: Number(gridSize) || 70,
+          activate: activateOnCreate,
         },
       });
       onCreated(result.scene);
@@ -413,7 +426,7 @@ export function SceneManagerModal({
       {!creating ? (
         <>
           <div className="scene-manager-list">
-            {scenes.map((scene) => (
+            {scenes.map((scene, index) => (
               <div key={scene.id} className={`scene-manager-row ${scene.id === activeSceneId ? "is-active" : ""}`}>
                 <div className="scene-manager-thumb">
                   {scene.imageUrl ? <img src={scene.imageUrl} alt="" /> : <Map size={20} />}
@@ -422,11 +435,37 @@ export function SceneManagerModal({
                   <div className="row" style={{ gap: 7 }}>
                     <strong>{scene.name}</strong>
                     {scene.id === activeSceneId ? <Badge tone="gold">Active</Badge> : null}
+                    {scene.id === previewSceneId ? <Badge tone="blue">Previewing</Badge> : null}
                   </div>
                   <p className="tiny muted">{scene.width} × {scene.height} · {scene.gridSize}px grid · {scene.fogEnabled ? "Fog on" : "Fog off"}</p>
                 </div>
                 <div className="row" style={{ gap: 5 }}>
+                  <IconButton
+                    label="Move scene up"
+                    disabled={index === 0}
+                    onClick={() => {
+                      if (index === 0) return;
+                      const ids = scenes.map((entry) => entry.id);
+                      [ids[index - 1], ids[index]] = [ids[index], ids[index - 1]];
+                      onReorder(ids);
+                    }}
+                  >
+                    <ArrowUp size={13} />
+                  </IconButton>
+                  <IconButton
+                    label="Move scene down"
+                    disabled={index === scenes.length - 1}
+                    onClick={() => {
+                      if (index >= scenes.length - 1) return;
+                      const ids = scenes.map((entry) => entry.id);
+                      [ids[index], ids[index + 1]] = [ids[index + 1], ids[index]];
+                      onReorder(ids);
+                    }}
+                  >
+                    <ArrowDown size={13} />
+                  </IconButton>
                   {scene.id !== activeSceneId ? <Button size="sm" onClick={() => onActivate(scene.id)}>Activate</Button> : null}
+                  <Button size="sm" variant="ghost" icon={<Eye size={13} />} onClick={() => onPreview(scene.id)}>Preview</Button>
                   <Button size="sm" variant="ghost" onClick={() => onEdit(scene)}>Edit</Button>
                   <Button size="sm" variant="ghost" onClick={() => onDuplicate(scene.id)}>Duplicate</Button>
                   <button
@@ -488,6 +527,7 @@ export function SceneManagerModal({
               </div>
             </Field>
           </div>
+          <Toggle checked={activateOnCreate} onChange={setActivateOnCreate} label="Activate this scene after creating it" />
           <div className="modal-foot" style={{ margin: "4px -22px -20px", paddingTop: 14 }}>
             <Button type="button" variant="ghost" onClick={() => setCreating(false)}>Back</Button>
             <Button type="submit" variant="primary" loading={busy} icon={<Upload size={15} />}>Create scene</Button>

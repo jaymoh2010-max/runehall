@@ -77,7 +77,7 @@ The target table size is one GM plus 4–10 players. That means the product shou
 - Token conditions with values and round durations, ticking automatically when initiative advances; character-sheet durations remain.
 - Auras, multi-select, and a proper token context menu. Multi-select group drag is built; marquee selection and bulk actions remain.
 - Player-side group checks, combat-log filters, delay/ready actions.
-- Scene playlists and GM-only preview.
+- Scene playlists with reorder controls, previous/next navigation, activate-on-create, and GM player-safe preview; drag reordering and thumbnails remain.
 
 ### Phase 6 — Hosting and durability
 - Docker image, Compose deployment, HTTPS reverse-proxy guide, security headers, CSP, origin checks, and auth/upload rate limits are built.

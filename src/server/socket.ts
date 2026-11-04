@@ -622,6 +622,31 @@ export function registerSocketServer(io: TypedServer): void {
       touchCampaign(campaignId);
     });
 
+    socket.on("scene:reorder", ({ campaignId, sceneIds }) => {
+      if (!requireGm(socket, campaignId)) return;
+      const rows = db
+        .prepare("SELECT id FROM scenes WHERE campaign_id = ?")
+        .all(campaignId) as { id: string }[];
+      const existing = new Set(rows.map((row) => row.id));
+      if (
+        sceneIds.length !== rows.length ||
+        new Set(sceneIds).size !== sceneIds.length ||
+        !sceneIds.every((id) => existing.has(id))
+      ) {
+        return;
+      }
+      const ts = now();
+      const update = db.prepare(
+        "UPDATE scenes SET sort_order = ?, updated_at = ? WHERE id = ? AND campaign_id = ?",
+      );
+      sceneIds.forEach((id, index) => update.run(index, ts, id, campaignId));
+      const scenes = db
+        .prepare("SELECT * FROM scenes WHERE campaign_id = ? ORDER BY sort_order ASC, created_at ASC")
+        .all(campaignId) as SceneRow[];
+      io.to(room(campaignId)).emit("scenes:reordered", scenes.map(serializeScene));
+      touchCampaign(campaignId);
+    });
+
     socket.on("template:add", ({ campaignId, sceneId, template }) => {
       if (!requireGm(socket, campaignId)) return;
       const scene = sceneBelongs(sceneId, campaignId);

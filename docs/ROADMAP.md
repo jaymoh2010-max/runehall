@@ -382,7 +382,12 @@ Acceptance: a GM can prepare a full session in Runehall and start it with one â€
   - Bestiary group members still move together and are merged into multi-selection drags.
   - The primary selected token still drives the token panel.
   - Remaining: marquee selection and bulk condition/HP actions.
-- [ ] Scene playlists, reordering, activate-on-create, thumbnails, and player-safe preview.
+- [x] **Scene playlists and player-safe preview**
+  - Scenes can be reordered with up/down controls; ordering is persisted and broadcast.
+  - Toolbar previous/next buttons step through the scene playlist.
+  - Creating a scene can activate it immediately.
+  - The GM can preview any scene as players see it without changing the active scene.
+  - Remaining: drag-and-drop reordering and player-facing preview controls.
 - [ ] Filterable combat log, group checks, delay/ready actions, and tie handling.
 - [ ] Decide the token HP â†” sheet HP source of truth, or make sync explicitly two-way.
 - [ ] Optional first pass at walls/doors with manual reveal before dynamic lighting.

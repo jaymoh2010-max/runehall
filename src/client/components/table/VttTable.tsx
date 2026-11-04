@@ -98,6 +98,7 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
   const [bestiaryOpen, setBestiaryOpen] = useState(false);
   const [templateKind, setTemplateKind] = useState<TemplateKind | null>(null);
   const [templateSize, setTemplateSize] = useState(20);
+  const [previewSceneId, setPreviewSceneId] = useState<string | null>(null);
   const [leftOpen, setLeftOpen] = useState(true);
   const [rightOpen, setRightOpen] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -133,13 +134,29 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
     }
   }, [theaterMode]);
 
-  const activeScene = scenes.find((scene) => scene.id === activeSceneId) ?? null;
+  const activeScene = scenes.find((scene) => scene.id === (previewSceneId ?? activeSceneId)) ?? null;
+  const previewing = Boolean(previewSceneId);
   const sceneTokens = useMemo(
-    () => tokens.filter((token) => token.sceneId === activeSceneId && (isGm || !token.hidden)),
-    [tokens, activeSceneId, isGm],
+    () =>
+      tokens.filter(
+        (token) =>
+          token.sceneId === (previewSceneId ?? activeSceneId) &&
+          ((!previewing && isGm) || !token.hidden),
+      ),
+    [tokens, activeSceneId, previewSceneId, previewing, isGm],
   );
   const selectedToken = sceneTokens.find((token) => token.id === selectedTokenId) ?? null;
   const editingToken = tokens.find((token) => token.id === editingTokenId) ?? null;
+
+  useEffect(() => {
+    setPreviewSceneId(null);
+  }, [activeSceneId]);
+
+  useEffect(() => {
+    if (previewSceneId && !scenes.some((scene) => scene.id === previewSceneId)) {
+      setPreviewSceneId(null);
+    }
+  }, [scenes, previewSceneId]);
 
   // ---- Realtime -----------------------------------------------------------
   useEffect(() => {
@@ -163,6 +180,22 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
   const clearTemplates = () => {
     if (!activeSceneId) return;
     getSocket().emit("template:clear", { campaignId, sceneId: activeSceneId });
+  };
+
+  const reorderScenes = (sceneIds: string[]) => {
+    if (!isGm) return;
+    getSocket().emit("scene:reorder", { campaignId, sceneIds });
+  };
+
+  const previewScene = (sceneId: string) => {
+    if (!isGm) return;
+    setPreviewSceneId(sceneId);
+    setSelectedTokenId(null);
+  };
+
+  const exitPreview = () => {
+    setPreviewSceneId(null);
+    setSelectedTokenId(null);
   };
 
   const duplicateScene = async (sceneId: string) => {
@@ -453,6 +486,12 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
   ]);
 
   const expanded = isFullscreen || theaterMode;
+  const activeSceneIndex = scenes.findIndex((scene) => scene.id === activeSceneId);
+  const previousScene = activeSceneIndex > 0 ? scenes[activeSceneIndex - 1] : null;
+  const nextScene =
+    activeSceneIndex >= 0 && activeSceneIndex < scenes.length - 1
+      ? scenes[activeSceneIndex + 1]
+      : null;
   const defaultPosition = activeScene
     ? { x: activeScene.width / 2, y: activeScene.height / 2 }
     : { x: 100, y: 100 };
@@ -472,9 +511,12 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
           campaignId={campaignId}
           scenes={scenes}
           activeSceneId={activeSceneId}
+          previewSceneId={previewSceneId}
           onActivate={activateScene}
           onDelete={deleteScene}
           onDuplicate={duplicateScene}
+          onReorder={reorderScenes}
+          onPreview={previewScene}
           onCreated={(scene) => setScenes((current) => (current.some((item) => item.id === scene.id) ? current : [...current, scene]))}
           onEdit={setEditingScene}
         />
@@ -493,6 +535,8 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
         activeSceneId={activeSceneId}
         activateScene={activateScene}
         activeSceneName={activeScene.name}
+        onPreviousScene={previousScene ? () => activateScene(previousScene.id) : undefined}
+        onNextScene={nextScene ? () => activateScene(nextScene.id) : undefined}
         setSceneManagerOpen={setSceneManagerOpen}
         fogBrush={fogBrush}
         setFogBrush={setFogBrush}
@@ -519,6 +563,17 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
         toggleFullscreen={toggleFullscreen}
         toast={toast}
       />
+
+      {previewing && activeScene ? (
+        <div className="vtt-preview-banner">
+          <Eye size={14} />
+          <span>
+            Previewing <strong>{activeScene.name}</strong> as players see it. The table is still on{" "}
+            <strong>{scenes.find((scene) => scene.id === activeSceneId)?.name ?? "another scene"}</strong>.
+          </span>
+          <Button size="sm" variant="ghost" onClick={exitPreview}>Exit preview</Button>
+        </div>
+      ) : null}
 
       <div className="vtt-body">
         {leftOpen ? (
@@ -557,22 +612,22 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
             scene={activeScene}
             tokens={sceneTokens}
             characters={characters}
-            isGm={isGm}
+            isGm={isGm && !previewing}
             userId={user.id}
             selectedTokenId={selectedTokenId}
             selectedTokenIds={selectedTokenIds}
             onSelectToken={selectToken}
             onOpenCharacter={(id) => window.open(`/characters/${id}`, "_blank")}
-            onEditToken={isGm ? setEditingTokenId : undefined}
+            onEditToken={isGm && !previewing ? setEditingTokenId : undefined}
             onMoveToken={moveToken}
             onFog={applyFog}
-            fogBrush={activeScene.fogEnabled ? fogBrush : null}
+            fogBrush={previewing ? null : activeScene.fogEnabled ? fogBrush : null}
             brushSize={brushSize}
             measureMode={measureMode}
             onPing={(x, y) => getSocket().emit("pointer", { campaignId, sceneId: activeScene.id, x, y })}
             remotePointer={remotePointer}
-            onDropMonster={placeMonster}
-            templateKind={templateKind}
+            onDropMonster={previewing ? undefined : placeMonster}
+            templateKind={previewing ? null : templateKind}
             templateSize={templateSize}
             onTemplate={placeTemplate}
           />
@@ -620,9 +675,12 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
         campaignId={campaignId}
         scenes={scenes}
         activeSceneId={activeSceneId}
+        previewSceneId={previewSceneId}
         onActivate={activateScene}
         onDelete={deleteScene}
         onDuplicate={duplicateScene}
+        onReorder={reorderScenes}
+        onPreview={previewScene}
         onCreated={(scene) => {
           setScenes((current) => (current.some((item) => item.id === scene.id) ? current : [...current, scene]));
           setActiveSceneId((current) => current ?? scene.id);

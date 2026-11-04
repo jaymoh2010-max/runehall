@@ -1,5 +1,7 @@
 import {
   BookOpen,
+  ChevronLeft,
+  ChevronRight,
   Eye,
   EyeOff,
   Grid3X3,
@@ -23,6 +25,8 @@ export function VttToolbar({
   activeSceneId,
   activateScene,
   activeSceneName,
+  onPreviousScene,
+  onNextScene,
   setSceneManagerOpen,
   fogBrush,
   setFogBrush,
@@ -54,6 +58,8 @@ export function VttToolbar({
   activeSceneId: string | null;
   activateScene: (sceneId: string) => void;
   activeSceneName: string;
+  onPreviousScene?: () => void;
+  onNextScene?: () => void;
   setSceneManagerOpen: (open: boolean) => void;
   fogBrush: "reveal" | "hide" | null;
   setFogBrush: (brush: "reveal" | "hide" | null | ((current: "reveal" | "hide" | null) => "reveal" | "hide" | null)) => void;
@@ -88,6 +94,12 @@ export function VttToolbar({
             <Select value={activeSceneId ?? ""} onChange={(event) => activateScene(event.target.value)} className="scene-select">
               {scenes.map((scene) => <option key={scene.id} value={scene.id}>{scene.name}</option>)}
             </Select>
+            <IconButton label="Previous scene" onClick={onPreviousScene} disabled={!onPreviousScene}>
+              <ChevronLeft size={14} />
+            </IconButton>
+            <IconButton label="Next scene" onClick={onNextScene} disabled={!onNextScene}>
+              <ChevronRight size={14} />
+            </IconButton>
             <Button size="sm" variant="ghost" icon={<Grid3X3 size={14} />} onClick={() => setSceneManagerOpen(true)}>Scenes</Button>
           </>
         ) : (
