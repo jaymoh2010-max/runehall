@@ -17,7 +17,7 @@
 - **Content volume needs curation.** The builder exposes 540 backgrounds and 29 classes by default. That is impressive, but overwhelming; not every option has the same automation quality.
 - **Test coverage is unit + smoke + simulation.** Dice, rules math, compendium integrity, content tiers, security, and migrations are unit-tested; the GM/player campaign flow and registration/admin flows have an automated smoke test. Browser-level E2E and upload edge cases still rely on manual checks.
 - **Code health has guardrails.** Route-level splitting keeps the entry bundle near 107â€“122 KB gzip, `npm run check` covers types, tests, build, and bundle budgets, and the table state layer is tested. There is still no lint/format gate and some large components remain.
-- **Operations are on solid footing.** The Docker image is built and health-checked in CI, backup shipping is checksum-verified and automated, and the audit log supports retention and CSV export. A clean-machine restore drill and browser-level E2E remain. Uploads validate magic bytes and image dimensions.
+- **Operations are on solid footing.** The Docker image is built and health-checked in CI, backup shipping is checksum-verified and automated, the restore drill runs end to end, and the audit log supports retention and CSV export. Confirming the drill on a clean CI runner and browser-level E2E remain. Uploads validate magic bytes and image dimensions.
 
 ### Highest-risk issues (fix before adding lots of features)
 1. Losing campaign data or failing to upgrade a database.
@@ -507,7 +507,11 @@ Acceptance: a GM can prepare a full session in Runehall and start it with one â€
   - Expired entries are pruned when retention is saved and at server startup.
   - `npm run audit-prune` previews expired entries by default; `--delete` removes them.
   - Export and retention changes are themselves recorded in the audit log.
-- [ ] Run the restore drill on a clean machine.
+- [x] **Automated restore drill**
+  - `npm run restore-drill` creates real campaign and upload data on an isolated server, takes a live backup, ships it, rejects a corrupted copy, restores into a fresh data directory, and boots the restored server.
+  - The restored campaign ID, name, invite code, uploaded asset metadata, and file bytes are compared with the originals.
+  - CI runs the drill on a fresh runner after the smoke test.
+- [ ] Confirm the restore drill on the project's clean CI runner once a remote is configured.
 - [ ] Only then consider Postgres/S3 adapters or OAuth.
 
 **Acceptance:** clean-machine deploy and restore drill pass end to end.
@@ -541,7 +545,7 @@ The feature roadmap through Sprint 11 is complete. Start Sprint 12:
 1. verify the Docker build in CI or on a Docker host,
 2. add off-machine backup shipping with checksum verification,
 3. add audit-log retention and export,
-4. run a clean-machine restore drill,
+4. confirm the automated restore drill on a clean CI runner,
 5. defer Postgres/S3 adapters and OAuth until the local deployment is proven.
 
 Keep the two-user smoke test green as new socket events are added.

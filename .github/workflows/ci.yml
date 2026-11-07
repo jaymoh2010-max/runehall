@@ -37,6 +37,9 @@ jobs:
       - name: Smoke test
         run: npm run smoke
 
+      - name: Backup and restore drill
+        run: npm run restore-drill
+
   docker:
     runs-on: ubuntu-latest
     timeout-minutes: 20

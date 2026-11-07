@@ -217,7 +217,15 @@ BACKUP_DIR=./backups npm run ship-backup -- --to /mnt/nas/runehall --keep 14
 
 ### Restore drill
 
-Run this at least once after setup and before trusting the deployment:
+Run the automated drill after setup and before trusting a release:
+
+```bash
+npm run restore-drill
+```
+
+It creates real campaign and upload data in a temporary directory, takes a live backup, ships it, rejects a corrupted copy, restores into a fresh directory, and boots the restored server to compare the data. The CI workflow runs it on a fresh runner, so it also serves as the clean-machine check.
+
+For a real host, run this manual drill at least once after setup:
 
 Docker flow:
 

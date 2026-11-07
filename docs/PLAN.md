@@ -85,9 +85,9 @@ The target table size is one GM plus 4–10 players. That means the product shou
 ### Phase 6 — Hosting and durability
 - Docker image, Compose deployment, HTTPS reverse-proxy guide, security headers, CSP, origin checks, and auth/upload rate limits are built. The Node 26 Alpine image is built and health-checked in CI and was verified locally with a clean volume, uploads, backup, restore, and restart persistence.
 - Configurable registration (open, invite-only, closed), first-user administrator bootstrap, invite codes, local password recovery, self-service password change, and an audit log with retention and CSV export are built.
-- Backups support retention pruning, per-file SHA-256 manifests, verified off-machine shipping, documented cron/systemd/Task Scheduler automation, and a checksum-verified restore drill.
+- Backups support retention pruning, per-file SHA-256 manifests, verified off-machine shipping, documented cron/systemd/Task Scheduler automation, and an automated end-to-end restore drill.
 - The compendium manifest is pinned to the source commit.
-- Remaining: a true clean-machine restore drill and optional Postgres/S3 adapters.
+- Remaining: confirm the automated restore drill on a clean CI runner and optional Postgres/S3 adapters.
 - Multi-device uploads and campaign import/export.
 - Optional OAuth.
 

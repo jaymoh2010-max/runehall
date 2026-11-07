@@ -124,7 +124,15 @@ Use `npm run ship-backup` for filesystem destinations. For cloud APIs without a 
 
 ### Restore drill
 
-Do this once after setup and whenever the host changes:
+Run the automated drill after setup, whenever the host changes, and before trusting a new release:
+
+```bash
+npm run restore-drill
+```
+
+It starts an isolated server in a temporary directory, creates a campaign and uploads an asset, takes a live backup, ships it to a second directory, proves a corrupted copy is refused, restores into a fresh data directory, boots the restored server, and compares the campaign, invite code, and uploaded bytes. It never touches `data/` or `backups/`. CI runs the same command on a fresh runner.
+
+For a real host, also do a manual drill once after setup and whenever the host changes:
 
 Docker:
 
