@@ -2330,10 +2330,20 @@ export function computeCharacter(
   focusPointsMax = Math.max(focusPointsMax, Math.min(3, draft.spells.focus.length));
   focusPointsMax = Math.min(3, focusPointsMax);
 
+  const featureLanguages = features.flatMap((feature) => {
+    const raw = feature.languages;
+    if (!raw || typeof raw !== "object") return [];
+    const granted = (raw as { granted?: unknown }).granted;
+    return Array.isArray(granted)
+      ? granted.filter((value): value is string => typeof value === "string")
+      : [];
+  });
+
   const languages = [
     ...(ancestry?.languages ?? []).map(titleCase),
     ...draft.details.languages,
     ...(featMods.languages ?? []).map(titleCase),
+    ...featureLanguages.map(titleCase),
   ].filter(
     (value, index, arr) => arr.findIndex((x) => x.toLowerCase() === value.toLowerCase()) === index
   );
