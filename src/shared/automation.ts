@@ -1,4 +1,5 @@
 import type { Equipment, Feat } from "./types";
+import { featEffect } from "./effects";
 
 export type AutomationLevel = "full" | "partial" | "manual";
 
@@ -41,6 +42,17 @@ function plainText(html: string): string {
 export function automationForFeat(feat: Feat): AutomationInfo {
   const override = FEAT_OVERRIDES[feat.id];
   if (override) return override;
+  const effect = featEffect(feat.id);
+  if (effect) {
+    const numeric =
+      Boolean(effect.hpPerLevel) ||
+      Boolean(effect.speed) ||
+      Boolean(effect.senses?.length) ||
+      Boolean(effect.languages?.length);
+    return numeric
+      ? { level: "full", reason: "Runehall applies this feat's mechanics to the sheet." }
+      : { level: "partial", reason: "Runehall records the effect as a note for the table." };
+  }
   if (MECHANICAL_TEXT.test(plainText(feat.description))) {
     return {
       level: "manual",

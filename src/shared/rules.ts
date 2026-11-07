@@ -28,6 +28,7 @@ import {
   type ValidationIssue,
 } from "./types";
 import { propertyRuneDamage, shieldRuneBonus, summarizeRunes } from "./runes";
+import { collectFeatEffects } from "./effects";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -1616,6 +1617,7 @@ export function computeCharacter(
     ABILITIES.map((ability) => [ability, abilityMod(abilities[ability])])
   ) as Record<AbilityKey, number>;
   const prof = buildProficiencies(draft, context);
+  const featMods = collectFeatEffects(Object.keys(context.feats));
   const caster = casterInfo(classData);
   const keyOptions = classKeyOptions(draft, classData);
   const key =
@@ -1909,7 +1911,9 @@ export function computeCharacter(
   const ancestryHp = ancestry?.hp ?? 0;
   const classHp = classData?.hp ?? 0;
   const perLevel = Math.max(1, classHp + conMod);
-  const maxHp = Math.max(1, ancestryHp + perLevel + Math.max(0, draft.level - 1) * perLevel);
+  const maxHp =
+    Math.max(1, ancestryHp + perLevel + Math.max(0, draft.level - 1) * perLevel) +
+    (featMods.hpPerLevel ?? 0) * draft.level;
   const currentHp =
     draft.play.hp === null ? maxHp : Math.max(0, Math.min(maxHp, Math.round(draft.play.hp)));
 
@@ -1947,7 +1951,7 @@ export function computeCharacter(
   const shieldBonus =
     draft.play.shieldRaised && shield?.shield ? Math.abs(shield.shield.acBonus || 2) : 0;
   let ac: number;
-  let speed = ancestry?.speed ?? 25;
+  let speed = (ancestry?.speed ?? 25) + (featMods.speed ?? 0);
   if (armor?.armor) {
     const armorCategory = armor.armor.category === "unarmored" ? "unarmored" : armor.armor.category;
     // Negative Dexterity still applies; only the armor's Dex cap limits it.
@@ -2329,11 +2333,17 @@ export function computeCharacter(
   const languages = [
     ...(ancestry?.languages ?? []).map(titleCase),
     ...draft.details.languages,
+    ...(featMods.languages ?? []).map(titleCase),
   ].filter(
     (value, index, arr) => arr.findIndex((x) => x.toLowerCase() === value.toLowerCase()) === index
   );
 
-  const senses = ancestry?.vision && ancestry.vision !== "normal" ? [ancestry.vision] : [];
+  const senses = [
+    ...(ancestry?.vision && ancestry.vision !== "normal" ? [ancestry.vision] : []),
+    ...(featMods.senses ?? []),
+  ].filter(
+    (value, index, arr) => arr.findIndex((x) => x.toLowerCase() === value.toLowerCase()) === index
+  );
 
   const className = classData?.name.toLowerCase();
   const font = divineFontInfo(draft.level, classData?.name);
