@@ -15,9 +15,9 @@
 - **Realtime recovery is revision-aware.** Reconnects refetch the authoritative table, campaign revisions detect missed events, character saves reject stale writes, and the table socket/state layer now lives in a tested hook with pure event reducers.
 - **Table polish is deep.** AoE templates, condition values/durations, multi-select, group drag, bulk actions, scene playlists, generated thumbnails, combat-log filters, group checks, delay/ready/ties, and first-run setup are built. Walls, doors, and dynamic lighting remain future work.
 - **Content volume needs curation.** The builder exposes 540 backgrounds and 29 classes by default. That is impressive, but overwhelming; not every option has the same automation quality.
-- **Test coverage is unit + smoke + simulation.** Dice, rules math, compendium integrity, content tiers, security, and migrations are unit-tested; the GM/player campaign flow and registration/admin flows have an automated smoke test. Browser-level E2E and upload edge cases still rely on manual checks.
+- **Test coverage is unit + smoke + browser E2E + simulation.** Dice, rules math, compendium integrity, content tiers, security, and migrations are unit-tested; the GM/player campaign flow and registration/admin flows have an automated smoke test; Playwright covers registration, admin audit controls, campaign creation, the character builder and sheet, compendium routes, and player-safe campaign access. Upload edge cases still rely on manual checks.
 - **Code health has guardrails.** Route-level splitting keeps the entry bundle near 107â€“122 KB gzip, `npm run check` covers types, tests, build, and bundle budgets, and the table state layer is tested. There is still no lint/format gate and some large components remain.
-- **Operations are on solid footing.** The Docker image is built and health-checked in CI, backup shipping is checksum-verified and automated, the restore drill runs end to end, and the audit log supports retention and CSV export. Confirming the drill on a clean CI runner and browser-level E2E remain. Uploads validate magic bytes and image dimensions.
+- **Operations are on solid footing.** The Docker image is built and health-checked in CI, backup shipping is checksum-verified and automated, the restore drill runs end to end, the audit log supports retention and CSV export, and Playwright covers the main GM/player browser flows. Confirming the drill on a clean CI runner and lint/format guardrails remain. Uploads validate magic bytes and image dimensions.
 
 ### Highest-risk issues (fix before adding lots of features)
 1. Losing campaign data or failing to upgrade a database.
@@ -511,7 +511,12 @@ Acceptance: a GM can prepare a full session in Runehall and start it with one â€
   - `npm run restore-drill` creates real campaign and upload data on an isolated server, takes a live backup, ships it, rejects a corrupted copy, restores into a fresh data directory, and boots the restored server.
   - The restored campaign ID, name, invite code, uploaded asset metadata, and file bytes are compared with the originals.
   - CI runs the drill on a fresh runner after the smoke test.
+- [x] **Browser E2E**
+  - Playwright covers first-user registration, Hall controls (retention, CSV export, filtering), campaign creation, the invite code, the character builder and sheet, lazy library/compendium/rules/account routes, and a second player joining with the invite code.
+  - Player-safe campaign navigation is checked: GM-only tabs are absent for the player, and the GM sees the new member in Settings.
+  - CI installs Chromium, runs the suite, and uploads the Playwright report on failure.
 - [ ] Confirm the restore drill on the project's clean CI runner once a remote is configured.
+- [ ] Add lint and format guardrails.
 - [ ] Only then consider Postgres/S3 adapters or OAuth.
 
 **Acceptance:** clean-machine deploy and restore drill pass end to end.
@@ -540,12 +545,11 @@ That is more trustworthy than silently showing a number that may be missing a +1
 
 ## Recommended next session
 
-The feature roadmap through Sprint 11 is complete. Start Sprint 12:
+Sprint 12 is nearly complete. Remaining:
 
-1. verify the Docker build in CI or on a Docker host,
-2. add off-machine backup shipping with checksum verification,
-3. add audit-log retention and export,
-4. confirm the automated restore drill on a clean CI runner,
-5. defer Postgres/S3 adapters and OAuth until the local deployment is proven.
+1. confirm the automated restore drill on a clean CI runner,
+2. add lint and format guardrails,
+3. keep the Docker and browser E2E jobs green,
+4. defer Postgres/S3 adapters and OAuth until the local deployment is proven.
 
-Keep the two-user smoke test green as new socket events are added.
+Keep the two-user smoke test and browser E2E suite green as new socket events are added.

@@ -83,6 +83,13 @@ npm start
 ```
 Open **http://localhost:3001**. The Fastify server serves the built client, API, uploads, and websocket server from one process.
 
+### Browser tests
+```bash
+npx playwright install chromium
+npm run e2e
+```
+The suite builds the client, starts its own server on port 5199 with a temporary database, and runs the GM/player flows in Chromium. It never touches `data/`.
+
 ### First five minutes
 1. **Register** an account.
 2. **Create a campaign** — you become the GM and get an invite code.
@@ -109,6 +116,7 @@ Players join with the GM's invite link or code from their own accounts. They can
 | `npm run check:bundle` | Verify the production entry JS/CSS gzip budgets after a build |
 | `npm run check:full` | `check` plus the two-user smoke test |
 | `npm run smoke` | Two-user GM/player API + socket smoke test against a temporary database |
+| `npm run e2e` | Build and run the Playwright GM/player browser flows |
 | `npm run ingest` | Rebuild the compendium from the Foundry PF2e data clone |
 | `npm run verify:data` | Validate compendium counts, required fields, cross-references, inline macros, SQLite integrity, and foreign keys |
 | `npm run simulate` | Generate valid characters across classes, levels, ancestries, backgrounds, subclass options, feats, spells, and gear; report rule/math problems |
@@ -205,7 +213,7 @@ This is a substantial, playable foundation — not a complete Pathbuilder/Foundr
 
 ### Good next steps
 1. **Hosting verification:** confirm the automated restore drill on a clean CI runner and keep the Docker check green.
-2. **Browser E2E:** automate the GM/player campaign, table, modal, and lazy-route flows.
+2. **Lint and format guardrails:** add an enforceable style gate before the components grow further.
 3. **Rules automation:** close the remaining subclass, feat, and item effect gaps.
 4. **Optional scale:** Postgres/S3 adapters and OAuth only when the local deployment is proven.
 

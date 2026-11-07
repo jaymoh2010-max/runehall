@@ -10,3 +10,5 @@ backups/
 .env
 .env.local
 .DS_Store
+test-results/
+playwright-report/
