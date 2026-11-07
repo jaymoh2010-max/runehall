@@ -18,6 +18,7 @@
     "restore": "node scripts/restore.mjs",
     "reset-password": "node scripts/reset-password.mjs",
     "cleanup-assets": "node scripts/cleanup-assets.mjs",
+    "audit-prune": "node scripts/prune-audit.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",

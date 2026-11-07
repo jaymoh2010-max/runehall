@@ -1275,6 +1275,9 @@
 .admin-invite-actions { display: flex; gap: 6px; flex: none; }
 .admin-audit-filter { display: flex; gap: 6px; align-items: center; }
 .admin-audit-filter .input { width: 190px; height: 32px; font-size: 0.8rem; }
+.admin-audit-actions { display: flex; gap: 8px; align-items: center; justify-content: flex-end; flex-wrap: wrap; }
+.admin-retention-row { display: flex; align-items: flex-end; gap: 10px; flex-wrap: wrap; margin-top: 4px; }
+.admin-retention-row .field { margin: 0; max-width: 220px; flex: 1; }
 .admin-audit-list { display: flex; flex-direction: column; margin-top: 8px; }
 .admin-audit-row { display: grid; grid-template-columns: 132px 170px 130px minmax(0, 1fr) 100px; gap: 10px; padding: 7px 0; border-bottom: 1px solid rgba(255,255,255,0.04); font-size: 0.78rem; align-items: baseline; }
 .admin-audit-time, .admin-audit-ip { color: var(--muted); font-variant-numeric: tabular-nums; }

@@ -17,7 +17,7 @@
 - **Content volume needs curation.** The builder exposes 540 backgrounds and 29 classes by default. That is impressive, but overwhelming; not every option has the same automation quality.
 - **Test coverage is unit + smoke + simulation.** Dice, rules math, compendium integrity, content tiers, security, and migrations are unit-tested; the GM/player campaign flow and registration/admin flows have an automated smoke test. Browser-level E2E and upload edge cases still rely on manual checks.
 - **Code health has guardrails.** Route-level splitting keeps the entry bundle near 107â€“122 KB gzip, `npm run check` covers types, tests, build, and bundle budgets, and the table state layer is tested. There is still no lint/format gate and some large components remain.
-- **Operations are not fully proven.** Docker has not been built and run in this environment, backup shipping is still manual, and the audit log has no automatic retention. Uploads now validate magic bytes and image dimensions.
+- **Operations are on solid footing.** The Docker image is built and health-checked in CI, backup shipping is checksum-verified and automated, and the audit log supports retention and CSV export. A clean-machine restore drill and browser-level E2E remain. Uploads validate magic bytes and image dimensions.
 
 ### Highest-risk issues (fix before adding lots of features)
 1. Losing campaign data or failing to upgrade a database.
@@ -501,8 +501,13 @@ Acceptance: a GM can prepare a full session in Runehall and start it with one â€
   - Restore verifies the manifest before changing live data and refuses corrupted archives.
   - Docker exposes `/app/shipped` as a writable off-machine mount; backup and shipping were verified inside the container.
   - Legacy archives require explicit `--allow-unverified`.
+- [x] **Audit retention and export**
+  - Admins can filter the audit log and download the current view as CSV with a stable header and RFC-style escaping.
+  - Retention is stored in `app_settings`, configurable from 0 (keep forever) to 3650 days, and seeded by `AUDIT_RETENTION_DAYS`.
+  - Expired entries are pruned when retention is saved and at server startup.
+  - `npm run audit-prune` previews expired entries by default; `--delete` removes them.
+  - Export and retention changes are themselves recorded in the audit log.
 - [ ] Run the restore drill on a clean machine.
-- [ ] Audit retention and export.
 - [ ] Only then consider Postgres/S3 adapters or OAuth.
 
 **Acceptance:** clean-machine deploy and restore drill pass end to end.
@@ -535,8 +540,8 @@ The feature roadmap through Sprint 11 is complete. Start Sprint 12:
 
 1. verify the Docker build in CI or on a Docker host,
 2. add off-machine backup shipping with checksum verification,
-3. run a clean-machine restore drill,
-4. add audit-log retention and export,
+3. add audit-log retention and export,
+4. run a clean-machine restore drill,
 5. defer Postgres/S3 adapters and OAuth until the local deployment is proven.
 
 Keep the two-user smoke test green as new socket events are added.

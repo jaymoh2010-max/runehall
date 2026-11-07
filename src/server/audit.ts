@@ -2,6 +2,12 @@ import type { FastifyRequest } from "fastify";
 import { db, type AuditLogRow } from "./db";
 import { newId, now, safeString, sanitizeUserText } from "./util";
 import type { AuditEntry, PublicUser } from "../shared/types";
+import {
+  auditRetentionCutoff,
+  normalizeAuditRetentionDays,
+} from "../shared/audit";
+
+const AUDIT_RETENTION_KEY = "audit_retention_days";
 
 export interface AuditInput {
   action: string;
@@ -50,6 +56,67 @@ export function logAudit(input: AuditInput): void {
   } catch {
     // Audit logging must not break the request that triggered it.
   }
+}
+
+export interface AuditStatus {
+  total: number;
+  oldestAt: number | null;
+  retentionDays: number;
+}
+
+export function getAuditRetentionDays(): number {
+  const row = db
+    .prepare("SELECT value FROM app_settings WHERE key = ?")
+    .get(AUDIT_RETENTION_KEY) as { value: string } | undefined;
+  if (row) return normalizeAuditRetentionDays(row.value);
+  return normalizeAuditRetentionDays(process.env.AUDIT_RETENTION_DAYS);
+}
+
+export function setAuditRetentionDays(value: unknown): number {
+  const days = normalizeAuditRetentionDays(value);
+  db.prepare(
+    `INSERT INTO app_settings (key, value, updated_at) VALUES (?, ?, ?)
+     ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
+  ).run(AUDIT_RETENTION_KEY, String(days), now());
+  return days;
+}
+
+export function auditStatus(): AuditStatus {
+  const row = db
+    .prepare("SELECT COUNT(*) AS total, MIN(created_at) AS oldest FROM audit_log")
+    .get() as { total: number; oldest: number | null };
+  return {
+    total: Number(row?.total ?? 0),
+    oldestAt: row?.oldest ?? null,
+    retentionDays: getAuditRetentionDays(),
+  };
+}
+
+export function listAuditForExport(action = ""): AuditEntry[] {
+  const filter = safeString(action, "", 80);
+  const where = filter ? "WHERE action = ?" : "";
+  const rows = db
+    .prepare(
+      `SELECT * FROM audit_log ${where} ORDER BY created_at ASC, rowid ASC LIMIT 100000`,
+    )
+    .all(...(filter ? [filter] : [])) as AuditLogRow[];
+  return rows.map(serialize);
+}
+
+export function pruneAuditLog(
+  days: number,
+  dryRun = false,
+): { deleted: number; cutoff: number | null } {
+  const cutoff = auditRetentionCutoff(days);
+  if (cutoff === null) return { deleted: 0, cutoff: null };
+  const count = db
+    .prepare("SELECT COUNT(*) AS count FROM audit_log WHERE created_at < ?")
+    .get(cutoff) as { count: number };
+  const deleted = Number(count?.count ?? 0);
+  if (!dryRun && deleted > 0) {
+    db.prepare("DELETE FROM audit_log WHERE created_at < ?").run(cutoff);
+  }
+  return { deleted, cutoff };
 }
 
 export interface AuditQuery {

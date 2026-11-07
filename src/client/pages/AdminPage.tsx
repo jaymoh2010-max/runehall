@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import {
   Copy,
+  Download,
   KeyRound,
   Plus,
   RefreshCw,
@@ -32,10 +33,17 @@ import {
   Stat,
 } from "../components/ui";
 
+interface AuditOverview {
+  total: number;
+  oldestAt: number | null;
+  retentionDays: number;
+}
+
 interface Overview {
   registration: RegistrationStatus;
   users: number;
   invites: number;
+  audit: AuditOverview;
 }
 
 const MODE_COPY: Record<RegistrationMode, { label: string; hint: string }> = {
@@ -79,6 +87,9 @@ export function AdminPage() {
   const [inviteDays, setInviteDays] = useState("14");
   const [creatingInvite, setCreatingInvite] = useState(false);
   const [lastCode, setLastCode] = useState("");
+  const [retentionDays, setRetentionDays] = useState("0");
+  const [savingRetention, setSavingRetention] = useState(false);
+  const [exportingAudit, setExportingAudit] = useState(false);
 
   const loadAudit = useCallback(
     async (offset = 0, append = false, filter = appliedFilterRef.current) => {
@@ -109,6 +120,7 @@ export function AdminPage() {
       ]);
       setOverview(overviewResult);
       setInvites(inviteResult.invites);
+      setRetentionDays(String(overviewResult.audit.retentionDays));
       await loadAudit(0, false);
     } catch (err) {
       setError(errorMessage(err));
@@ -189,6 +201,67 @@ export function AdminPage() {
     }
   };
 
+  const saveRetention = async () => {
+    const days = Number(retentionDays);
+    if (!Number.isFinite(days)) {
+      toast("Choose a valid retention period.", "error");
+      return;
+    }
+    setSavingRetention(true);
+    try {
+      const result = await api<{
+        audit: AuditOverview;
+        pruned: { deleted: number };
+      }>("/api/admin/audit/retention", {
+        method: "PUT",
+        body: { days },
+      });
+      setOverview((current) => (current ? { ...current, audit: result.audit } : current));
+      setRetentionDays(String(result.audit.retentionDays));
+      toast(
+        result.pruned.deleted
+          ? `Audit retention saved; removed ${result.pruned.deleted} expired entries.`
+          : "Audit retention saved.",
+        "success",
+      );
+      await loadAudit(0, false);
+    } catch (err) {
+      toast(errorMessage(err), "error");
+    } finally {
+      setSavingRetention(false);
+    }
+  };
+
+  const exportAudit = async () => {
+    setExportingAudit(true);
+    try {
+      const params = new URLSearchParams();
+      if (appliedFilterRef.current.trim()) params.set("action", appliedFilterRef.current.trim());
+      const query = params.toString();
+      const response = await fetch(
+        `/api/admin/audit/export${query ? `?${query}` : ""}`,
+        { credentials: "include" },
+      );
+      if (!response.ok) throw new Error(`Audit export failed (${response.status}).`);
+      const blob = await response.blob();
+      const disposition = response.headers.get("content-disposition") ?? "";
+      const filename =
+        disposition.match(/filename="?([^"]+)"?/)?.[1] ??
+        `runehall-audit-${new Date().toISOString().slice(0, 10)}.csv`;
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = filename;
+      anchor.click();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      toast("Audit CSV exported.", "success");
+    } catch (err) {
+      toast(errorMessage(err), "error");
+    } finally {
+      setExportingAudit(false);
+    }
+  };
+
   const copyCode = async (code: string) => {
     const ok = await copyText(code);
     toast(ok ? `Copied ${code}.` : `Invite code: ${code}`, ok ? "success" : "info");
@@ -196,6 +269,7 @@ export function AdminPage() {
 
   const mode = overview?.registration.mode ?? "open";
   const openInvites = invites.filter((invite) => !invite.usedAt && !invite.usedBy);
+  const retainedEntries = overview?.audit.total ?? auditTotal;
 
   return (
     <div className="page">
@@ -217,7 +291,16 @@ export function AdminPage() {
       <div className="admin-stats">
         <Stat label="Accounts" value={overview?.users ?? "—"} hint="All local users" />
         <Stat label="Open invites" value={openInvites.length} hint="Unused registration codes" tone="gold" />
-        <Stat label="Audit entries" value={auditTotal} hint="Retained locally" tone="blue" />
+        <Stat
+          label="Audit entries"
+          value={retainedEntries}
+          hint={
+            overview?.audit.retentionDays
+              ? `${overview.audit.retentionDays}-day retention`
+              : "Kept forever"
+          }
+          tone="blue"
+        />
       </div>
 
       <div className="admin-grid">
@@ -334,38 +417,83 @@ export function AdminPage() {
         </Card>
       </div>
 
+      <Card className="admin-card admin-retention">
+        <SectionTitle
+          title="Audit retention"
+          subtitle="Automatically prune security and administrative log entries. Set 0 to keep them forever."
+          action={
+            <Badge tone="blue">
+              {retentionDays === "0" ? "Keep forever" : `${retentionDays} days`}
+            </Badge>
+          }
+        />
+        <div className="admin-retention-row">
+          <Field label="Keep entries for (days)" hint="Pruning runs on save and at server startup.">
+            <Input
+              type="number"
+              min={0}
+              max={3650}
+              value={retentionDays}
+              onChange={(event) => setRetentionDays(event.target.value)}
+            />
+          </Field>
+          <Button variant="primary" loading={savingRetention} onClick={() => void saveRetention()}>
+            Save retention
+          </Button>
+        </div>
+        <p className="tiny muted">
+          {retainedEntries} {retainedEntries === 1 ? "entry" : "entries"}
+          {overview?.audit.oldestAt
+            ? ` · oldest ${when(overview.audit.oldestAt)}`
+            : " · no entries yet"}
+          . Export the current filter as CSV from the audit log.
+        </p>
+      </Card>
+
       <Card className="admin-card">
         <SectionTitle
           title="Audit log"
           subtitle="Sign-ins, account changes, campaign changes, and administrative actions."
           action={
-            <form
-              className="admin-audit-filter"
-              onSubmit={(event) => {
-                event.preventDefault();
-                applyFilter(auditFilter);
-              }}
-            >
-              <Input
-                value={auditFilter}
-                onChange={(event) => setAuditFilter(event.target.value)}
-                placeholder="Filter action, e.g. auth.login"
-              />
-              <Button type="submit" size="sm">Filter</Button>
-              {appliedFilter ? (
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => {
-                    setAuditFilter("");
-                    applyFilter("");
-                  }}
-                >
-                  Clear
-                </Button>
-              ) : null}
-            </form>
+            <div className="admin-audit-actions">
+              <form
+                className="admin-audit-filter"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  applyFilter(auditFilter);
+                }}
+              >
+                <Input
+                  value={auditFilter}
+                  onChange={(event) => setAuditFilter(event.target.value)}
+                  placeholder="Filter action, e.g. auth.login"
+                />
+                <Button type="submit" size="sm">Filter</Button>
+                {appliedFilter ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      setAuditFilter("");
+                      applyFilter("");
+                    }}
+                  >
+                    Clear
+                  </Button>
+                ) : null}
+              </form>
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                icon={<Download size={13} />}
+                loading={exportingAudit}
+                onClick={() => void exportAudit()}
+              >
+                Export CSV
+              </Button>
+            </div>
           }
         />
         {audit.length === 0 ? (

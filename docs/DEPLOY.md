@@ -149,7 +149,17 @@ The command prints a temporary password once, signs out every session for that a
 
 Signed-in users can change their own password from **Account & security**. Other sessions are signed out.
 
-The audit log records sign-ins, failed sign-ins, password changes, campaign creation/deletion, member removal, party level-ups, invite creation, and registration-mode changes. It is stored in SQLite and shown in **Hall controls**. It is not shipped anywhere by default.
+The audit log records sign-ins, failed sign-ins, password changes, campaign creation/deletion, member removal, party level-ups, invite creation, and registration-mode changes. It is stored in SQLite and shown in **Hall controls**. Admins can filter it and export the current view as CSV.
+
+Retention is configurable in **Hall controls** from 0 (keep forever) to 3650 days. The value is stored in `app_settings` and can be seeded with `AUDIT_RETENTION_DAYS`. Expired entries are pruned when retention is saved and at server startup. To preview or prune manually while the server is stopped:
+
+```bash
+npm run audit-prune
+npm run audit-prune -- --days 180
+npm run audit-prune -- --days 180 --delete
+```
+
+The command is a dry run unless `--delete` is present. Audit entries are not forwarded to an external log service.
 
 Before exposing the hall to the internet, set `REGISTRATION_MODE=invite` or `closed`, or keep the reverse proxy behind a VPN/access list.
 
@@ -238,6 +248,6 @@ Then complete the same checks for either flow:
 
 - SQLite is the only database adapter. One process and one machine is the supported deployment.
 - Password recovery is local only; there is no email provider integration.
-- Audit entries are stored but not forwarded to an external log service.
+- Audit entries are stored locally with configurable retention and CSV export; they are not forwarded to an external log service.
 - Uploaded assets live on local disk; use the backup archive to move them between machines.
 - There is no built-in scheduler. Use cron, a systemd timer, or Task Scheduler.

@@ -264,7 +264,73 @@ async function main() {
   for (const required of ["auth.register", "auth.login", "auth.password_change", "admin.invite_create"]) {
     if (!actions.has(required)) throw new Error(`Audit log is missing ${required}`);
   }
-  log("invite-only registration, password change, and audit logging verified");
+
+  const playerExport = await fetch(`${base}/api/admin/audit/export`, {
+    headers: { cookie: playerCookie },
+  });
+  if (playerExport.status !== 403) {
+    throw new Error(`A player could export the audit log (${playerExport.status})`);
+  }
+  const exportResponse = await fetch(`${base}/api/admin/audit/export`, {
+    headers: { cookie: gmCookie },
+  });
+  if (exportResponse.status !== 200) {
+    throw new Error(`Admin audit export failed (${exportResponse.status})`);
+  }
+  if (!exportResponse.headers.get("content-type")?.includes("text/csv")) {
+    throw new Error("Audit export did not return CSV");
+  }
+  if (!exportResponse.headers.get("content-disposition")?.includes("attachment")) {
+    throw new Error("Audit export is missing a download disposition");
+  }
+  const exportedCsv = await exportResponse.text();
+  const csvHeader = "id,created_at,actor_id,actor_name,action,target_type,target_id,detail,ip";
+  if (!exportedCsv.startsWith(`${csvHeader}\r\n`)) {
+    throw new Error("Audit CSV header is missing or unstable");
+  }
+  if (!exportedCsv.includes(",auth.login,")) {
+    throw new Error("Audit CSV did not include the sign-in entry");
+  }
+  const filteredExport = await fetch(`${base}/api/admin/audit/export?action=auth.login`, {
+    headers: { cookie: gmCookie },
+  });
+  const filteredCsv = await filteredExport.text();
+  if (!filteredCsv.includes(",auth.login,") || filteredCsv.includes(",auth.register,")) {
+    throw new Error("Audit CSV action filter did not isolate sign-in entries");
+  }
+
+  const invalidRetention = await fetch(`${base}/api/admin/audit/retention`, {
+    method: "PUT",
+    headers: { "content-type": "application/json", cookie: gmCookie },
+    body: JSON.stringify({ days: "not-a-number" }),
+  });
+  if (invalidRetention.status !== 400) {
+    throw new Error(`Invalid audit retention was accepted (${invalidRetention.status})`);
+  }
+  const retentionResult = await api("/api/admin/audit/retention", {
+    method: "PUT",
+    cookie: gmCookie,
+    body: { days: 30 },
+  });
+  if (retentionResult.payload.audit.retentionDays !== 30) {
+    throw new Error("Audit retention did not persist");
+  }
+  if (typeof retentionResult.payload.pruned?.deleted !== "number") {
+    throw new Error("Audit retention response did not report a prune count");
+  }
+  const auditOverview = await api("/api/admin/overview", { cookie: gmCookie });
+  if (auditOverview.payload.audit.retentionDays !== 30) {
+    throw new Error("Admin overview did not expose audit retention");
+  }
+  if (auditOverview.payload.audit.total < 1) {
+    throw new Error("Admin overview did not expose audit totals");
+  }
+  const exportAudit = await api("/api/admin/audit?limit=200", { cookie: gmCookie });
+  const exportAuditActions = new Set(exportAudit.payload.entries.map((entry) => entry.action));
+  for (const required of ["admin.audit_export", "admin.audit_retention"]) {
+    if (!exportAuditActions.has(required)) throw new Error(`Audit log is missing ${required}`);
+  }
+  log("audit CSV export, access control, and retention settings verified");
 
   const campaignResult = await api("/api/campaigns", {
     method: "POST",

@@ -6,6 +6,7 @@ import multipart from "@fastify/multipart";
 import fastifyStatic from "@fastify/static";
 import { Server } from "socket.io";
 import { attachUser } from "./auth";
+import { getAuditRetentionDays, pruneAuditLog } from "./audit";
 import { registerAuthRoutes } from "./routes/auth";
 import { registerAdminRoutes } from "./routes/admin";
 import { registerAssetRoutes } from "./routes/assets";
@@ -124,6 +125,17 @@ await registerSessionRoutes(app);
 await registerSystemRoutes(app);
 await registerTableRoutes(app);
 await registerUploadRoutes(app);
+
+const auditRetentionDays = getAuditRetentionDays();
+if (auditRetentionDays > 0) {
+  const pruned = pruneAuditLog(auditRetentionDays);
+  if (pruned.deleted > 0) {
+    app.log.info(
+      { deleted: pruned.deleted, retentionDays: auditRetentionDays },
+      "Pruned expired audit entries",
+    );
+  }
+}
 
 await app.register(fastifyStatic, {
   root: uploadsDir(),

@@ -1,6 +1,14 @@
 import type { FastifyInstance } from "fastify";
 import { db, type UserRow } from "../db";
-import { logAudit, listAudit } from "../audit";
+import {
+  auditStatus,
+  listAudit,
+  listAuditForExport,
+  logAudit,
+  pruneAuditLog,
+  setAuditRetentionDays,
+} from "../audit";
+import { auditCsv, normalizeAuditRetentionDays } from "../../shared/audit";
 import {
   createRegistrationInvite,
   getRegistrationMode,
@@ -30,6 +38,7 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
       registration: registrationStatus(),
       users: userCount(),
       invites: listRegistrationInvites().filter((invite) => !invite.usedAt && !invite.usedBy).length,
+      audit: auditStatus(),
     });
   });
 
@@ -105,6 +114,48 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
       request,
     });
     return reply.send({ ok: true });
+  });
+
+  app.get("/api/admin/audit/export", async (request, reply) => {
+    if (!requireAdmin(request, reply)) return;
+    const query = (request.query ?? {}) as Record<string, unknown>;
+    const entries = listAuditForExport(safeString(query.action, "", 80));
+    const csv = auditCsv(entries);
+    logAudit({
+      action: "admin.audit_export",
+      actor: request.user,
+      targetType: "audit_log",
+      detail: `${entries.length} entries`,
+      request,
+    });
+    const date = new Date().toISOString().slice(0, 10);
+    return reply
+      .header("content-type", "text/csv; charset=utf-8")
+      .header("content-disposition", `attachment; filename="runehall-audit-${date}.csv"`)
+      .header("cache-control", "no-store")
+      .send(csv);
+  });
+
+  app.put("/api/admin/audit/retention", async (request, reply) => {
+    if (!requireAdmin(request, reply)) return;
+    const body = (request.body ?? {}) as Record<string, unknown>;
+    const numeric = Number(body.days);
+    if (body.days === undefined || !Number.isFinite(numeric)) {
+      return reply.code(400).send({ error: "Choose a valid retention period." });
+    }
+    const previous = auditStatus().retentionDays;
+    const days = normalizeAuditRetentionDays(numeric);
+    setAuditRetentionDays(days);
+    const pruned = pruneAuditLog(days);
+    logAudit({
+      action: "admin.audit_retention",
+      actor: request.user,
+      targetType: "setting",
+      targetId: "audit_retention_days",
+      detail: `${previous} -> ${days} days; removed ${pruned.deleted}`,
+      request,
+    });
+    return reply.send({ audit: auditStatus(), pruned });
   });
 
   app.get("/api/admin/audit", async (request, reply) => {
