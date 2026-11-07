@@ -91,7 +91,7 @@ export function AddTokenModal({
       try {
         const result = await api<{ items: Monster[] }>(
           `/api/compendium/monsters?q=${encodeURIComponent(monsterQuery)}&limit=40`,
-          { signal: controller.signal },
+          { signal: controller.signal }
         );
         if (cancelled) return;
         setMonsters(result.items);
@@ -141,11 +141,33 @@ export function AddTokenModal({
       wide
     >
       <div className="segmented" style={{ marginBottom: 16 }}>
-        <button type="button" className={tab === "party" ? "is-active" : ""} onClick={() => setTab("party")}><Users size={13} /> Party</button>
-        <button type="button" className={tab === "monster" ? "is-active" : ""} onClick={() => setTab("monster")}><Swords size={13} /> Bestiary</button>
-        <button type="button" className={tab === "custom" ? "is-active" : ""} onClick={() => setTab("custom")}><Plus size={13} /> Custom</button>
+        <button
+          type="button"
+          className={tab === "party" ? "is-active" : ""}
+          onClick={() => setTab("party")}
+        >
+          <Users size={13} /> Party
+        </button>
+        <button
+          type="button"
+          className={tab === "monster" ? "is-active" : ""}
+          onClick={() => setTab("monster")}
+        >
+          <Swords size={13} /> Bestiary
+        </button>
+        <button
+          type="button"
+          className={tab === "custom" ? "is-active" : ""}
+          onClick={() => setTab("custom")}
+        >
+          <Plus size={13} /> Custom
+        </button>
       </div>
-      {error ? <div className="auth-error" style={{ marginBottom: 12 }}>{error}</div> : null}
+      {error ? (
+        <div className="auth-error" style={{ marginBottom: 12 }}>
+          {error}
+        </div>
+      ) : null}
 
       {tab === "party" ? (
         <div className="token-add-list">
@@ -155,7 +177,9 @@ export function AddTokenModal({
               <div className="grow">
                 <strong>{character.name}</strong>
                 <p className="tiny muted">
-                  {character.summary ? `Level ${character.summary.level} ${character.summary.className} · ${character.summary.hp} HP · AC ${character.summary.ac}` : "Unfinished character"}
+                  {character.summary
+                    ? `Level ${character.summary.level} ${character.summary.className} · ${character.summary.hp} HP · AC ${character.summary.ac}`
+                    : "Unfinished character"}
                   {character.ownerName ? ` · ${character.ownerName}` : ""}
                 </p>
               </div>
@@ -187,14 +211,23 @@ export function AddTokenModal({
               </Button>
             </div>
           ))}
-          {!characters.length ? <p className="muted small">No characters in this campaign yet. Create one from the Party tab.</p> : null}
+          {!characters.length ? (
+            <p className="muted small">
+              No characters in this campaign yet. Create one from the Party tab.
+            </p>
+          ) : null}
         </div>
       ) : tab === "monster" ? (
         <div className="token-monster-layout">
           <div className="token-monster-list">
             <div className="search-box">
               <Search size={15} />
-              <Input autoFocus value={monsterQuery} onChange={(event) => setMonsterQuery(event.target.value)} placeholder="Search the bestiary…" />
+              <Input
+                autoFocus
+                value={monsterQuery}
+                onChange={(event) => setMonsterQuery(event.target.value)}
+                placeholder="Search the bestiary…"
+              />
             </div>
             <div className="token-monster-results">
               {monsterLoading ? <Spinner label="Searching…" /> : null}
@@ -203,7 +236,11 @@ export function AddTokenModal({
                   key={monster.id}
                   title={monster.name}
                   subtitle={`Level ${monster.level} · ${monster.source}`}
-                  meta={<span>{monster.hp} HP · AC {monster.ac} · {monster.size}</span>}
+                  meta={
+                    <span>
+                      {monster.hp} HP · AC {monster.ac} · {monster.size}
+                    </span>
+                  }
                   body={stripHtml(monster.description || monster.blurb, 220) || undefined}
                 >
                   <button
@@ -213,13 +250,17 @@ export function AddTokenModal({
                   >
                     <div className="picker-item-main">
                       <span className="picker-item-name">{monster.name}</span>
-                      <span className="picker-item-sub">Level {monster.level} · {monster.hp} HP · AC {monster.ac}</span>
+                      <span className="picker-item-sub">
+                        Level {monster.level} · {monster.hp} HP · AC {monster.ac}
+                      </span>
                     </div>
                     {monster.rarity !== "common" ? <RarityTag rarity={monster.rarity} /> : null}
                   </button>
                 </HoverCard>
               ))}
-              {!monsterLoading && !monsters.length ? <p className="muted small">No creatures match that search.</p> : null}
+              {!monsterLoading && !monsters.length ? (
+                <p className="muted small">No creatures match that search.</p>
+              ) : null}
             </div>
           </div>
           <div className="token-monster-detail">
@@ -228,22 +269,47 @@ export function AddTokenModal({
                 <div className="row-between">
                   <div>
                     <h3>{selectedMonster.name}</h3>
-                    <p className="tiny muted">Level {selectedMonster.level} · {selectedMonster.source}</p>
+                    <p className="tiny muted">
+                      Level {selectedMonster.level} · {selectedMonster.source}
+                    </p>
                   </div>
                   <RarityTag rarity={selectedMonster.rarity} />
                 </div>
                 <div className="chip-row" style={{ marginTop: 9 }}>
-                  {selectedMonster.traits.map((trait) => <Tag key={trait}>{trait}</Tag>)}
+                  {selectedMonster.traits.map((trait) => (
+                    <Tag key={trait}>{trait}</Tag>
+                  ))}
                 </div>
                 <div className="spell-meta-grid" style={{ marginTop: 12 }}>
-                  <div><span>HP</span><strong>{selectedMonster.hp}</strong></div>
-                  <div><span>AC</span><strong>{selectedMonster.ac}</strong></div>
-                  <div><span>Fort</span><strong>{selectedMonster.fortitude}</strong></div>
-                  <div><span>Ref</span><strong>{selectedMonster.reflex}</strong></div>
-                  <div><span>Will</span><strong>{selectedMonster.will}</strong></div>
-                  <div><span>Perception</span><strong>{selectedMonster.perception}</strong></div>
+                  <div>
+                    <span>HP</span>
+                    <strong>{selectedMonster.hp}</strong>
+                  </div>
+                  <div>
+                    <span>AC</span>
+                    <strong>{selectedMonster.ac}</strong>
+                  </div>
+                  <div>
+                    <span>Fort</span>
+                    <strong>{selectedMonster.fortitude}</strong>
+                  </div>
+                  <div>
+                    <span>Ref</span>
+                    <strong>{selectedMonster.reflex}</strong>
+                  </div>
+                  <div>
+                    <span>Will</span>
+                    <strong>{selectedMonster.will}</strong>
+                  </div>
+                  <div>
+                    <span>Perception</span>
+                    <strong>{selectedMonster.perception}</strong>
+                  </div>
                 </div>
-                <RichText html={selectedMonster.description || selectedMonster.blurb} className="monster-blurb" />
+                <RichText
+                  html={selectedMonster.description || selectedMonster.blurb}
+                  className="monster-blurb"
+                />
                 <div className="token-monster-add">
                   <Field label="Count" hint="Groups move and roll initiative together.">
                     <Input
@@ -294,7 +360,10 @@ export function AddTokenModal({
                       onClose();
                     }}
                   >
-                    Add {Number(monsterCount) > 1 ? `${Math.max(1, Math.min(20, Number(monsterCount) || 1))} × ${selectedMonster.name}` : selectedMonster.name}
+                    Add{" "}
+                    {Number(monsterCount) > 1
+                      ? `${Math.max(1, Math.min(20, Number(monsterCount) || 1))} × ${selectedMonster.name}`
+                      : selectedMonster.name}
                   </Button>
                 </div>
               </>
@@ -309,14 +378,27 @@ export function AddTokenModal({
       ) : (
         <div className="stack">
           <Field label="Token name">
-            <Input autoFocus value={customName} onChange={(event) => setCustomName(event.target.value)} placeholder="e.g. Strange Statue" />
+            <Input
+              autoFocus
+              value={customName}
+              onChange={(event) => setCustomName(event.target.value)}
+              placeholder="e.g. Strange Statue"
+            />
           </Field>
           <div className="form-grid">
             <Field label="Hit points">
-              <Input type="number" value={customHp} onChange={(event) => setCustomHp(event.target.value)} />
+              <Input
+                type="number"
+                value={customHp}
+                onChange={(event) => setCustomHp(event.target.value)}
+              />
             </Field>
             <Field label="Armor class">
-              <Input type="number" value={customAc} onChange={(event) => setCustomAc(event.target.value)} />
+              <Input
+                type="number"
+                value={customAc}
+                onChange={(event) => setCustomAc(event.target.value)}
+              />
             </Field>
             <Field label="Size">
               <Select value={customSize} onChange={(event) => setCustomSize(event.target.value)}>
@@ -327,10 +409,17 @@ export function AddTokenModal({
               </Select>
             </Field>
             <Field label="Color">
-              <Input type="color" value={customColor} onChange={(event) => setCustomColor(event.target.value)} style={{ padding: 4, height: 42 }} />
+              <Input
+                type="color"
+                value={customColor}
+                onChange={(event) => setCustomColor(event.target.value)}
+                style={{ padding: 4, height: 42 }}
+              />
             </Field>
           </div>
-          <Button variant="primary" icon={<Plus size={15} />} onClick={custom}>Place token</Button>
+          <Button variant="primary" icon={<Plus size={15} />} onClick={custom}>
+            Place token
+          </Button>
         </div>
       )}
     </Modal>
@@ -450,7 +539,13 @@ export function SceneManagerModal({
   };
 
   return (
-    <Modal open={open} onClose={onClose} title="Scenes" subtitle="Maps, grid settings, and the active scene." wide>
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="Scenes"
+      subtitle="Maps, grid settings, and the active scene."
+      wide
+    >
       {!creating ? (
         <>
           <div className="scene-manager-list">
@@ -481,7 +576,9 @@ export function SceneManagerModal({
                 }}
                 onDragEnd={() => setDraggingSceneId(null)}
               >
-                <span className="scene-drag-handle" title="Drag to reorder"><GripVertical size={14} /></span>
+                <span className="scene-drag-handle" title="Drag to reorder">
+                  <GripVertical size={14} />
+                </span>
                 <div className="scene-manager-thumb">
                   {scene.thumbnailUrl || scene.imageUrl ? (
                     <img
@@ -500,7 +597,10 @@ export function SceneManagerModal({
                     {scene.id === activeSceneId ? <Badge tone="gold">Active</Badge> : null}
                     {scene.id === previewSceneId ? <Badge tone="blue">Previewing</Badge> : null}
                   </div>
-                  <p className="tiny muted">{scene.width} × {scene.height} · {scene.gridSize}px grid · {scene.fogEnabled ? "Fog on" : "Fog off"}</p>
+                  <p className="tiny muted">
+                    {scene.width} × {scene.height} · {scene.gridSize}px grid ·{" "}
+                    {scene.fogEnabled ? "Fog on" : "Fog off"}
+                  </p>
                 </div>
                 <div className="row" style={{ gap: 5 }}>
                   <IconButton
@@ -527,16 +627,32 @@ export function SceneManagerModal({
                   >
                     <ArrowDown size={13} />
                   </IconButton>
-                  {scene.id !== activeSceneId ? <Button size="sm" onClick={() => onActivate(scene.id)}>Activate</Button> : null}
-                  <Button size="sm" variant="ghost" icon={<Eye size={13} />} onClick={() => onPreview(scene.id)}>Preview</Button>
-                  <Button size="sm" variant="ghost" onClick={() => onEdit(scene)}>Edit</Button>
-                  <Button size="sm" variant="ghost" onClick={() => onDuplicate(scene.id)}>Duplicate</Button>
+                  {scene.id !== activeSceneId ? (
+                    <Button size="sm" onClick={() => onActivate(scene.id)}>
+                      Activate
+                    </Button>
+                  ) : null}
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    icon={<Eye size={13} />}
+                    onClick={() => onPreview(scene.id)}
+                  >
+                    Preview
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => onEdit(scene)}>
+                    Edit
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => onDuplicate(scene.id)}>
+                    Duplicate
+                  </Button>
                   <button
                     type="button"
                     className="icon-btn"
                     title="Delete scene"
                     onClick={() => {
-                      if (window.confirm(`Delete scene “${scene.name}” and all its tokens?`)) onDelete(scene.id);
+                      if (window.confirm(`Delete scene “${scene.name}” and all its tokens?`))
+                        onDelete(scene.id);
                     }}
                   >
                     <Trash2 size={14} />
@@ -544,9 +660,16 @@ export function SceneManagerModal({
                 </div>
               </div>
             ))}
-            {!scenes.length ? <p className="muted small">No scenes yet. Create one to open the map.</p> : null}
+            {!scenes.length ? (
+              <p className="muted small">No scenes yet. Create one to open the map.</p>
+            ) : null}
           </div>
-          <Button variant="primary" icon={<Plus size={15} />} onClick={() => setCreating(true)} style={{ marginTop: 14 }}>
+          <Button
+            variant="primary"
+            icon={<Plus size={15} />}
+            onClick={() => setCreating(true)}
+            style={{ marginTop: 14 }}
+          >
             New scene
           </Button>
         </>
@@ -554,10 +677,17 @@ export function SceneManagerModal({
         <form className="stack" onSubmit={create}>
           {error ? <div className="auth-error">{error}</div> : null}
           <Field label="Scene name">
-            <Input autoFocus value={name} onChange={(event) => setName(event.target.value)} placeholder="e.g. The Sunken Crypt" />
+            <Input
+              autoFocus
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              placeholder="e.g. The Sunken Crypt"
+            />
           </Field>
           <div className="map-upload-zone" onClick={() => fileRef.current?.click()}>
-            {preview ? <img src={preview} alt="" /> : (
+            {preview ? (
+              <img src={preview} alt="" />
+            ) : (
               <>
                 <ImagePlus size={30} />
                 <strong>Upload a map</strong>
@@ -574,26 +704,56 @@ export function SceneManagerModal({
           </div>
           {file ? (
             <div className="row-between">
-              <span className="tiny muted">{file.name} · {dimensions.width} × {dimensions.height}</span>
-              <Button size="sm" type="button" variant="ghost" onClick={() => pickFile(null)}>Remove</Button>
+              <span className="tiny muted">
+                {file.name} · {dimensions.width} × {dimensions.height}
+              </span>
+              <Button size="sm" type="button" variant="ghost" onClick={() => pickFile(null)}>
+                Remove
+              </Button>
             </div>
           ) : null}
           <div className="form-grid">
             <Field label="Grid size (px)" hint="Leave room for drag and measurement.">
-              <Input type="number" value={gridSize} min={20} max={300} onChange={(event) => setGridSize(event.target.value)} />
+              <Input
+                type="number"
+                value={gridSize}
+                min={20}
+                max={300}
+                onChange={(event) => setGridSize(event.target.value)}
+              />
             </Field>
             <Field label="Dimensions" hint="Auto-detected from the map; editable for alignment.">
               <div className="row" style={{ gap: 6 }}>
-                <Input type="number" value={dimensions.width} onChange={(event) => setDimensions((d) => ({ ...d, width: Number(event.target.value) || 1600 }))} />
+                <Input
+                  type="number"
+                  value={dimensions.width}
+                  onChange={(event) =>
+                    setDimensions((d) => ({ ...d, width: Number(event.target.value) || 1600 }))
+                  }
+                />
                 <span className="muted">×</span>
-                <Input type="number" value={dimensions.height} onChange={(event) => setDimensions((d) => ({ ...d, height: Number(event.target.value) || 1000 }))} />
+                <Input
+                  type="number"
+                  value={dimensions.height}
+                  onChange={(event) =>
+                    setDimensions((d) => ({ ...d, height: Number(event.target.value) || 1000 }))
+                  }
+                />
               </div>
             </Field>
           </div>
-          <Toggle checked={activateOnCreate} onChange={setActivateOnCreate} label="Activate this scene after creating it" />
+          <Toggle
+            checked={activateOnCreate}
+            onChange={setActivateOnCreate}
+            label="Activate this scene after creating it"
+          />
           <div className="modal-foot" style={{ margin: "4px -22px -20px", paddingTop: 14 }}>
-            <Button type="button" variant="ghost" onClick={() => setCreating(false)}>Back</Button>
-            <Button type="submit" variant="primary" loading={busy} icon={<Upload size={15} />}>Create scene</Button>
+            <Button type="button" variant="ghost" onClick={() => setCreating(false)}>
+              Back
+            </Button>
+            <Button type="submit" variant="primary" loading={busy} icon={<Upload size={15} />}>
+              Create scene
+            </Button>
           </div>
         </form>
       )}
@@ -697,22 +857,45 @@ export function SceneEditModal({
   };
 
   return (
-    <Modal open={open} onClose={onClose} title={`Edit “${scene.name}”`} subtitle="Grid alignment, fog, and map image." wide>
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={`Edit “${scene.name}”`}
+      subtitle="Grid alignment, fog, and map image."
+      wide
+    >
       <form className="stack" onSubmit={save}>
         {error ? <div className="auth-error">{error}</div> : null}
         <Field label="Scene name">
           <Input value={name} onChange={(event) => setName(event.target.value)} />
         </Field>
         <div className="map-upload-zone compact" onClick={() => fileRef.current?.click()}>
-          {preview || scene.imageUrl ? <img src={preview ?? scene.imageUrl ?? ""} alt="" /> : <><ImagePlus size={24} /><span>Replace map</span></>}
-          <input ref={fileRef} type="file" hidden accept="image/png,image/jpeg,image/webp,image/gif,image/avif" onChange={(event) => pickFile(event.target.files?.[0] ?? null)} />
+          {preview || scene.imageUrl ? (
+            <img src={preview ?? scene.imageUrl ?? ""} alt="" />
+          ) : (
+            <>
+              <ImagePlus size={24} />
+              <span>Replace map</span>
+            </>
+          )}
+          <input
+            ref={fileRef}
+            type="file"
+            hidden
+            accept="image/png,image/jpeg,image/webp,image/gif,image/avif"
+            onChange={(event) => pickFile(event.target.files?.[0] ?? null)}
+          />
         </div>
         <div className="grid-calibration">
           <div
             className="grid-calibration-canvas"
             style={{ aspectRatio: `${dimensions.width} / ${dimensions.height}` }}
           >
-            {preview || scene.imageUrl ? <img src={preview ?? scene.imageUrl ?? ""} alt="" /> : <div className="grid-calibration-blank" />}
+            {preview || scene.imageUrl ? (
+              <img src={preview ?? scene.imageUrl ?? ""} alt="" />
+            ) : (
+              <div className="grid-calibration-blank" />
+            )}
             <svg
               className="grid-calibration-lines"
               viewBox={`0 0 ${dimensions.width} ${dimensions.height}`}
@@ -725,36 +908,114 @@ export function SceneEditModal({
                 const oy = Number(offsetY) || 0;
                 const vertical: number[] = [];
                 const horizontal: number[] = [];
-                for (let x = ox; x <= dimensions.width && vertical.length < 200; x += grid) if (x >= 0) vertical.push(x);
-                for (let y = oy; y <= dimensions.height && horizontal.length < 200; y += grid) if (y >= 0) horizontal.push(y);
+                for (let x = ox; x <= dimensions.width && vertical.length < 200; x += grid)
+                  if (x >= 0) vertical.push(x);
+                for (let y = oy; y <= dimensions.height && horizontal.length < 200; y += grid)
+                  if (y >= 0) horizontal.push(y);
                 return (
                   <>
                     {vertical.map((x) => (
-                      <line key={`v-${x}`} x1={x} y1={0} x2={x} y2={dimensions.height} stroke="rgba(229,202,145,0.55)" strokeWidth={Math.max(1, dimensions.width / 900)} />
+                      <line
+                        key={`v-${x}`}
+                        x1={x}
+                        y1={0}
+                        x2={x}
+                        y2={dimensions.height}
+                        stroke="rgba(229,202,145,0.55)"
+                        strokeWidth={Math.max(1, dimensions.width / 900)}
+                      />
                     ))}
                     {horizontal.map((y) => (
-                      <line key={`h-${y}`} x1={0} y1={y} x2={dimensions.width} y2={y} stroke="rgba(229,202,145,0.55)" strokeWidth={Math.max(1, dimensions.height / 900)} />
+                      <line
+                        key={`h-${y}`}
+                        x1={0}
+                        y1={y}
+                        x2={dimensions.width}
+                        y2={y}
+                        stroke="rgba(229,202,145,0.55)"
+                        strokeWidth={Math.max(1, dimensions.height / 900)}
+                      />
                     ))}
                   </>
                 );
               })()}
             </svg>
           </div>
-          <p className="tiny muted">Live grid preview — adjust size and offsets to align with the map.</p>
+          <p className="tiny muted">
+            Live grid preview — adjust size and offsets to align with the map.
+          </p>
         </div>
         <div className="form-grid">
-          <Field label="Grid size (px)"><Input type="number" value={gridSize} min={20} max={300} onChange={(event) => setGridSize(event.target.value)} /></Field>
-          <Field label="Fog of war"><Toggle checked={fogEnabled} onChange={setFogEnabled} label={fogEnabled ? "Enabled" : "Disabled"} /></Field>
-          <Field label="Grid offset X"><Input type="number" value={offsetX} onChange={(event) => setOffsetX(event.target.value)} /></Field>
-          <Field label="Grid offset Y"><Input type="number" value={offsetY} onChange={(event) => setOffsetY(event.target.value)} /></Field>
-          <Field label="Width"><Input type="number" value={dimensions.width} onChange={(event) => setDimensions((d) => ({ ...d, width: Number(event.target.value) || 1600 }))} /></Field>
-          <Field label="Height"><Input type="number" value={dimensions.height} onChange={(event) => setDimensions((d) => ({ ...d, height: Number(event.target.value) || 1000 }))} /></Field>
+          <Field label="Grid size (px)">
+            <Input
+              type="number"
+              value={gridSize}
+              min={20}
+              max={300}
+              onChange={(event) => setGridSize(event.target.value)}
+            />
+          </Field>
+          <Field label="Fog of war">
+            <Toggle
+              checked={fogEnabled}
+              onChange={setFogEnabled}
+              label={fogEnabled ? "Enabled" : "Disabled"}
+            />
+          </Field>
+          <Field label="Grid offset X">
+            <Input
+              type="number"
+              value={offsetX}
+              onChange={(event) => setOffsetX(event.target.value)}
+            />
+          </Field>
+          <Field label="Grid offset Y">
+            <Input
+              type="number"
+              value={offsetY}
+              onChange={(event) => setOffsetY(event.target.value)}
+            />
+          </Field>
+          <Field label="Width">
+            <Input
+              type="number"
+              value={dimensions.width}
+              onChange={(event) =>
+                setDimensions((d) => ({ ...d, width: Number(event.target.value) || 1600 }))
+              }
+            />
+          </Field>
+          <Field label="Height">
+            <Input
+              type="number"
+              value={dimensions.height}
+              onChange={(event) =>
+                setDimensions((d) => ({ ...d, height: Number(event.target.value) || 1000 }))
+              }
+            />
+          </Field>
         </div>
         <div className="modal-foot" style={{ margin: "4px -22px -20px", paddingTop: 14 }}>
-          <Button type="button" variant="danger" icon={<Trash2 size={14} />} onClick={() => { if (window.confirm(`Delete scene “${scene.name}”?`)) { onDelete(scene.id); onClose(); } }}>Delete scene</Button>
+          <Button
+            type="button"
+            variant="danger"
+            icon={<Trash2 size={14} />}
+            onClick={() => {
+              if (window.confirm(`Delete scene “${scene.name}”?`)) {
+                onDelete(scene.id);
+                onClose();
+              }
+            }}
+          >
+            Delete scene
+          </Button>
           <span className="grow" />
-          <Button type="button" variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button type="submit" variant="primary" loading={busy} icon={<Check size={15} />}>Save scene</Button>
+          <Button type="button" variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button type="submit" variant="primary" loading={busy} icon={<Check size={15} />}>
+            Save scene
+          </Button>
         </div>
       </form>
     </Modal>

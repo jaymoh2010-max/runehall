@@ -2,10 +2,7 @@ import type { FastifyRequest } from "fastify";
 import { db, type AuditLogRow } from "./db";
 import { newId, now, safeString, sanitizeUserText } from "./util";
 import type { AuditEntry, PublicUser } from "../shared/types";
-import {
-  auditRetentionCutoff,
-  normalizeAuditRetentionDays,
-} from "../shared/audit";
+import { auditRetentionCutoff, normalizeAuditRetentionDays } from "../shared/audit";
 
 const AUDIT_RETENTION_KEY = "audit_retention_days";
 
@@ -41,7 +38,7 @@ export function logAudit(input: AuditInput): void {
     db.prepare(
       `INSERT INTO audit_log
         (id, created_at, actor_id, actor_name, action, target_type, target_id, detail, ip)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       newId("audit"),
       now(),
@@ -51,7 +48,7 @@ export function logAudit(input: AuditInput): void {
       safeString(input.targetType, "", 40),
       input.targetId ? safeString(input.targetId, "", 120) : null,
       sanitizeUserText(input.detail ?? "", 2000),
-      safeString(input.request?.ip, "", 80),
+      safeString(input.request?.ip, "", 80)
     );
   } catch {
     // Audit logging must not break the request that triggered it.
@@ -76,7 +73,7 @@ export function setAuditRetentionDays(value: unknown): number {
   const days = normalizeAuditRetentionDays(value);
   db.prepare(
     `INSERT INTO app_settings (key, value, updated_at) VALUES (?, ?, ?)
-     ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
+     ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`
   ).run(AUDIT_RETENTION_KEY, String(days), now());
   return days;
 }
@@ -96,16 +93,14 @@ export function listAuditForExport(action = ""): AuditEntry[] {
   const filter = safeString(action, "", 80);
   const where = filter ? "WHERE action = ?" : "";
   const rows = db
-    .prepare(
-      `SELECT * FROM audit_log ${where} ORDER BY created_at ASC, rowid ASC LIMIT 100000`,
-    )
+    .prepare(`SELECT * FROM audit_log ${where} ORDER BY created_at ASC, rowid ASC LIMIT 100000`)
     .all(...(filter ? [filter] : [])) as AuditLogRow[];
   return rows.map(serialize);
 }
 
 export function pruneAuditLog(
   days: number,
-  dryRun = false,
+  dryRun = false
 ): { deleted: number; cutoff: number | null } {
   const cutoff = auditRetentionCutoff(days);
   if (cutoff === null) return { deleted: 0, cutoff: null };
@@ -133,7 +128,7 @@ export function listAudit(query: AuditQuery = {}): { entries: AuditEntry[]; tota
   const params = action ? [action] : [];
   const rows = db
     .prepare(
-      `SELECT * FROM audit_log ${where} ORDER BY created_at DESC, rowid DESC LIMIT ? OFFSET ?`,
+      `SELECT * FROM audit_log ${where} ORDER BY created_at DESC, rowid DESC LIMIT ? OFFSET ?`
     )
     .all(...params, limit, offset) as AuditLogRow[];
   const totalRow = db

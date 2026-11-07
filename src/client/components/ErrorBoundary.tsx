@@ -29,16 +29,24 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     return (
       <div className="fatal-error">
         <div className="fatal-error-card card">
-          <div className="fatal-error-icon"><ShieldAlert size={26} /></div>
+          <div className="fatal-error-icon">
+            <ShieldAlert size={26} />
+          </div>
           <div className="page-eyebrow">The page hit a snag</div>
           <h1>Runehall lost its place.</h1>
           <p>
-            Your campaign data is still safe in the local database. Reload the page to try again; if the
-            problem keeps happening, export a backup before making further changes.
+            Your campaign data is still safe in the local database. Reload the page to try again; if
+            the problem keeps happening, export a backup before making further changes.
           </p>
-          {this.state.message ? <pre className="fatal-error-detail">{this.state.message}</pre> : null}
+          {this.state.message ? (
+            <pre className="fatal-error-detail">{this.state.message}</pre>
+          ) : null}
           <div className="row wrap">
-            <button type="button" className="btn btn-primary btn-md" onClick={() => window.location.reload()}>
+            <button
+              type="button"
+              className="btn btn-primary btn-md"
+              onClick={() => window.location.reload()}
+            >
               <RefreshCw size={15} /> Reload the page
             </button>
             <a className="btn btn-secondary btn-md" href="/campaigns">

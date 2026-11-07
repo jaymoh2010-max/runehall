@@ -78,7 +78,7 @@ for (const file of files) {
   data[file.key] = items;
   if (manifest?.count?.[file.key] !== items.length) {
     fail(
-      `${file.key} count ${items.length} does not match manifest count ${manifest?.count?.[file.key] ?? "missing"}`,
+      `${file.key} count ${items.length} does not match manifest count ${manifest?.count?.[file.key] ?? "missing"}`
     );
   }
   const ids = new Set();
@@ -116,18 +116,99 @@ function requireFields(key, fields) {
   }
 }
 
-requireFields("ancestries", ["name", "hp", "speed", "vision", "boosts", "flaws", "languages", "features", "description", "source"]);
+requireFields("ancestries", [
+  "name",
+  "hp",
+  "speed",
+  "vision",
+  "boosts",
+  "flaws",
+  "languages",
+  "features",
+  "description",
+  "source",
+]);
 requireFields("heritages", ["name", "ancestry", "versatile", "description", "source"]);
-requireFields("backgrounds", ["name", "boosts", "trainedSkills", "skillChoices", "lore", "loreChoices", "featChoices", "grantedFeats", "description", "source"]);
-requireFields("classes", ["name", "hp", "keyAbility", "savingThrows", "trainedSkills", "features", "choiceGroups", "description", "source"]);
+requireFields("backgrounds", [
+  "name",
+  "boosts",
+  "trainedSkills",
+  "skillChoices",
+  "lore",
+  "loreChoices",
+  "featChoices",
+  "grantedFeats",
+  "description",
+  "source",
+]);
+requireFields("classes", [
+  "name",
+  "hp",
+  "keyAbility",
+  "savingThrows",
+  "trainedSkills",
+  "features",
+  "choiceGroups",
+  "description",
+  "source",
+]);
 requireFields("classFeatures", ["name", "level", "description"]);
 requireFields("feats", ["name", "category", "level", "prerequisites", "description", "source"]);
-requireFields("spells", ["name", "rank", "traditions", "actionType", "actions", "range", "area", "targets", "duration", "defense", "damage", "heightening", "description", "source"]);
-requireFields("equipment", ["name", "type", "level", "price", "bulk", "usage", "description", "source"]);
-requireFields("deities", ["name", "category", "domains", "alternateDomains", "font", "skill", "weapons", "description", "source"]);
+requireFields("spells", [
+  "name",
+  "rank",
+  "traditions",
+  "actionType",
+  "actions",
+  "range",
+  "area",
+  "targets",
+  "duration",
+  "defense",
+  "damage",
+  "heightening",
+  "description",
+  "source",
+]);
+requireFields("equipment", [
+  "name",
+  "type",
+  "level",
+  "price",
+  "bulk",
+  "usage",
+  "description",
+  "source",
+]);
+requireFields("deities", [
+  "name",
+  "category",
+  "domains",
+  "alternateDomains",
+  "font",
+  "skill",
+  "weapons",
+  "description",
+  "source",
+]);
 requireFields("conditions", ["name", "description", "source"]);
 requireFields("actions", ["name", "category", "description", "source"]);
-requireFields("monsters", ["name", "level", "hp", "ac", "fortitude", "reflex", "will", "perception", "speeds", "skills", "attacks", "abilities", "description", "source"]);
+requireFields("monsters", [
+  "name",
+  "level",
+  "hp",
+  "ac",
+  "fortitude",
+  "reflex",
+  "will",
+  "perception",
+  "speeds",
+  "skills",
+  "attacks",
+  "abilities",
+  "description",
+  "source",
+]);
 
 // --- Cross references ------------------------------------------------------
 const ancestryNames = new Set((data.ancestries ?? []).map((item) => item.name.toLowerCase()));
@@ -140,11 +221,13 @@ for (const heritage of data.heritages ?? []) {
 const featIds = new Set((data.feats ?? []).map((item) => item.id));
 for (const background of data.backgrounds ?? []) {
   for (const feat of background.grantedFeats ?? []) {
-    if (feat.id && !featIds.has(feat.id)) fail(`background ${background.name}: granted feat ${feat.name} is missing`);
+    if (feat.id && !featIds.has(feat.id))
+      fail(`background ${background.name}: granted feat ${feat.name} is missing`);
   }
   for (const choice of background.featChoices ?? []) {
     for (const feat of choice.options ?? []) {
-      if (feat.id && !featIds.has(feat.id)) fail(`background ${background.name}: feat choice ${feat.name} is missing`);
+      if (feat.id && !featIds.has(feat.id))
+        fail(`background ${background.name}: feat choice ${feat.name} is missing`);
     }
   }
 }
@@ -158,7 +241,9 @@ for (const cls of data.classes ?? []) {
     for (const group of feature.choiceGroups ?? []) {
       for (const option of group.options ?? []) {
         if (option.id && !classFeatureIds.has(option.id)) {
-          fail(`class ${cls.name}/${group.prompt}: option ${option.name} is missing from classFeatures.json`);
+          fail(
+            `class ${cls.name}/${group.prompt}: option ${option.name} is missing from classFeatures.json`
+          );
         }
       }
     }
@@ -166,9 +251,22 @@ for (const cls of data.classes ?? []) {
 }
 
 const skillIds = new Set([
-  "acrobatics", "arcana", "athletics", "crafting", "deception", "diplomacy",
-  "intimidation", "medicine", "nature", "occultism", "performance", "religion",
-  "society", "stealth", "survival", "thievery",
+  "acrobatics",
+  "arcana",
+  "athletics",
+  "crafting",
+  "deception",
+  "diplomacy",
+  "intimidation",
+  "medicine",
+  "nature",
+  "occultism",
+  "performance",
+  "religion",
+  "society",
+  "stealth",
+  "survival",
+  "thievery",
 ]);
 for (const background of data.backgrounds ?? []) {
   for (const skill of background.trainedSkills ?? []) {
@@ -176,7 +274,8 @@ for (const background of data.backgrounds ?? []) {
   }
   for (const choice of background.skillChoices ?? []) {
     for (const skill of choice.options ?? []) {
-      if (!skillIds.has(skill)) fail(`background ${background.name}: unknown skill choice "${skill}"`);
+      if (!skillIds.has(skill))
+        fail(`background ${background.name}: unknown skill choice "${skill}"`);
     }
   }
 }
@@ -192,7 +291,8 @@ for (const cls of data.classes ?? []) {
   for (const group of cls.choiceGroups ?? []) {
     for (const option of group.options ?? []) {
       for (const skill of option.trainedSkills ?? []) {
-        if (!skillIds.has(skill)) fail(`class ${cls.name}/${option.name}: unknown trained skill "${skill}"`);
+        if (!skillIds.has(skill))
+          fail(`class ${cls.name}/${option.name}: unknown trained skill "${skill}"`);
       }
     }
   }
@@ -200,8 +300,10 @@ for (const cls of data.classes ?? []) {
 
 // --- Numeric and content sanity -------------------------------------------
 for (const ancestry of data.ancestries ?? []) {
-  if (!Number.isFinite(ancestry.hp) || ancestry.hp <= 0) fail(`ancestry ${ancestry.name}: invalid HP`);
-  if (!Number.isFinite(ancestry.speed) || ancestry.speed <= 0) fail(`ancestry ${ancestry.name}: invalid speed`);
+  if (!Number.isFinite(ancestry.hp) || ancestry.hp <= 0)
+    fail(`ancestry ${ancestry.name}: invalid HP`);
+  if (!Number.isFinite(ancestry.speed) || ancestry.speed <= 0)
+    fail(`ancestry ${ancestry.name}: invalid speed`);
 }
 for (const cls of data.classes ?? []) {
   if (!Number.isFinite(cls.hp) || cls.hp <= 0) fail(`class ${cls.name}: invalid HP`);
@@ -226,34 +328,42 @@ for (const spell of data.spells ?? []) {
     }
   }
   for (const part of spell.damage ?? []) {
-    if (!part.formula || /@|\[\[/.test(part.formula)) fail(`spell ${spell.name}: unresolved damage formula ${part.formula}`);
+    if (!part.formula || /@|\[\[/.test(part.formula))
+      fail(`spell ${spell.name}: unresolved damage formula ${part.formula}`);
     if (!part.type) fail(`spell ${spell.name}: damage part has no type`);
   }
 }
 for (const item of data.equipment ?? []) {
-  if (!Number.isFinite(item.level) || item.level < 0 || item.level > 30) fail(`item ${item.name}: invalid level ${item.level}`);
-  if (!item.price || !Number.isFinite(item.price.cpTotal) || item.price.cpTotal < 0) fail(`item ${item.name}: invalid price`);
+  if (!Number.isFinite(item.level) || item.level < 0 || item.level > 30)
+    fail(`item ${item.name}: invalid level ${item.level}`);
+  if (!item.price || !Number.isFinite(item.price.cpTotal) || item.price.cpTotal < 0)
+    fail(`item ${item.name}: invalid price`);
   if (!Number.isFinite(item.bulk) || item.bulk < 0) fail(`item ${item.name}: invalid bulk`);
 }
 for (const monster of data.monsters ?? []) {
-  if (!Number.isFinite(monster.level) || monster.level < -1 || monster.level > 30) fail(`creature ${monster.name}: invalid level ${monster.level}`);
+  if (!Number.isFinite(monster.level) || monster.level < -1 || monster.level > 30)
+    fail(`creature ${monster.name}: invalid level ${monster.level}`);
   if (!Number.isFinite(monster.hp) || monster.hp <= 0) fail(`creature ${monster.name}: invalid HP`);
   if (!Number.isFinite(monster.ac) || monster.ac <= 0) fail(`creature ${monster.name}: invalid AC`);
   for (const save of ["fortitude", "reflex", "will", "perception"]) {
     if (!Number.isFinite(monster[save])) fail(`creature ${monster.name}: invalid ${save}`);
   }
-  if (!Number.isFinite(monster.speeds?.base) || monster.speeds.base < 0) fail(`creature ${monster.name}: invalid base speed`);
+  if (!Number.isFinite(monster.speeds?.base) || monster.speeds.base < 0)
+    fail(`creature ${monster.name}: invalid base speed`);
   for (const attack of monster.attacks ?? []) {
-    if (!Number.isFinite(attack.bonus)) fail(`creature ${monster.name}/${attack.name}: invalid attack bonus`);
+    if (!Number.isFinite(attack.bonus))
+      fail(`creature ${monster.name}/${attack.name}: invalid attack bonus`);
   }
 }
 const attacksWithoutDamage = (data.monsters ?? []).flatMap((monster) =>
   (monster.attacks ?? [])
     .filter((attack) => !attack.damage?.trim())
-    .map((attack) => `${monster.name}/${attack.name}`),
+    .map((attack) => `${monster.name}/${attack.name}`)
 );
 if (attacksWithoutDamage.length) {
-  warn(`${attacksWithoutDamage.length} creature attacks have no damage (normal for web, tongue, and similar control attacks): ${attacksWithoutDamage.slice(0, 8).join(", ")}${attacksWithoutDamage.length > 8 ? ", …" : ""}`);
+  warn(
+    `${attacksWithoutDamage.length} creature attacks have no damage (normal for web, tongue, and similar control attacks): ${attacksWithoutDamage.slice(0, 8).join(", ")}${attacksWithoutDamage.length > 8 ? ", …" : ""}`
+  );
 }
 
 // Content gaps are warnings: variants and class-locked spells can legitimately
@@ -268,9 +378,16 @@ const missingDescriptions = [
   ["monsters", "monsters"],
 ];
 for (const [key, label] of missingDescriptions) {
-  const missing = (data[key] ?? []).filter((item) => !String(item.description || item.blurb || "").trim());
+  const missing = (data[key] ?? []).filter(
+    (item) => !String(item.description || item.blurb || "").trim()
+  );
   if (missing.length) {
-    warn(`${missing.length} ${label} have no separate description (fallback text will be shown): ${missing.slice(0, 8).map((item) => item.name).join(", ")}${missing.length > 8 ? ", …" : ""}`);
+    warn(
+      `${missing.length} ${label} have no separate description (fallback text will be shown): ${missing
+        .slice(0, 8)
+        .map((item) => item.name)
+        .join(", ")}${missing.length > 8 ? ", …" : ""}`
+    );
   }
 }
 const noTraditions = (data.spells ?? []).filter((spell) => !(spell.traditions ?? []).length);
@@ -279,7 +396,7 @@ if (noTraditions.length) {
   const rituals = noTraditions.filter((spell) => spell.ritual).length;
   const classOnly = noTraditions.length - focus - rituals;
   warn(
-    `${noTraditions.length} spells have no tradition: ${focus} focus, ${rituals} ritual, and ${classOnly} class-locked/spellshape entries. These are expected to be excluded from ordinary tradition-filtered pickers.`,
+    `${noTraditions.length} spells have no tradition: ${focus} focus, ${rituals} ritual, and ${classOnly} class-locked/spellshape entries. These are expected to be excluded from ordinary tradition-filtered pickers.`
   );
 }
 
@@ -319,11 +436,25 @@ if (fs.existsSync(databasePath)) {
       fail("SQLite schema_migrations contains duplicate versions");
     }
     const counts = {};
-    for (const table of ["users", "campaigns", "characters", "scenes", "tokens", "messages", "journal_entries"]) {
+    for (const table of [
+      "users",
+      "campaigns",
+      "characters",
+      "scenes",
+      "tokens",
+      "messages",
+      "journal_entries",
+    ]) {
       if (!tables.includes(table)) continue;
-      counts[table] = Number(Object.values(db.prepare(`SELECT COUNT(*) AS count FROM ${table}`).get())[0]);
+      counts[table] = Number(
+        Object.values(db.prepare(`SELECT COUNT(*) AS count FROM ${table}`).get())[0]
+      );
     }
-    databaseSummary = `integrity ok · ${tables.length} tables · migrations ${versions.join(", ") || "none"} · ${Object.entries(counts).map(([table, count]) => `${table} ${count}`).join(", ")}`;
+    databaseSummary = `integrity ok · ${tables.length} tables · migrations ${versions.join(", ") || "none"} · ${Object.entries(
+      counts
+    )
+      .map(([table, count]) => `${table} ${count}`)
+      .join(", ")}`;
   } catch (error) {
     fail(`SQLite check failed: ${error instanceof Error ? error.message : String(error)}`);
   } finally {

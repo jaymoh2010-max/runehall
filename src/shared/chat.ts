@@ -10,15 +10,12 @@ export function filterChatMessages(messages: ChatMessage[], filter: ChatFilter):
   return messages.filter((message) => message.visibility === "gm");
 }
 
-export function rollResponsesForRequest(
-  messages: ChatMessage[],
-  requestId: string,
-): ChatMessage[] {
+export function rollResponsesForRequest(messages: ChatMessage[], requestId: string): ChatMessage[] {
   return messages.filter(
     (message) =>
       message.type === "roll" &&
       message.data !== null &&
       "total" in message.data &&
-      message.data.requestId === requestId,
+      message.data.requestId === requestId
   );
 }

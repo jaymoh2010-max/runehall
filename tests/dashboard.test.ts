@@ -9,7 +9,7 @@ describe("campaign dashboard threads", () => {
         { text: "   " },
         { text: "Speak to the ferryman", visible: false },
         null,
-      ]),
+      ])
     ).toEqual([
       { id: "t1", text: "Find the silver key", done: true, visible: true },
       { id: "thread_3", text: "Speak to the ferryman", done: false, visible: false },
@@ -27,7 +27,7 @@ describe("campaign dashboard threads", () => {
         { id: "1", text: "Open", done: false, visible: true },
         { id: "2", text: "Done", done: true, visible: true },
         { id: "3", text: "Also open", done: false, visible: false },
-      ]),
+      ])
     ).toBe(2);
   });
 });

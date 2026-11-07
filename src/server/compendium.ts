@@ -118,11 +118,9 @@ function searchScore(name: string, q: string | undefined): number {
 function sortByRelevance<T extends { name: string }>(
   items: T[],
   q: string | undefined,
-  tieBreak: (a: T, b: T) => number,
+  tieBreak: (a: T, b: T) => number
 ): T[] {
-  return items.sort(
-    (a, b) => searchScore(a.name, q) - searchScore(b.name, q) || tieBreak(a, b),
-  );
+  return items.sort((a, b) => searchScore(a.name, q) - searchScore(b.name, q) || tieBreak(a, b));
 }
 
 function matchesTraits(itemTraits: string[], requested: string[] | undefined): boolean {
@@ -130,7 +128,10 @@ function matchesTraits(itemTraits: string[], requested: string[] | undefined): b
   return requested.some((trait) => itemTraits.includes(trait));
 }
 
-function paginate<T>(items: T[], opts: SearchOptions): { items: T[]; total: number; next: number | null } {
+function paginate<T>(
+  items: T[],
+  opts: SearchOptions
+): { items: T[]; total: number; next: number | null } {
   const total = items.length;
   const limit = Math.max(1, Math.min(200, Math.floor(opts.limit ?? 80)));
   const offset = Math.max(0, Math.floor(opts.offset ?? 0));
@@ -161,7 +162,9 @@ export function searchFeats(opts: SearchOptions) {
   return paginate(filtered, opts);
 }
 
-export function searchSpells(opts: SearchOptions & { rank?: number; tradition?: string; rankMin?: number; rankMax?: number }) {
+export function searchSpells(
+  opts: SearchOptions & { rank?: number; tradition?: string; rankMin?: number; rankMax?: number }
+) {
   const traits = opts.traits?.filter(Boolean) ?? [];
   const wantsFocus = Boolean(opts.traits?.includes("focus") || opts.allTraits?.includes("focus"));
   const filtered = spells.filter((spell) => {
@@ -173,12 +176,21 @@ export function searchSpells(opts: SearchOptions & { rank?: number; tradition?: 
     if (opts.rank !== undefined && spell.rank !== opts.rank) return false;
     if (opts.rankMin !== undefined && spell.rank < opts.rankMin) return false;
     if (opts.rankMax !== undefined && spell.rank > opts.rankMax) return false;
-    if (opts.tradition && !spell.traditions.includes(opts.tradition) && !spell.traits.includes("focus")) return false;
+    if (
+      opts.tradition &&
+      !spell.traditions.includes(opts.tradition) &&
+      !spell.traits.includes("focus")
+    )
+      return false;
     if (opts.levelMin !== undefined && spell.rank < opts.levelMin) return false;
     if (opts.levelMax !== undefined && spell.rank > opts.levelMax) return false;
     if (!matchesTraits(spell.traits, traits.length ? traits : undefined)) return false;
-    if (opts.allTraits?.length && !opts.allTraits.every((trait) => spell.traits.includes(trait))) return false;
-    if (!matchesText(`${spell.name} ${spell.traits.join(" ")} ${spell.traditions.join(" ")}`, opts.q)) return false;
+    if (opts.allTraits?.length && !opts.allTraits.every((trait) => spell.traits.includes(trait)))
+      return false;
+    if (
+      !matchesText(`${spell.name} ${spell.traits.join(" ")} ${spell.traditions.join(" ")}`, opts.q)
+    )
+      return false;
     return true;
   });
   sortByRelevance(filtered, opts.q, (a, b) => a.rank - b.rank || a.name.localeCompare(b.name));
@@ -207,7 +219,8 @@ export function searchEquipment(opts: SearchOptions) {
     if (opts.levelMax !== undefined && item.level > opts.levelMax) return false;
     if (opts.rarity?.length && !opts.rarity.includes(item.rarity)) return false;
     if (!matchesTraits(item.traits, opts.traits?.length ? opts.traits : undefined)) return false;
-    if (!matchesText(`${item.name} ${item.traits.join(" ")} ${item.type} ${item.source}`, opts.q)) return false;
+    if (!matchesText(`${item.name} ${item.traits.join(" ")} ${item.type} ${item.source}`, opts.q))
+      return false;
     return true;
   });
   sortByRelevance(filtered, opts.q, (a, b) => a.level - b.level || a.name.localeCompare(b.name));
@@ -221,7 +234,8 @@ export function searchMonsters(opts: SearchOptions) {
     if (opts.levelMax !== undefined && monster.level > opts.levelMax) return false;
     if (opts.rarity?.length && !opts.rarity.includes(monster.rarity)) return false;
     if (!matchesTraits(monster.traits, opts.traits?.length ? opts.traits : undefined)) return false;
-    if (!matchesText(`${monster.name} ${monster.traits.join(" ")} ${monster.source}`, opts.q)) return false;
+    if (!matchesText(`${monster.name} ${monster.traits.join(" ")} ${monster.source}`, opts.q))
+      return false;
     return true;
   });
   sortByRelevance(filtered, opts.q, (a, b) => a.level - b.level || a.name.localeCompare(b.name));
@@ -229,7 +243,9 @@ export function searchMonsters(opts: SearchOptions) {
 }
 
 export function searchDeities(q?: string, limit = 80) {
-  const filtered = deities.filter((deity) => matchesText(`${deity.name} ${deity.traits.join(" ")} ${deity.source}`, q));
+  const filtered = deities.filter((deity) =>
+    matchesText(`${deity.name} ${deity.traits.join(" ")} ${deity.source}`, q)
+  );
   return {
     items: filtered.slice(0, Math.max(1, Math.min(500, limit))),
     total: filtered.length,
@@ -264,7 +280,7 @@ const searchCandidates: SearchCandidate[] = (() => {
       gmDescription?: boolean;
     }[],
     kind: CompendiumEntryKind,
-    level: (item: never) => number | null,
+    level: (item: never) => number | null
   ) => {
     for (const item of items) {
       candidates.push({
@@ -276,7 +292,8 @@ const searchCandidates: SearchCandidate[] = (() => {
         rarity: item.rarity ?? "common",
         traits: item.traits ?? [],
         description: stripHtml(item.description, 2000),
-        searchMeta: `${item.name} ${(item.traits ?? []).join(" ")} ${item.source ?? ""}`.toLowerCase(),
+        searchMeta:
+          `${item.name} ${(item.traits ?? []).join(" ")} ${item.source ?? ""}`.toLowerCase(),
         ritual: item.ritual,
         gmDescription: item.gmDescription,
       });
@@ -323,9 +340,11 @@ function searchCandidateScore(candidate: SearchCandidate, query: string): number
 export function globalSearch(
   q: string,
   limit = 48,
-  kinds?: CompendiumEntryKind[],
+  kinds?: CompendiumEntryKind[]
 ): CompendiumSearchResponse {
-  const query = String(q || "").trim().toLowerCase();
+  const query = String(q || "")
+    .trim()
+    .toLowerCase();
   const safeLimit = Math.max(1, Math.min(200, Math.floor(limit)));
   if (!query) return { items: [], total: 0, counts: {} };
 
@@ -345,7 +364,7 @@ export function globalSearch(
     (a, b) =>
       a.score - b.score ||
       (a.candidate.level ?? 0) - (b.candidate.level ?? 0) ||
-      a.candidate.name.localeCompare(b.candidate.name),
+      a.candidate.name.localeCompare(b.candidate.name)
   );
 
   const perKind = Math.max(3, Math.ceil(safeLimit / COMPENDIUM_KIND_ORDER.length));
@@ -374,7 +393,7 @@ export function globalSearch(
       (a, b) =>
         a.score - b.score ||
         (a.candidate.level ?? 0) - (b.candidate.level ?? 0) ||
-        a.candidate.name.localeCompare(b.candidate.name),
+        a.candidate.name.localeCompare(b.candidate.name)
     )
     .slice(0, safeLimit)
     .map(({ candidate }) => ({
@@ -401,7 +420,12 @@ export function compendiumEntry(id: string): unknown | null {
 // ---------------------------------------------------------------------------
 function featIdsFromDraft(draft: CharacterDraft): string[] {
   const ids = new Set<string>();
-  for (const bucket of [draft.feats.ancestry, draft.feats.class, draft.feats.skill, draft.feats.general]) {
+  for (const bucket of [
+    draft.feats.ancestry,
+    draft.feats.class,
+    draft.feats.skill,
+    draft.feats.general,
+  ]) {
     for (const id of Object.values(bucket)) if (id) ids.add(id);
   }
   for (const id of draft.feats.extras) ids.add(id);
@@ -409,11 +433,11 @@ function featIdsFromDraft(draft: CharacterDraft): string[] {
 }
 
 export function contextForDraft(draft: CharacterDraft): CharacterContext {
-  const ancestry = draft.ancestryId ? maps.ancestry.get(draft.ancestryId) ?? null : null;
-  const heritage = draft.heritageId ? maps.heritage.get(draft.heritageId) ?? null : null;
-  const background = draft.backgroundId ? maps.background.get(draft.backgroundId) ?? null : null;
-  const classData = draft.classId ? maps.class.get(draft.classId) ?? null : null;
-  const deity = draft.deityId ? maps.deity.get(draft.deityId) ?? null : null;
+  const ancestry = draft.ancestryId ? (maps.ancestry.get(draft.ancestryId) ?? null) : null;
+  const heritage = draft.heritageId ? (maps.heritage.get(draft.heritageId) ?? null) : null;
+  const background = draft.backgroundId ? (maps.background.get(draft.backgroundId) ?? null) : null;
+  const classData = draft.classId ? (maps.class.get(draft.classId) ?? null) : null;
+  const deity = draft.deityId ? (maps.deity.get(draft.deityId) ?? null) : null;
 
   const featMap: Record<string, Feat> = {};
   for (const id of featIdsFromDraft(draft)) {

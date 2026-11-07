@@ -7,14 +7,10 @@ import {
 } from "./db";
 import { serializeCampaignSession } from "./serialize";
 
-export function campaignSessionsFor(
-  campaignId: string,
-  role: "gm" | "player",
-  userId: string,
-) {
+export function campaignSessionsFor(campaignId: string, role: "gm" | "player", userId: string) {
   const sessions = db
     .prepare(
-      "SELECT * FROM campaign_sessions WHERE campaign_id = ? ORDER BY scheduled_at ASC, created_at ASC",
+      "SELECT * FROM campaign_sessions WHERE campaign_id = ? ORDER BY scheduled_at ASC, created_at ASC"
     )
     .all(campaignId) as CampaignSessionRow[];
   if (!sessions.length) return [];
@@ -22,7 +18,7 @@ export function campaignSessionsFor(
     .prepare(
       `SELECT a.* FROM session_attendance a
        JOIN campaign_sessions s ON s.id = a.session_id
-       WHERE s.campaign_id = ?`,
+       WHERE s.campaign_id = ?`
     )
     .all(campaignId) as SessionAttendanceRow[];
   const bySession = new Map<string, SessionAttendanceRow[]>();
@@ -36,7 +32,7 @@ export function campaignSessionsFor(
     .prepare(
       `SELECT c.* FROM session_checkins c
        JOIN campaign_sessions s ON s.id = c.session_id
-       WHERE s.campaign_id = ?`,
+       WHERE s.campaign_id = ?`
     )
     .all(campaignId) as SessionCheckinRow[];
   const checkinsBySession = new Map<string, SessionCheckinRow[]>();
@@ -52,7 +48,7 @@ export function campaignSessionsFor(
       bySession.get(session.id) ?? [],
       checkinsBySession.get(session.id) ?? [],
       role,
-      userId,
-    ),
+      userId
+    )
   );
 }

@@ -14,9 +14,8 @@ export function setRevisionBroadcaster(next: RevisionBroadcaster | null): void {
 }
 
 export function campaignRevision(campaignId: string): number {
-  const row = db
-    .prepare("SELECT revision FROM campaigns WHERE id = ?")
-    .get(campaignId) as { revision: number } | undefined;
+  const row = db.prepare("SELECT revision FROM campaigns WHERE id = ?").get(campaignId) as
+    { revision: number } | undefined;
   return Number(row?.revision ?? 0);
 }
 
@@ -28,7 +27,7 @@ export function campaignRevision(campaignId: string): number {
 export function bumpCampaign(campaignId: string): number {
   const ts = now();
   db.prepare(
-    "UPDATE campaigns SET updated_at = ?, last_played_at = ?, revision = revision + 1 WHERE id = ?",
+    "UPDATE campaigns SET updated_at = ?, last_played_at = ?, revision = revision + 1 WHERE id = ?"
   ).run(ts, ts, campaignId);
   const revision = campaignRevision(campaignId);
   broadcaster?.(campaignId, revision);

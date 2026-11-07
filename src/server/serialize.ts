@@ -53,7 +53,7 @@ export function serializeCampaignSummary(
   campaign: CampaignRow,
   role: "gm" | "player",
   counts: { memberCount: number; characterCount: number },
-  gmName = "",
+  gmName = ""
 ): CampaignSummary {
   return {
     id: campaign.id,
@@ -73,7 +73,11 @@ export function serializeCampaignSummary(
   };
 }
 
-export function serializeMember(user: UserRow, role: "gm" | "player", joinedAt: number): CampaignMember {
+export function serializeMember(
+  user: UserRow,
+  role: "gm" | "player",
+  joinedAt: number
+): CampaignMember {
   return {
     id: user.id,
     username: user.username,
@@ -88,14 +92,13 @@ export function serializeMember(user: UserRow, role: "gm" | "player", joinedAt: 
 export function serializeCharacter(
   row: CharacterRow,
   ownerName = "",
-  permissions?: CharacterRecord["permissions"],
+  permissions?: CharacterRecord["permissions"]
 ): CharacterRecord {
   const data = parseJson(row.data, {});
   const summary = parseJson(row.summary, null);
   const campaignRow = row.campaign_id
     ? (db.prepare("SELECT ruleset FROM campaigns WHERE id = ?").get(row.campaign_id) as
-        | { ruleset: string }
-        | undefined)
+        { ruleset: string } | undefined)
     : undefined;
   const campaignRuleset = campaignRow ? normalizeCampaignRuleset(campaignRow.ruleset) : null;
   return {
@@ -213,7 +216,7 @@ export function encounterCombatants(encounterId: string): EncounterCombatant[] {
   return (
     db
       .prepare(
-        "SELECT * FROM encounter_combatants WHERE encounter_id = ? ORDER BY sort_order ASC, created_at ASC",
+        "SELECT * FROM encounter_combatants WHERE encounter_id = ? ORDER BY sort_order ASC, created_at ASC"
       )
       .all(encounterId) as EncounterCombatantRow[]
   ).map(serializeEncounterCombatant);
@@ -238,12 +241,11 @@ export function serializeCampaignSession(
   attendanceRows: SessionAttendanceRow[],
   checkinRows: SessionCheckinRow[],
   role: "gm" | "player",
-  userId: string,
+  userId: string
 ): CampaignSession {
   const attendanceByUser = new Map(attendanceRows.map((entry) => [entry.user_id, entry]));
   const checkinByUser = new Map(checkinRows.map((entry) => [entry.user_id, entry]));
-  const visibleMembers =
-    role === "gm" ? members : members.filter((member) => member.id === userId);
+  const visibleMembers = role === "gm" ? members : members.filter((member) => member.id === userId);
   return {
     id: row.id,
     campaignId: row.campaign_id,
@@ -298,7 +300,7 @@ export function serializeCampaignNpc(row: CampaignNpcRow): CampaignNpc {
 
 export function serializeCampaignDashboard(
   row: CampaignDashboardRow,
-  role: "gm" | "player",
+  role: "gm" | "player"
 ): CampaignDashboard {
   const threads = normalizeCampaignThreads(parseJson(row.threads, []));
   return {
@@ -335,7 +337,11 @@ export function serializeLootParcel(row: LootParcelRow): LootParcel {
 export function serializeInitiative(value: unknown): InitiativeEntry[] {
   if (!Array.isArray(value)) return [];
   return value.filter((entry): entry is InitiativeEntry => {
-    return Boolean(entry) && typeof entry === "object" && typeof (entry as InitiativeEntry).id === "string";
+    return (
+      Boolean(entry) &&
+      typeof entry === "object" &&
+      typeof (entry as InitiativeEntry).id === "string"
+    );
   });
 }
 

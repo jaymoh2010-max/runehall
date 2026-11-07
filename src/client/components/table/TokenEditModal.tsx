@@ -94,7 +94,7 @@ export function TokenEditModal({
     setConditions((current) =>
       current.some((condition) => condition.name.toLowerCase() === name.toLowerCase())
         ? current
-        : [...current, { name, value, duration }],
+        : [...current, { name, value, duration }]
     );
     setConditionInput("");
     setConditionValue("");
@@ -142,24 +142,36 @@ export function TokenEditModal({
       wide
       footer={
         <>
-          <Button variant="danger" icon={<Trash2 size={14} />} onClick={() => {
-            if (window.confirm(`Delete token “${token.name}”?`)) {
-              onDelete(token.id);
-              onClose();
-            }
-          }}>
+          <Button
+            variant="danger"
+            icon={<Trash2 size={14} />}
+            onClick={() => {
+              if (window.confirm(`Delete token “${token.name}”?`)) {
+                onDelete(token.id);
+                onClose();
+              }
+            }}
+          >
             Delete
           </Button>
           <span className="grow" />
-          <Button variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button variant="primary" onClick={save} loading={uploading}>Save token</Button>
+          <Button variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button variant="primary" onClick={save} loading={uploading}>
+            Save token
+          </Button>
         </>
       }
     >
       <div className="token-edit-layout">
         <div className="token-edit-art">
           <div className="token-edit-preview">
-            {imageUrl ? <img src={imageUrl} alt="" /> : <span>{name.slice(0, 2).toUpperCase() || "TO"}</span>}
+            {imageUrl ? (
+              <img src={imageUrl} alt="" />
+            ) : (
+              <span>{name.slice(0, 2).toUpperCase() || "TO"}</span>
+            )}
           </div>
           <Button
             variant="secondary"
@@ -171,7 +183,11 @@ export function TokenEditModal({
           >
             Upload token art
           </Button>
-          {imageUrl ? <Button variant="ghost" size="sm" onClick={() => setImageUrl(null)} block>Use initials</Button> : null}
+          {imageUrl ? (
+            <Button variant="ghost" size="sm" onClick={() => setImageUrl(null)} block>
+              Use initials
+            </Button>
+          ) : null}
           <input
             ref={fileRef}
             type="file"
@@ -183,28 +199,60 @@ export function TokenEditModal({
               event.target.value = "";
             }}
           />
-          <p className="tiny muted">Token art is saved as an uploaded asset and cropped into a circle on the map.</p>
+          <p className="tiny muted">
+            Token art is saved as an uploaded asset and cropped into a circle on the map.
+          </p>
         </div>
 
         <div className="token-edit-form">
           {error ? <div className="auth-error">{error}</div> : null}
           <Field label="Token name">
-            <Input value={name} onChange={(event) => setName(event.target.value)} maxLength={80} autoFocus />
+            <Input
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              maxLength={80}
+              autoFocus
+            />
           </Field>
 
           <div className="token-edit-stat-grid">
             <Field label="Current HP">
               <div className="token-edit-number">
-                <button type="button" onClick={() => setHpCurrent(String(Math.max(0, Number(hpCurrent || 0) - 1)))}><Minus size={13} /></button>
-                <Input value={hpCurrent} onChange={(event) => setHpCurrent(event.target.value)} placeholder="—" inputMode="numeric" />
-                <button type="button" onClick={() => setHpCurrent(String(Math.max(0, Number(hpCurrent || 0) + 1)))}><Plus size={13} /></button>
+                <button
+                  type="button"
+                  onClick={() => setHpCurrent(String(Math.max(0, Number(hpCurrent || 0) - 1)))}
+                >
+                  <Minus size={13} />
+                </button>
+                <Input
+                  value={hpCurrent}
+                  onChange={(event) => setHpCurrent(event.target.value)}
+                  placeholder="—"
+                  inputMode="numeric"
+                />
+                <button
+                  type="button"
+                  onClick={() => setHpCurrent(String(Math.max(0, Number(hpCurrent || 0) + 1)))}
+                >
+                  <Plus size={13} />
+                </button>
               </div>
             </Field>
             <Field label="Max HP">
-              <Input value={hpMax} onChange={(event) => setHpMax(event.target.value)} placeholder="—" inputMode="numeric" />
+              <Input
+                value={hpMax}
+                onChange={(event) => setHpMax(event.target.value)}
+                placeholder="—"
+                inputMode="numeric"
+              />
             </Field>
             <Field label="Armor class">
-              <Input value={ac} onChange={(event) => setAc(event.target.value)} placeholder="—" inputMode="numeric" />
+              <Input
+                value={ac}
+                onChange={(event) => setAc(event.target.value)}
+                placeholder="—"
+                inputMode="numeric"
+              />
             </Field>
             <Field label="Size">
               <Select value={size} onChange={(event) => setSize(event.target.value)}>
@@ -217,21 +265,48 @@ export function TokenEditModal({
           </div>
 
           <div className="token-hp-actions">
-            <Button size="sm" variant="danger" onClick={() => setHpCurrent(String(Math.max(0, Number(hpCurrent || 0) - 5)))}>−5 HP</Button>
-            <Button size="sm" variant="secondary" onClick={() => setHpCurrent(String(Math.min(Number(hpMax || hpCurrent || 0), Number(hpCurrent || 0) + 5)))}>+5 HP</Button>
-            <Button size="sm" variant="ghost" onClick={() => setHpCurrent(hpMax)}>Full</Button>
-            <Button size="sm" variant="ghost" onClick={() => setHpCurrent("0")}>Down</Button>
+            <Button
+              size="sm"
+              variant="danger"
+              onClick={() => setHpCurrent(String(Math.max(0, Number(hpCurrent || 0) - 5)))}
+            >
+              −5 HP
+            </Button>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() =>
+                setHpCurrent(
+                  String(Math.min(Number(hpMax || hpCurrent || 0), Number(hpCurrent || 0) + 5))
+                )
+              }
+            >
+              +5 HP
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setHpCurrent(hpMax)}>
+              Full
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setHpCurrent("0")}>
+              Down
+            </Button>
           </div>
 
           <div className="token-edit-row">
             <Field label="Color">
-              <input className="token-color-input" type="color" value={color} onChange={(event) => setColor(event.target.value)} />
+              <input
+                className="token-color-input"
+                type="color"
+                value={color}
+                onChange={(event) => setColor(event.target.value)}
+              />
             </Field>
             <Field label="Owner">
               <Select value={ownerId} onChange={(event) => setOwnerId(event.target.value)}>
                 <option value="">Unowned</option>
                 {members.map((member) => (
-                  <option key={member.id} value={member.id}>{member.displayName}</option>
+                  <option key={member.id} value={member.id}>
+                    {member.displayName}
+                  </option>
                 ))}
               </Select>
             </Field>
@@ -254,13 +329,17 @@ export function TokenEditModal({
                   <button
                     type="button"
                     className="tag-remove"
-                    onClick={() => setConditions((current) => current.filter((_, i) => i !== index))}
+                    onClick={() =>
+                      setConditions((current) => current.filter((_, i) => i !== index))
+                    }
                   >
                     ×
                   </button>
                 </Tag>
               ))}
-              {!conditions.length ? <span className="tiny muted">No active conditions.</span> : null}
+              {!conditions.length ? (
+                <span className="tiny muted">No active conditions.</span>
+              ) : null}
             </div>
             <div className="row" style={{ marginTop: 7, gap: 6 }}>
               <Input
@@ -294,7 +373,9 @@ export function TokenEditModal({
                 style={{ maxWidth: 84 }}
                 title="Remaining duration in rounds"
               />
-              <Button size="sm" icon={<Plus size={13} />} onClick={addCondition}>Add</Button>
+              <Button size="sm" icon={<Plus size={13} />} onClick={addCondition}>
+                Add
+              </Button>
             </div>
           </div>
 
@@ -305,7 +386,12 @@ export function TokenEditModal({
                 <strong>{character.name}</strong>
                 <span className="tiny muted">Linked character · HP changes sync to the sheet</span>
               </div>
-              <Button size="sm" variant="ghost" icon={<UserRound size={13} />} onClick={() => onOpenCharacter(character.id)}>
+              <Button
+                size="sm"
+                variant="ghost"
+                icon={<UserRound size={13} />}
+                onClick={() => onOpenCharacter(character.id)}
+              >
                 Open sheet
               </Button>
             </div>

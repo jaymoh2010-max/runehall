@@ -23,10 +23,7 @@ export function PartyRail({
   onSelectToken,
   onOpenCharacter,
 }: PartyRailProps) {
-  const onlineUserIds = useMemo(
-    () => new Set(presence.map((person) => person.userId)),
-    [presence],
-  );
+  const onlineUserIds = useMemo(() => new Set(presence.map((person) => person.userId)), [presence]);
 
   return (
     <aside className="vtt-party-rail" aria-label="Party roster">
@@ -39,9 +36,7 @@ export function PartyRail({
           const token = sceneId
             ? tokens.find(
                 (item) =>
-                  item.characterId === character.id &&
-                  item.sceneId === sceneId &&
-                  !item.hidden,
+                  item.characterId === character.id && item.sceneId === sceneId && !item.hidden
               )
             : null;
           const summary = character.summary;
@@ -63,7 +58,10 @@ export function PartyRail({
                 <Avatar name={character.name} src={summary?.portraitUrl} size={34} />
                 <span className="party-avatar-level">{summary?.level ?? "?"}</span>
                 <span className={`party-token-dot ${token ? "is-on-scene" : ""}`} />
-                <span className={`party-online-dot ${isOnline ? "is-online" : ""}`} title={isOnline ? "Online" : "Offline"} />
+                <span
+                  className={`party-online-dot ${isOnline ? "is-online" : ""}`}
+                  title={isOnline ? "Online" : "Offline"}
+                />
               </button>
 
               <div className="party-popover" role="tooltip">
@@ -91,7 +89,9 @@ export function PartyRail({
                   <>
                     <div className="party-hp-block">
                       <div className="party-hp-label">
-                        <span><Heart size={12} /> Hit points</span>
+                        <span>
+                          <Heart size={12} /> Hit points
+                        </span>
                         <strong>
                           {currentHp} / {maxHp}
                           {tempHp ? <em> +{tempHp} temp</em> : null}
@@ -106,26 +106,61 @@ export function PartyRail({
                     </div>
 
                     <div className="party-popover-stats">
-                      <div><Shield size={12} /><span>AC</span><strong>{summary.ac ?? "—"}</strong></div>
-                      <div><Swords size={12} /><span>Speed</span><strong>{summary.speed ?? "—"} ft.</strong></div>
-                      <div><Sparkles size={12} /><span>Perception</span><strong>{signed(summary.perception ?? 0)}</strong></div>
-                      <div><span>Class DC</span><strong>{summary.classDc ?? "—"}</strong></div>
-                      <div><span>Spell DC</span><strong>{summary.spellDc ?? "—"}</strong></div>
-                      <div><span>Key ability</span><strong>{summary.keyAbility?.toUpperCase() || "—"}</strong></div>
+                      <div>
+                        <Shield size={12} />
+                        <span>AC</span>
+                        <strong>{summary.ac ?? "—"}</strong>
+                      </div>
+                      <div>
+                        <Swords size={12} />
+                        <span>Speed</span>
+                        <strong>{summary.speed ?? "—"} ft.</strong>
+                      </div>
+                      <div>
+                        <Sparkles size={12} />
+                        <span>Perception</span>
+                        <strong>{signed(summary.perception ?? 0)}</strong>
+                      </div>
+                      <div>
+                        <span>Class DC</span>
+                        <strong>{summary.classDc ?? "—"}</strong>
+                      </div>
+                      <div>
+                        <span>Spell DC</span>
+                        <strong>{summary.spellDc ?? "—"}</strong>
+                      </div>
+                      <div>
+                        <span>Key ability</span>
+                        <strong>{summary.keyAbility?.toUpperCase() || "—"}</strong>
+                      </div>
                     </div>
 
                     <div className="party-save-row">
-                      <span>Fort <strong>{signed(summary.fortitude ?? 0)}</strong></span>
-                      <span>Ref <strong>{signed(summary.reflex ?? 0)}</strong></span>
-                      <span>Will <strong>{signed(summary.will ?? 0)}</strong></span>
-                      <span>Hero <strong>{summary.heroPoints ?? 0}</strong></span>
-                      {(summary.focusPoints ?? 0) > 0 ? <span>Focus <strong>{summary.focusPoints}</strong></span> : null}
+                      <span>
+                        Fort <strong>{signed(summary.fortitude ?? 0)}</strong>
+                      </span>
+                      <span>
+                        Ref <strong>{signed(summary.reflex ?? 0)}</strong>
+                      </span>
+                      <span>
+                        Will <strong>{signed(summary.will ?? 0)}</strong>
+                      </span>
+                      <span>
+                        Hero <strong>{summary.heroPoints ?? 0}</strong>
+                      </span>
+                      {(summary.focusPoints ?? 0) > 0 ? (
+                        <span>
+                          Focus <strong>{summary.focusPoints}</strong>
+                        </span>
+                      ) : null}
                     </div>
 
                     {(summary.conditions ?? []).length ? (
                       <div className="party-condition-row">
                         {(summary.conditions ?? []).map((condition) => (
-                          <Tag key={condition} tone="red">{condition}</Tag>
+                          <Tag key={condition} tone="red">
+                            {condition}
+                          </Tag>
                         ))}
                       </div>
                     ) : null}
@@ -139,16 +174,24 @@ export function PartyRail({
                 <div className="party-popover-foot">
                   <span className="party-owner-presence">
                     <span className={`party-online-dot ${isOnline ? "is-online" : ""}`} />
-                    {character.ownerName ? `${character.ownerName} · ${isOnline ? "online" : "offline"}` : isOnline ? "Online" : "Offline"}
+                    {character.ownerName
+                      ? `${character.ownerName} · ${isOnline ? "online" : "offline"}`
+                      : isOnline
+                        ? "Online"
+                        : "Offline"}
                   </span>
-                  <span>{token ? "Click to select · Double-click for sheet" : "Double-click for sheet"}</span>
+                  <span>
+                    {token ? "Click to select · Double-click for sheet" : "Double-click for sheet"}
+                  </span>
                 </div>
               </div>
             </div>
           );
         })}
         {!characters.length ? (
-          <span className="party-rail-empty" title="No characters in this campaign yet">+</span>
+          <span className="party-rail-empty" title="No characters in this campaign yet">
+            +
+          </span>
         ) : null}
       </div>
     </aside>

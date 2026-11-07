@@ -69,7 +69,7 @@ export function campaignAssetUsages(campaignId: string): Map<string, string[]> {
   const tokens = db
     .prepare(
       `SELECT t.id, t.name, t.image_url FROM tokens t
-       JOIN scenes s ON s.id = t.scene_id WHERE s.campaign_id = ?`,
+       JOIN scenes s ON s.id = t.scene_id WHERE s.campaign_id = ?`
     )
     .all(campaignId) as { id: string; name: string; image_url: string | null }[];
   for (const token of tokens) {
@@ -139,12 +139,9 @@ export function listCampaignAssets(campaignId: string, userId: string): Campaign
   const visibleRecords = records.filter(
     (record) =>
       record.campaign_id === campaignId ||
-      (record.campaign_id === null && record.uploaded_by === userId),
+      (record.campaign_id === null && record.uploaded_by === userId)
   );
-  const filenames = new Set([
-    ...usages.keys(),
-    ...visibleRecords.map((record) => record.filename),
-  ]);
+  const filenames = new Set([...usages.keys(), ...visibleRecords.map((record) => record.filename)]);
   const directory = uploadsDir();
   const assets: CampaignAsset[] = [];
   for (const filename of filenames) {
@@ -155,8 +152,7 @@ export function listCampaignAssets(campaignId: string, userId: string): Campaign
     const usage = usages.get(filename) ?? [];
     const globalCount = references.get(filename) ?? 0;
     const belongsToCampaign = record?.campaign_id === campaignId;
-    const ownedByUser =
-      record?.campaign_id === null && record?.uploaded_by === userId;
+    const ownedByUser = record?.campaign_id === null && record?.uploaded_by === userId;
     assets.push({
       filename,
       url: `/uploads/${filename}`,
@@ -180,14 +176,13 @@ export function isValidAssetFilename(filename: string): boolean {
 export function deleteCampaignAsset(
   campaignId: string,
   userId: string,
-  filename: string,
+  filename: string
 ): { ok: true } | { ok: false; code: number; error: string } {
   if (!isValidAssetFilename(filename)) {
     return { ok: false, code: 400, error: "That filename is not valid." };
   }
-  const record = db
-    .prepare("SELECT * FROM uploaded_assets WHERE filename = ?")
-    .get(filename) as UploadedAssetRow | undefined;
+  const record = db.prepare("SELECT * FROM uploaded_assets WHERE filename = ?").get(filename) as
+    UploadedAssetRow | undefined;
   if (!record) return { ok: false, code: 404, error: "Asset not found." };
   const belongs =
     record.campaign_id === campaignId ||

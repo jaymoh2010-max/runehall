@@ -104,12 +104,7 @@ import {
   Textarea,
   Toggle,
 } from "../../ui";
-import {
-  DeityPicker,
-  EquipmentPicker,
-  FeatPicker,
-  SpellPicker,
-} from "../pickers";
+import { DeityPicker, EquipmentPicker, FeatPicker, SpellPicker } from "../pickers";
 import { ContentSourceToggle } from "../ContentSourceToggle";
 import { RunePicker } from "../RunePicker";
 import {
@@ -120,12 +115,7 @@ import {
 } from "../../../../shared/content";
 import { summarizeRunes } from "../../../../shared/runes";
 import type { BuilderProps } from "../shared";
-import {
-  StepHeading,
-  ValidationNote,
-  SearchInput,
-  MiniFeatureList,
-} from "../shared";
+import { StepHeading, ValidationNote, SearchInput, MiniFeatureList } from "../shared";
 
 export function BackgroundStep({
   draft,
@@ -147,9 +137,15 @@ export function BackgroundStep({
   const expanded = contentMode === "expanded";
   const visible = staticData.backgrounds.filter((background) => {
     if (!legacy && !background.remaster) return false;
-    if (!expanded && background.id !== draft.backgroundId && !isCoreSource(background.source)) return false;
+    if (!expanded && background.id !== draft.backgroundId && !isCoreSource(background.source))
+      return false;
     const q = query.trim().toLowerCase();
-    return !q || `${background.name} ${background.traits.join(" ")} ${background.source}`.toLowerCase().includes(q);
+    return (
+      !q ||
+      `${background.name} ${background.traits.join(" ")} ${background.source}`
+        .toLowerCase()
+        .includes(q)
+    );
   });
   const selected = staticData.backgrounds.find((b) => b.id === draft.backgroundId) ?? null;
   const selectedBackgroundFeat = (selected?.featChoices ?? [])
@@ -165,7 +161,7 @@ export function BackgroundStep({
       ...choice,
       index: loreChoiceOffset++,
       position: index,
-    })),
+    }))
   );
   return (
     <div className="step">
@@ -220,10 +216,14 @@ export function BackgroundStep({
             <span className="selection-emblem">{background.name[0]}</span>
             <span className="selection-copy">
               <span className="selection-name">{background.name}</span>
-              <span className="selection-sub">{background.trainedSkills.map(titleCase).join(", ") || "Background"}</span>
+              <span className="selection-sub">
+                {background.trainedSkills.map(titleCase).join(", ") || "Background"}
+              </span>
               <span className="selection-source">{background.source}</span>
             </span>
-            {draft.backgroundId === background.id ? <CheckCircle2 size={17} className="selection-check" /> : null}
+            {draft.backgroundId === background.id ? (
+              <CheckCircle2 size={17} className="selection-check" />
+            ) : null}
           </button>
         ))}
       </div>
@@ -233,10 +233,14 @@ export function BackgroundStep({
             <div>
               <PageEyebrow>Selected background</PageEyebrow>
               <h2>{selected.name}</h2>
-              <p className="muted">{selected.source} · {selected.rarity}</p>
+              <p className="muted">
+                {selected.source} · {selected.rarity}
+              </p>
             </div>
             <div className="chip-row">
-              {selected.traits.map((trait) => <Tag key={trait}>{traitLabel(trait)}</Tag>)}
+              {selected.traits.map((trait) => (
+                <Tag key={trait}>{traitLabel(trait)}</Tag>
+              ))}
             </div>
           </div>
           <div className="detail-columns">
@@ -254,9 +258,19 @@ export function BackgroundStep({
               </div>
               <h3 style={{ marginTop: 17, marginBottom: 8 }}>Trained skills</h3>
               <div className="chip-row">
-                {selected.trainedSkills.map((skill) => <Tag key={skill} tone="green">{titleCase(skill)}</Tag>)}
-                {selected.lore.map((lore) => <Tag key={lore} tone="green">{lore}</Tag>)}
-                {!selected.trainedSkills.length && !selected.lore.length ? <span className="muted small">None</span> : null}
+                {selected.trainedSkills.map((skill) => (
+                  <Tag key={skill} tone="green">
+                    {titleCase(skill)}
+                  </Tag>
+                ))}
+                {selected.lore.map((lore) => (
+                  <Tag key={lore} tone="green">
+                    {lore}
+                  </Tag>
+                ))}
+                {!selected.trainedSkills.length && !selected.lore.length ? (
+                  <span className="muted small">None</span>
+                ) : null}
               </div>
               {(selected.skillChoices ?? []).map((choice, index) => {
                 const value = draft.skills.background[index] ?? "";
@@ -299,7 +313,9 @@ export function BackgroundStep({
                 return (
                   <Field
                     key={`${choice.prompt}-${choice.index}`}
-                    label={choice.count > 1 ? `${choice.prompt} (${choice.position + 1})` : choice.prompt}
+                    label={
+                      choice.count > 1 ? `${choice.prompt} (${choice.position + 1})` : choice.prompt
+                    }
                   >
                     {choice.options.length ? (
                       <Select value={value} onChange={(event) => setLore(event.target.value)}>
@@ -344,15 +360,27 @@ export function BackgroundStep({
                 <>
                   <h3 style={{ marginTop: 17, marginBottom: 8 }}>Granted feat</h3>
                   <div className="chip-row">
-                    {granted.map((feat) => <Tag key={feat.name} tone="gold">{feat.name}</Tag>)}
+                    {granted.map((feat) => (
+                      <Tag key={feat.name} tone="gold">
+                        {feat.name}
+                      </Tag>
+                    ))}
                   </div>
                 </>
               ) : null}
             </div>
           </div>
           <div className="step-actions">
-            <Button variant="ghost" onClick={() => setStep("heritage")}>Back</Button>
-            <Button variant="primary" onClick={() => setStep("class")} icon={<ArrowRight size={15} />}>Choose a class</Button>
+            <Button variant="ghost" onClick={() => setStep("heritage")}>
+              Back
+            </Button>
+            <Button
+              variant="primary"
+              onClick={() => setStep("class")}
+              icon={<ArrowRight size={15} />}
+            >
+              Choose a class
+            </Button>
           </div>
         </Card>
       ) : (

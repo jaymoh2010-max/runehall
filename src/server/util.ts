@@ -51,9 +51,7 @@ export function ensureDir(dir: string): void {
 }
 
 export function dataDir(): string {
-  const dir = process.env.DATA_DIR
-    ? path.resolve(process.env.DATA_DIR)
-    : path.resolve("data");
+  const dir = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.resolve("data");
   ensureDir(dir);
   return dir;
 }

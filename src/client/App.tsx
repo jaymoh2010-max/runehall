@@ -11,31 +11,33 @@ import { JoinCampaignPage } from "./pages/JoinCampaignPage";
 import { CompendiumEntryPage } from "./pages/CompendiumEntryPage";
 
 const DashboardPage = lazy(() =>
-  import("./pages/DashboardPage").then((module) => ({ default: module.DashboardPage })),
+  import("./pages/DashboardPage").then((module) => ({ default: module.DashboardPage }))
 );
 const CampaignPage = lazy(() =>
-  import("./pages/CampaignPage").then((module) => ({ default: module.CampaignPage })),
+  import("./pages/CampaignPage").then((module) => ({ default: module.CampaignPage }))
 );
 const CharacterBuilderPage = lazy(() =>
-  import("./pages/CharacterBuilderPage").then((module) => ({ default: module.CharacterBuilderPage })),
+  import("./pages/CharacterBuilderPage").then((module) => ({
+    default: module.CharacterBuilderPage,
+  }))
 );
 const CharacterSheetPage = lazy(() =>
-  import("./pages/CharacterSheetPage").then((module) => ({ default: module.CharacterSheetPage })),
+  import("./pages/CharacterSheetPage").then((module) => ({ default: module.CharacterSheetPage }))
 );
 const LibraryPage = lazy(() =>
-  import("./pages/LibraryPage").then((module) => ({ default: module.LibraryPage })),
+  import("./pages/LibraryPage").then((module) => ({ default: module.LibraryPage }))
 );
 const RulesPage = lazy(() =>
-  import("./pages/RulesPage").then((module) => ({ default: module.RulesPage })),
+  import("./pages/RulesPage").then((module) => ({ default: module.RulesPage }))
 );
 const AccountPage = lazy(() =>
-  import("./pages/AccountPage").then((module) => ({ default: module.AccountPage })),
+  import("./pages/AccountPage").then((module) => ({ default: module.AccountPage }))
 );
 const AdminPage = lazy(() =>
-  import("./pages/AdminPage").then((module) => ({ default: module.AdminPage })),
+  import("./pages/AdminPage").then((module) => ({ default: module.AdminPage }))
 );
 const NotFoundPage = lazy(() =>
-  import("./pages/NotFoundPage").then((module) => ({ default: module.NotFoundPage })),
+  import("./pages/NotFoundPage").then((module) => ({ default: module.NotFoundPage }))
 );
 
 function RequireAuth({ children }: { children: ReactNode }) {
@@ -58,28 +60,28 @@ export default function App() {
       <ErrorBoundary>
         <Suspense fallback={<LoadingScreen label="Opening the hall…" />}>
           <Routes>
-        <Route path="/" element={<LandingPage />} />
-        <Route path="/login" element={<AuthPage mode="login" />} />
-        <Route path="/register" element={<AuthPage mode="register" />} />
-        <Route path="/join/:code" element={<JoinCampaignPage />} />
-        <Route
-          element={
-            <RequireAuth>
-              <AppShell />
-            </RequireAuth>
-          }
-        >
-          <Route path="/campaigns" element={<DashboardPage />} />
-          <Route path="/campaigns/:id" element={<CampaignPage />} />
-          <Route path="/characters/:id" element={<CharacterSheetPage />} />
-          <Route path="/characters/:id/edit" element={<CharacterBuilderPage />} />
-          <Route path="/library" element={<LibraryPage />} />
-          <Route path="/library/:kind/:id" element={<CompendiumEntryPage />} />
-          <Route path="/rules" element={<RulesPage />} />
-          <Route path="/account" element={<AccountPage />} />
-          <Route path="/admin" element={<AdminPage />} />
-        </Route>
-          <Route path="*" element={<NotFoundPage />} />
+            <Route path="/" element={<LandingPage />} />
+            <Route path="/login" element={<AuthPage mode="login" />} />
+            <Route path="/register" element={<AuthPage mode="register" />} />
+            <Route path="/join/:code" element={<JoinCampaignPage />} />
+            <Route
+              element={
+                <RequireAuth>
+                  <AppShell />
+                </RequireAuth>
+              }
+            >
+              <Route path="/campaigns" element={<DashboardPage />} />
+              <Route path="/campaigns/:id" element={<CampaignPage />} />
+              <Route path="/characters/:id" element={<CharacterSheetPage />} />
+              <Route path="/characters/:id/edit" element={<CharacterBuilderPage />} />
+              <Route path="/library" element={<LibraryPage />} />
+              <Route path="/library/:kind/:id" element={<CompendiumEntryPage />} />
+              <Route path="/rules" element={<RulesPage />} />
+              <Route path="/account" element={<AccountPage />} />
+              <Route path="/admin" element={<AdminPage />} />
+            </Route>
+            <Route path="*" element={<NotFoundPage />} />
           </Routes>
         </Suspense>
       </ErrorBoundary>

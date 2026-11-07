@@ -44,7 +44,7 @@ export function buildSecurityHeaders(env: Env = process.env): Record<string, str
 export function isTrustedOrigin(
   origin: string | undefined,
   host: string | undefined,
-  env: Env = process.env,
+  env: Env = process.env
 ): boolean {
   if (!origin) return true;
   if (origin === "null") return false;

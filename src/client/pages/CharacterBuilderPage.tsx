@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type FormEvent,
+} from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft,
@@ -113,7 +121,13 @@ import {
 } from "../components/builder/pickers";
 import { ContentSourceToggle } from "../components/builder/ContentSourceToggle";
 import { RunePicker } from "../components/builder/RunePicker";
-import { STEPS, type BuilderProps, type Picker, type StaticData, type StepId } from "../components/builder/shared";
+import {
+  STEPS,
+  type BuilderProps,
+  type Picker,
+  type StaticData,
+  type StepId,
+} from "../components/builder/shared";
 import { AncestryStep } from "../components/builder/steps/AncestryStep";
 import { HeritageStep } from "../components/builder/steps/HeritageStep";
 import { BackgroundStep } from "../components/builder/steps/BackgroundStep";
@@ -148,14 +162,20 @@ export function CharacterBuilderPage() {
   const toast = useToasts((state) => state.push);
   const [character, setCharacter] = useState<CharacterRecord | null>(null);
   const [draft, setDraft] = useState<CharacterDraft | null>(null);
-  const [context, setContext] = useState<CharacterContext>({ feats: {}, spells: {}, equipment: {} });
+  const [context, setContext] = useState<CharacterContext>({
+    feats: {},
+    spells: {},
+    equipment: {},
+  });
   const [staticData, setStaticData] = useState<StaticData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [step, setStep] = useState<StepId>("ancestry");
   const [picker, setPicker] = useState<Picker>(null);
   const [levelUpOpen, setLevelUpOpen] = useState(false);
-  const [levelUpPlan, setLevelUpPlan] = useState<{ level: number; tasks: LevelUpTask[] } | null>(null);
+  const [levelUpPlan, setLevelUpPlan] = useState<{ level: number; tasks: LevelUpTask[] } | null>(
+    null
+  );
   const [saveState, setSaveState] = useState<"saved" | "saving" | "dirty" | "error">("saved");
   const [conflict, setConflict] = useState<CharacterRecord | null>(null);
   const initialized = useRef(false);
@@ -183,11 +203,17 @@ export function CharacterBuilderPage() {
           api<{ character: CharacterRecord }>(`/api/characters/${id}`),
         ]);
         if (cancelled) return;
-        const normalized = normalizeCharacterDraft(characterResult.character.data, characterResult.character.name);
-        const contextResult = await api<{ context: CharacterContext }>(`/api/characters/${id}/context`, {
-          method: "POST",
-          body: { draft: normalized },
-        });
+        const normalized = normalizeCharacterDraft(
+          characterResult.character.data,
+          characterResult.character.name
+        );
+        const contextResult = await api<{ context: CharacterContext }>(
+          `/api/characters/${id}/context`,
+          {
+            method: "POST",
+            body: { draft: normalized },
+          }
+        );
         if (cancelled) return;
         if (characterResult.character.permissions?.canEdit === false) {
           navigate(`/characters/${id}`, { replace: true });
@@ -211,7 +237,7 @@ export function CharacterBuilderPage() {
           (issue) =>
             issue.severity === "error" &&
             issue.step &&
-            STEPS.some((entry) => entry.id === issue.step),
+            STEPS.some((entry) => entry.id === issue.step)
         );
         setStep((firstIssue?.step as StepId | undefined) ?? "review");
       } catch (err) {
@@ -227,7 +253,7 @@ export function CharacterBuilderPage() {
 
   const derived = useMemo(
     () => (draft ? computeCharacter(draft, context) : null),
-    [draft, context],
+    [draft, context]
   );
 
   useEffect(() => {
@@ -292,7 +318,7 @@ export function CharacterBuilderPage() {
         saveInFlight.current = false;
       }
     },
-    [id, toast],
+    [id, toast]
   );
 
   useEffect(() => {
@@ -378,8 +404,19 @@ export function CharacterBuilderPage() {
   const exportJson = () => {
     if (!draft) return;
     const blob = new Blob(
-      [JSON.stringify({ format: "runehall-character", version: 1, exportedAt: new Date().toISOString(), data: draft }, null, 2)],
-      { type: "application/json" },
+      [
+        JSON.stringify(
+          {
+            format: "runehall-character",
+            version: 1,
+            exportedAt: new Date().toISOString(),
+            data: draft,
+          },
+          null,
+          2
+        ),
+      ],
+      { type: "application/json" }
     );
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
@@ -394,7 +431,10 @@ export function CharacterBuilderPage() {
       const parsed = JSON.parse(await file.text());
       const raw = parsed?.data ?? parsed;
       const normalized = normalizeCharacterDraft(raw, file.name.replace(/\.json$/i, ""));
-      update((current) => ({ ...normalized, portraitUrl: current.portraitUrl ?? normalized.portraitUrl }));
+      update((current) => ({
+        ...normalized,
+        portraitUrl: current.portraitUrl ?? normalized.portraitUrl,
+      }));
       toast("Character imported. Review the choices before your next session.", "success");
       setStep("review");
     } catch (err) {
@@ -414,7 +454,12 @@ export function CharacterBuilderPage() {
     }
   };
 
-  if (loading) return <div className="builder-loading"><Spinner label="Opening the character forge…" /></div>;
+  if (loading)
+    return (
+      <div className="builder-loading">
+        <Spinner label="Opening the character forge…" />
+      </div>
+    );
   if (error) {
     return (
       <div className="page">
@@ -432,7 +477,9 @@ export function CharacterBuilderPage() {
   const campaignRuleset = character?.campaignRuleset ?? null;
   const contentMode = campaignRuleset ? rulesetContentMode(campaignRuleset) : draft.contentMode;
   const contentModeLocked = Boolean(campaignRuleset);
-  const legacyDefault = campaignRuleset ? rulesetIncludesLegacy(campaignRuleset) : draft.includeLegacy;
+  const legacyDefault = campaignRuleset
+    ? rulesetIncludesLegacy(campaignRuleset)
+    : draft.includeLegacy;
   const legacyLocked = Boolean(campaignRuleset);
   const nextLevel = Math.min(20, draft.level + 1);
   const levelUpItems: LevelUpTask[] = [];
@@ -460,7 +507,7 @@ export function CharacterBuilderPage() {
       }
     }
     const newFeatSlots = featSlotsFor(context.classData, nextLevel).filter(
-      (slot) => slot.level === nextLevel,
+      (slot) => slot.level === nextLevel
     );
     for (const slot of newFeatSlots) {
       levelUpItems.push({
@@ -500,22 +547,34 @@ export function CharacterBuilderPage() {
     }
   }
   const issues = derived.validation;
-  const stepErrors = (stepId: StepId) => issues.filter((issue) => issue.step === stepId && issue.severity === "error");
+  const stepErrors = (stepId: StepId) =>
+    issues.filter((issue) => issue.step === stepId && issue.severity === "error");
   const stepStatus = (stepId: StepId): "done" | "error" | "pending" | "optional" => {
-    if (stepId === "spells" && casterInfo(context.classData).progression === "none") return "optional";
+    if (stepId === "spells" && casterInfo(context.classData).progression === "none")
+      return "optional";
     if (stepErrors(stepId).length) return "error";
     const done =
-      stepId === "ancestry" ? Boolean(draft.ancestryId) :
-      stepId === "heritage" ? Boolean(draft.heritageId) :
-      stepId === "background" ? Boolean(draft.backgroundId) :
-      stepId === "class" ? Boolean(draft.classId) && !issues.some((i) => i.step === "class") :
-      stepId === "abilities" ? !issues.some((i) => i.step === "abilities") :
-      stepId === "skills" ? !issues.some((i) => i.step === "skills") :
-      stepId === "feats" ? !issues.some((i) => i.step === "feats") :
-      stepId === "spells" ? !issues.some((i) => i.step === "spells") :
-      stepId === "gear" ? true :
-      stepId === "details" ? Boolean(draft.name.trim()) :
-      !issues.some((i) => i.severity === "error");
+      stepId === "ancestry"
+        ? Boolean(draft.ancestryId)
+        : stepId === "heritage"
+          ? Boolean(draft.heritageId)
+          : stepId === "background"
+            ? Boolean(draft.backgroundId)
+            : stepId === "class"
+              ? Boolean(draft.classId) && !issues.some((i) => i.step === "class")
+              : stepId === "abilities"
+                ? !issues.some((i) => i.step === "abilities")
+                : stepId === "skills"
+                  ? !issues.some((i) => i.step === "skills")
+                  : stepId === "feats"
+                    ? !issues.some((i) => i.step === "feats")
+                    : stepId === "spells"
+                      ? !issues.some((i) => i.step === "spells")
+                      : stepId === "gear"
+                        ? true
+                        : stepId === "details"
+                          ? Boolean(draft.name.trim())
+                          : !issues.some((i) => i.severity === "error");
     return done ? "done" : "pending";
   };
   const errors = issues.filter((issue) => issue.severity === "error");
@@ -561,17 +620,35 @@ export function CharacterBuilderPage() {
       setStep,
     };
     switch (step) {
-      case "ancestry": return <AncestryStep {...props} />;
-      case "heritage": return <HeritageStep {...props} />;
-      case "background": return <BackgroundStep {...props} />;
-      case "class": return <ClassStep {...props} />;
-      case "abilities": return <AbilitiesStep {...props} />;
-      case "skills": return <SkillsStep {...props} />;
-      case "feats": return <FeatsStep {...props} />;
-      case "spells": return <SpellsStep {...props} />;
-      case "gear": return <GearStep {...props} />;
-      case "details": return <DetailsStep {...props} />;
-      case "review": return <ReviewStep {...props} onExport={exportJson} onImport={importJson} onDelete={removeCharacter} />;
+      case "ancestry":
+        return <AncestryStep {...props} />;
+      case "heritage":
+        return <HeritageStep {...props} />;
+      case "background":
+        return <BackgroundStep {...props} />;
+      case "class":
+        return <ClassStep {...props} />;
+      case "abilities":
+        return <AbilitiesStep {...props} />;
+      case "skills":
+        return <SkillsStep {...props} />;
+      case "feats":
+        return <FeatsStep {...props} />;
+      case "spells":
+        return <SpellsStep {...props} />;
+      case "gear":
+        return <GearStep {...props} />;
+      case "details":
+        return <DetailsStep {...props} />;
+      case "review":
+        return (
+          <ReviewStep
+            {...props}
+            onExport={exportJson}
+            onImport={importJson}
+            onDelete={removeCharacter}
+          />
+        );
     }
   };
 
@@ -579,7 +656,11 @@ export function CharacterBuilderPage() {
     <div className="builder-page">
       <header className="builder-header">
         <div className="builder-header-left">
-          <Link to={character?.campaignId ? `/campaigns/${character.campaignId}` : "/campaigns"} className="icon-btn" title="Back to campaigns">
+          <Link
+            to={character?.campaignId ? `/campaigns/${character.campaignId}` : "/campaigns"}
+            className="icon-btn"
+            title="Back to campaigns"
+          >
             <ArrowLeft size={18} />
           </Link>
           <div className="builder-title">
@@ -591,11 +672,15 @@ export function CharacterBuilderPage() {
               maxLength={120}
             />
             <span className="tiny muted">
-              {saveState === "saved" ? "Saved" : saveState === "saving" ? "Saving…" : saveState === "error" ? "Save failed" : "Unsaved changes"}
+              {saveState === "saved"
+                ? "Saved"
+                : saveState === "saving"
+                  ? "Saving…"
+                  : saveState === "error"
+                    ? "Save failed"
+                    : "Unsaved changes"}
             </span>
-            {campaignRuleset ? (
-              <Badge tone="gold">{rulesetLabel(campaignRuleset)}</Badge>
-            ) : null}
+            {campaignRuleset ? <Badge tone="gold">{rulesetLabel(campaignRuleset)}</Badge> : null}
           </div>
         </div>
         <div className="builder-header-actions">
@@ -609,7 +694,9 @@ export function CharacterBuilderPage() {
               className="level-select"
             >
               {Array.from({ length: 20 }, (_, index) => index + 1).map((level) => (
-                <option key={level} value={level}>Level {level}</option>
+                <option key={level} value={level}>
+                  Level {level}
+                </option>
               ))}
             </Select>
           </Field>
@@ -622,8 +709,17 @@ export function CharacterBuilderPage() {
           >
             Level up
           </Button>
-          <Link to={`/characters/${id}`} className="btn btn-secondary btn-sm"><ScrollText size={15} /> Sheet</Link>
-          <Button variant="ghost" size="sm" icon={<FileUp size={15} />} onClick={() => document.getElementById("builder-import")?.click()}>Import</Button>
+          <Link to={`/characters/${id}`} className="btn btn-secondary btn-sm">
+            <ScrollText size={15} /> Sheet
+          </Link>
+          <Button
+            variant="ghost"
+            size="sm"
+            icon={<FileUp size={15} />}
+            onClick={() => document.getElementById("builder-import")?.click()}
+          >
+            Import
+          </Button>
           <input
             id="builder-import"
             type="file"
@@ -650,7 +746,9 @@ export function CharacterBuilderPage() {
                 className={`builder-step ${step === entry.id ? "is-active" : ""} is-${status}`}
                 onClick={() => setStep(entry.id)}
               >
-                <span className="builder-step-num">{status === "done" ? <Check size={13} /> : index + 1}</span>
+                <span className="builder-step-num">
+                  {status === "done" ? <Check size={13} /> : index + 1}
+                </span>
                 <span className="builder-step-icon">{entry.icon}</span>
                 <span className="builder-step-label">{entry.short}</span>
                 {status === "error" ? <span className="builder-step-dot" /> : null}
@@ -690,7 +788,9 @@ export function CharacterBuilderPage() {
                       className={`levelup-checklist-item ${done ? "is-done" : ""}`}
                       onClick={() => setStep(task.step)}
                     >
-                      <span className="levelup-checklist-check">{done ? <Check size={12} /> : null}</span>
+                      <span className="levelup-checklist-check">
+                        {done ? <Check size={12} /> : null}
+                      </span>
                       <span>
                         <strong>{task.label}</strong>
                         <small>{done ? "Done" : task.detail}</small>
@@ -704,9 +804,19 @@ export function CharacterBuilderPage() {
           ) : null}
           {renderStep()}
           <div className="builder-nav-mobile">
-            <Button variant="ghost" onClick={() => go(-1)} disabled={stepIndex <= 0}><ArrowLeft size={15} /> Back</Button>
-            <span className="tiny muted">{stepIndex + 1} / {STEPS.length}</span>
-            <Button variant="secondary" onClick={() => go(1)} disabled={stepIndex >= STEPS.length - 1}>Next <ArrowRight size={15} /></Button>
+            <Button variant="ghost" onClick={() => go(-1)} disabled={stepIndex <= 0}>
+              <ArrowLeft size={15} /> Back
+            </Button>
+            <span className="tiny muted">
+              {stepIndex + 1} / {STEPS.length}
+            </span>
+            <Button
+              variant="secondary"
+              onClick={() => go(1)}
+              disabled={stepIndex >= STEPS.length - 1}
+            >
+              Next <ArrowRight size={15} />
+            </Button>
           </div>
         </main>
 
@@ -714,7 +824,12 @@ export function CharacterBuilderPage() {
           <Card className="summary-hero">
             <div className="summary-avatar-wrap">
               <Avatar name={draft.name} src={draft.portraitUrl} size={70} />
-              <button type="button" className="summary-portrait-edit" title="Upload portrait" onClick={() => portraitRef.current?.click()}>
+              <button
+                type="button"
+                className="summary-portrait-edit"
+                title="Upload portrait"
+                onClick={() => portraitRef.current?.click()}
+              >
                 <Upload size={13} />
               </button>
               <input
@@ -735,7 +850,9 @@ export function CharacterBuilderPage() {
               {context.classData ? ` · ${context.classData.name}` : ""}
             </p>
             <p className="tiny muted">
-              {[context.ancestry?.name, context.heritage?.name, context.background?.name].filter(Boolean).join(" · ") || "Choose an ancestry, heritage, and background."}
+              {[context.ancestry?.name, context.heritage?.name, context.background?.name]
+                .filter(Boolean)
+                .join(" · ") || "Choose an ancestry, heritage, and background."}
             </p>
             <div className="summary-ability-row">
               {ABILITIES.map((ability) => (
@@ -754,24 +871,57 @@ export function CharacterBuilderPage() {
             </div>
             <div className="summary-issues">
               {errors.length ? (
-                <span className="danger-text"><CircleAlert size={14} /> {errors.length} to fix</span>
+                <span className="danger-text">
+                  <CircleAlert size={14} /> {errors.length} to fix
+                </span>
               ) : (
-                <span className="gold-text"><CheckCircle2 size={14} /> Ready</span>
+                <span className="gold-text">
+                  <CheckCircle2 size={14} /> Ready
+                </span>
               )}
-              {warnings.length ? <span className="muted tiny">{warnings.length} warning{warnings.length === 1 ? "" : "s"}</span> : null}
+              {warnings.length ? (
+                <span className="muted tiny">
+                  {warnings.length} warning{warnings.length === 1 ? "" : "s"}
+                </span>
+              ) : null}
             </div>
-            <Link to={`/characters/${id}`} className="btn btn-gold btn-sm btn-block" style={{ marginTop: 11 }}>
+            <Link
+              to={`/characters/${id}`}
+              className="btn btn-gold btn-sm btn-block"
+              style={{ marginTop: 11 }}
+            >
               <ScrollText size={14} /> Open character sheet
             </Link>
           </Card>
           <Card className="summary-wealth">
-            <div className="row-between"><span className="tiny muted">Gear budget</span><strong className="tiny">{formatCp(derived.wealth.remaining)} left</strong></div>
-            <ProgressBar value={Math.min(derived.wealth.spent, derived.wealth.budget)} max={Math.max(1, derived.wealth.budget)} />
-            <div className="row-between" style={{ marginTop: 8 }}><span className="tiny muted">Bulk</span><strong className="tiny">{derived.bulk.total} / {derived.bulk.capacity}</strong></div>
+            <div className="row-between">
+              <span className="tiny muted">Gear budget</span>
+              <strong className="tiny">{formatCp(derived.wealth.remaining)} left</strong>
+            </div>
+            <ProgressBar
+              value={Math.min(derived.wealth.spent, derived.wealth.budget)}
+              max={Math.max(1, derived.wealth.budget)}
+            />
+            <div className="row-between" style={{ marginTop: 8 }}>
+              <span className="tiny muted">Bulk</span>
+              <strong className="tiny">
+                {derived.bulk.total} / {derived.bulk.capacity}
+              </strong>
+            </div>
           </Card>
           <div className="summary-links">
-            <button type="button" onClick={() => setStep("review")}><CheckCircle2 size={14} /> Review &amp; export</button>
-            <button type="button" onClick={() => { void removeCharacter(); }} className="danger-text"><Trash2 size={14} /> Delete character</button>
+            <button type="button" onClick={() => setStep("review")}>
+              <CheckCircle2 size={14} /> Review &amp; export
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                void removeCharacter();
+              }}
+              className="danger-text"
+            >
+              <Trash2 size={14} /> Delete character
+            </button>
           </div>
         </aside>
       </div>
@@ -797,7 +947,10 @@ export function CharacterBuilderPage() {
               ...current,
               feats: {
                 ...current.feats,
-                [picker.category]: { ...current.feats[picker.category], [String(picker.level)]: feat.id },
+                [picker.category]: {
+                  ...current.feats[picker.category],
+                  [String(picker.level)]: feat.id,
+                },
               },
             }))
           }
@@ -824,7 +977,10 @@ export function CharacterBuilderPage() {
               if (current.spells[picker.target].includes(spell.id)) return current;
               return {
                 ...current,
-                spells: { ...current.spells, [picker.target]: [...current.spells[picker.target], spell.id] },
+                spells: {
+                  ...current.spells,
+                  [picker.target]: [...current.spells[picker.target], spell.id],
+                },
               };
             })
           }
@@ -848,13 +1004,20 @@ export function CharacterBuilderPage() {
                 return {
                   ...current,
                   equipment: current.equipment.map((entry) =>
-                    entry.itemId === item.id ? { ...entry, quantity: entry.quantity + 1 } : entry,
+                    entry.itemId === item.id ? { ...entry, quantity: entry.quantity + 1 } : entry
                   ),
                 };
               }
               return {
                 ...current,
-                equipment: [...current.equipment, { itemId: item.id, quantity: 1, equipped: Boolean(item.weapon || item.armor || item.shield) }],
+                equipment: [
+                  ...current.equipment,
+                  {
+                    itemId: item.id,
+                    quantity: 1,
+                    equipped: Boolean(item.weapon || item.armor || item.shield),
+                  },
+                ],
               };
             })
           }
@@ -870,7 +1033,9 @@ export function CharacterBuilderPage() {
           legacyDefault={legacyDefault}
           legacyLocked={legacyLocked}
           onLegacyChange={(value) => update((current) => ({ ...current, includeLegacy: value }))}
-          onSelect={(deity) => update((current) => ({ ...current, deityId: deity.id, deitySkill: null }))}
+          onSelect={(deity) =>
+            update((current) => ({ ...current, deityId: deity.id, deitySkill: null }))
+          }
         />
       ) : null}
       <Modal
@@ -880,8 +1045,14 @@ export function CharacterBuilderPage() {
         subtitle="Review what changes, then jump straight into each new choice."
         footer={
           <>
-            <Button variant="ghost" onClick={() => setLevelUpOpen(false)}>Cancel</Button>
-            <Button variant="primary" icon={<TrendingUp size={15} />} onClick={() => completeLevelUp()}>
+            <Button variant="ghost" onClick={() => setLevelUpOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              icon={<TrendingUp size={15} />}
+              onClick={() => completeLevelUp()}
+            >
               Level up
             </Button>
           </>
@@ -892,7 +1063,8 @@ export function CharacterBuilderPage() {
             <Heart size={15} />
             <span>
               Hit points increase by{" "}
-              <strong>{Math.max(1, (context.classData?.hp ?? 0) + derived.abilityMods.con)}</strong>.
+              <strong>{Math.max(1, (context.classData?.hp ?? 0) + derived.abilityMods.con)}</strong>
+              .
             </span>
           </div>
           {levelUpItems.length ? (
@@ -911,7 +1083,10 @@ export function CharacterBuilderPage() {
               </button>
             ))
           ) : (
-            <p className="muted small">No new feat, skill, spell, or ability choices at this level. Review the sheet after leveling.</p>
+            <p className="muted small">
+              No new feat, skill, spell, or ability choices at this level. Review the sheet after
+              leveling.
+            </p>
           )}
         </div>
       </Modal>
@@ -936,8 +1111,10 @@ export function CharacterBuilderPage() {
           <CircleAlert size={16} />
           <span>
             Reloading replaces your unsaved edits with the version from{" "}
-            <strong>{conflict ? new Date(conflict.updatedAt).toLocaleString() : "the server"}</strong>.
-            Keeping your changes overwrites that newer save.
+            <strong>
+              {conflict ? new Date(conflict.updatedAt).toLocaleString() : "the server"}
+            </strong>
+            . Keeping your changes overwrites that newer save.
           </span>
         </div>
       </Modal>

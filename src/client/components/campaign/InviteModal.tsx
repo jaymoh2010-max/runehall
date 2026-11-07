@@ -36,9 +36,12 @@ export function InviteModal({ open, onClose, campaign }: InviteModalProps) {
     const isLoopback = ["localhost", "127.0.0.1", "::1"].includes(window.location.hostname);
     const protocol = window.location.protocol;
     const port = window.location.port ? `:${window.location.port}` : "";
-    const lan = isLoopback && network
-      ? network.addresses.map((entry) => `${protocol}//${entry.address}${port}/join/${encodeURIComponent(code)}`)
-      : [];
+    const lan =
+      isLoopback && network
+        ? network.addresses.map(
+            (entry) => `${protocol}//${entry.address}${port}/join/${encodeURIComponent(code)}`
+          )
+        : [];
     return { primary: lan[0] || current, lan, current, isLoopback };
   }, [campaign, network]);
 
@@ -48,7 +51,7 @@ export function InviteModal({ open, onClose, campaign }: InviteModalProps) {
     const copied = await copyText(value);
     toast(
       copied ? `${label} copied.` : "Could not copy. Select the text and copy it manually.",
-      copied ? "success" : "error",
+      copied ? "success" : "error"
     );
   };
 
@@ -62,10 +65,15 @@ export function InviteModal({ open, onClose, campaign }: InviteModalProps) {
     >
       <div className="invite-modal">
         <div className="invite-modal-hero">
-          <div className="invite-modal-icon"><UserPlus size={22} /></div>
+          <div className="invite-modal-icon">
+            <UserPlus size={22} />
+          </div>
           <div>
             <h3>Send them a seat</h3>
-            <p>New players will create an account or sign in, then choose or create a character before joining the campaign.</p>
+            <p>
+              New players will create an account or sign in, then choose or create a character
+              before joining the campaign.
+            </p>
           </div>
         </div>
 
@@ -78,8 +86,16 @@ export function InviteModal({ open, onClose, campaign }: InviteModalProps) {
             <Badge tone="gold">Recommended</Badge>
           </div>
           <div className="invite-field-row">
-            <Input readOnly value={links.primary} onFocus={(event) => event.currentTarget.select()} />
-            <Button variant="primary" icon={<Copy size={14} />} onClick={() => copy(links.primary, "Invite link")}>
+            <Input
+              readOnly
+              value={links.primary}
+              onFocus={(event) => event.currentTarget.select()}
+            />
+            <Button
+              variant="primary"
+              icon={<Copy size={14} />}
+              onClick={() => copy(links.primary, "Invite link")}
+            >
               Copy
             </Button>
           </div>
@@ -96,11 +112,13 @@ export function InviteModal({ open, onClose, campaign }: InviteModalProps) {
           {links.isLoopback ? (
             links.lan.length ? (
               <p className="invite-note">
-                This link uses a local network address. Friends must be on the same network or connected to your VPN.
+                This link uses a local network address. Friends must be on the same network or
+                connected to your VPN.
               </p>
             ) : network ? (
               <p className="invite-note">
-                No LAN address was detected. This localhost link will only work on this machine. Connect to your network or use your machine&apos;s LAN address before sharing.
+                No LAN address was detected. This localhost link will only work on this machine.
+                Connect to your network or use your machine&apos;s LAN address before sharing.
               </p>
             ) : (
               <p className="invite-note">Finding a shareable local network address…</p>
@@ -114,18 +132,29 @@ export function InviteModal({ open, onClose, campaign }: InviteModalProps) {
             <p className="tiny muted">For players who prefer to enter a code from My Campaigns.</p>
           </div>
           <div className="invite-field-row">
-            <Input readOnly value={campaign.inviteCode} onFocus={(event) => event.currentTarget.select()} className="invite-code-input" />
-            <Button icon={<Copy size={14} />} onClick={() => copy(campaign.inviteCode, "Invite code")}>
+            <Input
+              readOnly
+              value={campaign.inviteCode}
+              onFocus={(event) => event.currentTarget.select()}
+              className="invite-code-input"
+            />
+            <Button
+              icon={<Copy size={14} />}
+              onClick={() => copy(campaign.inviteCode, "Invite code")}
+            >
               Copy code
             </Button>
           </div>
         </div>
 
-        {networkError ? <p className="invite-note">LAN addresses unavailable: {networkError}</p> : null}
+        {networkError ? (
+          <p className="invite-note">LAN addresses unavailable: {networkError}</p>
+        ) : null}
 
         <div className="invite-modal-foot">
           <p className="tiny muted">
-            Players join as members of this campaign. Their campaigns and characters remain under <strong>My Campaigns</strong> until the GM deletes the campaign.
+            Players join as members of this campaign. Their campaigns and characters remain under{" "}
+            <strong>My Campaigns</strong> until the GM deletes the campaign.
           </p>
           {typeof navigator.share === "function" ? (
             <Button
@@ -133,7 +162,10 @@ export function InviteModal({ open, onClose, campaign }: InviteModalProps) {
               icon={<Share2 size={14} />}
               onClick={() =>
                 navigator
-                  .share({ title: `Join ${campaign.name}`, text: `Join our Pathfinder table: ${links.primary}` })
+                  .share({
+                    title: `Join ${campaign.name}`,
+                    text: `Join our Pathfinder table: ${links.primary}`,
+                  })
                   .catch(() => undefined)
               }
             >

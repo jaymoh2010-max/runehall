@@ -39,29 +39,39 @@ function item(overrides: Partial<Equipment>): Equipment {
 
 describe("automation labels", () => {
   it("marks feat text effects as manual", () => {
-    expect(automationForFeat(feat({ description: "You gain a +1 circumstance bonus to saves." })).level).toBe(
-      "manual",
-    );
+    expect(
+      automationForFeat(feat({ description: "You gain a +1 circumstance bonus to saves." })).level
+    ).toBe("manual");
   });
 
   it("marks pure flavor feats as full", () => {
-    expect(automationForFeat(feat({ description: "You have a knack for local gossip." })).level).toBe("full");
+    expect(
+      automationForFeat(feat({ description: "You have a knack for local gossip." })).level
+    ).toBe("full");
   });
 
   it("marks base gear as full, magic gear as partial, and other items as manual", () => {
     expect(
       automationForEquipment(
-        item({ weapon: { category: "martial", damage: { dice: 1, die: "d8", type: "slashing" } } as Equipment["weapon"] }),
-      ).level,
+        item({
+          weapon: {
+            category: "martial",
+            damage: { dice: 1, die: "d8", type: "slashing" },
+          } as Equipment["weapon"],
+        })
+      ).level
     ).toBe("full");
     expect(
       automationForEquipment(
         item({
           level: 4,
           traits: ["magical"],
-          weapon: { category: "martial", damage: { dice: 1, die: "d8", type: "slashing" } } as Equipment["weapon"],
-        }),
-      ).level,
+          weapon: {
+            category: "martial",
+            damage: { dice: 1, die: "d8", type: "slashing" },
+          } as Equipment["weapon"],
+        })
+      ).level
     ).toBe("partial");
     expect(automationForEquipment(item({ type: "consumable", level: 1 })).level).toBe("manual");
   });

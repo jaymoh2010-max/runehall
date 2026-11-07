@@ -24,7 +24,7 @@ import { compendiumKindFromId } from "../src/shared/compendium";
 describe("compendium search", () => {
   it("ranks an exact name match first", () => {
     expect(searchFeats({ q: "Toughness", limit: 5, includeLegacy: true }).items[0]?.name).toBe(
-      "Toughness",
+      "Toughness"
     );
     expect(searchMonsters({ q: "Goblin Warrior", limit: 5 }).items[0]?.name).toBe("Goblin Warrior");
   });
@@ -33,7 +33,9 @@ describe("compendium search", () => {
     const all = searchFeats({ limit: 200, includeLegacy: true });
     const recommended = searchFeats({ limit: 200, includeLegacy: true, recommended: true });
     expect(recommended.total).toBeLessThan(all.total);
-    expect(recommended.items.every((feat) => feat.rarity === "common" && !feat.playtest)).toBe(true);
+    expect(recommended.items.every((feat) => feat.rarity === "common" && !feat.playtest)).toBe(
+      true
+    );
   });
 
   it("filters recommended spells and equipment to common options", () => {
@@ -60,8 +62,14 @@ describe("compendium search", () => {
     ];
     for (const [query, kind] of cases) {
       const result = globalSearch(query, 60);
-      expect(result.counts[kind as keyof typeof result.counts], `${query} should reach ${kind}`).toBeGreaterThan(0);
-      expect(result.items.some((item) => item.kind === kind), `${query} should return a ${kind}`).toBe(true);
+      expect(
+        result.counts[kind as keyof typeof result.counts],
+        `${query} should reach ${kind}`
+      ).toBeGreaterThan(0);
+      expect(
+        result.items.some((item) => item.kind === kind),
+        `${query} should return a ${kind}`
+      ).toBe(true);
     }
   });
 
@@ -77,8 +85,12 @@ describe("compendium search", () => {
   it("filters global search by kind and returns plain-text summaries", () => {
     const result = globalSearch("fire", 40, ["spell", "equipment"]);
     expect(result.items.length).toBeGreaterThan(0);
-    expect(result.items.every((item) => item.kind === "spell" || item.kind === "equipment")).toBe(true);
-    expect(result.items.every((item) => !item.summary.includes("<") && !item.summary.includes("&nbsp;"))).toBe(true);
+    expect(result.items.every((item) => item.kind === "spell" || item.kind === "equipment")).toBe(
+      true
+    );
+    expect(
+      result.items.every((item) => !item.summary.includes("<") && !item.summary.includes("&nbsp;"))
+    ).toBe(true);
     expect(globalSearch("", 10)).toEqual({ items: [], total: 0, counts: {} });
   });
 

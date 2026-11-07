@@ -73,7 +73,7 @@ export function GlobalSearch() {
       try {
         const response = await api<CompendiumSearchResponse>(
           `/api/compendium/search?q=${encodeURIComponent(trimmed)}&limit=60`,
-          { signal: controller.signal },
+          { signal: controller.signal }
         );
         if (controller.signal.aborted) return;
         setResult(response);
@@ -115,7 +115,7 @@ export function GlobalSearch() {
     if (event.key === "ArrowUp") {
       event.preventDefault();
       setActive((current) =>
-        result.items.length ? (current - 1 + result.items.length) % result.items.length : 0,
+        result.items.length ? (current - 1 + result.items.length) % result.items.length : 0
       );
       return;
     }
@@ -226,9 +226,7 @@ export function GlobalSearch() {
                 </span>
               </button>
             ))}
-            {!loading && error ? (
-              <div className="global-search-empty">{error}</div>
-            ) : null}
+            {!loading && error ? <div className="global-search-empty">{error}</div> : null}
             {!loading && !error && query.trim().length >= 2 && !result.items.length ? (
               <div className="global-search-empty">
                 Nothing in the compendium matches “{query.trim()}”.

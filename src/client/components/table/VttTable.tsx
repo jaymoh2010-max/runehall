@@ -136,16 +136,17 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
     }
   }, [theaterMode]);
 
-  const activeScene = scenes.find((scene) => scene.id === (previewSceneId ?? activeSceneId)) ?? null;
+  const activeScene =
+    scenes.find((scene) => scene.id === (previewSceneId ?? activeSceneId)) ?? null;
   const previewing = Boolean(previewSceneId);
   const sceneTokens = useMemo(
     () =>
       tokens.filter(
         (token) =>
           token.sceneId === (previewSceneId ?? activeSceneId) &&
-          ((!previewing && isGm) || !token.hidden),
+          ((!previewing && isGm) || !token.hidden)
       ),
-    [tokens, activeSceneId, previewSceneId, previewing, isGm],
+    [tokens, activeSceneId, previewSceneId, previewing, isGm]
   );
   const selectedToken = sceneTokens.find((token) => token.id === selectedTokenId) ?? null;
   const editingToken = tokens.find((token) => token.id === editingTokenId) ?? null;
@@ -202,8 +203,12 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
 
   const duplicateScene = async (sceneId: string) => {
     try {
-      const result = await api<{ scene: Scene }>(`/api/scenes/${sceneId}/duplicate`, { method: "POST" });
-      setScenes((current) => (current.some((scene) => scene.id === result.scene.id) ? current : [...current, result.scene]));
+      const result = await api<{ scene: Scene }>(`/api/scenes/${sceneId}/duplicate`, {
+        method: "POST",
+      });
+      setScenes((current) =>
+        current.some((scene) => scene.id === result.scene.id) ? current : [...current, result.scene]
+      );
       toast("Scene duplicated with its tokens.", "success");
     } catch (error) {
       toast(errorMessage(error), "error");
@@ -213,7 +218,9 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
   const deleteScene = (sceneId: string) => {
     if (!isGm) return;
     setScenes((current) => current.filter((scene) => scene.id !== sceneId));
-    setActiveSceneId((current) => (current === sceneId ? scenes.find((scene) => scene.id !== sceneId)?.id ?? null : current));
+    setActiveSceneId((current) =>
+      current === sceneId ? (scenes.find((scene) => scene.id !== sceneId)?.id ?? null) : current
+    );
     getSocket().emit("scene:delete", { campaignId, sceneId });
   };
 
@@ -223,7 +230,9 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
   };
 
   const moveToken = (tokenId: string, x: number, y: number) => {
-    setTokens((current) => current.map((token) => (token.id === tokenId ? { ...token, x, y } : token)));
+    setTokens((current) =>
+      current.map((token) => (token.id === tokenId ? { ...token, x, y } : token))
+    );
     getSocket().emit("token:move", { campaignId, sceneId: activeSceneId!, tokenId, x, y });
   };
 
@@ -238,7 +247,7 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
           else next.add(cell);
         }
         return { ...scene, revealed: [...next] };
-      }),
+      })
     );
     getSocket().emit("fog:update", { campaignId, sceneId: activeSceneId, cells, mode });
   };
@@ -253,10 +262,12 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
           toast("Could not place that token.", "error");
           return;
         }
-        setTokens((current) => (current.some((item) => item.id === token.id) ? current : [...current, token]));
+        setTokens((current) =>
+          current.some((item) => item.id === token.id) ? current : [...current, token]
+        );
         setSelectedTokenId(token.id);
         toast(`${token.name} placed.`, "success");
-      },
+      }
     );
   };
 
@@ -270,10 +281,10 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
             socket.emit(
               "token:create",
               { campaignId, sceneId: activeSceneId, token: partial },
-              (token) => resolve((token as Token | null) ?? null),
+              (token) => resolve((token as Token | null) ?? null)
             );
-          }),
-      ),
+          })
+      )
     )
       .then((created) => {
         const valid = created.filter((token): token is Token => Boolean(token));
@@ -295,9 +306,7 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
     if (!activeScene) return;
     const total = Math.max(1, Math.min(20, Math.round(count) || 1));
     const groupId =
-      total > 1
-        ? `grp_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`
-        : null;
+      total > 1 ? `grp_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}` : null;
     const columns = Math.ceil(Math.sqrt(total));
     const rows = Math.ceil(total / columns);
     const spacing = Math.max(40, activeScene.gridSize);
@@ -330,9 +339,7 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
     if (!activeSceneId) return;
     const members = tokens.filter(
       (token) =>
-        token.sceneId === activeSceneId &&
-        token.groupId === groupId &&
-        token.hpMax !== null,
+        token.sceneId === activeSceneId && token.groupId === groupId && token.hpMax !== null
     );
     for (const member of members) {
       const current = member.hpCurrent ?? member.hpMax ?? 0;
@@ -342,19 +349,21 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
   };
 
   const updateToken = (tokenId: string, patch: Partial<Token>) => {
-    setTokens((current) => current.map((token) => (token.id === tokenId ? { ...token, ...patch } : token)));
+    setTokens((current) =>
+      current.map((token) => (token.id === tokenId ? { ...token, ...patch } : token))
+    );
     getSocket().emit("token:update", { campaignId, token: { id: tokenId, ...patch } });
   };
 
   const bulkHp = (delta: number, full = false) => {
     const selected = tokens.filter(
-      (token) => selectedTokenIds.includes(token.id) && token.sceneId === activeSceneId,
+      (token) => selectedTokenIds.includes(token.id) && token.sceneId === activeSceneId
     );
     for (const token of selected) {
       const max = token.hpMax;
       const current = token.hpCurrent ?? max ?? 0;
       const next = full
-        ? max ?? current
+        ? (max ?? current)
         : Math.max(0, Math.min(max ?? 1_000_000, current + delta));
       updateToken(token.id, { hpCurrent: next });
     }
@@ -362,10 +371,12 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
 
   const bulkCondition = (name: string, value: number | null, duration: number | null) => {
     const selected = tokens.filter(
-      (token) => selectedTokenIds.includes(token.id) && token.sceneId === activeSceneId,
+      (token) => selectedTokenIds.includes(token.id) && token.sceneId === activeSceneId
     );
     for (const token of selected) {
-      if (token.conditions.some((condition) => condition.name.toLowerCase() === name.toLowerCase())) {
+      if (
+        token.conditions.some((condition) => condition.name.toLowerCase() === name.toLowerCase())
+      ) {
         continue;
       }
       updateToken(token.id, { conditions: [...token.conditions, { name, value, duration }] });
@@ -374,21 +385,21 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
 
   const bulkClearConditions = () => {
     const selected = tokens.filter(
-      (token) => selectedTokenIds.includes(token.id) && token.sceneId === activeSceneId,
+      (token) => selectedTokenIds.includes(token.id) && token.sceneId === activeSceneId
     );
     for (const token of selected) updateToken(token.id, { conditions: [] });
   };
 
   const bulkPatch = (patch: Partial<Token>) => {
     const selected = tokens.filter(
-      (token) => selectedTokenIds.includes(token.id) && token.sceneId === activeSceneId,
+      (token) => selectedTokenIds.includes(token.id) && token.sceneId === activeSceneId
     );
     for (const token of selected) updateToken(token.id, patch);
   };
 
   const bulkDelete = () => {
     const selected = tokens.filter(
-      (token) => selectedTokenIds.includes(token.id) && token.sceneId === activeSceneId,
+      (token) => selectedTokenIds.includes(token.id) && token.sceneId === activeSceneId
     );
     if (!selected.length) return;
     const ids = new Set(selected.map((token) => token.id));
@@ -409,14 +420,31 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
     getSocket().emit("chat:send", { campaignId, content, visibility: gmOnly ? "gm" : "all" });
   };
 
-  const roll = (formula: string, label: string, dc: number | null, gmOnly: boolean, requestId?: string | null) => {
+  const roll = (
+    formula: string,
+    label: string,
+    dc: number | null,
+    gmOnly: boolean,
+    requestId?: string | null
+  ) => {
     getSocket().emit(
       "dice:roll",
-      { campaignId, formula, label, dc, visibility: gmOnly ? "gm" : "all", requestId: requestId ?? null },
+      {
+        campaignId,
+        formula,
+        label,
+        dc,
+        visibility: gmOnly ? "gm" : "all",
+        requestId: requestId ?? null,
+      },
       (message) => {
         if (!message) toast("That roll could not be made. Check the formula.", "error");
-        else if (message.data && "total" in message.data) toast(`${label}: ${message.data.total}${message.data.degree ? ` · ${message.data.degree.replace("-", " ")}` : ""}`, "success");
-      },
+        else if (message.data && "total" in message.data)
+          toast(
+            `${label}: ${message.data.total}${message.data.degree ? ` · ${message.data.degree.replace("-", " ")}` : ""}`,
+            "success"
+          );
+      }
     );
   };
 
@@ -448,7 +476,7 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
 
   const readyEntry = (entryId: string) => {
     const next = initiative.map((entry) =>
-      entry.id === entryId ? { ...entry, readied: true, delayed: false } : entry,
+      entry.id === entryId ? { ...entry, readied: true, delayed: false } : entry
     );
     let nextTurn = turnIndex + 1;
     let nextRound = round;
@@ -463,7 +491,7 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
     const entry = initiative.find((item) => item.id === entryId);
     if (!entry?.readied) return;
     emitInitiative(
-      initiative.map((item) => (item.id === entryId ? { ...item, readied: false } : item)),
+      initiative.map((item) => (item.id === entryId ? { ...item, readied: false } : item))
     );
     sendChat(`${entry.name}'s readied action triggers.`, false);
   };
@@ -471,8 +499,8 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
   const clearInitiativeState = (entryId: string) => {
     emitInitiative(
       initiative.map((entry) =>
-        entry.id === entryId ? { ...entry, delayed: false, readied: false } : entry,
-      ),
+        entry.id === entryId ? { ...entry, delayed: false, readied: false } : entry
+      )
     );
   };
 
@@ -496,14 +524,10 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
   };
 
   const requestRoll = (formula: string, label: string, dc: number | null) => {
-    getSocket().emit(
-      "dice:request",
-      { campaignId, formula, label, dc },
-      (message) => {
-        if (!message) toast("That roll request could not be sent.", "error");
-        else toast("Roll request sent to the table.", "success");
-      },
-    );
+    getSocket().emit("dice:request", { campaignId, formula, label, dc }, (message) => {
+      if (!message) toast("That roll request could not be sent.", "error");
+      else toast("Roll request sent to the table.", "success");
+    });
   };
 
   // Keyboard shortcuts stay out of the way whenever a form control has focus.
@@ -511,7 +535,8 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) return;
       const target = event.target as HTMLElement | null;
-      if (target?.closest("input, textarea, select, [contenteditable='true'], [role='dialog']")) return;
+      if (target?.closest("input, textarea, select, [contenteditable='true'], [role='dialog']"))
+        return;
       const key = event.key.toLowerCase();
 
       if (event.key === "Escape") {
@@ -618,8 +643,16 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
         <EmptyState
           icon={<Map size={34} />}
           title="No scene yet"
-          description={isGm ? "Create your first map to open the table." : "The GM hasn't opened a scene yet."}
-          action={isGm ? <Button variant="primary" onClick={() => setSceneManagerOpen(true)}><Plus size={15} /> Create a scene</Button> : null}
+          description={
+            isGm ? "Create your first map to open the table." : "The GM hasn't opened a scene yet."
+          }
+          action={
+            isGm ? (
+              <Button variant="primary" onClick={() => setSceneManagerOpen(true)}>
+                <Plus size={15} /> Create a scene
+              </Button>
+            ) : null
+          }
         />
         <SceneManagerModal
           open={sceneManagerOpen}
@@ -633,7 +666,11 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
           onDuplicate={duplicateScene}
           onReorder={reorderScenes}
           onPreview={previewScene}
-          onCreated={(scene) => setScenes((current) => (current.some((item) => item.id === scene.id) ? current : [...current, scene]))}
+          onCreated={(scene) =>
+            setScenes((current) =>
+              current.some((item) => item.id === scene.id) ? current : [...current, scene]
+            )
+          }
           onEdit={setEditingScene}
         />
       </div>
@@ -685,9 +722,14 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
           <Eye size={14} />
           <span>
             Previewing <strong>{activeScene.name}</strong> as players see it. The table is still on{" "}
-            <strong>{scenes.find((scene) => scene.id === activeSceneId)?.name ?? "another scene"}</strong>.
+            <strong>
+              {scenes.find((scene) => scene.id === activeSceneId)?.name ?? "another scene"}
+            </strong>
+            .
           </span>
-          <Button size="sm" variant="ghost" onClick={exitPreview}>Exit preview</Button>
+          <Button size="sm" variant="ghost" onClick={exitPreview}>
+            Exit preview
+          </Button>
         </div>
       ) : null}
 
@@ -747,7 +789,9 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
             fogBrush={previewing ? null : activeScene.fogEnabled ? fogBrush : null}
             brushSize={brushSize}
             measureMode={measureMode}
-            onPing={(x, y) => getSocket().emit("pointer", { campaignId, sceneId: activeScene.id, x, y })}
+            onPing={(x, y) =>
+              getSocket().emit("pointer", { campaignId, sceneId: activeScene.id, x, y })
+            }
             remotePointer={remotePointer}
             onDropMonster={previewing ? undefined : placeMonster}
             templateKind={previewing ? null : templateKind}
@@ -810,7 +854,9 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
         onReorder={reorderScenes}
         onPreview={previewScene}
         onCreated={(scene) => {
-          setScenes((current) => (current.some((item) => item.id === scene.id) ? current : [...current, scene]));
+          setScenes((current) =>
+            current.some((item) => item.id === scene.id) ? current : [...current, scene]
+          );
           setActiveSceneId((current) => current ?? scene.id);
         }}
         onEdit={(scene) => {

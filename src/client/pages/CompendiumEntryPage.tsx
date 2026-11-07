@@ -36,7 +36,7 @@ export function CompendiumEntryPage() {
         const actualKind = compendiumKindFromId(result.item.id);
         if (actualKind && actualKind !== kind) {
           setError(
-            `That entry belongs to ${COMPENDIUM_KIND_PLURALS[actualKind]}, not ${COMPENDIUM_KIND_PLURALS[kind]}.`,
+            `That entry belongs to ${COMPENDIUM_KIND_PLURALS[actualKind]}, not ${COMPENDIUM_KIND_PLURALS[kind]}.`
           );
           return;
         }
@@ -67,7 +67,8 @@ export function CompendiumEntryPage() {
           </Link>
           <h1>{entry?.name ?? (kind ? COMPENDIUM_KIND_LABELS[kind] : "Compendium entry")}</h1>
           <p className="sub">
-            Full rules text, traits, and statistics from the local Pathfinder Second Edition compendium.
+            Full rules text, traits, and statistics from the local Pathfinder Second Edition
+            compendium.
           </p>
         </div>
       </div>
@@ -82,7 +83,9 @@ export function CompendiumEntryPage() {
             description="The archive may have been regenerated since this link was saved."
           />
         ) : null}
-        {!loading && !error && entry && kind ? <CompendiumDetail kind={kind} entry={entry} /> : null}
+        {!loading && !error && entry && kind ? (
+          <CompendiumDetail kind={kind} entry={entry} />
+        ) : null}
       </div>
     </div>
   );

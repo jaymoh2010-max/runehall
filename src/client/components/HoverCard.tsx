@@ -119,7 +119,7 @@ export function HoverCard({
               {body ? <div className="hover-card-body">{body}</div> : null}
               {footer ? <div className="hover-card-footer">{footer}</div> : null}
             </div>,
-            document.body,
+            document.body
           )
         : null}
     </>

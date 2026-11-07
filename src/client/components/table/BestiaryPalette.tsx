@@ -36,7 +36,7 @@ export function BestiaryPalette({
         }
         const result = await api<{ items: Monster[]; total: number }>(
           `/api/compendium/monsters?${params.toString()}`,
-          { signal: controller.signal },
+          { signal: controller.signal }
         );
         if (cancelled) return;
         setMonsters(result.items);
@@ -63,7 +63,9 @@ export function BestiaryPalette({
       <div className="vtt-bestiary-head">
         <div>
           <span className="tiny muted">Drag to map</span>
-          <h3><BookOpen size={14} /> Bestiary</h3>
+          <h3>
+            <BookOpen size={14} /> Bestiary
+          </h3>
         </div>
         <IconButton label="Close bestiary" onClick={onClose}>
           <X size={14} />
@@ -99,7 +101,9 @@ export function BestiaryPalette({
             onChange={(event) => setCount(event.target.value)}
           />
         </Field>
-        <span className="tiny muted">{loading ? "Searching…" : `${monsters.length} of ${total}`}</span>
+        <span className="tiny muted">
+          {loading ? "Searching…" : `${monsters.length} of ${total}`}
+        </span>
       </div>
 
       {error ? <div className="auth-error">{error}</div> : null}
@@ -117,7 +121,12 @@ export function BestiaryPalette({
               key={monster.id}
               title={monster.name}
               subtitle={`Level ${monster.level} · ${monster.size} · ${monster.source}`}
-              meta={<span>HP {monster.hp} · AC {monster.ac} · Fort {monster.fortitude} · Ref {monster.reflex} · Will {monster.will}</span>}
+              meta={
+                <span>
+                  HP {monster.hp} · AC {monster.ac} · Fort {monster.fortitude} · Ref{" "}
+                  {monster.reflex} · Will {monster.will}
+                </span>
+              }
               body={stripHtml(monster.description || monster.blurb, 240) || undefined}
               footer="Drag onto the map or press Add"
             >
@@ -134,7 +143,9 @@ export function BestiaryPalette({
                 <span className="vtt-bestiary-mark">L{monster.level}</span>
                 <span className="grow">
                   <strong>{monster.name}</strong>
-                  <span className="tiny muted">{monster.hp} HP · AC {monster.ac}</span>
+                  <span className="tiny muted">
+                    {monster.hp} HP · AC {monster.ac}
+                  </span>
                 </span>
                 <Button
                   size="sm"

@@ -1,13 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import {
-  CalendarClock,
-  Check,
-  ListChecks,
-  Pencil,
-  Plus,
-  Trash2,
-  Users,
-} from "lucide-react";
+import { CalendarClock, Check, ListChecks, Pencil, Plus, Trash2, Users } from "lucide-react";
 import type {
   CampaignSession,
   SessionAgendaItem,
@@ -133,21 +125,21 @@ export function SessionsPage({
     setSessions((current) =>
       current.some((entry) => entry.id === session.id)
         ? current.map((entry) => (entry.id === session.id ? session : entry))
-        : [...current, session],
+        : [...current, session]
     );
   };
 
   const setAttendance = async (
     session: CampaignSession,
     userId: string,
-    status: SessionAttendanceStatus,
+    status: SessionAttendanceStatus
   ) => {
     const key = `${session.id}:${userId}`;
     setAttendanceBusy(key);
     try {
       const result = await api<{ session: CampaignSession }>(
         `/api/campaigns/${campaignId}/sessions/${session.id}/attendance/${userId}`,
-        { method: "PUT", body: { status } },
+        { method: "PUT", body: { status } }
       );
       replaceSession(result.session);
     } catch (err) {
@@ -163,7 +155,7 @@ export function SessionsPage({
     try {
       const result = await api<{ session: CampaignSession }>(
         `/api/campaigns/${campaignId}/sessions/${session.id}/checkin`,
-        { method: "PUT", body: { status } },
+        { method: "PUT", body: { status } }
       );
       replaceSession(result.session);
     } catch (err) {
@@ -178,7 +170,7 @@ export function SessionsPage({
     try {
       const result = await api<{ session: CampaignSession }>(
         `/api/campaigns/${campaignId}/sessions/${session.id}`,
-        { method: "PATCH", body: { status: "played" } },
+        { method: "PATCH", body: { status: "played" } }
       );
       replaceSession(result.session);
       toast("Session marked played.", "success");
@@ -240,11 +232,22 @@ export function SessionsPage({
             {isGm ? (
               <div className="row" style={{ gap: 4 }}>
                 {session.status === "scheduled" ? (
-                  <Button size="sm" variant="ghost" icon={<Check size={13} />} loading={busy} onClick={() => void markPlayed(session)}>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    icon={<Check size={13} />}
+                    loading={busy}
+                    onClick={() => void markPlayed(session)}
+                  >
                     Mark played
                   </Button>
                 ) : null}
-                <Button size="sm" variant="ghost" icon={<Pencil size={13} />} onClick={() => setEditor(session)}>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  icon={<Pencil size={13} />}
+                  onClick={() => setEditor(session)}
+                >
                   Edit
                 </Button>
                 <IconButton label="Delete session" onClick={() => void deleteSession(session)}>
@@ -259,14 +262,18 @@ export function SessionsPage({
           {isGm && session.agenda.length ? (
             <div className="session-agenda">
               <div className="row-between">
-                <span className="field-label"><ListChecks size={13} /> Agenda</span>
+                <span className="field-label">
+                  <ListChecks size={13} /> Agenda
+                </span>
                 <span className="tiny muted">
                   {session.agenda.filter((item) => item.done).length}/{session.agenda.length} done
                 </span>
               </div>
               {session.agenda.map((item) => (
                 <div key={item.id} className={`session-agenda-item ${item.done ? "is-done" : ""}`}>
-                  <span className="session-agenda-check">{item.done ? <Check size={11} /> : null}</span>
+                  <span className="session-agenda-check">
+                    {item.done ? <Check size={11} /> : null}
+                  </span>
                   <span>{item.text}</span>
                 </div>
               ))}
@@ -276,7 +283,9 @@ export function SessionsPage({
           {showCheckins ? (
             <div className="session-checkins">
               <div className="row-between">
-                <span className="field-label"><Users size={13} /> Check-in</span>
+                <span className="field-label">
+                  <Users size={13} /> Check-in
+                </span>
                 <span className="tiny muted">
                   {checkinSummary.yes} in · {checkinSummary.maybe} maybe ·{" "}
                   {checkinSummary.unanswered} no reply
@@ -288,7 +297,10 @@ export function SessionsPage({
                 return (
                   <div key={entry.userId} className={`session-checkin-row ${own ? "is-self" : ""}`}>
                     <Avatar name={entry.displayName} src={entry.avatarUrl} size={26} />
-                    <span className="grow">{entry.displayName}{own ? " (you)" : ""}</span>
+                    <span className="grow">
+                      {entry.displayName}
+                      {own ? " (you)" : ""}
+                    </span>
                     {own ? (
                       <div className="session-checkin-actions">
                         {(["yes", "maybe", "no"] as const).map((status) => (
@@ -345,12 +357,14 @@ export function SessionsPage({
                         void setAttendance(
                           session,
                           entry.userId,
-                          event.target.value as SessionAttendanceStatus,
+                          event.target.value as SessionAttendanceStatus
                         )
                       }
                     >
                       {ATTENDANCE_OPTIONS.map((status) => (
-                        <option key={status} value={status}>{ATTENDANCE_STATUS_LABELS[status]}</option>
+                        <option key={status} value={status}>
+                          {ATTENDANCE_STATUS_LABELS[status]}
+                        </option>
                       ))}
                     </Select>
                   </div>
@@ -396,7 +410,11 @@ export function SessionsPage({
         ) : null}
       </div>
 
-      {error ? <div className="auth-error" style={{ marginBottom: 14 }}>{error}</div> : null}
+      {error ? (
+        <div className="auth-error" style={{ marginBottom: 14 }}>
+          {error}
+        </div>
+      ) : null}
 
       {loading ? (
         <Spinner label="Opening the calendar…" />
@@ -404,8 +422,18 @@ export function SessionsPage({
         <EmptyState
           icon={<CalendarClock size={30} />}
           title="Nothing scheduled"
-          description={isGm ? "Put the next session on the calendar." : "The GM hasn't scheduled the next session yet."}
-          action={isGm ? <Button variant="primary" icon={<Plus size={15} />} onClick={() => setEditor("new")}>Schedule the first session</Button> : undefined}
+          description={
+            isGm
+              ? "Put the next session on the calendar."
+              : "The GM hasn't scheduled the next session yet."
+          }
+          action={
+            isGm ? (
+              <Button variant="primary" icon={<Plus size={15} />} onClick={() => setEditor("new")}>
+                Schedule the first session
+              </Button>
+            ) : undefined
+          }
         />
       ) : (
         <>
@@ -415,9 +443,13 @@ export function SessionsPage({
               <Badge tone="gold">{upcoming.length}</Badge>
             </div>
             {upcoming.length ? (
-              <div className="session-list">{upcoming.map((session) => renderSession(session, false))}</div>
+              <div className="session-list">
+                {upcoming.map((session) => renderSession(session, false))}
+              </div>
             ) : (
-              <p className="muted small">No upcoming sessions. {isGm ? "Schedule the next one." : "Check back later."}</p>
+              <p className="muted small">
+                No upcoming sessions. {isGm ? "Schedule the next one." : "Check back later."}
+              </p>
             )}
           </section>
 
@@ -427,7 +459,9 @@ export function SessionsPage({
                 <h3>Past & previous</h3>
                 <Badge>{past.length}</Badge>
               </div>
-              <div className="session-list">{past.map((session) => renderSession(session, true))}</div>
+              <div className="session-list">
+                {past.map((session) => renderSession(session, true))}
+              </div>
             </section>
           ) : null}
         </>
@@ -503,7 +537,7 @@ function SessionEditor({
 
   const toggleAgendaItem = (id: string) => {
     setAgenda((current) =>
-      current.map((item) => (item.id === id ? { ...item, done: !item.done } : item)),
+      current.map((item) => (item.id === id ? { ...item, done: !item.done } : item))
     );
   };
 
@@ -533,10 +567,13 @@ function SessionEditor({
         agenda,
       };
       const result = editing
-        ? await api<{ session: CampaignSession }>(`/api/campaigns/${campaignId}/sessions/${editing.id}`, {
-            method: "PATCH",
-            body: payload,
-          })
+        ? await api<{ session: CampaignSession }>(
+            `/api/campaigns/${campaignId}/sessions/${editing.id}`,
+            {
+              method: "PATCH",
+              body: payload,
+            }
+          )
         : await api<{ session: CampaignSession }>(`/api/campaigns/${campaignId}/sessions`, {
             method: "POST",
             body: payload,
@@ -559,7 +596,9 @@ function SessionEditor({
       subtitle="The next scheduled session also appears on the Overview dashboard."
       footer={
         <>
-          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
           <Button variant="primary" loading={busy} onClick={submit}>
             {editing ? "Save session" : "Schedule session"}
           </Button>
@@ -569,17 +608,35 @@ function SessionEditor({
       <form className="stack" onSubmit={submit}>
         {error ? <div className="auth-error">{error}</div> : null}
         <Field label="Title">
-          <Input autoFocus value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Session 5 — The Ashen Gate" />
+          <Input
+            autoFocus
+            value={title}
+            onChange={(event) => setTitle(event.target.value)}
+            placeholder="Session 5 — The Ashen Gate"
+          />
         </Field>
         <div className="form-grid two">
           <Field label="Date and time">
-            <Input type="datetime-local" value={scheduledAt} onChange={(event) => setScheduledAt(event.target.value)} />
+            <Input
+              type="datetime-local"
+              value={scheduledAt}
+              onChange={(event) => setScheduledAt(event.target.value)}
+            />
           </Field>
           <Field label="Duration (minutes)">
-            <Input type="number" min={30} max={1440} value={duration} onChange={(event) => setDuration(event.target.value)} />
+            <Input
+              type="number"
+              min={30}
+              max={1440}
+              value={duration}
+              onChange={(event) => setDuration(event.target.value)}
+            />
           </Field>
           <Field label="Status">
-            <Select value={status} onChange={(event) => setStatus(event.target.value as SessionStatus)}>
+            <Select
+              value={status}
+              onChange={(event) => setStatus(event.target.value as SessionStatus)}
+            >
               <option value="scheduled">Scheduled</option>
               <option value="played">Played</option>
               <option value="canceled">Canceled</option>
@@ -597,7 +654,10 @@ function SessionEditor({
         <Field label="Agenda" hint="A GM-only checklist for this session.">
           <div className="session-agenda-editor">
             {agenda.map((item) => (
-              <div key={item.id} className={`session-agenda-edit-row ${item.done ? "is-done" : ""}`}>
+              <div
+                key={item.id}
+                className={`session-agenda-edit-row ${item.done ? "is-done" : ""}`}
+              >
                 <button
                   type="button"
                   className={`session-agenda-check ${item.done ? "is-done" : ""}`}
@@ -607,7 +667,11 @@ function SessionEditor({
                   {item.done ? <Check size={11} /> : null}
                 </button>
                 <span className="grow">{item.text}</span>
-                <IconButton label="Remove agenda item" type="button" onClick={() => removeAgendaItem(item.id)}>
+                <IconButton
+                  label="Remove agenda item"
+                  type="button"
+                  onClick={() => removeAgendaItem(item.id)}
+                >
                   <Trash2 size={13} />
                 </IconButton>
               </div>
@@ -624,7 +688,14 @@ function SessionEditor({
                   }
                 }}
               />
-              <Button type="button" size="sm" variant="secondary" icon={<Plus size={13} />} onClick={addAgendaItem} disabled={!agendaText.trim()}>
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                icon={<Plus size={13} />}
+                onClick={addAgendaItem}
+                disabled={!agendaText.trim()}
+              >
                 Add
               </Button>
             </div>

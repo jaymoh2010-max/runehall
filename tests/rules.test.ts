@@ -48,7 +48,9 @@ function buildCleric() {
   const acolyte = backgrounds.find((entry) => entry.name === "Acolyte")!;
   const cleric = classes.find((entry) => entry.name === "Cleric")!;
   const abadar = deities.find((entry) => entry.name === "Abadar")!;
-  const dwarvenWeaponFamiliarity = feats.find((entry) => entry.name === "Dwarven Weapon Familiarity")!;
+  const dwarvenWeaponFamiliarity = feats.find(
+    (entry) => entry.name === "Dwarven Weapon Familiarity"
+  )!;
   const doctrine = cleric.choiceGroups.find((group) => group.tag === "cleric-doctrine")!;
   const warpriest = doctrine.options.find((option) => option.name === "Warpriest")!;
 
@@ -143,7 +145,7 @@ describe("PF2e character rules", () => {
         equipment: [{ itemId: "item:x", quantity: -1 }],
         details: { notes: "Hello" },
       },
-      "Fallback",
+      "Fallback"
     );
     expect(draft.level).toBe(20);
     expect(draft.name).toBe("Half-Built");
@@ -158,7 +160,7 @@ describe("PF2e character rules", () => {
         name: "Condition Test",
         play: { conditions: [{ name: "Frightened", value: 2, duration: 3 }] },
       },
-      "Fallback",
+      "Fallback"
     );
     expect(draft.play.conditions[0]).toEqual({ name: "Frightened", value: 2, duration: 3 });
   });
@@ -181,7 +183,7 @@ describe("PF2e character rules", () => {
           },
         ],
       },
-      "Fallback",
+      "Fallback"
     );
     expect(draft.companions[0].monsterId).toBe("monster:wolf");
     expect(draft.companions[0].name).toBe("Wolf");
@@ -311,7 +313,12 @@ describe("PF2e character rules", () => {
     const rogueDraft = emptyCharacterDraft("Test Rogue");
     rogueDraft.classId = rogue.id;
     rogueDraft.classChoices[racket.key] = [thief.id];
-    const rogueSkills = grantedTrainedSkills(rogueDraft, { classData: rogue, feats: {}, spells: {}, equipment: {} });
+    const rogueSkills = grantedTrainedSkills(rogueDraft, {
+      classData: rogue,
+      feats: {},
+      spells: {},
+      equipment: {},
+    });
     expect(rogueSkills.has("stealth")).toBe(true);
     expect(rogueSkills.has("thievery")).toBe(true);
 
@@ -321,7 +328,12 @@ describe("PF2e character rules", () => {
     const druidDraft = emptyCharacterDraft("Test Druid");
     druidDraft.classId = druid.id;
     druidDraft.classChoices[order.key] = [animal.id];
-    const druidSkills = grantedTrainedSkills(druidDraft, { classData: druid, feats: {}, spells: {}, equipment: {} });
+    const druidSkills = grantedTrainedSkills(druidDraft, {
+      classData: druid,
+      feats: {},
+      spells: {},
+      equipment: {},
+    });
     expect(druidSkills.has("athletics")).toBe(true);
 
     const hermit = backgrounds.find((entry) => entry.name === "Hermit")!;
@@ -355,7 +367,9 @@ describe("PF2e character rules", () => {
     draft.skills.increases["3"] = "athletics";
     const derived = computeCharacter(draft, context);
     expect(derived.skills.find((skill) => skill.id === "athletics")?.rank).toBe(1);
-    expect(derived.validation.some((issue) => issue.message.includes("already trained"))).toBe(false);
+    expect(derived.validation.some((issue) => issue.message.includes("already trained"))).toBe(
+      false
+    );
   });
 
   it("uses the bounded and focus slot tables", () => {
@@ -443,11 +457,18 @@ describe("PF2e character rules", () => {
   it("enforces the skill rank cap at each increase level", () => {
     const { draft, context } = buildCleric();
     draft.level = 9;
-    draft.skills.increases = { "3": "athletics", "5": "athletics", "7": "athletics", "9": "athletics" };
+    draft.skills.increases = {
+      "3": "athletics",
+      "5": "athletics",
+      "7": "athletics",
+      "9": "athletics",
+    };
     const derived = computeCharacter(draft, context);
     expect(derived.skills.find((skill) => skill.id === "athletics")?.rank).toBe(4);
     expect(
-      derived.validation.some((issue) => issue.message.includes("above the proficiency rank allowed")),
+      derived.validation.some((issue) =>
+        issue.message.includes("above the proficiency rank allowed")
+      )
     ).toBe(true);
   });
 
@@ -471,7 +492,9 @@ describe("PF2e character rules", () => {
     });
     expect(derived.abilities.str).toBe(16);
     // Propulsive adds half the Strength modifier (+3 / 2 = +1).
-    expect(derived.attacks.find((attack) => attack.name === "Composite Longbow")?.damageFormula).toBe("1d8+1");
+    expect(
+      derived.attacks.find((attack) => attack.name === "Composite Longbow")?.damageFormula
+    ).toBe("1d8+1");
   });
 
   it("gives gunslingers expert proficiency with firearms at 1st level", () => {
@@ -531,7 +554,12 @@ describe("PF2e character rules", () => {
     expect(spellRepertoireLimits(bard, 1)).toEqual({ cantrips: 5, ranks: [2] });
     expect(spellRepertoireLimits(bard, 5)).toEqual({ cantrips: 5, ranks: [3, 3, 2] });
     expect(spellRepertoireLimits(summoner, 3)).toEqual({ cantrips: 5, ranks: [2, 1] });
-    expect(spellRepertoireLimits(classes.find((entry) => entry.name === "Wizard")!, 5)).toBeNull();
+    expect(
+      spellRepertoireLimits(
+        classes.find((entry) => entry.name === "Wizard")!,
+        5
+      )
+    ).toBeNull();
 
     const rankOne = spells.filter((spell) => spell.rank === 1).slice(0, 3);
     const draft = emptyCharacterDraft("Test Bard");
@@ -546,14 +574,16 @@ describe("PF2e character rules", () => {
     const over = computeCharacter(draft, context);
     expect(
       over.validation.some((issue) =>
-        issue.message.includes("knows 3 rank 1 spells but the repertoire allows 2"),
-      ),
+        issue.message.includes("knows 3 rank 1 spells but the repertoire allows 2")
+      )
     ).toBe(true);
 
     draft.spells.known = rankOne.slice(0, 2).map((spell) => spell.id);
     const legal = computeCharacter(draft, context);
     expect(
-      legal.validation.some((issue) => issue.message.includes("rank 1 spells but the repertoire allows")),
+      legal.validation.some((issue) =>
+        issue.message.includes("rank 1 spells but the repertoire allows")
+      )
     ).toBe(false);
   });
 
@@ -572,13 +602,15 @@ describe("PF2e character rules", () => {
     };
     const over = computeCharacter(draft, context);
     expect(
-      over.validation.some((issue) => issue.message.includes("4 rank 1 spells prepared but only 3 slots")),
+      over.validation.some((issue) =>
+        issue.message.includes("4 rank 1 spells prepared but only 3 slots")
+      )
     ).toBe(true);
 
     draft.spells.prepared = rankOne.slice(0, 3).map((spell) => spell.id);
     const legal = computeCharacter(draft, context);
     expect(
-      legal.validation.some((issue) => issue.message.includes("spells prepared but only")),
+      legal.validation.some((issue) => issue.message.includes("spells prepared but only"))
     ).toBe(false);
   });
 
@@ -595,14 +627,14 @@ describe("PF2e character rules", () => {
     };
     const missing = computeCharacter(draft, context);
     expect(
-      missing.validation.some((issue) => issue.message.includes("Choose your starting feat")),
+      missing.validation.some((issue) => issue.message.includes("Choose your starting feat"))
     ).toBe(true);
 
     draft.backgroundFeat = dirtyTrick.id;
     const selected = computeCharacter(draft, context);
     expect(selected.grantedFeats.map((feat) => feat.name)).toContain("Dirty Trick");
     expect(
-      selected.validation.some((issue) => issue.message.includes("Choose your starting feat")),
+      selected.validation.some((issue) => issue.message.includes("Choose your starting feat"))
     ).toBe(false);
   });
 
@@ -619,15 +651,22 @@ describe("PF2e character rules", () => {
     };
     const derived = computeCharacter(draft, context);
     expect(derived.lore.map((entry) => entry.name)).toEqual(
-      expect.arrayContaining(["Farming Lore", "Sailing Lore", "Warfare Lore"]),
+      expect.arrayContaining(["Farming Lore", "Sailing Lore", "Warfare Lore"])
     );
     expect(
-      derived.validation.some((issue) => issue.message.includes("Choose 3 Lore skills for Time Traveler")),
+      derived.validation.some((issue) =>
+        issue.message.includes("Choose 3 Lore skills for Time Traveler")
+      )
     ).toBe(false);
 
-    const missing = computeCharacter({ ...draft, skills: { ...draft.skills, backgroundLore: [] } }, context);
+    const missing = computeCharacter(
+      { ...draft, skills: { ...draft.skills, backgroundLore: [] } },
+      context
+    );
     expect(
-      missing.validation.some((issue) => issue.message.includes("Choose 3 Lore skills for Time Traveler")),
+      missing.validation.some((issue) =>
+        issue.message.includes("Choose 3 Lore skills for Time Traveler")
+      )
     ).toBe(true);
   });
 
@@ -649,7 +688,9 @@ describe("PF2e character rules", () => {
     expect(featPrerequisiteStatus(titan, draft, context, untrained).status).toBe("unmet");
     expect(featAvailability(titan, draft, context, untrained)).toBe("blocked");
     expect(
-      untrained.validation.some((issue) => issue.message.includes("Titan Wrestler prerequisites are not met")),
+      untrained.validation.some((issue) =>
+        issue.message.includes("Titan Wrestler prerequisites are not met")
+      )
     ).toBe(true);
     expect(checkFeatPrerequisite("Strength +2", draft, context, untrained)).toBe("unmet");
 
@@ -658,9 +699,13 @@ describe("PF2e character rules", () => {
     expect(featPrerequisiteStatus(titan, draft, context, trained).status).toBe("met");
     expect(featAvailability(titan, draft, context, trained)).toBe("available");
     expect(featPrerequisiteStatus(harder, draft, context, trained).status).toBe("met");
-    expect(checkFeatPrerequisite("trained in Athletics or Acrobatics", draft, context, trained)).toBe("met");
     expect(
-      trained.validation.some((issue) => issue.message.includes("Titan Wrestler prerequisites are not met")),
+      checkFeatPrerequisite("trained in Athletics or Acrobatics", draft, context, trained)
+    ).toBe("met");
+    expect(
+      trained.validation.some((issue) =>
+        issue.message.includes("Titan Wrestler prerequisites are not met")
+      )
     ).toBe(false);
   });
 
@@ -675,12 +720,17 @@ describe("PF2e character rules", () => {
       equipment: {},
     });
     expect(
-      checkFeatPrerequisite("member of the Pathfinder Society", draft, {
-        classData: rogue,
-        feats: {},
-        spells: {},
-        equipment: {},
-      }, derived),
+      checkFeatPrerequisite(
+        "member of the Pathfinder Society",
+        draft,
+        {
+          classData: rogue,
+          feats: {},
+          spells: {},
+          equipment: {},
+        },
+        derived
+      )
     ).toBe("unknown");
   });
 
@@ -746,9 +796,7 @@ describe("PF2e character rules", () => {
 
     expect(runedSword.attackBonus).toBe(baselineSword.attackBonus + 1);
     expect(runedSword.damageFormula.startsWith("2d8")).toBe(true);
-    expect(runedSword.extraDamage).toEqual([
-      { formula: "1d6", type: "fire", label: "Flaming" },
-    ]);
+    expect(runedSword.extraDamage).toEqual([{ formula: "1d6", type: "fire", label: "Flaming" }]);
     expect(runed.ac).toBe(baseline.ac + 1);
     expect(runed.saves.fortitude).toBe(baseline.saves.fortitude + 1);
     expect(runed.saves.reflex).toBe(baseline.saves.reflex + 1);
@@ -837,6 +885,8 @@ describe("PF2e character rules", () => {
     };
     const derived = computeCharacter(draft, context);
     expect(derived.prof.attacks.martial).toBe(3); // master from Fighter Weapon Mastery
-    expect(derived.attacks.find((attack) => attack.name === "Longsword")?.damageFormula).toBe("1d8+6");
+    expect(derived.attacks.find((attack) => attack.name === "Longsword")?.damageFormula).toBe(
+      "1d8+6"
+    );
   });
 });

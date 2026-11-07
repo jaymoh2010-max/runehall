@@ -43,7 +43,11 @@ export function Button({
       disabled={disabled || loading}
       {...rest}
     >
-      {loading ? <Loader2 className="spin" size={16} /> : icon ? <span className="btn-icon">{icon}</span> : null}
+      {loading ? (
+        <Loader2 className="spin" size={16} />
+      ) : icon ? (
+        <span className="btn-icon">{icon}</span>
+      ) : null}
       {children ? <span>{children}</span> : null}
     </button>
   );
@@ -94,7 +98,12 @@ export function Tag({
 }
 
 export function RarityTag({ rarity }: { rarity: string }) {
-  const tone = rarity === "rare" || rarity === "unique" ? "violet" : rarity === "uncommon" ? "blue" : "neutral";
+  const tone =
+    rarity === "rare" || rarity === "unique"
+      ? "violet"
+      : rarity === "uncommon"
+        ? "blue"
+        : "neutral";
   return <Tag tone={tone}>{rarity}</Tag>;
 }
 
@@ -129,7 +138,11 @@ export function Field({
     <label className={`field ${className}`} htmlFor={htmlFor}>
       {label ? <span className="field-label">{label}</span> : null}
       {children}
-      {error ? <span className="field-error">{error}</span> : hint ? <span className="field-hint">{hint}</span> : null}
+      {error ? (
+        <span className="field-error">{error}</span>
+      ) : hint ? (
+        <span className="field-hint">{hint}</span>
+      ) : null}
     </label>
   );
 }
@@ -379,7 +392,7 @@ export function Modal({
     const focusable = () =>
       dialog
         ? Array.from(dialog.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)).filter(
-            (element) => element.getClientRects().length > 0,
+            (element) => element.getClientRects().length > 0
           )
         : [];
 
@@ -458,7 +471,7 @@ export function Modal({
         {footer ? <div className="modal-foot">{footer}</div> : null}
       </div>
     </div>,
-    document.body,
+    document.body
   );
 }
 
@@ -486,7 +499,15 @@ export function Stat({
   );
 }
 
-export function ProgressBar({ value, max, label }: { value: number; max: number; label?: ReactNode }) {
+export function ProgressBar({
+  value,
+  max,
+  label,
+}: {
+  value: number;
+  max: number;
+  label?: ReactNode;
+}) {
   const pct = max > 0 ? Math.max(0, Math.min(100, (value / max) * 100)) : 0;
   return (
     <div className="progress-wrap">

@@ -22,7 +22,7 @@ export function cpToCurrency(copper: number): CharacterCurrency {
 
 export function spendCurrency(
   currency: CharacterCurrency,
-  amountCp: number,
+  amountCp: number
 ): CharacterCurrency | null {
   const total = currencyToCp(currency);
   const spend = Math.max(0, Math.floor(Number(amountCp) || 0));
@@ -41,14 +41,14 @@ export function addCurrency(currency: CharacterCurrency, amountCp: number): Char
 export function removeItemQuantity(
   draft: CharacterDraft,
   itemId: string,
-  quantity: number,
+  quantity: number
 ): { draft: CharacterDraft; moved: CharacterEquipment | null } {
   const index = draft.equipment.findIndex((entry) => entry.itemId === itemId);
   if (index < 0) return { draft, moved: null };
   const entry = draft.equipment[index];
   const amount = Math.max(
     1,
-    Math.min(entry.quantity, MAX_ITEM_QUANTITY, Math.floor(Number(quantity) || 1)),
+    Math.min(entry.quantity, MAX_ITEM_QUANTITY, Math.floor(Number(quantity) || 1))
   );
   const wholeStack = amount >= entry.quantity;
   const moved: CharacterEquipment = {
@@ -83,7 +83,7 @@ export function addItemToDraft(draft: CharacterDraft, moved: CharacterEquipment)
               quantity: Math.min(MAX_ITEM_QUANTITY, entry.quantity + quantity),
               runes: [...new Set([...(entry.runes ?? []), ...(moved.runes ?? [])])].slice(0, 12),
             }
-          : entry,
+          : entry
       ),
     };
   }

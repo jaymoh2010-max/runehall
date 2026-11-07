@@ -26,7 +26,10 @@ import { isCompendiumEntryKind } from "../../shared/compendium";
 
 function csv(value: unknown): string[] | undefined {
   if (typeof value !== "string" || !value.trim()) return undefined;
-  return value.split(",").map((part) => part.trim()).filter(Boolean);
+  return value
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean);
 }
 
 function bool(value: unknown, fallback: boolean): boolean {
@@ -94,7 +97,13 @@ export async function registerCompendiumRoutes(app: FastifyInstance): Promise<vo
     const legacy = bool(query.legacy, true);
     const items = backgrounds.filter((background) => {
       if (!legacy && !background.remaster) return false;
-      if (q && !`${background.name} ${background.traits.join(" ")} ${background.source}`.toLowerCase().includes(q)) return false;
+      if (
+        q &&
+        !`${background.name} ${background.traits.join(" ")} ${background.source}`
+          .toLowerCase()
+          .includes(q)
+      )
+        return false;
       return true;
     });
     return reply.send({ items });
@@ -159,7 +168,10 @@ export async function registerCompendiumRoutes(app: FastifyInstance): Promise<vo
 
   app.get("/api/compendium/deities", async (request, reply) => {
     const query = request.query as Record<string, unknown>;
-    const result = searchDeities(typeof query.q === "string" ? query.q : undefined, num(query.limit) ?? 500);
+    const result = searchDeities(
+      typeof query.q === "string" ? query.q : undefined,
+      num(query.limit) ?? 500
+    );
     return reply.send(result);
   });
 
@@ -204,12 +216,12 @@ export async function registerCompendiumRoutes(app: FastifyInstance): Promise<vo
 
   app.post("/api/compendium/lookup", async (request, reply) => {
     const body = (request.body ?? {}) as Record<string, unknown>;
-    const ids = Array.isArray(body.ids) ? body.ids.filter((id): id is string => typeof id === "string") : [];
+    const ids = Array.isArray(body.ids)
+      ? body.ids.filter((id): id is string => typeof id === "string")
+      : [];
     if (ids.length > 500) return reply.code(400).send({ error: "Too many items requested." });
     return reply.send({
-      items: ids
-        .map((id) => lookupItem(id))
-        .filter(Boolean),
+      items: ids.map((id) => lookupItem(id)).filter(Boolean),
     });
   });
 }

@@ -49,7 +49,9 @@ const manifest = readManifest(backupDir);
 if (!manifest) {
   if (!allowUnverified) {
     console.error(`No valid backup.json found in ${backupDir}.`);
-    console.error("Refusing to restore an unverifiable archive. Add --allow-unverified only for a manually inspected backup.");
+    console.error(
+      "Refusing to restore an unverifiable archive. Add --allow-unverified only for a manually inspected backup."
+    );
     process.exit(1);
   }
   console.warn("WARNING: restoring an archive without backup.json; checksums cannot be verified.");
@@ -84,7 +86,9 @@ function portIsOpen() {
 }
 
 if (await portIsOpen()) {
-  console.error(`Runehall appears to be running on port ${port}. Stop the server before restoring.`);
+  console.error(
+    `Runehall appears to be running on port ${port}. Stop the server before restoring.`
+  );
   process.exit(1);
 }
 

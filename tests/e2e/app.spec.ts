@@ -49,7 +49,9 @@ test("first account becomes the administrator and opens Hall controls", async ({
   await expect(page.getByRole("button", { name: "Export CSV" })).toBeVisible();
 });
 
-test("administrator updates audit retention, exports CSV, and filters the log", async ({ page }) => {
+test("administrator updates audit retention, exports CSV, and filters the log", async ({
+  page,
+}) => {
   await signIn(page, admin);
   await page.goto("/admin");
   await expect(page.getByRole("heading", { name: "Hall controls" })).toBeVisible();
@@ -65,9 +67,9 @@ test("administrator updates audit retention, exports CSV, and filters the log", 
   const downloadPath = await download.path();
   expect(downloadPath).toBeTruthy();
   const csv = fs.readFileSync(downloadPath!, "utf8");
-  expect(csv.startsWith("id,created_at,actor_id,actor_name,action,target_type,target_id,detail,ip\r\n")).toBe(
-    true,
-  );
+  expect(
+    csv.startsWith("id,created_at,actor_id,actor_name,action,target_type,target_id,detail,ip\r\n")
+  ).toBe(true);
   expect(csv).toContain(",auth.register,");
   expect(csv).toContain(",admin.audit_retention,");
 
@@ -77,7 +79,7 @@ test("administrator updates audit retention, exports CSV, and filters the log", 
   await expect(page.getByRole("button", { name: "Clear" })).toBeVisible();
   await page.getByRole("button", { name: "Clear" }).click();
   await expect(
-    page.locator(".admin-audit-action").filter({ hasText: "admin.audit_retention" }),
+    page.locator(".admin-audit-action").filter({ hasText: "admin.audit_retention" })
   ).toHaveCount(1);
 });
 
@@ -157,7 +159,9 @@ test("player registers, joins with the invite code, and sees a player-safe table
   await joinDialog.getByLabel("Invite code or link").fill(inviteCode);
   await joinDialog.getByRole("button", { name: "Join the table" }).click();
 
-  await expect(page).toHaveURL(new RegExp(`${campaignPath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`));
+  await expect(page).toHaveURL(
+    new RegExp(`${campaignPath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`)
+  );
   await expect(page.getByText("Player's table")).toBeVisible();
   await expect(page.getByRole("heading", { name: campaignName })).toBeVisible();
   for (const gmTab of ["Encounters", "Loot", "NPCs", "Assets", "GM Screen"]) {

@@ -30,7 +30,17 @@ describe("content tiers", () => {
     const feats = read<Feat>("feats.json");
     const core = feats.filter((feat) => isCoreSource(feat.source));
     expect(core.length).toBeGreaterThan(1000);
-    expect(core.every((feat) => ["Pathfinder Player Core", "Pathfinder Player Core 2", "Pathfinder GM Core", "Pathfinder Core Rulebook", "Pathfinder Monster Core"].includes(feat.source))).toBe(true);
+    expect(
+      core.every((feat) =>
+        [
+          "Pathfinder Player Core",
+          "Pathfinder Player Core 2",
+          "Pathfinder GM Core",
+          "Pathfinder Core Rulebook",
+          "Pathfinder Monster Core",
+        ].includes(feat.source)
+      )
+    ).toBe(true);
   });
 
   it("defaults to core sources and preserves expanded/legacy preferences", () => {

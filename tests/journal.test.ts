@@ -21,7 +21,7 @@ describe("journal attachments", () => {
       normalizeJournalAttachments([
         { id: "att_1", name: "Map", url: "/uploads/map.png", mimeType: "image/png" },
         { url: "/uploads/letter.jpg" },
-      ]),
+      ])
     ).toEqual([
       { id: "att_1", name: "Map", url: "/uploads/map.png", mimeType: "image/png" },
       { id: "att_2", name: "Handout image", url: "/uploads/letter.jpg", mimeType: "image/*" },
@@ -36,8 +36,10 @@ describe("journal attachments", () => {
         { url: "/uploads/map.png" },
         { url: "/uploads/map.png" },
         { url: "/uploads/../../secret.png" },
-      ]),
-    ).toEqual([{ id: "att_3", name: "Handout image", url: "/uploads/map.png", mimeType: "image/*" }]);
+      ])
+    ).toEqual([
+      { id: "att_3", name: "Handout image", url: "/uploads/map.png", mimeType: "image/*" },
+    ]);
   });
 
   it("caps attachments at twelve", () => {

@@ -33,9 +33,8 @@ import { propertyRuneDamage, shieldRuneBonus, summarizeRunes } from "./runes";
 // Constants
 // ---------------------------------------------------------------------------
 export const STARTING_WEALTH_CP = [
-  0, 1500, 3000, 7500, 14000, 27000, 44000, 72000, 110000, 160000, 230000,
-  320000, 450000, 600000, 800000, 1050000, 1350000, 1800000, 2400000, 3200000,
-  4500000,
+  0, 1500, 3000, 7500, 14000, 27000, 44000, 72000, 110000, 160000, 230000, 320000, 450000, 600000,
+  800000, 1050000, 1350000, 1800000, 2400000, 3200000, 4500000,
 ];
 
 export function startingWealthCp(level: number): number {
@@ -90,52 +89,148 @@ export function casterInfo(classData: ClassData | null | undefined): CasterInfo 
   };
   if (!name) return none;
   if (name === "cleric") {
-    return { progression: "full", tradition: "divine", traditionOptions: null, requiresDeity: true, spellAbility: "wis" };
+    return {
+      progression: "full",
+      tradition: "divine",
+      traditionOptions: null,
+      requiresDeity: true,
+      spellAbility: "wis",
+    };
   }
   if (name === "druid") {
-    return { progression: "full", tradition: "primal", traditionOptions: null, requiresDeity: false, spellAbility: "wis" };
+    return {
+      progression: "full",
+      tradition: "primal",
+      traditionOptions: null,
+      requiresDeity: false,
+      spellAbility: "wis",
+    };
   }
   if (name === "bard") {
-    return { progression: "full", tradition: "occult", traditionOptions: null, requiresDeity: false, spellAbility: "cha" };
+    return {
+      progression: "full",
+      tradition: "occult",
+      traditionOptions: null,
+      requiresDeity: false,
+      spellAbility: "cha",
+    };
   }
   if (name === "wizard") {
-    return { progression: "full", tradition: "arcane", traditionOptions: null, requiresDeity: false, spellAbility: "int" };
+    return {
+      progression: "full",
+      tradition: "arcane",
+      traditionOptions: null,
+      requiresDeity: false,
+      spellAbility: "int",
+    };
   }
   if (name === "animist") {
-    return { progression: "full", tradition: "divine", traditionOptions: null, requiresDeity: false, spellAbility: "wis" };
+    return {
+      progression: "full",
+      tradition: "divine",
+      traditionOptions: null,
+      requiresDeity: false,
+      spellAbility: "wis",
+    };
   }
   if (name === "oracle") {
-    return { progression: "full", tradition: "divine", traditionOptions: null, requiresDeity: false, spellAbility: "cha" };
+    return {
+      progression: "full",
+      tradition: "divine",
+      traditionOptions: null,
+      requiresDeity: false,
+      spellAbility: "cha",
+    };
   }
   if (name === "psychic") {
-    return { progression: "bounded", tradition: "occult", traditionOptions: null, requiresDeity: false, spellAbility: null };
+    return {
+      progression: "bounded",
+      tradition: "occult",
+      traditionOptions: null,
+      requiresDeity: false,
+      spellAbility: null,
+    };
   }
   if (name === "sorcerer") {
-    return { progression: "full", tradition: null, traditionOptions: TRADITIONS, requiresDeity: false, spellAbility: "cha" };
+    return {
+      progression: "full",
+      tradition: null,
+      traditionOptions: TRADITIONS,
+      requiresDeity: false,
+      spellAbility: "cha",
+    };
   }
   if (name === "witch") {
-    return { progression: "full", tradition: null, traditionOptions: TRADITIONS, requiresDeity: false, spellAbility: "int" };
+    return {
+      progression: "full",
+      tradition: null,
+      traditionOptions: TRADITIONS,
+      requiresDeity: false,
+      spellAbility: "int",
+    };
   }
   if (name === "summoner") {
-    return { progression: "bounded", tradition: null, traditionOptions: TRADITIONS, requiresDeity: false, spellAbility: "cha" };
+    return {
+      progression: "bounded",
+      tradition: null,
+      traditionOptions: TRADITIONS,
+      requiresDeity: false,
+      spellAbility: "cha",
+    };
   }
   if (name === "magus") {
-    return { progression: "bounded", tradition: "arcane", traditionOptions: null, requiresDeity: false, spellAbility: "int" };
+    return {
+      progression: "bounded",
+      tradition: "arcane",
+      traditionOptions: null,
+      requiresDeity: false,
+      spellAbility: "int",
+    };
   }
   if (name === "necromancer") {
-    return { progression: "bounded", tradition: "occult", traditionOptions: null, requiresDeity: false, spellAbility: "int" };
+    return {
+      progression: "bounded",
+      tradition: "occult",
+      traditionOptions: null,
+      requiresDeity: false,
+      spellAbility: "int",
+    };
   }
   if (name === "champion") {
-    return { progression: "focus", tradition: "divine", traditionOptions: null, requiresDeity: true, spellAbility: "cha" };
+    return {
+      progression: "focus",
+      tradition: "divine",
+      traditionOptions: null,
+      requiresDeity: true,
+      spellAbility: "cha",
+    };
   }
   if (FULL_CASTER_CLASSES.has(name)) {
-    return { progression: "full", tradition: null, traditionOptions: TRADITIONS, requiresDeity: false, spellAbility: null };
+    return {
+      progression: "full",
+      tradition: null,
+      traditionOptions: TRADITIONS,
+      requiresDeity: false,
+      spellAbility: null,
+    };
   }
   if (BOUNDED_CASTER_CLASSES.has(name)) {
-    return { progression: "bounded", tradition: null, traditionOptions: TRADITIONS, requiresDeity: false, spellAbility: null };
+    return {
+      progression: "bounded",
+      tradition: null,
+      traditionOptions: TRADITIONS,
+      requiresDeity: false,
+      spellAbility: null,
+    };
   }
   if (Number(classData?.spellcasting) > 0) {
-    return { progression: "full", tradition: null, traditionOptions: TRADITIONS, requiresDeity: false, spellAbility: null };
+    return {
+      progression: "full",
+      tradition: null,
+      traditionOptions: TRADITIONS,
+      requiresDeity: false,
+      spellAbility: null,
+    };
   }
   return none;
 }
@@ -230,7 +325,7 @@ export function wizardSlots(level: number): number[] {
 /** Clerics add divine font slots of their highest regular rank (heal or harm only). */
 export function divineFontInfo(
   level: number,
-  className?: string,
+  className?: string
 ): { slots: number; rank: number } | null {
   if (className?.toLowerCase() !== "cleric") return null;
   return {
@@ -249,7 +344,7 @@ export function clericSlots(level: number): number[] {
 export function spellSlotsFor(
   level: number,
   progression: CasterProgression,
-  className?: string,
+  className?: string
 ): number[] | null {
   if (progression === "full") {
     switch (className?.toLowerCase()) {
@@ -299,7 +394,7 @@ export function traitLabel(value: string): string {
     "two-hand-d12": "Two-Hand d12",
     "thrown-20": "Thrown 20 ft.",
     "range-increment-60": "Range 60 ft.",
-    "nonlethal": "Nonlethal",
+    nonlethal: "Nonlethal",
   };
   if (special[value]) return special[value];
   return titleCase(value);
@@ -399,7 +494,7 @@ export function normalizeCharacterDraft(input: unknown, fallbackName = "New Hero
     value && typeof value === "object" && !Array.isArray(value)
       ? (value as Record<string, unknown>)
       : {};
-  const arr = <T,>(value: unknown): T[] => (Array.isArray(value) ? (value as T[]) : []);
+  const arr = <T>(value: unknown): T[] => (Array.isArray(value) ? (value as T[]) : []);
   const cleanAbilities = (value: unknown) =>
     arr<AbilityKey>(value).filter((x) => ABILITIES.includes(x));
 
@@ -407,7 +502,9 @@ export function normalizeCharacterDraft(input: unknown, fallbackName = "New Hero
   const levelsRaw = obj(boosts.levels);
   const levels: Record<string, (AbilityKey | null)[]> = { "5": [], "10": [], "15": [], "20": [] };
   for (const key of Object.keys(levels)) {
-    levels[key] = arr<AbilityKey | null>(levelsRaw[key]).map((x) => (x && ABILITIES.includes(x) ? x : null));
+    levels[key] = arr<AbilityKey | null>(levelsRaw[key]).map((x) =>
+      x && ABILITIES.includes(x) ? x : null
+    );
   }
   const skills = obj(raw.skills);
   const feats = obj(raw.feats);
@@ -427,7 +524,8 @@ export function normalizeCharacterDraft(input: unknown, fallbackName = "New Hero
   };
   const choicesRaw = obj(raw.classChoices);
   const classChoices: Record<string, string[]> = {};
-  for (const [key, value] of Object.entries(choicesRaw)) classChoices[key] = arr<string>(value).filter((x) => typeof x === "string");
+  for (const [key, value] of Object.entries(choicesRaw))
+    classChoices[key] = arr<string>(value).filter((x) => typeof x === "string");
 
   type NormalizedEquipment = {
     itemId: string;
@@ -440,7 +538,9 @@ export function normalizeCharacterDraft(input: unknown, fallbackName = "New Hero
   for (const item of arr<Record<string, unknown>>(raw.equipment)) {
     if (!item || typeof item.itemId !== "string") continue;
     const itemId = String(item.itemId);
-    const runes = [...new Set(arr<string>(item.runes).filter((value) => typeof value === "string"))].slice(0, 12);
+    const runes = [
+      ...new Set(arr<string>(item.runes).filter((value) => typeof value === "string")),
+    ].slice(0, 12);
     const existing = equipmentMap.get(itemId);
     if (existing) {
       existing.quantity += Math.max(1, Math.floor(num(item.quantity, 1)));
@@ -472,7 +572,10 @@ export function normalizeCharacterDraft(input: unknown, fallbackName = "New Hero
     deityId: typeof raw.deityId === "string" ? raw.deityId : null,
     deitySkill: typeof raw.deitySkill === "string" ? raw.deitySkill : null,
     backgroundFeat: typeof raw.backgroundFeat === "string" ? raw.backgroundFeat : null,
-    keyAbility: raw.keyAbility && ABILITIES.includes(raw.keyAbility as AbilityKey) ? (raw.keyAbility as AbilityKey) : null,
+    keyAbility:
+      raw.keyAbility && ABILITIES.includes(raw.keyAbility as AbilityKey)
+        ? (raw.keyAbility as AbilityKey)
+        : null,
     portraitUrl: typeof raw.portraitUrl === "string" ? raw.portraitUrl : null,
     boosts: {
       ancestry: cleanAbilities(boosts.ancestry),
@@ -499,14 +602,16 @@ export function normalizeCharacterDraft(input: unknown, fallbackName = "New Hero
     },
     classChoices,
     spells: {
-      tradition: TRADITIONS.includes(spells.tradition as SpellTradition) ? (spells.tradition as SpellTradition) : null,
+      tradition: TRADITIONS.includes(spells.tradition as SpellTradition)
+        ? (spells.tradition as SpellTradition)
+        : null,
       cantrips: arr<string>(spells.cantrips).filter((x) => typeof x === "string"),
       known: arr<string>(spells.known).filter((x) => typeof x === "string"),
       prepared: arr<string>(spells.prepared).filter((x) => typeof x === "string"),
       focus: arr<string>(spells.focus).filter((x) => typeof x === "string"),
       divineFontUsed: Math.max(0, Math.min(10, Math.round(num(spells.divineFontUsed, 0)))),
       slotsUsed: Object.fromEntries(
-        Object.entries(obj(spells.slotsUsed)).filter(([, value]) => typeof value === "number"),
+        Object.entries(obj(spells.slotsUsed)).filter(([, value]) => typeof value === "number")
       ) as Record<string, number>,
     },
     equipment: equipmentEntries,
@@ -525,11 +630,15 @@ export function normalizeCharacterDraft(input: unknown, fallbackName = "New Hero
             ? Math.max(0, Math.floor(companion.hpCurrent))
             : null;
         return {
-          id: typeof companion.id === "string" ? companion.id : `comp_${Math.random().toString(16).slice(2, 10)}`,
+          id:
+            typeof companion.id === "string"
+              ? companion.id
+              : `comp_${Math.random().toString(16).slice(2, 10)}`,
           name: String(companion.name).slice(0, 80),
           kind,
           level: Math.max(1, Math.min(20, Math.floor(num(companion.level, 1)))),
-          hpCurrent: hpMax !== null && rawHpCurrent !== null ? Math.min(rawHpCurrent, hpMax) : rawHpCurrent,
+          hpCurrent:
+            hpMax !== null && rawHpCurrent !== null ? Math.min(rawHpCurrent, hpMax) : rawHpCurrent,
           hpMax,
           ac:
             typeof companion.ac === "number" && Number.isFinite(companion.ac)
@@ -585,7 +694,10 @@ export function fixedBoosts(ancestry: Ancestry | null | undefined) {
   return (ancestry?.boosts ?? []).filter((entry) => entry.fixed);
 }
 
-export function selectedChoiceOptions(draft: CharacterDraft, classData: ClassData | null | undefined): ClassChoiceOption[] {
+export function selectedChoiceOptions(
+  draft: CharacterDraft,
+  classData: ClassData | null | undefined
+): ClassChoiceOption[] {
   if (!classData) return [];
   const out: ClassChoiceOption[] = [];
   for (const group of classData.choiceGroups) {
@@ -598,7 +710,9 @@ export function selectedChoiceOptions(draft: CharacterDraft, classData: ClassDat
   return out;
 }
 
-export function choiceOptionsById(classData: ClassData | null | undefined): Map<string, ClassChoiceOption> {
+export function choiceOptionsById(
+  classData: ClassData | null | undefined
+): Map<string, ClassChoiceOption> {
   const map = new Map<string, ClassChoiceOption>();
   if (!classData) return map;
   for (const group of classData.choiceGroups) {
@@ -607,18 +721,23 @@ export function choiceOptionsById(classData: ClassData | null | undefined): Map<
   return map;
 }
 
-export function applicableChoiceGroups(draft: CharacterDraft, classData: ClassData | null | undefined): ClassChoiceGroup[] {
+export function applicableChoiceGroups(
+  draft: CharacterDraft,
+  classData: ClassData | null | undefined
+): ClassChoiceGroup[] {
   if (!classData) return [];
   return classData.choiceGroups.filter((group) => (group.sourceFeature?.level ?? 0) <= draft.level);
 }
 
 export function deitySkillOptions(deity: Deity | null | undefined): SkillId[] {
-  return (deity?.skill ?? []).filter((skill): skill is SkillId => Boolean(SKILL_BY_ID[skill as SkillId]));
+  return (deity?.skill ?? []).filter((skill): skill is SkillId =>
+    Boolean(SKILL_BY_ID[skill as SkillId])
+  );
 }
 
 export function selectedDeitySkill(
   draft: CharacterDraft,
-  deity: Deity | null | undefined,
+  deity: Deity | null | undefined
 ): SkillId | null {
   const options = deitySkillOptions(deity);
   if (draft.deitySkill && options.includes(draft.deitySkill as SkillId)) {
@@ -630,7 +749,7 @@ export function selectedDeitySkill(
 /** Automatic skill-rank upgrades from active class features and chosen options. */
 export function automaticSkillRanks(
   draft: CharacterDraft,
-  context: CharacterContext,
+  context: CharacterContext
 ): Record<string, number> {
   const out: Record<string, number> = {};
   const add = (feature: { skillRanks?: Record<string, number> | null } | null | undefined) => {
@@ -651,7 +770,10 @@ export function automaticSkillRanks(
 }
 
 /** All training that is fixed by the character's ancestry, background, class, subclass, and deity. */
-export function grantedTrainedSkills(draft: CharacterDraft, context: CharacterContext): Set<string> {
+export function grantedTrainedSkills(
+  draft: CharacterDraft,
+  context: CharacterContext
+): Set<string> {
   const out = new Set<string>();
   for (const skill of context.background?.trainedSkills ?? []) out.add(skill);
   for (const skill of context.classData?.trainedSkills.value ?? []) out.add(skill);
@@ -673,7 +795,10 @@ export function grantedTrainedSkills(draft: CharacterDraft, context: CharacterCo
   return out;
 }
 
-export function classKeyOptions(draft: CharacterDraft, classData: ClassData | null | undefined): AbilityKey[] {
+export function classKeyOptions(
+  draft: CharacterDraft,
+  classData: ClassData | null | undefined
+): AbilityKey[] {
   if (!classData) return [];
   const options = selectedChoiceOptions(draft, classData);
   const fromChoices = [...new Set(options.flatMap((option) => option.keyOptions ?? []))];
@@ -751,7 +876,7 @@ function combineStatuses(statuses: PrerequisiteStatus[], mode: "and" | "or"): Pr
 function proficiencyRankForTarget(
   target: string,
   derived: DerivedCharacter,
-  context: CharacterContext,
+  context: CharacterContext
 ): number | null {
   const value = lowerName(target).replace(/[.!]$/g, "");
   if (!value) return null;
@@ -768,7 +893,8 @@ function proficiencyRankForTarget(
     return derived.prof.spellcasting;
   }
 
-  if (value === "unarmored defense" || value === "unarmored") return derived.prof.defenses.unarmored;
+  if (value === "unarmored defense" || value === "unarmored")
+    return derived.prof.defenses.unarmored;
   if (value === "light armor" || value === "light") return derived.prof.defenses.light;
   if (value === "medium armor" || value === "medium") return derived.prof.defenses.medium;
   if (value === "heavy armor" || value === "heavy") return derived.prof.defenses.heavy;
@@ -776,7 +902,7 @@ function proficiencyRankForTarget(
     return Math.min(
       derived.prof.defenses.light,
       derived.prof.defenses.medium,
-      derived.prof.defenses.heavy,
+      derived.prof.defenses.heavy
     );
   }
 
@@ -792,21 +918,26 @@ function proficiencyRankForTarget(
       derived.prof.attacks.simple,
       derived.prof.attacks.martial,
       derived.prof.attacks.advanced,
-      derived.prof.attacks.unarmed,
+      derived.prof.attacks.unarmed
     );
   }
   if (value === "martial weapons") return derived.prof.attacks.martial;
   if (value === "advanced weapons") return derived.prof.attacks.advanced;
-  if (value === "unarmed attacks" || value === "unarmed attack") return derived.prof.attacks.unarmed;
+  if (value === "unarmed attacks" || value === "unarmed attack")
+    return derived.prof.attacks.unarmed;
   if (value === "all martial weapons" || value === "martial weapons and unarmed attacks") {
     return Math.max(derived.prof.attacks.martial, derived.prof.attacks.unarmed);
   }
-  if (value === "any kind of weapon or unarmed attack" || value === "a weapon" || value === "weapon") {
+  if (
+    value === "any kind of weapon or unarmed attack" ||
+    value === "a weapon" ||
+    value === "weapon"
+  ) {
     return Math.max(
       derived.prof.attacks.simple,
       derived.prof.attacks.martial,
       derived.prof.attacks.advanced,
-      derived.prof.attacks.unarmed,
+      derived.prof.attacks.unarmed
     );
   }
   if (value === "a simple weapon") return derived.prof.attacks.simple;
@@ -837,7 +968,9 @@ function proficiencyRankForTarget(
   if (abilitySkill) {
     const ability = ABILITY_BY_LABEL[abilitySkill[1]];
     if (!ability) return null;
-    const ranks = derived.skills.filter((skill) => skill.ability === ability).map((skill) => skill.rank);
+    const ranks = derived.skills
+      .filter((skill) => skill.ability === ability)
+      .map((skill) => skill.rank);
     return ranks.length ? Math.max(...ranks) : 0;
   }
   const loreTarget = value.replace(/ lore$/, "");
@@ -852,7 +985,11 @@ function proficiencyRankForTarget(
   return null;
 }
 
-function proficiencyPrerequisite(text: string, derived: DerivedCharacter, context: CharacterContext): PrerequisiteStatus | null {
+function proficiencyPrerequisite(
+  text: string,
+  derived: DerivedCharacter,
+  context: CharacterContext
+): PrerequisiteStatus | null {
   const match = /^(trained|expert|master|legendary) in (.+)$/i.exec(text.trim());
   if (!match) return null;
   const required = PREREQUISITE_RANKS[match[1].toLowerCase()];
@@ -871,14 +1008,20 @@ function proficiencyPrerequisite(text: string, derived: DerivedCharacter, contex
 }
 
 function abilityPrerequisite(text: string, derived: DerivedCharacter): PrerequisiteStatus | null {
-  const match = /^(Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma)\s*\+(\d+)$/i.exec(text.trim());
+  const match = /^(Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma)\s*\+(\d+)$/i.exec(
+    text.trim()
+  );
   if (!match) return null;
   const ability = ABILITY_BY_LABEL[match[1].toLowerCase()];
   const required = Number(match[2]);
   return derived.abilityMods[ability] >= required ? "met" : "unmet";
 }
 
-function currentTraits(draft: CharacterDraft, context: CharacterContext, derived: DerivedCharacter): Set<string> {
+function currentTraits(
+  draft: CharacterDraft,
+  context: CharacterContext,
+  derived: DerivedCharacter
+): Set<string> {
   const traits = new Set<string>();
   const add = (values: string[] | undefined) => {
     for (const value of values ?? []) traits.add(lowerName(value));
@@ -897,7 +1040,7 @@ function namedPrerequisite(
   text: string,
   draft: CharacterDraft,
   context: CharacterContext,
-  derived: DerivedCharacter,
+  derived: DerivedCharacter
 ): PrerequisiteStatus {
   const name = lowerName(text);
   const selectedFeatNames = new Set(derived.selectedFeats.map((feat) => lowerName(feat.name)));
@@ -916,7 +1059,9 @@ function namedPrerequisite(
   }
   if (context.featNames?.includes(name)) return "unmet";
 
-  const classFeature = context.classData?.features.find((feature) => lowerName(feature.name) === name);
+  const classFeature = context.classData?.features.find(
+    (feature) => lowerName(feature.name) === name
+  );
   if (classFeature) return classFeature.level <= draft.level ? "met" : "unmet";
   const classOption = context.classData?.choiceGroups
     .flatMap((group) => group.options)
@@ -963,7 +1108,7 @@ export function checkFeatPrerequisite(
   raw: string,
   draft: CharacterDraft,
   context: CharacterContext,
-  derived: DerivedCharacter,
+  derived: DerivedCharacter
 ): PrerequisiteStatus {
   const text = raw.trim().replace(/[.]$/g, "");
   const lower = lowerName(text);
@@ -984,7 +1129,7 @@ export function checkFeatPrerequisite(
   if (lower === "ability to cast focus spells") return derived.focusPointsMax > 0 ? "met" : "unmet";
   if (
     /^(?:you have(?: the)? ability to cast|you're able to cast|you can cast|ability to cast|able to cast) (?:a )?spells?(?: (?:from|using) (?:spell )?slots?)?$/.test(
-      lower,
+      lower
     )
   ) {
     return derived.casterProgression !== "none" ? "met" : "unmet";
@@ -992,9 +1137,10 @@ export function checkFeatPrerequisite(
   if (/^(arcane|divine|occult|primal) spells$/.test(lower)) {
     return derived.casterTradition === lower.split(" ")[0] ? "met" : "unmet";
   }
-  const traditionCast = /^(?:ability to cast|able to cast|you can cast) (arcane|divine|occult|primal) spells$/i.exec(
-    text,
-  );
+  const traditionCast =
+    /^(?:ability to cast|able to cast|you can cast) (arcane|divine|occult|primal) spells$/i.exec(
+      text
+    );
   if (traditionCast) {
     return derived.casterTradition === traditionCast[1].toLowerCase() ? "met" : "unmet";
   }
@@ -1004,21 +1150,26 @@ export function checkFeatPrerequisite(
       .replace(/\s+(?:cantrip|spell)$/, "")
       .replace(/\s+(?:with|using) a spell slot$/, "")
       .replace(/^the /, "");
-    if (
-      !target ||
-      /\b(at least|or higher|spell slot|ritual|trait|any|one of)\b/.test(target)
-    ) {
+    if (!target || /\b(at least|or higher|spell slot|ritual|trait|any|one of)\b/.test(target)) {
       return "unknown";
     }
     const spellNames = new Set(Object.values(context.spells).map((spell) => lowerName(spell.name)));
-    const alternatives = target.split(/\s+or\s+/i).map((part) => part.trim()).filter(Boolean);
+    const alternatives = target
+      .split(/\s+or\s+/i)
+      .map((part) => part.trim())
+      .filter(Boolean);
     if (alternatives.some((name) => spellNames.has(name))) return "met";
     if (alternatives.length > 1) return "unmet";
-    const required = target.split(/\s+and\s+/i).map((part) => part.trim()).filter(Boolean);
+    const required = target
+      .split(/\s+and\s+/i)
+      .map((part) => part.trim())
+      .filter(Boolean);
     return required.every((name) => spellNames.has(name)) ? "met" : "unmet";
   }
   if (lower === "low-light vision") {
-    return derived.senses.some((sense) => /lowlight|low-light|darkvision/i.test(sense)) ? "met" : "unmet";
+    return derived.senses.some((sense) => /lowlight|low-light|darkvision/i.test(sense))
+      ? "met"
+      : "unmet";
   }
   if (lower === "darkvision") {
     return derived.senses.some((sense) => /darkvision/i.test(sense)) ? "met" : "unmet";
@@ -1026,7 +1177,10 @@ export function checkFeatPrerequisite(
   if (lower === "you follow a deity" || lower === "follower of a specific religion") {
     return context.deity ? "met" : "unmet";
   }
-  if (/^(worshipper|worship|follow|follower) of (.+)$/i.test(text) || /^(worship|follow) (.+)$/i.test(text)) {
+  if (
+    /^(worshipper|worship|follow|follower) of (.+)$/i.test(text) ||
+    /^(worship|follow) (.+)$/i.test(text)
+  ) {
     const match = /(?:of|worship|follow)\s+(.+)$/i.exec(text);
     if (match) {
       return context.deity && lowerName(context.deity.name) === lowerName(match[1])
@@ -1074,7 +1228,7 @@ export function checkFeatPrerequisite(
       derived.prof.attacks.simple,
       derived.prof.attacks.martial,
       derived.prof.attacks.advanced,
-      derived.prof.attacks.unarmed,
+      derived.prof.attacks.unarmed
     );
     return rank >= 3 ? "met" : "unmet";
   }
@@ -1095,17 +1249,23 @@ export function checkFeatPrerequisite(
   // Compound OR/AND conditions. Proficiency and ability checks handled their
   // own lists above.
   if (/\s+or\s+/i.test(text)) {
-    const parts = text.split(/\s+or\s+/i).map((part) => part.trim()).filter(Boolean);
+    const parts = text
+      .split(/\s+or\s+/i)
+      .map((part) => part.trim())
+      .filter(Boolean);
     return combineStatuses(
       parts.map((part) => checkFeatPrerequisite(part, draft, context, derived)),
-      "or",
+      "or"
     );
   }
   if (/\s+and\s+/i.test(text)) {
-    const parts = text.split(/\s+and\s+/i).map((part) => part.trim()).filter(Boolean);
+    const parts = text
+      .split(/\s+and\s+/i)
+      .map((part) => part.trim())
+      .filter(Boolean);
     return combineStatuses(
       parts.map((part) => checkFeatPrerequisite(part, draft, context, derived)),
-      "and",
+      "and"
     );
   }
 
@@ -1116,7 +1276,7 @@ export function featPrerequisiteChecks(
   feat: Feat,
   draft: CharacterDraft,
   context: CharacterContext,
-  derived: DerivedCharacter,
+  derived: DerivedCharacter
 ): PrerequisiteCheck[] {
   return (feat.prerequisites ?? []).map((text) => ({
     text,
@@ -1128,11 +1288,14 @@ export function featPrerequisiteStatus(
   feat: Feat,
   draft: CharacterDraft,
   context: CharacterContext,
-  derived: DerivedCharacter,
+  derived: DerivedCharacter
 ): { status: PrerequisiteStatus; checks: PrerequisiteCheck[] } {
   const checks = featPrerequisiteChecks(feat, draft, context, derived);
   return {
-    status: combineStatuses(checks.map((check) => check.status), "and"),
+    status: combineStatuses(
+      checks.map((check) => check.status),
+      "and"
+    ),
     checks,
   };
 }
@@ -1148,7 +1311,7 @@ export function featAvailability(
   feat: Feat,
   draft: CharacterDraft,
   context: CharacterContext,
-  derived: DerivedCharacter,
+  derived: DerivedCharacter
 ): FeatAvailability {
   const { status } = featPrerequisiteStatus(feat, draft, context, derived);
   if (status === "unmet") return "blocked";
@@ -1163,7 +1326,7 @@ export function featAvailability(
  */
 export function spellRepertoireLimits(
   classData: ClassData | null | undefined,
-  level: number,
+  level: number
 ): { cantrips: number; ranks: number[] } | null {
   const name = classData?.name.toLowerCase();
   if (!name || !["bard", "oracle", "sorcerer", "summoner"].includes(name)) return null;
@@ -1194,7 +1357,7 @@ export interface BoostApplication {
 export function baseAbilityScores(
   draft: CharacterDraft,
   context: CharacterContext,
-  capAt18 = true,
+  capAt18 = true
 ): Record<AbilityKey, number> {
   const scores = { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 };
   const add = (ability: AbilityKey, amount: number) => {
@@ -1229,11 +1392,12 @@ export function baseAbilityScores(
   const classData = context.classData;
   if (classData) {
     const options = classKeyOptions(draft, classData);
-    const key = draft.keyAbility && options.includes(draft.keyAbility)
-      ? draft.keyAbility
-      : options.length === 1
-        ? options[0]
-        : null;
+    const key =
+      draft.keyAbility && options.includes(draft.keyAbility)
+        ? draft.keyAbility
+        : options.length === 1
+          ? options[0]
+          : null;
     if (key) add(key, 2);
   }
 
@@ -1268,7 +1432,7 @@ export function baseAbilityScores(
 function applyProficiencyMap(
   prof: DerivedCharacter["prof"],
   map: Record<string, { rank?: number; attribute?: AbilityKey | null }> | null | undefined,
-  className: string,
+  className: string
 ) {
   if (!map) return;
   const classSlug = className.toLowerCase();
@@ -1291,7 +1455,7 @@ function applyProficiencyMap(
 
 function buildProficiencies(
   draft: CharacterDraft,
-  context: CharacterContext,
+  context: CharacterContext
 ): DerivedCharacter["prof"] {
   const classData = context.classData;
   const className = classData?.name ?? "";
@@ -1321,7 +1485,7 @@ function buildProficiencies(
   if (!classData) return prof;
   const chosen = selectedChoiceOptions(draft, classData);
   const suppressed = new Set(
-    chosen.flatMap((option) => (option.suppressedFeatures ?? []).map(parseClassFeatureUuidName)),
+    chosen.flatMap((option) => (option.suppressedFeatures ?? []).map(parseClassFeatureUuidName))
   );
 
   for (const feature of classData.features) {
@@ -1342,13 +1506,19 @@ function buildProficiencies(
   // base rank comes from the class (or the Deity feature), and doctrine
   // features can upgrade it.
   const hasDeityFeature = classData.features.some((feature) =>
-    feature.name.toLowerCase().startsWith("deity ("),
+    feature.name.toLowerCase().startsWith("deity (")
   );
   const other = classData.attacks.other;
   const otherRank =
     other && typeof other === "object" && typeof other.rank === "number" ? other.rank : 0;
   let favoredWeaponRank = hasDeityFeature || caster.requiresDeity ? 1 : 0;
-  if (other && typeof other === "object" && String(other.name ?? "").toLowerCase().includes("deity")) {
+  if (
+    other &&
+    typeof other === "object" &&
+    String(other.name ?? "")
+      .toLowerCase()
+      .includes("deity")
+  ) {
     favoredWeaponRank = Math.max(favoredWeaponRank, otherRank);
   }
   for (const feature of classData.features) {
@@ -1391,11 +1561,14 @@ function attackRankFor(
   item: Equipment,
   prof: DerivedCharacter["prof"],
   classData: ClassData | null | undefined,
-  deity: Deity | null | undefined,
+  deity: Deity | null | undefined
 ): number {
   if (!item.weapon) return 0;
   let rank = prof.attacks[item.weapon.category || "simple"] ?? 0;
-  const weaponSlug = item.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  const weaponSlug = item.name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
   rank = Math.max(rank, prof.attacks[`weapon-base-${weaponSlug}`] ?? 0);
   if (isBomb(item)) rank = Math.max(rank, prof.attacks["weapon-base-alchemical-bomb"] ?? 0);
   if (matchesDeityWeapon(item, deity)) {
@@ -1412,12 +1585,14 @@ function attackRankFor(
 }
 
 function weaponSpecializationBonus(features: { name: string }[], rank: number): number {
-  const greater = features.some((feature) => /^greater weapon specialization\b/i.test(feature.name));
+  const greater = features.some((feature) =>
+    /^greater weapon specialization\b/i.test(feature.name)
+  );
   const base = features.some(
     (feature) =>
       /weapon specialization/i.test(feature.name) &&
       !/^greater/i.test(feature.name) &&
-      !/eidolon/i.test(feature.name),
+      !/eidolon/i.test(feature.name)
   );
   if (!base && !greater) return 0;
   const values = greater ? [0, 0, 4, 6, 8] : [0, 0, 2, 3, 4];
@@ -1427,7 +1602,10 @@ function weaponSpecializationBonus(features: { name: string }[], rank: number): 
 // ---------------------------------------------------------------------------
 // Character computation
 // ---------------------------------------------------------------------------
-export function computeCharacter(draft: CharacterDraft, context: CharacterContext): DerivedCharacter {
+export function computeCharacter(
+  draft: CharacterDraft,
+  context: CharacterContext
+): DerivedCharacter {
   const ancestry = context.ancestry ?? null;
   const classData = context.classData ?? null;
   const background = context.background ?? null;
@@ -1435,7 +1613,7 @@ export function computeCharacter(draft: CharacterDraft, context: CharacterContex
   // Validate the 1st-level allocation independently of later milestones.
   const rawAbilities = baseAbilityScores({ ...draft, level: 1 }, context, false);
   const abilityMods = Object.fromEntries(
-    ABILITIES.map((ability) => [ability, abilityMod(abilities[ability])]),
+    ABILITIES.map((ability) => [ability, abilityMod(abilities[ability])])
   ) as Record<AbilityKey, number>;
   const prof = buildProficiencies(draft, context);
   const caster = casterInfo(classData);
@@ -1449,7 +1627,9 @@ export function computeCharacter(draft: CharacterDraft, context: CharacterContex
   const keyMod = key ? abilityMods[key] : 0;
   const needsDeity =
     caster.requiresDeity ||
-    Boolean(classData?.features.some((feature) => feature.name.toLowerCase().startsWith("deity (")));
+    Boolean(
+      classData?.features.some((feature) => feature.name.toLowerCase().startsWith("deity ("))
+    );
   const spellAbility = caster.spellAbility ?? key;
   const spellMod = spellAbility ? abilityMods[spellAbility] : 0;
   const validation: ValidationIssue[] = [];
@@ -1461,54 +1641,79 @@ export function computeCharacter(draft: CharacterDraft, context: CharacterContex
   if (ancestry && !draft.heritageId) issue("error", "Choose a heritage.", "heritage");
   if (!background) issue("error", "Choose a background.", "background");
   if (!classData) issue("error", "Choose a class.", "class");
-  if (classData && keyOptions.length > 1 && !key) issue("error", "Choose your key ability score.", "abilities");
-  if (classData && keyOptions.length === 0 && !key) issue("warning", "This class needs a key ability score; select one manually.", "abilities");
+  if (classData && keyOptions.length > 1 && !key)
+    issue("error", "Choose your key ability score.", "abilities");
+  if (classData && keyOptions.length === 0 && !key)
+    issue("warning", "This class needs a key ability score; select one manually.", "abilities");
 
   // --- Ability boosts ------------------------------------------------------
   if (ancestry) {
     const flex = flexibleBoosts(ancestry);
     const picks = flex.map((_, index) => draft.boosts.ancestry[index] ?? null);
-    if (picks.some((pick) => pick === null)) issue("error", "Choose all ancestry ability boosts.", "abilities");
-    const fixedAbilities = new Set(ancestry.boosts.filter((entry) => entry.fixed).flatMap((entry) => entry.from));
+    if (picks.some((pick) => pick === null))
+      issue("error", "Choose all ancestry ability boosts.", "abilities");
+    const fixedAbilities = new Set(
+      ancestry.boosts.filter((entry) => entry.fixed).flatMap((entry) => entry.from)
+    );
     for (let i = 0; i < picks.length; i++) {
       const pick = picks[i];
-      if (pick && !flex[i].from.includes(pick)) issue("error", "An ancestry boost is not allowed for that ability.", "abilities");
-      if (pick && fixedAbilities.has(pick)) issue("error", "An ancestry free boost must go to an ability that isn't already boosted by your ancestry.", "abilities");
+      if (pick && !flex[i].from.includes(pick))
+        issue("error", "An ancestry boost is not allowed for that ability.", "abilities");
+      if (pick && fixedAbilities.has(pick))
+        issue(
+          "error",
+          "An ancestry free boost must go to an ability that isn't already boosted by your ancestry.",
+          "abilities"
+        );
     }
     const duplicates = picks.filter(Boolean).filter((pick, i, arr) => arr.indexOf(pick) !== i);
-    if (duplicates.length) issue("error", "Ancestry boosts must be applied to different abilities.", "abilities");
+    if (duplicates.length)
+      issue("error", "Ancestry boosts must be applied to different abilities.", "abilities");
   }
   if (background) {
     const flex = background.boosts.filter((entry) => !entry.fixed);
     const picks = flex.map((_, index) => draft.boosts.background[index] ?? null);
-    if (picks.some((pick) => pick === null)) issue("error", "Choose all background ability boosts.", "abilities");
+    if (picks.some((pick) => pick === null))
+      issue("error", "Choose all background ability boosts.", "abilities");
     for (let i = 0; i < picks.length; i++) {
       const pick = picks[i];
-      if (pick && !flex[i].from.includes(pick)) issue("error", "A background boost is not allowed for that ability.", "abilities");
+      if (pick && !flex[i].from.includes(pick))
+        issue("error", "A background boost is not allowed for that ability.", "abilities");
     }
     const duplicates = picks.filter(Boolean).filter((pick, i, arr) => arr.indexOf(pick) !== i);
-    if (duplicates.length) issue("error", "Background boosts must be applied to different abilities.", "abilities");
+    if (duplicates.length)
+      issue("error", "Background boosts must be applied to different abilities.", "abilities");
   }
   if (!draft.boosts.free.some(Boolean)) {
     if (draft.level >= 1) issue("error", "Choose your four free ability boosts.", "abilities");
   } else {
-    if (draft.boosts.free.filter(Boolean).length < 4) issue("error", "Choose all four free ability boosts.", "abilities");
-    const duplicates = draft.boosts.free.filter(Boolean).filter((pick, i, arr) => arr.indexOf(pick) !== i);
-    if (duplicates.length) issue("error", "The four free boosts must be applied to different abilities.", "abilities");
+    if (draft.boosts.free.filter(Boolean).length < 4)
+      issue("error", "Choose all four free ability boosts.", "abilities");
+    const duplicates = draft.boosts.free
+      .filter(Boolean)
+      .filter((pick, i, arr) => arr.indexOf(pick) !== i);
+    if (duplicates.length)
+      issue("error", "The four free boosts must be applied to different abilities.", "abilities");
   }
   for (const milestone of [5, 10, 15, 20]) {
     if (draft.level < milestone) continue;
     const picks = draft.boosts.levels[String(milestone)] ?? [];
-    if (picks.filter(Boolean).length < 4) issue("error", `Choose all four level ${milestone} ability boosts.`, "abilities");
+    if (picks.filter(Boolean).length < 4)
+      issue("error", `Choose all four level ${milestone} ability boosts.`, "abilities");
     const duplicates = picks.filter(Boolean).filter((pick, i, arr) => arr.indexOf(pick) !== i);
-    if (duplicates.length) issue("error", `Level ${milestone} boosts must be applied to different abilities.`, "abilities");
+    if (duplicates.length)
+      issue(
+        "error",
+        `Level ${milestone} boosts must be applied to different abilities.`,
+        "abilities"
+      );
   }
   for (const ability of ABILITIES) {
     if (rawAbilities[ability] > 18) {
       issue(
         "error",
         `${ABILITY_LABELS[ability]} would be ${rawAbilities[ability]} at 1st level. Reassign a boost so no score exceeds 18.`,
-        "abilities",
+        "abilities"
       );
     }
   }
@@ -1522,31 +1727,47 @@ export function computeCharacter(draft: CharacterDraft, context: CharacterContex
   for (const group of background?.skillChoices ?? []) {
     const chosen = draft.skills.background.filter((skill) => group.options.includes(skill));
     if (chosen.length < group.count) {
-      issue("error", `Choose ${group.count} skill${group.count === 1 ? "" : "s"} for ${background?.name ?? "your background"}.`, "background");
+      issue(
+        "error",
+        `Choose ${group.count} skill${group.count === 1 ? "" : "s"} for ${background?.name ?? "your background"}.`,
+        "background"
+      );
     }
   }
   for (const group of background?.loreChoices ?? []) {
     const chosen = draft.skills.backgroundLore.filter(
-      (lore) => !group.options.length || group.options.includes(lore),
+      (lore) => !group.options.length || group.options.includes(lore)
     );
     if (chosen.length < group.count) {
-      issue("error", `Choose ${group.count} Lore skill${group.count === 1 ? "" : "s"} for ${background?.name ?? "your background"}.`, "background");
+      issue(
+        "error",
+        `Choose ${group.count} Lore skill${group.count === 1 ? "" : "s"} for ${background?.name ?? "your background"}.`,
+        "background"
+      );
     }
     if (new Set(chosen).size < chosen.length) {
-      issue("error", `Choose different Lore skills for ${background?.name ?? "your background"}.`, "background");
+      issue(
+        "error",
+        `Choose different Lore skills for ${background?.name ?? "your background"}.`,
+        "background"
+      );
     }
   }
   for (const group of background?.featChoices ?? []) {
     const chosen = group.options.filter((option) => option.id === draft.backgroundFeat);
     if (chosen.length < group.count) {
-      issue("error", `Choose your starting feat for ${background?.name ?? "your background"}.`, "background");
+      issue(
+        "error",
+        `Choose your starting feat for ${background?.name ?? "your background"}.`,
+        "background"
+      );
     }
   }
   const extraRequired = classData
     ? Math.max(0, classData.trainedSkills.additional + Math.max(0, abilityMods.int))
     : 0;
   const selectedExtra = draft.skills.trained.filter(
-    (skill) => SKILL_BY_ID[skill as SkillId] && !fixedSkillSet.has(skill),
+    (skill) => SKILL_BY_ID[skill as SkillId] && !fixedSkillSet.has(skill)
   );
   const uniqueExtra = [...new Set(selectedExtra)];
   if (classData && uniqueExtra.length !== extraRequired) {
@@ -1555,12 +1776,13 @@ export function computeCharacter(draft: CharacterDraft, context: CharacterContex
       uniqueExtra.length < extraRequired
         ? `Choose ${extraRequired - uniqueExtra.length} more trained skill${extraRequired - uniqueExtra.length === 1 ? "" : "s"}.`
         : "You have selected too many trained skills.",
-      "skills",
+      "skills"
     );
   }
   if (fixedSkillSet.size) {
     for (const skill of fixedSkillSet) {
-      if (!SKILL_BY_ID[skill as SkillId]) issue("warning", `Unknown trained skill “${skill}”.`, "skills");
+      if (!SKILL_BY_ID[skill as SkillId])
+        issue("warning", `Unknown trained skill “${skill}”.`, "skills");
     }
   }
 
@@ -1568,12 +1790,15 @@ export function computeCharacter(draft: CharacterDraft, context: CharacterContex
   for (const skill of SKILLS) ranks[skill.id] = 0;
   for (const skill of fixedSkillSet) if (skill in ranks) ranks[skill] = 1;
   for (const skill of uniqueExtra) if (skill in ranks) ranks[skill] = 1;
-  for (const skill of draft.skills.trained) if (skill in ranks) ranks[skill] = Math.max(ranks[skill], 1);
+  for (const skill of draft.skills.trained)
+    if (skill in ranks) ranks[skill] = Math.max(ranks[skill], 1);
   for (const [skill, rank] of Object.entries(automaticSkillRanks(draft, context))) {
     if (skill in ranks) ranks[skill] = Math.max(ranks[skill], rank);
   }
 
-  const increaseLevels = (classData?.skillIncreaseLevels ?? []).filter((level) => level <= draft.level).sort((a, b) => a - b);
+  const increaseLevels = (classData?.skillIncreaseLevels ?? [])
+    .filter((level) => level <= draft.level)
+    .sort((a, b) => a - b);
   for (const level of increaseLevels) {
     const skill = draft.skills.increases[String(level)];
     if (!skill) {
@@ -1588,18 +1813,27 @@ export function computeCharacter(draft: CharacterDraft, context: CharacterContex
     // already-trained skill by one rank.
     ranks[skill] = Math.min(4, ranks[skill] + 1);
     if (ranks[skill] > skillRankCap(level)) {
-      issue("error", `${SKILL_BY_ID[skill as SkillId]?.name ?? skill} is above the proficiency rank allowed at level ${level}.`, "skills");
+      issue(
+        "error",
+        `${SKILL_BY_ID[skill as SkillId]?.name ?? skill} is above the proficiency rank allowed at level ${level}.`,
+        "skills"
+      );
     }
   }
   for (const skill of SKILLS) {
     if (ranks[skill.id] > skillRankCap(draft.level)) {
-      issue("error", `${skill.name} has a proficiency rank above what your level allows.`, "skills");
+      issue(
+        "error",
+        `${skill.name} has a proficiency rank above what your level allows.`,
+        "skills"
+      );
     }
   }
 
   const equippedArmorItem = equippedArmor(draft, context);
-  const meetsArmorStrength =
-    equippedArmorItem?.armor ? abilityMods.str >= (equippedArmorItem.armor.strength || 0) : true;
+  const meetsArmorStrength = equippedArmorItem?.armor
+    ? abilityMods.str >= (equippedArmorItem.armor.strength || 0)
+    : true;
   const armorCheckPenalty =
     equippedArmorItem?.armor && !meetsArmorStrength && equippedArmorItem.armor.checkPenalty
       ? -Math.abs(equippedArmorItem.armor.checkPenalty)
@@ -1645,7 +1879,9 @@ export function computeCharacter(draft: CharacterDraft, context: CharacterContex
   }
   const classLoreFeatures = [
     ...(classData?.features ?? []),
-    ...(classData ? selectedChoiceOptions(draft, classData).flatMap((option) => option.grantedFeatures ?? []) : []),
+    ...(classData
+      ? selectedChoiceOptions(draft, classData).flatMap((option) => option.grantedFeatures ?? [])
+      : []),
   ];
   for (const feature of classLoreFeatures) {
     if (feature.level > draft.level) continue;
@@ -1675,19 +1911,19 @@ export function computeCharacter(draft: CharacterDraft, context: CharacterContex
   const perLevel = Math.max(1, classHp + conMod);
   const maxHp = Math.max(1, ancestryHp + perLevel + Math.max(0, draft.level - 1) * perLevel);
   const currentHp =
-    draft.play.hp === null
-      ? maxHp
-      : Math.max(0, Math.min(maxHp, Math.round(draft.play.hp)));
+    draft.play.hp === null ? maxHp : Math.max(0, Math.min(maxHp, Math.round(draft.play.hp)));
 
   const armor = equippedArmor(draft, context);
-  const armorEntry = draft.equipment.find(
-    (entry) => entry.equipped && Boolean(context.equipment[entry.itemId]?.armor),
-  ) ?? null;
+  const armorEntry =
+    draft.equipment.find(
+      (entry) => entry.equipped && Boolean(context.equipment[entry.itemId]?.armor)
+    ) ?? null;
   const armorRunes = summarizeRunes(armorEntry?.runes, context.equipment);
   const shield = equippedShield(draft, context);
-  const shieldEntry = draft.equipment.find(
-    (entry) => entry.equipped && Boolean(context.equipment[entry.itemId]?.shield),
-  ) ?? null;
+  const shieldEntry =
+    draft.equipment.find(
+      (entry) => entry.equipped && Boolean(context.equipment[entry.itemId]?.shield)
+    ) ?? null;
   const shieldRunes = shieldRuneBonus(shieldEntry?.runes, context.equipment);
   const shieldInfo = shield?.shield
     ? {
@@ -1696,22 +1932,20 @@ export function computeCharacter(draft: CharacterDraft, context: CharacterContex
           shield.shield.hardness,
           Math.min(
             shieldRunes.maxHardness ?? Number.POSITIVE_INFINITY,
-            shield.shield.hardness + shieldRunes.hardness,
-          ),
+            shield.shield.hardness + shieldRunes.hardness
+          )
         ),
         hp: Math.max(
           shield.shield.hp,
-          Math.min(
-            shieldRunes.maxHp ?? Number.POSITIVE_INFINITY,
-            shield.shield.hp + shieldRunes.hp,
-          ),
+          Math.min(shieldRunes.maxHp ?? Number.POSITIVE_INFINITY, shield.shield.hp + shieldRunes.hp)
         ),
         brokenThreshold: 0,
         raised: draft.play.shieldRaised,
       }
     : null;
   if (shieldInfo) shieldInfo.brokenThreshold = Math.floor(shieldInfo.hp / 2);
-  const shieldBonus = draft.play.shieldRaised && shield?.shield ? Math.abs(shield.shield.acBonus || 2) : 0;
+  const shieldBonus =
+    draft.play.shieldRaised && shield?.shield ? Math.abs(shield.shield.acBonus || 2) : 0;
   let ac: number;
   let speed = ancestry?.speed ?? 25;
   if (armor?.armor) {
@@ -1727,39 +1961,60 @@ export function computeCharacter(draft: CharacterDraft, context: CharacterContex
       shieldBonus;
     if (!meetsArmorStrength) speed += armor.armor.speedPenalty || 0;
   } else {
-    ac = 10 + abilityMods.dex + proficiencyBonus(prof.defenses.unarmored ?? 0, draft.level) + shieldBonus;
+    ac =
+      10 +
+      abilityMods.dex +
+      proficiencyBonus(prof.defenses.unarmored ?? 0, draft.level) +
+      shieldBonus;
   }
   if (shield?.shield?.speedPenalty) speed += shield.shield.speedPenalty;
   speed = Math.max(5, speed);
 
   const saves: Record<SaveKey, number> = {
-    fortitude: proficiencyBonus(prof.fortitude, draft.level) + abilityMods.con + armorRunes.resilient,
+    fortitude:
+      proficiencyBonus(prof.fortitude, draft.level) + abilityMods.con + armorRunes.resilient,
     reflex: proficiencyBonus(prof.reflex, draft.level) + abilityMods.dex + armorRunes.resilient,
     will: proficiencyBonus(prof.will, draft.level) + abilityMods.wis + armorRunes.resilient,
   };
   const perception = proficiencyBonus(prof.perception, draft.level) + abilityMods.wis;
-  const classDc = classData ? 10 + proficiencyBonus(prof.classDc, draft.level) + keyMod : 10 + keyMod;
+  const classDc = classData
+    ? 10 + proficiencyBonus(prof.classDc, draft.level) + keyMod
+    : 10 + keyMod;
   const spellDc =
-    caster.progression === "none" ? null : 10 + proficiencyBonus(prof.spellcasting, draft.level) + spellMod;
+    caster.progression === "none"
+      ? null
+      : 10 + proficiencyBonus(prof.spellcasting, draft.level) + spellMod;
   const spellAttack =
-    caster.progression === "none" ? null : proficiencyBonus(prof.spellcasting, draft.level) + spellMod;
+    caster.progression === "none"
+      ? null
+      : proficiencyBonus(prof.spellcasting, draft.level) + spellMod;
 
   // --- Equipment -----------------------------------------------------------
   const ownedEquipment = draft.equipment
     .map((entry) => ({ entry, item: context.equipment[entry.itemId] }))
-    .filter((x): x is { entry: typeof draft.equipment[number]; item: Equipment } => Boolean(x.item));
-  const bulkTotal = ownedEquipment.reduce((sum, { entry, item }) => sum + (item.bulk || 0) * entry.quantity, 0);
+    .filter((x): x is { entry: (typeof draft.equipment)[number]; item: Equipment } =>
+      Boolean(x.item)
+    );
+  const bulkTotal = ownedEquipment.reduce(
+    (sum, { entry, item }) => sum + (item.bulk || 0) * entry.quantity,
+    0
+  );
   const capacity = 5 + abilityMods.str;
   const maxBulk = 10 + abilityMods.str;
   const spent = ownedEquipment.reduce((sum, { entry, item }) => {
     const runeCost = (entry.runes ?? []).reduce(
       (runeSum, runeId) => runeSum + (context.equipment[runeId]?.price.cpTotal ?? 0),
-      0,
+      0
     );
     return sum + item.price.cpTotal * entry.quantity + runeCost;
   }, 0);
   const budget = startingWealthCp(draft.level);
-  if (spent > budget) issue("warning", "Your equipment costs more than the standard starting wealth for this level.", "gear");
+  if (spent > budget)
+    issue(
+      "warning",
+      "Your equipment costs more than the standard starting wealth for this level.",
+      "gear"
+    );
 
   for (const { entry, item } of ownedEquipment) {
     if (!entry.runes?.length) continue;
@@ -1769,7 +2024,7 @@ export function computeCharacter(draft: CharacterDraft, context: CharacterContex
       issue(
         "error",
         `${item.name} has ${runeEffects.property.length} property runes but its potency supports ${slots}.`,
-        "gear",
+        "gear"
       );
     }
   }
@@ -1780,7 +2035,9 @@ export function computeCharacter(draft: CharacterDraft, context: CharacterContex
   const thief = selectedOptionNames.has("thief");
   const activeFeatures = [
     ...(classData?.features ?? []).filter((feature) => feature.level <= draft.level),
-    ...chosenOptions.flatMap((option) => option.grantedFeatures ?? []).filter((feature) => feature.level <= draft.level),
+    ...chosenOptions
+      .flatMap((option) => option.grantedFeatures ?? [])
+      .filter((feature) => feature.level <= draft.level),
   ];
   const attacks: DerivedAttack[] = [];
   for (const { entry, item } of ownedEquipment) {
@@ -1792,7 +2049,8 @@ export function computeCharacter(draft: CharacterDraft, context: CharacterContex
     const rank = attackRankFor(item, prof, classData, context.deity);
     const runes = summarizeRunes(entry.runes, context.equipment);
     const ranged = weapon.range !== null || item.traits.includes("thrown");
-    const isThrown = item.traits.includes("thrown") || item.traits.some((t) => t.startsWith("thrown-"));
+    const isThrown =
+      item.traits.includes("thrown") || item.traits.some((t) => t.startsWith("thrown-"));
     const finesse = item.traits.includes("finesse");
     let attackAbility = abilityMods.str;
     let damageAbility = abilityMods.str;
@@ -1809,12 +2067,16 @@ export function computeCharacter(draft: CharacterDraft, context: CharacterContex
       damageAbility = thief ? Math.max(abilityMods.str, abilityMods.dex) : abilityMods.str;
     }
     const attackBonus =
-      proficiencyBonus(rank, draft.level) + attackAbility + (weapon.bonus || 0) + runes.weaponPotency;
+      proficiencyBonus(rank, draft.level) +
+      attackAbility +
+      (weapon.bonus || 0) +
+      runes.weaponPotency;
     const damageDice = Math.max(weapon.damage.dice, runes.strikingDice);
     const damageBase = `${damageDice}${weapon.damage.die}`;
     // Alchemical bombs have an item bonus to attack rolls but not to damage.
     const weaponDamageBonus = isBomb(item) ? 0 : weapon.bonus || 0;
-    const damageMod = damageAbility + weaponDamageBonus + weaponSpecializationBonus(activeFeatures, rank);
+    const damageMod =
+      damageAbility + weaponDamageBonus + weaponSpecializationBonus(activeFeatures, rank);
     const damageFormula = damageMod === 0 ? damageBase : `${damageBase}${signed(damageMod)}`;
     const extraDamage = runes.property
       .map((rune) => propertyRuneDamage(rune))
@@ -1844,8 +2106,12 @@ export function computeCharacter(draft: CharacterDraft, context: CharacterContex
   }
   const deityFist =
     context.deity?.weapons.some((weapon) => /^(fist|unarmed)/i.test(weapon)) ?? false;
-  const fistRank = Math.max(prof.attacks.unarmed ?? 0, deityFist ? prof.attacks.favoredWeapon ?? 0 : 0);
-  const fistAttack = proficiencyBonus(fistRank, draft.level) + Math.max(abilityMods.str, abilityMods.dex);
+  const fistRank = Math.max(
+    prof.attacks.unarmed ?? 0,
+    deityFist ? (prof.attacks.favoredWeapon ?? 0) : 0
+  );
+  const fistAttack =
+    proficiencyBonus(fistRank, draft.level) + Math.max(abilityMods.str, abilityMods.dex);
   const fistDamage = abilityMods.str + weaponSpecializationBonus(activeFeatures, fistRank);
   attacks.push({
     id: "unarmed:fist",
@@ -1863,7 +2129,11 @@ export function computeCharacter(draft: CharacterDraft, context: CharacterContex
 
   // --- Spells --------------------------------------------------------------
   const slots = spellSlotsFor(draft.level, caster.progression, classData?.name);
-  const maxSpellRank = slots ? slots.length : caster.progression === "none" ? 0 : Math.ceil(draft.level / 2);
+  const maxSpellRank = slots
+    ? slots.length
+    : caster.progression === "none"
+      ? 0
+      : Math.ceil(draft.level / 2);
   const tradition = caster.tradition ?? draft.spells.tradition;
   if (caster.traditionOptions && !tradition) {
     issue("error", "Choose your magical tradition.", "spells");
@@ -1872,12 +2142,17 @@ export function computeCharacter(draft: CharacterDraft, context: CharacterContex
     const spell = context.spells[spellId];
     if (!spell) continue;
     if (spell.rank > maxSpellRank) {
-      issue("warning", `${spell.name} is a rank ${spell.rank} spell, above what this character can cast.`, "spells");
+      issue(
+        "warning",
+        `${spell.name} is a rank ${spell.rank} spell, above what this character can cast.`,
+        "spells"
+      );
     }
   }
   if (caster.progression !== "none") {
     for (const spellId of draft.spells.known) {
-      if (!context.spells[spellId]) issue("warning", "A selected spell is missing from the compendium.", "spells");
+      if (!context.spells[spellId])
+        issue("warning", "A selected spell is missing from the compendium.", "spells");
     }
   }
   const preparedCaster = PREPARED_CASTER_CLASSES.has(classData?.name.toLowerCase() ?? "");
@@ -1890,7 +2165,11 @@ export function computeCharacter(draft: CharacterDraft, context: CharacterContex
         continue;
       }
       if (!draft.spells.known.includes(spellId) && !draft.spells.cantrips.includes(spellId)) {
-        issue("warning", `${spell.name} is prepared but is not in this character's spellbook or list.`, "spells");
+        issue(
+          "warning",
+          `${spell.name} is prepared but is not in this character's spellbook or list.`,
+          "spells"
+        );
       }
       if (spell.rank > 0) preparedByRank.set(spell.rank, (preparedByRank.get(spell.rank) ?? 0) + 1);
     }
@@ -1900,7 +2179,7 @@ export function computeCharacter(draft: CharacterDraft, context: CharacterContex
         issue(
           "error",
           `${classData?.name ?? "This class"} has ${count} rank ${rank} spells prepared but only ${limit} slot${limit === 1 ? "" : "s"}.`,
-          "spells",
+          "spells"
         );
       }
     }
@@ -1911,7 +2190,7 @@ export function computeCharacter(draft: CharacterDraft, context: CharacterContex
       issue(
         "error",
         `${classData?.name ?? "This class"} knows ${draft.spells.cantrips.length} cantrips but the repertoire allows ${repertoire.cantrips}.`,
-        "spells",
+        "spells"
       );
     }
     const knownByRank = new Map<number, number>();
@@ -1926,7 +2205,7 @@ export function computeCharacter(draft: CharacterDraft, context: CharacterContex
         issue(
           "error",
           `${classData?.name ?? "This class"} knows ${count} rank ${rank} spells but the repertoire allows ${limit}.`,
-          "spells",
+          "spells"
         );
       }
     }
@@ -1947,10 +2226,15 @@ export function computeCharacter(draft: CharacterDraft, context: CharacterContex
       issue("warning", "A selected feat is missing from the compendium.", "feats");
       continue;
     }
-    if (feat.level > slot.level) issue("error", `${feat.name} is above the level ${slot.level} slot.`, "feats");
+    if (feat.level > slot.level)
+      issue("error", `${feat.name} is above the level ${slot.level} slot.`, "feats");
     const expected = slot.category === "class" ? ["class", "archetype"] : [slot.category];
     if (!expected.includes(feat.category)) {
-      issue("error", `${feat.name} is a ${feat.category} feat and cannot fill a ${slot.category} feat slot.`, "feats");
+      issue(
+        "error",
+        `${feat.name} is a ${feat.category} feat and cannot fill a ${slot.category} feat slot.`,
+        "feats"
+      );
     }
   }
   for (const id of draft.feats.extras) selectedFeatIds.push(id);
@@ -1962,13 +2246,13 @@ export function computeCharacter(draft: CharacterDraft, context: CharacterContex
   if (classData) {
     for (const group of applicableChoiceGroups(draft, classData)) {
       const selected = (draft.classChoices[group.key] ?? []).filter((id) =>
-        group.options.some((option) => option.id === id),
+        group.options.some((option) => option.id === id)
       );
       if (selected.length !== group.count) {
         issue(
           "error",
           `${group.prompt} Choose ${group.count} option${group.count === 1 ? "" : "s"}.`,
-          "class",
+          "class"
         );
       }
       if (new Set(selected).size !== selected.length) {
@@ -1982,10 +2266,14 @@ export function computeCharacter(draft: CharacterDraft, context: CharacterContex
 
   // --- Features ------------------------------------------------------------
   const suppressed = new Set(
-    chosenOptions.flatMap((option) => (option.suppressedFeatures ?? []).map(parseClassFeatureUuidName)),
+    chosenOptions.flatMap((option) =>
+      (option.suppressedFeatures ?? []).map(parseClassFeatureUuidName)
+    )
   );
   const features: FeatureSummary[] = classData
-    ? classData.features.filter((feature) => feature.level <= draft.level && !suppressed.has(feature.name))
+    ? classData.features.filter(
+        (feature) => feature.level <= draft.level && !suppressed.has(feature.name)
+      )
     : [];
   const addFeature = (feature: FeatureSummary) => {
     if (feature.level > draft.level || suppressed.has(feature.name)) return;
@@ -2020,10 +2308,17 @@ export function computeCharacter(draft: CharacterDraft, context: CharacterContex
 
   let focusPointsMax =
     caster.progression !== "none" ||
-    features.some((feature) => /focus|devotion spells|conflux spells|link spells|hexes|revelation spells|grave spells|composition spells|psi cantrips/i.test(feature.name))
+    features.some((feature) =>
+      /focus|devotion spells|conflux spells|link spells|hexes|revelation spells|grave spells|composition spells|psi cantrips/i.test(
+        feature.name
+      )
+    )
       ? 1
       : 0;
-  if (classData?.name.toLowerCase() === "necromancer" || classData?.name.toLowerCase() === "psychic") {
+  if (
+    classData?.name.toLowerCase() === "necromancer" ||
+    classData?.name.toLowerCase() === "psychic"
+  ) {
     focusPointsMax = Math.max(focusPointsMax, 2);
   }
   // A focus pool can hold one point per focus spell, up to 3. This is a
@@ -2034,7 +2329,9 @@ export function computeCharacter(draft: CharacterDraft, context: CharacterContex
   const languages = [
     ...(ancestry?.languages ?? []).map(titleCase),
     ...draft.details.languages,
-  ].filter((value, index, arr) => arr.findIndex((x) => x.toLowerCase() === value.toLowerCase()) === index);
+  ].filter(
+    (value, index, arr) => arr.findIndex((x) => x.toLowerCase() === value.toLowerCase()) === index
+  );
 
   const senses = ancestry?.vision && ancestry.vision !== "normal" ? [ancestry.vision] : [];
 
@@ -2111,7 +2408,9 @@ export function computeCharacter(draft: CharacterDraft, context: CharacterContex
       const unmet = checks.filter((check) => check.status === "unmet").map((check) => check.text);
       issue("error", `${feat.name} prerequisites are not met: ${unmet.join("; ")}.`, "feats");
     } else if (status === "unknown") {
-      const unknown = checks.filter((check) => check.status === "unknown").map((check) => check.text);
+      const unknown = checks
+        .filter((check) => check.status === "unknown")
+        .map((check) => check.text);
       issue("warning", `Verify ${feat.name} prerequisites: ${unknown.join("; ")}.`, "feats");
     }
   }
@@ -2178,7 +2477,7 @@ export function characterSummary(draft: CharacterDraft, context: CharacterContex
     focusPoints: draft.play.focusPoints,
     conditions: draft.play.conditions.map(
       (condition) =>
-        `${condition.name}${condition.value ? ` ${condition.value}` : ""}${condition.duration ? ` (${condition.duration}r)` : ""}`,
+        `${condition.name}${condition.value ? ` ${condition.value}` : ""}${condition.duration ? ` (${condition.duration}r)` : ""}`
     ),
     portraitUrl: draft.portraitUrl,
   };

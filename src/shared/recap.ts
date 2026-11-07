@@ -9,21 +9,11 @@ import type {
   SessionRecapStats,
 } from "./types";
 
-type RecapMessage = Pick<
-  ChatMessage,
-  "type" | "visibility" | "authorName" | "data" | "createdAt"
->;
+type RecapMessage = Pick<ChatMessage, "type" | "visibility" | "authorName" | "data" | "createdAt">;
 type RecapJournal = Pick<JournalEntry, "title" | "kind" | "visible" | "updatedAt">;
 type RecapLoot = Pick<
   LootParcel,
-  | "name"
-  | "items"
-  | "gp"
-  | "sp"
-  | "cp"
-  | "status"
-  | "distributedToName"
-  | "updatedAt"
+  "name" | "items" | "gp" | "sp" | "cp" | "status" | "distributedToName" | "updatedAt"
 >;
 
 export interface SessionRecapInput {
@@ -83,12 +73,12 @@ function rollSummary(stats: SessionRecapStats): string {
   parts.push(`${stats.failures} ${stats.failures === 1 ? "failure" : "failures"}`);
   if (stats.criticalSuccesses) {
     parts.push(
-      `${stats.criticalSuccesses} critical ${stats.criticalSuccesses === 1 ? "success" : "successes"}`,
+      `${stats.criticalSuccesses} critical ${stats.criticalSuccesses === 1 ? "success" : "successes"}`
     );
   }
   if (stats.criticalFailures) {
     parts.push(
-      `${stats.criticalFailures} critical ${stats.criticalFailures === 1 ? "failure" : "failures"}`,
+      `${stats.criticalFailures} critical ${stats.criticalFailures === 1 ? "failure" : "failures"}`
     );
   }
   return `${stats.rolls} ${stats.rolls === 1 ? "roll" : "rolls"}: ${parts.join(", ")}.`;
@@ -101,16 +91,18 @@ function rollSummary(stats: SessionRecapStats): string {
  */
 export function buildSessionRecap(input: SessionRecapInput): SessionRecap {
   const messages = input.messages.filter(
-    (message) => message.visibility === "all" && inWindow(message.createdAt, input.from, input.to),
+    (message) => message.visibility === "all" && inWindow(message.createdAt, input.from, input.to)
   );
   const journal = input.journal.filter(
-    (entry) => entry.visible && inWindow(entry.updatedAt, input.from, input.to),
+    (entry) => entry.visible && inWindow(entry.updatedAt, input.from, input.to)
   );
   const loot = input.loot.filter((parcel) => inWindow(parcel.updatedAt, input.from, input.to));
   const threads = input.threads.filter((thread) => thread.visible && !thread.done);
   const rolls = messages
     .map((message) => ({ message, result: rollResult(message) }))
-    .filter((entry): entry is { message: RecapMessage; result: RollResult } => entry.result !== null);
+    .filter(
+      (entry): entry is { message: RecapMessage; result: RollResult } => entry.result !== null
+    );
 
   let successes = 0;
   let failures = 0;
@@ -137,12 +129,10 @@ export function buildSessionRecap(input: SessionRecapInput): SessionRecap {
   };
 
   const lines: string[] = [`# Session recap — ${input.campaignName}`, ""];
-  lines.push(
-    `**Window:** ${formatTimestamp(input.from)} – ${formatTimestamp(input.to)}`,
-  );
+  lines.push(`**Window:** ${formatTimestamp(input.from)} – ${formatTimestamp(input.to)}`);
   if (input.session) {
     lines.push(
-      `**Session:** ${input.session.title} — ${formatTimestamp(input.session.scheduledAt)}`,
+      `**Session:** ${input.session.title} — ${formatTimestamp(input.session.scheduledAt)}`
     );
     const present = input.session.attendance
       .filter((entry) => entry.status === "attended" || entry.status === "late")
@@ -178,9 +168,7 @@ export function buildSessionRecap(input: SessionRecapInput): SessionRecap {
   if (loot.length) {
     lines.push("", "## Treasure");
     for (const parcel of loot.slice(0, MAX_LOOT_LINES)) {
-      const items = parcel.items
-        .map((item) => `${item.quantity}× ${item.name}`)
-        .join(", ");
+      const items = parcel.items.map((item) => `${item.quantity}× ${item.name}`).join(", ");
       const coins = coinParts(parcel);
       const contents = [...(items ? [items] : []), ...(coins.length ? [coins.join(", ")] : [])];
       const distributed = parcel.distributedToName
@@ -189,7 +177,7 @@ export function buildSessionRecap(input: SessionRecapInput): SessionRecap {
           ? " — distributed"
           : "";
       lines.push(
-        `- **${parcel.name}**: ${contents.length ? contents.join("; ") : "no recorded contents"}${distributed}.`,
+        `- **${parcel.name}**: ${contents.length ? contents.join("; ") : "no recorded contents"}${distributed}.`
       );
     }
     if (loot.length > MAX_LOOT_LINES) {

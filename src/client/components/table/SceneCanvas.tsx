@@ -86,11 +86,30 @@ export function SceneCanvas({
     tokenId: string;
     positions: Record<string, { x: number; y: number }>;
   } | null>(null);
-  const [panning, setPanning] = useState<{ startX: number; startY: number; panX: number; panY: number } | null>(null);
-  const [measuring, setMeasuring] = useState<{ startX: number; startY: number; x: number; y: number } | null>(null);
-  const [marquee, setMarquee] = useState<{ startX: number; startY: number; x: number; y: number } | null>(null);
+  const [panning, setPanning] = useState<{
+    startX: number;
+    startY: number;
+    panX: number;
+    panY: number;
+  } | null>(null);
+  const [measuring, setMeasuring] = useState<{
+    startX: number;
+    startY: number;
+    x: number;
+    y: number;
+  } | null>(null);
+  const [marquee, setMarquee] = useState<{
+    startX: number;
+    startY: number;
+    x: number;
+    y: number;
+  } | null>(null);
   const [fogPreview, setFogPreview] = useState<Set<string>>(() => new Set(scene.revealed));
-  const [templateDraft, setTemplateDraft] = useState<{ x: number; y: number; direction: number } | null>(null);
+  const [templateDraft, setTemplateDraft] = useState<{
+    x: number;
+    y: number;
+    direction: number;
+  } | null>(null);
   const templateDraftRef = useRef<{ x: number; y: number; direction: number } | null>(null);
   const painting = useRef<{ mode: FogMode; cells: Set<string> } | null>(null);
   const fittedScene = useRef<string | null>(null);
@@ -99,7 +118,8 @@ export function SceneCanvas({
   const rows = Math.max(1, Math.ceil(scene.height / scene.gridSize));
   const portraitMap = useMemo(() => {
     const map = new Map<string, string | null>();
-    for (const character of characters) map.set(character.id, character.summary?.portraitUrl ?? null);
+    for (const character of characters)
+      map.set(character.id, character.summary?.portraitUrl ?? null);
     return map;
   }, [characters]);
   const characterMap = useMemo(() => {
@@ -169,10 +189,19 @@ export function SceneCanvas({
         (scene.gridOffsetX + cx * scene.gridSize) * fogScale,
         (scene.gridOffsetY + cy * scene.gridSize) * fogScale,
         cellSize,
-        cellSize,
+        cellSize
       );
     }
-  }, [fogPreview, isGm, scene.width, scene.height, scene.gridSize, scene.gridOffsetX, scene.gridOffsetY, scene.fogEnabled]);
+  }, [
+    fogPreview,
+    isGm,
+    scene.width,
+    scene.height,
+    scene.gridSize,
+    scene.gridOffsetX,
+    scene.gridOffsetY,
+    scene.fogEnabled,
+  ]);
 
   const scenePoint = (clientX: number, clientY: number) => {
     const rect = surfaceRef.current?.getBoundingClientRect();
@@ -348,7 +377,13 @@ export function SceneCanvas({
       templateDraftRef.current = null;
       setTemplateDraft(null);
       if (templateKind) {
-        onTemplate({ kind: templateKind, size: templateSize, x: draft.x, y: draft.y, direction: draft.direction });
+        onTemplate({
+          kind: templateKind,
+          size: templateSize,
+          x: draft.x,
+          y: draft.y,
+          direction: draft.direction,
+        });
       }
       viewportRef.current?.releasePointerCapture(event.pointerId);
       return;
@@ -399,7 +434,9 @@ export function SceneCanvas({
         if (member.groupId === token.groupId) movingIds.add(member.id);
       }
     }
-    const positions: Record<string, { x: number; y: number }> = { [token.id]: { x: point.x, y: point.y } };
+    const positions: Record<string, { x: number; y: number }> = {
+      [token.id]: { x: point.x, y: point.y },
+    };
     for (const id of movingIds) {
       const member = tokens.find((entry) => entry.id === id);
       if (!member) continue;
@@ -414,14 +451,8 @@ export function SceneCanvas({
     if (dragging?.tokenId !== token.id) return;
     const point = scenePoint(event.clientX, event.clientY);
     const half = (token.size * scene.gridSize) / 2;
-    const nextX = snap(
-      Math.max(half, Math.min(scene.width - half, point.x)),
-      scene.gridOffsetX,
-    );
-    const nextY = snap(
-      Math.max(half, Math.min(scene.height - half, point.y)),
-      scene.gridOffsetY,
-    );
+    const nextX = snap(Math.max(half, Math.min(scene.width - half, point.x)), scene.gridOffsetX);
+    const nextY = snap(Math.max(half, Math.min(scene.height - half, point.y)), scene.gridOffsetY);
     const dx = nextX - token.x;
     const dy = nextY - token.y;
     const members = Object.keys(dragging.positions)
@@ -548,18 +579,25 @@ export function SceneCanvas({
         {tokens.map((token) => {
           const size = token.size * scene.gridSize;
           const position = dragPosition(token);
-          const portrait = token.imageUrl || (token.characterId ? portraitMap.get(token.characterId) : null);
+          const portrait =
+            token.imageUrl || (token.characterId ? portraitMap.get(token.characterId) : null);
           const canDrag = isGm || (token.ownerId === userId && !token.locked);
           const isSelected = selectedTokenIds.includes(token.id) || selectedTokenId === token.id;
           const character = token.characterId ? characterMap.get(token.characterId) : null;
           const summary = character?.summary;
           const conditions = token.conditions
             .map((condition) =>
-              [condition.name, condition.value ? ` ${condition.value}` : "", condition.duration ? ` (${condition.duration}r)` : ""].join(""),
+              [
+                condition.name,
+                condition.value ? ` ${condition.value}` : "",
+                condition.duration ? ` (${condition.duration}r)` : "",
+              ].join("")
             )
             .join(", ");
           const tokenMeta = [
-            token.hpMax !== null && token.hpCurrent !== null ? `HP ${token.hpCurrent}/${token.hpMax}` : "",
+            token.hpMax !== null && token.hpCurrent !== null
+              ? `HP ${token.hpCurrent}/${token.hpMax}`
+              : "",
             token.ac !== null ? `AC ${token.ac}` : "",
             conditions ? `Conditions: ${conditions}` : "",
           ].filter(Boolean);
@@ -570,11 +608,24 @@ export function SceneCanvas({
               subtitle={
                 summary
                   ? `Level ${summary.level} ${summary.className || "adventurer"}${token.groupName ? ` · ${token.groupName}` : ""}`
-                  : token.groupName ?? (token.hidden && isGm ? "Hidden token" : "Token")
+                  : (token.groupName ?? (token.hidden && isGm ? "Hidden token" : "Token"))
               }
               meta={tokenMeta.length ? <span>{tokenMeta.join(" · ")}</span> : undefined}
-              body={summary ? <span>{[summary.ancestry, summary.heritage].filter(Boolean).join(" · ") || "Party member"}</span> : undefined}
-              footer={isGm ? "Right-click to edit" : character ? "Double-click for the character sheet" : undefined}
+              body={
+                summary ? (
+                  <span>
+                    {[summary.ancestry, summary.heritage].filter(Boolean).join(" · ") ||
+                      "Party member"}
+                  </span>
+                ) : undefined
+              }
+              footer={
+                isGm
+                  ? "Right-click to edit"
+                  : character
+                    ? "Double-click for the character sheet"
+                    : undefined
+              }
               disabled={Boolean(dragging)}
             >
               <div
@@ -611,13 +662,21 @@ export function SceneCanvas({
                 {portrait ? (
                   <img src={portrait} alt="" draggable={false} />
                 ) : (
-                  <span style={{ background: `linear-gradient(145deg, ${token.color}33, #11161f)` }}>
+                  <span
+                    style={{ background: `linear-gradient(145deg, ${token.color}33, #11161f)` }}
+                  >
                     {token.name.slice(0, 2).toUpperCase()}
                   </span>
                 )}
                 <span className="scene-token-name">{token.name}</span>
                 {token.hpMax !== null && token.hpCurrent !== null ? (
-                  <span className="token-hp"><span style={{ width: `${Math.max(0, Math.min(100, (token.hpCurrent / Math.max(1, token.hpMax)) * 100))}%` }} /></span>
+                  <span className="token-hp">
+                    <span
+                      style={{
+                        width: `${Math.max(0, Math.min(100, (token.hpCurrent / Math.max(1, token.hpMax)) * 100))}%`,
+                      }}
+                    />
+                  </span>
                 ) : null}
                 {token.locked ? <span className="token-lock" title="Locked"></span> : null}
               </div>
@@ -635,7 +694,12 @@ export function SceneCanvas({
               strokeWidth={2 / Math.max(zoom, 0.4)}
               strokeDasharray={`${8 / Math.max(zoom, 0.4)} ${5 / Math.max(zoom, 0.4)}`}
             />
-            <circle cx={measuring.startX} cy={measuring.startY} r={4 / Math.max(zoom, 0.4)} fill="#e5ca91" />
+            <circle
+              cx={measuring.startX}
+              cy={measuring.startY}
+              r={4 / Math.max(zoom, 0.4)}
+              fill="#e5ca91"
+            />
             <circle cx={measuring.x} cy={measuring.y} r={4 / Math.max(zoom, 0.4)} fill="#e5ca91" />
           </svg>
         ) : null}
@@ -690,7 +754,10 @@ export function SceneCanvas({
         {measuring ? (
           <div
             className="measure-label"
-            style={{ left: (measuring.startX + measuring.x) / 2, top: (measuring.startY + measuring.y) / 2 - 8 }}
+            style={{
+              left: (measuring.startX + measuring.x) / 2,
+              top: (measuring.startY + measuring.y) / 2 - 8,
+            }}
           >
             {Math.max(1, Math.round(measureSquares))} sq · {Math.max(5, measureFeet)} ft.
           </div>
@@ -698,16 +765,45 @@ export function SceneCanvas({
       </div>
 
       <div className="scene-zoom" onPointerDown={(event) => event.stopPropagation()}>
-        <button type="button" onClick={() => setZoom((current) => Math.max(0.08, current - 0.1))} title="Zoom out"><Minus size={14} /></button>
+        <button
+          type="button"
+          onClick={() => setZoom((current) => Math.max(0.08, current - 0.1))}
+          title="Zoom out"
+        >
+          <Minus size={14} />
+        </button>
         <span>{Math.round(zoom * 100)}%</span>
-        <button type="button" onClick={() => setZoom((current) => Math.min(4, current + 0.1))} title="Zoom in"><Plus size={14} /></button>
-        <button type="button" onClick={fit} title="Fit scene"><Maximize size={14} /></button>
+        <button
+          type="button"
+          onClick={() => setZoom((current) => Math.min(4, current + 0.1))}
+          title="Zoom in"
+        >
+          <Plus size={14} />
+        </button>
+        <button type="button" onClick={fit} title="Fit scene">
+          <Maximize size={14} />
+        </button>
       </div>
       <div className="scene-hints">
-        {fogBrush ? <Tag tone="gold"><Move size={11} /> Painting fog ({brushSize === 1 ? "1" : brushSize === 3 ? "3×3" : "5×5"})</Tag> : null}
-        {measureMode ? <Tag tone="gold"><Ruler size={11} /> Measuring</Tag> : null}
-        {templateKind ? <Tag tone="gold"><Move size={11} /> {TEMPLATE_LABELS[templateKind]} template · click and drag</Tag> : null}
-        {!fogBrush && !measureMode && !templateKind ? <span>Drag to pan · Shift-drag to select · wheel to zoom · right-click to ping</span> : null}
+        {fogBrush ? (
+          <Tag tone="gold">
+            <Move size={11} /> Painting fog (
+            {brushSize === 1 ? "1" : brushSize === 3 ? "3×3" : "5×5"})
+          </Tag>
+        ) : null}
+        {measureMode ? (
+          <Tag tone="gold">
+            <Ruler size={11} /> Measuring
+          </Tag>
+        ) : null}
+        {templateKind ? (
+          <Tag tone="gold">
+            <Move size={11} /> {TEMPLATE_LABELS[templateKind]} template · click and drag
+          </Tag>
+        ) : null}
+        {!fogBrush && !measureMode && !templateKind ? (
+          <span>Drag to pan · Shift-drag to select · wheel to zoom · right-click to ping</span>
+        ) : null}
       </div>
     </div>
   );

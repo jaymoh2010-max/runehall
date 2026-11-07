@@ -49,8 +49,14 @@ export async function api<T>(path: string, options: ApiOptions = {}): Promise<T>
 
 export async function uploadImage(
   file: File,
-  campaignId?: string | null,
-): Promise<{ url: string; filename: string; size: number; mimeType: string; campaignId?: string | null }> {
+  campaignId?: string | null
+): Promise<{
+  url: string;
+  filename: string;
+  size: number;
+  mimeType: string;
+  campaignId?: string | null;
+}> {
   const form = new FormData();
   form.append("file", file);
   return api("/api/uploads", {

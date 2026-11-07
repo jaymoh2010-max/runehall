@@ -1,8 +1,32 @@
 import { useState } from "react";
-import { Dices, Eye, EyeOff, Lock, Minus, MousePointer2, Plus, Swords, Trash2, Unlock, X } from "lucide-react";
+import {
+  Dices,
+  Eye,
+  EyeOff,
+  Lock,
+  Minus,
+  MousePointer2,
+  Plus,
+  Swords,
+  Trash2,
+  Unlock,
+  X,
+} from "lucide-react";
 import type { CharacterRecord, PublicUser, Scene, Token } from "../../../shared/types";
 import { groupHp, tokenConditionLabel, tokenConditionSummary } from "../../../shared/tokens";
-import { Avatar, Badge, Button, Field, IconButton, Input, ProgressBar, Select, Stat, Tag, Toggle } from "../ui";
+import {
+  Avatar,
+  Badge,
+  Button,
+  Field,
+  IconButton,
+  Input,
+  ProgressBar,
+  Select,
+  Stat,
+  Tag,
+  Toggle,
+} from "../ui";
 import { HoverCard } from "../HoverCard";
 
 export function VttTokenPanel({
@@ -69,7 +93,7 @@ export function VttTokenPanel({
     onBulkCondition(
       name,
       bulkValue === "" ? null : Math.max(0, Math.round(Number(bulkValue))),
-      bulkDuration === "" ? null : Math.max(0, Math.round(Number(bulkDuration))),
+      bulkDuration === "" ? null : Math.max(0, Math.round(Number(bulkDuration)))
     );
     setBulkCondition("");
     setBulkValue("");
@@ -83,38 +107,102 @@ export function VttTokenPanel({
           <span className="tiny muted">Scene</span>
           <h3>{activeScene.name}</h3>
         </div>
-        {isGm ? <Button size="sm" variant="ghost" onClick={() => setEditingScene(activeScene)}>Edit</Button> : null}
+        {isGm ? (
+          <Button size="sm" variant="ghost" onClick={() => setEditingScene(activeScene)}>
+            Edit
+          </Button>
+        ) : null}
       </div>
       {selectedTokens.length > 1 ? (
         <div className="bulk-token-bar">
           <div className="row-between">
             <strong>{selectedTokens.length} tokens selected</strong>
-            <IconButton label="Clear selection" onClick={() => setSelectedTokenId(null)}><X size={13} /></IconButton>
+            <IconButton label="Clear selection" onClick={() => setSelectedTokenId(null)}>
+              <X size={13} />
+            </IconButton>
           </div>
           <div className="row wrap" style={{ gap: 5 }}>
-            <Button size="sm" onClick={() => onBulkHp(-5)}>-5 HP</Button>
-            <Button size="sm" onClick={() => onBulkHp(5)}>+5 HP</Button>
-            <Button size="sm" variant="ghost" onClick={() => onBulkHp(0, true)}>Full HP</Button>
+            <Button size="sm" onClick={() => onBulkHp(-5)}>
+              -5 HP
+            </Button>
+            <Button size="sm" onClick={() => onBulkHp(5)}>
+              +5 HP
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => onBulkHp(0, true)}>
+              Full HP
+            </Button>
           </div>
           <div className="row wrap" style={{ gap: 5 }}>
-            <Input value={bulkCondition} onChange={(event) => setBulkCondition(event.target.value)} placeholder="Condition" style={{ minWidth: 100 }} />
-            <Input type="number" min={0} value={bulkValue} onChange={(event) => setBulkValue(event.target.value)} placeholder="Val" style={{ maxWidth: 62 }} />
-            <Input type="number" min={0} value={bulkDuration} onChange={(event) => setBulkDuration(event.target.value)} placeholder="Rounds" style={{ maxWidth: 76 }} />
-            <Button size="sm" icon={<Plus size={13} />} onClick={applyBulkCondition}>Apply</Button>
+            <Input
+              value={bulkCondition}
+              onChange={(event) => setBulkCondition(event.target.value)}
+              placeholder="Condition"
+              style={{ minWidth: 100 }}
+            />
+            <Input
+              type="number"
+              min={0}
+              value={bulkValue}
+              onChange={(event) => setBulkValue(event.target.value)}
+              placeholder="Val"
+              style={{ maxWidth: 62 }}
+            />
+            <Input
+              type="number"
+              min={0}
+              value={bulkDuration}
+              onChange={(event) => setBulkDuration(event.target.value)}
+              placeholder="Rounds"
+              style={{ maxWidth: 76 }}
+            />
+            <Button size="sm" icon={<Plus size={13} />} onClick={applyBulkCondition}>
+              Apply
+            </Button>
           </div>
-          <Button size="sm" variant="ghost" onClick={onBulkClearConditions}>Clear conditions</Button>
+          <Button size="sm" variant="ghost" onClick={onBulkClearConditions}>
+            Clear conditions
+          </Button>
           {isGm ? (
             <div className="row wrap" style={{ gap: 5 }}>
-              <Button size="sm" variant="ghost" icon={<EyeOff size={13} />} onClick={() => onBulkPatch({ hidden: true })}>Hide</Button>
-              <Button size="sm" variant="ghost" icon={<Eye size={13} />} onClick={() => onBulkPatch({ hidden: false })}>Show</Button>
-              <Button size="sm" variant="ghost" icon={<Lock size={13} />} onClick={() => onBulkPatch({ locked: true })}>Lock</Button>
-              <Button size="sm" variant="ghost" icon={<Unlock size={13} />} onClick={() => onBulkPatch({ locked: false })}>Unlock</Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                icon={<EyeOff size={13} />}
+                onClick={() => onBulkPatch({ hidden: true })}
+              >
+                Hide
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                icon={<Eye size={13} />}
+                onClick={() => onBulkPatch({ hidden: false })}
+              >
+                Show
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                icon={<Lock size={13} />}
+                onClick={() => onBulkPatch({ locked: true })}
+              >
+                Lock
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                icon={<Unlock size={13} />}
+                onClick={() => onBulkPatch({ locked: false })}
+              >
+                Unlock
+              </Button>
               <Button
                 size="sm"
                 variant="danger"
                 icon={<Trash2 size={13} />}
                 onClick={() => {
-                  if (window.confirm(`Delete ${selectedTokens.length} selected tokens?`)) onBulkDelete();
+                  if (window.confirm(`Delete ${selectedTokens.length} selected tokens?`))
+                    onBulkDelete();
                 }}
               >
                 Delete
@@ -125,13 +213,19 @@ export function VttTokenPanel({
       ) : null}
       <div className="vtt-token-list">
         {sceneTokens.map((token) => {
-          const character = token.characterId ? characters.find((c) => c.id === token.characterId) : null;
+          const character = token.characterId
+            ? characters.find((c) => c.id === token.characterId)
+            : null;
           const portrait = token.imageUrl || character?.summary?.portraitUrl;
           return (
             <HoverCard
               key={token.id}
               title={token.name}
-              subtitle={character?.summary ? `Level ${character.summary.level} ${character.summary.className || "adventurer"}` : token.groupName ?? "Token"}
+              subtitle={
+                character?.summary
+                  ? `Level ${character.summary.level} ${character.summary.className || "adventurer"}`
+                  : (token.groupName ?? "Token")
+              }
               meta={
                 <span>
                   {token.hpMax !== null ? `${token.hpCurrent ?? "?"} / ${token.hpMax} HP` : "No HP"}
@@ -145,13 +239,17 @@ export function VttTokenPanel({
                 type="button"
                 className={`vtt-token-row ${selectedTokenIds.includes(token.id) || selectedTokenId === token.id ? "is-selected" : ""} ${token.hidden ? "is-hidden" : ""}`}
                 onClick={() => setSelectedTokenId(token.id)}
-                onDoubleClick={() => character && window.open(`/characters/${character.id}`, "_blank")}
+                onDoubleClick={() =>
+                  character && window.open(`/characters/${character.id}`, "_blank")
+                }
               >
                 <Avatar name={token.name} src={portrait} size={34} />
                 <span className="grow">
                   <strong>{token.name}</strong>
                   <span className="tiny muted">
-                    {token.hpMax !== null ? `${token.hpCurrent ?? "?"} / ${token.hpMax} HP` : "No HP"}
+                    {token.hpMax !== null
+                      ? `${token.hpCurrent ?? "?"} / ${token.hpMax} HP`
+                      : "No HP"}
                     {token.ac !== null ? ` · AC ${token.ac}` : ""}
                   </span>
                 </span>
@@ -165,7 +263,13 @@ export function VttTokenPanel({
         {!sceneTokens.length ? <p className="muted small">No tokens on this scene.</p> : null}
       </div>
       {isGm ? (
-        <Button size="sm" variant="gold" block icon={<Plus size={14} />} onClick={() => setAddTokenOpen(true)}>
+        <Button
+          size="sm"
+          variant="gold"
+          block
+          icon={<Plus size={14} />}
+          onClick={() => setAddTokenOpen(true)}
+        >
           Add token
         </Button>
       ) : null}
@@ -173,16 +277,22 @@ export function VttTokenPanel({
         <div className="token-editor">
           <div className="row-between">
             <h3>Selected token</h3>
-            <IconButton label="Deselect" onClick={() => setSelectedTokenId(null)}><X size={14} /></IconButton>
+            <IconButton label="Deselect" onClick={() => setSelectedTokenId(null)}>
+              <X size={14} />
+            </IconButton>
           </div>
           {group ? (
             <div className="token-group-card">
               <div className="row-between">
                 <div>
                   <span className="tiny muted">Group</span>
-                  <h3 style={{ marginTop: 2 }}>{groupName} <Badge tone="violet">{group.count}</Badge></h3>
+                  <h3 style={{ marginTop: 2 }}>
+                    {groupName} <Badge tone="violet">{group.count}</Badge>
+                  </h3>
                 </div>
-                <strong className="token-group-hp">{group.current} / {group.max} HP</strong>
+                <strong className="token-group-hp">
+                  {group.current} / {group.max} HP
+                </strong>
               </div>
               <ProgressBar value={group.current} max={group.max} />
               {isGm ? (
@@ -197,21 +307,26 @@ export function VttTokenPanel({
                   <Button
                     size="sm"
                     variant="danger"
-                    onClick={() => onGroupHp(selectedToken.groupId!, -Math.max(0, Number(groupAmount) || 0))}
+                    onClick={() =>
+                      onGroupHp(selectedToken.groupId!, -Math.max(0, Number(groupAmount) || 0))
+                    }
                   >
                     Damage each
                   </Button>
                   <Button
                     size="sm"
                     variant="secondary"
-                    onClick={() => onGroupHp(selectedToken.groupId!, Math.max(0, Number(groupAmount) || 0))}
+                    onClick={() =>
+                      onGroupHp(selectedToken.groupId!, Math.max(0, Number(groupAmount) || 0))
+                    }
                   >
                     Heal each
                   </Button>
                 </div>
               ) : null}
               <p className="tiny muted">
-                Group HP is the sum of its members. Damage/heal applies to every creature; use the individual controls for one target.
+                Group HP is the sum of its members. Damage/heal applies to every creature; use the
+                individual controls for one target.
               </p>
             </div>
           ) : null}
@@ -221,7 +336,13 @@ export function VttTokenPanel({
                 <Input
                   value={selectedToken.name}
                   onChange={(event) =>
-                    setTokens((current) => current.map((token) => token.id === selectedToken.id ? { ...token, name: event.target.value } : token))
+                    setTokens((current) =>
+                      current.map((token) =>
+                        token.id === selectedToken.id
+                          ? { ...token, name: event.target.value }
+                          : token
+                      )
+                    )
                   }
                   onBlur={(event) => updateToken(selectedToken.id, { name: event.target.value })}
                 />
@@ -232,9 +353,17 @@ export function VttTokenPanel({
                     type="number"
                     value={selectedToken.hpCurrent ?? ""}
                     onChange={(event) =>
-                      setTokens((current) => current.map((token) => token.id === selectedToken.id ? { ...token, hpCurrent: Number(event.target.value) } : token))
+                      setTokens((current) =>
+                        current.map((token) =>
+                          token.id === selectedToken.id
+                            ? { ...token, hpCurrent: Number(event.target.value) }
+                            : token
+                        )
+                      )
                     }
-                    onBlur={(event) => updateToken(selectedToken.id, { hpCurrent: Number(event.target.value) })}
+                    onBlur={(event) =>
+                      updateToken(selectedToken.id, { hpCurrent: Number(event.target.value) })
+                    }
                   />
                 </Field>
                 <Field label="HP max">
@@ -242,9 +371,17 @@ export function VttTokenPanel({
                     type="number"
                     value={selectedToken.hpMax ?? ""}
                     onChange={(event) =>
-                      setTokens((current) => current.map((token) => token.id === selectedToken.id ? { ...token, hpMax: Number(event.target.value) } : token))
+                      setTokens((current) =>
+                        current.map((token) =>
+                          token.id === selectedToken.id
+                            ? { ...token, hpMax: Number(event.target.value) }
+                            : token
+                        )
+                      )
                     }
-                    onBlur={(event) => updateToken(selectedToken.id, { hpMax: Number(event.target.value) })}
+                    onBlur={(event) =>
+                      updateToken(selectedToken.id, { hpMax: Number(event.target.value) })
+                    }
                   />
                 </Field>
                 <Field label="AC">
@@ -252,15 +389,25 @@ export function VttTokenPanel({
                     type="number"
                     value={selectedToken.ac ?? ""}
                     onChange={(event) =>
-                      setTokens((current) => current.map((token) => token.id === selectedToken.id ? { ...token, ac: Number(event.target.value) } : token))
+                      setTokens((current) =>
+                        current.map((token) =>
+                          token.id === selectedToken.id
+                            ? { ...token, ac: Number(event.target.value) }
+                            : token
+                        )
+                      )
                     }
-                    onBlur={(event) => updateToken(selectedToken.id, { ac: Number(event.target.value) })}
+                    onBlur={(event) =>
+                      updateToken(selectedToken.id, { ac: Number(event.target.value) })
+                    }
                   />
                 </Field>
                 <Field label="Size">
                   <Select
                     value={selectedToken.size}
-                    onChange={(event) => updateToken(selectedToken.id, { size: Number(event.target.value) })}
+                    onChange={(event) =>
+                      updateToken(selectedToken.id, { size: Number(event.target.value) })
+                    }
                   >
                     <option value={1}>Medium</option>
                     <option value={2}>Large</option>
@@ -282,39 +429,107 @@ export function VttTokenPanel({
                 />
               </div>
               <div className="row wrap" style={{ gap: 7, marginTop: 10 }}>
-                <Button size="sm" variant="primary" icon={<Swords size={13} />} onClick={() => setEditingTokenId(selectedToken.id)}>Edit token</Button>
-                <Button size="sm" variant="secondary" icon={<Dices size={13} />} onClick={addSelectedToInitiative}>Add to initiative</Button>
+                <Button
+                  size="sm"
+                  variant="primary"
+                  icon={<Swords size={13} />}
+                  onClick={() => setEditingTokenId(selectedToken.id)}
+                >
+                  Edit token
+                </Button>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  icon={<Dices size={13} />}
+                  onClick={addSelectedToInitiative}
+                >
+                  Add to initiative
+                </Button>
                 {selectedToken.characterId ? (
-                  <Button size="sm" variant="ghost" icon={<Swords size={13} />} onClick={() => window.open(`/characters/${selectedToken.characterId}`, "_blank")}>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    icon={<Swords size={13} />}
+                    onClick={() =>
+                      window.open(`/characters/${selectedToken.characterId}`, "_blank")
+                    }
+                  >
                     Sheet
                   </Button>
                 ) : null}
-                <Button size="sm" variant="danger" icon={<Trash2 size={13} />} onClick={() => deleteToken(selectedToken.id)}>Delete</Button>
+                <Button
+                  size="sm"
+                  variant="danger"
+                  icon={<Trash2 size={13} />}
+                  onClick={() => deleteToken(selectedToken.id)}
+                >
+                  Delete
+                </Button>
               </div>
             </>
           ) : (
             <>
               <div className="token-player-stats">
-                <Stat label="HP" value={selectedToken.hpMax !== null ? `${selectedToken.hpCurrent ?? "?"} / ${selectedToken.hpMax}` : "—"} />
+                <Stat
+                  label="HP"
+                  value={
+                    selectedToken.hpMax !== null
+                      ? `${selectedToken.hpCurrent ?? "?"} / ${selectedToken.hpMax}`
+                      : "—"
+                  }
+                />
                 <Stat label="AC" value={selectedToken.ac ?? "—"} />
               </div>
               {selectedToken.characterId ? (
-                <Button size="sm" variant="primary" block icon={<Swords size={13} />} onClick={() => window.open(`/characters/${selectedToken.characterId}`, "_blank")}>
+                <Button
+                  size="sm"
+                  variant="primary"
+                  block
+                  icon={<Swords size={13} />}
+                  onClick={() => window.open(`/characters/${selectedToken.characterId}`, "_blank")}
+                >
                   Open character sheet
                 </Button>
               ) : null}
               {selectedToken.hpCurrent !== null ? (
                 <div className="token-hp-controls">
-                  <Button size="sm" variant="ghost" onClick={() => updateToken(selectedToken.id, { hpCurrent: Math.max(0, (selectedToken.hpCurrent ?? 0) - 1) })}><Minus size={12} /></Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() =>
+                      updateToken(selectedToken.id, {
+                        hpCurrent: Math.max(0, (selectedToken.hpCurrent ?? 0) - 1),
+                      })
+                    }
+                  >
+                    <Minus size={12} />
+                  </Button>
                   <span>{selectedToken.hpCurrent}</span>
-                  <Button size="sm" variant="ghost" onClick={() => updateToken(selectedToken.id, { hpCurrent: Math.min(selectedToken.hpMax ?? selectedToken.hpCurrent ?? 0, (selectedToken.hpCurrent ?? 0) + 1) })}><Plus size={12} /></Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() =>
+                      updateToken(selectedToken.id, {
+                        hpCurrent: Math.min(
+                          selectedToken.hpMax ?? selectedToken.hpCurrent ?? 0,
+                          (selectedToken.hpCurrent ?? 0) + 1
+                        ),
+                      })
+                    }
+                  >
+                    <Plus size={12} />
+                  </Button>
                 </div>
               ) : null}
             </>
           )}
           {selectedToken.conditions.length ? (
             <div className="chip-row" style={{ marginTop: 10 }}>
-              {selectedToken.conditions.map((condition) => <Tag key={condition.name} tone="red">{tokenConditionLabel(condition)}</Tag>)}
+              {selectedToken.conditions.map((condition) => (
+                <Tag key={condition.name} tone="red">
+                  {tokenConditionLabel(condition)}
+                </Tag>
+              ))}
             </div>
           ) : null}
         </div>

@@ -16,7 +16,7 @@ function message(
   type: ChatMessage["type"],
   visibility: ChatMessage["visibility"],
   data: ChatMessage["data"],
-  createdAt = FROM + 60_000,
+  createdAt = FROM + 60_000
 ): ChatMessage {
   return {
     id,
@@ -38,7 +38,7 @@ function roll(
   total: number,
   degree: "critical-success" | "success" | "failure" | "critical-failure",
   dc: number | null = 15,
-  authorName = "Mira",
+  authorName = "Mira"
 ): ChatMessage {
   return {
     ...message(id, "roll", "all", {
@@ -61,7 +61,7 @@ function journalEntry(
   title: string,
   kind: JournalEntry["kind"],
   visible: boolean,
-  updatedAt = FROM + 120_000,
+  updatedAt = FROM + 120_000
 ): JournalEntry {
   return {
     id,
@@ -82,7 +82,7 @@ function parcel(
   id: string,
   name: string,
   status: LootParcel["status"],
-  updatedAt = FROM + 180_000,
+  updatedAt = FROM + 180_000
 ): LootParcel {
   return {
     id,

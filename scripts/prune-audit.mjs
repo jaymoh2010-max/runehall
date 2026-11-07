@@ -34,16 +34,14 @@ let days = 0;
 if (daysArg >= 0) {
   days = Math.max(0, Math.min(3650, Math.round(Number(args[daysArg + 1]) || 0)));
 } else {
-  const row = db
-    .prepare("SELECT value FROM app_settings WHERE key = 'audit_retention_days'")
-    .get();
+  const row = db.prepare("SELECT value FROM app_settings WHERE key = 'audit_retention_days'").get();
   days = row
     ? Math.max(0, Math.min(3650, Math.round(Number(row.value) || 0)))
     : Math.max(0, Math.min(3650, Math.round(Number(process.env.AUDIT_RETENTION_DAYS) || 0)));
 }
 
 const total = Number(
-  (db.prepare("SELECT COUNT(*) AS count FROM audit_log").get() || {}).count || 0,
+  (db.prepare("SELECT COUNT(*) AS count FROM audit_log").get() || {}).count || 0
 );
 
 if (days <= 0) {
@@ -55,11 +53,8 @@ if (days <= 0) {
 
 const cutoff = Date.now() - days * 86_400_000;
 const expired = Number(
-  (
-    db
-      .prepare("SELECT COUNT(*) AS count FROM audit_log WHERE created_at < ?")
-      .get(cutoff) || {}
-  ).count || 0,
+  (db.prepare("SELECT COUNT(*) AS count FROM audit_log WHERE created_at < ?").get(cutoff) || {})
+    .count || 0
 );
 console.log(`Audit entries: ${total}`);
 console.log(`Retention:    ${days} days`);

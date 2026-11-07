@@ -37,7 +37,8 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
     return reply.send({
       registration: registrationStatus(),
       users: userCount(),
-      invites: listRegistrationInvites().filter((invite) => !invite.usedAt && !invite.usedBy).length,
+      invites: listRegistrationInvites().filter((invite) => !invite.usedAt && !invite.usedBy)
+        .length,
       audit: auditStatus(),
     });
   });
@@ -171,9 +172,7 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
 
   app.get("/api/admin/users", async (request, reply) => {
     if (!requireAdmin(request, reply)) return;
-    const rows = db
-      .prepare("SELECT * FROM users ORDER BY created_at ASC")
-      .all() as UserRow[];
+    const rows = db.prepare("SELECT * FROM users ORDER BY created_at ASC").all() as UserRow[];
     return reply.send({ users: rows.map(serializeUser) });
   });
 }

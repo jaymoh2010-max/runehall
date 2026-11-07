@@ -8,10 +8,10 @@ import type {
 
 export function applyTokenMoved(
   tokens: Token[],
-  payload: { tokenId: string; x: number; y: number },
+  payload: { tokenId: string; x: number; y: number }
 ): Token[] {
   return tokens.map((token) =>
-    token.id === payload.tokenId ? { ...token, x: payload.x, y: payload.y } : token,
+    token.id === payload.tokenId ? { ...token, x: payload.x, y: payload.y } : token
   );
 }
 
@@ -28,14 +28,12 @@ export function applyTokenDeleted(tokens: Token[], tokenId: string): Token[] {
 }
 
 export function toggleTokenSelection(current: string[], tokenId: string): string[] {
-  return current.includes(tokenId)
-    ? current.filter((id) => id !== tokenId)
-    : [...current, tokenId];
+  return current.includes(tokenId) ? current.filter((id) => id !== tokenId) : [...current, tokenId];
 }
 
 export function applyFogUpdated(
   scenes: Scene[],
-  payload: { sceneId: string; cells: string[]; mode: "reveal" | "hide" | "replace" },
+  payload: { sceneId: string; cells: string[]; mode: "reveal" | "hide" | "replace" }
 ): Scene[] {
   return scenes.map((scene) => {
     if (scene.id !== payload.sceneId) return scene;
@@ -59,14 +57,13 @@ export function applySceneCreated(scenes: Scene[], created: Scene): Scene[] {
 
 export function applySceneDeleted(
   state: { scenes: Scene[]; tokens: Token[]; activeSceneId: string | null },
-  sceneId: string,
+  sceneId: string
 ): { scenes: Scene[]; tokens: Token[]; activeSceneId: string | null } {
   const scenes = state.scenes.filter((scene) => scene.id !== sceneId);
   return {
     scenes,
     tokens: state.tokens.filter((token) => token.sceneId !== sceneId),
-    activeSceneId:
-      state.activeSceneId === sceneId ? (scenes[0]?.id ?? null) : state.activeSceneId,
+    activeSceneId: state.activeSceneId === sceneId ? (scenes[0]?.id ?? null) : state.activeSceneId,
   };
 }
 
@@ -76,7 +73,7 @@ export function applyChatMessage(messages: ChatMessage[], message: ChatMessage):
 
 export function mergeSnapshotMessages(
   current: ChatMessage[],
-  snapshot: ChatMessage[],
+  snapshot: ChatMessage[]
 ): ChatMessage[] {
   const merged = new Map(current.map((message) => [message.id, message]));
   for (const message of snapshot) merged.set(message.id, message);
@@ -85,18 +82,18 @@ export function mergeSnapshotMessages(
 
 export function applyCharacterUpdated(
   characters: CharacterRecord[],
-  payload: { characterId: string; summary: CharacterSummary | null; name: string },
+  payload: { characterId: string; summary: CharacterSummary | null; name: string }
 ): CharacterRecord[] {
   return characters.map((character) =>
     character.id === payload.characterId
       ? { ...character, name: payload.name, summary: payload.summary }
-      : character,
+      : character
   );
 }
 
 export function applyCharacterCreated(
   characters: CharacterRecord[],
-  created: CharacterRecord,
+  created: CharacterRecord
 ): CharacterRecord[] {
   return characters.some((character) => character.id === created.id)
     ? characters.map((character) => (character.id === created.id ? created : character))

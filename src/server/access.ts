@@ -8,7 +8,10 @@ export interface MembershipRow {
 }
 
 export function getCampaign(campaignId: string): CampaignRow | null {
-  return (db.prepare("SELECT * FROM campaigns WHERE id = ?").get(campaignId) as CampaignRow | undefined) ?? null;
+  return (
+    (db.prepare("SELECT * FROM campaigns WHERE id = ?").get(campaignId) as
+      CampaignRow | undefined) ?? null
+  );
 }
 
 export function getMembership(campaignId: string, userId: string): MembershipRow | null {
@@ -28,18 +31,22 @@ export function isCampaignGm(campaignId: string, userId: string): boolean {
 }
 
 export function getUser(userId: string): UserRow | null {
-  return (db.prepare("SELECT * FROM users WHERE id = ?").get(userId) as UserRow | undefined) ?? null;
+  return (
+    (db.prepare("SELECT * FROM users WHERE id = ?").get(userId) as UserRow | undefined) ?? null
+  );
 }
 
 export function getUserByUsername(username: string): UserRow | null {
   return (
-    (db.prepare("SELECT * FROM users WHERE username = ?").get(username) as UserRow | undefined) ?? null
+    (db.prepare("SELECT * FROM users WHERE username = ?").get(username) as UserRow | undefined) ??
+    null
   );
 }
 
 export function getCharacter(characterId: string): CharacterRow | null {
   return (
-    (db.prepare("SELECT * FROM characters WHERE id = ?").get(characterId) as CharacterRow | undefined) ?? null
+    (db.prepare("SELECT * FROM characters WHERE id = ?").get(characterId) as
+      CharacterRow | undefined) ?? null
   );
 }
 
@@ -75,7 +82,7 @@ export function campaignMembers(campaignId: string) {
       `SELECT u.*, m.role, m.joined_at
        FROM campaign_members m JOIN users u ON u.id = m.user_id
        WHERE m.campaign_id = ?
-       ORDER BY m.role DESC, u.display_name ASC`,
+       ORDER BY m.role DESC, u.display_name ASC`
     )
     .all(campaignId) as (UserRow & { role: "gm" | "player"; joined_at: number })[];
 }
@@ -86,7 +93,7 @@ export function campaignCharacters(campaignId: string) {
       `SELECT c.*, u.display_name AS owner_name
        FROM characters c JOIN users u ON u.id = c.user_id
        WHERE c.campaign_id = ?
-       ORDER BY c.name ASC`,
+       ORDER BY c.name ASC`
     )
     .all(campaignId) as (CharacterRow & { owner_name: string })[];
 }

@@ -179,7 +179,11 @@ export function CampaignPage() {
     setError("");
     try {
       const [details, table] = await Promise.all([
-        api<{ campaign: CampaignSummary; members: CampaignMember[]; characters: CharacterRecord[] }>(`/api/campaigns/${id}`),
+        api<{
+          campaign: CampaignSummary;
+          members: CampaignMember[];
+          characters: CharacterRecord[];
+        }>(`/api/campaigns/${id}`),
         api<CampaignTable>(`/api/campaigns/${id}/table`),
       ]);
       setCampaign(details.campaign);
@@ -212,7 +216,15 @@ export function CampaignPage() {
       setInviteOpen(true);
       navigate(`${location.pathname}${location.search}`, { replace: true, state: null });
     }
-  }, [campaign?.id, campaign?.role, campaign?.inviteCode, location.pathname, location.search, location.state, navigate]);
+  }, [
+    campaign?.id,
+    campaign?.role,
+    campaign?.inviteCode,
+    location.pathname,
+    location.search,
+    location.state,
+    navigate,
+  ]);
 
   useEffect(() => {
     if (tab === "table") setTableMounted(true);
@@ -221,9 +233,12 @@ export function CampaignPage() {
   // Refresh party/settings data when those tabs are opened so newly joined
   // players and newly created characters show up without a full page reload.
   useEffect(() => {
-    if (!id || (tab !== "overview" && tab !== "party" && tab !== "loot" && tab !== "settings")) return;
+    if (!id || (tab !== "overview" && tab !== "party" && tab !== "loot" && tab !== "settings"))
+      return;
     let cancelled = false;
-    api<{ campaign: CampaignSummary; members: CampaignMember[]; characters: CharacterRecord[] }>(`/api/campaigns/${id}`)
+    api<{ campaign: CampaignSummary; members: CampaignMember[]; characters: CharacterRecord[] }>(
+      `/api/campaigns/${id}`
+    )
       .then((details) => {
         if (cancelled) return;
         setCampaign(details.campaign);
@@ -262,10 +277,8 @@ export function CampaignPage() {
 
   const selectedJournal = useMemo(
     () =>
-      filteredJournal.find((entry) => entry.id === selectedJournalId) ??
-      filteredJournal[0] ??
-      null,
-    [filteredJournal, selectedJournalId],
+      filteredJournal.find((entry) => entry.id === selectedJournalId) ?? filteredJournal[0] ?? null,
+    [filteredJournal, selectedJournalId]
   );
 
   const setTab = (next: Tab) => {
@@ -367,24 +380,32 @@ export function CampaignPage() {
           },
         });
         setTableData((current) =>
-          current ? { ...current, journal: [result.entry, ...current.journal] } : current,
+          current ? { ...current, journal: [result.entry, ...current.journal] } : current
         );
         setSelectedJournalId(result.entry.id);
       } else if (journalEditor) {
-        const result = await api<{ entry: JournalEntry }>(`/api/campaigns/${id}/journal/${journalEditor.id}`, {
-          method: "PUT",
-          body: {
-            title: journalTitle,
-            content: journalContent,
-            visible: journalVisible,
-            kind: journalKind,
-            attachments: journalAttachments,
-          },
-        });
+        const result = await api<{ entry: JournalEntry }>(
+          `/api/campaigns/${id}/journal/${journalEditor.id}`,
+          {
+            method: "PUT",
+            body: {
+              title: journalTitle,
+              content: journalContent,
+              visible: journalVisible,
+              kind: journalKind,
+              attachments: journalAttachments,
+            },
+          }
+        );
         setTableData((current) =>
           current
-            ? { ...current, journal: current.journal.map((entry) => (entry.id === result.entry.id ? result.entry : entry)) }
-            : current,
+            ? {
+                ...current,
+                journal: current.journal.map((entry) =>
+                  entry.id === result.entry.id ? result.entry : entry
+                ),
+              }
+            : current
         );
       }
       setJournalEditor(null);
@@ -402,7 +423,9 @@ export function CampaignPage() {
     try {
       await api(`/api/campaigns/${id}/journal/${entry.id}`, { method: "DELETE" });
       setTableData((current) =>
-        current ? { ...current, journal: current.journal.filter((item) => item.id !== entry.id) } : current,
+        current
+          ? { ...current, journal: current.journal.filter((item) => item.id !== entry.id) }
+          : current
       );
       setSelectedJournalId(null);
       toast("Journal entry deleted.", "success");
@@ -417,12 +440,10 @@ export function CampaignPage() {
     try {
       const result = await api<{ entry: JournalEntry }>(
         `/api/campaigns/${id}/journal/${entry.id}/duplicate`,
-        { method: "POST" },
+        { method: "POST" }
       );
       setTableData((current) =>
-        current
-          ? { ...current, journal: [result.entry, ...current.journal] }
-          : current,
+        current ? { ...current, journal: [result.entry, ...current.journal] } : current
       );
       setSelectedJournalId(result.entry.id);
       setJournalFilter("all");
@@ -461,7 +482,7 @@ export function CampaignPage() {
                 xpMode: result.campaign.xpMode,
               },
             }
-          : current,
+          : current
       );
       toast("Campaign settings saved.", "success");
     } catch (err) {
@@ -474,7 +495,9 @@ export function CampaignPage() {
   const regenerateCode = async () => {
     if (!id) return;
     try {
-      const result = await api<{ inviteCode: string }>(`/api/campaigns/${id}/regenerate-code`, { method: "POST" });
+      const result = await api<{ inviteCode: string }>(`/api/campaigns/${id}/regenerate-code`, {
+        method: "POST",
+      });
       setCampaign((current) => (current ? { ...current, inviteCode: result.inviteCode } : current));
       toast("Invite code regenerated.", "success");
     } catch (err) {
@@ -524,7 +547,7 @@ export function CampaignPage() {
     if (!id || !campaign) return;
     if (
       !window.confirm(
-        "Advance every character in this campaign by one level? Players can finish their new choices in the builder.",
+        "Advance every character in this campaign by one level? Players can finish their new choices in the builder."
       )
     ) {
       return;
@@ -539,12 +562,12 @@ export function CampaignPage() {
       }>(`/api/campaigns/${id}/level-up`, { method: "POST" });
       setCharacters(result.characters);
       setTableData((current) =>
-        current ? { ...current, characters: result.characters } : current,
+        current ? { ...current, characters: result.characters } : current
       );
       if (result.leveled > 0) {
         toast(
           `Advanced ${result.leveled} ${result.leveled === 1 ? "character" : "characters"} by one level.`,
-          "success",
+          "success"
         );
       } else if (result.atMaxLevel > 0 && result.skipped === 0) {
         toast("Every character is already at level 20.", "info");
@@ -560,17 +583,17 @@ export function CampaignPage() {
 
   const handleCharacterUpdated = (character: CharacterRecord) => {
     setCharacters((current) =>
-      current.map((entry) => (entry.id === character.id ? character : entry)),
+      current.map((entry) => (entry.id === character.id ? character : entry))
     );
     setTableData((current) =>
       current
         ? {
             ...current,
             characters: current.characters.map((entry) =>
-              entry.id === character.id ? character : entry,
+              entry.id === character.id ? character : entry
             ),
           }
-        : current,
+        : current
     );
   };
 
@@ -583,7 +606,7 @@ export function CampaignPage() {
               ? current.tokens
               : [...current.tokens, token],
           }
-        : current,
+        : current
     );
   };
 
@@ -594,10 +617,7 @@ export function CampaignPage() {
       return {
         ...current,
         activeSceneId: result.sceneId,
-        tokens: [
-          ...current.tokens,
-          ...result.tokens.filter((token) => !known.has(token.id)),
-        ],
+        tokens: [...current.tokens, ...result.tokens.filter((token) => !known.has(token.id))],
         initiative: result.initiative,
         round: result.round,
         turnIndex: result.turnIndex,
@@ -609,7 +629,12 @@ export function CampaignPage() {
 
   const deleteCampaign = async () => {
     if (!id || !campaign) return;
-    if (!window.confirm(`Delete “${campaign.name}” permanently? This removes every scene, character link, and journal entry.`)) return;
+    if (
+      !window.confirm(
+        `Delete “${campaign.name}” permanently? This removes every scene, character link, and journal entry.`
+      )
+    )
+      return;
     try {
       await api(`/api/campaigns/${id}`, { method: "DELETE" });
       navigate("/campaigns");
@@ -636,9 +661,13 @@ export function CampaignPage() {
     <div className={`campaign-page ${tab === "table" ? "is-table" : ""}`}>
       <div className="campaign-top">
         <div className="campaign-top-main">
-          <Link to="/campaigns" className="back-link"><LayoutGrid size={14} /> All campaigns</Link>
+          <Link to="/campaigns" className="back-link">
+            <LayoutGrid size={14} /> All campaigns
+          </Link>
           <div className="campaign-title-row">
-            <div className="campaign-title-emblem"><Swords size={22} /></div>
+            <div className="campaign-title-emblem">
+              <Swords size={22} />
+            </div>
             <div>
               <PageEyebrow>{isGm ? "Game Master's table" : "Player's table"}</PageEyebrow>
               <h1>{campaign.name}</h1>
@@ -651,12 +680,9 @@ export function CampaignPage() {
         </div>
         <div className="campaign-top-actions">
           {isGm && campaign.inviteCode ? (
-            <button
-              type="button"
-              className="invite-chip large"
-              onClick={() => setInviteOpen(true)}
-            >
-              <UserPlus size={14} /> Invite players <strong>{campaign.inviteCode}</strong> <Copy size={13} />
+            <button type="button" className="invite-chip large" onClick={() => setInviteOpen(true)}>
+              <UserPlus size={14} /> Invite players <strong>{campaign.inviteCode}</strong>{" "}
+              <Copy size={13} />
             </button>
           ) : null}
           <div className="campaign-member-stack">
@@ -670,11 +696,19 @@ export function CampaignPage() {
 
       <nav className="campaign-tabs">
         {visibleTabs.map((entry) => (
-          <button key={entry.id} type="button" className={tab === entry.id ? "is-active" : ""} aria-current={tab === entry.id ? "page" : undefined} onClick={() => setTab(entry.id)}>
+          <button
+            key={entry.id}
+            type="button"
+            className={tab === entry.id ? "is-active" : ""}
+            aria-current={tab === entry.id ? "page" : undefined}
+            onClick={() => setTab(entry.id)}
+          >
             {entry.icon}
             <span>{entry.label}</span>
             {entry.id === "party" ? <span className="tab-count">{characters.length}</span> : null}
-            {entry.id === "journal" ? <span className="tab-count">{tableData.journal.length}</span> : null}
+            {entry.id === "journal" ? (
+              <span className="tab-count">{tableData.journal.length}</span>
+            ) : null}
           </button>
         ))}
       </nav>
@@ -699,9 +733,7 @@ export function CampaignPage() {
             onNavigate={(next) => setTab(next)}
             onJournalCreated={(entry) => {
               setTableData((current) =>
-                current
-                  ? { ...current, journal: [entry, ...current.journal] }
-                  : current,
+                current ? { ...current, journal: [entry, ...current.journal] } : current
               );
               setSelectedJournalId(entry.id);
             }}
@@ -729,7 +761,9 @@ export function CampaignPage() {
                     Level up party
                   </Button>
                 ) : null}
-                <Button variant="primary" icon={<Plus size={15} />} onClick={createCharacter}>New character</Button>
+                <Button variant="primary" icon={<Plus size={15} />} onClick={createCharacter}>
+                  New character
+                </Button>
               </div>
             </div>
             <div className="party-grid">
@@ -740,14 +774,18 @@ export function CampaignPage() {
                     <div className="grow">
                       <div className="row wrap" style={{ gap: 7 }}>
                         <h3>{character.name}</h3>
-                        {character.permissions?.canEdit ? <Badge tone="gold">Editable</Badge> : null}
+                        {character.permissions?.canEdit ? (
+                          <Badge tone="gold">Editable</Badge>
+                        ) : null}
                       </div>
                       <p className="tiny muted">
                         {character.summary
                           ? `Level ${character.summary.level} ${character.summary.className || ""} · ${character.summary.ancestry || "No ancestry"}`
                           : "Unfinished character"}
                       </p>
-                      <p className="tiny muted">{character.ownerName ? `Played by ${character.ownerName}` : ""}</p>
+                      <p className="tiny muted">
+                        {character.ownerName ? `Played by ${character.ownerName}` : ""}
+                      </p>
                     </div>
                   </div>
                   {character.summary ? (
@@ -758,8 +796,17 @@ export function CampaignPage() {
                     </div>
                   ) : null}
                   <div className="party-card-actions">
-                    <Link to={`/characters/${character.id}`} className="btn btn-secondary btn-sm"><ScrollText size={14} /> Sheet</Link>
-                    {character.permissions?.canEdit ? <Link to={`/characters/${character.id}/edit`} className="btn btn-ghost btn-sm"><Pencil size={14} /> Edit</Link> : null}
+                    <Link to={`/characters/${character.id}`} className="btn btn-secondary btn-sm">
+                      <ScrollText size={14} /> Sheet
+                    </Link>
+                    {character.permissions?.canEdit ? (
+                      <Link
+                        to={`/characters/${character.id}/edit`}
+                        className="btn btn-ghost btn-sm"
+                      >
+                        <Pencil size={14} /> Edit
+                      </Link>
+                    ) : null}
                   </div>
                 </article>
               ))}
@@ -768,7 +815,11 @@ export function CampaignPage() {
                   icon={<Users size={30} />}
                   title="No heroes yet"
                   description="Create the first character for this campaign."
-                  action={<Button variant="primary" icon={<Plus size={15} />} onClick={createCharacter}>Create a character</Button>}
+                  action={
+                    <Button variant="primary" icon={<Plus size={15} />} onClick={createCharacter}>
+                      Create a character
+                    </Button>
+                  }
                 />
               ) : null}
             </div>
@@ -819,9 +870,7 @@ export function CampaignPage() {
           />
         ) : null}
 
-        {tab === "assets" ? (
-          <AssetLibrary campaignId={campaign.id} toast={toast} />
-        ) : null}
+        {tab === "assets" ? <AssetLibrary campaignId={campaign.id} toast={toast} /> : null}
 
         {tab === "journal" ? (
           <div className="page-inner journal-layout">
@@ -831,12 +880,42 @@ export function CampaignPage() {
                   <PageEyebrow>Chronicle</PageEyebrow>
                   <h2 style={{ marginTop: 5 }}>Journal</h2>
                 </div>
-                {isGm ? <Button size="sm" variant="primary" icon={<FilePlus2 size={14} />} onClick={() => setJournalEditor("new")}>New entry</Button> : null}
+                {isGm ? (
+                  <Button
+                    size="sm"
+                    variant="primary"
+                    icon={<FilePlus2 size={14} />}
+                    onClick={() => setJournalEditor("new")}
+                  >
+                    New entry
+                  </Button>
+                ) : null}
               </div>
               <div className="segmented journal-filter">
-                <button type="button" className={journalFilter === "all" ? "is-active" : ""} aria-pressed={journalFilter === "all"} onClick={() => setJournalFilter("all")}>All</button>
-                <button type="button" className={journalFilter === "note" ? "is-active" : ""} aria-pressed={journalFilter === "note"} onClick={() => setJournalFilter("note")}>Entries</button>
-                <button type="button" className={journalFilter === "handout" ? "is-active" : ""} aria-pressed={journalFilter === "handout"} onClick={() => setJournalFilter("handout")}><FileImage size={12} /> Handouts</button>
+                <button
+                  type="button"
+                  className={journalFilter === "all" ? "is-active" : ""}
+                  aria-pressed={journalFilter === "all"}
+                  onClick={() => setJournalFilter("all")}
+                >
+                  All
+                </button>
+                <button
+                  type="button"
+                  className={journalFilter === "note" ? "is-active" : ""}
+                  aria-pressed={journalFilter === "note"}
+                  onClick={() => setJournalFilter("note")}
+                >
+                  Entries
+                </button>
+                <button
+                  type="button"
+                  className={journalFilter === "handout" ? "is-active" : ""}
+                  aria-pressed={journalFilter === "handout"}
+                  onClick={() => setJournalFilter("handout")}
+                >
+                  <FileImage size={12} /> Handouts
+                </button>
               </div>
               {filteredJournal.map((entry) => (
                 <button
@@ -848,7 +927,9 @@ export function CampaignPage() {
                   <span className="journal-list-title">{entry.title}</span>
                   <span className="journal-list-meta">
                     {entry.kind === "handout" ? <Tag tone="violet">Handout</Tag> : null}
-                    <span className="tiny muted">{formatDate(entry.updatedAt)} · {entry.visible ? "Visible" : "GM only"}</span>
+                    <span className="tiny muted">
+                      {formatDate(entry.updatedAt)} · {entry.visible ? "Visible" : "GM only"}
+                    </span>
                   </span>
                 </button>
               ))}
@@ -873,17 +954,46 @@ export function CampaignPage() {
                         {selectedJournal.kind === "handout" ? "Handout" : "Chronicle"} ·{" "}
                         {selectedJournal.visible ? "shared" : "GM only"}
                       </PageEyebrow>
-                      <div className="row wrap" style={{ gap: 7, alignItems: "center", marginTop: 4 }}>
+                      <div
+                        className="row wrap"
+                        style={{ gap: 7, alignItems: "center", marginTop: 4 }}
+                      >
                         <h2>{selectedJournal.title}</h2>
-                        {selectedJournal.kind === "handout" ? <Tag tone="violet">Handout</Tag> : null}
+                        {selectedJournal.kind === "handout" ? (
+                          <Tag tone="violet">Handout</Tag>
+                        ) : null}
                       </div>
-                      <p className="tiny muted">Written by {selectedJournal.authorName} · {formatDate(selectedJournal.updatedAt)}</p>
+                      <p className="tiny muted">
+                        Written by {selectedJournal.authorName} ·{" "}
+                        {formatDate(selectedJournal.updatedAt)}
+                      </p>
                     </div>
                     {isGm ? (
                       <div className="row" style={{ gap: 6 }}>
-                        <Button size="sm" variant="ghost" icon={<Pencil size={13} />} onClick={() => setJournalEditor(selectedJournal)}>Edit</Button>
-                        <Button size="sm" variant="ghost" icon={<Copy size={13} />} loading={journalBusy} onClick={() => duplicateJournal(selectedJournal)}>Duplicate</Button>
-                        <button className="icon-btn" title="Delete entry" onClick={() => deleteJournal(selectedJournal)}><Trash2 size={14} /></button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          icon={<Pencil size={13} />}
+                          onClick={() => setJournalEditor(selectedJournal)}
+                        >
+                          Edit
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          icon={<Copy size={13} />}
+                          loading={journalBusy}
+                          onClick={() => duplicateJournal(selectedJournal)}
+                        >
+                          Duplicate
+                        </Button>
+                        <button
+                          className="icon-btn"
+                          title="Delete entry"
+                          onClick={() => deleteJournal(selectedJournal)}
+                        >
+                          <Trash2 size={14} />
+                        </button>
                       </div>
                     ) : null}
                   </div>
@@ -905,18 +1015,18 @@ export function CampaignPage() {
                   <JournalBody content={selectedJournal.content} className="journal-body" />
                 </>
               ) : (
-                <EmptyState icon={<ScrollText size={28} />} title="The page is blank" description="Choose an entry or write a new one." />
+                <EmptyState
+                  icon={<ScrollText size={28} />}
+                  title="The page is blank"
+                  description="Choose an entry or write a new one."
+                />
               )}
             </div>
           </div>
         ) : null}
 
         {tab === "gm-screen" ? (
-          <GmScreen
-            campaignId={campaign.id}
-            characters={characters}
-            toast={toast}
-          />
+          <GmScreen campaignId={campaign.id} characters={characters} toast={toast} />
         ) : null}
 
         {tab === "settings" ? (
@@ -926,16 +1036,25 @@ export function CampaignPage() {
               <h2 style={{ marginTop: 6 }}>The shape of the story</h2>
               <form className="stack" style={{ marginTop: 16 }} onSubmit={saveSettings}>
                 <Field label="Campaign name">
-                  <Input value={settingsName} onChange={(event) => setSettingsName(event.target.value)} disabled={!isGm} />
+                  <Input
+                    value={settingsName}
+                    onChange={(event) => setSettingsName(event.target.value)}
+                    disabled={!isGm}
+                  />
                 </Field>
                 <Field label="Premise">
-                  <Textarea value={settingsDescription} onChange={(event) => setSettingsDescription(event.target.value)} disabled={!isGm} />
+                  <Textarea
+                    value={settingsDescription}
+                    onChange={(event) => setSettingsDescription(event.target.value)}
+                    disabled={!isGm}
+                  />
                 </Field>
                 <Field
                   label="Ruleset"
                   hint={
                     isGm
-                      ? CAMPAIGN_RULESET_OPTIONS.find((option) => option.value === settingsRuleset)?.description
+                      ? CAMPAIGN_RULESET_OPTIONS.find((option) => option.value === settingsRuleset)
+                          ?.description
                       : "Set by the campaign GM. Your character inherits this ruleset."
                   }
                 >
@@ -945,7 +1064,9 @@ export function CampaignPage() {
                     disabled={!isGm}
                   >
                     {CAMPAIGN_RULESET_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>{option.label}</option>
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
                     ))}
                   </Select>
                 </Field>
@@ -953,7 +1074,8 @@ export function CampaignPage() {
                   label="Advancement"
                   hint={
                     isGm
-                      ? XP_MODE_OPTIONS.find((option) => option.value === settingsXpMode)?.description
+                      ? XP_MODE_OPTIONS.find((option) => option.value === settingsXpMode)
+                          ?.description
                       : "Set by the campaign GM. It controls whether encounter XP budgets are shown."
                   }
                 >
@@ -963,19 +1085,26 @@ export function CampaignPage() {
                     disabled={!isGm}
                   >
                     {XP_MODE_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>{option.label}</option>
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
                     ))}
                   </Select>
                 </Field>
-                {isGm ? <Button type="submit" variant="primary" loading={settingsBusy}>Save changes</Button> : null}
+                {isGm ? (
+                  <Button type="submit" variant="primary" loading={settingsBusy}>
+                    Save changes
+                  </Button>
+                ) : null}
               </form>
               {isGm ? (
                 <div className="settings-note">
                   <Sparkles size={15} />
                   <p>
-                    Switch to <strong>XP budget</strong> to see PF2e encounter difficulty while preparing.
-                    Switch back to <strong>Milestone</strong> to hide those numbers. Either way, the party
-                    only advances when you choose <strong>Level up party</strong> on the Party tab.
+                    Switch to <strong>XP budget</strong> to see PF2e encounter difficulty while
+                    preparing. Switch back to <strong>Milestone</strong> to hide those numbers.
+                    Either way, the party only advances when you choose{" "}
+                    <strong>Level up party</strong> on the Party tab.
                   </p>
                 </div>
               ) : null}
@@ -983,12 +1112,41 @@ export function CampaignPage() {
                 <>
                   <div className="divider" />
                   <h3>Invite code</h3>
-                  <p className="muted small">Share this seven-character code with your players. Regenerating it invalidates the old one.</p>
+                  <p className="muted small">
+                    Share this seven-character code with your players. Regenerating it invalidates
+                    the old one.
+                  </p>
                   <div className="invite-code-row">
                     <code>{campaign.inviteCode}</code>
-                    <Button size="sm" icon={<Copy size={14} />} onClick={async () => { const copied = await copyText(campaign.inviteCode); toast(copied ? "Invite code copied." : "Could not copy the code.", copied ? "success" : "error"); }}>Copy</Button>
-                    <Button size="sm" variant="primary" icon={<UserPlus size={14} />} onClick={() => setInviteOpen(true)}>Invite link</Button>
-                    <Button size="sm" variant="ghost" icon={<RefreshCw size={14} />} onClick={regenerateCode}>Regenerate</Button>
+                    <Button
+                      size="sm"
+                      icon={<Copy size={14} />}
+                      onClick={async () => {
+                        const copied = await copyText(campaign.inviteCode);
+                        toast(
+                          copied ? "Invite code copied." : "Could not copy the code.",
+                          copied ? "success" : "error"
+                        );
+                      }}
+                    >
+                      Copy
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="primary"
+                      icon={<UserPlus size={14} />}
+                      onClick={() => setInviteOpen(true)}
+                    >
+                      Invite link
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      icon={<RefreshCw size={14} />}
+                      onClick={regenerateCode}
+                    >
+                      Regenerate
+                    </Button>
                   </div>
                 </>
               ) : null}
@@ -1009,13 +1167,25 @@ export function CampaignPage() {
                     <div className="grow">
                       <div className="row" style={{ gap: 7 }}>
                         <strong>{member.displayName}</strong>
-                        {member.role === "gm" ? <Badge tone="gold"><Crown size={10} /> GM</Badge> : null}
+                        {member.role === "gm" ? (
+                          <Badge tone="gold">
+                            <Crown size={10} /> GM
+                          </Badge>
+                        ) : null}
                         {member.id === user?.id ? <Badge tone="blue">You</Badge> : null}
                       </div>
-                      <p className="tiny muted">@{member.username} · joined {formatDate(member.joinedAt)}</p>
+                      <p className="tiny muted">
+                        @{member.username} · joined {formatDate(member.joinedAt)}
+                      </p>
                     </div>
                     {isGm && member.role !== "gm" ? (
-                      <button className="icon-btn" title="Remove from campaign" onClick={() => removeMember(member)}><Trash2 size={14} /></button>
+                      <button
+                        className="icon-btn"
+                        title="Remove from campaign"
+                        onClick={() => removeMember(member)}
+                      >
+                        <Trash2 size={14} />
+                      </button>
                     ) : null}
                   </div>
                 ))}
@@ -1026,11 +1196,15 @@ export function CampaignPage() {
                   <div>
                     <h3>Campaign archive</h3>
                     <p className="muted small">
-                      Export characters, scenes, tokens, chat, journal, and state as portable JSON. Use{" "}
-                      <code>npm run backup</code> for a database + uploads archive.
+                      Export characters, scenes, tokens, chat, journal, and state as portable JSON.
+                      Use <code>npm run backup</code> for a database + uploads archive.
                     </p>
                   </div>
-                  <Button variant="secondary" icon={<Download size={14} />} onClick={exportCampaign}>
+                  <Button
+                    variant="secondary"
+                    icon={<Download size={14} />}
+                    onClick={exportCampaign}
+                  >
                     Export campaign
                   </Button>
                 </div>
@@ -1040,17 +1214,26 @@ export function CampaignPage() {
                 <div className="danger-zone">
                   <div>
                     <h3>Delete campaign</h3>
-                    <p className="muted small">This removes the campaign, scenes, journal, and character links permanently.</p>
+                    <p className="muted small">
+                      This removes the campaign, scenes, journal, and character links permanently.
+                    </p>
                   </div>
-                  <Button variant="danger" icon={<Trash2 size={14} />} onClick={deleteCampaign}>Delete campaign</Button>
+                  <Button variant="danger" icon={<Trash2 size={14} />} onClick={deleteCampaign}>
+                    Delete campaign
+                  </Button>
                 </div>
               ) : (
                 <div className="danger-zone">
                   <div>
                     <h3>Leave campaign</h3>
-                    <p className="muted small">Your characters will remain, but they'll no longer be assigned to this campaign.</p>
+                    <p className="muted small">
+                      Your characters will remain, but they'll no longer be assigned to this
+                      campaign.
+                    </p>
                   </div>
-                  <Button variant="danger" icon={<LogOut size={14} />} onClick={leaveCampaign}>Leave campaign</Button>
+                  <Button variant="danger" icon={<LogOut size={14} />} onClick={leaveCampaign}>
+                    Leave campaign
+                  </Button>
                 </div>
               )}
             </Card>
@@ -1061,7 +1244,11 @@ export function CampaignPage() {
       <InviteModal
         open={inviteOpen}
         onClose={() => setInviteOpen(false)}
-        campaign={campaign && campaign.inviteCode ? { id: campaign.id, name: campaign.name, inviteCode: campaign.inviteCode } : null}
+        campaign={
+          campaign && campaign.inviteCode
+            ? { id: campaign.id, name: campaign.name, inviteCode: campaign.inviteCode }
+            : null
+        }
       />
 
       <Modal
@@ -1069,8 +1256,12 @@ export function CampaignPage() {
         onClose={() => setJournalEditor(null)}
         title={
           journalEditor === "new"
-            ? journalKind === "handout" ? "New handout" : "New journal entry"
-            : journalKind === "handout" ? "Edit handout" : "Edit journal entry"
+            ? journalKind === "handout"
+              ? "New handout"
+              : "New journal entry"
+            : journalKind === "handout"
+              ? "Edit handout"
+              : "Edit journal entry"
         }
         subtitle={
           journalKind === "handout"
@@ -1080,8 +1271,15 @@ export function CampaignPage() {
         wide
         footer={
           <>
-            <Button variant="ghost" onClick={() => setJournalEditor(null)}>Cancel</Button>
-            <Button variant="primary" onClick={saveJournal} loading={journalBusy} disabled={journalUploadBusy}>
+            <Button variant="ghost" onClick={() => setJournalEditor(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              onClick={saveJournal}
+              loading={journalBusy}
+              disabled={journalUploadBusy}
+            >
               {journalKind === "handout" ? "Save handout" : "Save entry"}
             </Button>
           </>
@@ -1089,15 +1287,30 @@ export function CampaignPage() {
       >
         <form className="stack" onSubmit={saveJournal}>
           <div className="segmented">
-            <button type="button" className={journalKind === "note" ? "is-active" : ""} onClick={() => setJournalKind("note")}>
+            <button
+              type="button"
+              className={journalKind === "note" ? "is-active" : ""}
+              onClick={() => setJournalKind("note")}
+            >
               <ScrollText size={13} /> Journal entry
             </button>
-            <button type="button" className={journalKind === "handout" ? "is-active" : ""} onClick={() => setJournalKind("handout")}>
+            <button
+              type="button"
+              className={journalKind === "handout" ? "is-active" : ""}
+              onClick={() => setJournalKind("handout")}
+            >
               <FileImage size={13} /> Handout
             </button>
           </div>
           <Field label="Title">
-            <Input autoFocus value={journalTitle} onChange={(event) => setJournalTitle(event.target.value)} placeholder={journalKind === "handout" ? "The ferryman's letter" : "Session 4 — The Sunken Crypt"} />
+            <Input
+              autoFocus
+              value={journalTitle}
+              onChange={(event) => setJournalTitle(event.target.value)}
+              placeholder={
+                journalKind === "handout" ? "The ferryman's letter" : "Session 4 — The Sunken Crypt"
+              }
+            />
           </Field>
           <Field label={journalKind === "handout" ? "Caption or description" : "Entry"}>
             <Textarea
@@ -1115,7 +1328,9 @@ export function CampaignPage() {
             <div className="row-between">
               <div>
                 <span className="field-label">Images</span>
-                <p className="field-hint">Attach maps, letters, portraits, or clues. Shared entries show these to players.</p>
+                <p className="field-hint">
+                  Attach maps, letters, portraits, or clues. Shared entries show these to players.
+                </p>
               </div>
               <div className="row" style={{ gap: 6 }}>
                 <Button
@@ -1159,13 +1374,22 @@ export function CampaignPage() {
               <div className="attachment-editor-grid">
                 {journalAttachments.map((attachment) => (
                   <div className="attachment-editor-item" key={attachment.id}>
-                    <img src={attachment.url} alt={attachment.name} loading="lazy" decoding="async" />
+                    <img
+                      src={attachment.url}
+                      alt={attachment.name}
+                      loading="lazy"
+                      decoding="async"
+                    />
                     <span>{attachment.name}</span>
                     <button
                       type="button"
                       className="icon-btn"
                       title="Remove image"
-                      onClick={() => setJournalAttachments((current) => current.filter((item) => item.id !== attachment.id))}
+                      onClick={() =>
+                        setJournalAttachments((current) =>
+                          current.filter((item) => item.id !== attachment.id)
+                        )
+                      }
                     >
                       <Trash2 size={12} />
                     </button>
@@ -1196,7 +1420,11 @@ export function CampaignPage() {
         title="Choose from library"
         subtitle="Attach an image already uploaded for this campaign, including scene art, portraits, and token images."
         wide
-        footer={<Button variant="ghost" onClick={() => setAssetPickerOpen(false)}>Done</Button>}
+        footer={
+          <Button variant="ghost" onClick={() => setAssetPickerOpen(false)}>
+            Done
+          </Button>
+        }
       >
         {assetPickerError ? <div className="auth-error">{assetPickerError}</div> : null}
         {assetPickerLoading ? (
@@ -1220,7 +1448,7 @@ export function CampaignPage() {
                 <span>
                   <strong>{asset.name}</strong>
                   <span className="tiny muted">
-                    {asset.unused ? "Unused" : asset.usage[0] ?? "In use"}
+                    {asset.unused ? "Unused" : (asset.usage[0] ?? "In use")}
                   </span>
                 </span>
               </button>
@@ -1236,7 +1464,11 @@ export function CampaignPage() {
         extraWide
       >
         {previewAttachment ? (
-          <img className="handout-preview" src={previewAttachment.url} alt={previewAttachment.name} />
+          <img
+            className="handout-preview"
+            src={previewAttachment.url}
+            alt={previewAttachment.name}
+          />
         ) : null}
       </Modal>
     </div>

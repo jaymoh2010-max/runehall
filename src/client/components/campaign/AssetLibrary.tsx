@@ -3,16 +3,7 @@ import { Eye, ImageOff, Images, RefreshCw, Trash2 } from "lucide-react";
 import type { CampaignAsset } from "../../../shared/types";
 import { api, formatDate } from "../../api";
 import { errorMessage } from "../../stores";
-import {
-  Badge,
-  Button,
-  Card,
-  EmptyState,
-  Modal,
-  PageEyebrow,
-  Spinner,
-  Tag,
-} from "../ui";
+import { Badge, Button, Card, EmptyState, Modal, PageEyebrow, Spinner, Tag } from "../ui";
 
 function formatBytes(bytes: number): string {
   if (!Number.isFinite(bytes) || bytes <= 0) return "0 KB";
@@ -56,16 +47,16 @@ export function AssetLibrary({
   const visible = useMemo(
     () =>
       assets.filter((asset) =>
-        filter === "all" ? true : filter === "unused" ? asset.unused : !asset.unused,
+        filter === "all" ? true : filter === "unused" ? asset.unused : !asset.unused
       ),
-    [assets, filter],
+    [assets, filter]
   );
   const reclaimableBytes = useMemo(
     () =>
       assets
         .filter((asset) => asset.unused && asset.deletable)
         .reduce((total, asset) => total + asset.size, 0),
-    [assets],
+    [assets]
   );
 
   const remove = async (asset: CampaignAsset) => {
@@ -106,7 +97,11 @@ export function AssetLibrary({
         </Button>
       </div>
 
-      {error ? <div className="auth-error" style={{ marginBottom: 14 }}>{error}</div> : null}
+      {error ? (
+        <div className="auth-error" style={{ marginBottom: 14 }}>
+          {error}
+        </div>
+      ) : null}
 
       <div className="asset-summary">
         <div className="asset-summary-stat">
@@ -123,18 +118,35 @@ export function AssetLibrary({
         </div>
         <div className="asset-summary-hint">
           <Images size={15} />
-          <span>Journal → edit entry → <strong>From library</strong></span>
+          <span>
+            Journal → edit entry → <strong>From library</strong>
+          </span>
         </div>
       </div>
 
       <div className="segmented asset-filter">
-        <button type="button" className={filter === "all" ? "is-active" : ""} aria-pressed={filter === "all"} onClick={() => setFilter("all")}>
+        <button
+          type="button"
+          className={filter === "all" ? "is-active" : ""}
+          aria-pressed={filter === "all"}
+          onClick={() => setFilter("all")}
+        >
           All
         </button>
-        <button type="button" className={filter === "unused" ? "is-active" : ""} aria-pressed={filter === "unused"} onClick={() => setFilter("unused")}>
+        <button
+          type="button"
+          className={filter === "unused" ? "is-active" : ""}
+          aria-pressed={filter === "unused"}
+          onClick={() => setFilter("unused")}
+        >
           Unused
         </button>
-        <button type="button" className={filter === "used" ? "is-active" : ""} aria-pressed={filter === "used"} onClick={() => setFilter("used")}>
+        <button
+          type="button"
+          className={filter === "used" ? "is-active" : ""}
+          aria-pressed={filter === "used"}
+          onClick={() => setFilter("used")}
+        >
           In use
         </button>
       </div>
@@ -164,7 +176,9 @@ export function AssetLibrary({
                   {asset.unused ? (
                     <Badge tone="gold">Unused</Badge>
                   ) : (
-                    <Badge tone="green">{asset.usage.length} use{asset.usage.length === 1 ? "" : "s"}</Badge>
+                    <Badge tone="green">
+                      {asset.usage.length} use{asset.usage.length === 1 ? "" : "s"}
+                    </Badge>
                   )}
                 </div>
                 <span className="tiny muted">
@@ -172,14 +186,23 @@ export function AssetLibrary({
                 </span>
                 <div className="chip-row asset-usage">
                   {asset.usage.slice(0, 3).map((usage) => (
-                    <Tag key={usage} tone="neutral">{usage}</Tag>
+                    <Tag key={usage} tone="neutral">
+                      {usage}
+                    </Tag>
                   ))}
-                  {asset.usage.length > 3 ? <Tag tone="neutral">+{asset.usage.length - 3}</Tag> : null}
+                  {asset.usage.length > 3 ? (
+                    <Tag tone="neutral">+{asset.usage.length - 3}</Tag>
+                  ) : null}
                   {asset.usedElsewhere ? <Tag tone="violet">Used elsewhere</Tag> : null}
                 </div>
               </div>
               <div className="asset-actions">
-                <Button size="sm" variant="ghost" icon={<Eye size={13} />} onClick={() => setPreview(asset)}>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  icon={<Eye size={13} />}
+                  onClick={() => setPreview(asset)}
+                >
                   Preview
                 </Button>
                 {asset.deletable ? (
@@ -203,14 +226,18 @@ export function AssetLibrary({
         open={Boolean(preview)}
         onClose={() => setPreview(null)}
         title={preview?.name}
-        subtitle={preview ? `${formatBytes(preview.size)} · ${formatDate(preview.createdAt)}` : undefined}
+        subtitle={
+          preview ? `${formatBytes(preview.size)} · ${formatDate(preview.createdAt)}` : undefined
+        }
         wide
       >
         {preview ? (
           <>
             <img className="asset-preview" src={preview.url} alt={preview.name} />
             <div className="tiny muted" style={{ marginTop: 10 }}>
-              {preview.usage.length ? `Used by ${preview.usage.join(", ")}` : "Not used by any record yet."}
+              {preview.usage.length
+                ? `Used by ${preview.usage.join(", ")}`
+                : "Not used by any record yet."}
             </div>
           </>
         ) : null}

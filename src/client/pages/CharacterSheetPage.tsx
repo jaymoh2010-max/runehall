@@ -109,7 +109,11 @@ export function CharacterSheetPage() {
   const toast = useToasts((state) => state.push);
   const [character, setCharacter] = useState<CharacterRecord | null>(null);
   const [draft, setDraft] = useState<CharacterDraft | null>(null);
-  const [context, setContext] = useState<CharacterContext>({ feats: {}, spells: {}, equipment: {} });
+  const [context, setContext] = useState<CharacterContext>({
+    feats: {},
+    spells: {},
+    equipment: {},
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [saveState, setSaveState] = useState<"saved" | "saving" | "error">("saved");
@@ -148,10 +152,13 @@ export function CharacterSheetPage() {
         ]);
         if (cancelled) return;
         const normalized = normalizeCharacterDraft(result.character.data, result.character.name);
-        const contextResult = await api<{ context: CharacterContext }>(`/api/characters/${id}/context`, {
-          method: "POST",
-          body: { draft: normalized },
-        });
+        const contextResult = await api<{ context: CharacterContext }>(
+          `/api/characters/${id}/context`,
+          {
+            method: "POST",
+            body: { draft: normalized },
+          }
+        );
         if (cancelled) return;
         setCharacter(result.character);
         characterRef.current = result.character;
@@ -172,18 +179,24 @@ export function CharacterSheetPage() {
     };
   }, [id]);
 
-  const derived = useMemo(() => (draft ? computeCharacter(draft, context) : null), [draft, context]);
+  const derived = useMemo(
+    () => (draft ? computeCharacter(draft, context) : null),
+    [draft, context]
+  );
   const canEdit = Boolean(character?.permissions?.canEdit);
 
   const transferTargets = useMemo(
     () => party.filter((entry) => entry.id !== character?.id),
-    [party, character?.id],
+    [party, character?.id]
   );
   const transferEntry = useMemo(
-    () => (draft && transferItemId ? draft.equipment.find((entry) => entry.itemId === transferItemId) ?? null : null),
-    [draft, transferItemId],
+    () =>
+      draft && transferItemId
+        ? (draft.equipment.find((entry) => entry.itemId === transferItemId) ?? null)
+        : null,
+    [draft, transferItemId]
   );
-  const transferItem = transferItemId ? context.equipment[transferItemId] ?? null : null;
+  const transferItem = transferItemId ? (context.equipment[transferItemId] ?? null) : null;
   const transferTotalCp = currencyToCp({
     gp: Number(transferCoins.gp) || 0,
     sp: Number(transferCoins.sp) || 0,
@@ -194,9 +207,9 @@ export function CharacterSheetPage() {
       (draft?.equipment ?? []).reduce(
         (total, entry) =>
           total + (context.equipment[entry.itemId]?.price.cpTotal ?? 0) * entry.quantity,
-        0,
+        0
       ),
-    [draft?.equipment, context.equipment],
+    [draft?.equipment, context.equipment]
   );
 
   const saveDraft = useCallback(
@@ -246,7 +259,7 @@ export function CharacterSheetPage() {
         saveInFlight.current = false;
       }
     },
-    [id, canEdit, toast],
+    [id, canEdit, toast]
   );
 
   useEffect(() => {
@@ -313,9 +326,7 @@ export function CharacterSheetPage() {
       setTransferLoading(false);
       return;
     }
-    api<{ characters: CharacterRecord[] }>(
-      `/api/characters?campaignId=${character.campaignId}`,
-    )
+    api<{ characters: CharacterRecord[] }>(`/api/characters?campaignId=${character.campaignId}`)
       .then((result) => {
         setParty(result.characters);
         const others = result.characters.filter((entry) => entry.id !== character.id);
@@ -344,7 +355,7 @@ export function CharacterSheetPage() {
         if (!transferEntry) throw new Error("That item is no longer in the pack.");
         const quantity = Math.max(
           1,
-          Math.min(transferEntry.quantity, Math.floor(Number(transferQuantity) || 1)),
+          Math.min(transferEntry.quantity, Math.floor(Number(transferQuantity) || 1))
         );
         body = { ...body, itemId: transferEntry.itemId, quantity };
         description = `${quantity}× ${transferItem?.name ?? transferEntry.itemId}`;
@@ -362,7 +373,7 @@ export function CharacterSheetPage() {
       }
       const result = await api<{ from: CharacterRecord; to: CharacterRecord }>(
         `/api/characters/${character.id}/transfer`,
-        { method: "POST", body },
+        { method: "POST", body }
       );
       const normalized = normalizeCharacterDraft(result.from.data, result.from.name);
       characterRef.current = result.from;
@@ -395,7 +406,10 @@ export function CharacterSheetPage() {
       try {
         const result = rollFormula(formula, { dc: dc ?? null, label });
         setRollLog(result);
-        toast(`${label}: ${result.total}${result.degree ? ` · ${DEGREE_LABELS[result.degree]}` : ""}`, "success");
+        toast(
+          `${label}: ${result.total}${result.degree ? ` · ${DEGREE_LABELS[result.degree]}` : ""}`,
+          "success"
+        );
       } catch (err) {
         toast(errorMessage(err), "error");
       }
@@ -419,10 +433,12 @@ export function CharacterSheetPage() {
               setRollLog(message.data);
               toast(
                 `${label}: ${message.data.total}${message.data.degree ? ` · ${DEGREE_LABELS[message.data.degree]}` : ""}`,
-                message.data.degree === "critical-failure" || message.data.degree === "failure" ? "error" : "success",
+                message.data.degree === "critical-failure" || message.data.degree === "failure"
+                  ? "error"
+                  : "success"
               );
             }
-          },
+          }
         );
       });
     };
@@ -479,14 +495,22 @@ export function CharacterSheetPage() {
   return (
     <div className="page sheet-page">
       <div className="sheet-topline">
-        <Link to={character.campaignId ? `/campaigns/${character.campaignId}` : "/campaigns"} className="back-link">
+        <Link
+          to={character.campaignId ? `/campaigns/${character.campaignId}` : "/campaigns"}
+          className="back-link"
+        >
           <ArrowLeft size={15} /> {character.campaignId ? "Back to campaign" : "Back to campaigns"}
         </Link>
         <div className="row" style={{ gap: 8 }}>
           <span className={`save-indicator ${saveState}`}>
             {saveState === "saved" ? "Saved" : saveState === "saving" ? "Saving…" : "Save failed"}
           </span>
-          <Button variant="secondary" size="sm" icon={<Printer size={14} />} onClick={() => window.print()}>
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={<Printer size={14} />}
+            onClick={() => window.print()}
+          >
             Print / PDF
           </Button>
           {character.permissions?.canEdit ? (
@@ -507,11 +531,17 @@ export function CharacterSheetPage() {
           </PageEyebrow>
           <h1>{draft.name}</h1>
           <p className="sheet-subtitle">
-            {[context.ancestry?.name, context.heritage?.name, context.background?.name].filter(Boolean).join(" · ") || "No ancestry or background chosen"}
+            {[context.ancestry?.name, context.heritage?.name, context.background?.name]
+              .filter(Boolean)
+              .join(" · ") || "No ancestry or background chosen"}
           </p>
           <div className="chip-row" style={{ marginTop: 10 }}>
             {context.deity ? <Tag tone="gold">{context.deity.name}</Tag> : null}
-            {selectedOptions.slice(0, 3).map((option) => <Tag key={option.id} tone="blue">{option.name}</Tag>)}
+            {selectedOptions.slice(0, 3).map((option) => (
+              <Tag key={option.id} tone="blue">
+                {option.name}
+              </Tag>
+            ))}
             {context.classData ? <Tag>{context.classData.name}</Tag> : null}
           </div>
         </div>
@@ -527,7 +557,11 @@ export function CharacterSheetPage() {
             <Stat label="Class DC" value={derived.classDc} />
             <Stat label="Speed" value={`${derived.speed} ft.`} />
             {(derived.otherSpeeds ?? []).map((entry) => (
-              <Stat key={entry.type} label={`${titleCase(entry.type)} speed`} value={`${entry.value} ft.`} />
+              <Stat
+                key={entry.type}
+                label={`${titleCase(entry.type)} speed`}
+                value={`${entry.value} ft.`}
+              />
             ))}
           </div>
         </div>
@@ -559,14 +593,23 @@ export function CharacterSheetPage() {
             </div>
             <div className="defense-grid">
               {(["fortitude", "reflex", "will"] as const).map((save) => (
-                <button key={save} type="button" className="roll-card" onClick={() => roll(`1d20${signed(derived.saves[save])}`, SAVE_LABELS[save])}>
+                <button
+                  key={save}
+                  type="button"
+                  className="roll-card"
+                  onClick={() => roll(`1d20${signed(derived.saves[save])}`, SAVE_LABELS[save])}
+                >
                   <span>{SAVE_LABELS[save]}</span>
                   <strong>{signed(derived.saves[save])}</strong>
                   <span className="tiny muted">{PROFICIENCY_NAMES[derived.prof[save]]}</span>
                   <Dices size={14} />
                 </button>
               ))}
-              <button type="button" className="roll-card" onClick={() => roll(`1d20${signed(derived.perception)}`, "Perception")}>
+              <button
+                type="button"
+                className="roll-card"
+                onClick={() => roll(`1d20${signed(derived.perception)}`, "Perception")}
+              >
                 <span>Perception</span>
                 <strong>{signed(derived.perception)}</strong>
                 <span className="tiny muted">{PROFICIENCY_NAMES[derived.prof.perception]}</span>
@@ -575,13 +618,19 @@ export function CharacterSheetPage() {
               <div className="roll-card is-static">
                 <span>Armor Class</span>
                 <strong>{derived.ac}</strong>
-                <span className="tiny muted">{draft.play.shieldRaised ? "Shield raised" : "Shield down"}</span>
+                <span className="tiny muted">
+                  {draft.play.shieldRaised ? "Shield raised" : "Shield down"}
+                </span>
                 <Shield size={14} />
               </div>
               <div className="roll-card is-static">
                 <span>Spell DC</span>
                 <strong>{derived.spellDc ?? "—"}</strong>
-                <span className="tiny muted">{caster.progression === "none" ? "No spellcasting" : `${derived.casterTradition || ""} caster`}</span>
+                <span className="tiny muted">
+                  {caster.progression === "none"
+                    ? "No spellcasting"
+                    : `${derived.casterTradition || ""} caster`}
+                </span>
                 <Sparkles size={14} />
               </div>
             </div>
@@ -601,19 +650,34 @@ export function CharacterSheetPage() {
             </div>
             <div className="skill-sheet-grid">
               {derived.skills.map((skill) => (
-                <button key={skill.id} type="button" className="skill-sheet-row" onClick={() => roll(`1d20${signed(skill.mod)}`, skill.name)}>
+                <button
+                  key={skill.id}
+                  type="button"
+                  className="skill-sheet-row"
+                  onClick={() => roll(`1d20${signed(skill.mod)}`, skill.name)}
+                >
                   <span className="skill-sheet-name">
                     {skill.name}
                     {skill.trained ? <span className={`rank-dot rank-${skill.rank}`} /> : null}
                   </span>
-                  <span className="tiny muted">{ABILITY_SHORT[skill.ability]} · {PROFICIENCY_NAMES[skill.rank]}</span>
+                  <span className="tiny muted">
+                    {ABILITY_SHORT[skill.ability]} · {PROFICIENCY_NAMES[skill.rank]}
+                  </span>
                   <strong>{signed(skill.mod)}</strong>
                   <Dices size={13} />
                 </button>
               ))}
               {derived.lore.map((lore) => (
-                <button key={lore.name} type="button" className="skill-sheet-row" onClick={() => roll(`1d20${signed(lore.mod)}`, lore.name)}>
-                  <span className="skill-sheet-name">{lore.name}<span className="rank-dot rank-1" /></span>
+                <button
+                  key={lore.name}
+                  type="button"
+                  className="skill-sheet-row"
+                  onClick={() => roll(`1d20${signed(lore.mod)}`, lore.name)}
+                >
+                  <span className="skill-sheet-name">
+                    {lore.name}
+                    <span className="rank-dot rank-1" />
+                  </span>
                   <span className="tiny muted">INT · Lore</span>
                   <strong>{signed(lore.mod)}</strong>
                   <Dices size={13} />
@@ -632,13 +696,27 @@ export function CharacterSheetPage() {
                 <div key={attack.id} className="attack-sheet-row">
                   <div className="attack-name">
                     <strong>{attack.name}</strong>
-                    <span className="chip-row">{attack.traits.slice(0, 4).map((trait) => <Tag key={trait}>{titleCase(trait)}</Tag>)}</span>
+                    <span className="chip-row">
+                      {attack.traits.slice(0, 4).map((trait) => (
+                        <Tag key={trait}>{titleCase(trait)}</Tag>
+                      ))}
+                    </span>
                   </div>
                   <div className="attack-actions">
-                    <Button size="sm" variant="secondary" icon={<Dices size={13} />} onClick={() => roll(attack.attackFormula, `${attack.name} attack`)}>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      icon={<Dices size={13} />}
+                      onClick={() => roll(attack.attackFormula, `${attack.name} attack`)}
+                    >
                       {signed(attack.attackBonus)}
                     </Button>
-                    <Button size="sm" variant="ghost" icon={<Swords size={13} />} onClick={() => roll(attack.damageFormula, `${attack.name} damage`)}>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      icon={<Swords size={13} />}
+                      onClick={() => roll(attack.damageFormula, `${attack.name} damage`)}
+                    >
                       {attack.damageFormula} {attack.damageType}
                     </Button>
                     {attack.extraDamage?.map((extra) => (
@@ -663,7 +741,10 @@ export function CharacterSheetPage() {
             <Card className="sheet-section">
               <div className="sheet-section-head">
                 <h2>Spells</h2>
-                <span className="tiny muted">Spell attack {derived.spellAttack === null ? "—" : signed(derived.spellAttack)} · DC {derived.spellDc}</span>
+                <span className="tiny muted">
+                  Spell attack {derived.spellAttack === null ? "—" : signed(derived.spellAttack)} ·
+                  DC {derived.spellDc}
+                </span>
               </div>
               {derived.spellSlots ? (
                 <div className="sheet-slots">
@@ -673,7 +754,10 @@ export function CharacterSheetPage() {
                     const fontSlots = derived.divineFontSlots ?? 0;
                     const regularCount = fontRank === rank ? Math.max(0, count - fontSlots) : count;
                     const used = draft.spells.slotsUsed[String(rank)] ?? 0;
-                    const fontUsed = Math.max(0, Math.min(fontSlots, draft.spells.divineFontUsed ?? 0));
+                    const fontUsed = Math.max(
+                      0,
+                      Math.min(fontSlots, draft.spells.divineFontUsed ?? 0)
+                    );
                     return (
                       <div key={index}>
                         <div className="sheet-slot-row">
@@ -701,7 +785,9 @@ export function CharacterSheetPage() {
                               />
                             ))}
                           </div>
-                          <span className="tiny muted">{Math.max(0, regularCount - used)} / {regularCount}</span>
+                          <span className="tiny muted">
+                            {Math.max(0, regularCount - used)} / {regularCount}
+                          </span>
                         </div>
                         {fontRank === rank && fontSlots ? (
                           <div className="sheet-slot-row slot-row-font">
@@ -726,7 +812,9 @@ export function CharacterSheetPage() {
                                 />
                               ))}
                             </div>
-                            <span className="tiny muted">{fontSlots - fontUsed} / {fontSlots} · heal or harm</span>
+                            <span className="tiny muted">
+                              {fontSlots - fontUsed} / {fontSlots} · heal or harm
+                            </span>
                           </div>
                         ) : null}
                       </div>
@@ -734,22 +822,41 @@ export function CharacterSheetPage() {
                   })}
                 </div>
               ) : null}
-              {derived.spellSlotsNote ? <p className="muted small">{derived.spellSlotsNote}</p> : null}
-              <SpellGroups draft={draft} context={context} onRoll={roll} spellAttack={derived.spellAttack} />
+              {derived.spellSlotsNote ? (
+                <p className="muted small">{derived.spellSlotsNote}</p>
+              ) : null}
+              <SpellGroups
+                draft={draft}
+                context={context}
+                onRoll={roll}
+                spellAttack={derived.spellAttack}
+              />
             </Card>
           ) : null}
 
           <Card className="sheet-section">
             <div className="sheet-section-head">
               <h2>Feats &amp; features</h2>
-              <span className="tiny muted">{derived.selectedFeats.length} feats · {derived.features.length} class features</span>
+              <span className="tiny muted">
+                {derived.selectedFeats.length} feats · {derived.features.length} class features
+              </span>
             </div>
             <div className="sheet-feature-list">
               {derived.selectedFeats.map((feat) => (
                 <details key={feat.id} className="sheet-feature">
                   <summary>
-                    <span><strong>{feat.name}</strong><span className="tiny muted"> · {titleCase(feat.category)} · level {feat.level}</span></span>
-                    <span className="chip-row">{feat.traits.slice(0, 3).map((trait) => <Tag key={trait}>{trait}</Tag>)}</span>
+                    <span>
+                      <strong>{feat.name}</strong>
+                      <span className="tiny muted">
+                        {" "}
+                        · {titleCase(feat.category)} · level {feat.level}
+                      </span>
+                    </span>
+                    <span className="chip-row">
+                      {feat.traits.slice(0, 3).map((trait) => (
+                        <Tag key={trait}>{trait}</Tag>
+                      ))}
+                    </span>
                   </summary>
                   <RichText html={feat.description} />
                 </details>
@@ -757,18 +864,30 @@ export function CharacterSheetPage() {
               {derived.features.map((feature) => (
                 <details key={feature.id} className="sheet-feature">
                   <summary>
-                    <span><strong>{feature.name}</strong><span className="tiny muted"> · class feature · level {feature.level}</span></span>
-                    <span className="chip-row">{feature.traits.slice(0, 2).map((trait) => <Tag key={trait}>{trait}</Tag>)}</span>
+                    <span>
+                      <strong>{feature.name}</strong>
+                      <span className="tiny muted"> · class feature · level {feature.level}</span>
+                    </span>
+                    <span className="chip-row">
+                      {feature.traits.slice(0, 2).map((trait) => (
+                        <Tag key={trait}>{trait}</Tag>
+                      ))}
+                    </span>
                   </summary>
                   <RichText html={feature.description} />
                 </details>
               ))}
               {derived.grantedFeats.map((feat) => (
                 <div key={feat.name} className="sheet-feature static">
-                  <span><strong>{feat.name}</strong><span className="tiny muted"> · granted by background</span></span>
+                  <span>
+                    <strong>{feat.name}</strong>
+                    <span className="tiny muted"> · granted by background</span>
+                  </span>
                 </div>
               ))}
-              {!derived.selectedFeats.length && !derived.features.length ? <p className="muted small">No feats or class features selected yet.</p> : null}
+              {!derived.selectedFeats.length && !derived.features.length ? (
+                <p className="muted small">No feats or class features selected yet.</p>
+              ) : null}
             </div>
           </Card>
 
@@ -807,8 +926,7 @@ export function CharacterSheetPage() {
                 return (
                   <div key={entry.itemId} className="sheet-equipment-row">
                     <span className="grow">
-                      <strong>{name}</strong>{" "}
-                      <span className="tiny muted">×{entry.quantity}</span>
+                      <strong>{name}</strong> <span className="tiny muted">×{entry.quantity}</span>
                       {item ? (
                         <span className="tiny muted"> · {formatCp(item.price.cpTotal)} each</span>
                       ) : null}
@@ -826,7 +944,7 @@ export function CharacterSheetPage() {
                             equipment: current.equipment.map((candidate) =>
                               candidate.itemId === entry.itemId
                                 ? { ...candidate, quantity: Math.max(1, candidate.quantity - 1) }
-                                : candidate,
+                                : candidate
                             ),
                           }))
                         }
@@ -844,7 +962,7 @@ export function CharacterSheetPage() {
                             equipment: current.equipment.map((candidate) =>
                               candidate.itemId === entry.itemId
                                 ? { ...candidate, quantity: candidate.quantity + 1 }
-                                : candidate,
+                                : candidate
                             ),
                           }))
                         }
@@ -861,7 +979,7 @@ export function CharacterSheetPage() {
                           equipment: current.equipment.map((candidate) =>
                             candidate.itemId === entry.itemId
                               ? { ...candidate, equipped: value }
-                              : candidate,
+                              : candidate
                           ),
                         }))
                       }
@@ -878,7 +996,7 @@ export function CharacterSheetPage() {
                         update((current) => ({
                           ...current,
                           equipment: current.equipment.filter(
-                            (candidate) => candidate.itemId !== entry.itemId,
+                            (candidate) => candidate.itemId !== entry.itemId
                           ),
                         }));
                       }}
@@ -914,56 +1032,70 @@ export function CharacterSheetPage() {
               </div>
               <div className="sheet-companion-list">
                 {draft.companions.map((companion) => {
-                  const linkedMonster = companion.monsterId ? context.monsters?.[companion.monsterId] : null;
+                  const linkedMonster = companion.monsterId
+                    ? context.monsters?.[companion.monsterId]
+                    : null;
                   return (
-                  <div key={companion.id} className="sheet-companion-row">
-                    <div>
-                      <div className="row" style={{ gap: 7 }}>
-                        <strong>{companion.name}</strong>
-                        <Tag tone="blue">{companion.kind}</Tag>
-                        <span className="tiny muted">level {companion.level}</span>
-                        {linkedMonster ? <Tag tone="gold">Bestiary</Tag> : null}
-                      </div>
-                      <p className="tiny muted">
-                        {companion.hpMax !== null
-                          ? `${companion.hpCurrent ?? "?"} / ${companion.hpMax} HP`
-                          : companion.hpCurrent !== null
-                            ? `${companion.hpCurrent} HP`
-                            : "HP —"}
-                        {companion.ac !== null ? ` · AC ${companion.ac}` : ""}
-                      </p>
-                    </div>
-                    {linkedMonster ? (
-                      <details className="sheet-companion-statblock">
-                        <summary className="tiny gold-text">Bestiary statblock · {linkedMonster.name}</summary>
+                    <div key={companion.id} className="sheet-companion-row">
+                      <div>
+                        <div className="row" style={{ gap: 7 }}>
+                          <strong>{companion.name}</strong>
+                          <Tag tone="blue">{companion.kind}</Tag>
+                          <span className="tiny muted">level {companion.level}</span>
+                          {linkedMonster ? <Tag tone="gold">Bestiary</Tag> : null}
+                        </div>
                         <p className="tiny muted">
-                          HP {linkedMonster.hp} · AC {linkedMonster.ac} · Fort {signed(linkedMonster.fortitude)} ·
-                          Ref {signed(linkedMonster.reflex)} · Will {signed(linkedMonster.will)} · Per{" "}
-                          {signed(linkedMonster.perception)}
+                          {companion.hpMax !== null
+                            ? `${companion.hpCurrent ?? "?"} / ${companion.hpMax} HP`
+                            : companion.hpCurrent !== null
+                              ? `${companion.hpCurrent} HP`
+                              : "HP —"}
+                          {companion.ac !== null ? ` · AC ${companion.ac}` : ""}
                         </p>
-                        {linkedMonster.attacks.length ? (
+                      </div>
+                      {linkedMonster ? (
+                        <details className="sheet-companion-statblock">
+                          <summary className="tiny gold-text">
+                            Bestiary statblock · {linkedMonster.name}
+                          </summary>
                           <p className="tiny muted">
-                            {linkedMonster.attacks
-                              .map((attack) => `${attack.name} ${signed(attack.bonus)} (${attack.damage})`)
-                              .join(" · ")}
+                            HP {linkedMonster.hp} · AC {linkedMonster.ac} · Fort{" "}
+                            {signed(linkedMonster.fortitude)} · Ref {signed(linkedMonster.reflex)} ·
+                            Will {signed(linkedMonster.will)} · Per{" "}
+                            {signed(linkedMonster.perception)}
                           </p>
-                        ) : null}
-                        {linkedMonster.abilities.length ? (
-                          <details>
-                            <summary className="tiny gold-text">{linkedMonster.abilities.length} abilities</summary>
-                            {linkedMonster.abilities.map((ability) => (
-                              <div key={ability.name} className="companion-ability">
-                                <strong>{ability.name}</strong>
-                                {ability.actions ? <span className="tiny muted"> · {ability.actions}</span> : null}
-                                <RichText html={ability.description} />
-                              </div>
-                            ))}
-                          </details>
-                        ) : null}
-                      </details>
-                    ) : null}
-                    {companion.notes ? <p className="tiny muted sheet-companion-notes">{companion.notes}</p> : null}
-                  </div>
+                          {linkedMonster.attacks.length ? (
+                            <p className="tiny muted">
+                              {linkedMonster.attacks
+                                .map(
+                                  (attack) =>
+                                    `${attack.name} ${signed(attack.bonus)} (${attack.damage})`
+                                )
+                                .join(" · ")}
+                            </p>
+                          ) : null}
+                          {linkedMonster.abilities.length ? (
+                            <details>
+                              <summary className="tiny gold-text">
+                                {linkedMonster.abilities.length} abilities
+                              </summary>
+                              {linkedMonster.abilities.map((ability) => (
+                                <div key={ability.name} className="companion-ability">
+                                  <strong>{ability.name}</strong>
+                                  {ability.actions ? (
+                                    <span className="tiny muted"> · {ability.actions}</span>
+                                  ) : null}
+                                  <RichText html={ability.description} />
+                                </div>
+                              ))}
+                            </details>
+                          ) : null}
+                        </details>
+                      ) : null}
+                      {companion.notes ? (
+                        <p className="tiny muted sheet-companion-notes">{companion.notes}</p>
+                      ) : null}
+                    </div>
                   );
                 })}
               </div>
@@ -976,12 +1108,37 @@ export function CharacterSheetPage() {
               <span className="tiny muted">Backstory, beliefs, and session notes</span>
             </div>
             <div className="sheet-notes">
-              {draft.details.appearance ? <div><h4>Appearance</h4><p>{draft.details.appearance}</p></div> : null}
-              {draft.details.personality ? <div><h4>Personality</h4><p>{draft.details.personality}</p></div> : null}
-              {draft.details.beliefs ? <div><h4>Beliefs &amp; bonds</h4><p>{draft.details.beliefs}</p></div> : null}
-              {draft.details.notes ? <div><h4>Notes</h4><p style={{ whiteSpace: "pre-wrap" }}>{draft.details.notes}</p></div> : null}
-              {!draft.details.appearance && !draft.details.personality && !draft.details.beliefs && !draft.details.notes ? (
-                <p className="muted small">No notes yet. Add a backstory from the character builder.</p>
+              {draft.details.appearance ? (
+                <div>
+                  <h4>Appearance</h4>
+                  <p>{draft.details.appearance}</p>
+                </div>
+              ) : null}
+              {draft.details.personality ? (
+                <div>
+                  <h4>Personality</h4>
+                  <p>{draft.details.personality}</p>
+                </div>
+              ) : null}
+              {draft.details.beliefs ? (
+                <div>
+                  <h4>Beliefs &amp; bonds</h4>
+                  <p>{draft.details.beliefs}</p>
+                </div>
+              ) : null}
+              {draft.details.notes ? (
+                <div>
+                  <h4>Notes</h4>
+                  <p style={{ whiteSpace: "pre-wrap" }}>{draft.details.notes}</p>
+                </div>
+              ) : null}
+              {!draft.details.appearance &&
+              !draft.details.personality &&
+              !draft.details.beliefs &&
+              !draft.details.notes ? (
+                <p className="muted small">
+                  No notes yet. Add a backstory from the character builder.
+                </p>
               ) : null}
             </div>
           </Card>
@@ -991,16 +1148,38 @@ export function CharacterSheetPage() {
           <Card className="sheet-play-card">
             <div className="row-between">
               <h2>At the table</h2>
-              <Badge tone={canEdit ? "green" : "neutral"}>{canEdit ? "Editable" : "Read only"}</Badge>
+              <Badge tone={canEdit ? "green" : "neutral"}>
+                {canEdit ? "Editable" : "Read only"}
+              </Badge>
             </div>
             <div className="hp-editor">
               <div className="hp-editor-head">
-                <span><Heart size={14} /> Hit points</span>
-                <span className="tiny muted">{hp} / {derived.maxHp}{fortune.tempHp ? ` (+${fortune.tempHp} temp)` : ""}</span>
+                <span>
+                  <Heart size={14} /> Hit points
+                </span>
+                <span className="tiny muted">
+                  {hp} / {derived.maxHp}
+                  {fortune.tempHp ? ` (+${fortune.tempHp} temp)` : ""}
+                </span>
               </div>
               <ProgressBar value={hp} max={derived.maxHp} />
               <div className="hp-controls">
-                <Button size="sm" variant="ghost" onClick={() => update((current) => ({ ...current, play: { ...current.play, hp: Math.max(0, (current.play.hp ?? derived.maxHp) - 1) } }))} disabled={!canEdit}><Minus size={13} /></Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() =>
+                    update((current) => ({
+                      ...current,
+                      play: {
+                        ...current.play,
+                        hp: Math.max(0, (current.play.hp ?? derived.maxHp) - 1),
+                      },
+                    }))
+                  }
+                  disabled={!canEdit}
+                >
+                  <Minus size={13} />
+                </Button>
                 <Input
                   type="number"
                   value={draft.play.hp ?? derived.maxHp}
@@ -1010,16 +1189,76 @@ export function CharacterSheetPage() {
                   onChange={(event) =>
                     update((current) => ({
                       ...current,
-                      play: { ...current.play, hp: Math.max(0, Math.min(derived.maxHp, Number(event.target.value) || 0)) },
+                      play: {
+                        ...current.play,
+                        hp: Math.max(0, Math.min(derived.maxHp, Number(event.target.value) || 0)),
+                      },
                     }))
                   }
                 />
-                <Button size="sm" variant="ghost" onClick={() => update((current) => ({ ...current, play: { ...current.play, hp: Math.min(derived.maxHp, (current.play.hp ?? derived.maxHp) + 1) } }))} disabled={!canEdit}><Plus size={13} /></Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() =>
+                    update((current) => ({
+                      ...current,
+                      play: {
+                        ...current.play,
+                        hp: Math.min(derived.maxHp, (current.play.hp ?? derived.maxHp) + 1),
+                      },
+                    }))
+                  }
+                  disabled={!canEdit}
+                >
+                  <Plus size={13} />
+                </Button>
               </div>
               <div className="hp-quick">
-                <Button size="sm" variant="danger" onClick={() => update((current) => ({ ...current, play: { ...current.play, hp: Math.max(0, (current.play.hp ?? derived.maxHp) - 5) } }))} disabled={!canEdit}>−5</Button>
-                <Button size="sm" variant="secondary" onClick={() => update((current) => ({ ...current, play: { ...current.play, hp: Math.min(derived.maxHp, (current.play.hp ?? derived.maxHp) + 5) } }))} disabled={!canEdit}>+5</Button>
-                <Button size="sm" variant="ghost" onClick={() => update((current) => ({ ...current, play: { ...current.play, hp: derived.maxHp } }))} disabled={!canEdit}>Full</Button>
+                <Button
+                  size="sm"
+                  variant="danger"
+                  onClick={() =>
+                    update((current) => ({
+                      ...current,
+                      play: {
+                        ...current.play,
+                        hp: Math.max(0, (current.play.hp ?? derived.maxHp) - 5),
+                      },
+                    }))
+                  }
+                  disabled={!canEdit}
+                >
+                  −5
+                </Button>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() =>
+                    update((current) => ({
+                      ...current,
+                      play: {
+                        ...current.play,
+                        hp: Math.min(derived.maxHp, (current.play.hp ?? derived.maxHp) + 5),
+                      },
+                    }))
+                  }
+                  disabled={!canEdit}
+                >
+                  +5
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() =>
+                    update((current) => ({
+                      ...current,
+                      play: { ...current.play, hp: derived.maxHp },
+                    }))
+                  }
+                  disabled={!canEdit}
+                >
+                  Full
+                </Button>
               </div>
               <Field label="Temp HP">
                 <Input
@@ -1027,7 +1266,15 @@ export function CharacterSheetPage() {
                   min={0}
                   value={draft.play.tempHp}
                   disabled={!canEdit}
-                  onChange={(event) => update((current) => ({ ...current, play: { ...current.play, tempHp: Math.max(0, Number(event.target.value) || 0) } }))}
+                  onChange={(event) =>
+                    update((current) => ({
+                      ...current,
+                      play: {
+                        ...current.play,
+                        tempHp: Math.max(0, Number(event.target.value) || 0),
+                      },
+                    }))
+                  }
                 />
               </Field>
             </div>
@@ -1041,7 +1288,15 @@ export function CharacterSheetPage() {
                       key={index}
                       type="button"
                       className={`point-pip ${draft.play.heroPoints > index ? "is-on" : ""}`}
-                      onClick={() => update((current) => ({ ...current, play: { ...current.play, heroPoints: index + 1 === current.play.heroPoints ? index : index + 1 } }))}
+                      onClick={() =>
+                        update((current) => ({
+                          ...current,
+                          play: {
+                            ...current.play,
+                            heroPoints: index + 1 === current.play.heroPoints ? index : index + 1,
+                          },
+                        }))
+                      }
                       disabled={!canEdit}
                       title={`${index + 1} hero point${index ? "s" : ""}`}
                     />
@@ -1057,7 +1312,16 @@ export function CharacterSheetPage() {
                         key={index}
                         type="button"
                         className={`point-pip focus ${draft.play.focusPoints > index ? "is-on" : ""}`}
-                        onClick={() => update((current) => ({ ...current, play: { ...current.play, focusPoints: index + 1 === current.play.focusPoints ? index : index + 1 } }))}
+                        onClick={() =>
+                          update((current) => ({
+                            ...current,
+                            play: {
+                              ...current.play,
+                              focusPoints:
+                                index + 1 === current.play.focusPoints ? index : index + 1,
+                            },
+                          }))
+                        }
                         disabled={!canEdit}
                       />
                     ))}
@@ -1068,7 +1332,12 @@ export function CharacterSheetPage() {
                 <span>Shield raised</span>
                 <Toggle
                   checked={draft.play.shieldRaised}
-                  onChange={(value) => update((current) => ({ ...current, play: { ...current.play, shieldRaised: value } }))}
+                  onChange={(value) =>
+                    update((current) => ({
+                      ...current,
+                      play: { ...current.play, shieldRaised: value },
+                    }))
+                  }
                   disabled={!canEdit}
                 />
               </div>
@@ -1102,7 +1371,7 @@ export function CharacterSheetPage() {
                                           ? entry.duration - 1
                                           : null,
                                     }
-                                  : entry,
+                                  : entry
                               ),
                             },
                           }))
@@ -1112,11 +1381,27 @@ export function CharacterSheetPage() {
                       </button>
                     ) : null}
                     {canEdit ? (
-                      <button type="button" className="tag-remove" onClick={() => update((current) => ({ ...current, play: { ...current.play, conditions: current.play.conditions.filter((_, i) => i !== index) } }))}>×</button>
+                      <button
+                        type="button"
+                        className="tag-remove"
+                        onClick={() =>
+                          update((current) => ({
+                            ...current,
+                            play: {
+                              ...current.play,
+                              conditions: current.play.conditions.filter((_, i) => i !== index),
+                            },
+                          }))
+                        }
+                      >
+                        ×
+                      </button>
                     ) : null}
                   </Tag>
                 ))}
-                {!draft.play.conditions.length ? <span className="muted tiny">No active conditions.</span> : null}
+                {!draft.play.conditions.length ? (
+                  <span className="muted tiny">No active conditions.</span>
+                ) : null}
               </div>
               {canEdit ? (
                 <div className="condition-add">
@@ -1127,10 +1412,18 @@ export function CharacterSheetPage() {
                     }}
                   >
                     <option value="">Add condition…</option>
-                    {COMMON_CONDITIONS.map((condition) => <option key={condition} value={condition}>{condition}</option>)}
-                    {conditions.filter((condition) => !COMMON_CONDITIONS.includes(condition.name)).map((condition) => (
-                      <option key={condition.id} value={condition.name}>{condition.name}</option>
+                    {COMMON_CONDITIONS.map((condition) => (
+                      <option key={condition} value={condition}>
+                        {condition}
+                      </option>
                     ))}
+                    {conditions
+                      .filter((condition) => !COMMON_CONDITIONS.includes(condition.name))
+                      .map((condition) => (
+                        <option key={condition.id} value={condition.name}>
+                          {condition.name}
+                        </option>
+                      ))}
                   </Select>
                   <Input
                     placeholder="or type one, e.g. Frightened 2"
@@ -1169,16 +1462,60 @@ export function CharacterSheetPage() {
           <Card className="sheet-meta-card">
             <h3>Details</h3>
             <dl>
-              {context.ancestry ? <div><dt>Ancestry</dt><dd>{context.ancestry.name}</dd></div> : null}
-              {context.heritage ? <div><dt>Heritage</dt><dd>{context.heritage.name}</dd></div> : null}
-              {context.background ? <div><dt>Background</dt><dd>{context.background.name}</dd></div> : null}
-              {classData ? <div><dt>Class</dt><dd>{classData.name}</dd></div> : null}
-              {context.deity ? <div><dt>Deity</dt><dd>{context.deity.name}</dd></div> : null}
-              <div><dt>Size</dt><dd>{SIZES[derived.size] || derived.size}</dd></div>
-              <div><dt>Languages</dt><dd>{derived.languages.join(", ") || "—"}</dd></div>
-              <div><dt>Senses</dt><dd>{derived.senses.join(", ") || "Normal"}</dd></div>
-              <div><dt>Bulk</dt><dd>{derived.bulk.total} / {derived.bulk.capacity}</dd></div>
-              <div><dt>Purse</dt><dd>{formatCp(draft.currency.gp * 100 + draft.currency.sp * 10 + draft.currency.cp)}</dd></div>
+              {context.ancestry ? (
+                <div>
+                  <dt>Ancestry</dt>
+                  <dd>{context.ancestry.name}</dd>
+                </div>
+              ) : null}
+              {context.heritage ? (
+                <div>
+                  <dt>Heritage</dt>
+                  <dd>{context.heritage.name}</dd>
+                </div>
+              ) : null}
+              {context.background ? (
+                <div>
+                  <dt>Background</dt>
+                  <dd>{context.background.name}</dd>
+                </div>
+              ) : null}
+              {classData ? (
+                <div>
+                  <dt>Class</dt>
+                  <dd>{classData.name}</dd>
+                </div>
+              ) : null}
+              {context.deity ? (
+                <div>
+                  <dt>Deity</dt>
+                  <dd>{context.deity.name}</dd>
+                </div>
+              ) : null}
+              <div>
+                <dt>Size</dt>
+                <dd>{SIZES[derived.size] || derived.size}</dd>
+              </div>
+              <div>
+                <dt>Languages</dt>
+                <dd>{derived.languages.join(", ") || "—"}</dd>
+              </div>
+              <div>
+                <dt>Senses</dt>
+                <dd>{derived.senses.join(", ") || "Normal"}</dd>
+              </div>
+              <div>
+                <dt>Bulk</dt>
+                <dd>
+                  {derived.bulk.total} / {derived.bulk.capacity}
+                </dd>
+              </div>
+              <div>
+                <dt>Purse</dt>
+                <dd>
+                  {formatCp(draft.currency.gp * 100 + draft.currency.sp * 10 + draft.currency.cp)}
+                </dd>
+              </div>
             </dl>
           </Card>
 
@@ -1192,10 +1529,24 @@ export function CharacterSheetPage() {
                 <span className="tiny muted">{rollLog.label || rollLog.formula}</span>
                 <strong>{rollLog.total}</strong>
                 <span className="tiny muted">{rollLog.breakdown}</span>
-                {rollLog.degree ? <Badge tone={rollLog.degree === "critical-failure" ? "red" : rollLog.degree === "success" || rollLog.degree === "critical-success" ? "green" : "neutral"}>{DEGREE_LABELS[rollLog.degree]}</Badge> : null}
+                {rollLog.degree ? (
+                  <Badge
+                    tone={
+                      rollLog.degree === "critical-failure"
+                        ? "red"
+                        : rollLog.degree === "success" || rollLog.degree === "critical-success"
+                          ? "green"
+                          : "neutral"
+                    }
+                  >
+                    {DEGREE_LABELS[rollLog.degree]}
+                  </Badge>
+                ) : null}
               </div>
             ) : (
-              <p className="muted small">Roll a skill, save, attack, or spell to see the result here.</p>
+              <p className="muted small">
+                Roll a skill, save, attack, or spell to see the result here.
+              </p>
             )}
           </Card>
         </aside>
@@ -1203,7 +1554,11 @@ export function CharacterSheetPage() {
 
       {!draft.play.conditions.length ? null : (
         <div className="sheet-condition-ribbon">
-          {draft.play.conditions.map((condition) => <Badge key={condition.name} tone="red">{conditionLabel(condition)}</Badge>)}
+          {draft.play.conditions.map((condition) => (
+            <Badge key={condition.name} tone="red">
+              {conditionLabel(condition)}
+            </Badge>
+          ))}
         </div>
       )}
 
@@ -1231,7 +1586,9 @@ export function CharacterSheetPage() {
       >
         {transferError ? <div className="auth-error">{transferError}</div> : null}
         {!character.campaignId ? (
-          <p className="muted small">Assign this character to a campaign before giving items away.</p>
+          <p className="muted small">
+            Assign this character to a campaign before giving items away.
+          </p>
         ) : transferLoading ? (
           <p className="muted small">Loading the party…</p>
         ) : !transferTargets.length ? (
@@ -1334,8 +1691,10 @@ export function CharacterSheetPage() {
           <CircleAlert size={16} />
           <span>
             Reloading replaces your unsaved changes with the version from{" "}
-            <strong>{conflict ? new Date(conflict.updatedAt).toLocaleString() : "the server"}</strong>.
-            Keeping your changes overwrites that newer save.
+            <strong>
+              {conflict ? new Date(conflict.updatedAt).toLocaleString() : "the server"}
+            </strong>
+            . Keeping your changes overwrites that newer save.
           </span>
         </div>
       </Modal>
@@ -1374,30 +1733,40 @@ function SpellGroups({
       {cantrips.length ? (
         <div className="spell-group">
           <h4>Cantrips</h4>
-          {cantrips.map((spell) => <SpellRow key={spell.id} spell={spell} onRoll={onRoll} spellAttack={spellAttack} />)}
-        </div>
-      ) : null}
-      {[...grouped.entries()].sort((a, b) => a[0] - b[0]).map(([rank, spells]) => (
-        <div key={rank} className="spell-group">
-          <h4>Rank {rank} {preparedCaster ? "spellbook" : "repertoire"}</h4>
-          {spells.map((spell) => (
-            <SpellRow
-              key={spell.id}
-              spell={spell}
-              onRoll={onRoll}
-              spellAttack={spellAttack}
-              prepared={prepared.get(spell.id) ?? 0}
-            />
+          {cantrips.map((spell) => (
+            <SpellRow key={spell.id} spell={spell} onRoll={onRoll} spellAttack={spellAttack} />
           ))}
         </div>
-      ))}
+      ) : null}
+      {[...grouped.entries()]
+        .sort((a, b) => a[0] - b[0])
+        .map(([rank, spells]) => (
+          <div key={rank} className="spell-group">
+            <h4>
+              Rank {rank} {preparedCaster ? "spellbook" : "repertoire"}
+            </h4>
+            {spells.map((spell) => (
+              <SpellRow
+                key={spell.id}
+                spell={spell}
+                onRoll={onRoll}
+                spellAttack={spellAttack}
+                prepared={prepared.get(spell.id) ?? 0}
+              />
+            ))}
+          </div>
+        ))}
       {focus.length ? (
         <div className="spell-group">
           <h4>Focus spells</h4>
-          {focus.map((spell) => <SpellRow key={spell.id} spell={spell} onRoll={onRoll} spellAttack={spellAttack} />)}
+          {focus.map((spell) => (
+            <SpellRow key={spell.id} spell={spell} onRoll={onRoll} spellAttack={spellAttack} />
+          ))}
         </div>
       ) : null}
-      {!cantrips.length && !known.length && !focus.length ? <p className="muted small">No spells selected yet.</p> : null}
+      {!cantrips.length && !known.length && !focus.length ? (
+        <p className="muted small">No spells selected yet.</p>
+      ) : null}
     </div>
   );
 }
@@ -1427,17 +1796,29 @@ function SpellRow({
           {prepared ? (
             <span className="tiny gold-text"> · Prepared{prepared > 1 ? ` ×${prepared}` : ""}</span>
           ) : null}
-          <span className="tiny muted"> · {spell.actions || "—"} · {spell.range || "range —"}{spell.defense?.save ? ` · ${spell.defense.save}` : ""}</span>
+          <span className="tiny muted">
+            {" "}
+            · {spell.actions || "—"} · {spell.range || "range —"}
+            {spell.defense?.save ? ` · ${spell.defense.save}` : ""}
+          </span>
           {spell.damageText ? <span className="tiny gold-text"> · {spell.damageText}</span> : null}
         </div>
         <div className="row" style={{ gap: 5 }}>
           {spellAttack !== null && spell.traits.includes("attack") ? (
-            <Button size="sm" variant="ghost" onClick={() => onRoll(`1d20${signed(spellAttack)}`, `${spell.name} spell attack`)}>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => onRoll(`1d20${signed(spellAttack)}`, `${spell.name} spell attack`)}
+            >
               <Dices size={13} /> Attack
             </Button>
           ) : null}
           {damageFormula ? (
-            <Button size="sm" variant="ghost" onClick={() => onRoll(damageFormula, `${spell.name} damage`)}>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => onRoll(damageFormula, `${spell.name} damage`)}
+            >
               <Swords size={13} /> {damageFormula}
             </Button>
           ) : null}

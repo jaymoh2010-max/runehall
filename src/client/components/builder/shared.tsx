@@ -84,10 +84,17 @@ export function BoostSelect({
   placeholder?: string;
 }) {
   return (
-    <Select value={value ?? ""} onChange={(event) => onChange((event.target.value || null) as AbilityKey | null)}>
+    <Select
+      value={value ?? ""}
+      onChange={(event) => onChange((event.target.value || null) as AbilityKey | null)}
+    >
       <option value="">{placeholder}</option>
       {options.map((ability) => (
-        <option key={ability} value={ability} disabled={exclude.includes(ability) && value !== ability}>
+        <option
+          key={ability}
+          value={ability}
+          disabled={exclude.includes(ability) && value !== ability}
+        >
           {ABILITY_LABELS[ability]}
         </option>
       ))}
@@ -111,7 +118,15 @@ export interface BuilderProps {
   setStep: (step: StepId) => void;
 }
 
-export function StepHeading({ eyebrow, title, lede }: { eyebrow: string; title: string; lede: string }) {
+export function StepHeading({
+  eyebrow,
+  title,
+  lede,
+}: {
+  eyebrow: string;
+  title: string;
+  lede: string;
+}) {
   return (
     <div className="step-heading">
       <PageEyebrow>{eyebrow}</PageEyebrow>
@@ -147,12 +162,20 @@ export function SearchInput({
   return (
     <div className="search-box">
       <BookOpen size={15} />
-      <Input value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} />
+      <Input
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+      />
     </div>
   );
 }
 
-export function MiniFeatureList({ features }: { features: { name: string; level: number; description: string }[] }) {
+export function MiniFeatureList({
+  features,
+}: {
+  features: { name: string; level: number; description: string }[];
+}) {
   const [open, setOpen] = useState<string | null>(null);
   if (!features.length) return null;
   return (

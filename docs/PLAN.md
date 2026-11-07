@@ -88,7 +88,7 @@ The target table size is one GM plus 4–10 players. That means the product shou
 - Backups support retention pruning, per-file SHA-256 manifests, verified off-machine shipping, documented cron/systemd/Task Scheduler automation, and an automated end-to-end restore drill.
 - Playwright browser E2E covers first-user registration, admin audit controls, campaign creation, the character builder and sheet, lazy compendium routes, and a second player joining with the invite code; CI runs it in Chromium.
 - The compendium manifest is pinned to the source commit.
-- Remaining: confirm the automated restore drill on a clean CI runner, then add lint/format guardrails and optional Postgres/S3 adapters.
+- Remaining: confirm the automated restore drill on a clean CI runner, then optional Postgres/S3 adapters.
 - Multi-device uploads and campaign import/export.
 - Optional OAuth.
 
@@ -214,7 +214,10 @@ These gaps are surfaced in the interface rather than hidden so the table knows w
   - chat, dice, journal, settings, library.
 - Production build (`npm run build`) and single-process server verification.
 
-Future: Playwright happy-path tests, database backup/restore tests, and an import/export round-trip test.
+- `npm run check` enforces TypeScript strict mode, ESLint (with `react-hooks`), Prettier formatting, unit tests, the production build, and the bundle budget.
+- Playwright covers the GM/player browser flows (registration, admin controls, campaign creation, builder/sheet, compendium routes, and player-safe access).
+
+Future: an import/export round-trip test.
 
 ---
 

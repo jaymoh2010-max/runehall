@@ -25,9 +25,7 @@ export async function registerUploadRoutes(app: FastifyInstance): Promise<void> 
     if (!request.user) return reply.code(401).send({ error: "Sign in to continue." });
     const campaignHeader = request.headers["x-campaign-id"];
     const campaignId =
-      typeof campaignHeader === "string" && campaignHeader.trim()
-        ? campaignHeader.trim()
-        : null;
+      typeof campaignHeader === "string" && campaignHeader.trim() ? campaignHeader.trim() : null;
     if (campaignId && !getCampaignRole(campaignId, request.user.id)) {
       return reply.code(403).send({ error: "You are not a member of that campaign." });
     }
@@ -84,14 +82,17 @@ export async function registerUploadRoutes(app: FastifyInstance): Promise<void> 
         metadata.height > MAX_DIMENSION ||
         metadata.width * metadata.height > MAX_PIXELS)
     ) {
-      return reject(413, "That image is too large. Keep it under 12,000 pixels per side and 100 megapixels.");
+      return reject(
+        413,
+        "That image is too large. Keep it under 12,000 pixels per side and 100 megapixels."
+      );
     }
 
     try {
       db.prepare(
         `INSERT INTO uploaded_assets
           (id, filename, original_name, mime_type, size, campaign_id, uploaded_by, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
       ).run(
         newId("asset"),
         filename,
@@ -100,7 +101,7 @@ export async function registerUploadRoutes(app: FastifyInstance): Promise<void> 
         size,
         campaignId,
         request.user.id,
-        now(),
+        now()
       );
     } catch {
       return reject(500, "Could not record the uploaded image.");

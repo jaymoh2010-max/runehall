@@ -32,7 +32,15 @@ describe("PF2e encounter XP", () => {
 
   it("multiplies XP by the number of creatures", () => {
     expect(combatantXp({ level: 3, count: 4 }, 5)).toBe(80);
-    expect(encounterAwardXp([{ level: 5, count: 2 }, { level: 3, count: 3 }], 5)).toBe(140);
+    expect(
+      encounterAwardXp(
+        [
+          { level: 5, count: 2 },
+          { level: 3, count: 3 },
+        ],
+        5
+      )
+    ).toBe(140);
   });
 });
 
@@ -97,7 +105,7 @@ describe("encounter waves", () => {
         { wave: 1, count: 2 },
         { wave: 2, count: 1 },
         { wave: 1, count: 4 },
-      ]),
+      ])
     ).toEqual([
       { wave: 1, combatants: 2, creatures: 6 },
       { wave: 2, combatants: 2, creatures: 4 },
@@ -109,7 +117,7 @@ describe("encounter waves", () => {
       encounterWaveSummaries([
         { wave: 0, count: 1 },
         { wave: Number.NaN, count: 0 },
-      ]),
+      ])
     ).toEqual([{ wave: 1, combatants: 2, creatures: 2 }]);
   });
 

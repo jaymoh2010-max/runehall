@@ -104,12 +104,7 @@ import {
   Textarea,
   Toggle,
 } from "../../ui";
-import {
-  DeityPicker,
-  EquipmentPicker,
-  FeatPicker,
-  SpellPicker,
-} from "../pickers";
+import { DeityPicker, EquipmentPicker, FeatPicker, SpellPicker } from "../pickers";
 import { ContentSourceToggle } from "../ContentSourceToggle";
 import { RunePicker } from "../RunePicker";
 import {
@@ -120,13 +115,7 @@ import {
 } from "../../../../shared/content";
 import { summarizeRunes } from "../../../../shared/runes";
 import type { BuilderProps } from "../shared";
-import {
-  BoostSelect,
-  StepHeading,
-  ValidationNote,
-  SearchInput,
-  MiniFeatureList,
-} from "../shared";
+import { BoostSelect, StepHeading, ValidationNote, SearchInput, MiniFeatureList } from "../shared";
 
 export function AbilitiesStep({ draft, update, derived, context, setStep }: BuilderProps) {
   const ancestry = context.ancestry;
@@ -154,7 +143,10 @@ export function AbilitiesStep({ draft, update, derived, context, setStep }: Buil
       const picks = [...(current.boosts.levels[key] ?? [])];
       while (picks.length < 4) picks.push(null);
       picks[index] = ability;
-      return { ...current, boosts: { ...current.boosts, levels: { ...current.boosts.levels, [key]: picks } } };
+      return {
+        ...current,
+        boosts: { ...current.boosts, levels: { ...current.boosts.levels, [key]: picks } },
+      };
     });
 
   return (
@@ -180,17 +172,28 @@ export function AbilitiesStep({ draft, update, derived, context, setStep }: Buil
       <div className="boost-sections">
         <Card className="boost-section">
           <div className="boost-section-head">
-            <div><h3>Ancestry boosts</h3><p>{ancestry ? ancestry.name : "Choose an ancestry first."}</p></div>
+            <div>
+              <h3>Ancestry boosts</h3>
+              <p>{ancestry ? ancestry.name : "Choose an ancestry first."}</p>
+            </div>
             <Badge tone="gold">Source 1</Badge>
           </div>
           {ancestry ? (
             <div className="boost-rows">
-              {ancestry.boosts.filter((boost) => boost.fixed).map((boost, index) => (
-                <div key={`fixed-${index}`} className="boost-row">
-                  <span>Fixed boost</span>
-                  <div className="chip-row">{boost.from.map((a) => <Tag key={a} tone="green">{ABILITY_SHORT[a]} +2</Tag>)}</div>
-                </div>
-              ))}
+              {ancestry.boosts
+                .filter((boost) => boost.fixed)
+                .map((boost, index) => (
+                  <div key={`fixed-${index}`} className="boost-row">
+                    <span>Fixed boost</span>
+                    <div className="chip-row">
+                      {boost.from.map((a) => (
+                        <Tag key={a} tone="green">
+                          {ABILITY_SHORT[a]} +2
+                        </Tag>
+                      ))}
+                    </div>
+                  </div>
+                ))}
               {flexAncestry.map((entry, index) => {
                 const value = draft.boosts.ancestry[index] ?? null;
                 const chosen = draft.boosts.ancestry.filter((x): x is AbilityKey => Boolean(x));
@@ -199,7 +202,12 @@ export function AbilitiesStep({ draft, update, derived, context, setStep }: Buil
                   .flatMap((boost) => boost.from);
                 return (
                   <div key={`anc-flex-${index}`} className="boost-row">
-                    <span>Choose one{entry.from.length === 6 ? " free boost" : ` of ${entry.from.map((a) => ABILITY_SHORT[a]).join(" / ")}`}</span>
+                    <span>
+                      Choose one
+                      {entry.from.length === 6
+                        ? " free boost"
+                        : ` of ${entry.from.map((a) => ABILITY_SHORT[a]).join(" / ")}`}
+                    </span>
                     <BoostSelect
                       value={value}
                       options={entry.from}
@@ -216,12 +224,17 @@ export function AbilitiesStep({ draft, update, derived, context, setStep }: Buil
                 </div>
               ))}
             </div>
-          ) : <p className="muted small">Choose an ancestry to unlock its boosts.</p>}
+          ) : (
+            <p className="muted small">Choose an ancestry to unlock its boosts.</p>
+          )}
         </Card>
 
         <Card className="boost-section">
           <div className="boost-section-head">
-            <div><h3>Background boosts</h3><p>{background ? background.name : "Choose a background first."}</p></div>
+            <div>
+              <h3>Background boosts</h3>
+              <p>{background ? background.name : "Choose a background first."}</p>
+            </div>
             <Badge tone="gold">Source 2</Badge>
           </div>
           {background ? (
@@ -231,7 +244,11 @@ export function AbilitiesStep({ draft, update, derived, context, setStep }: Buil
                 const chosen = draft.boosts.background.filter((x): x is AbilityKey => Boolean(x));
                 return (
                   <div key={`bg-flex-${index}`} className="boost-row">
-                    <span>{entry.from.length === 6 ? "Free boost" : `Choose ${entry.from.map((a) => ABILITY_SHORT[a]).join(" / ")}`}</span>
+                    <span>
+                      {entry.from.length === 6
+                        ? "Free boost"
+                        : `Choose ${entry.from.map((a) => ABILITY_SHORT[a]).join(" / ")}`}
+                    </span>
                     <BoostSelect
                       value={value}
                       options={entry.from}
@@ -242,37 +259,61 @@ export function AbilitiesStep({ draft, update, derived, context, setStep }: Buil
                 );
               })}
             </div>
-          ) : <p className="muted small">Choose a background to unlock its boosts.</p>}
+          ) : (
+            <p className="muted small">Choose a background to unlock its boosts.</p>
+          )}
         </Card>
 
         <Card className="boost-section">
           <div className="boost-section-head">
-            <div><h3>Class boost</h3><p>{classData ? classData.name : "Choose a class first."}</p></div>
+            <div>
+              <h3>Class boost</h3>
+              <p>{classData ? classData.name : "Choose a class first."}</p>
+            </div>
             <Badge tone="gold">Source 3</Badge>
           </div>
           {classData ? (
             keyOptions.length === 1 ? (
-              <div className="boost-row"><span>Key ability</span><Tag tone="green">{ABILITY_LABELS[keyOptions[0]]} +2</Tag></div>
+              <div className="boost-row">
+                <span>Key ability</span>
+                <Tag tone="green">{ABILITY_LABELS[keyOptions[0]]} +2</Tag>
+              </div>
             ) : keyOptions.length > 1 ? (
               <div className="boost-row">
                 <span>Choose your key ability</span>
                 <Select
                   value={draft.keyAbility ?? ""}
-                  onChange={(event) => update((current) => ({ ...current, keyAbility: (event.target.value || null) as AbilityKey | null }))}
+                  onChange={(event) =>
+                    update((current) => ({
+                      ...current,
+                      keyAbility: (event.target.value || null) as AbilityKey | null,
+                    }))
+                  }
                 >
                   <option value="">Choose…</option>
-                  {keyOptions.map((ability) => <option key={ability} value={ability}>{ABILITY_LABELS[ability]}</option>)}
+                  {keyOptions.map((ability) => (
+                    <option key={ability} value={ability}>
+                      {ABILITY_LABELS[ability]}
+                    </option>
+                  ))}
                 </Select>
               </div>
             ) : (
-              <p className="muted small">This class determines its key ability through its subclass choices.</p>
+              <p className="muted small">
+                This class determines its key ability through its subclass choices.
+              </p>
             )
-          ) : <p className="muted small">Choose a class to unlock its key ability.</p>}
+          ) : (
+            <p className="muted small">Choose a class to unlock its key ability.</p>
+          )}
         </Card>
 
         <Card className="boost-section">
           <div className="boost-section-head">
-            <div><h3>Free boosts</h3><p>Four +2 boosts, each to a different ability.</p></div>
+            <div>
+              <h3>Free boosts</h3>
+              <p>Four +2 boosts, each to a different ability.</p>
+            </div>
             <Badge tone="gold">Source 4</Badge>
           </div>
           <div className="free-boost-grid">
@@ -293,41 +334,55 @@ export function AbilitiesStep({ draft, update, derived, context, setStep }: Buil
           </div>
         </Card>
 
-        {[5, 10, 15, 20].filter((milestone) => draft.level >= milestone).map((milestone) => (
-          <Card key={milestone} className="boost-section">
-            <div className="boost-section-head">
-              <div><h3>Level {milestone} boosts</h3><p>Four boosts, each to a different ability. A boost is +2, or +1 if that score is already 18 or higher.</p></div>
-              <Badge tone="gold">Milestone</Badge>
-            </div>
-            <div className="free-boost-grid">
-              {[0, 1, 2, 3].map((index) => {
-                const picks = draft.boosts.levels[String(milestone)] ?? [];
-                const value = picks[index] ?? null;
-                const chosen = picks.filter((x): x is AbilityKey => Boolean(x));
-                return (
-                  <Field key={index} label={`Boost ${index + 1}`}>
-                    <BoostSelect
-                      value={value}
-                      options={ABILITIES}
-                      exclude={chosen.filter((x) => x !== value)}
-                      onChange={(ability) => setLevel(milestone, index, ability)}
-                    />
-                  </Field>
-                );
-              })}
-            </div>
-          </Card>
-        ))}
+        {[5, 10, 15, 20]
+          .filter((milestone) => draft.level >= milestone)
+          .map((milestone) => (
+            <Card key={milestone} className="boost-section">
+              <div className="boost-section-head">
+                <div>
+                  <h3>Level {milestone} boosts</h3>
+                  <p>
+                    Four boosts, each to a different ability. A boost is +2, or +1 if that score is
+                    already 18 or higher.
+                  </p>
+                </div>
+                <Badge tone="gold">Milestone</Badge>
+              </div>
+              <div className="free-boost-grid">
+                {[0, 1, 2, 3].map((index) => {
+                  const picks = draft.boosts.levels[String(milestone)] ?? [];
+                  const value = picks[index] ?? null;
+                  const chosen = picks.filter((x): x is AbilityKey => Boolean(x));
+                  return (
+                    <Field key={index} label={`Boost ${index + 1}`}>
+                      <BoostSelect
+                        value={value}
+                        options={ABILITIES}
+                        exclude={chosen.filter((x) => x !== value)}
+                        onChange={(ability) => setLevel(milestone, index, ability)}
+                      />
+                    </Field>
+                  );
+                })}
+              </div>
+            </Card>
+          ))}
       </div>
       <div className="ability-legend">
         {ABILITIES.map((ability) => (
-          <span key={ability}><strong>{ABILITY_SHORT[ability]}</strong> {ABILITY_DESCRIPTIONS[ability]}</span>
+          <span key={ability}>
+            <strong>{ABILITY_SHORT[ability]}</strong> {ABILITY_DESCRIPTIONS[ability]}
+          </span>
         ))}
       </div>
       <ValidationNote issues={issues} />
       <div className="step-actions">
-        <Button variant="ghost" onClick={() => setStep("class")}>Back</Button>
-        <Button variant="primary" onClick={() => setStep("skills")} icon={<ArrowRight size={15} />}>Skills</Button>
+        <Button variant="ghost" onClick={() => setStep("class")}>
+          Back
+        </Button>
+        <Button variant="primary" onClick={() => setStep("skills")} icon={<ArrowRight size={15} />}>
+          Skills
+        </Button>
       </div>
     </div>
   );

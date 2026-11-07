@@ -1,10 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import {
-  campaignCharacterCount,
-  campaignMemberCount,
-  getCampaignRole,
-  getUser,
-} from "../access";
+import { campaignCharacterCount, campaignMemberCount, getCampaignRole, getUser } from "../access";
 import { db, type CampaignRow } from "../db";
 import { serializeCampaignSummary } from "../serialize";
 
@@ -15,9 +10,13 @@ export async function registerInviteRoutes(app: FastifyInstance): Promise<void> 
       .prepare(
         `SELECT c.*, u.display_name AS gm_name FROM campaigns c
          JOIN users u ON u.id = c.gm_id
-         WHERE UPPER(c.invite_code) = ?`,
+         WHERE UPPER(c.invite_code) = ?`
       )
-      .get(String(code || "").trim().toUpperCase()) as (CampaignRow & { gm_name: string }) | undefined;
+      .get(
+        String(code || "")
+          .trim()
+          .toUpperCase()
+      ) as (CampaignRow & { gm_name: string }) | undefined;
     if (!row) return reply.code(404).send({ error: "That invite code is not valid." });
 
     const role = request.user ? getCampaignRole(row.id, request.user.id) : null;
@@ -29,7 +28,7 @@ export async function registerInviteRoutes(app: FastifyInstance): Promise<void> 
         memberCount: campaignMemberCount(row.id),
         characterCount: campaignCharacterCount(row.id),
       },
-      gm?.display_name ?? row.gm_name,
+      gm?.display_name ?? row.gm_name
     );
 
     return reply.send({

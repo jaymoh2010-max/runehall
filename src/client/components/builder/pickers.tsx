@@ -48,12 +48,7 @@ interface PickerBase {
   onClose: () => void;
 }
 
-function useSearch<T>(
-  open: boolean,
-  url: string,
-  deps: unknown[],
-  limit = 100,
-) {
+function useSearch<T>(open: boolean, url: string, deps: unknown[], limit = 100) {
   const [items, setItems] = useState<T[]>([]);
   const [total, setTotal] = useState(0);
   const [next, setNext] = useState<number | null>(null);
@@ -79,7 +74,7 @@ function useSearch<T>(
         const separator = url.includes("?") ? "&" : "?";
         const result = await api<{ items: T[]; total: number; next: number | null }>(
           `${url}${separator}limit=${limit}&offset=${offset}`,
-          { signal: controller.signal },
+          { signal: controller.signal }
         );
         if (!mounted.current) return;
         if (offset === 0) setItems(result.items);
@@ -200,7 +195,7 @@ export function FeatPicker({
   const { items, total, next, loading, error, offset, setOffset } = useSearch<Feat>(
     open,
     `/api/compendium/feats?${params.toString()}`,
-    [query, onlyMine, legacy, expanded, recommended, category, slotLevel, ancestryTrait, classTrait],
+    [query, onlyMine, legacy, expanded, recommended, category, slotLevel, ancestryTrait, classTrait]
   );
 
   // Evaluate prerequisites as if this slot were empty, so replacing a feat
@@ -212,7 +207,7 @@ export function FeatPicker({
   }, [draft, category, slotLevel]);
   const selectionDerived = useMemo(
     () => computeCharacter(selectionDraft, context),
-    [selectionDraft, context],
+    [selectionDraft, context]
   );
 
   const statusById = useMemo(
@@ -221,9 +216,9 @@ export function FeatPicker({
         items.map((feat) => [
           feat.id,
           featPrerequisiteStatus(feat, selectionDraft, context, selectionDerived),
-        ]),
+        ])
       ),
-    [items, selectionDraft, context, selectionDerived],
+    [items, selectionDraft, context, selectionDerived]
   );
   const eligible = items.filter((feat) => statusById[feat.id]?.status !== "unmet");
   const hiddenCount = items.length - eligible.length;
@@ -298,11 +293,13 @@ export function FeatPicker({
               </p>
             ) : null}
             <p className="tiny muted picker-prereq-note">
-              Automation badges are conservative. Manual means Runehall does not apply that effect for you.
+              Automation badges are conservative. Manual means Runehall does not apply that effect
+              for you.
             </p>
             {hiddenCount ? (
               <p className="tiny muted picker-prereq-note">
-                {hiddenCount} feat{hiddenCount === 1 ? "" : "s"} hidden because prerequisites are not met.
+                {hiddenCount} feat{hiddenCount === 1 ? "" : "s"} hidden because prerequisites are
+                not met.
               </p>
             ) : null}
             {eligible.map((feat) => (
@@ -329,7 +326,9 @@ export function FeatPicker({
                   <div className="picker-item-tags">
                     <AutomationTag level={automationForFeat(feat).level} />
                     {feat.rarity !== "common" ? <RarityTag rarity={feat.rarity} /> : null}
-                    {statusById[feat.id]?.status === "unknown" ? <Tag tone="gold">Check prereqs</Tag> : null}
+                    {statusById[feat.id]?.status === "unknown" ? (
+                      <Tag tone="gold">Check prereqs</Tag>
+                    ) : null}
                     {feat.traits.slice(0, 3).map((trait) => (
                       <Tag key={trait}>{trait}</Tag>
                     ))}
@@ -357,8 +356,8 @@ export function FeatPicker({
                 <div>
                   <h3>{selected.name}</h3>
                   <p className="tiny muted">
-                    {CATEGORY_LABELS[selected.category] || selected.category} feat · level {selected.level} ·{" "}
-                    {selected.source}
+                    {CATEGORY_LABELS[selected.category] || selected.category} feat · level{" "}
+                    {selected.level} · {selected.source}
                   </p>
                 </div>
                 <div className="chip-row">
@@ -376,34 +375,43 @@ export function FeatPicker({
                 <div className="prereq-box">
                   <strong>Prerequisites</strong>
                   <ul>
-                    {(selectedStatus?.checks ?? selected.prerequisites.map((text) => ({ text, status: "unknown" as const }))).map(
-                      (check, index) => (
-                        <li key={index}>
-                          {check.text}
-                          <span className="tiny muted">
-                            {" "}
-                            · {check.status === "met" ? "met" : check.status === "unmet" ? "not met" : "verify"}
-                          </span>
-                        </li>
-                      ),
-                    )}
+                    {(
+                      selectedStatus?.checks ??
+                      selected.prerequisites.map((text) => ({ text, status: "unknown" as const }))
+                    ).map((check, index) => (
+                      <li key={index}>
+                        {check.text}
+                        <span className="tiny muted">
+                          {" "}
+                          ·{" "}
+                          {check.status === "met"
+                            ? "met"
+                            : check.status === "unmet"
+                              ? "not met"
+                              : "verify"}
+                        </span>
+                      </li>
+                    ))}
                   </ul>
                   {selectedStatus?.status === "unmet" ? (
                     <p className="tiny danger-text">
-                      This character does not meet these prerequisites, so this feat cannot be selected.
+                      This character does not meet these prerequisites, so this feat cannot be
+                      selected.
                     </p>
                   ) : null}
                   {selectedStatus?.status === "unknown" ? (
                     <p className="tiny muted">
-                      This prerequisite needs table verification. It is available with a warning, but confirm it
-                      with your GM before play.
+                      This prerequisite needs table verification. It is available with a warning,
+                      but confirm it with your GM before play.
                     </p>
                   ) : null}
                 </div>
               ) : null}
               <RichText html={selected.description} />
               <div className="picker-detail-actions">
-                <Button variant="ghost" onClick={onClose}>Cancel</Button>
+                <Button variant="ghost" onClick={onClose}>
+                  Cancel
+                </Button>
                 <Button
                   variant="primary"
                   icon={<Check size={15} />}
@@ -501,14 +509,22 @@ export function SpellPicker({
   const { items, total, next, loading, error, offset, setOffset } = useSearch<Spell>(
     open,
     `/api/compendium/spells?${params.toString()}`,
-    [query, legacy, expanded, recommended, rank, maxRank, tradition, focus, classTrait],
+    [query, legacy, expanded, recommended, rank, maxRank, tradition, focus, classTrait]
   );
 
   const filtered = items;
 
   return (
     <PickerShell
-      title={rank === 0 ? "Choose a cantrip" : focus ? "Choose a focus spell" : rank ? `Choose a rank ${rank} spell` : "Choose a spell"}
+      title={
+        rank === 0
+          ? "Choose a cantrip"
+          : focus
+            ? "Choose a focus spell"
+            : rank
+              ? `Choose a rank ${rank} spell`
+              : "Choose a spell"
+      }
       subtitle={`${total} options${tradition ? ` · ${tradition}` : ""}`}
       onClose={onClose}
     >
@@ -563,7 +579,8 @@ export function SpellPicker({
               </p>
             ) : null}
             <p className="tiny muted picker-prereq-note">
-              Automation badges are conservative. Manual means Runehall does not apply that effect for you.
+              Automation badges are conservative. Manual means Runehall does not apply that effect
+              for you.
             </p>
             {filtered.map((spell) => (
               <HoverCard
@@ -581,7 +598,8 @@ export function SpellPicker({
                   <div className="picker-item-main">
                     <span className="picker-item-name">{spell.name}</span>
                     <span className="picker-item-sub">
-                      {spell.rank === 0 ? "Cantrip" : `Rank ${spell.rank}`} · {spellTraditionLabel(spell)}
+                      {spell.rank === 0 ? "Cantrip" : `Rank ${spell.rank}`} ·{" "}
+                      {spellTraditionLabel(spell)}
                       {spell.actions ? ` · ${spell.actions}` : ""}
                     </span>
                   </div>
@@ -594,7 +612,9 @@ export function SpellPicker({
                 </button>
               </HoverCard>
             ))}
-            {!loading && !filtered.length && !error ? <div className="picker-empty">No spells match those filters.</div> : null}
+            {!loading && !filtered.length && !error ? (
+              <div className="picker-empty">No spells match those filters.</div>
+            ) : null}
             {loading ? <Spinner label="Searching spellbooks…" /> : null}
             {next !== null && !loading ? (
               <Button variant="ghost" size="sm" onClick={() => setOffset(next)} block>
@@ -624,18 +644,53 @@ export function SpellPicker({
                 ))}
               </div>
               <div className="spell-meta-grid">
-                <div><span>Cast</span><strong>{selected.actions || "—"}</strong></div>
-                <div><span>Range</span><strong>{selected.range || "—"}</strong></div>
-                <div><span>Area</span><strong>{selected.area || "—"}</strong></div>
-                <div><span>Targets</span><strong>{selected.targets || "—"}</strong></div>
-                <div><span>Defense</span><strong>{selected.defense?.save ? `${selected.defense.save}${selected.defense.basic ? " (basic)" : ""}` : "—"}</strong></div>
-                <div><span>Duration</span><strong>{selected.duration || "—"}</strong></div>
+                <div>
+                  <span>Cast</span>
+                  <strong>{selected.actions || "—"}</strong>
+                </div>
+                <div>
+                  <span>Range</span>
+                  <strong>{selected.range || "—"}</strong>
+                </div>
+                <div>
+                  <span>Area</span>
+                  <strong>{selected.area || "—"}</strong>
+                </div>
+                <div>
+                  <span>Targets</span>
+                  <strong>{selected.targets || "—"}</strong>
+                </div>
+                <div>
+                  <span>Defense</span>
+                  <strong>
+                    {selected.defense?.save
+                      ? `${selected.defense.save}${selected.defense.basic ? " (basic)" : ""}`
+                      : "—"}
+                  </strong>
+                </div>
+                <div>
+                  <span>Duration</span>
+                  <strong>{selected.duration || "—"}</strong>
+                </div>
               </div>
-              {selected.damageText ? <div className="damage-callout"><Swords size={14} /> {selected.damageText}</div> : null}
+              {selected.damageText ? (
+                <div className="damage-callout">
+                  <Swords size={14} /> {selected.damageText}
+                </div>
+              ) : null}
               <RichText html={selected.description} />
               <div className="picker-detail-actions">
-                <Button variant="ghost" onClick={onClose}>Cancel</Button>
-                <Button variant="primary" icon={<Check size={15} />} onClick={() => { onSelect(selected); onClose(); }}>
+                <Button variant="ghost" onClick={onClose}>
+                  Cancel
+                </Button>
+                <Button
+                  variant="primary"
+                  icon={<Check size={15} />}
+                  onClick={() => {
+                    onSelect(selected);
+                    onClose();
+                  }}
+                >
                   Learn {selected.name}
                 </Button>
               </div>
@@ -719,11 +774,15 @@ export function EquipmentPicker({
   const { items, total, next, loading, error, offset, setOffset } = useSearch<Equipment>(
     open,
     `/api/compendium/equipment?${params.toString()}`,
-    [query, type, legacy, expanded, recommended, level],
+    [query, type, legacy, expanded, recommended, level]
   );
 
   return (
-    <PickerShell title="Add equipment" subtitle={`${total} items · prices count against starting wealth`} onClose={onClose}>
+    <PickerShell
+      title="Add equipment"
+      subtitle={`${total} items · prices count against starting wealth`}
+      onClose={onClose}
+    >
       <div className="picker-layout">
         <div className="picker-list">
           <div className="picker-filters">
@@ -754,7 +813,16 @@ export function EquipmentPicker({
                 </button>
               ))}
             </div>
-            <Toggle checked={legacy} onChange={(value) => { setLegacy(value); onLegacyChange?.(value); setOffset(0); }} label="Include legacy" disabled={legacyLocked} />
+            <Toggle
+              checked={legacy}
+              onChange={(value) => {
+                setLegacy(value);
+                onLegacyChange?.(value);
+                setOffset(0);
+              }}
+              label="Include legacy"
+              disabled={legacyLocked}
+            />
             <ContentSourceToggle
               mode={expanded ? "expanded" : "core"}
               onChange={(mode) => {
@@ -781,7 +849,8 @@ export function EquipmentPicker({
               </p>
             ) : null}
             <p className="tiny muted picker-prereq-note">
-              Automation badges are conservative. Manual means Runehall does not apply that effect for you.
+              Automation badges are conservative. Manual means Runehall does not apply that effect
+              for you.
             </p>
             {items.map((item) => (
               <HoverCard
@@ -812,7 +881,9 @@ export function EquipmentPicker({
                 </button>
               </HoverCard>
             ))}
-            {!loading && !items.length && !error ? <div className="picker-empty">No items match those filters.</div> : null}
+            {!loading && !items.length && !error ? (
+              <div className="picker-empty">No items match those filters.</div>
+            ) : null}
             {loading ? <Spinner label="Opening the armory…" /> : null}
             {next !== null && !loading ? (
               <Button variant="ghost" size="sm" onClick={() => setOffset(next)} block>
@@ -838,21 +909,65 @@ export function EquipmentPicker({
                 </div>
               </div>
               <div className="chip-row" style={{ marginBottom: 12 }}>
-                {selected.traits.map((trait) => <Tag key={trait}>{trait}</Tag>)}
+                {selected.traits.map((trait) => (
+                  <Tag key={trait}>{trait}</Tag>
+                ))}
               </div>
               <div className="spell-meta-grid">
-                <div><span>Price</span><strong>{formatCp(selected.price.cpTotal)}</strong></div>
-                <div><span>Bulk</span><strong>{selected.bulk || "—"}</strong></div>
-                <div><span>Usage</span><strong>{selected.usage || "—"}</strong></div>
-                {selected.weapon ? <div><span>Damage</span><strong>{weaponDamageLabel(selected.weapon)}</strong></div> : null}
-                {selected.weapon ? <div><span>Category</span><strong>{selected.weapon.category}</strong></div> : null}
-                {selected.armor ? <div><span>AC</span><strong>+{selected.armor.acBonus} · Dex cap +{selected.armor.dexCap}</strong></div> : null}
-                {selected.shield ? <div><span>Shield</span><strong>+{selected.shield.acBonus} AC · hardness {selected.shield.hardness}</strong></div> : null}
+                <div>
+                  <span>Price</span>
+                  <strong>{formatCp(selected.price.cpTotal)}</strong>
+                </div>
+                <div>
+                  <span>Bulk</span>
+                  <strong>{selected.bulk || "—"}</strong>
+                </div>
+                <div>
+                  <span>Usage</span>
+                  <strong>{selected.usage || "—"}</strong>
+                </div>
+                {selected.weapon ? (
+                  <div>
+                    <span>Damage</span>
+                    <strong>{weaponDamageLabel(selected.weapon)}</strong>
+                  </div>
+                ) : null}
+                {selected.weapon ? (
+                  <div>
+                    <span>Category</span>
+                    <strong>{selected.weapon.category}</strong>
+                  </div>
+                ) : null}
+                {selected.armor ? (
+                  <div>
+                    <span>AC</span>
+                    <strong>
+                      +{selected.armor.acBonus} · Dex cap +{selected.armor.dexCap}
+                    </strong>
+                  </div>
+                ) : null}
+                {selected.shield ? (
+                  <div>
+                    <span>Shield</span>
+                    <strong>
+                      +{selected.shield.acBonus} AC · hardness {selected.shield.hardness}
+                    </strong>
+                  </div>
+                ) : null}
               </div>
               <RichText html={selected.description} />
               <div className="picker-detail-actions">
-                <Button variant="ghost" onClick={onClose}>Cancel</Button>
-                <Button variant="primary" icon={<Coins size={15} />} onClick={() => { onSelect(selected); onClose(); }}>
+                <Button variant="ghost" onClick={onClose}>
+                  Cancel
+                </Button>
+                <Button
+                  variant="primary"
+                  icon={<Coins size={15} />}
+                  onClick={() => {
+                    onSelect(selected);
+                    onClose();
+                  }}
+                >
                   Add to gear
                 </Button>
               </div>
@@ -924,18 +1039,29 @@ export function DeityPicker({
       if (!expanded && !isCoreSource(deity.source, "deity")) return false;
       if (!legacy && !deity.remaster) return false;
       if (!q) return true;
-      return `${deity.name} ${deity.domains.join(" ")} ${(deity.alternateDomains ?? []).join(" ")} ${deity.traits.join(" ")} ${deity.source}`.toLowerCase().includes(q);
+      return `${deity.name} ${deity.domains.join(" ")} ${(deity.alternateDomains ?? []).join(" ")} ${deity.traits.join(" ")} ${deity.source}`
+        .toLowerCase()
+        .includes(q);
     });
   }, [items, query, expanded, legacy]);
 
   return (
-    <PickerShell title="Choose a deity" subtitle={`${filtered.length} deities and faiths shown`} onClose={onClose}>
+    <PickerShell
+      title="Choose a deity"
+      subtitle={`${filtered.length} deities and faiths shown`}
+      onClose={onClose}
+    >
       <div className="picker-layout">
         <div className="picker-list">
           <div className="picker-filters">
             <div className="search-box">
               <Search size={15} />
-              <Input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search deities, domains, traits…" />
+              <Input
+                autoFocus
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Search deities, domains, traits…"
+              />
             </div>
             <Toggle
               checked={legacy}
@@ -955,32 +1081,39 @@ export function DeityPicker({
           <div className="picker-scroll">
             {loading ? <Spinner label="Reading the heavens…" /> : null}
             {error ? <div className="auth-error">{error}</div> : null}
-            {!loading && filtered.map((deity) => (
-              <HoverCard
-                key={deity.id}
-                title={deity.name}
-                subtitle={`${deity.category} · ${deity.source}`}
-                body={stripHtml(deity.description, 240) || undefined}
-                meta={<span>{deity.domains.slice(0, 4).join(" · ")}</span>}
-              >
-                <button
-                  type="button"
-                  className={`picker-item ${selected?.id === deity.id ? "is-selected" : ""}`}
-                  onClick={() => setSelected(deity)}
+            {!loading &&
+              filtered.map((deity) => (
+                <HoverCard
+                  key={deity.id}
+                  title={deity.name}
+                  subtitle={`${deity.category} · ${deity.source}`}
+                  body={stripHtml(deity.description, 240) || undefined}
+                  meta={<span>{deity.domains.slice(0, 4).join(" · ")}</span>}
                 >
-                  <div className="picker-item-main">
-                    <span className="picker-item-name">{deity.name}</span>
-                    <span className="picker-item-sub">
-                      {deity.domains.slice(0, 4).join(" · ") || "Deity"} · {deity.source}
-                    </span>
-                  </div>
-                  <div className="picker-item-tags">
-                    {deity.font.map((font) => <Tag key={font} tone="gold">{font}</Tag>)}
-                  </div>
-                </button>
-              </HoverCard>
-            ))}
-            {!loading && !filtered.length ? <div className="picker-empty">No deity matches that search.</div> : null}
+                  <button
+                    type="button"
+                    className={`picker-item ${selected?.id === deity.id ? "is-selected" : ""}`}
+                    onClick={() => setSelected(deity)}
+                  >
+                    <div className="picker-item-main">
+                      <span className="picker-item-name">{deity.name}</span>
+                      <span className="picker-item-sub">
+                        {deity.domains.slice(0, 4).join(" · ") || "Deity"} · {deity.source}
+                      </span>
+                    </div>
+                    <div className="picker-item-tags">
+                      {deity.font.map((font) => (
+                        <Tag key={font} tone="gold">
+                          {font}
+                        </Tag>
+                      ))}
+                    </div>
+                  </button>
+                </HoverCard>
+              ))}
+            {!loading && !filtered.length ? (
+              <div className="picker-empty">No deity matches that search.</div>
+            ) : null}
           </div>
         </div>
         <div className="picker-detail">
@@ -989,20 +1122,45 @@ export function DeityPicker({
               <div className="picker-detail-head">
                 <div>
                   <h3>{selected.name}</h3>
-                  <p className="tiny muted">{selected.category} · {selected.source}</p>
+                  <p className="tiny muted">
+                    {selected.category} · {selected.source}
+                  </p>
                 </div>
                 <RarityTag rarity={selected.rarity} />
               </div>
               <div className="deity-grid">
-                <div><span>Divine font</span><strong>{selected.font.join(", ") || "—"}</strong></div>
-                <div><span>Skill</span><strong>{(selected.skill ?? []).join(" or ") || "—"}</strong></div>
-                <div><span>Domains</span><strong>{[...selected.domains, ...(selected.alternateDomains ?? [])].join(", ") || "—"}</strong></div>
-                <div><span>Favored weapon</span><strong>{selected.weapons.join(", ") || "—"}</strong></div>
+                <div>
+                  <span>Divine font</span>
+                  <strong>{selected.font.join(", ") || "—"}</strong>
+                </div>
+                <div>
+                  <span>Skill</span>
+                  <strong>{(selected.skill ?? []).join(" or ") || "—"}</strong>
+                </div>
+                <div>
+                  <span>Domains</span>
+                  <strong>
+                    {[...selected.domains, ...(selected.alternateDomains ?? [])].join(", ") || "—"}
+                  </strong>
+                </div>
+                <div>
+                  <span>Favored weapon</span>
+                  <strong>{selected.weapons.join(", ") || "—"}</strong>
+                </div>
               </div>
               <RichText html={selected.description} />
               <div className="picker-detail-actions">
-                <Button variant="ghost" onClick={onClose}>Cancel</Button>
-                <Button variant="primary" icon={<Check size={15} />} onClick={() => { onSelect(selected); onClose(); }}>
+                <Button variant="ghost" onClick={onClose}>
+                  Cancel
+                </Button>
+                <Button
+                  variant="primary"
+                  icon={<Check size={15} />}
+                  onClick={() => {
+                    onSelect(selected);
+                    onClose();
+                  }}
+                >
                   Follow {selected.name}
                 </Button>
               </div>

@@ -21,7 +21,7 @@ import { newId, now, parseJson, safeInt, safeString, sanitizeUserText } from "..
 
 function gmRequires(
   request: { user: { id: string } | null },
-  campaignId: string,
+  campaignId: string
 ): { row: CampaignRow | null; error?: string; code?: number } {
   if (!request.user) return { row: null, error: "Sign in to continue.", code: 401 };
   const row = getCampaign(campaignId);
@@ -48,13 +48,15 @@ function saveItems(parcelId: string, items: ReturnType<typeof parcelItems>): voi
   db.prepare("UPDATE loot_parcels SET items = ?, updated_at = ? WHERE id = ?").run(
     JSON.stringify(items),
     now(),
-    parcelId,
+    parcelId
   );
 }
 
 function nextSortOrder(campaignId: string): number {
   const row = db
-    .prepare("SELECT COALESCE(MAX(sort_order), 0) + 1 AS next FROM loot_parcels WHERE campaign_id = ?")
+    .prepare(
+      "SELECT COALESCE(MAX(sort_order), 0) + 1 AS next FROM loot_parcels WHERE campaign_id = ?"
+    )
     .get(campaignId) as { next: number };
   return row.next;
 }
@@ -65,7 +67,9 @@ export async function registerLootRoutes(app: FastifyInstance): Promise<void> {
     const access = gmRequires(request, id);
     if (!access.row) return reply.code(access.code ?? 403).send({ error: access.error });
     const rows = db
-      .prepare("SELECT * FROM loot_parcels WHERE campaign_id = ? ORDER BY sort_order ASC, updated_at DESC")
+      .prepare(
+        "SELECT * FROM loot_parcels WHERE campaign_id = ? ORDER BY sort_order ASC, updated_at DESC"
+      )
       .all(id) as LootParcelRow[];
     return reply.send({ parcels: rows.map(serializeLootParcel) });
   });
@@ -80,7 +84,7 @@ export async function registerLootRoutes(app: FastifyInstance): Promise<void> {
     db.prepare(
       `INSERT INTO loot_parcels
         (id, campaign_id, name, description, items, gp, sp, cp, status, sort_order, created_at, updated_at)
-       VALUES (?, ?, ?, ?, '[]', 0, 0, 0, 'open', ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, '[]', 0, 0, 0, 'open', ?, ?, ?)`
     ).run(
       parcelId,
       id,
@@ -88,7 +92,7 @@ export async function registerLootRoutes(app: FastifyInstance): Promise<void> {
       sanitizeUserText(body.description, 4000),
       nextSortOrder(id),
       ts,
-      ts,
+      ts
     );
     touchCampaign(id);
     return reply.code(201).send({ parcel: serializeLootParcel(getParcel(id, parcelId)!) });
@@ -104,16 +108,20 @@ export async function registerLootRoutes(app: FastifyInstance): Promise<void> {
       return reply.code(409).send({ error: "This parcel has already been distributed." });
     }
     const body = (request.body ?? {}) as Record<string, unknown>;
-    const name = body.name === undefined ? existing.name : safeString(body.name, existing.name, 120);
+    const name =
+      body.name === undefined ? existing.name : safeString(body.name, existing.name, 120);
     const description =
       body.description === undefined
         ? existing.description
         : sanitizeUserText(body.description, 4000);
-    const gp = body.gp === undefined ? existing.gp : safeInt(body.gp, existing.gp, 0, 1_000_000_000);
-    const sp = body.sp === undefined ? existing.sp : safeInt(body.sp, existing.sp, 0, 1_000_000_000);
-    const cp = body.cp === undefined ? existing.cp : safeInt(body.cp, existing.cp, 0, 1_000_000_000);
+    const gp =
+      body.gp === undefined ? existing.gp : safeInt(body.gp, existing.gp, 0, 1_000_000_000);
+    const sp =
+      body.sp === undefined ? existing.sp : safeInt(body.sp, existing.sp, 0, 1_000_000_000);
+    const cp =
+      body.cp === undefined ? existing.cp : safeInt(body.cp, existing.cp, 0, 1_000_000_000);
     db.prepare(
-      "UPDATE loot_parcels SET name = ?, description = ?, gp = ?, sp = ?, cp = ?, updated_at = ? WHERE id = ?",
+      "UPDATE loot_parcels SET name = ?, description = ?, gp = ?, sp = ?, cp = ?, updated_at = ? WHERE id = ?"
     ).run(name, description, gp, sp, cp, now(), parcelId);
     touchCampaign(id);
     return reply.send({ parcel: serializeLootParcel(getParcel(id, parcelId)!) });
@@ -194,7 +202,7 @@ export async function registerLootRoutes(app: FastifyInstance): Promise<void> {
     }
     saveItems(
       parcelId,
-      parcelItems(existing).filter((item) => item.itemId !== itemId),
+      parcelItems(existing).filter((item) => item.itemId !== itemId)
     );
     touchCampaign(id);
     return reply.send({ parcel: serializeLootParcel(getParcel(id, parcelId)!) });
@@ -213,7 +221,8 @@ export async function registerLootRoutes(app: FastifyInstance): Promise<void> {
     }
     const body = (request.body ?? {}) as Record<string, unknown>;
     const characterId = safeString(body.characterId, "", 120);
-    if (!characterId) return reply.code(400).send({ error: "Choose a character to receive the loot." });
+    if (!characterId)
+      return reply.code(400).send({ error: "Choose a character to receive the loot." });
     const character = getCharacter(characterId);
     if (!character || character.campaign_id !== id) {
       return reply.code(404).send({ error: "That character is not part of this campaign." });
@@ -232,19 +241,16 @@ export async function registerLootRoutes(app: FastifyInstance): Promise<void> {
     const equippable = new Set(
       equipment
         .filter((item) => Boolean(item.weapon || item.armor || item.shield))
-        .map((item) => item.id),
+        .map((item) => item.id)
     );
     draft = applyLootToDraft(draft, serializedParcel, equippable);
     const summary = characterSummary(draft, contextForDraft(draft));
     const ts = now();
 
     const updatedTokens = transaction(() => {
-      db.prepare("UPDATE characters SET data = ?, summary = ?, updated_at = ?, revision = revision + 1 WHERE id = ?").run(
-        JSON.stringify(draft),
-        JSON.stringify(summary),
-        ts,
-        character.id,
-      );
+      db.prepare(
+        "UPDATE characters SET data = ?, summary = ?, updated_at = ?, revision = revision + 1 WHERE id = ?"
+      ).run(JSON.stringify(draft), JSON.stringify(summary), ts, character.id);
       const linkedTokens = db
         .prepare("SELECT * FROM tokens WHERE character_id = ?")
         .all(character.id) as TokenRow[];
@@ -254,14 +260,14 @@ export async function registerLootRoutes(app: FastifyInstance): Promise<void> {
           token.hp_current === null || token.hp_max === null || token.hp_current >= token.hp_max;
         const nextHp = wasFull ? summary.hp : Math.min(token.hp_current ?? summary.hp, summary.hp);
         db.prepare(
-          "UPDATE tokens SET name = ?, hp_max = ?, hp_current = ?, ac = ?, updated_at = ? WHERE id = ?",
+          "UPDATE tokens SET name = ?, hp_max = ?, hp_current = ?, ac = ?, updated_at = ? WHERE id = ?"
         ).run(draft.name, summary.hp, nextHp, summary.ac, ts, token.id);
         tokens.push(db.prepare("SELECT * FROM tokens WHERE id = ?").get(token.id) as TokenRow);
       }
       db.prepare(
         `UPDATE loot_parcels
          SET status = 'distributed', distributed_to = ?, distributed_to_name = ?, distributed_at = ?, updated_at = ?
-         WHERE id = ?`,
+         WHERE id = ?`
       ).run(character.id, draft.name, ts, ts, parcelId);
       return tokens;
     });

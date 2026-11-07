@@ -55,12 +55,15 @@ describe("table event application", () => {
 
   it("reveals, hides, and replaces fog cells", () => {
     const scenes = [scene("scene_a", ["1,1", "2,2"])];
-    expect(applyFogUpdated(scenes, { sceneId: "scene_a", cells: ["3,3"], mode: "reveal" })[0].revealed)
-      .toEqual(["1,1", "2,2", "3,3"]);
-    expect(applyFogUpdated(scenes, { sceneId: "scene_a", cells: ["1,1"], mode: "hide" })[0].revealed)
-      .toEqual(["2,2"]);
-    expect(applyFogUpdated(scenes, { sceneId: "scene_a", cells: ["9,9"], mode: "replace" })[0].revealed)
-      .toEqual(["9,9"]);
+    expect(
+      applyFogUpdated(scenes, { sceneId: "scene_a", cells: ["3,3"], mode: "reveal" })[0].revealed
+    ).toEqual(["1,1", "2,2", "3,3"]);
+    expect(
+      applyFogUpdated(scenes, { sceneId: "scene_a", cells: ["1,1"], mode: "hide" })[0].revealed
+    ).toEqual(["2,2"]);
+    expect(
+      applyFogUpdated(scenes, { sceneId: "scene_a", cells: ["9,9"], mode: "replace" })[0].revealed
+    ).toEqual(["9,9"]);
   });
 
   it("creates and updates scenes", () => {
@@ -90,7 +93,10 @@ describe("table event application", () => {
     const two = message("two", 2);
     expect(applyChatMessage([one], one)).toEqual([one]);
     expect(applyChatMessage([one], two)).toEqual([one, two]);
-    expect(mergeSnapshotMessages([two], [one, two]).map((entry) => entry.id)).toEqual(["one", "two"]);
+    expect(mergeSnapshotMessages([two], [one, two]).map((entry) => entry.id)).toEqual([
+      "one",
+      "two",
+    ]);
   });
 
   it("caps merged chat history at 200 messages", () => {
@@ -102,9 +108,7 @@ describe("table event application", () => {
   });
 
   it("updates and creates characters", () => {
-    const characters = [
-      { id: "one", name: "Old", summary: null },
-    ] as unknown as CharacterRecord[];
+    const characters = [{ id: "one", name: "Old", summary: null }] as unknown as CharacterRecord[];
     const updated = applyCharacterUpdated(characters, {
       characterId: "one",
       name: "New",
@@ -114,7 +118,10 @@ describe("table event application", () => {
 
     const created = applyCharacterCreated(characters, { id: "two" } as CharacterRecord);
     expect(created.map((entry) => entry.id)).toEqual(["one", "two"]);
-    const replaced = applyCharacterCreated(created, { id: "two", name: "Replaced" } as CharacterRecord);
+    const replaced = applyCharacterCreated(created, {
+      id: "two",
+      name: "Replaced",
+    } as CharacterRecord);
     expect(replaced.find((entry) => entry.id === "two")).toMatchObject({ name: "Replaced" });
   });
 });

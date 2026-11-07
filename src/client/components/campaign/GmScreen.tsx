@@ -54,7 +54,11 @@ export function GmScreen({
   const [dc, setDc] = useState("");
   const [rollBusy, setRollBusy] = useState(false);
   const [groupCheck, setGroupCheck] = useState(false);
-  const [lastRoll, setLastRoll] = useState<{ label: string; total: number; degree: string | null } | null>(null);
+  const [lastRoll, setLastRoll] = useState<{
+    label: string;
+    total: number;
+    degree: string | null;
+  } | null>(null);
   const [connected, setConnected] = useState(false);
 
   useEffect(() => {
@@ -89,7 +93,7 @@ export function GmScreen({
     return conditions.filter(
       (condition) =>
         condition.name.toLowerCase().includes(value) ||
-        condition.description.toLowerCase().includes(value),
+        condition.description.toLowerCase().includes(value)
     );
   }, [conditions, conditionQuery]);
 
@@ -97,7 +101,7 @@ export function GmScreen({
   const finalDc = adjustDc(baseDc, adjustment);
   const parsedDc = dc.trim() === "" ? null : Number(dc);
 
-  const useDc = (value: number, source: string) => {
+  const applyDc = (value: number, source: string) => {
     setDc(String(value));
     setLabel(source);
     toast(`Roll DC set to ${value}.`, "success");
@@ -136,7 +140,7 @@ export function GmScreen({
           degree: data?.degree ?? null,
         });
         toast(total !== null ? `Secret roll: ${total}` : "Secret roll made.", "success");
-      },
+      }
     );
   };
 
@@ -159,8 +163,11 @@ export function GmScreen({
         group: groupCheck,
       },
       (message) => {
-        toast(message ? "Roll request sent to the table." : "Could not send the roll request.", message ? "success" : "error");
-      },
+        toast(
+          message ? "Roll request sent to the table." : "Could not send the roll request.",
+          message ? "success" : "error"
+        );
+      }
     );
   };
 
@@ -170,7 +177,9 @@ export function GmScreen({
         <div>
           <PageEyebrow>GM screen</PageEyebrow>
           <h2>Run the table</h2>
-          <p>DCs, conditions, secret rolls, and player roll requests without leaving the campaign.</p>
+          <p>
+            DCs, conditions, secret rolls, and player roll requests without leaving the campaign.
+          </p>
         </div>
         <div className="row" style={{ gap: 7 }}>
           <Badge tone={connected ? "green" : "neutral"}>{connected ? "Live" : "Connecting…"}</Badge>
@@ -178,7 +187,11 @@ export function GmScreen({
         </div>
       </div>
 
-      {error ? <div className="auth-error" style={{ marginBottom: 14 }}>{error}</div> : null}
+      {error ? (
+        <div className="auth-error" style={{ marginBottom: 14 }}>
+          {error}
+        </div>
+      ) : null}
 
       <div className="gm-screen-grid">
         <Card className="gm-roll-card">
@@ -190,11 +203,19 @@ export function GmScreen({
             <EyeOff size={19} />
           </div>
           <Field label="Formula">
-            <Input value={formula} onChange={(event) => setFormula(event.target.value)} placeholder="1d20+12" />
+            <Input
+              value={formula}
+              onChange={(event) => setFormula(event.target.value)}
+              placeholder="1d20+12"
+            />
           </Field>
           <div className="form-grid two">
             <Field label="Label">
-              <Input value={label} onChange={(event) => setLabel(event.target.value)} placeholder="Secret Perception" />
+              <Input
+                value={label}
+                onChange={(event) => setLabel(event.target.value)}
+                placeholder="Secret Perception"
+              />
             </Field>
             <Field label="DC">
               <Input
@@ -212,7 +233,12 @@ export function GmScreen({
               label="Group check"
               title="Ask every player for the same check."
             />
-            <Button variant="primary" icon={<Dices size={15} />} loading={rollBusy} onClick={secretRoll}>
+            <Button
+              variant="primary"
+              icon={<Dices size={15} />}
+              loading={rollBusy}
+              onClick={secretRoll}
+            >
               Secret roll
             </Button>
             <Button variant="secondary" icon={<Sparkles size={15} />} onClick={requestRoll}>
@@ -220,8 +246,8 @@ export function GmScreen({
             </Button>
           </div>
           <p className="tiny muted">
-            Secret rolls are posted only to the GM chat. Requests appear in the shared chat with a prefilled dice tray.
-            Group checks are marked as a table-wide request.
+            Secret rolls are posted only to the GM chat. Requests appear in the shared chat with a
+            prefilled dice tray. Group checks are marked as a table-wide request.
           </p>
           {lastRoll ? (
             <div className="gm-last-roll">
@@ -248,7 +274,9 @@ export function GmScreen({
                 min={0}
                 max={25}
                 value={level}
-                onChange={(event) => setLevel(Math.max(0, Math.min(25, Number(event.target.value) || 0)))}
+                onChange={(event) =>
+                  setLevel(Math.max(0, Math.min(25, Number(event.target.value) || 0)))
+                }
               />
             </Field>
             <div className="gm-adjustments">
@@ -267,17 +295,28 @@ export function GmScreen({
           </div>
           <div className="gm-dc-result">
             <div>
-              <span className="tiny muted">Level {level} · {DC_ADJUSTMENTS.find((entry) => entry.id === adjustment)?.label}</span>
+              <span className="tiny muted">
+                Level {level} · {DC_ADJUSTMENTS.find((entry) => entry.id === adjustment)?.label}
+              </span>
               <strong>{finalDc}</strong>
               {finalDc !== baseDc ? <span className="tiny muted">base {baseDc}</span> : null}
             </div>
-            <Button size="sm" variant="secondary" onClick={() => useDc(finalDc, `Level ${level} check`)}>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => applyDc(finalDc, `Level ${level} check`)}
+            >
               Use for roll
             </Button>
           </div>
           <div className="gm-simple-dcs">
             {SIMPLE_DCS.map((entry) => (
-              <button key={entry.id} type="button" className="gm-simple-dc" onClick={() => useDc(entry.dc, `${entry.label} check`)}>
+              <button
+                key={entry.id}
+                type="button"
+                className="gm-simple-dc"
+                onClick={() => applyDc(entry.dc, `${entry.label} check`)}
+              >
                 <span>{entry.label}</span>
                 <strong>{entry.dc}</strong>
               </button>
@@ -296,7 +335,11 @@ export function GmScreen({
           {conditionsLoading ? (
             <Spinner label="Loading conditions…" />
           ) : !conditions.length ? (
-            <EmptyState icon={<Search size={26} />} title="No conditions loaded" description="The compendium may still be importing." />
+            <EmptyState
+              icon={<Search size={26} />}
+              title="No conditions loaded"
+              description="The compendium may still be importing."
+            />
           ) : (
             <div className="gm-condition-layout">
               <div className="gm-condition-list">
@@ -319,7 +362,9 @@ export function GmScreen({
                     <span className="tiny muted">{condition.source}</span>
                   </button>
                 ))}
-                {!filteredConditions.length ? <p className="muted small">No conditions match that search.</p> : null}
+                {!filteredConditions.length ? (
+                  <p className="muted small">No conditions match that search.</p>
+                ) : null}
               </div>
               <div className="gm-condition-detail">
                 {selectedCondition ? (

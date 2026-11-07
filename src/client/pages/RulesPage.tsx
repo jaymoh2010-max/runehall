@@ -52,12 +52,16 @@ export function RulesPage() {
   const filteredActions = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return actions;
-    return actions.filter((action) => `${action.name} ${action.traits.join(" ")} ${action.category}`.toLowerCase().includes(q));
+    return actions.filter((action) =>
+      `${action.name} ${action.traits.join(" ")} ${action.category}`.toLowerCase().includes(q)
+    );
   }, [actions, query]);
   const filteredConditions = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return conditions;
-    return conditions.filter((condition) => `${condition.name} ${condition.description}`.toLowerCase().includes(q));
+    return conditions.filter((condition) =>
+      `${condition.name} ${condition.description}`.toLowerCase().includes(q)
+    );
   }, [conditions, query]);
 
   return (
@@ -66,21 +70,47 @@ export function RulesPage() {
         <div>
           <PageEyebrow>Quick reference</PageEyebrow>
           <h1>Rules at the table</h1>
-          <p className="sub">The common actions, conditions, and skill reminders you reach for mid-session.</p>
+          <p className="sub">
+            The common actions, conditions, and skill reminders you reach for mid-session.
+          </p>
         </div>
-        <div className="library-count"><BookOpen size={15} /> Pathfinder 2e</div>
+        <div className="library-count">
+          <BookOpen size={15} /> Pathfinder 2e
+        </div>
       </div>
 
       <div className="library-toolbar">
         <div className="library-tabs">
-          <button type="button" className={tab === "basics" ? "is-active" : ""} onClick={() => setTab("basics")}><Shield size={15} /> Basics</button>
-          <button type="button" className={tab === "actions" ? "is-active" : ""} onClick={() => setTab("actions")}><Sword size={15} /> Actions</button>
-          <button type="button" className={tab === "conditions" ? "is-active" : ""} onClick={() => setTab("conditions")}><Dices size={15} /> Conditions</button>
+          <button
+            type="button"
+            className={tab === "basics" ? "is-active" : ""}
+            onClick={() => setTab("basics")}
+          >
+            <Shield size={15} /> Basics
+          </button>
+          <button
+            type="button"
+            className={tab === "actions" ? "is-active" : ""}
+            onClick={() => setTab("actions")}
+          >
+            <Sword size={15} /> Actions
+          </button>
+          <button
+            type="button"
+            className={tab === "conditions" ? "is-active" : ""}
+            onClick={() => setTab("conditions")}
+          >
+            <Dices size={15} /> Conditions
+          </button>
         </div>
         {tab !== "basics" ? (
           <div className="search-box library-search">
             <Search size={16} />
-            <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={`Search ${tab}…`} />
+            <Input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder={`Search ${tab}…`}
+            />
           </div>
         ) : null}
       </div>
@@ -89,17 +119,37 @@ export function RulesPage() {
         <div className="rules-basics">
           <Card className="rules-card">
             <h2>Degrees of success</h2>
-            <p>Compare the result to the DC. Beating it by 10 or more is a critical success; missing by 10 or more is a critical failure. A natural 20 improves the degree by one; a natural 1 worsens it by one.</p>
+            <p>
+              Compare the result to the DC. Beating it by 10 or more is a critical success; missing
+              by 10 or more is a critical failure. A natural 20 improves the degree by one; a
+              natural 1 worsens it by one.
+            </p>
             <div className="degree-row">
-              <div className="degree crit-success"><strong>Critical success</strong><span>Result ≥ DC + 10</span></div>
-              <div className="degree success"><strong>Success</strong><span>Result ≥ DC</span></div>
-              <div className="degree failure"><strong>Failure</strong><span>Result &lt; DC</span></div>
-              <div className="degree crit-failure"><strong>Critical failure</strong><span>Result ≤ DC − 10</span></div>
+              <div className="degree crit-success">
+                <strong>Critical success</strong>
+                <span>Result ≥ DC + 10</span>
+              </div>
+              <div className="degree success">
+                <strong>Success</strong>
+                <span>Result ≥ DC</span>
+              </div>
+              <div className="degree failure">
+                <strong>Failure</strong>
+                <span>Result &lt; DC</span>
+              </div>
+              <div className="degree crit-failure">
+                <strong>Critical failure</strong>
+                <span>Result ≤ DC − 10</span>
+              </div>
             </div>
           </Card>
           <Card className="rules-card">
             <h2>Proficiency</h2>
-            <p>Your proficiency bonus is your level plus a rank bonus: trained +2, expert +4, master +6, legendary +8. Untrained checks add only the ability modifier. Armor check penalties apply to Strength- and Dexterity-based skills like Acrobatics and Stealth.</p>
+            <p>
+              Your proficiency bonus is your level plus a rank bonus: trained +2, expert +4, master
+              +6, legendary +8. Untrained checks add only the ability modifier. Armor check
+              penalties apply to Strength- and Dexterity-based skills like Acrobatics and Stealth.
+            </p>
             <div className="chip-row">
               <Tag tone="green">Trained +2</Tag>
               <Tag tone="blue">Expert +4</Tag>
@@ -114,7 +164,9 @@ export function RulesPage() {
                 <div key={skill.id} className="rules-skill-row">
                   <strong>{skill.name}</strong>
                   <span className="tiny muted">{skill.ability.toUpperCase()}</span>
-                  <span className="tiny muted">{skill.armorPenalty ? "Armor penalty" : "No armor penalty"}</span>
+                  <span className="tiny muted">
+                    {skill.armorPenalty ? "Armor penalty" : "No armor penalty"}
+                  </span>
                 </div>
               ))}
             </div>
@@ -122,10 +174,22 @@ export function RulesPage() {
           <Card className="rules-card">
             <h2>Table rhythm</h2>
             <ol className="rules-list">
-              <li><strong>Roll initiative.</strong> The GM rolls Perception for the combatants and sorts the order.</li>
-              <li><strong>Take turns.</strong> On your turn you get three actions, one reaction between turns, and free actions as allowed.</li>
-              <li><strong>Strike.</strong> Roll d20 + attack modifier against AC. A hit deals damage; a critical hit doubles the damage.</li>
-              <li><strong>Track conditions.</strong> Frightened, sickened, and similar conditions have values that tick down at the end of your turn.</li>
+              <li>
+                <strong>Roll initiative.</strong> The GM rolls Perception for the combatants and
+                sorts the order.
+              </li>
+              <li>
+                <strong>Take turns.</strong> On your turn you get three actions, one reaction
+                between turns, and free actions as allowed.
+              </li>
+              <li>
+                <strong>Strike.</strong> Roll d20 + attack modifier against AC. A hit deals damage;
+                a critical hit doubles the damage.
+              </li>
+              <li>
+                <strong>Track conditions.</strong> Frightened, sickened, and similar conditions have
+                values that tick down at the end of your turn.
+              </li>
             </ol>
           </Card>
         </div>
@@ -141,12 +205,19 @@ export function RulesPage() {
               >
                 <div className="grow">
                   <span className="library-row-name">{action.name}</span>
-                  <span className="library-row-sub">{action.category || "Action"} · {action.actions ? `${action.actions} action${action.actions === 1 ? "" : "s"}` : action.actionType || "—"}</span>
+                  <span className="library-row-sub">
+                    {action.category || "Action"} ·{" "}
+                    {action.actions
+                      ? `${action.actions} action${action.actions === 1 ? "" : "s"}`
+                      : action.actionType || "—"}
+                  </span>
                 </div>
               </button>
             ))}
             {loading ? <Spinner label="Loading actions…" /> : null}
-            {!loading && !filteredActions.length ? <EmptyState icon={<Search size={22} />} title="No action found" /> : null}
+            {!loading && !filteredActions.length ? (
+              <EmptyState icon={<Search size={22} />} title="No action found" />
+            ) : null}
           </div>
           <div className="library-detail card">
             {selectedAction ? (
@@ -155,16 +226,27 @@ export function RulesPage() {
                   <div>
                     <PageEyebrow>{selectedAction.category || "Action"}</PageEyebrow>
                     <h2>{selectedAction.name}</h2>
-                    <p className="muted small">{selectedAction.actionType || ""} {selectedAction.actions ? `· ${selectedAction.actions} action${selectedAction.actions === 1 ? "" : "s"}` : ""}</p>
+                    <p className="muted small">
+                      {selectedAction.actionType || ""}{" "}
+                      {selectedAction.actions
+                        ? `· ${selectedAction.actions} action${selectedAction.actions === 1 ? "" : "s"}`
+                        : ""}
+                    </p>
                   </div>
-                  {selectedAction.rarity !== "common" ? <Badge tone="violet">{selectedAction.rarity}</Badge> : null}
+                  {selectedAction.rarity !== "common" ? (
+                    <Badge tone="violet">{selectedAction.rarity}</Badge>
+                  ) : null}
                 </div>
                 <div className="chip-row" style={{ marginBottom: 12 }}>
-                  {selectedAction.traits.map((trait) => <Tag key={trait}>{titleCase(trait)}</Tag>)}
+                  {selectedAction.traits.map((trait) => (
+                    <Tag key={trait}>{titleCase(trait)}</Tag>
+                  ))}
                 </div>
                 <RichText html={selectedAction.description} />
               </div>
-            ) : <EmptyState icon={<BookOpen size={24} />} title="Select an action" />}
+            ) : (
+              <EmptyState icon={<BookOpen size={24} />} title="Select an action" />
+            )}
           </div>
         </div>
       ) : (
@@ -179,12 +261,16 @@ export function RulesPage() {
               >
                 <div className="grow">
                   <span className="library-row-name">{condition.name}</span>
-                  <span className="library-row-sub">{condition.description.replace(/<[^>]+>/g, " ").slice(0, 90)}…</span>
+                  <span className="library-row-sub">
+                    {condition.description.replace(/<[^>]+>/g, " ").slice(0, 90)}…
+                  </span>
                 </div>
               </button>
             ))}
             {loading ? <Spinner label="Loading conditions…" /> : null}
-            {!loading && !filteredConditions.length ? <EmptyState icon={<Search size={22} />} title="No condition found" /> : null}
+            {!loading && !filteredConditions.length ? (
+              <EmptyState icon={<Search size={22} />} title="No condition found" />
+            ) : null}
           </div>
           <div className="library-detail card">
             {selectedCondition ? (
@@ -197,7 +283,9 @@ export function RulesPage() {
                 </div>
                 <RichText html={selectedCondition.description} />
               </div>
-            ) : <EmptyState icon={<BookOpen size={24} />} title="Select a condition" />}
+            ) : (
+              <EmptyState icon={<BookOpen size={24} />} title="Select a condition" />
+            )}
           </div>
         </div>
       )}

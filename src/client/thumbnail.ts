@@ -3,7 +3,7 @@ const DEFAULT_MAX_WIDTH = 320;
 export function thumbnailDimensions(
   width: number,
   height: number,
-  maxWidth = DEFAULT_MAX_WIDTH,
+  maxWidth = DEFAULT_MAX_WIDTH
 ): { width: number; height: number } {
   const safeWidth = Math.max(1, Math.round(width));
   const safeHeight = Math.max(1, Math.round(height));
@@ -14,7 +14,11 @@ export function thumbnailDimensions(
   };
 }
 
-function canvasBlob(canvas: HTMLCanvasElement, type: string, quality?: number): Promise<Blob | null> {
+function canvasBlob(
+  canvas: HTMLCanvasElement,
+  type: string,
+  quality?: number
+): Promise<Blob | null> {
   return new Promise((resolve) => canvas.toBlob(resolve, type, quality));
 }
 
@@ -25,7 +29,7 @@ function canvasBlob(canvas: HTMLCanvasElement, type: string, quality?: number): 
  */
 export async function createThumbnailFile(
   file: File,
-  maxWidth = DEFAULT_MAX_WIDTH,
+  maxWidth = DEFAULT_MAX_WIDTH
 ): Promise<File | null> {
   if (typeof createImageBitmap !== "function") return null;
   let bitmap: ImageBitmap | null = null;

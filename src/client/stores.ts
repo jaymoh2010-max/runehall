@@ -9,7 +9,12 @@ interface SessionState {
   busy: boolean;
   refresh: () => Promise<void>;
   login: (username: string, password: string) => Promise<void>;
-  register: (username: string, displayName: string, password: string, inviteCode?: string) => Promise<void>;
+  register: (
+    username: string,
+    displayName: string,
+    password: string,
+    inviteCode?: string
+  ) => Promise<void>;
   logout: () => Promise<void>;
   setUser: (user: PublicUser | null) => void;
 }

@@ -12,7 +12,7 @@ declare module "fastify" {
       campaignId: string,
       event: string,
       payload: unknown,
-      target?: "all" | "gm" | "players",
+      target?: "all" | "gm" | "players"
     ): void;
   }
 }

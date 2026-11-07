@@ -99,7 +99,9 @@ const ID_PREFIXES: Record<string, CompendiumEntryKind> = {
 };
 
 export function isCompendiumEntryKind(value: unknown): value is CompendiumEntryKind {
-  return typeof value === "string" && Object.prototype.hasOwnProperty.call(COMPENDIUM_KIND_LABELS, value);
+  return (
+    typeof value === "string" && Object.prototype.hasOwnProperty.call(COMPENDIUM_KIND_LABELS, value)
+  );
 }
 
 export function compendiumKindFromId(id: string): CompendiumEntryKind | null {
@@ -120,7 +122,7 @@ export function compendiumEntryPath(kind: CompendiumEntryKind, id: string): stri
  * tradition. Give the UI a useful label instead of rendering an empty list.
  */
 export function spellTraditionLabel(
-  spell: Pick<Spell, "ritual" | "traditions" | "traits">,
+  spell: Pick<Spell, "ritual" | "traditions" | "traits">
 ): string {
   if (spell.ritual) return "Ritual";
   if (spell.traditions.length) {

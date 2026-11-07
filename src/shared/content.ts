@@ -68,8 +68,7 @@ export function rulesetIncludesLegacy(ruleset: CampaignRuleset | null | undefine
 
 export function rulesetLabel(ruleset: CampaignRuleset | null | undefined): string {
   return (
-    CAMPAIGN_RULESET_OPTIONS.find((option) => option.value === ruleset)?.label ??
-    "Core Remastered"
+    CAMPAIGN_RULESET_OPTIONS.find((option) => option.value === ruleset)?.label ?? "Core Remastered"
   );
 }
 

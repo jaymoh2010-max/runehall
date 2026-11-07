@@ -26,12 +26,6 @@ function renderLines(content: string): ReactNode[] {
 }
 
 /** Shared, escaping-safe renderer for journal entries and session summaries. */
-export function JournalBody({
-  content,
-  className = "",
-}: {
-  content: string;
-  className?: string;
-}) {
+export function JournalBody({ content, className = "" }: { content: string; className?: string }) {
   return <div className={className}>{renderLines(content)}</div>;
 }

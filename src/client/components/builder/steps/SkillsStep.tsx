@@ -104,12 +104,7 @@ import {
   Textarea,
   Toggle,
 } from "../../ui";
-import {
-  DeityPicker,
-  EquipmentPicker,
-  FeatPicker,
-  SpellPicker,
-} from "../pickers";
+import { DeityPicker, EquipmentPicker, FeatPicker, SpellPicker } from "../pickers";
 import { ContentSourceToggle } from "../ContentSourceToggle";
 import { RunePicker } from "../RunePicker";
 import {
@@ -120,12 +115,7 @@ import {
 } from "../../../../shared/content";
 import { summarizeRunes } from "../../../../shared/runes";
 import type { BuilderProps } from "../shared";
-import {
-  StepHeading,
-  ValidationNote,
-  SearchInput,
-  MiniFeatureList,
-} from "../shared";
+import { StepHeading, ValidationNote, SearchInput, MiniFeatureList } from "../shared";
 
 export function SkillsStep({ draft, update, derived, context, setStep }: BuilderProps) {
   const background = context.background;
@@ -135,16 +125,28 @@ export function SkillsStep({ draft, update, derived, context, setStep }: Builder
     ? Math.max(0, classData.trainedSkills.additional + Math.max(0, derived.abilityMods.int))
     : 0;
   const chosen = draft.skills.trained.filter((skill) => !fixed.has(skill));
-  const increaseLevels = (classData?.skillIncreaseLevels ?? []).filter((level) => level <= draft.level);
+  const increaseLevels = (classData?.skillIncreaseLevels ?? []).filter(
+    (level) => level <= draft.level
+  );
   const issues = derived.validation.filter((issue) => issue.step === "skills");
 
   const toggleTrained = (skill: SkillId) =>
     update((current) => {
       const isChosen = current.skills.trained.includes(skill);
-      if (isChosen) return { ...current, skills: { ...current.skills, trained: current.skills.trained.filter((id) => id !== skill) } };
+      if (isChosen)
+        return {
+          ...current,
+          skills: {
+            ...current.skills,
+            trained: current.skills.trained.filter((id) => id !== skill),
+          },
+        };
       if (fixed.has(skill)) return current;
       if (current.skills.trained.filter((id) => !fixed.has(id)).length >= required) return current;
-      return { ...current, skills: { ...current.skills, trained: [...current.skills.trained, skill] } };
+      return {
+        ...current,
+        skills: { ...current.skills, trained: [...current.skills.trained, skill] },
+      };
     });
 
   return (
@@ -165,13 +167,19 @@ export function SkillsStep({ draft, update, derived, context, setStep }: Builder
               </Tag>
             );
           })}
-          {(background?.lore ?? []).map((lore) => <Tag key={lore} tone="green">{lore} · trained</Tag>)}
-          {draft.skills.backgroundLore
-            .filter(Boolean)
-            .map((lore) => {
-              const name = lore.toLowerCase().includes("lore") ? lore : `${lore} Lore`;
-              return <Tag key={name} tone="green">{name} · trained</Tag>;
-            })}
+          {(background?.lore ?? []).map((lore) => (
+            <Tag key={lore} tone="green">
+              {lore} · trained
+            </Tag>
+          ))}
+          {draft.skills.backgroundLore.filter(Boolean).map((lore) => {
+            const name = lore.toLowerCase().includes("lore") ? lore : `${lore} Lore`;
+            return (
+              <Tag key={name} tone="green">
+                {name} · trained
+              </Tag>
+            );
+          })}
           {!fixed.size && !background?.lore.length && !draft.skills.backgroundLore.some(Boolean) ? (
             <span className="muted small">No automatic skills yet.</span>
           ) : null}
@@ -181,9 +189,14 @@ export function SkillsStep({ draft, update, derived, context, setStep }: Builder
         <div className="skill-picker-head">
           <div>
             <h3>Class skill choices</h3>
-            <p className="muted small">Choose {required} additional trained skill{required === 1 ? "" : "s"} (including Intelligence bonus).</p>
+            <p className="muted small">
+              Choose {required} additional trained skill{required === 1 ? "" : "s"} (including
+              Intelligence bonus).
+            </p>
           </div>
-          <Badge tone={chosen.length === required ? "green" : "gold"}>{chosen.length}/{required}</Badge>
+          <Badge tone={chosen.length === required ? "green" : "gold"}>
+            {chosen.length}/{required}
+          </Badge>
         </div>
         <div className="skill-choice-grid">
           {SKILLS.map((skill) => {
@@ -202,7 +215,11 @@ export function SkillsStep({ draft, update, derived, context, setStep }: Builder
                   <strong>{skill.name}</strong>
                   <span className="tiny muted"> ({ABILITY_SHORT[skill.ability]})</span>
                 </span>
-                {isFixed ? <Badge tone="green">Class</Badge> : isChosen ? <CheckCircle2 size={15} /> : null}
+                {isFixed ? (
+                  <Badge tone="green">Class</Badge>
+                ) : isChosen ? (
+                  <CheckCircle2 size={15} />
+                ) : null}
               </button>
             );
           })}
@@ -210,7 +227,10 @@ export function SkillsStep({ draft, update, derived, context, setStep }: Builder
       </Card>
       <Card className="skill-increases">
         <h3>Skill increases</h3>
-        <p className="muted small" style={{ marginTop: 3 }}>Each increase raises a trained skill by one rank. Higher ranks unlock at 3rd, 7th, and 15th level.</p>
+        <p className="muted small" style={{ marginTop: 3 }}>
+          Each increase raises a trained skill by one rank. Higher ranks unlock at 3rd, 7th, and
+          15th level.
+        </p>
         <div className="increase-list">
           {increaseLevels.map((level) => {
             const value = draft.skills.increases[String(level)] ?? "";
@@ -218,7 +238,7 @@ export function SkillsStep({ draft, update, derived, context, setStep }: Builder
             const options = SKILLS.filter(
               (skill) =>
                 skill.id === value ||
-                (derived.skills.find((x) => x.id === skill.id)?.rank ?? 0) < cap,
+                (derived.skills.find((x) => x.id === skill.id)?.rank ?? 0) < cap
             );
             return (
               <div key={level} className="increase-row">
@@ -230,7 +250,10 @@ export function SkillsStep({ draft, update, derived, context, setStep }: Builder
                       ...current,
                       skills: {
                         ...current.skills,
-                        increases: { ...current.skills.increases, [String(level)]: event.target.value },
+                        increases: {
+                          ...current.skills.increases,
+                          [String(level)]: event.target.value,
+                        },
                       },
                     }))
                   }
@@ -238,14 +261,17 @@ export function SkillsStep({ draft, update, derived, context, setStep }: Builder
                   <option value="">Choose a skill…</option>
                   {options.map((skill) => (
                     <option key={skill.id} value={skill.id}>
-                      {skill.name} (currently {PROFICIENCY_NAMES[derived.skills.find((x) => x.id === skill.id)?.rank ?? 0]})
+                      {skill.name} (currently{" "}
+                      {PROFICIENCY_NAMES[derived.skills.find((x) => x.id === skill.id)?.rank ?? 0]})
                     </option>
                   ))}
                 </Select>
               </div>
             );
           })}
-          {!increaseLevels.length ? <p className="muted small">Skill increases begin at 3rd level.</p> : null}
+          {!increaseLevels.length ? (
+            <p className="muted small">Skill increases begin at 3rd level.</p>
+          ) : null}
         </div>
       </Card>
       <Card className="lore-card">
@@ -256,14 +282,26 @@ export function SkillsStep({ draft, update, derived, context, setStep }: Builder
           </div>
         </div>
         <div className="chip-row" style={{ marginTop: 10 }}>
-          {(background?.lore ?? []).map((lore) => <Tag key={lore} tone="green">{lore}</Tag>)}
+          {(background?.lore ?? []).map((lore) => (
+            <Tag key={lore} tone="green">
+              {lore}
+            </Tag>
+          ))}
           {draft.skills.lore.map((lore, index) => (
             <Tag key={`${lore}-${index}`} tone="blue">
               {lore}
               <button
                 type="button"
                 className="tag-remove"
-                onClick={() => update((current) => ({ ...current, skills: { ...current.skills, lore: current.skills.lore.filter((_, i) => i !== index) } }))}
+                onClick={() =>
+                  update((current) => ({
+                    ...current,
+                    skills: {
+                      ...current.skills,
+                      lore: current.skills.lore.filter((_, i) => i !== index),
+                    },
+                  }))
+                }
               >
                 ×
               </button>
@@ -271,19 +309,25 @@ export function SkillsStep({ draft, update, derived, context, setStep }: Builder
           ))}
         </div>
         <form
-          className="row" style={{ marginTop: 12 }}
+          className="row"
+          style={{ marginTop: 12 }}
           onSubmit={(event) => {
             event.preventDefault();
             const form = event.currentTarget;
             const input = form.elements.namedItem("lore") as HTMLInputElement;
             const value = input.value.trim();
             if (!value) return;
-            update((current) => ({ ...current, skills: { ...current.skills, lore: [...current.skills.lore, value] } }));
+            update((current) => ({
+              ...current,
+              skills: { ...current.skills, lore: [...current.skills.lore, value] },
+            }));
             input.value = "";
           }}
         >
           <Input name="lore" placeholder="e.g. Absalom Lore" />
-          <Button type="submit" icon={<Plus size={14} />}>Add lore</Button>
+          <Button type="submit" icon={<Plus size={14} />}>
+            Add lore
+          </Button>
         </form>
       </Card>
       <Card className="skill-table-card">
@@ -309,8 +353,12 @@ export function SkillsStep({ draft, update, derived, context, setStep }: Builder
       </Card>
       <ValidationNote issues={issues} />
       <div className="step-actions">
-        <Button variant="ghost" onClick={() => setStep("abilities")}>Back</Button>
-        <Button variant="primary" onClick={() => setStep("feats")} icon={<ArrowRight size={15} />}>Feats</Button>
+        <Button variant="ghost" onClick={() => setStep("abilities")}>
+          Back
+        </Button>
+        <Button variant="primary" onClick={() => setStep("feats")} icon={<ArrowRight size={15} />}>
+          Feats
+        </Button>
       </div>
     </div>
   );

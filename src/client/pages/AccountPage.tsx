@@ -86,7 +86,11 @@ export function AccountPage() {
           <SectionTitle
             title="Profile"
             subtitle="This is the name your table sees."
-            action={<Badge tone={user.isAdmin ? "gold" : "neutral"}>{user.isAdmin ? "Administrator" : "Player"}</Badge>}
+            action={
+              <Badge tone={user.isAdmin ? "gold" : "neutral"}>
+                {user.isAdmin ? "Administrator" : "Player"}
+              </Badge>
+            }
           />
           <div className="account-identity">
             <Avatar name={user.displayName} src={user.avatarUrl} size={52} />
@@ -149,14 +153,20 @@ export function AccountPage() {
               />
             </Field>
             <div>
-              <Button type="submit" variant="primary" icon={<KeyRound size={15} />} loading={savingPassword}>
+              <Button
+                type="submit"
+                variant="primary"
+                icon={<KeyRound size={15} />}
+                loading={savingPassword}
+              >
                 Change password
               </Button>
             </div>
           </form>
           <p className="tiny muted" style={{ marginTop: 12 }}>
             Locked out? A host with shell access can run{" "}
-            <code>npm run reset-password -- --username {user.username}</code> to issue a temporary password.
+            <code>npm run reset-password -- --username {user.username}</code> to issue a temporary
+            password.
           </p>
         </Card>
       </div>
@@ -166,8 +176,9 @@ export function AccountPage() {
         <div>
           <strong>Local-first accounts</strong>
           <p className="small muted">
-            Accounts live in this hall's SQLite database. Passwords are hashed with scrypt. There is no email
-            reset: recovery is handled by the local reset command or another administrator on the machine.
+            Accounts live in this hall's SQLite database. Passwords are hashed with scrypt. There is
+            no email reset: recovery is handled by the local reset command or another administrator
+            on the machine.
           </p>
         </div>
       </Card>

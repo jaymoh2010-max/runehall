@@ -13,12 +13,17 @@ describe("token group HP", () => {
         { hpCurrent: 4, hpMax: 6 },
         { hpCurrent: 2, hpMax: 6 },
         { hpCurrent: null, hpMax: 10 },
-      ]),
+      ])
     ).toEqual({ count: 3, current: 16, max: 22, percent: (16 / 22) * 100 });
   });
 
   it("ignores members without HP but still counts them", () => {
-    expect(groupHp([{ hpCurrent: 5, hpMax: 10 }, { hpCurrent: 3, hpMax: null }])).toEqual({
+    expect(
+      groupHp([
+        { hpCurrent: 5, hpMax: 10 },
+        { hpCurrent: 3, hpMax: null },
+      ])
+    ).toEqual({
       count: 2,
       current: 5,
       max: 10,
@@ -36,7 +41,12 @@ describe("token group HP", () => {
   });
 
   it("clamps members above or below their maximum", () => {
-    expect(groupHp([{ hpCurrent: 20, hpMax: 10 }, { hpCurrent: -5, hpMax: 10 }])).toEqual({
+    expect(
+      groupHp([
+        { hpCurrent: 20, hpMax: 10 },
+        { hpCurrent: -5, hpMax: 10 },
+      ])
+    ).toEqual({
       count: 2,
       current: 10,
       max: 20,
@@ -48,7 +58,7 @@ describe("token group HP", () => {
 describe("token conditions", () => {
   it("normalizes legacy string conditions and structured values", () => {
     expect(
-      normalizeTokenConditions(["Frightened", { name: "Clumsy", value: 2, duration: 3 }, null]),
+      normalizeTokenConditions(["Frightened", { name: "Clumsy", value: 2, duration: 3 }, null])
     ).toEqual([
       { name: "Frightened", value: null, duration: null },
       { name: "Clumsy", value: 2, duration: 3 },
@@ -57,7 +67,7 @@ describe("token conditions", () => {
 
   it("formats condition values and durations", () => {
     expect(tokenConditionLabel({ name: "Frightened", value: 2, duration: 3 })).toBe(
-      "Frightened 2 (3r)",
+      "Frightened 2 (3r)"
     );
     expect(tokenConditionLabel({ name: "Prone" })).toBe("Prone");
     expect(tokenConditionLabel({ name: "Clumsy", value: 0, duration: null })).toBe("Clumsy");
@@ -70,7 +80,7 @@ describe("token conditions", () => {
         { name: "Drained", duration: 1 },
         { name: "Prone", duration: null },
         { name: "Frightened", value: 2, duration: 0 },
-      ]),
+      ])
     ).toEqual([
       { name: "Clumsy", duration: 1 },
       { name: "Prone", duration: null },

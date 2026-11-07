@@ -60,7 +60,7 @@ export function lootIsEmpty(parcel: Pick<LootParcel, "items" | "gp" | "sp" | "cp
 export function applyLootToDraft(
   draft: CharacterDraft,
   parcel: Pick<LootParcel, "items" | "gp" | "sp" | "cp">,
-  equippableItemIds: ReadonlySet<string> = new Set(),
+  equippableItemIds: ReadonlySet<string> = new Set()
 ): CharacterDraft {
   const equipment = draft.equipment.map((entry) => ({ ...entry }));
   for (const item of normalizeLootItems(parcel.items)) {

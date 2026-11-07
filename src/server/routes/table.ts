@@ -35,10 +35,12 @@ function ensureState(campaignId: string) {
     | undefined;
   if (state) return state;
   const firstScene = db
-    .prepare("SELECT id FROM scenes WHERE campaign_id = ? ORDER BY sort_order ASC, created_at ASC LIMIT 1")
+    .prepare(
+      "SELECT id FROM scenes WHERE campaign_id = ? ORDER BY sort_order ASC, created_at ASC LIMIT 1"
+    )
     .get(campaignId) as { id: string } | undefined;
   db.prepare(
-    "INSERT INTO campaign_state (campaign_id, active_scene_id, initiative, round, turn_index, updated_at) VALUES (?, ?, '[]', 1, 0, ?)",
+    "INSERT INTO campaign_state (campaign_id, active_scene_id, initiative, round, turn_index, updated_at) VALUES (?, ?, '[]', 1, 0, ?)"
   ).run(campaignId, firstScene?.id ?? null, now());
   return db.prepare("SELECT * FROM campaign_state WHERE campaign_id = ?").get(campaignId) as {
     campaign_id: string;
@@ -60,7 +62,7 @@ function campaignSummaryFor(row: CampaignRow, userId: string) {
       memberCount: campaignMemberCount(row.id),
       characterCount: campaignCharacterCount(row.id),
     },
-    gm?.display_name ?? "",
+    gm?.display_name ?? ""
   );
 }
 
@@ -85,7 +87,7 @@ export async function registerTableRoutes(app: FastifyInstance): Promise<void> {
              LEFT JOIN users u ON u.id = t.owner_id
              WHERE t.scene_id IN (${scenes.map(() => "?").join(",")})
              ${role === "player" ? "AND t.hidden = 0" : ""}
-             ORDER BY t.sort_order ASC, t.created_at ASC`,
+             ORDER BY t.sort_order ASC, t.created_at ASC`
           )
           .all(...scenes.map((scene) => scene.id)) as (TokenRow & { owner_name: string | null })[])
       : [];
@@ -93,7 +95,7 @@ export async function registerTableRoutes(app: FastifyInstance): Promise<void> {
       .prepare(
         `SELECT * FROM messages WHERE campaign_id = ?
          ${role === "player" ? "AND (visibility = 'all' OR user_id = ?)" : ""}
-         ORDER BY created_at DESC LIMIT 120`,
+         ORDER BY created_at DESC LIMIT 120`
       )
       .all(...(role === "player" ? [id, request.user.id] : [id])) as MessageRow[];
     const journalRows = db
@@ -101,7 +103,7 @@ export async function registerTableRoutes(app: FastifyInstance): Promise<void> {
         `SELECT j.*, u.display_name AS author_name FROM journal_entries j
          LEFT JOIN users u ON u.id = j.created_by
          WHERE j.campaign_id = ? ${role === "player" ? "AND j.visible = 1" : ""}
-         ORDER BY j.updated_at DESC`,
+         ORDER BY j.updated_at DESC`
       )
       .all(id) as (import("../db").JournalRow & { author_name: string | null })[];
 
@@ -109,7 +111,7 @@ export async function registerTableRoutes(app: FastifyInstance): Promise<void> {
       serializeCharacter(character, character.owner_name, {
         canEdit: canEditCharacter(character, request.user!.id),
         canView: true,
-      }),
+      })
     );
 
     return reply.send({
@@ -118,12 +120,15 @@ export async function registerTableRoutes(app: FastifyInstance): Promise<void> {
         inviteCode: role === "gm" ? campaign.invite_code : "",
       },
       members: campaignMembers(id).map((member) =>
-        serializeMember(member, member.role, member.joined_at),
+        serializeMember(member, member.role, member.joined_at)
       ),
       characters: memberCharacters,
       scenes: scenes.map(serializeScene),
       tokens: tokenRows.map((token) => serializeToken(token, token.owner_name ?? undefined)),
-      activeSceneId: state.active_scene_id && sceneIds.has(state.active_scene_id) ? state.active_scene_id : scenes[0]?.id ?? null,
+      activeSceneId:
+        state.active_scene_id && sceneIds.has(state.active_scene_id)
+          ? state.active_scene_id
+          : (scenes[0]?.id ?? null),
       initiative: serializeInitiative(JSON.parse(state.initiative || "[]")),
       round: state.round,
       turnIndex: state.turn_index,
@@ -155,7 +160,7 @@ export async function registerTableRoutes(app: FastifyInstance): Promise<void> {
     const ts = now();
     db.prepare(
       `INSERT INTO scenes (id, campaign_id, name, image_url, thumbnail_url, width, height, grid_size, grid_offset_x, grid_offset_y, fog_enabled, fog_revealed, sort_order, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, '[]', ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, '[]', ?, ?, ?)`
     ).run(
       sceneId,
       id,
@@ -169,18 +174,16 @@ export async function registerTableRoutes(app: FastifyInstance): Promise<void> {
       gridOffsetY,
       order.next,
       ts,
-      ts,
+      ts
     );
     const row = db.prepare("SELECT * FROM scenes WHERE id = ?").get(sceneId) as SceneRow;
     const scene = serializeScene(row);
     app.broadcastCampaign(id, "scene:created", scene);
     if (body.activate === true) {
       ensureState(id);
-      db.prepare("UPDATE campaign_state SET active_scene_id = ?, updated_at = ? WHERE campaign_id = ?").run(
-        sceneId,
-        now(),
-        id,
-      );
+      db.prepare(
+        "UPDATE campaign_state SET active_scene_id = ?, updated_at = ? WHERE campaign_id = ?"
+      ).run(sceneId, now(), id);
       app.broadcastCampaign(id, "scene:activated", { sceneId });
     }
     touchCampaign(id);
@@ -203,7 +206,7 @@ export async function registerTableRoutes(app: FastifyInstance): Promise<void> {
     const name = `${source.name} (copy)`.slice(0, 80);
     db.prepare(
       `INSERT INTO scenes (id, campaign_id, name, image_url, thumbnail_url, width, height, grid_size, grid_offset_x, grid_offset_y, fog_enabled, fog_revealed, sort_order, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       sceneId,
       source.campaign_id,
@@ -219,13 +222,15 @@ export async function registerTableRoutes(app: FastifyInstance): Promise<void> {
       source.fog_revealed,
       order.next,
       ts,
-      ts,
+      ts
     );
-    const sourceTokens = db.prepare("SELECT * FROM tokens WHERE scene_id = ?").all(id) as TokenRow[];
+    const sourceTokens = db
+      .prepare("SELECT * FROM tokens WHERE scene_id = ?")
+      .all(id) as TokenRow[];
     for (const token of sourceTokens) {
       db.prepare(
         `INSERT INTO tokens (id, scene_id, name, image_url, character_id, owner_id, x, y, size, color, hp_current, hp_max, ac, initiative_bonus, group_id, group_name, conditions, hidden, locked, sort_order, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).run(
         `tok_${Math.random().toString(16).slice(2, 14)}${Date.now().toString(16)}`,
         sceneId,
@@ -248,7 +253,7 @@ export async function registerTableRoutes(app: FastifyInstance): Promise<void> {
         token.locked,
         token.sort_order,
         ts,
-        ts,
+        ts
       );
     }
     const row = db.prepare("SELECT * FROM scenes WHERE id = ?").get(sceneId) as SceneRow;
@@ -268,22 +273,54 @@ export async function registerTableRoutes(app: FastifyInstance): Promise<void> {
     }
     const body = (request.body ?? {}) as Record<string, unknown>;
     const name = body.name === undefined ? row.name : safeString(body.name, row.name, 80);
-    const imageUrl = body.imageUrl === undefined ? row.image_url : body.imageUrl ? safeString(body.imageUrl, "", 500) : null;
+    const imageUrl =
+      body.imageUrl === undefined
+        ? row.image_url
+        : body.imageUrl
+          ? safeString(body.imageUrl, "", 500)
+          : null;
     const thumbnailUrl =
       body.thumbnailUrl === undefined
         ? row.thumbnail_url
         : body.thumbnailUrl
           ? safeString(body.thumbnailUrl, "", 500)
           : null;
-    const width = body.width === undefined ? row.width : clamp(safeInt(body.width, row.width, 100, 10_000), 100, 10_000);
-    const height = body.height === undefined ? row.height : clamp(safeInt(body.height, row.height, 100, 10_000), 100, 10_000);
-    const gridSize = body.gridSize === undefined ? row.grid_size : clamp(safeInt(body.gridSize, row.grid_size, 20, 300), 20, 300);
-    const gridOffsetX = body.gridOffsetX === undefined ? row.grid_offset_x : clamp(Number(body.gridOffsetX) || 0, -gridSize, gridSize);
-    const gridOffsetY = body.gridOffsetY === undefined ? row.grid_offset_y : clamp(Number(body.gridOffsetY) || 0, -gridSize, gridSize);
+    const width =
+      body.width === undefined
+        ? row.width
+        : clamp(safeInt(body.width, row.width, 100, 10_000), 100, 10_000);
+    const height =
+      body.height === undefined
+        ? row.height
+        : clamp(safeInt(body.height, row.height, 100, 10_000), 100, 10_000);
+    const gridSize =
+      body.gridSize === undefined
+        ? row.grid_size
+        : clamp(safeInt(body.gridSize, row.grid_size, 20, 300), 20, 300);
+    const gridOffsetX =
+      body.gridOffsetX === undefined
+        ? row.grid_offset_x
+        : clamp(Number(body.gridOffsetX) || 0, -gridSize, gridSize);
+    const gridOffsetY =
+      body.gridOffsetY === undefined
+        ? row.grid_offset_y
+        : clamp(Number(body.gridOffsetY) || 0, -gridSize, gridSize);
     const fogEnabled = body.fogEnabled === undefined ? row.fog_enabled : body.fogEnabled ? 1 : 0;
     db.prepare(
-      `UPDATE scenes SET name = ?, image_url = ?, thumbnail_url = ?, width = ?, height = ?, grid_size = ?, grid_offset_x = ?, grid_offset_y = ?, fog_enabled = ?, updated_at = ? WHERE id = ?`,
-    ).run(name, imageUrl, thumbnailUrl, width, height, gridSize, gridOffsetX, gridOffsetY, fogEnabled, now(), id);
+      `UPDATE scenes SET name = ?, image_url = ?, thumbnail_url = ?, width = ?, height = ?, grid_size = ?, grid_offset_x = ?, grid_offset_y = ?, fog_enabled = ?, updated_at = ? WHERE id = ?`
+    ).run(
+      name,
+      imageUrl,
+      thumbnailUrl,
+      width,
+      height,
+      gridSize,
+      gridOffsetX,
+      gridOffsetY,
+      fogEnabled,
+      now(),
+      id
+    );
     const updated = db.prepare("SELECT * FROM scenes WHERE id = ?").get(id) as SceneRow;
     const scene = serializeScene(updated);
     app.broadcastCampaign(row.campaign_id, "scene:updated", scene);
@@ -300,11 +337,9 @@ export async function registerTableRoutes(app: FastifyInstance): Promise<void> {
       return reply.code(403).send({ error: "Only the GM can change scenes." });
     }
     ensureState(row.campaign_id);
-    db.prepare("UPDATE campaign_state SET active_scene_id = ?, updated_at = ? WHERE campaign_id = ?").run(
-      id,
-      now(),
-      row.campaign_id,
-    );
+    db.prepare(
+      "UPDATE campaign_state SET active_scene_id = ?, updated_at = ? WHERE campaign_id = ?"
+    ).run(id, now(), row.campaign_id);
     app.broadcastCampaign(row.campaign_id, "scene:activated", { sceneId: id });
     touchCampaign(row.campaign_id);
     return reply.send({ ok: true });
@@ -324,12 +359,11 @@ export async function registerTableRoutes(app: FastifyInstance): Promise<void> {
       .get(row.campaign_id) as { id: string } | undefined;
     const state = ensureState(row.campaign_id);
     if (state.active_scene_id === id) {
-      db.prepare("UPDATE campaign_state SET active_scene_id = ?, updated_at = ? WHERE campaign_id = ?").run(
-        remaining?.id ?? null,
-        now(),
-        row.campaign_id,
-      );
-      if (remaining) app.broadcastCampaign(row.campaign_id, "scene:activated", { sceneId: remaining.id });
+      db.prepare(
+        "UPDATE campaign_state SET active_scene_id = ?, updated_at = ? WHERE campaign_id = ?"
+      ).run(remaining?.id ?? null, now(), row.campaign_id);
+      if (remaining)
+        app.broadcastCampaign(row.campaign_id, "scene:activated", { sceneId: remaining.id });
     }
     app.broadcastCampaign(row.campaign_id, "scene:deleted", { sceneId: id });
     touchCampaign(row.campaign_id);

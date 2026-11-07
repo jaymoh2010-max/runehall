@@ -92,7 +92,9 @@ export function RunePicker({
         params.set("legacy", legacy ? "1" : "0");
         if (!expanded) params.set("core", "1");
         if (query.trim()) params.set("q", query.trim());
-        const result = await api<{ items: Equipment[] }>(`/api/compendium/equipment?${params.toString()}`);
+        const result = await api<{ items: Equipment[] }>(
+          `/api/compendium/equipment?${params.toString()}`
+        );
         if (!cancelled) setItems(result.items);
       } catch (err) {
         if (!cancelled) setError(errorMessage(err));
@@ -113,10 +115,7 @@ export function RunePicker({
     return map;
   }, [equipment, items]);
 
-  const effectiveEquipment = useMemo(
-    () => Object.fromEntries(runeById.entries()),
-    [runeById],
-  );
+  const effectiveEquipment = useMemo(() => Object.fromEntries(runeById.entries()), [runeById]);
   const attached = (entry?.runes ?? [])
     .map((id) => runeById.get(id))
     .filter((rune): rune is Equipment => Boolean(rune));
@@ -130,7 +129,7 @@ export function RunePicker({
       setNotice(
         slots
           ? `This item has ${slots} property rune slot${slots === 1 ? "" : "s"} and they are already filled.`
-          : "Add a potency rune before etching property runes.",
+          : "Add a potency rune before etching property runes."
       );
       return;
     }
@@ -145,7 +144,11 @@ export function RunePicker({
       title={item ? `Runes for ${item.name}` : "Runes"}
       subtitle="Fundamental runes change attacks, damage, AC, or saves. Property runes add magical effects."
       extraWide
-      footer={<Button variant="primary" onClick={onClose}>Done</Button>}
+      footer={
+        <Button variant="primary" onClick={onClose}>
+          Done
+        </Button>
+      }
     >
       <div className="rune-picker">
         {attached.length ? (
@@ -219,7 +222,8 @@ export function RunePicker({
                   <span className="rune-row-main">
                     <strong>{rune.name}</strong>
                     <span className="tiny muted">
-                      {CATEGORY_LABELS[category ?? ""] ?? "Rune"} · level {rune.level} · {formatCp(rune.price.cpTotal)}
+                      {CATEGORY_LABELS[category ?? ""] ?? "Rune"} · level {rune.level} ·{" "}
+                      {formatCp(rune.price.cpTotal)}
                     </span>
                   </span>
                   {isAttached ? <Tag tone="green">Etched</Tag> : null}
@@ -239,15 +243,17 @@ export function RunePicker({
                   <div>
                     <h3>{selected.name}</h3>
                     <p className="tiny muted">
-                      {CATEGORY_LABELS[runeCategory(selected) ?? ""] ?? "Rune"} · level {selected.level} ·{" "}
-                      {formatCp(selected.price.cpTotal)}
+                      {CATEGORY_LABELS[runeCategory(selected) ?? ""] ?? "Rune"} · level{" "}
+                      {selected.level} · {formatCp(selected.price.cpTotal)}
                     </p>
                   </div>
                   <Sparkles size={18} className="gold-text" />
                 </div>
                 <div className="chip-row" style={{ margin: "10px 0" }}>
                   <ContentTierTag source={selected.source} />
-                  {selected.traits.map((trait) => <Tag key={trait}>{trait}</Tag>)}
+                  {selected.traits.map((trait) => (
+                    <Tag key={trait}>{trait}</Tag>
+                  ))}
                   {selected.rarity !== "common" ? <Tag tone="violet">{selected.rarity}</Tag> : null}
                 </div>
                 <RichText html={selected.description} />
@@ -256,7 +262,9 @@ export function RunePicker({
                     <Button
                       variant="danger"
                       icon={<X size={14} />}
-                      onClick={() => onChange((entry?.runes ?? []).filter((id) => id !== selected.id))}
+                      onClick={() =>
+                        onChange((entry?.runes ?? []).filter((id) => id !== selected.id))
+                      }
                     >
                       Remove rune
                     </Button>

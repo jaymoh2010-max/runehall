@@ -1,13 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import {
-  ImagePlus,
-  MapPin,
-  Pencil,
-  Plus,
-  Search,
-  Trash2,
-  UserRound,
-} from "lucide-react";
+import { ImagePlus, MapPin, Pencil, Plus, Search, Trash2, UserRound } from "lucide-react";
 import type { CampaignNpc, Scene, Token } from "../../../shared/types";
 import { api, uploadImage } from "../../api";
 import { errorMessage } from "../../stores";
@@ -80,8 +72,7 @@ export function NpcLibrary({
     if (!value) return npcs;
     return npcs.filter(
       (npc) =>
-        npc.name.toLowerCase().includes(value) ||
-        npc.description.toLowerCase().includes(value),
+        npc.name.toLowerCase().includes(value) || npc.description.toLowerCase().includes(value)
     );
   }, [npcs, query]);
 
@@ -103,7 +94,7 @@ export function NpcLibrary({
     try {
       const result = await api<{ token: Token; sceneId: string }>(
         `/api/campaigns/${campaignId}/npcs/${npc.id}/token`,
-        { method: "POST", body: { sceneId } },
+        { method: "POST", body: { sceneId } }
       );
       onTokenCreated(result.token, result.sceneId);
       const sceneName = scenes.find((scene) => scene.id === result.sceneId)?.name ?? "the scene";
@@ -147,14 +138,20 @@ export function NpcLibrary({
         <div>
           <PageEyebrow>GM preparation</PageEyebrow>
           <h2>NPCs</h2>
-          <p>Save recurring allies, villains, and monsters, then place their tokens on any scene.</p>
+          <p>
+            Save recurring allies, villains, and monsters, then place their tokens on any scene.
+          </p>
         </div>
         <Button variant="primary" icon={<Plus size={15} />} onClick={() => setEditor("new")}>
           New NPC
         </Button>
       </div>
 
-      {error ? <div className="auth-error" style={{ marginBottom: 14 }}>{error}</div> : null}
+      {error ? (
+        <div className="auth-error" style={{ marginBottom: 14 }}>
+          {error}
+        </div>
+      ) : null}
 
       <div className="npc-toolbar">
         <div className="search-box">
@@ -168,7 +165,9 @@ export function NpcLibrary({
         <Field label="Place tokens on">
           <Select value={sceneId} onChange={(event) => setSceneId(event.target.value)}>
             {scenes.map((scene) => (
-              <option key={scene.id} value={scene.id}>{scene.name}</option>
+              <option key={scene.id} value={scene.id}>
+                {scene.name}
+              </option>
             ))}
           </Select>
         </Field>
@@ -182,10 +181,18 @@ export function NpcLibrary({
           icon={<UserRound size={30} />}
           title="No NPCs saved"
           description="Create a statblock for a recurring NPC, villain, or custom creature."
-          action={<Button variant="primary" icon={<Plus size={15} />} onClick={() => setEditor("new")}>Create the first NPC</Button>}
+          action={
+            <Button variant="primary" icon={<Plus size={15} />} onClick={() => setEditor("new")}>
+              Create the first NPC
+            </Button>
+          }
         />
       ) : !filtered.length ? (
-        <EmptyState icon={<Search size={28} />} title="No matches" description="Try a different name or description." />
+        <EmptyState
+          icon={<Search size={28} />}
+          title="No matches"
+          description="Try a different name or description."
+        />
       ) : (
         <div className="npc-grid">
           {filtered.map((npc) => (
@@ -198,7 +205,8 @@ export function NpcLibrary({
                     <Badge tone="gold">Level {npc.level}</Badge>
                   </div>
                   <p className="tiny muted">
-                    {npc.hp !== null ? `${npc.hp} HP` : "No HP"} · {npc.ac !== null ? `AC ${npc.ac}` : "No AC"}
+                    {npc.hp !== null ? `${npc.hp} HP` : "No HP"} ·{" "}
+                    {npc.ac !== null ? `AC ${npc.ac}` : "No AC"}
                     {npc.perception !== null ? ` · Perception ${npc.perception}` : ""}
                   </p>
                 </div>
@@ -215,7 +223,12 @@ export function NpcLibrary({
                 >
                   Place token
                 </Button>
-                <Button size="sm" variant="ghost" icon={<Pencil size={13} />} onClick={() => setEditor(npc)}>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  icon={<Pencil size={13} />}
+                  onClick={() => setEditor(npc)}
+                >
                   Edit
                 </Button>
                 <IconButton label={`Delete ${npc.name}`} onClick={() => void deleteNpc(npc)}>
@@ -282,7 +295,7 @@ function NpcEditor({
     setPerception(
       editing?.perception === null || editing?.perception === undefined
         ? ""
-        : String(editing.perception),
+        : String(editing.perception)
     );
     setSize(String(editing?.size ?? 1));
     setColor(editing?.color ?? "#b06767");
@@ -352,7 +365,9 @@ function NpcEditor({
       wide
       footer={
         <>
-          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
           <Button variant="primary" loading={busy} onClick={submit}>
             {editing ? "Save NPC" : "Create NPC"}
           </Button>
@@ -364,7 +379,11 @@ function NpcEditor({
         <div className="npc-editor-layout">
           <div className="npc-editor-art">
             <div className="npc-editor-preview">
-              {imageUrl ? <img src={imageUrl} alt="" loading="lazy" decoding="async" /> : <span>{(name || "NPC").slice(0, 2).toUpperCase()}</span>}
+              {imageUrl ? (
+                <img src={imageUrl} alt="" loading="lazy" decoding="async" />
+              ) : (
+                <span>{(name || "NPC").slice(0, 2).toUpperCase()}</span>
+              )}
             </div>
             <Button
               variant="secondary"
@@ -392,24 +411,53 @@ function NpcEditor({
                 event.target.value = "";
               }}
             />
-            <p className="tiny muted">Token art is optional. Initials are used when no image is set.</p>
+            <p className="tiny muted">
+              Token art is optional. Initials are used when no image is set.
+            </p>
           </div>
           <div className="npc-editor-fields">
             <Field label="Name">
-              <Input autoFocus value={name} onChange={(event) => setName(event.target.value)} placeholder="e.g. The Ferryman" />
+              <Input
+                autoFocus
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                placeholder="e.g. The Ferryman"
+              />
             </Field>
             <div className="form-grid three">
               <Field label="Level">
-                <Input type="number" min={-1} max={30} value={level} onChange={(event) => setLevel(event.target.value)} />
+                <Input
+                  type="number"
+                  min={-1}
+                  max={30}
+                  value={level}
+                  onChange={(event) => setLevel(event.target.value)}
+                />
               </Field>
               <Field label="HP">
-                <Input type="number" min={0} value={hp} onChange={(event) => setHp(event.target.value)} placeholder="Optional" />
+                <Input
+                  type="number"
+                  min={0}
+                  value={hp}
+                  onChange={(event) => setHp(event.target.value)}
+                  placeholder="Optional"
+                />
               </Field>
               <Field label="AC">
-                <Input type="number" value={ac} onChange={(event) => setAc(event.target.value)} placeholder="Optional" />
+                <Input
+                  type="number"
+                  value={ac}
+                  onChange={(event) => setAc(event.target.value)}
+                  placeholder="Optional"
+                />
               </Field>
               <Field label="Perception">
-                <Input type="number" value={perception} onChange={(event) => setPerception(event.target.value)} placeholder="Optional" />
+                <Input
+                  type="number"
+                  value={perception}
+                  onChange={(event) => setPerception(event.target.value)}
+                  placeholder="Optional"
+                />
               </Field>
               <Field label="Size">
                 <Select value={size} onChange={(event) => setSize(event.target.value)}>
@@ -420,7 +468,12 @@ function NpcEditor({
                 </Select>
               </Field>
               <Field label="Token color">
-                <input className="token-color-input" type="color" value={color} onChange={(event) => setColor(event.target.value)} />
+                <input
+                  className="token-color-input"
+                  type="color"
+                  value={color}
+                  onChange={(event) => setColor(event.target.value)}
+                />
               </Field>
             </div>
             <Field label="Statblock notes" hint="Attacks, abilities, tactics, or reminders.">
@@ -428,7 +481,9 @@ function NpcEditor({
                 rows={8}
                 value={description}
                 onChange={(event) => setDescription(event.target.value)}
-                placeholder={"Melee: +12 to hit, 2d8+5 slashing\nReaction: Parry\nTactics: Opens with Intimidation, then targets the healer."}
+                placeholder={
+                  "Melee: +12 to hit, 2d8+5 slashing\nReaction: Parry\nTactics: Opens with Intimidation, then targets the healer."
+                }
               />
             </Field>
           </div>

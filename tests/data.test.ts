@@ -18,7 +18,7 @@ function read<T>(file: string): T[] {
 }
 
 const manifest = JSON.parse(
-  fs.readFileSync(path.resolve("data", "compendium", "manifest.json"), "utf8"),
+  fs.readFileSync(path.resolve("data", "compendium", "manifest.json"), "utf8")
 ) as { count: Record<string, number> };
 const ancestries = read<Ancestry>("ancestries.json");
 const heritages = read<Heritage>("heritages.json");
@@ -180,10 +180,12 @@ describe("compendium data", () => {
     expect(dwarf.hp).toBe(10);
     expect(dwarf.speed).toBe(20);
     expect(dwarf.vision).toBe("darkvision");
-    expect(dwarf.boosts.filter((boost) => boost.fixed).flatMap((boost) => boost.from).sort()).toEqual([
-      "con",
-      "wis",
-    ]);
+    expect(
+      dwarf.boosts
+        .filter((boost) => boost.fixed)
+        .flatMap((boost) => boost.from)
+        .sort()
+    ).toEqual(["con", "wis"]);
     expect(dwarf.flaws).toEqual(["cha"]);
 
     const elf = byName(ancestries, "Elf");
@@ -199,13 +201,16 @@ describe("compendium data", () => {
     const minotaur = byName(ancestries, "Minotaur");
     expect(minotaur.features.map((feature) => feature.name)).toContain("Horns (Minotaur)");
 
-    expect(ancestries.every((ancestry) => ["normal", "lowLight", "darkvision"].includes(ancestry.vision))).toBe(
-      true,
-    );
+    expect(
+      ancestries.every((ancestry) => ["normal", "lowLight", "darkvision"].includes(ancestry.vision))
+    ).toBe(true);
   });
 
   it("uses official class chassis values", () => {
-    const expected: Record<string, { hp: number; key: string[]; perception: number; saves: [number, number, number] }> = {
+    const expected: Record<
+      string,
+      { hp: number; key: string[]; perception: number; saves: [number, number, number] }
+    > = {
       Alchemist: { hp: 8, key: ["int"], perception: 1, saves: [2, 2, 1] },
       Barbarian: { hp: 12, key: ["str"], perception: 2, saves: [2, 1, 2] },
       Cleric: { hp: 8, key: ["wis"], perception: 1, saves: [1, 1, 2] },
@@ -221,7 +226,7 @@ describe("compendium data", () => {
       expect(cls.perception, `${name} perception`).toBe(values.perception);
       expect(
         [cls.savingThrows.fortitude, cls.savingThrows.reflex, cls.savingThrows.will],
-        `${name} saves`,
+        `${name} saves`
       ).toEqual(values.saves);
     }
 
@@ -234,17 +239,24 @@ describe("compendium data", () => {
     ]);
 
     const inventor = byName(classes, "Inventor");
-    expect(inventor.features.find((feature) => feature.name === "Expert Overdrive")?.skillRanks).toEqual({
+    expect(
+      inventor.features.find((feature) => feature.name === "Expert Overdrive")?.skillRanks
+    ).toEqual({
       crafting: 2,
     });
-    expect(inventor.features.find((feature) => feature.name === "Master Overdrive")?.skillRanks).toEqual({
+    expect(
+      inventor.features.find((feature) => feature.name === "Master Overdrive")?.skillRanks
+    ).toEqual({
       crafting: 3,
     });
 
     const warpriest = cleric.choiceGroups[0].options.find((option) => option.name === "Warpriest")!;
-    expect(warpriest.grantedFeatures?.some((feature) => feature.name === "First Doctrine (Warpriest)")).toBe(true);
     expect(
-      warpriest.grantedFeatures?.find((feature) => feature.name === "First Doctrine (Warpriest)")?.proficiencies,
+      warpriest.grantedFeatures?.some((feature) => feature.name === "First Doctrine (Warpriest)")
+    ).toBe(true);
+    expect(
+      warpriest.grantedFeatures?.find((feature) => feature.name === "First Doctrine (Warpriest)")
+        ?.proficiencies
     ).toMatchObject({ fortitude: { rank: 2 }, light: { rank: 1 }, medium: { rank: 1 } });
   });
 
@@ -259,7 +271,7 @@ describe("compendium data", () => {
 
     const investigator = byName(classes, "Investigator");
     const forensic = investigator.choiceGroups[0].options.find(
-      (option) => option.name === "Forensic Medicine Methodology",
+      (option) => option.name === "Forensic Medicine Methodology"
     )!;
     expect(forensic.trainedSkills).toContain("medicine");
   });
@@ -302,7 +314,10 @@ describe("compendium data", () => {
         background.lore.length > 0 ||
         background.loreChoices.length > 0;
       if (!hasData) {
-        expect(intentionallyEmpty.has(background.name), `${background.name} has skill/Lore data`).toBe(true);
+        expect(
+          intentionallyEmpty.has(background.name),
+          `${background.name} has skill/Lore data`
+        ).toBe(true);
       }
       for (const choice of background.loreChoices) {
         expect(choice.count, `${background.name} Lore choice count`).toBeGreaterThan(0);

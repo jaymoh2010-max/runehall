@@ -109,7 +109,11 @@ export function JoinCampaignPage() {
         body: { code, characterId: character.id },
       });
       toast(`${character.name} joined ${invite.campaign.name}.`, "success");
-      navigate(character.summary ? `/campaigns/${invite.campaign.id}?tab=party` : `/characters/${character.id}/edit`);
+      navigate(
+        character.summary
+          ? `/campaigns/${invite.campaign.id}?tab=party`
+          : `/characters/${character.id}/edit`
+      );
     } catch (err) {
       setError(errorMessage(err));
     } finally {
@@ -146,7 +150,10 @@ export function JoinCampaignPage() {
     setError("");
     try {
       await api("/api/campaigns/join", { method: "POST", body: { code } });
-      toast(`Joined ${invite.campaign.name}. You can create a character from the Party tab.`, "success");
+      toast(
+        `Joined ${invite.campaign.name}. You can create a character from the Party tab.`,
+        "success"
+      );
       navigate(`/campaigns/${invite.campaign.id}?tab=party`);
     } catch (err) {
       setError(errorMessage(err));
@@ -167,8 +174,14 @@ export function JoinCampaignPage() {
             description="The code may have been regenerated, or the link may be incomplete. Ask your GM for a fresh invite."
             action={
               <div className="row" style={{ justifyContent: "center" }}>
-                <Link to="/" className="btn btn-secondary btn-md"><ArrowLeft size={15} /> Back home</Link>
-                {user ? <Link to="/campaigns" className="btn btn-primary btn-md">My Campaigns</Link> : null}
+                <Link to="/" className="btn btn-secondary btn-md">
+                  <ArrowLeft size={15} /> Back home
+                </Link>
+                {user ? (
+                  <Link to="/campaigns" className="btn btn-primary btn-md">
+                    My Campaigns
+                  </Link>
+                ) : null}
               </div>
             }
           />
@@ -183,17 +196,23 @@ export function JoinCampaignPage() {
     return (
       <div className="join-page">
         <div className="join-invalid card">
-          <div className="join-already-icon"><CheckCircle2 size={30} /></div>
+          <div className="join-already-icon">
+            <CheckCircle2 size={30} />
+          </div>
           <PageEyebrow>Already at the table</PageEyebrow>
           <h1>You&apos;re already in {campaign.name}.</h1>
           <p className="muted">
-            {invite.role === "gm" ? "You're the GM for this campaign." : "Your seat is saved. Jump back in whenever you're ready."}
+            {invite.role === "gm"
+              ? "You're the GM for this campaign."
+              : "Your seat is saved. Jump back in whenever you're ready."}
           </p>
           <div className="row wrap" style={{ justifyContent: "center", marginTop: 20 }}>
             <Link to={`/campaigns/${campaign.id}`} className="btn btn-primary btn-lg">
               Enter campaign <ArrowRight size={16} />
             </Link>
-            <Link to="/campaigns" className="btn btn-secondary btn-lg">My Campaigns</Link>
+            <Link to="/campaigns" className="btn btn-secondary btn-lg">
+              My Campaigns
+            </Link>
           </div>
         </div>
       </div>
@@ -205,18 +224,32 @@ export function JoinCampaignPage() {
       <aside className="auth-side join-side">
         <Link to="/" className="brand">
           <img src="/rune.svg" alt="" />
-          <span className="brand-word">Rune<span>hall</span></span>
+          <span className="brand-word">
+            Rune<span>hall</span>
+          </span>
         </Link>
         <div className="join-side-copy">
-          <div className="page-eyebrow"><UserPlus size={12} /> You&apos;re invited</div>
-          <div className="join-campaign-emblem"><Crown size={22} /></div>
+          <div className="page-eyebrow">
+            <UserPlus size={12} /> You&apos;re invited
+          </div>
+          <div className="join-campaign-emblem">
+            <Crown size={22} />
+          </div>
           <h1>{campaign.name}</h1>
           <p>{campaign.description || "A new story is waiting at the table."}</p>
           <div className="join-invite-meta">
-            <span><Crown size={14} /> GM: {campaign.gmName}</span>
-            <span><Sparkles size={14} /> {rulesetLabel(campaign.ruleset)}</span>
-            <span><Users size={14} /> {campaign.memberCount} at the table</span>
-            <span><ScrollText size={14} /> {campaign.characterCount} characters</span>
+            <span>
+              <Crown size={14} /> GM: {campaign.gmName}
+            </span>
+            <span>
+              <Sparkles size={14} /> {rulesetLabel(campaign.ruleset)}
+            </span>
+            <span>
+              <Users size={14} /> {campaign.memberCount} at the table
+            </span>
+            <span>
+              <ScrollText size={14} /> {campaign.characterCount} characters
+            </span>
           </div>
         </div>
         <div className="auth-side-quote">
@@ -229,7 +262,9 @@ export function JoinCampaignPage() {
         <div className="auth-card join-card">
           <Link to="/" className="brand auth-brand">
             <img src="/rune.svg" alt="" />
-            <span className="brand-word">Rune<span>hall</span></span>
+            <span className="brand-word">
+              Rune<span>hall</span>
+            </span>
           </Link>
 
           {!user ? (
@@ -237,8 +272,9 @@ export function JoinCampaignPage() {
               <PageEyebrow>Join the table</PageEyebrow>
               <h2>Take your seat in {campaign.name}</h2>
               <p className="auth-sub">
-                Sign in or create a Runehall account. After that, choose an existing character or create a new one for this campaign.
-                Your character will use the <strong>{rulesetLabel(campaign.ruleset)}</strong> ruleset chosen by the GM.
+                Sign in or create a Runehall account. After that, choose an existing character or
+                create a new one for this campaign. Your character will use the{" "}
+                <strong>{rulesetLabel(campaign.ruleset)}</strong> ruleset chosen by the GM.
               </p>
               <div className="join-auth-actions">
                 <Link to="/register" state={authState} className="btn btn-primary btn-lg btn-block">
@@ -249,7 +285,8 @@ export function JoinCampaignPage() {
                 </Link>
               </div>
               <div className="auth-hint" style={{ marginTop: 20 }}>
-                Your campaign membership and characters will be saved to your account under <strong>My Campaigns</strong>, so you can return for the next session.
+                Your campaign membership and characters will be saved to your account under{" "}
+                <strong>My Campaigns</strong>, so you can return for the next session.
               </div>
             </>
           ) : (
@@ -257,15 +294,29 @@ export function JoinCampaignPage() {
               <PageEyebrow>Choose your hero</PageEyebrow>
               <h2>How are you joining?</h2>
               <p className="auth-sub">
-                Signed in as <strong>{user.displayName}</strong>. Bring a hero or forge a new one for this table.
+                Signed in as <strong>{user.displayName}</strong>. Bring a hero or forge a new one
+                for this table.
               </p>
 
-              {error ? <div className="auth-error" style={{ marginTop: 14 }}>{error}</div> : null}
+              {error ? (
+                <div className="auth-error" style={{ marginTop: 14 }}>
+                  {error}
+                </div>
+              ) : null}
 
               <div className="join-choices">
-                <button type="button" className={`join-choice ${mode === "new" ? "is-selected" : ""}`} onClick={() => setMode("new")}>
-                  <span className="join-choice-icon"><Plus size={18} /></span>
-                  <span><strong>Create a new character</strong><small>Build a fresh hero and join the campaign.</small></span>
+                <button
+                  type="button"
+                  className={`join-choice ${mode === "new" ? "is-selected" : ""}`}
+                  onClick={() => setMode("new")}
+                >
+                  <span className="join-choice-icon">
+                    <Plus size={18} />
+                  </span>
+                  <span>
+                    <strong>Create a new character</strong>
+                    <small>Build a fresh hero and join the campaign.</small>
+                  </span>
                   {mode === "new" ? <CheckCircle2 size={17} /> : null}
                 </button>
                 <button
@@ -274,8 +325,17 @@ export function JoinCampaignPage() {
                   onClick={() => setMode("existing")}
                   disabled={!characters.length}
                 >
-                  <span className="join-choice-icon"><Sparkles size={18} /></span>
-                  <span><strong>Bring an existing character</strong><small>{characters.length ? `${characters.length} unassigned hero${characters.length === 1 ? "" : "es"} ready` : "No unassigned characters yet"}</small></span>
+                  <span className="join-choice-icon">
+                    <Sparkles size={18} />
+                  </span>
+                  <span>
+                    <strong>Bring an existing character</strong>
+                    <small>
+                      {characters.length
+                        ? `${characters.length} unassigned hero${characters.length === 1 ? "" : "es"} ready`
+                        : "No unassigned characters yet"}
+                    </small>
+                  </span>
                   {mode === "existing" ? <CheckCircle2 size={17} /> : null}
                 </button>
               </div>
@@ -304,7 +364,11 @@ export function JoinCampaignPage() {
                       disabled={busy}
                       onClick={() => joinWithCharacter(character)}
                     >
-                      <Avatar name={character.name} src={character.summary?.portraitUrl} size={42} />
+                      <Avatar
+                        name={character.name}
+                        src={character.summary?.portraitUrl}
+                        size={42}
+                      />
                       <span className="grow">
                         <strong>{character.name}</strong>
                         <span className="tiny muted">
@@ -313,7 +377,11 @@ export function JoinCampaignPage() {
                             : "Unfinished character"}
                         </span>
                       </span>
-                      {character.summary ? <Badge tone="green">Ready</Badge> : <Badge tone="gold">Draft</Badge>}
+                      {character.summary ? (
+                        <Badge tone="green">Ready</Badge>
+                      ) : (
+                        <Badge tone="gold">Draft</Badge>
+                      )}
                       <ArrowRight size={15} />
                     </button>
                   ))}
@@ -333,7 +401,9 @@ export function JoinCampaignPage() {
               </div>
 
               <div className="join-footer-links">
-                <Link to="/campaigns" className="tiny muted">My Campaigns</Link>
+                <Link to="/campaigns" className="tiny muted">
+                  My Campaigns
+                </Link>
                 <button
                   type="button"
                   className="tiny muted join-signout"

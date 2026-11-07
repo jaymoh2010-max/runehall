@@ -104,12 +104,7 @@ import {
   Textarea,
   Toggle,
 } from "../../ui";
-import {
-  DeityPicker,
-  EquipmentPicker,
-  FeatPicker,
-  SpellPicker,
-} from "../pickers";
+import { DeityPicker, EquipmentPicker, FeatPicker, SpellPicker } from "../pickers";
 import { ContentSourceToggle } from "../ContentSourceToggle";
 import { RunePicker } from "../RunePicker";
 import {
@@ -120,12 +115,7 @@ import {
 } from "../../../../shared/content";
 import { summarizeRunes } from "../../../../shared/runes";
 import type { BuilderProps } from "../shared";
-import {
-  StepHeading,
-  ValidationNote,
-  SearchInput,
-  MiniFeatureList,
-} from "../shared";
+import { StepHeading, ValidationNote, SearchInput, MiniFeatureList } from "../shared";
 
 export function ClassStep({
   draft,
@@ -159,7 +149,7 @@ export function ClassStep({
   const needsDeity = Boolean(
     selected?.features.some((feature) => feature.name.toLowerCase().startsWith("deity (")) ||
     selected?.name.toLowerCase() === "cleric" ||
-    selected?.name.toLowerCase() === "champion",
+    selected?.name.toLowerCase() === "champion"
   );
   const deity = context.deity;
   return (
@@ -202,19 +192,33 @@ export function ClassStep({
                   classChoices: {},
                   deityId: null,
                   deitySkill: null,
-                  spells: { ...current.spells, tradition: null, cantrips: [], known: [], prepared: [], focus: [], slotsUsed: {} },
+                  spells: {
+                    ...current.spells,
+                    tradition: null,
+                    cantrips: [],
+                    known: [],
+                    prepared: [],
+                    focus: [],
+                    slotsUsed: {},
+                  },
                   feats: { ...current.feats, class: {} },
                 };
               })
             }
           >
-            <span className="selection-emblem"><Swords size={19} /></span>
+            <span className="selection-emblem">
+              <Swords size={19} />
+            </span>
             <span className="selection-copy">
               <span className="selection-name">{cls.name}</span>
-              <span className="selection-sub">{cls.hp} HP · {cls.keyAbility.map((a) => ABILITY_SHORT[a]).join(" / ") || "Special"}</span>
+              <span className="selection-sub">
+                {cls.hp} HP · {cls.keyAbility.map((a) => ABILITY_SHORT[a]).join(" / ") || "Special"}
+              </span>
               <span className="selection-source">{cls.source}</span>
             </span>
-            {draft.classId === cls.id ? <CheckCircle2 size={17} className="selection-check" /> : null}
+            {draft.classId === cls.id ? (
+              <CheckCircle2 size={17} className="selection-check" />
+            ) : null}
           </button>
         ))}
       </div>
@@ -225,7 +229,9 @@ export function ClassStep({
               <div>
                 <PageEyebrow>Selected class</PageEyebrow>
                 <h2>{selected.name}</h2>
-                <p className="muted">{selected.source} · {selected.rarity}</p>
+                <p className="muted">
+                  {selected.source} · {selected.rarity}
+                </p>
               </div>
               <div className="chip-row">
                 <Tag tone="gold">{selected.hp} HP</Tag>
@@ -238,10 +244,32 @@ export function ClassStep({
                 <RichText html={selected.description} />
               </div>
               <div className="class-facts">
-                <div><span>Saving throws</span><strong>Fort {selected.savingThrows.fortitude} · Ref {selected.savingThrows.reflex} · Will {selected.savingThrows.will}</strong></div>
-                <div><span>Key ability</span><strong>{selected.keyAbility.map((a) => ABILITY_LABELS[a]).join(" or ") || "Chosen by subclass"}</strong></div>
-                <div><span>Skills</span><strong>{selected.trainedSkills.value.map(titleCase).join(", ") || "—"} + {selected.trainedSkills.additional} choice{selected.trainedSkills.additional === 1 ? "" : "s"}</strong></div>
-                <div><span>Feat levels</span><strong>Class {selected.featLevels.class.join(", ") || "—"}</strong></div>
+                <div>
+                  <span>Saving throws</span>
+                  <strong>
+                    Fort {selected.savingThrows.fortitude} · Ref {selected.savingThrows.reflex} ·
+                    Will {selected.savingThrows.will}
+                  </strong>
+                </div>
+                <div>
+                  <span>Key ability</span>
+                  <strong>
+                    {selected.keyAbility.map((a) => ABILITY_LABELS[a]).join(" or ") ||
+                      "Chosen by subclass"}
+                  </strong>
+                </div>
+                <div>
+                  <span>Skills</span>
+                  <strong>
+                    {selected.trainedSkills.value.map(titleCase).join(", ") || "—"} +{" "}
+                    {selected.trainedSkills.additional} choice
+                    {selected.trainedSkills.additional === 1 ? "" : "s"}
+                  </strong>
+                </div>
+                <div>
+                  <span>Feat levels</span>
+                  <strong>Class {selected.featLevels.class.join(", ") || "—"}</strong>
+                </div>
               </div>
             </div>
           </Card>
@@ -258,7 +286,9 @@ export function ClassStep({
                 <div className="choice-group-head">
                   <div>
                     <h3>Deity</h3>
-                    <p className="muted small">Your faith grants a skill, domains, a divine font, and a favored weapon.</p>
+                    <p className="muted small">
+                      Your faith grants a skill, domains, a divine font, and a favored weapon.
+                    </p>
                   </div>
                   <Button variant="gold" size="sm" onClick={() => openPicker({ kind: "deity" })}>
                     {deity ? "Change deity" : "Choose deity"}
@@ -271,16 +301,29 @@ export function ClassStep({
                       <span className="muted small"> · {deity.source}</span>
                     </div>
                     <div className="chip-row">
-                      {deity.font.map((font) => <Tag key={font} tone="gold">{titleCase(font)}</Tag>)}
-                      {(deity.skill ?? []).map((skill) => <Tag key={skill} tone="green">{titleCase(skill)}</Tag>)}
-                      {deity.weapons.map((weapon) => <Tag key={weapon}>{weapon}</Tag>)}
+                      {deity.font.map((font) => (
+                        <Tag key={font} tone="gold">
+                          {titleCase(font)}
+                        </Tag>
+                      ))}
+                      {(deity.skill ?? []).map((skill) => (
+                        <Tag key={skill} tone="green">
+                          {titleCase(skill)}
+                        </Tag>
+                      ))}
+                      {deity.weapons.map((weapon) => (
+                        <Tag key={weapon}>{weapon}</Tag>
+                      ))}
                     </div>
                     {deitySkillOptions(deity).length > 1 ? (
                       <Field label="Deity-granted skill">
                         <Select
                           value={selectedDeitySkill(draft, deity) ?? ""}
                           onChange={(event) =>
-                            update((current) => ({ ...current, deitySkill: event.target.value || null }))
+                            update((current) => ({
+                              ...current,
+                              deitySkill: event.target.value || null,
+                            }))
                           }
                         >
                           <option value="">Choose a skill…</option>
@@ -293,7 +336,9 @@ export function ClassStep({
                       </Field>
                     ) : null}
                   </div>
-                ) : <p className="muted small">No deity selected yet.</p>}
+                ) : (
+                  <p className="muted small">No deity selected yet.</p>
+                )}
               </Card>
             ) : null}
             {groups.map((group) => {
@@ -309,7 +354,9 @@ export function ClassStep({
                         {group.count === 1 ? "Choose one" : `Choose ${group.count}`}
                       </p>
                     </div>
-                    <Badge tone={picks.length === group.count ? "green" : "gold"}>{picks.length}/{group.count}</Badge>
+                    <Badge tone={picks.length === group.count ? "green" : "gold"}>
+                      {picks.length}/{group.count}
+                    </Badge>
                   </div>
                   <div className="choice-options">
                     {optionList.map((option) => {
@@ -323,9 +370,11 @@ export function ClassStep({
                             update((current) => {
                               const currentPicks = current.classChoices[group.key] ?? [];
                               let nextPicks: string[];
-                              if (selectedOption) nextPicks = currentPicks.filter((id) => id !== option.id);
+                              if (selectedOption)
+                                nextPicks = currentPicks.filter((id) => id !== option.id);
                               else if (group.count === 1) nextPicks = [option.id];
-                              else if (currentPicks.length < group.count) nextPicks = [...currentPicks, option.id];
+                              else if (currentPicks.length < group.count)
+                                nextPicks = [...currentPicks, option.id];
                               else nextPicks = [...currentPicks.slice(1), option.id];
                               return {
                                 ...current,
@@ -343,7 +392,12 @@ export function ClassStep({
                           </span>
                           <span className="tiny muted">{option.source}</span>
                           <span className="choice-option-desc">
-                            {option.description.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 145)}…
+                            {option.description
+                              .replace(/<[^>]+>/g, " ")
+                              .replace(/\s+/g, " ")
+                              .trim()
+                              .slice(0, 145)}
+                            …
                           </span>
                         </button>
                       );
@@ -352,17 +406,29 @@ export function ClassStep({
                 </Card>
               );
             })}
-            {!groups.length ? <p className="muted small">This class has no choices at your current level.</p> : null}
+            {!groups.length ? (
+              <p className="muted small">This class has no choices at your current level.</p>
+            ) : null}
           </div>
 
           <Card className="selection-detail">
             <h3 style={{ marginBottom: 10 }}>Class features</h3>
-            <MiniFeatureList features={selected.features.filter((feature) => feature.level <= draft.level)} />
+            <MiniFeatureList
+              features={selected.features.filter((feature) => feature.level <= draft.level)}
+            />
           </Card>
           <ValidationNote issues={derived.validation.filter((issue) => issue.step === "class")} />
           <div className="step-actions">
-            <Button variant="ghost" onClick={() => setStep("background")}>Back</Button>
-            <Button variant="primary" onClick={() => setStep("abilities")} icon={<ArrowRight size={15} />}>Ability scores</Button>
+            <Button variant="ghost" onClick={() => setStep("background")}>
+              Back
+            </Button>
+            <Button
+              variant="primary"
+              onClick={() => setStep("abilities")}
+              icon={<ArrowRight size={15} />}
+            >
+              Ability scores
+            </Button>
           </div>
         </>
       ) : (
@@ -374,4 +440,3 @@ export function ClassStep({
     </div>
   );
 }
-

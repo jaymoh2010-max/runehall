@@ -38,7 +38,7 @@ const steelShield = byName(equipment, "Steel Shield");
 function contextFor(
   background: Background,
   classData: ClassData,
-  items: Equipment[] = [],
+  items: Equipment[] = []
 ): CharacterContext {
   return {
     ancestry: human,
@@ -75,7 +75,7 @@ describe("golden sheets", () => {
 
     const derived = computeCharacter(
       draft,
-      contextFor(warrior, fighter, [chainMail, longsword, steelShield]),
+      contextFor(warrior, fighter, [chainMail, longsword, steelShield])
     );
 
     expect(derived.abilities).toEqual({

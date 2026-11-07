@@ -58,8 +58,9 @@ export function LandingPage() {
             <em>One hall.</em>
           </h1>
           <p className="hero-lede">
-            Runehall is a character builder, shared battle map, dice table, and campaign journal — built for the
-            friends around your table. No tabs, no scattered tools, no lost character sheets.
+            Runehall is a character builder, shared battle map, dice table, and campaign journal —
+            built for the friends around your table. No tabs, no scattered tools, no lost character
+            sheets.
           </p>
           <div className="hero-actions">
             <Link className="btn btn-primary btn-lg" to={user ? "/campaigns" : "/register"}>
@@ -110,8 +111,8 @@ export function LandingPage() {
             </div>
             <h3>A character forge</h3>
             <p>
-              Pathbuilder-style building with live PF2e math: ancestries, heritages, classes, feats, spells, gear,
-              and every boost accounted for.
+              Pathbuilder-style building with live PF2e math: ancestries, heritages, classes, feats,
+              spells, gear, and every boost accounted for.
             </p>
           </article>
           <article className="feature-card">
@@ -120,8 +121,8 @@ export function LandingPage() {
             </div>
             <h3>A shared table</h3>
             <p>
-              Upload a map, drop in tokens, pan and zoom, measure distance, and reveal the dungeon one brushstroke at
-              a time.
+              Upload a map, drop in tokens, pan and zoom, measure distance, and reveal the dungeon
+              one brushstroke at a time.
             </p>
           </article>
           <article className="feature-card">
@@ -130,8 +131,8 @@ export function LandingPage() {
             </div>
             <h3>Dice with consequence</h3>
             <p>
-              Server-rolled checks with PF2e degrees of success, damage formulas, secret GM rolls, and a table log
-              everyone can read.
+              Server-rolled checks with PF2e degrees of success, damage formulas, secret GM rolls,
+              and a table log everyone can read.
             </p>
           </article>
           <article className="feature-card">
@@ -140,7 +141,8 @@ export function LandingPage() {
             </div>
             <h3>A living chronicle</h3>
             <p>
-              Session notes, handouts, NPCs, and the party roster stay together — not in five different group chats.
+              Session notes, handouts, NPCs, and the party roster stay together — not in five
+              different group chats.
             </p>
           </article>
         </div>
@@ -149,9 +151,9 @@ export function LandingPage() {
       <footer className="landing-footer">
         <span>Runehall · A local-first Pathfinder 2e table</span>
         <span className="legal-note">
-          Independent, unofficial tool compatible with Pathfinder Second Edition. Rules data is derived from the
-          Apache-2.0 Foundry VTT PF2e system. Pathfinder and all related marks are trademarks of Paizo Inc. Not
-          affiliated with or endorsed by Paizo.
+          Independent, unofficial tool compatible with Pathfinder Second Edition. Rules data is
+          derived from the Apache-2.0 Foundry VTT PF2e system. Pathfinder and all related marks are
+          trademarks of Paizo Inc. Not affiliated with or endorsed by Paizo.
         </span>
       </footer>
     </div>

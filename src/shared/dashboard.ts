@@ -14,7 +14,8 @@ export function normalizeCampaignThreads(value: unknown): CampaignThread[] {
   for (const [index, raw] of value.entries()) {
     if (!raw || typeof raw !== "object") continue;
     const record = raw as Record<string, unknown>;
-    const text = typeof record.text === "string" ? record.text.trim().slice(0, MAX_THREAD_TEXT) : "";
+    const text =
+      typeof record.text === "string" ? record.text.trim().slice(0, MAX_THREAD_TEXT) : "";
     if (!text) continue;
     const id =
       typeof record.id === "string" && record.id.trim()

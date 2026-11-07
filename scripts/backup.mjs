@@ -19,7 +19,7 @@ const dirArg = args.indexOf("--dir");
 const keepArg = args.indexOf("--keep");
 const keep = keepArg >= 0 ? Math.max(1, Math.round(Number(args[keepArg + 1]) || 0)) : 0;
 const backupRoot = path.resolve(
-  dirArg >= 0 ? args[dirArg + 1] : process.env.BACKUP_DIR || "backups",
+  dirArg >= 0 ? args[dirArg + 1] : process.env.BACKUP_DIR || "backups"
 );
 const dataDir = path.resolve(process.env.DATA_DIR || "data");
 const databasePath = process.env.DATABASE_PATH
@@ -109,8 +109,8 @@ fs.writeFileSync(
       files,
     },
     null,
-    2,
-  ),
+    2
+  )
 );
 
 console.log(`Runehall backup created:`);
@@ -131,7 +131,9 @@ if (keep > 0) {
     fs.rmSync(path.join(backupRoot, name), { recursive: true, force: true });
   }
   if (stale.length) {
-    console.log(`\nRetention: kept the newest ${keep} backup${keep === 1 ? "" : "s"}; removed ${stale.length}.`);
+    console.log(
+      `\nRetention: kept the newest ${keep} backup${keep === 1 ? "" : "s"}; removed ${stale.length}.`
+    );
   }
 }
 

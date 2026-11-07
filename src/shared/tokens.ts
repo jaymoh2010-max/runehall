@@ -62,13 +62,11 @@ export function tickTokenConditions(conditions: TokenCondition[]): TokenConditio
     .map((condition) =>
       condition.duration !== null && condition.duration !== undefined && condition.duration > 0
         ? { ...condition, duration: condition.duration - 1 }
-        : condition,
+        : condition
     )
     .filter(
       (condition) =>
-        condition.duration === null ||
-        condition.duration === undefined ||
-        condition.duration > 0,
+        condition.duration === null || condition.duration === undefined || condition.duration > 0
     );
 }
 
@@ -77,9 +75,7 @@ export function tickTokenConditions(conditions: TokenCondition[]): TokenConditio
  * contribute to the pool; members without HP still count toward the group
  * size shown at the table.
  */
-export function groupHp(
-  tokens: Pick<Token, "hpCurrent" | "hpMax">[],
-): GroupHp {
+export function groupHp(tokens: Pick<Token, "hpCurrent" | "hpMax">[]): GroupHp {
   let current = 0;
   let max = 0;
   for (const token of tokens) {

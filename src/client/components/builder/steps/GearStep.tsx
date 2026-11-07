@@ -104,12 +104,7 @@ import {
   Textarea,
   Toggle,
 } from "../../ui";
-import {
-  DeityPicker,
-  EquipmentPicker,
-  FeatPicker,
-  SpellPicker,
-} from "../pickers";
+import { DeityPicker, EquipmentPicker, FeatPicker, SpellPicker } from "../pickers";
 import { ContentSourceToggle } from "../ContentSourceToggle";
 import { RunePicker } from "../RunePicker";
 import {
@@ -120,12 +115,7 @@ import {
 } from "../../../../shared/content";
 import { summarizeRunes } from "../../../../shared/runes";
 import type { BuilderProps } from "../shared";
-import {
-  StepHeading,
-  ValidationNote,
-  SearchInput,
-  MiniFeatureList,
-} from "../shared";
+import { StepHeading, ValidationNote, SearchInput, MiniFeatureList } from "../shared";
 
 export function GearStep({
   draft,
@@ -144,9 +134,9 @@ export function GearStep({
   const spent = derived.wealth.spent;
   const remaining = budget - spent;
   const runeEntry = runeEntryId
-    ? draft.equipment.find((entry) => entry.itemId === runeEntryId) ?? null
+    ? (draft.equipment.find((entry) => entry.itemId === runeEntryId) ?? null)
     : null;
-  const runeItem = runeEntry ? context.equipment[runeEntry.itemId] ?? null : null;
+  const runeItem = runeEntry ? (context.equipment[runeEntry.itemId] ?? null) : null;
   return (
     <div className="step">
       <StepHeading
@@ -158,23 +148,51 @@ export function GearStep({
         <div className="wealth-numbers">
           <Stat label="Starting wealth" value={formatCp(budget)} />
           <Stat label="Spent" value={formatCp(spent)} tone="red" />
-          <Stat label="Remaining" value={formatCp(remaining)} tone={remaining < 0 ? "red" : "green"} />
-          <Stat label="Bulk" value={`${derived.bulk.total}`} hint={`${derived.bulk.capacity} before encumbered`} />
+          <Stat
+            label="Remaining"
+            value={formatCp(remaining)}
+            tone={remaining < 0 ? "red" : "green"}
+          />
+          <Stat
+            label="Bulk"
+            value={`${derived.bulk.total}`}
+            hint={`${derived.bulk.capacity} before encumbered`}
+          />
         </div>
         <ProgressBar
           value={Math.min(spent, budget)}
           max={budget}
-          label={<><span>Gear budget</span><span>{Math.round((Math.min(spent, budget) / Math.max(1, budget)) * 100)}%</span></>}
+          label={
+            <>
+              <span>Gear budget</span>
+              <span>{Math.round((Math.min(spent, budget) / Math.max(1, budget)) * 100)}%</span>
+            </>
+          }
         />
-        {remaining < 0 ? <div className="validation-note"><div className="validation-line warning"><CircleAlert size={14} /><span>You are over the standard starting wealth for this level. The GM can approve it.</span></div></div> : null}
+        {remaining < 0 ? (
+          <div className="validation-note">
+            <div className="validation-line warning">
+              <CircleAlert size={14} />
+              <span>
+                You are over the standard starting wealth for this level. The GM can approve it.
+              </span>
+            </div>
+          </div>
+        ) : null}
       </Card>
 
       <div className="row-between" style={{ marginTop: 18 }}>
         <div>
           <h2>Pack and arsenal</h2>
-          <p className="muted small">Equipped weapons appear on your sheet. Equipped armor and shields affect AC.</p>
+          <p className="muted small">
+            Equipped weapons appear on your sheet. Equipped armor and shields affect AC.
+          </p>
         </div>
-        <Button variant="primary" icon={<Plus size={15} />} onClick={() => openPicker({ kind: "equipment" })}>
+        <Button
+          variant="primary"
+          icon={<Plus size={15} />}
+          onClick={() => openPicker({ kind: "equipment" })}
+        >
           Add item
         </Button>
       </div>
@@ -191,7 +209,15 @@ export function GearStep({
           return (
             <div key={entry.itemId} className="equipment-row">
               <div className="equipment-icon">
-                {item.weapon ? <Swords size={18} /> : item.armor || item.shield ? <Shield size={18} /> : item.consumable ? <FlaskConical size={18} /> : <Backpack size={18} />}
+                {item.weapon ? (
+                  <Swords size={18} />
+                ) : item.armor || item.shield ? (
+                  <Shield size={18} />
+                ) : item.consumable ? (
+                  <FlaskConical size={18} />
+                ) : (
+                  <Backpack size={18} />
+                )}
               </div>
               <div className="grow">
                 <div className="row wrap" style={{ gap: 7 }}>
@@ -205,14 +231,20 @@ export function GearStep({
                   {item.armor ? ` · +${item.armor.acBonus} AC · Dex cap +${item.armor.dexCap}` : ""}
                   {item.shield ? ` · +${item.shield.acBonus} AC shield` : ""}
                   {item.weapon && runes.weaponPotency ? ` · +${runes.weaponPotency} potency` : ""}
-                  {item.weapon && runes.strikingDice > 1 ? ` · ${runes.strikingDice} damage dice` : ""}
-                  {item.armor && runes.armorPotency ? ` · +${runes.armorPotency} armor potency` : ""}
+                  {item.weapon && runes.strikingDice > 1
+                    ? ` · ${runes.strikingDice} damage dice`
+                    : ""}
+                  {item.armor && runes.armorPotency
+                    ? ` · +${runes.armorPotency} armor potency`
+                    : ""}
                   {item.armor && runes.resilient ? ` · +${runes.resilient} saves` : ""}
                 </div>
                 {attachedRunes.length ? (
                   <div className="chip-row rune-chip-row">
                     {attachedRunes.map((rune) => (
-                      <Tag key={rune.id} tone="gold">{rune.name}</Tag>
+                      <Tag key={rune.id} tone="gold">
+                        {rune.name}
+                      </Tag>
                     ))}
                   </div>
                 ) : null}
@@ -229,20 +261,58 @@ export function GearStep({
                   </Button>
                 ) : null}
                 <div className="qty-control">
-                  <button type="button" onClick={() => update((current) => ({ ...current, equipment: current.equipment.map((e) => e.itemId === entry.itemId ? { ...e, quantity: Math.max(1, e.quantity - 1) } : e) }))}><Minus size={12} /></button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      update((current) => ({
+                        ...current,
+                        equipment: current.equipment.map((e) =>
+                          e.itemId === entry.itemId
+                            ? { ...e, quantity: Math.max(1, e.quantity - 1) }
+                            : e
+                        ),
+                      }))
+                    }
+                  >
+                    <Minus size={12} />
+                  </button>
                   <span>{entry.quantity}</span>
-                  <button type="button" onClick={() => update((current) => ({ ...current, equipment: current.equipment.map((e) => e.itemId === entry.itemId ? { ...e, quantity: e.quantity + 1 } : e) }))}><Plus size={12} /></button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      update((current) => ({
+                        ...current,
+                        equipment: current.equipment.map((e) =>
+                          e.itemId === entry.itemId ? { ...e, quantity: e.quantity + 1 } : e
+                        ),
+                      }))
+                    }
+                  >
+                    <Plus size={12} />
+                  </button>
                 </div>
                 <Toggle
                   checked={entry.equipped}
-                  onChange={(value) => update((current) => ({ ...current, equipment: current.equipment.map((e) => e.itemId === entry.itemId ? { ...e, equipped: value } : e) }))}
+                  onChange={(value) =>
+                    update((current) => ({
+                      ...current,
+                      equipment: current.equipment.map((e) =>
+                        e.itemId === entry.itemId ? { ...e, equipped: value } : e
+                      ),
+                    }))
+                  }
                   label="Equipped"
                 />
                 <button
                   type="button"
                   className="icon-btn"
                   title="Remove item"
-                  onClick={() => update((current) => ({ ...current, equipment: current.equipment.filter((e) => e.itemId !== entry.itemId) }))}
+                  onClick={() =>
+                    update((current) => ({
+                      ...current,
+                      equipment: current.equipment.filter((e) => e.itemId !== entry.itemId),
+                    }))
+                  }
                 >
                   <Trash2 size={14} />
                 </button>
@@ -255,14 +325,24 @@ export function GearStep({
             icon={<Backpack size={27} />}
             title="Your pack is empty"
             description="Add a weapon, armor, a shield, or the small things that keep an adventurer alive."
-            action={<Button variant="primary" icon={<Plus size={15} />} onClick={() => openPicker({ kind: "equipment" })}>Browse equipment</Button>}
+            action={
+              <Button
+                variant="primary"
+                icon={<Plus size={15} />}
+                onClick={() => openPicker({ kind: "equipment" })}
+              >
+                Browse equipment
+              </Button>
+            }
           />
         ) : null}
       </div>
 
       <Card className="currency-card">
         <h3>Purse</h3>
-        <p className="muted small">Carried coins. Treasure can be recorded here for easy bookkeeping.</p>
+        <p className="muted small">
+          Carried coins. Treasure can be recorded here for easy bookkeeping.
+        </p>
         <div className="currency-grid">
           {(["gp", "sp", "cp"] as const).map((coin) => (
             <Field key={coin} label={coin.toUpperCase()}>
@@ -273,7 +353,10 @@ export function GearStep({
                 onChange={(event) =>
                   update((current) => ({
                     ...current,
-                    currency: { ...current.currency, [coin]: Math.max(0, Number(event.target.value) || 0) },
+                    currency: {
+                      ...current.currency,
+                      [coin]: Math.max(0, Number(event.target.value) || 0),
+                    },
                   }))
                 }
               />
@@ -295,13 +378,19 @@ export function GearStep({
             <div key={attack.id} className="attack-preview-row">
               <strong>{attack.name}</strong>
               <span className="mono">{signed(attack.attackBonus)} to hit</span>
-              <span className="mono">{attack.damageFormula} {attack.damageType}</span>
+              <span className="mono">
+                {attack.damageFormula} {attack.damageType}
+              </span>
               {attack.extraDamage?.map((extra) => (
                 <span key={`${attack.id}-${extra.type}`} className="mono tiny gold-text">
                   +{extra.formula} {extra.type}
                 </span>
               ))}
-              <span className="chip-row">{attack.traits.slice(0, 3).map((trait) => <Tag key={trait}>{traitLabel(trait)}</Tag>)}</span>
+              <span className="chip-row">
+                {attack.traits.slice(0, 3).map((trait) => (
+                  <Tag key={trait}>{traitLabel(trait)}</Tag>
+                ))}
+              </span>
             </div>
           ))}
         </div>
@@ -324,14 +413,22 @@ export function GearStep({
           update((current) => ({
             ...current,
             equipment: current.equipment.map((entry) =>
-              entry.itemId === runeEntryId ? { ...entry, runes } : entry,
+              entry.itemId === runeEntryId ? { ...entry, runes } : entry
             ),
           }))
         }
       />
       <div className="step-actions">
-        <Button variant="ghost" onClick={() => setStep("spells")}>Back</Button>
-        <Button variant="primary" onClick={() => setStep("details")} icon={<ArrowRight size={15} />}>Details</Button>
+        <Button variant="ghost" onClick={() => setStep("spells")}>
+          Back
+        </Button>
+        <Button
+          variant="primary"
+          onClick={() => setStep("details")}
+          icon={<ArrowRight size={15} />}
+        >
+          Details
+        </Button>
       </div>
     </div>
   );

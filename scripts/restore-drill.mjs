@@ -16,23 +16,21 @@ import net from "node:net";
 import path from "node:path";
 
 const projectRoot = path.resolve(import.meta.dirname, "..");
-const tempDir = fs.mkdtempSync(
-  path.join(process.env.TEMP || "/tmp", "runehall-restore-drill-"),
-);
+const tempDir = fs.mkdtempSync(path.join(process.env.TEMP || "/tmp", "runehall-restore-drill-"));
 const sourceData = path.join(tempDir, "source-data");
 const restoredData = path.join(tempDir, "restored-data");
 const tamperedData = path.join(tempDir, "tampered-data");
 const localBackups = path.join(tempDir, "backups");
 const offsite = path.join(tempDir, "offsite");
 const compendiumDir = path.resolve(
-  process.env.COMPENDIUM_DIR || path.join(projectRoot, "data", "compendium"),
+  process.env.COMPENDIUM_DIR || path.join(projectRoot, "data", "compendium")
 );
 const tsxCli = path.join(projectRoot, "node_modules", "tsx", "dist", "cli.mjs");
 const username = "restore_drill_gm";
 const password = "restore-drill-password-123";
 const pixel = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9ZlwAAAABJRU5ErkJggg==",
-  "base64",
+  "base64"
 );
 
 let activeServer = null;
@@ -86,10 +84,7 @@ function startServer(dataDir, port) {
 async function stopServer(server) {
   if (!server || server.child.exitCode !== null) return;
   server.child.kill("SIGTERM");
-  await Promise.race([
-    new Promise((resolve) => server.child.once("exit", resolve)),
-    delay(1500),
-  ]);
+  await Promise.race([new Promise((resolve) => server.child.once("exit", resolve)), delay(1500)]);
   if (server.child.exitCode === null) server.child.kill("SIGKILL");
 }
 
@@ -128,7 +123,9 @@ async function api(pathname, { method = "GET", body, cookie } = {}) {
   });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error(`${method} ${pathname} failed (${response.status}): ${JSON.stringify(payload)}`);
+    throw new Error(
+      `${method} ${pathname} failed (${response.status}): ${JSON.stringify(payload)}`
+    );
   }
   return { payload, cookie: cookiesFrom(response) };
 }
@@ -141,7 +138,7 @@ function runScript(script, args, env, allowFailure = false) {
   });
   if (result.status !== 0 && !allowFailure) {
     throw new Error(
-      `${script} failed (${result.status}).\n${result.stdout ?? ""}${result.stderr ?? ""}`,
+      `${script} failed (${result.status}).\n${result.stdout ?? ""}${result.stderr ?? ""}`
     );
   }
   return result;
@@ -235,7 +232,7 @@ async function main() {
       DATABASE_PATH: path.join(tamperedData, "runehall.db"),
       PORT: String(port),
     },
-    true,
+    true
   );
   if (tamperResult.status === 0) {
     throw new Error("Restore accepted an archive with a corrupted file.");
@@ -268,7 +265,7 @@ async function main() {
   });
   const restoredCampaigns = await api("/api/campaigns", { cookie: login.cookie });
   const restoredCampaign = restoredCampaigns.payload.campaigns.find(
-    (entry) => entry.id === campaign.id,
+    (entry) => entry.id === campaign.id
   );
   if (!restoredCampaign) throw new Error("Restored campaign is missing.");
   if (restoredCampaign.name !== campaign.name) {
@@ -281,9 +278,7 @@ async function main() {
   const assets = await api(`/api/campaigns/${campaign.id}/assets`, {
     cookie: login.cookie,
   });
-  const restoredAsset = assets.payload.assets.find(
-    (asset) => asset.filename === upload.filename,
-  );
+  const restoredAsset = assets.payload.assets.find((asset) => asset.filename === upload.filename);
   if (!restoredAsset) throw new Error("Restored uploaded asset is missing.");
   const fileResponse = await fetch(`${base}${restoredAsset.url}`, {
     headers: { cookie: login.cookie },
@@ -322,7 +317,7 @@ try {
   } catch (error) {
     console.warn(
       `Could not remove temporary drill directory ${tempDir}:`,
-      error instanceof Error ? error.message : error,
+      error instanceof Error ? error.message : error
     );
   }
   process.exit(exitCode);

@@ -38,7 +38,7 @@ describe("audit CSV", () => {
     const csv = auditCsv([entry]);
     const lines = csv.trimEnd().split("\r\n");
     expect(lines[0]).toBe(
-      "id,created_at,actor_id,actor_name,action,target_type,target_id,detail,ip",
+      "id,created_at,actor_id,actor_name,action,target_type,target_id,detail,ip"
     );
     expect(lines[1]).toContain('"Ada, the GM"');
     expect(lines[1]).toContain('"A ""quoted""\nline"');
@@ -47,7 +47,7 @@ describe("audit CSV", () => {
 
   it("handles an empty log", () => {
     expect(auditCsv([])).toBe(
-      "id,created_at,actor_id,actor_name,action,target_type,target_id,detail,ip\r\n",
+      "id,created_at,actor_id,actor_name,action,target_type,target_id,detail,ip\r\n"
     );
   });
 

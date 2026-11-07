@@ -80,8 +80,16 @@ describe("applying loot to a character", () => {
     });
     const updated = applyLootToDraft(draft, value, new Set(["item:sword"]));
     expect(updated.equipment).toHaveLength(2);
-    expect(updated.equipment[0]).toMatchObject({ itemId: "item:sword", quantity: 1, equipped: true });
-    expect(updated.equipment[1]).toMatchObject({ itemId: "item:potion", quantity: 2, equipped: false });
+    expect(updated.equipment[0]).toMatchObject({
+      itemId: "item:sword",
+      quantity: 1,
+      equipped: true,
+    });
+    expect(updated.equipment[1]).toMatchObject({
+      itemId: "item:potion",
+      quantity: 2,
+      equipped: false,
+    });
     expect(updated.currency).toEqual({ gp: 1, sp: 2, cp: 3 });
     expect(draft.equipment).toHaveLength(0);
     expect(draft.currency).toEqual({ gp: 0, sp: 0, cp: 0 });

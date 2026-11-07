@@ -96,12 +96,12 @@ export function AdminPage() {
       const params = new URLSearchParams({ limit: "50", offset: String(offset) });
       if (filter.trim()) params.set("action", filter.trim());
       const result = await api<{ entries: AuditEntry[]; total: number }>(
-        `/api/admin/audit?${params.toString()}`,
+        `/api/admin/audit?${params.toString()}`
       );
       setAudit((current) => (append ? [...current, ...result.entries] : result.entries));
       setAuditTotal(result.total);
     },
-    [],
+    []
   );
 
   const applyFilter = (filter: string) => {
@@ -150,7 +150,9 @@ export function AdminPage() {
         method: "PUT",
         body: { mode },
       });
-      setOverview((current) => (current ? { ...current, registration: result.registration } : current));
+      setOverview((current) =>
+        current ? { ...current, registration: result.registration } : current
+      );
       toast(`Registration mode set to ${MODE_COPY[mode].label.toLowerCase()}.`, "success");
       await loadAudit(0, false);
     } catch (err) {
@@ -175,9 +177,7 @@ export function AdminPage() {
       setInvites((current) => [result.invite, ...current]);
       setInviteNote("");
       setLastCode(result.invite.code);
-      setOverview((current) =>
-        current ? { ...current, invites: current.invites + 1 } : current,
-      );
+      setOverview((current) => (current ? { ...current, invites: current.invites + 1 } : current));
       toast("Invite code created.", "success");
       await loadAudit(0, false);
     } catch (err) {
@@ -192,7 +192,7 @@ export function AdminPage() {
       await api(`/api/admin/invites/${id}`, { method: "DELETE" });
       setInvites((current) => current.filter((invite) => invite.id !== id));
       setOverview((current) =>
-        current ? { ...current, invites: Math.max(0, current.invites - 1) } : current,
+        current ? { ...current, invites: Math.max(0, current.invites - 1) } : current
       );
       toast("Invite revoked.", "success");
       await loadAudit(0, false);
@@ -222,7 +222,7 @@ export function AdminPage() {
         result.pruned.deleted
           ? `Audit retention saved; removed ${result.pruned.deleted} expired entries.`
           : "Audit retention saved.",
-        "success",
+        "success"
       );
       await loadAudit(0, false);
     } catch (err) {
@@ -238,10 +238,9 @@ export function AdminPage() {
       const params = new URLSearchParams();
       if (appliedFilterRef.current.trim()) params.set("action", appliedFilterRef.current.trim());
       const query = params.toString();
-      const response = await fetch(
-        `/api/admin/audit/export${query ? `?${query}` : ""}`,
-        { credentials: "include" },
-      );
+      const response = await fetch(`/api/admin/audit/export${query ? `?${query}` : ""}`, {
+        credentials: "include",
+      });
       if (!response.ok) throw new Error(`Audit export failed (${response.status}).`);
       const blob = await response.blob();
       const disposition = response.headers.get("content-disposition") ?? "";
@@ -290,7 +289,12 @@ export function AdminPage() {
 
       <div className="admin-stats">
         <Stat label="Accounts" value={overview?.users ?? "—"} hint="All local users" />
-        <Stat label="Open invites" value={openInvites.length} hint="Unused registration codes" tone="gold" />
+        <Stat
+          label="Open invites"
+          value={openInvites.length}
+          hint="Unused registration codes"
+          tone="gold"
+        />
         <Stat
           label="Audit entries"
           value={retainedEntries}
@@ -308,7 +312,11 @@ export function AdminPage() {
           <SectionTitle
             title="Registration"
             subtitle="Choose how new accounts may join this hall."
-            action={<Badge tone={mode === "open" ? "green" : mode === "invite" ? "gold" : "red"}>{MODE_COPY[mode].label}</Badge>}
+            action={
+              <Badge tone={mode === "open" ? "green" : mode === "invite" ? "gold" : "red"}>
+                {MODE_COPY[mode].label}
+              </Badge>
+            }
           />
           <div className="admin-mode-list">
             {(Object.keys(MODE_COPY) as RegistrationMode[]).map((candidate) => (
@@ -320,7 +328,13 @@ export function AdminPage() {
                 disabled={savingMode || mode === candidate}
               >
                 <span className="admin-mode-icon">
-                  {candidate === "open" ? <Users size={16} /> : candidate === "invite" ? <KeyRound size={16} /> : <ShieldCheck size={16} />}
+                  {candidate === "open" ? (
+                    <Users size={16} />
+                  ) : candidate === "invite" ? (
+                    <KeyRound size={16} />
+                  ) : (
+                    <ShieldCheck size={16} />
+                  )}
                 </span>
                 <span>
                   <strong>{MODE_COPY[candidate].label}</strong>
@@ -330,7 +344,8 @@ export function AdminPage() {
             ))}
           </div>
           <p className="tiny muted" style={{ marginTop: 12 }}>
-            The first account on a fresh install is always allowed and becomes the instance administrator.
+            The first account on a fresh install is always allowed and becomes the instance
+            administrator.
           </p>
         </Card>
 
@@ -359,7 +374,12 @@ export function AdminPage() {
                 <option value="never">Never</option>
               </Select>
             </Field>
-            <Button type="submit" variant="primary" icon={<Plus size={15} />} loading={creatingInvite}>
+            <Button
+              type="submit"
+              variant="primary"
+              icon={<Plus size={15} />}
+              loading={creatingInvite}
+            >
               Create code
             </Button>
           </form>
@@ -376,17 +396,30 @@ export function AdminPage() {
 
           <div className="admin-invite-list">
             {invites.length === 0 ? (
-              <EmptyState icon={<KeyRound size={20} />} title="No invite codes yet" description="Create one when a player is ready to join." />
+              <EmptyState
+                icon={<KeyRound size={20} />}
+                title="No invite codes yet"
+                description="Create one when a player is ready to join."
+              />
             ) : (
               invites.map((invite) => {
                 const used = Boolean(invite.usedAt || invite.usedBy);
                 const expired = invite.expiresAt !== null && invite.expiresAt <= Date.now();
                 return (
-                  <div key={invite.id} className={`admin-invite ${used ? "is-used" : expired ? "is-expired" : ""}`}>
+                  <div
+                    key={invite.id}
+                    className={`admin-invite ${used ? "is-used" : expired ? "is-expired" : ""}`}
+                  >
                     <div>
                       <div className="admin-invite-code">
                         <code>{invite.code}</code>
-                        {used ? <Badge tone="neutral">Used</Badge> : expired ? <Badge tone="red">Expired</Badge> : <Badge tone="green">Open</Badge>}
+                        {used ? (
+                          <Badge tone="neutral">Used</Badge>
+                        ) : expired ? (
+                          <Badge tone="red">Expired</Badge>
+                        ) : (
+                          <Badge tone="green">Open</Badge>
+                        )}
                       </div>
                       <div className="tiny muted">
                         {invite.note || "No note"} ·{" "}
@@ -399,12 +432,21 @@ export function AdminPage() {
                     </div>
                     <div className="admin-invite-actions">
                       {!used ? (
-                        <Button size="sm" icon={<Copy size={13} />} onClick={() => void copyCode(invite.code)}>
+                        <Button
+                          size="sm"
+                          icon={<Copy size={13} />}
+                          onClick={() => void copyCode(invite.code)}
+                        >
                           Copy
                         </Button>
                       ) : null}
                       {!used ? (
-                        <Button size="sm" variant="ghost" icon={<Trash2 size={13} />} onClick={() => void revoke(invite.id)}>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          icon={<Trash2 size={13} />}
+                          onClick={() => void revoke(invite.id)}
+                        >
                           Revoke
                         </Button>
                       ) : null}
@@ -468,7 +510,9 @@ export function AdminPage() {
                   onChange={(event) => setAuditFilter(event.target.value)}
                   placeholder="Filter action, e.g. auth.login"
                 />
-                <Button type="submit" size="sm">Filter</Button>
+                <Button type="submit" size="sm">
+                  Filter
+                </Button>
                 {appliedFilter ? (
                   <Button
                     type="button"
@@ -497,7 +541,11 @@ export function AdminPage() {
           }
         />
         {audit.length === 0 ? (
-          <EmptyState icon={<ScrollText size={20} />} title="No audit entries" description="Activity will appear here as people use the hall." />
+          <EmptyState
+            icon={<ScrollText size={20} />}
+            title="No audit entries"
+            description="Activity will appear here as people use the hall."
+          />
         ) : (
           <>
             <div className="admin-audit-list">

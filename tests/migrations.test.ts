@@ -43,10 +43,10 @@ describe("migrations", () => {
     for (const migration of before) db.exec(migration.sql);
 
     db.prepare(
-      "INSERT INTO users (id, username, display_name, password_hash, avatar_url, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+      "INSERT INTO users (id, username, display_name, password_hash, avatar_url, created_at) VALUES (?, ?, ?, ?, ?, ?)"
     ).run("usr_first", "first", "First User", "hash", null, 1_000);
     db.prepare(
-      "INSERT INTO users (id, username, display_name, password_hash, avatar_url, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+      "INSERT INTO users (id, username, display_name, password_hash, avatar_url, created_at) VALUES (?, ?, ?, ?, ?, ?)"
     ).run("usr_second", "second", "Second User", "hash", null, 2_000);
 
     const migration = migrations.find((entry) => entry.version === 11);
@@ -54,10 +54,10 @@ describe("migrations", () => {
     db.exec(migration!.sql);
 
     db.prepare(
-      "INSERT INTO campaigns (id, name, description, gm_id, invite_code, ruleset, xp_mode, created_at, updated_at, last_played_at) VALUES (?, ?, '', ?, ?, 'core', 'milestone', ?, ?, ?)",
+      "INSERT INTO campaigns (id, name, description, gm_id, invite_code, ruleset, xp_mode, created_at, updated_at, last_played_at) VALUES (?, ?, '', ?, ?, 'core', 'milestone', ?, ?, ?)"
     ).run("camp_one", "Test Campaign", "usr_first", "TESTCODE", 1_000, 1_000, 1_000);
     db.prepare(
-      "INSERT INTO characters (id, user_id, campaign_id, name, data, summary, created_at, updated_at) VALUES (?, ?, NULL, ?, '{}', NULL, ?, ?)",
+      "INSERT INTO characters (id, user_id, campaign_id, name, data, summary, created_at, updated_at) VALUES (?, ?, NULL, ?, '{}', NULL, ?, ?)"
     ).run("char_one", "usr_first", "Test Hero", 1_000, 1_000);
 
     const revisionMigration = migrations.find((entry) => entry.version === 12);
@@ -107,12 +107,12 @@ describe("migrations", () => {
     expect(first.is_admin).toBe(1);
     expect(second.is_admin).toBe(0);
 
-    const tables = db
-      .prepare("SELECT name FROM sqlite_master WHERE type = 'table'")
-      .all() as { name: string }[];
+    const tables = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as {
+      name: string;
+    }[];
     const names = tables.map((table) => table.name);
     expect(names).toEqual(
-      expect.arrayContaining(["app_settings", "registration_invites", "audit_log"]),
+      expect.arrayContaining(["app_settings", "registration_invites", "audit_log"])
     );
 
     db.close();

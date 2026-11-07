@@ -1,6 +1,21 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { Dices, EyeOff, Loader2, Megaphone, MessageSquare, Send, Sparkles, Swords } from "lucide-react";
-import type { ChatMessage, PublicUser, RollRequest, RollResult, PresenceUser } from "../../../shared/types";
+import {
+  Dices,
+  EyeOff,
+  Loader2,
+  Megaphone,
+  MessageSquare,
+  Send,
+  Sparkles,
+  Swords,
+} from "lucide-react";
+import type {
+  ChatMessage,
+  PublicUser,
+  RollRequest,
+  RollResult,
+  PresenceUser,
+} from "../../../shared/types";
 import { DEGREE_LABELS, validateFormula } from "../../../shared/dice";
 import { filterChatMessages, rollResponsesForRequest, type ChatFilter } from "../../../shared/chat";
 import { formatTime } from "../../api";
@@ -12,12 +27,27 @@ interface ChatPanelProps {
   user: PublicUser;
   isGm: boolean;
   onSend: (text: string, gmOnly: boolean) => void;
-  onRoll: (formula: string, label: string, dc: number | null, gmOnly: boolean, requestId?: string | null) => void;
+  onRoll: (
+    formula: string,
+    label: string,
+    dc: number | null,
+    gmOnly: boolean,
+    requestId?: string | null
+  ) => void;
   onRequest: (formula: string, label: string, dc: number | null) => void;
   disabled?: boolean;
 }
 
-export function ChatPanel({ messages, presence, user, isGm, onSend, onRoll, onRequest, disabled }: ChatPanelProps) {
+export function ChatPanel({
+  messages,
+  presence,
+  user,
+  isGm,
+  onSend,
+  onRoll,
+  onRequest,
+  disabled,
+}: ChatPanelProps) {
   const [tab, setTab] = useState<"chat" | "dice">("chat");
   const [filter, setFilter] = useState<ChatFilter>("all");
   const [text, setText] = useState("");
@@ -56,7 +86,13 @@ export function ChatPanel({ messages, presence, user, isGm, onSend, onRoll, onRe
 
   const roll = () => {
     if (!validate()) return;
-    onRoll(formula.trim(), label.trim() || "Roll", dc.trim() ? Number(dc) : null, gmOnly, activeRequestId);
+    onRoll(
+      formula.trim(),
+      label.trim() || "Roll",
+      dc.trim() ? Number(dc) : null,
+      gmOnly,
+      activeRequestId
+    );
     setActiveRequestId(null);
   };
 
@@ -77,10 +113,18 @@ export function ChatPanel({ messages, presence, user, isGm, onSend, onRoll, onRe
   return (
     <div className="chat-panel">
       <div className="chat-tabs">
-        <button type="button" className={tab === "chat" ? "is-active" : ""} onClick={() => setTab("chat")}>
+        <button
+          type="button"
+          className={tab === "chat" ? "is-active" : ""}
+          onClick={() => setTab("chat")}
+        >
           <MessageSquare size={14} /> Table talk
         </button>
-        <button type="button" className={tab === "dice" ? "is-active" : ""} onClick={() => setTab("dice")}>
+        <button
+          type="button"
+          className={tab === "dice" ? "is-active" : ""}
+          onClick={() => setTab("dice")}
+        >
           <Dices size={14} /> Dice tray
         </button>
       </div>
@@ -104,44 +148,91 @@ export function ChatPanel({ messages, presence, user, isGm, onSend, onRoll, onRe
                 if (event.key === "Enter") roll();
               }}
             />
-            <Button variant="primary" icon={<Dices size={15} />} onClick={roll} disabled={disabled}>Roll</Button>
+            <Button variant="primary" icon={<Dices size={15} />} onClick={roll} disabled={disabled}>
+              Roll
+            </Button>
           </div>
           {rollError ? <div className="auth-error">{rollError}</div> : null}
           <div className="quick-dice">
             {[4, 6, 8, 10, 12, 20].map((sides) => (
-              <button key={sides} type="button" onClick={() => setFormula(`1d${sides}`)}>d{sides}</button>
+              <button key={sides} type="button" onClick={() => setFormula(`1d${sides}`)}>
+                d{sides}
+              </button>
             ))}
           </div>
           <div className="dice-options">
             <label>
               <span className="tiny muted">Label</span>
-              <Input value={label} onChange={(event) => setLabel(event.target.value)} placeholder="Perception" />
+              <Input
+                value={label}
+                onChange={(event) => setLabel(event.target.value)}
+                placeholder="Perception"
+              />
             </label>
             <label>
               <span className="tiny muted">DC (optional)</span>
-              <Input type="number" value={dc} onChange={(event) => setDc(event.target.value)} placeholder="15" />
+              <Input
+                type="number"
+                value={dc}
+                onChange={(event) => setDc(event.target.value)}
+                placeholder="15"
+              />
             </label>
           </div>
           <label className={`gm-toggle-row ${gmOnly ? "is-on" : ""}`}>
-            <input type="checkbox" checked={gmOnly} onChange={(event) => setGmOnly(event.target.checked)} />
+            <input
+              type="checkbox"
+              checked={gmOnly}
+              onChange={(event) => setGmOnly(event.target.checked)}
+            />
             <EyeOff size={14} />
             <span>{isGm ? "Secret GM roll" : "Whisper roll to GM"}</span>
           </label>
           <div className="dice-presets">
-            <button type="button" onClick={() => { setFormula("1d20"); setLabel("Check"); }}><Swords size={13} /> d20 check</button>
-            <button type="button" onClick={() => { setFormula("1d20+5"); setLabel("Attack"); }}><Swords size={13} /> Attack +5</button>
-            <button type="button" onClick={() => { setFormula("1d8+3"); setLabel("Damage"); }}><Dices size={13} /> 1d8+3 damage</button>
+            <button
+              type="button"
+              onClick={() => {
+                setFormula("1d20");
+                setLabel("Check");
+              }}
+            >
+              <Swords size={13} /> d20 check
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setFormula("1d20+5");
+                setLabel("Attack");
+              }}
+            >
+              <Swords size={13} /> Attack +5
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setFormula("1d8+3");
+                setLabel("Damage");
+              }}
+            >
+              <Dices size={13} /> 1d8+3 damage
+            </button>
           </div>
           {isGm ? (
             <div className="dice-request-row">
-              <span className="tiny muted">Ask the table to make this roll. Requests are always public.</span>
+              <span className="tiny muted">
+                Ask the table to make this roll. Requests are always public.
+              </span>
               <Button
                 size="sm"
                 variant="secondary"
                 icon={<Megaphone size={13} />}
                 onClick={requestRoll}
                 disabled={disabled || gmOnly}
-                title={gmOnly ? "Clear the secret roll option to request an open roll." : "Send this roll request to the table"}
+                title={
+                  gmOnly
+                    ? "Clear the secret roll option to request an open roll."
+                    : "Send this roll request to the table"
+                }
               >
                 Request roll
               </Button>
@@ -151,13 +242,15 @@ export function ChatPanel({ messages, presence, user, isGm, onSend, onRoll, onRe
       ) : (
         <div className="chat-log">
           <div className="chat-filters">
-            {([
-              ["all", "All"],
-              ["talk", "Talk"],
-              ["rolls", "Rolls"],
-              ["requests", "Requests"],
-              ["private", "GM only"],
-            ] as const).map(([value, label]) => (
+            {(
+              [
+                ["all", "All"],
+                ["talk", "Talk"],
+                ["rolls", "Rolls"],
+                ["requests", "Requests"],
+                ["private", "GM only"],
+              ] as const
+            ).map(([value, label]) => (
               <button
                 key={value}
                 type="button"
@@ -172,7 +265,11 @@ export function ChatPanel({ messages, presence, user, isGm, onSend, onRoll, onRe
             {filteredMessages.length === 0 ? (
               <div className="chat-empty">
                 <MessageSquare size={24} />
-                <p>{messages.length === 0 ? "No messages yet. Say hello to the table." : "No messages match this filter."}</p>
+                <p>
+                  {messages.length === 0
+                    ? "No messages yet. Say hello to the table."
+                    : "No messages match this filter."}
+                </p>
               </div>
             ) : null}
             {filteredMessages.map((message) => (
@@ -204,16 +301,32 @@ export function ChatPanel({ messages, presence, user, isGm, onSend, onRoll, onRe
         />
         <div className="chat-compose-foot">
           <label className={`whisper-small ${gmOnly ? "is-on" : ""}`}>
-            <input type="checkbox" checked={gmOnly} onChange={(event) => setGmOnly(event.target.checked)} />
+            <input
+              type="checkbox"
+              checked={gmOnly}
+              onChange={(event) => setGmOnly(event.target.checked)}
+            />
             <EyeOff size={12} /> {isGm ? "GM only" : "Whisper GM"}
           </label>
-          <Button type="submit" variant="primary" size="sm" icon={<Send size={14} />} disabled={!text.trim() || disabled}>Send</Button>
+          <Button
+            type="submit"
+            variant="primary"
+            size="sm"
+            icon={<Send size={14} />}
+            disabled={!text.trim() || disabled}
+          >
+            Send
+          </Button>
         </div>
       </form>
 
       <div className="chat-presence">
         {presence.slice(0, 8).map((person) => (
-          <span key={person.socketId} className="chat-presence-person" title={`${person.displayName} (${person.role === "gm" ? "GM" : "player"})`}>
+          <span
+            key={person.socketId}
+            className="chat-presence-person"
+            title={`${person.displayName} (${person.role === "gm" ? "GM" : "player"})`}
+          >
             <Avatar name={person.displayName} src={person.avatarUrl} size={24} />
             <span className="presence-dot" />
           </span>
@@ -244,30 +357,46 @@ function ChatMessageRow({
           <strong>{message.authorName}</strong>
           <span className="tiny muted">{formatTime(message.createdAt)}</span>
         </div>
-        <RequestCard data={data} responses={responses} onUse={() => onUseRequest(data, message.id)} />
+        <RequestCard
+          data={data}
+          responses={responses}
+          onUse={() => onUseRequest(data, message.id)}
+        />
       </div>
     );
   }
   if (message.type === "roll" && data && "total" in data) {
     return (
-      <div className={`chat-message chat-roll ${self ? "is-self" : ""} ${message.visibility === "gm" ? "is-private" : ""}`}>
+      <div
+        className={`chat-message chat-roll ${self ? "is-self" : ""} ${message.visibility === "gm" ? "is-private" : ""}`}
+      >
         <div className="chat-message-head">
           <Avatar name={message.authorName} size={23} />
           <strong>{message.authorName}</strong>
           <span className="tiny muted">{formatTime(message.createdAt)}</span>
-          {message.visibility === "gm" ? <Badge tone="gold"><EyeOff size={10} /> private</Badge> : null}
+          {message.visibility === "gm" ? (
+            <Badge tone="gold">
+              <EyeOff size={10} /> private
+            </Badge>
+          ) : null}
         </div>
         <RollCard data={data} />
       </div>
     );
   }
   return (
-    <div className={`chat-message ${self ? "is-self" : ""} ${message.visibility === "gm" ? "is-private" : ""}`}>
+    <div
+      className={`chat-message ${self ? "is-self" : ""} ${message.visibility === "gm" ? "is-private" : ""}`}
+    >
       <div className="chat-message-head">
         <Avatar name={message.authorName} size={23} />
         <strong>{message.authorName}</strong>
         <span className="tiny muted">{formatTime(message.createdAt)}</span>
-        {message.visibility === "gm" ? <Badge tone="gold"><EyeOff size={10} /> private</Badge> : null}
+        {message.visibility === "gm" ? (
+          <Badge tone="gold">
+            <EyeOff size={10} /> private
+          </Badge>
+        ) : null}
       </div>
       <p className="chat-text">{message.content}</p>
     </div>
@@ -295,14 +424,22 @@ function RequestCard({
   return (
     <div className="roll-request-card">
       <div className="roll-request-head">
-        <span><Megaphone size={12} /> {data.group ? "Group check requested" : "Roll requested"}</span>
+        <span>
+          <Megaphone size={12} /> {data.group ? "Group check requested" : "Roll requested"}
+        </span>
         <span className="row" style={{ gap: 5 }}>
           {data.group ? <Badge tone="gold">Group check</Badge> : null}
           {data.dc !== null ? <Badge tone="gold">DC {data.dc}</Badge> : null}
           {data.group && completed.length ? (
-            <Badge tone={failures ? "red" : "green"}>{successes} pass · {failures} fail</Badge>
+            <Badge tone={failures ? "red" : "green"}>
+              {successes} pass · {failures} fail
+            </Badge>
           ) : null}
-          {completed.length ? <Badge tone="green">{completed.length} response{completed.length === 1 ? "" : "s"}</Badge> : null}
+          {completed.length ? (
+            <Badge tone="green">
+              {completed.length} response{completed.length === 1 ? "" : "s"}
+            </Badge>
+          ) : null}
         </span>
       </div>
       <div className="roll-request-body">
@@ -349,7 +486,11 @@ export function RollCard({ data }: { data: RollResult }) {
       </div>
       <div className="roll-card-main">
         <strong>{data.total}</strong>
-        {data.degree ? <Badge tone={tone === "success" ? "green" : tone === "failure" ? "red" : "neutral"}>{DEGREE_LABELS[data.degree]}</Badge> : null}
+        {data.degree ? (
+          <Badge tone={tone === "success" ? "green" : tone === "failure" ? "red" : "neutral"}>
+            {DEGREE_LABELS[data.degree]}
+          </Badge>
+        ) : null}
         {data.dc !== null ? <span className="tiny muted">vs DC {data.dc}</span> : null}
       </div>
       <div className="roll-card-breakdown">{data.breakdown}</div>

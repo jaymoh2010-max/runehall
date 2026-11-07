@@ -104,12 +104,7 @@ import {
   Textarea,
   Toggle,
 } from "../../ui";
-import {
-  DeityPicker,
-  EquipmentPicker,
-  FeatPicker,
-  SpellPicker,
-} from "../pickers";
+import { DeityPicker, EquipmentPicker, FeatPicker, SpellPicker } from "../pickers";
 import { ContentSourceToggle } from "../ContentSourceToggle";
 import { RunePicker } from "../RunePicker";
 import {
@@ -120,12 +115,7 @@ import {
 } from "../../../../shared/content";
 import { summarizeRunes } from "../../../../shared/runes";
 import type { BuilderProps } from "../shared";
-import {
-  StepHeading,
-  ValidationNote,
-  SearchInput,
-  MiniFeatureList,
-} from "../shared";
+import { StepHeading, ValidationNote, SearchInput, MiniFeatureList } from "../shared";
 
 export function HeritageStep({
   draft,
@@ -150,12 +140,13 @@ export function HeritageStep({
         (h) =>
           h.versatile ||
           h.ancestry === ancestry.name ||
-          h.ancestrySlug === ancestry.name.toLowerCase(),
+          h.ancestrySlug === ancestry.name.toLowerCase()
       )
     : staticData.heritages;
   const visible = all.filter((heritage) => {
     if (!legacy && !heritage.remaster) return false;
-    if (!expanded && heritage.id !== draft.heritageId && !isCoreSource(heritage.source)) return false;
+    if (!expanded && heritage.id !== draft.heritageId && !isCoreSource(heritage.source))
+      return false;
     const q = query.trim().toLowerCase();
     return !q || `${heritage.name} ${heritage.traits.join(" ")}`.toLowerCase().includes(q);
   });
@@ -172,21 +163,29 @@ export function HeritageStep({
           icon={<Dna size={28} />}
           title="Choose an ancestry first"
           description="Your heritage options depend on your ancestry."
-          action={<Button variant="primary" onClick={() => setStep("ancestry")}>Pick an ancestry</Button>}
+          action={
+            <Button variant="primary" onClick={() => setStep("ancestry")}>
+              Pick an ancestry
+            </Button>
+          }
         />
       ) : (
         <>
           <div className="browse-toolbar">
-            <SearchInput value={query} onChange={setQuery} placeholder={`Search ${ancestry.name} heritages…`} />
+            <SearchInput
+              value={query}
+              onChange={setQuery}
+              placeholder={`Search ${ancestry.name} heritages…`}
+            />
             <Toggle
-          checked={legacy}
-          onChange={(value) => {
-            setLegacy(value);
-            update((current) => ({ ...current, includeLegacy: value }));
-          }}
-          label="Include legacy"
-          disabled={legacyLocked}
-        />
+              checked={legacy}
+              onChange={(value) => {
+                setLegacy(value);
+                update((current) => ({ ...current, includeLegacy: value }));
+              }}
+              label="Include legacy"
+              disabled={legacyLocked}
+            />
             <ContentSourceToggle
               mode={contentMode}
               onChange={(mode) => update((current) => ({ ...current, contentMode: mode }))}
@@ -199,7 +198,12 @@ export function HeritageStep({
                 type="button"
                 key={heritage.id}
                 className={`selection-card ${draft.heritageId === heritage.id ? "is-selected" : ""}`}
-                onClick={() => update((current) => ({ ...current, heritageId: current.heritageId === heritage.id ? null : heritage.id }))}
+                onClick={() =>
+                  update((current) => ({
+                    ...current,
+                    heritageId: current.heritageId === heritage.id ? null : heritage.id,
+                  }))
+                }
               >
                 <span className="selection-emblem">{heritage.name[0]}</span>
                 <span className="selection-copy">
@@ -208,27 +212,49 @@ export function HeritageStep({
                     {heritage.versatile ? "Versatile · " : ""}
                     {heritage.source}
                   </span>
-                  <span className="selection-source">{heritage.traits.slice(0, 3).join(" · ") || "Heritage"}</span>
+                  <span className="selection-source">
+                    {heritage.traits.slice(0, 3).join(" · ") || "Heritage"}
+                  </span>
                 </span>
-                {draft.heritageId === heritage.id ? <CheckCircle2 size={17} className="selection-check" /> : null}
+                {draft.heritageId === heritage.id ? (
+                  <CheckCircle2 size={17} className="selection-check" />
+                ) : null}
               </button>
             ))}
           </div>
-          {!visible.length ? <div className="detail-placeholder"><p>No heritages match that search.</p></div> : null}
+          {!visible.length ? (
+            <div className="detail-placeholder">
+              <p>No heritages match that search.</p>
+            </div>
+          ) : null}
           {selected ? (
             <Card className="selection-detail">
               <div className="selection-detail-head">
                 <div>
                   <PageEyebrow>Selected heritage</PageEyebrow>
                   <h2>{selected.name}</h2>
-                  <p className="muted">{selected.source} · {selected.rarity}</p>
+                  <p className="muted">
+                    {selected.source} · {selected.rarity}
+                  </p>
                 </div>
-                <div className="chip-row">{selected.traits.map((trait) => <Tag key={trait}>{traitLabel(trait)}</Tag>)}</div>
+                <div className="chip-row">
+                  {selected.traits.map((trait) => (
+                    <Tag key={trait}>{traitLabel(trait)}</Tag>
+                  ))}
+                </div>
               </div>
               <RichText html={selected.description} />
               <div className="step-actions">
-                <Button variant="ghost" onClick={() => setStep("ancestry")}>Back</Button>
-                <Button variant="primary" onClick={() => setStep("background")} icon={<ArrowRight size={15} />}>Choose a background</Button>
+                <Button variant="ghost" onClick={() => setStep("ancestry")}>
+                  Back
+                </Button>
+                <Button
+                  variant="primary"
+                  onClick={() => setStep("background")}
+                  icon={<ArrowRight size={15} />}
+                >
+                  Choose a background
+                </Button>
               </div>
             </Card>
           ) : (

@@ -1,6 +1,15 @@
 import { Suspense, useEffect, useRef, useState } from "react";
 import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
-import { BookOpen, ChevronDown, LogOut, Shield, ShieldCheck, Swords, UserRound, Users } from "lucide-react";
+import {
+  BookOpen,
+  ChevronDown,
+  LogOut,
+  Shield,
+  ShieldCheck,
+  Swords,
+  UserRound,
+  Users,
+} from "lucide-react";
 import { useSession } from "../stores";
 import { Avatar, IconButton, LoadingScreen } from "./ui";
 import { GlobalSearch } from "./GlobalSearch";
@@ -33,20 +42,32 @@ export function AppShell() {
           </span>
         </Link>
         <nav className="topnav">
-          <NavLink to="/campaigns" className={({ isActive }) => `topnav-link ${isActive ? "is-active" : ""}`}>
+          <NavLink
+            to="/campaigns"
+            className={({ isActive }) => `topnav-link ${isActive ? "is-active" : ""}`}
+          >
             <Swords size={16} />
             <span>My Campaigns</span>
           </NavLink>
-          <NavLink to="/library" className={({ isActive }) => `topnav-link ${isActive ? "is-active" : ""}`}>
+          <NavLink
+            to="/library"
+            className={({ isActive }) => `topnav-link ${isActive ? "is-active" : ""}`}
+          >
             <BookOpen size={16} />
             <span>Library</span>
           </NavLink>
-          <NavLink to="/rules" className={({ isActive }) => `topnav-link ${isActive ? "is-active" : ""}`}>
+          <NavLink
+            to="/rules"
+            className={({ isActive }) => `topnav-link ${isActive ? "is-active" : ""}`}
+          >
             <Shield size={16} />
             <span>Rules</span>
           </NavLink>
           {user?.isAdmin ? (
-            <NavLink to="/admin" className={({ isActive }) => `topnav-link ${isActive ? "is-active" : ""}`}>
+            <NavLink
+              to="/admin"
+              className={({ isActive }) => `topnav-link ${isActive ? "is-active" : ""}`}
+            >
               <ShieldCheck size={16} />
               <span>Admin</span>
             </NavLink>

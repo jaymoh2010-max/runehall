@@ -1,10 +1,5 @@
 import type { Server, Socket } from "socket.io";
-import {
-  getCampaignRole,
-  getCharacter,
-  getMembership,
-  getUser,
-} from "./access";
+import { getCampaignRole, getCharacter, getMembership, getUser } from "./access";
 import { contextForDraft } from "./compendium";
 import { db, type MessageRow, type SceneRow, type TokenRow } from "./db";
 import { userFromCookieHeader } from "./auth";
@@ -78,14 +73,16 @@ function requireGm(socket: TypedSocket, campaignId: string): boolean {
 }
 
 function sceneBelongs(sceneId: string, campaignId: string): SceneRow | null {
-  const row = db.prepare("SELECT * FROM scenes WHERE id = ? AND campaign_id = ?").get(sceneId, campaignId) as
-    | SceneRow
-    | undefined;
+  const row = db
+    .prepare("SELECT * FROM scenes WHERE id = ? AND campaign_id = ?")
+    .get(sceneId, campaignId) as SceneRow | undefined;
   return row ?? null;
 }
 
 function tokenRow(tokenId: string): TokenRow | null {
-  return (db.prepare("SELECT * FROM tokens WHERE id = ?").get(tokenId) as TokenRow | undefined) ?? null;
+  return (
+    (db.prepare("SELECT * FROM tokens WHERE id = ?").get(tokenId) as TokenRow | undefined) ?? null
+  );
 }
 
 function tokenWithOwner(row: TokenRow): Token {
@@ -124,13 +121,19 @@ function ensureState(campaignId: string) {
     .prepare("SELECT id FROM scenes WHERE campaign_id = ? ORDER BY sort_order ASC LIMIT 1")
     .get(campaignId) as { id: string } | undefined;
   db.prepare(
-    "INSERT INTO campaign_state (campaign_id, active_scene_id, initiative, round, turn_index, updated_at) VALUES (?, ?, '[]', 1, 0, ?)",
+    "INSERT INTO campaign_state (campaign_id, active_scene_id, initiative, round, turn_index, updated_at) VALUES (?, ?, '[]', 1, 0, ?)"
   ).run(campaignId, firstScene?.id ?? null, now());
-  state = db.prepare("SELECT * FROM campaign_state WHERE campaign_id = ?").get(campaignId) as typeof state;
+  state = db
+    .prepare("SELECT * FROM campaign_state WHERE campaign_id = ?")
+    .get(campaignId) as typeof state;
   return state!;
 }
 
-function broadcastInitiative(io: TypedServer, campaignId: string, state: ReturnType<typeof ensureState>): void {
+function broadcastInitiative(
+  io: TypedServer,
+  campaignId: string,
+  state: ReturnType<typeof ensureState>
+): void {
   io.to(room(campaignId)).emit("initiative:updated", {
     entries: serializeInitiative(JSON.parse(state.initiative || "[]")),
     round: state.round,
@@ -188,7 +191,7 @@ function initiativeEntryForGroup(rows: TokenRow[]): InitiativeEntry {
 function groupTokens(sceneId: string, groupId: string): TokenRow[] {
   return db
     .prepare(
-      "SELECT * FROM tokens WHERE scene_id = ? AND group_id = ? ORDER BY sort_order ASC, created_at ASC",
+      "SELECT * FROM tokens WHERE scene_id = ? AND group_id = ? ORDER BY sort_order ASC, created_at ASC"
     )
     .all(sceneId, groupId) as TokenRow[];
 }
@@ -196,7 +199,7 @@ function groupTokens(sceneId: string, groupId: string): TokenRow[] {
 function tickConditionsForEntry(
   io: TypedServer,
   campaignId: string,
-  entry: InitiativeEntry | undefined,
+  entry: InitiativeEntry | undefined
 ): boolean {
   if (!entry) return false;
   let rows: TokenRow[] = [];
@@ -213,7 +216,7 @@ function tickConditionsForEntry(
     db.prepare("UPDATE tokens SET conditions = ?, updated_at = ? WHERE id = ?").run(
       JSON.stringify(next),
       now(),
-      row.id,
+      row.id
     );
     const updated = tokenRow(row.id);
     if (updated) io.to(room(campaignId)).emit("token:updated", tokenWithOwner(updated));
@@ -222,7 +225,7 @@ function tickConditionsForEntry(
   const characterIds = new Set(
     rows
       .map((row) => row.character_id)
-      .filter((id): id is string => typeof id === "string" && Boolean(id)),
+      .filter((id): id is string => typeof id === "string" && Boolean(id))
   );
   for (const characterId of characterIds) {
     const character = getCharacter(characterId);
@@ -235,7 +238,7 @@ function tickConditionsForEntry(
       draft.play.conditions = next;
       const summary = characterSummary(draft, contextForDraft(draft));
       db.prepare(
-        "UPDATE characters SET data = ?, summary = ?, updated_at = ?, revision = revision + 1 WHERE id = ?",
+        "UPDATE characters SET data = ?, summary = ?, updated_at = ?, revision = revision + 1 WHERE id = ?"
       ).run(JSON.stringify(draft), JSON.stringify(summary), now(), characterId);
       io.to(room(campaignId)).emit("character:updated", {
         characterId,
@@ -265,7 +268,7 @@ function initiativeEntriesForTokens(tokens: TokenRow[]): InitiativeEntry[] {
   return [
     ...singles.map((token) => initiativeEntryForToken(token)),
     ...[...groups.values()].map((members) =>
-      members.length > 1 ? initiativeEntryForGroup(members) : initiativeEntryForToken(members[0]),
+      members.length > 1 ? initiativeEntryForGroup(members) : initiativeEntryForToken(members[0])
     ),
   ];
 }
@@ -279,7 +282,7 @@ function createToken(
   io: TypedServer,
   campaignId: string,
   sceneId: string,
-  incoming: Partial<Token>,
+  incoming: Partial<Token>
 ): Token | null {
   const scene = sceneBelongs(sceneId, campaignId);
   if (!scene) {
@@ -302,7 +305,8 @@ function createToken(
   let hpMax: number | null = incoming.hpMax ?? null;
   let hpCurrent: number | null = incoming.hpCurrent ?? hpMax;
   let ac: number | null = incoming.ac ?? null;
-  let ownerId = typeof incoming.ownerId === "string" ? incoming.ownerId : character?.user_id ?? null;
+  let ownerId =
+    typeof incoming.ownerId === "string" ? incoming.ownerId : (character?.user_id ?? null);
   if (ownerId) {
     if (!getMembership(campaignId, ownerId)) ownerId = null;
   }
@@ -321,12 +325,10 @@ function createToken(
       ? null
       : safeInt(incoming.initiativeBonus, 0, -100, 1000);
   const groupId = incoming.groupId ? safeString(incoming.groupId, "", 80) || null : null;
-  const groupName = groupId
-    ? safeString(incoming.groupName, name, 80)
-    : null;
+  const groupName = groupId ? safeString(incoming.groupName, name, 80) : null;
   db.prepare(
     `INSERT INTO tokens (id, scene_id, name, image_url, character_id, owner_id, x, y, size, color, hp_current, hp_max, ac, initiative_bonus, group_id, group_name, conditions, hidden, locked, sort_order, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     id,
     sceneId,
@@ -349,7 +351,7 @@ function createToken(
     incoming.locked ? 1 : 0,
     Date.now(),
     ts,
-    ts,
+    ts
   );
   const row = tokenRow(id)!;
   const token = tokenWithOwner(row);
@@ -362,7 +364,7 @@ function rollInitiative(
   io: TypedServer,
   campaignId: string,
   sceneId: string,
-  tokenIds?: string[],
+  tokenIds?: string[]
 ): void {
   const tokens = db
     .prepare("SELECT * FROM tokens WHERE scene_id = ? AND hidden = 0")
@@ -371,7 +373,7 @@ function rollInitiative(
   const entries = sortInitiative(initiativeEntriesForTokens(chosen));
   const state = ensureState(campaignId);
   db.prepare(
-    "UPDATE campaign_state SET initiative = ?, round = 1, turn_index = 0, active_scene_id = ?, updated_at = ? WHERE campaign_id = ?",
+    "UPDATE campaign_state SET initiative = ?, round = 1, turn_index = 0, active_scene_id = ?, updated_at = ? WHERE campaign_id = ?"
   ).run(JSON.stringify(entries), sceneId, now(), campaignId);
   broadcastInitiative(io, campaignId, ensureState(campaignId));
 }
@@ -428,7 +430,12 @@ export function registerSocketServer(io: TypedServer): void {
       }
       const nx = clamp(Number(x) || 0, 0, scene.width);
       const ny = clamp(Number(y) || 0, 0, scene.height);
-      db.prepare("UPDATE tokens SET x = ?, y = ?, updated_at = ? WHERE id = ?").run(nx, ny, now(), tokenId);
+      db.prepare("UPDATE tokens SET x = ?, y = ?, updated_at = ? WHERE id = ?").run(
+        nx,
+        ny,
+        now(),
+        tokenId
+      );
       io.to(room(campaignId)).emit("token:moved", { tokenId, sceneId, x: nx, y: ny });
       touchCampaign(campaignId);
     });
@@ -444,9 +451,9 @@ export function registerSocketServer(io: TypedServer): void {
       if (!row) return;
       const role = getCampaignRole(campaignId, socket.data.user.id);
       if (!role) return;
-      const scene = db.prepare("SELECT * FROM scenes WHERE id = ? AND campaign_id = ?").get(row.scene_id, campaignId) as
-        | SceneRow
-        | undefined;
+      const scene = db
+        .prepare("SELECT * FROM scenes WHERE id = ? AND campaign_id = ?")
+        .get(row.scene_id, campaignId) as SceneRow | undefined;
       if (!scene) return;
       const isOwner = row.owner_id === socket.data.user.id;
       if (role !== "gm" && !isOwner) {
@@ -461,17 +468,20 @@ export function registerSocketServer(io: TypedServer): void {
       };
       if (role === "gm") {
         if (token.name !== undefined) add("name", safeString(token.name, row.name, 80));
-        if (token.imageUrl !== undefined) add("image_url", token.imageUrl ? safeString(token.imageUrl, "", 500) : null);
+        if (token.imageUrl !== undefined)
+          add("image_url", token.imageUrl ? safeString(token.imageUrl, "", 500) : null);
         if (token.x !== undefined) add("x", clamp(Number(token.x) || 0, 0, scene.width));
         if (token.y !== undefined) add("y", clamp(Number(token.y) || 0, 0, scene.height));
         if (token.size !== undefined) add("size", clamp(safeInt(token.size, row.size, 1, 6), 1, 6));
         if (token.color !== undefined) add("color", safeString(token.color, row.color, 30));
-        if (token.hpMax !== undefined) add("hp_max", token.hpMax === null ? null : safeInt(token.hpMax, 0, 0, 1_000_000));
-        if (token.ac !== undefined) add("ac", token.ac === null ? null : safeInt(token.ac, 0, -100, 1000));
+        if (token.hpMax !== undefined)
+          add("hp_max", token.hpMax === null ? null : safeInt(token.hpMax, 0, 0, 1_000_000));
+        if (token.ac !== undefined)
+          add("ac", token.ac === null ? null : safeInt(token.ac, 0, -100, 1000));
         if (token.initiativeBonus !== undefined) {
           add(
             "initiative_bonus",
-            token.initiativeBonus === null ? null : safeInt(token.initiativeBonus, 0, -100, 1000),
+            token.initiativeBonus === null ? null : safeInt(token.initiativeBonus, 0, -100, 1000)
           );
         }
         if (token.groupId !== undefined) {
@@ -483,19 +493,25 @@ export function registerSocketServer(io: TypedServer): void {
         if (token.hidden !== undefined) add("hidden", token.hidden ? 1 : 0);
         if (token.locked !== undefined) add("locked", token.locked ? 1 : 0);
         if (token.ownerId !== undefined) {
-          const ownerId = token.ownerId && getMembership(campaignId, token.ownerId) ? token.ownerId : null;
+          const ownerId =
+            token.ownerId && getMembership(campaignId, token.ownerId) ? token.ownerId : null;
           add("owner_id", ownerId);
         }
       }
       if (token.hpCurrent !== undefined) {
-        add("hp_current", token.hpCurrent === null ? null : safeInt(token.hpCurrent, 0, -1_000_000, 1_000_000));
+        add(
+          "hp_current",
+          token.hpCurrent === null ? null : safeInt(token.hpCurrent, 0, -1_000_000, 1_000_000)
+        );
       }
       if (token.conditions !== undefined) {
         add("conditions", JSON.stringify(normalizeTokenConditions(token.conditions)));
       }
       if (!updates.length) return;
       values.push(now(), token.id);
-      db.prepare(`UPDATE tokens SET ${updates.join(", ")}, updated_at = ? WHERE id = ?`).run(...values);
+      db.prepare(`UPDATE tokens SET ${updates.join(", ")}, updated_at = ? WHERE id = ?`).run(
+        ...values
+      );
       const updated = tokenRow(token.id);
       if (updated) io.to(room(campaignId)).emit("token:updated", tokenWithOwner(updated));
       // A GM changing a linked token's HP is a table action; mirror it into
@@ -510,12 +526,9 @@ export function registerSocketServer(io: TypedServer): void {
                 ? null
                 : Math.max(0, Math.min(1_000_000, Number(updated.hp_current)));
             const summary = characterSummary(draft, contextForDraft(draft));
-            db.prepare("UPDATE characters SET data = ?, summary = ?, updated_at = ?, revision = revision + 1 WHERE id = ?").run(
-              JSON.stringify(draft),
-              JSON.stringify(summary),
-              now(),
-              character.id,
-            );
+            db.prepare(
+              "UPDATE characters SET data = ?, summary = ?, updated_at = ?, revision = revision + 1 WHERE id = ?"
+            ).run(JSON.stringify(draft), JSON.stringify(summary), now(), character.id);
             io.to(room(campaignId)).emit("character:updated", {
               characterId: character.id,
               summary,
@@ -555,7 +568,7 @@ export function registerSocketServer(io: TypedServer): void {
       db.prepare("UPDATE scenes SET fog_revealed = ?, updated_at = ? WHERE id = ?").run(
         JSON.stringify([...current]),
         now(),
-        sceneId,
+        sceneId
       );
       io.to(room(campaignId)).emit("fog:updated", { sceneId, cells, mode });
       touchCampaign(campaignId);
@@ -566,32 +579,29 @@ export function registerSocketServer(io: TypedServer): void {
       const scene = sceneBelongs(sceneId, campaignId);
       if (!scene) return;
       ensureState(campaignId);
-      db.prepare("UPDATE campaign_state SET active_scene_id = ?, updated_at = ? WHERE campaign_id = ?").run(
-        sceneId,
-        now(),
-        campaignId,
-      );
+      db.prepare(
+        "UPDATE campaign_state SET active_scene_id = ?, updated_at = ? WHERE campaign_id = ?"
+      ).run(sceneId, now(), campaignId);
       io.to(room(campaignId)).emit("scene:activated", { sceneId });
       touchCampaign(campaignId);
     });
 
     socket.on("scene:update", ({ campaignId, scene }) => {
       if (!requireGm(socket, campaignId)) return;
-      const row = db.prepare("SELECT * FROM scenes WHERE id = ? AND campaign_id = ?").get(scene.id, campaignId) as
-        | SceneRow
-        | undefined;
+      const row = db
+        .prepare("SELECT * FROM scenes WHERE id = ? AND campaign_id = ?")
+        .get(scene.id, campaignId) as SceneRow | undefined;
       if (!row) return;
       const name = scene.name === undefined ? row.name : safeString(scene.name, row.name, 80);
-      const fogEnabled = scene.fogEnabled === undefined ? row.fog_enabled : scene.fogEnabled ? 1 : 0;
+      const fogEnabled =
+        scene.fogEnabled === undefined ? row.fog_enabled : scene.fogEnabled ? 1 : 0;
       const gridSize =
-        scene.gridSize === undefined ? row.grid_size : clamp(safeInt(scene.gridSize, row.grid_size, 20, 300), 20, 300);
-      db.prepare("UPDATE scenes SET name = ?, fog_enabled = ?, grid_size = ?, updated_at = ? WHERE id = ?").run(
-        name,
-        fogEnabled,
-        gridSize,
-        now(),
-        scene.id,
-      );
+        scene.gridSize === undefined
+          ? row.grid_size
+          : clamp(safeInt(scene.gridSize, row.grid_size, 20, 300), 20, 300);
+      db.prepare(
+        "UPDATE scenes SET name = ?, fog_enabled = ?, grid_size = ?, updated_at = ? WHERE id = ?"
+      ).run(name, fogEnabled, gridSize, now(), scene.id);
       const updated = db.prepare("SELECT * FROM scenes WHERE id = ?").get(scene.id) as SceneRow;
       io.to(room(campaignId)).emit("scene:updated", serializeScene(updated));
       touchCampaign(campaignId);
@@ -608,11 +618,13 @@ export function registerSocketServer(io: TypedServer): void {
       const height = clamp(safeInt(scene.height, 1000, 100, 10_000), 100, 10_000);
       const grid = clamp(safeInt(scene.gridSize, 70, 20, 300), 20, 300);
       const order = db
-        .prepare("SELECT COALESCE(MAX(sort_order), 0) + 1 AS next FROM scenes WHERE campaign_id = ?")
+        .prepare(
+          "SELECT COALESCE(MAX(sort_order), 0) + 1 AS next FROM scenes WHERE campaign_id = ?"
+        )
         .get(campaignId) as { next: number };
       db.prepare(
         `INSERT INTO scenes (id, campaign_id, name, image_url, width, height, grid_size, grid_offset_x, grid_offset_y, fog_enabled, fog_revealed, sort_order, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, 0, 0, 1, '[]', ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, 0, 0, 1, '[]', ?, ?, ?)`
       ).run(
         id,
         campaignId,
@@ -623,7 +635,7 @@ export function registerSocketServer(io: TypedServer): void {
         grid,
         order.next,
         ts,
-        ts,
+        ts
       );
       const row = db.prepare("SELECT * FROM scenes WHERE id = ?").get(id) as SceneRow;
       const serialized = serializeScene(row);
@@ -642,11 +654,9 @@ export function registerSocketServer(io: TypedServer): void {
         .get(campaignId) as { id: string } | undefined;
       const state = ensureState(campaignId);
       if (state.active_scene_id === sceneId) {
-        db.prepare("UPDATE campaign_state SET active_scene_id = ?, updated_at = ? WHERE campaign_id = ?").run(
-          remaining?.id ?? null,
-          now(),
-          campaignId,
-        );
+        db.prepare(
+          "UPDATE campaign_state SET active_scene_id = ?, updated_at = ? WHERE campaign_id = ?"
+        ).run(remaining?.id ?? null, now(), campaignId);
         if (remaining) io.to(room(campaignId)).emit("scene:activated", { sceneId: remaining.id });
       }
       io.to(room(campaignId)).emit("scene:deleted", { sceneId });
@@ -655,9 +665,9 @@ export function registerSocketServer(io: TypedServer): void {
 
     socket.on("scene:reorder", ({ campaignId, sceneIds }) => {
       if (!requireGm(socket, campaignId)) return;
-      const rows = db
-        .prepare("SELECT id FROM scenes WHERE campaign_id = ?")
-        .all(campaignId) as { id: string }[];
+      const rows = db.prepare("SELECT id FROM scenes WHERE campaign_id = ?").all(campaignId) as {
+        id: string;
+      }[];
       const existing = new Set(rows.map((row) => row.id));
       if (
         sceneIds.length !== rows.length ||
@@ -668,11 +678,13 @@ export function registerSocketServer(io: TypedServer): void {
       }
       const ts = now();
       const update = db.prepare(
-        "UPDATE scenes SET sort_order = ?, updated_at = ? WHERE id = ? AND campaign_id = ?",
+        "UPDATE scenes SET sort_order = ?, updated_at = ? WHERE id = ? AND campaign_id = ?"
       );
       sceneIds.forEach((id, index) => update.run(index, ts, id, campaignId));
       const scenes = db
-        .prepare("SELECT * FROM scenes WHERE campaign_id = ? ORDER BY sort_order ASC, created_at ASC")
+        .prepare(
+          "SELECT * FROM scenes WHERE campaign_id = ? ORDER BY sort_order ASC, created_at ASC"
+        )
         .all(campaignId) as SceneRow[];
       io.to(room(campaignId)).emit("scenes:reordered", scenes.map(serializeScene));
       touchCampaign(campaignId);
@@ -691,7 +703,7 @@ export function registerSocketServer(io: TypedServer): void {
       db.prepare("UPDATE scenes SET templates = ?, updated_at = ? WHERE id = ?").run(
         JSON.stringify(templates),
         now(),
-        sceneId,
+        sceneId
       );
       io.to(room(campaignId)).emit("scene:templates", { sceneId, templates });
       touchCampaign(campaignId);
@@ -701,7 +713,10 @@ export function registerSocketServer(io: TypedServer): void {
       if (!requireGm(socket, campaignId)) return;
       const scene = sceneBelongs(sceneId, campaignId);
       if (!scene) return;
-      db.prepare("UPDATE scenes SET templates = '[]', updated_at = ? WHERE id = ?").run(now(), sceneId);
+      db.prepare("UPDATE scenes SET templates = '[]', updated_at = ? WHERE id = ?").run(
+        now(),
+        sceneId
+      );
       io.to(room(campaignId)).emit("scene:templates", { sceneId, templates: [] });
       touchCampaign(campaignId);
     });
@@ -721,7 +736,7 @@ export function registerSocketServer(io: TypedServer): void {
       const ts = now();
       const vis = visibility === "gm" ? "gm" : "all";
       db.prepare(
-        "INSERT INTO messages (id, campaign_id, scene_id, user_id, author_name, type, content, data, visibility, created_at) VALUES (?, ?, NULL, ?, ?, 'chat', ?, NULL, ?, ?)",
+        "INSERT INTO messages (id, campaign_id, scene_id, user_id, author_name, type, content, data, visibility, created_at) VALUES (?, ?, NULL, ?, ?, 'chat', ?, NULL, ?, ?)"
       ).run(id, campaignId, socket.data.user.id, socket.data.user.displayName, text, vis, ts);
       const row = db.prepare("SELECT * FROM messages WHERE id = ?").get(id) as MessageRow;
       const message = serializeMessage(row);
@@ -735,52 +750,58 @@ export function registerSocketServer(io: TypedServer): void {
       ack?.(message);
     });
 
-    socket.on("dice:roll", ({ campaignId, formula, label, dc, visibility, characterId, requestId }, ack) => {
-      if (!getMembership(campaignId, socket.data.user.id)) {
-        sendError(socket, "You're not a member of that campaign.");
-        ack?.(null);
-        return;
-      }
-      try {
-        const result = rollFormula(safeString(formula, "1d20", 300), {
-          dc: typeof dc === "number" ? dc : null,
-          label: safeString(label, "", 120),
-        });
-        const id = newId("msg");
-        const ts = now();
-        const vis = visibility === "gm" ? "gm" : "all";
-        const content = result.label || result.formula;
-        db.prepare(
-          "INSERT INTO messages (id, campaign_id, scene_id, user_id, author_name, type, content, data, visibility, created_at) VALUES (?, ?, NULL, ?, ?, 'roll', ?, ?, ?, ?)",
-        ).run(
-          id,
-          campaignId,
-          socket.data.user.id,
-          socket.data.user.displayName,
-          content,
-          JSON.stringify({
-            ...result,
-            characterId: characterId ?? null,
-            requestId: safeString(requestId, "", 80) || null,
-          }),
-          vis,
-          ts,
-        );
-        const row = db.prepare("SELECT * FROM messages WHERE id = ?").get(id) as MessageRow;
-        const message = serializeMessage(row);
-        if (vis === "gm") {
-          io.to(gmRoom(campaignId)).emit("chat:message", message);
-          socket.emit("chat:message", message);
-        } else {
-          io.to(room(campaignId)).emit("chat:message", message);
+    socket.on(
+      "dice:roll",
+      ({ campaignId, formula, label, dc, visibility, characterId, requestId }, ack) => {
+        if (!getMembership(campaignId, socket.data.user.id)) {
+          sendError(socket, "You're not a member of that campaign.");
+          ack?.(null);
+          return;
         }
-        touchCampaign(campaignId);
-        ack?.(message);
-      } catch (error) {
-        sendError(socket, error instanceof Error ? error.message : "That roll could not be made.");
-        ack?.(null);
+        try {
+          const result = rollFormula(safeString(formula, "1d20", 300), {
+            dc: typeof dc === "number" ? dc : null,
+            label: safeString(label, "", 120),
+          });
+          const id = newId("msg");
+          const ts = now();
+          const vis = visibility === "gm" ? "gm" : "all";
+          const content = result.label || result.formula;
+          db.prepare(
+            "INSERT INTO messages (id, campaign_id, scene_id, user_id, author_name, type, content, data, visibility, created_at) VALUES (?, ?, NULL, ?, ?, 'roll', ?, ?, ?, ?)"
+          ).run(
+            id,
+            campaignId,
+            socket.data.user.id,
+            socket.data.user.displayName,
+            content,
+            JSON.stringify({
+              ...result,
+              characterId: characterId ?? null,
+              requestId: safeString(requestId, "", 80) || null,
+            }),
+            vis,
+            ts
+          );
+          const row = db.prepare("SELECT * FROM messages WHERE id = ?").get(id) as MessageRow;
+          const message = serializeMessage(row);
+          if (vis === "gm") {
+            io.to(gmRoom(campaignId)).emit("chat:message", message);
+            socket.emit("chat:message", message);
+          } else {
+            io.to(room(campaignId)).emit("chat:message", message);
+          }
+          touchCampaign(campaignId);
+          ack?.(message);
+        } catch (error) {
+          sendError(
+            socket,
+            error instanceof Error ? error.message : "That roll could not be made."
+          );
+          ack?.(null);
+        }
       }
-    });
+    );
 
     socket.on("dice:request", ({ campaignId, formula, label, dc, group }, ack) => {
       if (!requireGm(socket, campaignId)) {
@@ -807,7 +828,7 @@ export function registerSocketServer(io: TypedServer): void {
       };
       const ts = now();
       db.prepare(
-        "INSERT INTO messages (id, campaign_id, scene_id, user_id, author_name, type, content, data, visibility, created_at) VALUES (?, ?, NULL, ?, ?, 'request', ?, ?, 'all', ?)",
+        "INSERT INTO messages (id, campaign_id, scene_id, user_id, author_name, type, content, data, visibility, created_at) VALUES (?, ?, NULL, ?, ?, 'request', ?, ?, 'all', ?)"
       ).run(
         id,
         campaignId,
@@ -815,7 +836,7 @@ export function registerSocketServer(io: TypedServer): void {
         socket.data.user.displayName,
         request.label,
         JSON.stringify(request),
-        ts,
+        ts
       );
       const row = db.prepare("SELECT * FROM messages WHERE id = ?").get(id) as MessageRow;
       const message = serializeMessage(row);
@@ -847,7 +868,10 @@ export function registerSocketServer(io: TypedServer): void {
               ownerId: typeof entry.ownerId === "string" ? entry.ownerId : null,
               sceneId: typeof entry.sceneId === "string" ? entry.sceneId : null,
               groupId: typeof entry.groupId === "string" ? entry.groupId : null,
-              tieBreak: typeof entry.tieBreak === "number" ? safeInt(entry.tieBreak, 0, -10_000, 10_000) : 0,
+              tieBreak:
+                typeof entry.tieBreak === "number"
+                  ? safeInt(entry.tieBreak, 0, -10_000, 10_000)
+                  : 0,
               perception:
                 typeof entry.perception === "number"
                   ? safeInt(entry.perception, 0, -100, 1000)
@@ -858,13 +882,13 @@ export function registerSocketServer(io: TypedServer): void {
         : [];
       const current = ensureState(campaignId);
       db.prepare(
-        "UPDATE campaign_state SET initiative = ?, round = ?, turn_index = ?, updated_at = ? WHERE campaign_id = ?",
+        "UPDATE campaign_state SET initiative = ?, round = ?, turn_index = ?, updated_at = ? WHERE campaign_id = ?"
       ).run(
         JSON.stringify(clean),
         safeInt(round, current.round, 1, 999),
         safeInt(turnIndex, 0, 0, Math.max(0, clean.length - 1)),
         now(),
-        campaignId,
+        campaignId
       );
       broadcastInitiative(io, campaignId, ensureState(campaignId));
       touchCampaign(campaignId);
@@ -890,7 +914,7 @@ export function registerSocketServer(io: TypedServer): void {
         entries[turn] = { ...entries[turn], readied: false };
       }
       db.prepare(
-        "UPDATE campaign_state SET initiative = ?, turn_index = ?, round = ?, updated_at = ? WHERE campaign_id = ?",
+        "UPDATE campaign_state SET initiative = ?, turn_index = ?, round = ?, updated_at = ? WHERE campaign_id = ?"
       ).run(JSON.stringify(entries), turn, round, now(), campaignId);
       broadcastInitiative(io, campaignId, ensureState(campaignId));
       touchCampaign(campaignId);
@@ -908,18 +932,16 @@ export function registerSocketServer(io: TypedServer): void {
         entries.push(
           members.length > 1
             ? initiativeEntryForGroup(members)
-            : initiativeEntryForToken(row, typeof value === "number" ? value : undefined),
+            : initiativeEntryForToken(row, typeof value === "number" ? value : undefined)
         );
       } else {
         if (entries.some((entry) => entry.tokenId === tokenId)) return;
         entries.push(initiativeEntryForToken(row, typeof value === "number" ? value : undefined));
       }
       entries.sort((a, b) => b.initiative - a.initiative || a.name.localeCompare(b.name));
-      db.prepare("UPDATE campaign_state SET initiative = ?, updated_at = ? WHERE campaign_id = ?").run(
-        JSON.stringify(entries),
-        now(),
-        campaignId,
-      );
+      db.prepare(
+        "UPDATE campaign_state SET initiative = ?, updated_at = ? WHERE campaign_id = ?"
+      ).run(JSON.stringify(entries), now(), campaignId);
       broadcastInitiative(io, campaignId, ensureState(campaignId));
       touchCampaign(campaignId);
     });
@@ -945,9 +967,14 @@ export function registerSocketServer(io: TypedServer): void {
         id: current.id,
       };
       entries.sort((a, b) => b.initiative - a.initiative || a.name.localeCompare(b.name));
-      const nextTurn = activeId ? Math.max(0, entries.findIndex((entry) => entry.id === activeId)) : 0;
+      const nextTurn = activeId
+        ? Math.max(
+            0,
+            entries.findIndex((entry) => entry.id === activeId)
+          )
+        : 0;
       db.prepare(
-        "UPDATE campaign_state SET initiative = ?, turn_index = ?, updated_at = ? WHERE campaign_id = ?",
+        "UPDATE campaign_state SET initiative = ?, turn_index = ?, updated_at = ? WHERE campaign_id = ?"
       ).run(JSON.stringify(entries), nextTurn, now(), campaignId);
       broadcastInitiative(io, campaignId, ensureState(campaignId));
       touchCampaign(campaignId);
@@ -957,13 +984,11 @@ export function registerSocketServer(io: TypedServer): void {
       if (!requireGm(socket, campaignId)) return;
       const state = ensureState(campaignId);
       const entries = serializeInitiative(JSON.parse(state.initiative || "[]")).filter(
-        (entry) => entry.id !== entryId,
+        (entry) => entry.id !== entryId
       );
-      db.prepare("UPDATE campaign_state SET initiative = ?, turn_index = 0, updated_at = ? WHERE campaign_id = ?").run(
-        JSON.stringify(entries),
-        now(),
-        campaignId,
-      );
+      db.prepare(
+        "UPDATE campaign_state SET initiative = ?, turn_index = 0, updated_at = ? WHERE campaign_id = ?"
+      ).run(JSON.stringify(entries), now(), campaignId);
       broadcastInitiative(io, campaignId, ensureState(campaignId));
       touchCampaign(campaignId);
     });

@@ -80,7 +80,7 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
          JOIN campaign_members m ON m.campaign_id = c.id
          JOIN users u ON u.id = c.gm_id
          WHERE m.user_id = ?
-         ORDER BY COALESCE(c.last_played_at, c.updated_at) DESC`,
+         ORDER BY COALESCE(c.last_played_at, c.updated_at) DESC`
       )
       .all(request.user.id) as (CampaignRow & { gm_name: string })[];
     return reply.send({
@@ -116,10 +116,10 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
     const id = newId("camp");
     const ts = now();
     db.prepare(
-      "INSERT INTO campaigns (id, name, description, gm_id, invite_code, ruleset, xp_mode, created_at, updated_at, last_played_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      "INSERT INTO campaigns (id, name, description, gm_id, invite_code, ruleset, xp_mode, created_at, updated_at, last_played_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
     ).run(id, name, description, request.user.id, code, ruleset, xpMode, ts, ts, ts);
     db.prepare(
-      "INSERT INTO campaign_members (campaign_id, user_id, role, joined_at) VALUES (?, ?, 'gm', ?)",
+      "INSERT INTO campaign_members (campaign_id, user_id, role, joined_at) VALUES (?, ?, 'gm', ?)"
     ).run(id, request.user.id, ts);
     createDefaultScene(id, request.user.id);
     const row = getCampaign(id)!;
@@ -141,7 +141,8 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
     try {
       const result = importCampaign(request.user.id, request.body);
       const row = getCampaign(result.campaignId);
-      if (!row) return reply.code(500).send({ error: "The imported campaign could not be opened." });
+      if (!row)
+        return reply.code(500).send({ error: "The imported campaign could not be opened." });
       logAudit({
         action: "campaign.import",
         actor: request.user,
@@ -155,7 +156,7 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
           row,
           "gm",
           campaignCounts(row),
-          request.user.displayName,
+          request.user.displayName
         ),
         stats: result.stats,
       });
@@ -173,7 +174,9 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
     if (!code) return reply.code(400).send({ error: "Enter an invite code." });
 
     // Allow the join form to receive a pasted invite link as well as a bare code.
-    const normalizedCode = code.includes("/JOIN/") ? code.split("/JOIN/").pop()!.split(/[/?#]/)[0] : code;
+    const normalizedCode = code.includes("/JOIN/")
+      ? code.split("/JOIN/").pop()!.split(/[/?#]/)[0]
+      : code;
     const row = db
       .prepare("SELECT * FROM campaigns WHERE UPPER(invite_code) = ?")
       .get(normalizedCode) as CampaignRow | undefined;
@@ -195,7 +198,7 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
     const existing = getMembership(row.id, request.user.id);
     if (!existing) {
       db.prepare(
-        "INSERT INTO campaign_members (campaign_id, user_id, role, joined_at) VALUES (?, ?, 'player', ?)",
+        "INSERT INTO campaign_members (campaign_id, user_id, role, joined_at) VALUES (?, ?, 'player', ?)"
       ).run(row.id, request.user.id, now());
     }
 
@@ -211,12 +214,9 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
       } catch {
         // Keep the existing draft if it is malformed; the builder will normalize it.
       }
-      db.prepare("UPDATE characters SET campaign_id = ?, data = ?, updated_at = ? WHERE id = ?").run(
-        row.id,
-        data,
-        now(),
-        character.id,
-      );
+      db.prepare(
+        "UPDATE characters SET campaign_id = ?, data = ?, updated_at = ? WHERE id = ?"
+      ).run(row.id, data, now(), character.id);
       character = getCharacter(character.id);
       serializedCharacter = character
         ? serializeCharacter(character, request.user.displayName, { canEdit: true, canView: true })
@@ -243,7 +243,7 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
       campaign: serializeCampaignSummary(
         getCampaign(row.id)!,
         existing?.role ?? "player",
-        campaignCounts(row),
+        campaignCounts(row)
       ),
       character: serializedCharacter,
     });
@@ -258,13 +258,13 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
     if (!role) return reply.code(403).send({ error: "You're not a member of that campaign." });
     const gm = getUser(row.gm_id);
     const members = campaignMembers(id).map((member) =>
-      serializeMember(member, member.role, member.joined_at),
+      serializeMember(member, member.role, member.joined_at)
     );
     const characters = campaignCharacters(id).map((character) =>
       serializeCharacter(character, character.owner_name, {
         canEdit: canEditCharacter(character, request.user!.id),
         canView: true,
-      }),
+      })
     );
     return reply.send({
       campaign: serializeCampaignSummary(row, role, campaignCounts(row), gm?.display_name ?? ""),
@@ -283,42 +283,52 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
     }
 
     const members = campaignMembers(id).map((member) =>
-      serializeMember(member, member.role, member.joined_at),
+      serializeMember(member, member.role, member.joined_at)
     );
     const characters = campaignCharacters(id).map((character) =>
-      serializeCharacter(character, character.owner_name, { canEdit: true, canView: true }),
+      serializeCharacter(character, character.owner_name, { canEdit: true, canView: true })
     );
     const scenes = (
-      db.prepare("SELECT * FROM scenes WHERE campaign_id = ? ORDER BY sort_order ASC, created_at ASC").all(id) as SceneRow[]
+      db
+        .prepare(
+          "SELECT * FROM scenes WHERE campaign_id = ? ORDER BY sort_order ASC, created_at ASC"
+        )
+        .all(id) as SceneRow[]
     ).map(serializeScene);
     const tokens = (
       db
         .prepare(
           `SELECT t.* FROM tokens t JOIN scenes s ON s.id = t.scene_id
-           WHERE s.campaign_id = ? ORDER BY t.sort_order ASC, t.created_at ASC`,
+           WHERE s.campaign_id = ? ORDER BY t.sort_order ASC, t.created_at ASC`
         )
         .all(id) as TokenRow[]
     ).map((token) => serializeToken(token));
     const messages = (
-      db.prepare("SELECT * FROM messages WHERE campaign_id = ? ORDER BY created_at ASC").all(id) as MessageRow[]
+      db
+        .prepare("SELECT * FROM messages WHERE campaign_id = ? ORDER BY created_at ASC")
+        .all(id) as MessageRow[]
     ).map(serializeMessage);
     const journal = (
       db
         .prepare(
           `SELECT j.*, u.display_name AS author_name FROM journal_entries j
            LEFT JOIN users u ON u.id = j.created_by
-           WHERE j.campaign_id = ? ORDER BY j.created_at ASC`,
+           WHERE j.campaign_id = ? ORDER BY j.created_at ASC`
         )
         .all(id) as (JournalRow & { author_name: string | null })[]
     ).map(serializeJournal);
     const encounters = (
       db
-        .prepare("SELECT * FROM encounters WHERE campaign_id = ? ORDER BY sort_order ASC, created_at ASC")
+        .prepare(
+          "SELECT * FROM encounters WHERE campaign_id = ? ORDER BY sort_order ASC, created_at ASC"
+        )
         .all(id) as EncounterRow[]
     ).map(serializeEncounter);
     const loot = (
       db
-        .prepare("SELECT * FROM loot_parcels WHERE campaign_id = ? ORDER BY sort_order ASC, created_at ASC")
+        .prepare(
+          "SELECT * FROM loot_parcels WHERE campaign_id = ? ORDER BY sort_order ASC, created_at ASC"
+        )
         .all(id) as LootParcelRow[]
     ).map(serializeLootParcel);
     const dashboardRow = db
@@ -327,7 +337,9 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
     const dashboard = dashboardRow ? serializeCampaignDashboard(dashboardRow, "gm") : null;
     const npcs = (
       db
-        .prepare("SELECT * FROM campaign_npcs WHERE campaign_id = ? ORDER BY sort_order ASC, name ASC")
+        .prepare(
+          "SELECT * FROM campaign_npcs WHERE campaign_id = ? ORDER BY sort_order ASC, name ASC"
+        )
         .all(id) as CampaignNpcRow[]
     ).map(serializeCampaignNpc);
     const sessions = campaignSessionsFor(id, "gm", request.user.id);
@@ -337,7 +349,8 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
     const assets = new Set<string>();
     for (const scene of scenes) if (scene.imageUrl) assets.add(scene.imageUrl);
     for (const token of tokens) if (token.imageUrl) assets.add(token.imageUrl);
-    for (const character of characters) if (character.summary?.portraitUrl) assets.add(character.summary.portraitUrl);
+    for (const character of characters)
+      if (character.summary?.portraitUrl) assets.add(character.summary.portraitUrl);
 
     const payload = {
       format: "runehall-campaign",
@@ -347,7 +360,7 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
         row,
         "gm",
         campaignCounts(row),
-        getUser(row.gm_id)?.display_name ?? "",
+        getUser(row.gm_id)?.display_name ?? ""
       ),
       members,
       characters,
@@ -367,8 +380,7 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
         turnIndex: state?.turn_index ?? 0,
       },
       assets: [...assets],
-      note:
-        "Image files are referenced by URL. Use `npm run backup` to archive the database and data/uploads together.",
+      note: "Image files are referenced by URL. Use `npm run backup` to archive the database and data/uploads together.",
     };
     const safeName = row.name.replace(/[^a-z0-9-_]+/gi, "-").replace(/^-+|-+$/g, "") || "campaign";
     return reply
@@ -395,13 +407,10 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
       return reply.code(400).send({ error: "Choose milestone or XP budget advancement." });
     }
     const ruleset =
-      body.ruleset === undefined
-        ? normalizeCampaignRuleset(row.ruleset)
-        : body.ruleset;
-    const xpMode =
-      body.xpMode === undefined ? normalizeXpMode(row.xp_mode) : body.xpMode;
+      body.ruleset === undefined ? normalizeCampaignRuleset(row.ruleset) : body.ruleset;
+    const xpMode = body.xpMode === undefined ? normalizeXpMode(row.xp_mode) : body.xpMode;
     db.prepare(
-      "UPDATE campaigns SET name = ?, description = ?, ruleset = ?, xp_mode = ?, updated_at = ? WHERE id = ?",
+      "UPDATE campaigns SET name = ?, description = ?, ruleset = ?, xp_mode = ?, updated_at = ? WHERE id = ?"
     ).run(name, description, ruleset, xpMode, now(), id);
     if (ruleset !== normalizeCampaignRuleset(row.ruleset)) {
       const contentMode = rulesetContentMode(ruleset);
@@ -414,11 +423,9 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
           const draft = JSON.parse(character.data) as Record<string, unknown>;
           draft.contentMode = contentMode;
           draft.includeLegacy = legacyAllowed;
-          db.prepare("UPDATE characters SET data = ?, updated_at = ?, revision = revision + 1 WHERE id = ?").run(
-            JSON.stringify(draft),
-            now(),
-            character.id,
-          );
+          db.prepare(
+            "UPDATE characters SET data = ?, updated_at = ?, revision = revision + 1 WHERE id = ?"
+          ).run(JSON.stringify(draft), now(), character.id);
         } catch {
           // Keep an unreadable draft untouched; its owner can repair it in the builder.
         }
@@ -456,9 +463,14 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
     const row = getCampaign(id);
     if (!row) return reply.code(404).send({ error: "Campaign not found." });
     if (row.gm_id === request.user.id) {
-      return reply.code(400).send({ error: "The GM can't leave the campaign. Transfer or delete it instead." });
+      return reply
+        .code(400)
+        .send({ error: "The GM can't leave the campaign. Transfer or delete it instead." });
     }
-    db.prepare("DELETE FROM campaign_members WHERE campaign_id = ? AND user_id = ?").run(id, request.user.id);
+    db.prepare("DELETE FROM campaign_members WHERE campaign_id = ? AND user_id = ?").run(
+      id,
+      request.user.id
+    );
     return reply.send({ ok: true });
   });
 
@@ -471,7 +483,10 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
       return reply.code(403).send({ error: "Only the GM can remove members." });
     }
     if (userId === row.gm_id) return reply.code(400).send({ error: "The GM can't be removed." });
-    db.prepare("DELETE FROM campaign_members WHERE campaign_id = ? AND user_id = ?").run(id, userId);
+    db.prepare("DELETE FROM campaign_members WHERE campaign_id = ? AND user_id = ?").run(
+      id,
+      userId
+    );
     logAudit({
       action: "campaign.member_remove",
       actor: request.user,
@@ -496,7 +511,11 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
       if (!db.prepare("SELECT id FROM campaigns WHERE invite_code = ?").get(code)) break;
       code = inviteCode();
     }
-    db.prepare("UPDATE campaigns SET invite_code = ?, updated_at = ? WHERE id = ?").run(code, now(), id);
+    db.prepare("UPDATE campaigns SET invite_code = ?, updated_at = ? WHERE id = ?").run(
+      code,
+      now(),
+      id
+    );
     return reply.send({ inviteCode: code });
   });
 
@@ -536,12 +555,9 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
       const after = characterSummary(draft, contextForDraft(draft));
       draft.play.hp = wasFull ? null : Math.min(draft.play.hp ?? after.hp, after.hp);
       const summary = characterSummary(draft, contextForDraft(draft));
-      db.prepare("UPDATE characters SET data = ?, summary = ?, updated_at = ?, revision = revision + 1 WHERE id = ?").run(
-        JSON.stringify(draft),
-        JSON.stringify(summary),
-        now(),
-        character.id,
-      );
+      db.prepare(
+        "UPDATE characters SET data = ?, summary = ?, updated_at = ?, revision = revision + 1 WHERE id = ?"
+      ).run(JSON.stringify(draft), JSON.stringify(summary), now(), character.id);
 
       const linkedTokens = db
         .prepare("SELECT * FROM tokens WHERE character_id = ?")
@@ -553,9 +569,11 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
           ? summary.hp
           : Math.min(token.hp_current ?? summary.hp, summary.hp);
         db.prepare(
-          "UPDATE tokens SET name = ?, hp_max = ?, hp_current = ?, ac = ?, updated_at = ? WHERE id = ?",
+          "UPDATE tokens SET name = ?, hp_max = ?, hp_current = ?, ac = ?, updated_at = ? WHERE id = ?"
         ).run(draft.name, summary.hp, nextHp, summary.ac, now(), token.id);
-        const updatedToken = db.prepare("SELECT * FROM tokens WHERE id = ?").get(token.id) as TokenRow;
+        const updatedToken = db
+          .prepare("SELECT * FROM tokens WHERE id = ?")
+          .get(token.id) as TokenRow;
         app.broadcastCampaign(id, "token:updated", serializeToken(updatedToken));
       }
 
@@ -572,7 +590,7 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
       serializeCharacter(character, character.owner_name, {
         canEdit: true,
         canView: true,
-      }),
+      })
     );
     logAudit({
       action: "campaign.level_up",
@@ -596,7 +614,7 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
         `SELECT j.*, u.display_name AS author_name FROM journal_entries j
          LEFT JOIN users u ON u.id = j.created_by
          WHERE j.campaign_id = ? ${role === "player" ? "AND j.visible = 1" : ""}
-         ORDER BY j.updated_at DESC`,
+         ORDER BY j.updated_at DESC`
       )
       .all(id) as (import("../db").JournalRow & { author_name: string | null })[];
     return reply.send({ entries: rows.map(serializeJournal) });
@@ -606,7 +624,8 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
     if (!request.user) return reply.code(401).send({ error: "Sign in to continue." });
     const { id } = request.params as { id: string };
     const role = getMembership(id, request.user.id)?.role;
-    if (role !== "gm") return reply.code(403).send({ error: "Only the GM can write journal entries." });
+    if (role !== "gm")
+      return reply.code(403).send({ error: "Only the GM can write journal entries." });
     const body = (request.body ?? {}) as Record<string, unknown>;
     if (body.kind !== undefined && !isJournalKind(body.kind)) {
       return reply.code(400).send({ error: "Choose a journal entry or a handout." });
@@ -621,7 +640,7 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
     db.prepare(
       `INSERT INTO journal_entries
         (id, campaign_id, title, content, visible, kind, attachments, created_by, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       entryId,
       id,
@@ -632,12 +651,12 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
       JSON.stringify(attachments),
       request.user.id,
       ts,
-      ts,
+      ts
     );
     const row = db
       .prepare(
         `SELECT j.*, u.display_name AS author_name FROM journal_entries j
-         LEFT JOIN users u ON u.id = j.created_by WHERE j.id = ?`,
+         LEFT JOIN users u ON u.id = j.created_by WHERE j.id = ?`
       )
       .get(entryId) as import("../db").JournalRow & { author_name: string | null };
     return reply.code(201).send({ entry: serializeJournal(row) });
@@ -647,7 +666,8 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
     if (!request.user) return reply.code(401).send({ error: "Sign in to continue." });
     const { id, entryId } = request.params as { id: string; entryId: string };
     const role = getMembership(id, request.user.id)?.role;
-    if (role !== "gm") return reply.code(403).send({ error: "Only the GM can edit journal entries." });
+    if (role !== "gm")
+      return reply.code(403).send({ error: "Only the GM can edit journal entries." });
     const existing = db
       .prepare("SELECT * FROM journal_entries WHERE id = ? AND campaign_id = ?")
       .get(entryId, id) as import("../db").JournalRow | undefined;
@@ -661,26 +681,20 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
       body.content === undefined ? existing.content : sanitizeUserText(body.content, 100_000);
     const visible = body.visible === undefined ? Boolean(existing.visible) : body.visible !== false;
     const kind =
-      body.kind === undefined ? normalizeJournalKind(existing.kind) : normalizeJournalKind(body.kind);
+      body.kind === undefined
+        ? normalizeJournalKind(existing.kind)
+        : normalizeJournalKind(body.kind);
     const attachments =
       body.attachments === undefined
         ? normalizeJournalAttachments(parseJson(existing.attachments, []))
         : normalizeJournalAttachments(body.attachments);
     db.prepare(
-      "UPDATE journal_entries SET title = ?, content = ?, visible = ?, kind = ?, attachments = ?, updated_at = ? WHERE id = ?",
-    ).run(
-      title,
-      content,
-      visible ? 1 : 0,
-      kind,
-      JSON.stringify(attachments),
-      now(),
-      entryId,
-    );
+      "UPDATE journal_entries SET title = ?, content = ?, visible = ?, kind = ?, attachments = ?, updated_at = ? WHERE id = ?"
+    ).run(title, content, visible ? 1 : 0, kind, JSON.stringify(attachments), now(), entryId);
     const row = db
       .prepare(
         `SELECT j.*, u.display_name AS author_name FROM journal_entries j
-         LEFT JOIN users u ON u.id = j.created_by WHERE j.id = ?`,
+         LEFT JOIN users u ON u.id = j.created_by WHERE j.id = ?`
       )
       .get(entryId) as import("../db").JournalRow & { author_name: string | null };
     return reply.send({ entry: serializeJournal(row) });
@@ -702,7 +716,7 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
     db.prepare(
       `INSERT INTO journal_entries
         (id, campaign_id, title, content, visible, kind, attachments, created_by, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       duplicateId,
       id,
@@ -713,12 +727,12 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
       existing.attachments,
       request.user.id,
       ts,
-      ts,
+      ts
     );
     const row = db
       .prepare(
         `SELECT j.*, u.display_name AS author_name FROM journal_entries j
-         LEFT JOIN users u ON u.id = j.created_by WHERE j.id = ?`,
+         LEFT JOIN users u ON u.id = j.created_by WHERE j.id = ?`
       )
       .get(duplicateId) as JournalRow & { author_name: string | null };
     touchCampaign(id);
@@ -729,7 +743,8 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
     if (!request.user) return reply.code(401).send({ error: "Sign in to continue." });
     const { id, entryId } = request.params as { id: string; entryId: string };
     const role = getMembership(id, request.user.id)?.role;
-    if (role !== "gm") return reply.code(403).send({ error: "Only the GM can delete journal entries." });
+    if (role !== "gm")
+      return reply.code(403).send({ error: "Only the GM can delete journal entries." });
     db.prepare("DELETE FROM journal_entries WHERE id = ? AND campaign_id = ?").run(entryId, id);
     return reply.send({ ok: true });
   });

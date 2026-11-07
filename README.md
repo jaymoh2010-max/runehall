@@ -111,8 +111,11 @@ Players join with the GM's invite link or code from their own accounts. They can
 | `npm run build` | Build the production client into `dist/client` |
 | `npm start` | Run the server and serve the built client |
 | `npm run typecheck` | TypeScript check |
+| `npm run lint` | ESLint (react-hooks rules, syntax/safety checks) |
+| `npm run format:check` | Verify Prettier formatting |
+| `npm run format` | Rewrite files with Prettier |
 | `npm test` | Vitest unit tests |
-| `npm run check` | Typecheck, unit tests, production build, and bundle budget |
+| `npm run check` | Typecheck, lint, formatting, unit tests, production build, and bundle budget |
 | `npm run check:bundle` | Verify the production entry JS/CSS gzip budgets after a build |
 | `npm run check:full` | `check` plus the two-user smoke test |
 | `npm run smoke` | Two-user GM/player API + socket smoke test against a temporary database |
@@ -213,9 +216,8 @@ This is a substantial, playable foundation — not a complete Pathbuilder/Foundr
 
 ### Good next steps
 1. **Hosting verification:** confirm the automated restore drill on a clean CI runner and keep the Docker check green.
-2. **Lint and format guardrails:** add an enforceable style gate before the components grow further.
-3. **Rules automation:** close the remaining subclass, feat, and item effect gaps.
-4. **Optional scale:** Postgres/S3 adapters and OAuth only when the local deployment is proven.
+2. **Rules automation:** close the remaining subclass, feat, and item effect gaps.
+3. **Optional scale:** Postgres/S3 adapters and OAuth only when the local deployment is proven.
 
 ---
 

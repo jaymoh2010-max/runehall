@@ -36,7 +36,8 @@ export function normalizeSessionAgenda(value: unknown): SessionAgendaItem[] {
   for (const [index, raw] of value.entries()) {
     if (!raw || typeof raw !== "object") continue;
     const record = raw as Record<string, unknown>;
-    const text = typeof record.text === "string" ? record.text.trim().slice(0, MAX_AGENDA_TEXT) : "";
+    const text =
+      typeof record.text === "string" ? record.text.trim().slice(0, MAX_AGENDA_TEXT) : "";
     if (!text) continue;
     const id =
       typeof record.id === "string" && record.id.trim()
@@ -54,7 +55,7 @@ export function sessionCheckinSummary(checkins: SessionCheckin[]) {
       summary[checkin.status] += 1;
       return summary;
     },
-    { yes: 0, maybe: 0, no: 0, unanswered: 0 },
+    { yes: 0, maybe: 0, no: 0, unanswered: 0 }
   );
 }
 

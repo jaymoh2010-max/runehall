@@ -21,7 +21,7 @@ import { now, parseJson, sanitizeUserText } from "../util";
 
 function ensureDashboard(campaignId: string): CampaignDashboardRow {
   db.prepare(
-    "INSERT OR IGNORE INTO campaign_dashboard (campaign_id, updated_at) VALUES (?, ?)",
+    "INSERT OR IGNORE INTO campaign_dashboard (campaign_id, updated_at) VALUES (?, ?)"
   ).run(campaignId, now());
   return db
     .prepare("SELECT * FROM campaign_dashboard WHERE campaign_id = ?")
@@ -53,7 +53,7 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
     const to = Number.isFinite(toValue) && toValue > 0 ? Math.round(toValue) : now();
     const sessions = campaignSessionsFor(id, "gm", request.user.id);
     const played = sessions.filter(
-      (session) => session.status === "played" && session.scheduledAt <= to,
+      (session) => session.status === "played" && session.scheduledAt <= to
     );
     const session =
       played[played.length - 1] ??
@@ -63,7 +63,7 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
     const from =
       Number.isFinite(fromValue) && fromValue > 0
         ? Math.round(fromValue)
-        : session?.scheduledAt ?? to - 24 * 60 * 60 * 1000;
+        : (session?.scheduledAt ?? to - 24 * 60 * 60 * 1000);
     if (from > to) {
       return reply.code(400).send({ error: "The recap window must start before it ends." });
     }
@@ -72,7 +72,7 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
       .prepare(
         `SELECT * FROM messages
          WHERE campaign_id = ? AND visibility = 'all' AND created_at BETWEEN ? AND ?
-         ORDER BY created_at ASC LIMIT 2000`,
+         ORDER BY created_at ASC LIMIT 2000`
       )
       .all(id, from, to) as MessageRow[];
     const journalRows = db
@@ -80,14 +80,14 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
         `SELECT j.*, u.display_name AS author_name FROM journal_entries j
          LEFT JOIN users u ON u.id = j.created_by
          WHERE j.campaign_id = ? AND j.visible = 1 AND j.updated_at BETWEEN ? AND ?
-         ORDER BY j.updated_at ASC LIMIT 500`,
+         ORDER BY j.updated_at ASC LIMIT 500`
       )
       .all(id, from, to) as (JournalRow & { author_name: string | null })[];
     const lootRows = db
       .prepare(
         `SELECT * FROM loot_parcels
          WHERE campaign_id = ? AND updated_at BETWEEN ? AND ?
-         ORDER BY sort_order ASC, created_at ASC LIMIT 200`,
+         ORDER BY sort_order ASC, created_at ASC LIMIT 200`
       )
       .all(id, from, to) as LootParcelRow[];
     const dashboardRow = db
@@ -154,7 +154,7 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
       `UPDATE campaign_dashboard
        SET last_session_summary = ?, next_session_at = ?, next_session_teaser = ?,
            next_session_notes = ?, threads = ?, updated_at = ?
-       WHERE campaign_id = ?`,
+       WHERE campaign_id = ?`
     ).run(
       lastSessionSummary,
       nextSessionAt,
@@ -162,7 +162,7 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
       nextSessionNotes,
       JSON.stringify(threads),
       now(),
-      id,
+      id
     );
     touchCampaign(id);
     const row = ensureDashboard(id);

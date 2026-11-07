@@ -35,11 +35,15 @@ describe("security headers", () => {
 
   it("allows CSP opt-in and opt-out", () => {
     expect(buildSecurityHeaders({ ENABLE_CSP: "1" })["Content-Security-Policy"]).toBeTruthy();
-    expect(buildSecurityHeaders({ NODE_ENV: "production", ENABLE_CSP: "0" })["Content-Security-Policy"]).toBeUndefined();
+    expect(
+      buildSecurityHeaders({ NODE_ENV: "production", ENABLE_CSP: "0" })["Content-Security-Policy"]
+    ).toBeUndefined();
   });
 
   it("sets HSTS only when secure cookies are enabled", () => {
-    expect(buildSecurityHeaders({ COOKIE_SECURE: "1" })["Strict-Transport-Security"]).toContain("max-age=31536000");
+    expect(buildSecurityHeaders({ COOKIE_SECURE: "1" })["Strict-Transport-Security"]).toContain(
+      "max-age=31536000"
+    );
   });
 });
 
@@ -47,7 +51,11 @@ describe("origin checks", () => {
   it("accepts same-host and explicitly trusted origins", () => {
     expect(isTrustedOrigin(undefined, "runehall.local:3001")).toBe(true);
     expect(isTrustedOrigin("https://runehall.local", "runehall.local")).toBe(true);
-    expect(isTrustedOrigin("https://table.example.com", "runehall.local", { TRUSTED_ORIGINS: "https://table.example.com" })).toBe(true);
+    expect(
+      isTrustedOrigin("https://table.example.com", "runehall.local", {
+        TRUSTED_ORIGINS: "https://table.example.com",
+      })
+    ).toBe(true);
   });
 
   it("rejects cross-host and null origins", () => {

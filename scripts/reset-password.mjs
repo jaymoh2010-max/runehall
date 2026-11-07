@@ -39,7 +39,9 @@ db.exec("PRAGMA busy_timeout = 5000;");
 
 if (has("--list")) {
   const users = db
-    .prepare("SELECT username, display_name, is_admin, created_at FROM users ORDER BY created_at ASC")
+    .prepare(
+      "SELECT username, display_name, is_admin, created_at FROM users ORDER BY created_at ASC"
+    )
     .all();
   if (!users.length) {
     console.log("No accounts exist yet. Register the first account in the app.");
@@ -49,7 +51,7 @@ if (has("--list")) {
       console.log(
         `${String(user.username).padEnd(23)} ${String(user.display_name).padEnd(23)} ${
           user.is_admin ? "yes  " : "no   "
-        } ${new Date(Number(user.created_at)).toISOString()}`,
+        } ${new Date(Number(user.created_at)).toISOString()}`
       );
     }
   }
@@ -59,7 +61,9 @@ if (has("--list")) {
 
 const username = (option("--username") || "").trim();
 if (!username) {
-  console.error("Usage: npm run reset-password -- --username <username> [--password <value>] [--admin]");
+  console.error(
+    "Usage: npm run reset-password -- --username <username> [--password <value>] [--admin]"
+  );
   console.error("       npm run reset-password -- --list");
   process.exit(1);
 }
@@ -75,9 +79,7 @@ if (!row) {
 
 function hashPassword(password) {
   const salt = crypto.randomBytes(16).toString("hex");
-  const hash = crypto
-    .scryptSync(password, salt, 64, { N: 16384, r: 8, p: 1 })
-    .toString("hex");
+  const hash = crypto.scryptSync(password, salt, 64, { N: 16384, r: 8, p: 1 }).toString("hex");
   return `scrypt$${salt}$${hash}`;
 }
 
@@ -109,7 +111,7 @@ try {
   db.prepare(
     `INSERT INTO audit_log
       (id, created_at, actor_id, actor_name, action, target_type, target_id, detail, ip)
-     VALUES (?, ?, NULL, 'local-cli', 'auth.password_reset', 'user', ?, ?, '')`,
+     VALUES (?, ?, NULL, 'local-cli', 'auth.password_reset', 'user', ?, ?, '')`
   ).run(`audit_${crypto.randomBytes(12).toString("hex")}`, now, row.id, detail);
   db.exec("COMMIT");
 } catch (error) {
@@ -118,7 +120,9 @@ try {
   } catch {
     // ignore
   }
-  console.error(`Could not reset the password: ${error instanceof Error ? error.message : String(error)}`);
+  console.error(
+    `Could not reset the password: ${error instanceof Error ? error.message : String(error)}`
+  );
   db.close();
   process.exit(1);
 }

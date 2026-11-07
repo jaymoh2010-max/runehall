@@ -40,7 +40,7 @@ export function createSession(userId: string): string {
   const token = randomToken(32);
   const expires = now() + SESSION_DAYS * 24 * 60 * 60 * 1000;
   db.prepare(
-    "INSERT INTO sessions (token_hash, user_id, expires_at, created_at) VALUES (?, ?, ?, ?)",
+    "INSERT INTO sessions (token_hash, user_id, expires_at, created_at) VALUES (?, ?, ?, ?)"
   ).run(sha256(token), userId, expires, now());
   db.prepare("DELETE FROM sessions WHERE expires_at < ?").run(now());
   return token;
@@ -57,7 +57,7 @@ export function userFromToken(token: string | undefined | null): UserRow | null 
     .prepare(
       `SELECT u.* FROM sessions s
        JOIN users u ON u.id = s.user_id
-       WHERE s.token_hash = ? AND s.expires_at > ?`,
+       WHERE s.token_hash = ? AND s.expires_at > ?`
     )
     .get(sha256(token), now()) as UserRow | undefined;
   return row ?? null;
@@ -98,7 +98,9 @@ export function getSessionToken(request: FastifyRequest): string | undefined {
 export function validateUsername(value: unknown): string {
   const username = typeof value === "string" ? value.trim() : "";
   if (!/^[a-zA-Z0-9_-]{3,24}$/.test(username)) {
-    throw new Error("Username must be 3–24 characters, using letters, numbers, dashes, or underscores.");
+    throw new Error(
+      "Username must be 3–24 characters, using letters, numbers, dashes, or underscores."
+    );
   }
   return username;
 }

@@ -52,10 +52,15 @@ export function useCampaignTable({ initial, campaignId, toast }: UseCampaignTabl
   const [presence, setPresence] = useState<PresenceUser[]>([]);
   const [selectedTokenId, setSelectedTokenIdState] = useState<string | null>(null);
   const [selectedTokenIds, setSelectedTokenIds] = useState<string[]>([]);
-  const [remotePointer, setRemotePointer] = useState<{ x: number; y: number; name: string; ts: number } | null>(
-    null,
+  const [remotePointer, setRemotePointer] = useState<{
+    x: number;
+    y: number;
+    name: string;
+    ts: number;
+  } | null>(null);
+  const [connectionStatus, setConnectionStatus] = useState<"connecting" | "online" | "offline">(
+    "connecting"
   );
-  const [connectionStatus, setConnectionStatus] = useState<"connecting" | "online" | "offline">("connecting");
 
   const revisionRef = useRef(initial.revision);
   const refreshingRef = useRef(false);
@@ -87,7 +92,7 @@ export function useCampaignTable({ initial, campaignId, toast }: UseCampaignTabl
     }
     setSelectedTokenIds((current) => {
       const next = toggleTokenSelection(current, tokenId);
-      setSelectedTokenIdState(next.includes(tokenId) ? tokenId : next[0] ?? null);
+      setSelectedTokenIdState(next.includes(tokenId) ? tokenId : (next[0] ?? null));
       return next;
     });
   }, []);
@@ -113,15 +118,15 @@ export function useCampaignTable({ initial, campaignId, toast }: UseCampaignTabl
       revisionRef.current = snapshot.revision;
       setMessages((current) => mergeSnapshotMessages(current, snapshot.messages));
       setSelectedTokenIds((current) =>
-        current.filter((tokenId) => snapshot.tokens.some((token) => token.id === tokenId)),
+        current.filter((tokenId) => snapshot.tokens.some((token) => token.id === tokenId))
       );
       setSelectedTokenIdState((current) =>
-        current && snapshot.tokens.some((token) => token.id === current) ? current : null,
+        current && snapshot.tokens.some((token) => token.id === current) ? current : null
       );
     } catch (error) {
       toast(
         `Could not refresh the table: ${error instanceof Error ? error.message : "Unknown error"}`,
-        "error",
+        "error"
       );
     }
   }, [campaignId, toast]);
@@ -165,14 +170,13 @@ export function useCampaignTable({ initial, campaignId, toast }: UseCampaignTabl
       setSelectedTokenIdState(token.id);
       setSelectedTokenIds([token.id]);
     };
-    const onTokenUpdated = (token: Token) => setTokens((current) => applyTokenUpdated(current, token));
+    const onTokenUpdated = (token: Token) =>
+      setTokens((current) => applyTokenUpdated(current, token));
     const onTokenDeleted = ({ tokenId }: { tokenId: string }) => {
       setTokens((current) => applyTokenDeleted(current, tokenId));
       setSelectedTokenIds((current) => {
         const next = current.filter((id) => id !== tokenId);
-        setSelectedTokenIdState((primary) =>
-          primary === tokenId ? next[0] ?? null : primary,
-        );
+        setSelectedTokenIdState((primary) => (primary === tokenId ? (next[0] ?? null) : primary));
         return next;
       });
     };
@@ -186,7 +190,8 @@ export function useCampaignTable({ initial, campaignId, toast }: UseCampaignTabl
       setSelectedTokenIdState(null);
       setSelectedTokenIds([]);
     };
-    const onSceneUpdated = (scene: Scene) => setScenes((current) => applySceneUpdated(current, scene));
+    const onSceneUpdated = (scene: Scene) =>
+      setScenes((current) => applySceneUpdated(current, scene));
     const onSceneCreated = (scene: Scene) => {
       setScenes((current) => applySceneCreated(current, scene));
       setActiveSceneId((current) => current ?? scene.id);
@@ -198,16 +203,16 @@ export function useCampaignTable({ initial, campaignId, toast }: UseCampaignTabl
           tokens: tokensRef.current,
           activeSceneId: activeSceneIdRef.current,
         },
-        sceneId,
+        sceneId
       );
       setScenes(result.scenes);
       setTokens(result.tokens);
       setActiveSceneId(result.activeSceneId);
       setSelectedTokenIds((current) =>
-        current.filter((tokenId) => result.tokens.some((token) => token.id === tokenId)),
+        current.filter((tokenId) => result.tokens.some((token) => token.id === tokenId))
       );
       setSelectedTokenIdState((current) =>
-        current && result.tokens.some((token) => token.id === current) ? current : null,
+        current && result.tokens.some((token) => token.id === current) ? current : null
       );
     };
     const onSceneTemplates = ({
@@ -218,7 +223,7 @@ export function useCampaignTable({ initial, campaignId, toast }: UseCampaignTabl
       templates: Scene["templates"];
     }) =>
       setScenes((current) =>
-        current.map((scene) => (scene.id === sceneId ? { ...scene, templates } : scene)),
+        current.map((scene) => (scene.id === sceneId ? { ...scene, templates } : scene))
       );
     const onScenesReordered = (nextScenes: Scene[]) => setScenes(nextScenes);
     const onChatMessage = (message: ChatMessage) =>

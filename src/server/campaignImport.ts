@@ -117,21 +117,10 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
     const campaignId = newId("camp");
     const ts = now();
     db.prepare(
-      "INSERT INTO campaigns (id, name, description, gm_id, invite_code, ruleset, xp_mode, created_at, updated_at, last_played_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-    ).run(
-      campaignId,
-      name,
-      description,
-      userId,
-      uniqueInviteCode(),
-      ruleset,
-      xpMode,
-      ts,
-      ts,
-      ts,
-    );
+      "INSERT INTO campaigns (id, name, description, gm_id, invite_code, ruleset, xp_mode, created_at, updated_at, last_played_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    ).run(campaignId, name, description, userId, uniqueInviteCode(), ruleset, xpMode, ts, ts, ts);
     db.prepare(
-      "INSERT INTO campaign_members (campaign_id, user_id, role, joined_at) VALUES (?, ?, 'gm', ?)",
+      "INSERT INTO campaign_members (campaign_id, user_id, role, joined_at) VALUES (?, ?, 'gm', ?)"
     ).run(campaignId, userId, ts);
 
     const memberUserByExportId = new Map<string, string>();
@@ -144,7 +133,7 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
       if (!local) continue;
       if (!memberIds.has(local.id)) {
         db.prepare(
-          "INSERT OR IGNORE INTO campaign_members (campaign_id, user_id, role, joined_at) VALUES (?, ?, 'player', ?)",
+          "INSERT OR IGNORE INTO campaign_members (campaign_id, user_id, role, joined_at) VALUES (?, ?, 'player', ?)"
         ).run(campaignId, local.id, ts);
         memberIds.add(local.id);
         stats.members += 1;
@@ -157,7 +146,10 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
       const oldId = text(character.id, "", 120);
       if (!oldId) continue;
       try {
-        const draft = normalizeCharacterDraft(character.data, text(character.name, "Imported character", 120));
+        const draft = normalizeCharacterDraft(
+          character.data,
+          text(character.name, "Imported character", 120)
+        );
         draft.contentMode = rulesetContentMode(ruleset);
         draft.includeLegacy = rulesetIncludesLegacy(ruleset);
         const summary = characterSummary(draft, contextForDraft(draft));
@@ -167,7 +159,7 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
         if (!mappedOwner) stats.reassignedCharacters += 1;
         const characterId = newId("char");
         db.prepare(
-          "INSERT INTO characters (id, user_id, campaign_id, name, data, summary, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+          "INSERT INTO characters (id, user_id, campaign_id, name, data, summary, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
         ).run(
           characterId,
           ownerId,
@@ -176,7 +168,7 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
           JSON.stringify(draft),
           JSON.stringify(summary),
           ts,
-          ts,
+          ts
         );
         characterMap.set(oldId, characterId);
         stats.characters += 1;
@@ -193,7 +185,7 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
       db.prepare(
         `INSERT INTO scenes
           (id, campaign_id, name, image_url, thumbnail_url, width, height, grid_size, grid_offset_x, grid_offset_y, fog_enabled, fog_revealed, sort_order, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).run(
         sceneId,
         campaignId,
@@ -208,12 +200,14 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
         scene.fogEnabled === false ? 0 : 1,
         JSON.stringify(
           Array.isArray(scene.revealed)
-            ? scene.revealed.filter((cell): cell is string => typeof cell === "string").slice(0, 20_000)
-            : [],
+            ? scene.revealed
+                .filter((cell): cell is string => typeof cell === "string")
+                .slice(0, 20_000)
+            : []
         ),
         numberValue(scene.sortOrder, sceneMap.size),
         ts,
-        ts,
+        ts
       );
       sceneMap.set(oldId, sceneId);
       stats.scenes += 1;
@@ -223,7 +217,7 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
       db.prepare(
         `INSERT INTO scenes
           (id, campaign_id, name, image_url, width, height, grid_size, grid_offset_x, grid_offset_y, fog_enabled, fog_revealed, sort_order, created_at, updated_at)
-         VALUES (?, ?, 'The First Step', NULL, 1600, 1000, 70, 0, 0, 1, '[]', 0, ?, ?)`,
+         VALUES (?, ?, 'The First Step', NULL, 1600, 1000, 70, 0, 0, 1, '[]', 0, ?, ?)`
       ).run(sceneId, campaignId, ts, ts);
       sceneMap.set("__default__", sceneId);
       stats.scenes += 1;
@@ -243,14 +237,14 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
         groupMap.set(oldGroup, groupId);
       }
       const oldCharacter = text(token.characterId, "", 120);
-      const characterId = oldCharacter ? characterMap.get(oldCharacter) ?? null : null;
+      const characterId = oldCharacter ? (characterMap.get(oldCharacter) ?? null) : null;
       const oldOwner = text(token.ownerId, "", 120);
       const ownerId = oldOwner && memberIds.has(oldOwner) ? oldOwner : null;
       const tokenId = newId("tok");
       db.prepare(
         `INSERT INTO tokens
           (id, scene_id, name, image_url, character_id, owner_id, x, y, size, color, hp_current, hp_max, ac, initiative_bonus, group_id, group_name, conditions, hidden, locked, sort_order, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).run(
         tokenId,
         sceneId,
@@ -262,7 +256,9 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
         numberValue(token.y, 0),
         clamp(numberValue(token.size, 1, 1, 6), 1, 6),
         text(token.color, "#c8a96b", 30),
-        token.hpCurrent === null || token.hpCurrent === undefined ? null : numberValue(token.hpCurrent, 0),
+        token.hpCurrent === null || token.hpCurrent === undefined
+          ? null
+          : numberValue(token.hpCurrent, 0),
         token.hpMax === null || token.hpMax === undefined ? null : numberValue(token.hpMax, 0),
         token.ac === null || token.ac === undefined ? null : numberValue(token.ac, 0, -100, 1000),
         token.initiativeBonus === null || token.initiativeBonus === undefined
@@ -275,7 +271,7 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
         token.locked ? 1 : 0,
         numberValue(token.sortOrder, 0),
         ts,
-        ts,
+        ts
       );
       tokenMap.set(oldId, tokenId);
       stats.tokens += 1;
@@ -295,25 +291,25 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
             const oldGroup = text(entry.groupId, "", 80);
             return {
               id: text(entry.id, newId("init"), 80),
-              tokenId: oldToken ? tokenMap.get(oldToken) ?? null : null,
+              tokenId: oldToken ? (tokenMap.get(oldToken) ?? null) : null,
               name: text(entry.name, "Combatant", 80),
               initiative: numberValue(entry.initiative, 0, -100, 1000),
               color: text(entry.color, "#c8a96b", 30),
               ownerId: oldOwner && memberIds.has(oldOwner) ? oldOwner : null,
-              sceneId: oldScene ? sceneMap.get(oldScene) ?? null : null,
-              groupId: oldGroup ? groupMap.get(oldGroup) ?? null : null,
+              sceneId: oldScene ? (sceneMap.get(oldScene) ?? null) : null,
+              groupId: oldGroup ? (groupMap.get(oldGroup) ?? null) : null,
             };
           })
       : [];
     db.prepare(
-      "INSERT OR REPLACE INTO campaign_state (campaign_id, active_scene_id, initiative, round, turn_index, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+      "INSERT OR REPLACE INTO campaign_state (campaign_id, active_scene_id, initiative, round, turn_index, updated_at) VALUES (?, ?, ?, ?, ?, ?)"
     ).run(
       campaignId,
       activeSceneId,
       JSON.stringify(initiative),
       numberValue(stateData.round, 1, 1, 999),
       numberValue(stateData.turnIndex, 0, 0, 200),
-      ts,
+      ts
     );
 
     for (const message of records(payload.messages, 1000, "messages")) {
@@ -321,18 +317,18 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
       const oldUser = text(message.userId, "", 120);
       const visibility = message.visibility === "gm" ? "gm" : "all";
       db.prepare(
-        "INSERT INTO messages (id, campaign_id, scene_id, user_id, author_name, type, content, data, visibility, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO messages (id, campaign_id, scene_id, user_id, author_name, type, content, data, visibility, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
       ).run(
         newId("msg"),
         campaignId,
-        oldScene ? sceneMap.get(oldScene) ?? null : null,
+        oldScene ? (sceneMap.get(oldScene) ?? null) : null,
         oldUser && memberIds.has(oldUser) ? oldUser : null,
         text(message.authorName, "Imported user", 80),
         text(message.type, "chat", 20),
         longText(message.content, "", 5000),
         message.data && typeof message.data === "object" ? JSON.stringify(message.data) : null,
         visibility,
-        timestamp(message.createdAt, ts),
+        timestamp(message.createdAt, ts)
       );
       stats.messages += 1;
     }
@@ -341,7 +337,7 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
       db.prepare(
         `INSERT INTO journal_entries
           (id, campaign_id, title, content, visible, kind, attachments, created_by, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).run(
         newId("journal"),
         campaignId,
@@ -352,7 +348,7 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
         JSON.stringify(normalizeJournalAttachments(entry.attachments)),
         userId,
         timestamp(entry.createdAt, ts),
-        timestamp(entry.updatedAt, ts),
+        timestamp(entry.updatedAt, ts)
       );
       stats.journal += 1;
     }
@@ -361,22 +357,22 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
       const encounterId = newId("enc");
       const oldScene = text(encounter.sceneId, "", 120);
       db.prepare(
-        "INSERT INTO encounters (id, campaign_id, name, description, scene_id, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO encounters (id, campaign_id, name, description, scene_id, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
       ).run(
         encounterId,
         campaignId,
         text(encounter.name, "Imported encounter", 100),
         longText(encounter.description, "", 4000),
-        oldScene ? sceneMap.get(oldScene) ?? null : null,
+        oldScene ? (sceneMap.get(oldScene) ?? null) : null,
         numberValue(encounter.sortOrder, 0),
         ts,
-        ts,
+        ts
       );
       for (const combatant of records(encounter.combatants, 500, "combatants")) {
         db.prepare(
           `INSERT INTO encounter_combatants
             (id, encounter_id, monster_id, name, level, count, hp, ac, perception, notes, wave, sort_order, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
         ).run(
           newId("encm"),
           encounterId,
@@ -385,7 +381,9 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
           numberValue(combatant.level, 1, -1, 30),
           clamp(numberValue(combatant.count, 1, 1, 50), 1, 50),
           combatant.hp === null || combatant.hp === undefined ? null : numberValue(combatant.hp, 0),
-          combatant.ac === null || combatant.ac === undefined ? null : numberValue(combatant.ac, 0, -100, 1000),
+          combatant.ac === null || combatant.ac === undefined
+            ? null
+            : numberValue(combatant.ac, 0, -100, 1000),
           combatant.perception === null || combatant.perception === undefined
             ? null
             : numberValue(combatant.perception, 0, -100, 1000),
@@ -393,7 +391,7 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
           clamp(numberValue(combatant.wave, 1, 1, 20), 1, 20),
           numberValue(combatant.sortOrder, 0),
           ts,
-          ts,
+          ts
         );
       }
       stats.encounters += 1;
@@ -404,7 +402,7 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
       db.prepare(
         `INSERT INTO loot_parcels
           (id, campaign_id, name, description, items, gp, sp, cp, status, distributed_to, distributed_to_name, distributed_at, sort_order, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).run(
         newId("loot"),
         campaignId,
@@ -415,12 +413,12 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
         numberValue(parcel.sp, 0, 0, 1_000_000_000),
         numberValue(parcel.cp, 0, 0, 1_000_000_000),
         parcel.status === "distributed" ? "distributed" : "open",
-        oldRecipient ? characterMap.get(oldRecipient) ?? null : null,
+        oldRecipient ? (characterMap.get(oldRecipient) ?? null) : null,
         parcel.distributedToName ? text(parcel.distributedToName, "", 120) : null,
         optionalTimestamp(parcel.distributedAt),
         numberValue(parcel.sortOrder, 0),
         ts,
-        ts,
+        ts
       );
       stats.loot += 1;
     }
@@ -428,7 +426,7 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
     const dashboard = record(payload.dashboard);
     if (Object.keys(dashboard).length) {
       db.prepare(
-        "INSERT INTO campaign_dashboard (campaign_id, last_session_summary, next_session_at, next_session_teaser, next_session_notes, threads, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO campaign_dashboard (campaign_id, last_session_summary, next_session_at, next_session_teaser, next_session_notes, threads, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
       ).run(
         campaignId,
         longText(dashboard.lastSessionSummary, "", 20_000),
@@ -436,7 +434,7 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
         longText(dashboard.nextSessionTeaser, "", 500),
         longText(dashboard.nextSessionNotes, "", 20_000),
         JSON.stringify(normalizeCampaignThreads(dashboard.threads)),
-        ts,
+        ts
       );
     }
 
@@ -444,7 +442,7 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
       db.prepare(
         `INSERT INTO campaign_npcs
           (id, campaign_id, name, level, hp, ac, perception, size, color, image_url, description, sort_order, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).run(
         newId("npc"),
         campaignId,
@@ -461,7 +459,7 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
         longText(npc.description, "", 20_000),
         numberValue(npc.sortOrder, 0),
         ts,
-        ts,
+        ts
       );
       stats.npcs += 1;
     }
@@ -469,7 +467,7 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
     for (const session of records(payload.sessions, 500, "sessions")) {
       const sessionId = newId("sess");
       db.prepare(
-        "INSERT INTO campaign_sessions (id, campaign_id, title, scheduled_at, duration_minutes, notes, agenda, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO campaign_sessions (id, campaign_id, title, scheduled_at, duration_minutes, notes, agenda, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
       ).run(
         sessionId,
         campaignId,
@@ -480,7 +478,7 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
         JSON.stringify(normalizeSessionAgenda(session.agenda)),
         normalizeSessionStatus(session.status),
         ts,
-        ts,
+        ts
       );
       for (const attendance of records(session.attendance, 50, "attendance")) {
         const exportUserId = text(attendance.userId, "", 120);
@@ -490,13 +488,13 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
           `INSERT INTO session_attendance (session_id, user_id, status, note, updated_at)
            VALUES (?, ?, ?, ?, ?)
            ON CONFLICT(session_id, user_id)
-           DO UPDATE SET status = excluded.status, note = excluded.note, updated_at = excluded.updated_at`,
+           DO UPDATE SET status = excluded.status, note = excluded.note, updated_at = excluded.updated_at`
         ).run(
           sessionId,
           localUserId,
           normalizeAttendanceStatus(attendance.status),
           longText(attendance.note, "", 500),
-          ts,
+          ts
         );
       }
       for (const checkin of records(session.checkins, 100, "checkins")) {
@@ -508,7 +506,7 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
           `INSERT INTO session_checkins (session_id, user_id, status, updated_at)
            VALUES (?, ?, ?, ?)
            ON CONFLICT(session_id, user_id)
-           DO UPDATE SET status = excluded.status, updated_at = excluded.updated_at`,
+           DO UPDATE SET status = excluded.status, updated_at = excluded.updated_at`
         ).run(sessionId, localUserId, checkin.status, ts);
       }
       stats.sessions += 1;

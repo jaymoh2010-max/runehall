@@ -104,12 +104,7 @@ import {
   Textarea,
   Toggle,
 } from "../../ui";
-import {
-  DeityPicker,
-  EquipmentPicker,
-  FeatPicker,
-  SpellPicker,
-} from "../pickers";
+import { DeityPicker, EquipmentPicker, FeatPicker, SpellPicker } from "../pickers";
 import { ContentSourceToggle } from "../ContentSourceToggle";
 import { RunePicker } from "../RunePicker";
 import {
@@ -120,14 +115,17 @@ import {
 } from "../../../../shared/content";
 import { summarizeRunes } from "../../../../shared/runes";
 import type { BuilderProps } from "../shared";
-import {
-  StepHeading,
-  ValidationNote,
-  SearchInput,
-  MiniFeatureList,
-} from "../shared";
+import { StepHeading, ValidationNote, SearchInput, MiniFeatureList } from "../shared";
 
-export function FeatsStep({ draft, update, derived, context, setStep, openPicker, campaignRuleset }: BuilderProps) {
+export function FeatsStep({
+  draft,
+  update,
+  derived,
+  context,
+  setStep,
+  openPicker,
+  campaignRuleset,
+}: BuilderProps) {
   const classData = context.classData;
   const ancestry = context.ancestry;
   const slots = featSlotsFor(classData, draft.level);
@@ -147,7 +145,10 @@ export function FeatsStep({ draft, update, derived, context, setStep, openPicker
           const feat = featId ? context.feats[featId] : null;
           const label = `${slot.category === "class" ? "Class" : slot.category === "ancestry" ? "Ancestry" : slot.category === "skill" ? "Skill" : "General"} feat`;
           return (
-            <Card key={`${slot.category}-${slot.level}`} className={`feat-slot ${feat ? "is-filled" : ""}`}>
+            <Card
+              key={`${slot.category}-${slot.level}`}
+              className={`feat-slot ${feat ? "is-filled" : ""}`}
+            >
               <div className="feat-slot-head">
                 <div className="feat-slot-level">L{slot.level}</div>
                 <div className="grow">
@@ -180,7 +181,10 @@ export function FeatsStep({ draft, update, derived, context, setStep, openPicker
                         update((current) => {
                           const bucket = { ...current.feats[slot.category] };
                           delete bucket[String(slot.level)];
-                          return { ...current, feats: { ...current.feats, [slot.category]: bucket } };
+                          return {
+                            ...current,
+                            feats: { ...current.feats, [slot.category]: bucket },
+                          };
                         })
                       }
                     >
@@ -192,11 +196,15 @@ export function FeatsStep({ draft, update, derived, context, setStep, openPicker
               {feat ? (
                 <div className="feat-slot-body">
                   <div className="chip-row" style={{ marginBottom: 8 }}>
-                    {feat.traits.map((trait) => <Tag key={trait}>{traitLabel(trait)}</Tag>)}
+                    {feat.traits.map((trait) => (
+                      <Tag key={trait}>{traitLabel(trait)}</Tag>
+                    ))}
                     {feat.rarity !== "common" ? <Tag tone="violet">{feat.rarity}</Tag> : null}
                   </div>
                   {feat.prerequisites.length ? (
-                    <div className="prereq-inline"><strong>Requires:</strong> {feat.prerequisites.join("; ")}</div>
+                    <div className="prereq-inline">
+                      <strong>Requires:</strong> {feat.prerequisites.join("; ")}
+                    </div>
                   ) : null}
                   <RichText html={feat.description} />
                 </div>
@@ -210,16 +218,22 @@ export function FeatsStep({ draft, update, derived, context, setStep, openPicker
         <Card className="granted-feats">
           <h3>Granted by your background</h3>
           <div className="chip-row" style={{ marginTop: 8 }}>
-            {derived.grantedFeats.map((feat) => <Tag key={feat.name} tone="gold">{feat.name}</Tag>)}
+            {derived.grantedFeats.map((feat) => (
+              <Tag key={feat.name} tone="gold">
+                {feat.name}
+              </Tag>
+            ))}
           </div>
-          <p className="tiny muted" style={{ marginTop: 8 }}>These do not consume a feat slot.</p>
+          <p className="tiny muted" style={{ marginTop: 8 }}>
+            These do not consume a feat slot.
+          </p>
         </Card>
       ) : null}
       <div className="info-box">
         <BookOpen size={16} />
         <p>
-          Feats whose prerequisites are not met are hidden. Complex story or campaign prerequisites are shown as
-          warnings so you can verify them with your GM.{" "}
+          Feats whose prerequisites are not met are hidden. Complex story or campaign prerequisites
+          are shown as warnings so you can verify them with your GM.{" "}
           {campaignRuleset
             ? `This campaign uses ${rulesetLabel(campaignRuleset)}; the GM controls which sources are available.`
             : "The feat picker starts with core sources; use Expanded sources there to see the full compendium."}
@@ -227,8 +241,12 @@ export function FeatsStep({ draft, update, derived, context, setStep, openPicker
       </div>
       <ValidationNote issues={issues} />
       <div className="step-actions">
-        <Button variant="ghost" onClick={() => setStep("skills")}>Back</Button>
-        <Button variant="primary" onClick={() => setStep("spells")} icon={<ArrowRight size={15} />}>Spells</Button>
+        <Button variant="ghost" onClick={() => setStep("skills")}>
+          Back
+        </Button>
+        <Button variant="primary" onClick={() => setStep("spells")} icon={<ArrowRight size={15} />}>
+          Spells
+        </Button>
       </div>
     </div>
   );

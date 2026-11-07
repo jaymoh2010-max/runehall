@@ -1,10 +1,6 @@
 import { db, type RegistrationInviteRow } from "./db";
 import { inviteCode, newId, now, safeString } from "./util";
-import type {
-  RegistrationInvite,
-  RegistrationMode,
-  RegistrationStatus,
-} from "../shared/types";
+import type { RegistrationInvite, RegistrationMode, RegistrationStatus } from "../shared/types";
 
 const MODES: RegistrationMode[] = ["open", "invite", "closed"];
 const REGISTRATION_KEY = "registration_mode";
@@ -24,9 +20,8 @@ export function userCount(): number {
 }
 
 export function getRegistrationMode(): RegistrationMode {
-  const row = db
-    .prepare("SELECT value FROM app_settings WHERE key = ?")
-    .get(REGISTRATION_KEY) as { value: string } | undefined;
+  const row = db.prepare("SELECT value FROM app_settings WHERE key = ?").get(REGISTRATION_KEY) as
+    { value: string } | undefined;
   return isMode(row?.value) ? row.value : envMode();
 }
 
@@ -36,7 +31,7 @@ export function setRegistrationMode(mode: unknown): RegistrationMode {
   }
   db.prepare(
     `INSERT INTO app_settings (key, value, updated_at) VALUES (?, ?, ?)
-     ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
+     ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`
   ).run(REGISTRATION_KEY, mode, now());
   return mode;
 }
@@ -67,9 +62,8 @@ export function requireRegistrationInvite(code: unknown): RegistrationInviteRow 
   }
   const normalized = safeString(code, "", 40).toUpperCase();
   if (!normalized) throw new Error("An invite code is required to create an account.");
-  const invite = db
-    .prepare("SELECT * FROM registration_invites WHERE code = ?")
-    .get(normalized) as RegistrationInviteRow | undefined;
+  const invite = db.prepare("SELECT * FROM registration_invites WHERE code = ?").get(normalized) as
+    RegistrationInviteRow | undefined;
   if (!invite) throw new Error("That invite code is not valid.");
   if (invite.used_by || invite.used_at) throw new Error("That invite code has already been used.");
   if (invite.expires_at !== null && invite.expires_at <= now()) {
@@ -81,7 +75,7 @@ export function requireRegistrationInvite(code: unknown): RegistrationInviteRow 
 export function consumeRegistrationInvite(inviteId: string, userId: string): boolean {
   const result = db
     .prepare(
-      "UPDATE registration_invites SET used_by = ?, used_at = ? WHERE id = ? AND used_by IS NULL AND used_at IS NULL",
+      "UPDATE registration_invites SET used_by = ?, used_at = ? WHERE id = ? AND used_by IS NULL AND used_at IS NULL"
     )
     .run(userId, now(), inviteId);
   return Number(result.changes ?? 0) > 0;
@@ -95,7 +89,9 @@ function uniqueInviteCode(): string {
   return inviteCode();
 }
 
-function serializeInvite(row: RegistrationInviteRow & { used_by_name?: string | null }): RegistrationInvite {
+function serializeInvite(
+  row: RegistrationInviteRow & { used_by_name?: string | null }
+): RegistrationInvite {
   return {
     id: row.id,
     code: row.code,
@@ -123,9 +119,11 @@ export function createRegistrationInvite(input: {
   const code = uniqueInviteCode();
   db.prepare(
     `INSERT INTO registration_invites (id, code, note, created_by, created_at, expires_at)
-     VALUES (?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?)`
   ).run(id, code, note, input.createdBy, now(), expiresAt);
-  const row = db.prepare("SELECT * FROM registration_invites WHERE id = ?").get(id) as RegistrationInviteRow;
+  const row = db
+    .prepare("SELECT * FROM registration_invites WHERE id = ?")
+    .get(id) as RegistrationInviteRow;
   return serializeInvite(row);
 }
 
@@ -136,7 +134,7 @@ export function listRegistrationInvites(): RegistrationInvite[] {
        FROM registration_invites i
        LEFT JOIN users u ON u.id = i.used_by
        ORDER BY i.created_at DESC
-       LIMIT 200`,
+       LIMIT 200`
     )
     .all() as (RegistrationInviteRow & { used_by_name: string | null })[];
   return rows.map(serializeInvite);

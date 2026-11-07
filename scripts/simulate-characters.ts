@@ -33,7 +33,7 @@ import type {
 } from "../src/shared/types";
 
 const dir = path.resolve("data", "compendium");
-const read = <T,>(file: string): T[] =>
+const read = <T>(file: string): T[] =>
   JSON.parse(fs.readFileSync(path.join(dir, file), "utf8")) as T[];
 
 const ancestries = read<Ancestry>("ancestries.json");
@@ -64,11 +64,12 @@ function mulberry32(seed: number) {
 }
 
 const random = (rng: () => number) => rng();
-const pick = <T,>(rng: () => number, items: T[]): T => items[Math.floor(rng() * items.length)];
-const sample = <T,>(rng: () => number, items: T[], count: number): T[] => {
+const pick = <T>(rng: () => number, items: T[]): T => items[Math.floor(rng() * items.length)];
+const sample = <T>(rng: () => number, items: T[], count: number): T[] => {
   const copy = [...items];
   const out: T[] = [];
-  while (copy.length && out.length < count) out.push(copy.splice(Math.floor(rng() * copy.length), 1)[0]);
+  while (copy.length && out.length < count)
+    out.push(copy.splice(Math.floor(rng() * copy.length), 1)[0]);
   return out;
 };
 
@@ -76,7 +77,7 @@ function contextFor(
   draft: CharacterDraft,
   selectedFeats: Feat[],
   selectedSpells: Spell[],
-  selectedEquipment: Equipment[],
+  selectedEquipment: Equipment[]
 ): CharacterContext {
   return {
     ancestry: ancestries.find((entry) => entry.id === draft.ancestryId) ?? null,
@@ -101,7 +102,8 @@ function chooseBackgroundChoices(rng: () => number, draft: CharacterDraft, backg
   draft.skills.backgroundLore = [];
   for (const group of background.loreChoices ?? []) {
     if (group.options.length) {
-      for (const choice of sample(rng, group.options, group.count)) draft.skills.backgroundLore.push(choice);
+      for (const choice of sample(rng, group.options, group.count))
+        draft.skills.backgroundLore.push(choice);
     } else {
       for (let index = 0; index < group.count; index++) {
         draft.skills.backgroundLore.push(`Simulation ${index + 1} Lore`);
@@ -116,7 +118,7 @@ function chooseClassChoices(
   rng: () => number,
   draft: CharacterDraft,
   classData: ClassData,
-  forcedChoice?: { groupKey: string; optionId: string },
+  forcedChoice?: { groupKey: string; optionId: string }
 ) {
   draft.classChoices = {};
   for (const group of classData.choiceGroups) {
@@ -137,15 +139,19 @@ function chooseBoosts(rng: () => number, draft: CharacterDraft, context: Charact
   const classData = context.classData;
   const fixed = new Set<string>();
   if (ancestry) {
-    for (const entry of ancestry.boosts) if (entry.fixed) for (const ability of entry.from) fixed.add(ability);
+    for (const entry of ancestry.boosts)
+      if (entry.fixed) for (const ability of entry.from) fixed.add(ability);
   }
   if (background) {
-    for (const entry of background.boosts) if (entry.fixed) for (const ability of entry.from) fixed.add(ability);
+    for (const entry of background.boosts)
+      if (entry.fixed) for (const ability of entry.from) fixed.add(ability);
   }
   const ancestryFlex = flexibleBoosts(ancestry);
   const ancestryPicks: string[] = [];
   for (const entry of ancestryFlex) {
-    const choices = entry.from.filter((ability) => !ancestryPicks.includes(ability) && !fixed.has(ability));
+    const choices = entry.from.filter(
+      (ability) => !ancestryPicks.includes(ability) && !fixed.has(ability)
+    );
     ancestryPicks.push(choices.length ? pick(rng, choices) : pick(rng, entry.from));
   }
   draft.boosts.ancestry = ancestryPicks as CharacterDraft["boosts"]["ancestry"];
@@ -163,7 +169,9 @@ function chooseBoosts(rng: () => number, draft: CharacterDraft, context: Charact
 
   const free: string[] = [];
   for (let index = 0; index < 4; index++) {
-    const choices = ["str", "dex", "con", "int", "wis", "cha"].filter((ability) => !free.includes(ability));
+    const choices = ["str", "dex", "con", "int", "wis", "cha"].filter(
+      (ability) => !free.includes(ability)
+    );
     free.push(pick(rng, choices));
   }
   draft.boosts.free = free as CharacterDraft["boosts"]["free"];
@@ -171,7 +179,11 @@ function chooseBoosts(rng: () => number, draft: CharacterDraft, context: Charact
   for (const milestone of [5, 10, 15, 20]) {
     if (draft.level < milestone) continue;
     const abilities = ["str", "dex", "con", "int", "wis", "cha"];
-    draft.boosts.levels[String(milestone)] = sample(rng, abilities, 4) as CharacterDraft["boosts"]["levels"][string];
+    draft.boosts.levels[String(milestone)] = sample(
+      rng,
+      abilities,
+      4
+    ) as CharacterDraft["boosts"]["levels"][string];
   }
 }
 
@@ -180,7 +192,8 @@ function chooseSkills(rng: () => number, draft: CharacterDraft, context: Charact
   const fixed = grantedTrainedSkills(draft, context);
   const required = Math.max(
     0,
-    classData.trainedSkills.additional + Math.max(0, abilityMod(baseAbilityScores(draft, context).int)),
+    classData.trainedSkills.additional +
+      Math.max(0, abilityMod(baseAbilityScores(draft, context).int))
   );
   const candidates = SKILLS.map((skill) => skill.id).filter((id) => !fixed.has(id));
   draft.skills.trained = sample(rng, candidates, Math.min(required, candidates.length));
@@ -188,7 +201,8 @@ function chooseSkills(rng: () => number, draft: CharacterDraft, context: Charact
   const ranks: Record<string, number> = {};
   for (const skill of SKILLS) ranks[skill.id] = 0;
   for (const skill of fixed) if (skill in ranks) ranks[skill] = 1;
-  for (const skill of draft.skills.trained) if (skill in ranks) ranks[skill] = Math.max(ranks[skill], 1);
+  for (const skill of draft.skills.trained)
+    if (skill in ranks) ranks[skill] = Math.max(ranks[skill], 1);
 
   draft.skills.increases = {};
   for (const level of classData.skillIncreaseLevels.filter((entry) => entry <= draft.level)) {
@@ -222,7 +236,7 @@ function chooseFeats(
   rng: () => number,
   draft: CharacterDraft,
   context: CharacterContext,
-  selectedFeats: Feat[],
+  selectedFeats: Feat[]
 ) {
   const classData = context.classData!;
   const slots = featSlotsFor(classData, draft.level);
@@ -247,7 +261,7 @@ function chooseSpells(
   rng: () => number,
   draft: CharacterDraft,
   context: CharacterContext,
-  selectedSpells: Spell[],
+  selectedSpells: Spell[]
 ) {
   const classData = context.classData!;
   const caster = casterInfo(classData);
@@ -257,7 +271,7 @@ function chooseSpells(
   const focusPool = (remasterSpells.length ? remasterSpells : spells).filter(
     (spell) =>
       spell.traits.includes("focus") &&
-      (spell.traits.includes(classTrait) || spell.traits.includes("focus")),
+      (spell.traits.includes(classTrait) || spell.traits.includes("focus"))
   );
   if (caster.progression === "focus") {
     for (const spell of sample(rng, focusPool, 1)) {
@@ -268,23 +282,36 @@ function chooseSpells(
     return;
   }
 
-  const tradition = caster.tradition ?? (caster.traditionOptions ? pick(rng, caster.traditionOptions) : null);
+  const tradition =
+    caster.tradition ?? (caster.traditionOptions ? pick(rng, caster.traditionOptions) : null);
   draft.spells.tradition = tradition;
   const pool = (remasterSpells.length ? remasterSpells : spells).filter(
-    (spell) => !tradition || spell.traditions.includes(tradition),
+    (spell) => !tradition || spell.traditions.includes(tradition)
   );
   const maxRank = spellSlotsFor(draft.level, caster.progression, classData.name)?.length ?? 0;
   if (!maxRank) return;
 
   const cantripLimit = 5;
-  for (const spell of sample(rng, pool.filter((entry) => entry.rank === 0), cantripLimit)) {
+  for (const spell of sample(
+    rng,
+    pool.filter((entry) => entry.rank === 0),
+    cantripLimit
+  )) {
     draft.spells.cantrips.push(spell.id);
     selectedSpells.push(spell);
     context.spells[spell.id] = spell;
   }
 
   const repertoire = spellRepertoireLimits(classData, draft.level);
-  const preparedClasses = new Set(["animist", "cleric", "druid", "magus", "necromancer", "witch", "wizard"]);
+  const preparedClasses = new Set([
+    "animist",
+    "cleric",
+    "druid",
+    "magus",
+    "necromancer",
+    "witch",
+    "wizard",
+  ]);
   const prepared = preparedClasses.has(classTrait);
   const slots = spellSlotsFor(draft.level, caster.progression, classData.name) ?? [];
   for (let rank = 1; rank <= maxRank; rank++) {
@@ -297,7 +324,8 @@ function chooseSpells(
       context.spells[spell.id] = spell;
     }
     if (prepared) {
-      for (const spell of known.slice(0, slots[rank - 1] ?? 0)) draft.spells.prepared.push(spell.id);
+      for (const spell of known.slice(0, slots[rank - 1] ?? 0))
+        draft.spells.prepared.push(spell.id);
     }
   }
 
@@ -312,19 +340,25 @@ function chooseEquipment(
   rng: () => number,
   draft: CharacterDraft,
   context: CharacterContext,
-  selectedEquipment: Equipment[],
+  selectedEquipment: Equipment[]
 ) {
   const derived = computeCharacter(draft, context);
   const attacks = derived.prof.attacks;
   const category =
-    attacks.martial > 0 ? "martial" : attacks.simple > 0 ? "simple" : attacks.unarmed > 0 ? "unarmed" : "simple";
+    attacks.martial > 0
+      ? "martial"
+      : attacks.simple > 0
+        ? "simple"
+        : attacks.unarmed > 0
+          ? "unarmed"
+          : "simple";
   const weaponPool = equipment.filter(
     (item) =>
       item.weapon &&
       item.weapon.category === category &&
       item.level <= 1 &&
       item.weapon.damage.dice > 0 &&
-      item.weapon.damage.die,
+      item.weapon.damage.die
   );
   if (weaponPool.length) {
     const weapon = pick(rng, weaponPool);
@@ -342,7 +376,7 @@ function chooseEquipment(
           ? "light"
           : "unarmored";
   const armorPool = equipment.filter(
-    (item) => item.armor && item.armor.category === defenseCategory && item.level <= 1,
+    (item) => item.armor && item.armor.category === defenseCategory && item.level <= 1
   );
   if (armorPool.length) {
     const armor = pick(rng, armorPool);
@@ -363,7 +397,13 @@ function chooseEquipment(
 function diffObjects(a: unknown, b: unknown, prefix = ""): string[] {
   const out: string[] = [];
   if (a === b) return out;
-  if (typeof a !== typeof b || a === null || b === null || typeof a !== "object" || typeof b !== "object") {
+  if (
+    typeof a !== typeof b ||
+    a === null ||
+    b === null ||
+    typeof a !== "object" ||
+    typeof b !== "object"
+  ) {
     out.push(`${prefix || "root"}: ${JSON.stringify(a)} -> ${JSON.stringify(b)}`);
     return out;
   }
@@ -380,7 +420,13 @@ function diffObjects(a: unknown, b: unknown, prefix = ""): string[] {
   }
   const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
   for (const key of keys) {
-    out.push(...diffObjects((a as Record<string, unknown>)[key], (b as Record<string, unknown>)[key], prefix ? `${prefix}.${key}` : key));
+    out.push(
+      ...diffObjects(
+        (a as Record<string, unknown>)[key],
+        (b as Record<string, unknown>)[key],
+        prefix ? `${prefix}.${key}` : key
+      )
+    );
   }
   return out;
 }
@@ -397,7 +443,7 @@ function validateCharacter(
   draft: CharacterDraft,
   context: CharacterContext,
   derived: ReturnType<typeof computeCharacter>,
-  problems: Problem[],
+  problems: Problem[]
 ) {
   const character = `${draft.name} (${draft.level})`;
   const push = (kind: string, detail: string) => problems.push({ seed, character, kind, detail });
@@ -416,7 +462,8 @@ function validateCharacter(
   numeric("will", derived.saves.will);
   numeric("bulk", derived.bulk.total);
   numeric("wealth", derived.wealth.remaining);
-  for (const ability of Object.entries(derived.abilities)) numeric(`ability ${ability[0]}`, ability[1]);
+  for (const ability of Object.entries(derived.abilities))
+    numeric(`ability ${ability[0]}`, ability[1]);
   for (const skill of derived.skills) numeric(`skill ${skill.id}`, skill.mod);
   for (const lore of derived.lore) numeric(`lore ${lore.name}`, lore.mod);
   for (const attack of derived.attacks) {
@@ -426,7 +473,8 @@ function validateCharacter(
     }
   }
   for (const message of derived.validation) {
-    if (/undefined|NaN|\[object Object\]/.test(message.message)) push("bad-validation", message.message);
+    if (/undefined|NaN|\[object Object\]/.test(message.message))
+      push("bad-validation", message.message);
   }
   if (draft.level === 1) {
     for (const [ability, score] of Object.entries(derived.abilities)) {
@@ -443,7 +491,7 @@ function simulate(
   forcedLevel?: number,
   forcedAncestry?: Ancestry,
   forcedBackground?: Background,
-  forcedChoice?: { groupKey: string; optionId: string },
+  forcedChoice?: { groupKey: string; optionId: string }
 ): Problem[] {
   const rng = mulberry32(seed);
   const problems: Problem[] = [];
@@ -451,7 +499,9 @@ function simulate(
   const heritageChoices = heritages.filter(
     (entry) =>
       entry.remaster &&
-      (entry.versatile || entry.ancestry === ancestry.name || entry.ancestrySlug === ancestry.name.toLowerCase()),
+      (entry.versatile ||
+        entry.ancestry === ancestry.name ||
+        entry.ancestrySlug === ancestry.name.toLowerCase())
   );
   const heritage = heritageChoices.length ? pick(rng, heritageChoices) : null;
   const background = forcedBackground ?? pick(rng, remasterBackgrounds);
@@ -486,7 +536,10 @@ function simulate(
 
   try {
     const normalized = normalizeCharacterDraft(JSON.parse(JSON.stringify(draft)), draft.name);
-    const roundTripped = normalizeCharacterDraft(JSON.parse(JSON.stringify(normalized)), draft.name);
+    const roundTripped = normalizeCharacterDraft(
+      JSON.parse(JSON.stringify(normalized)),
+      draft.name
+    );
     const differences = diffObjects(normalized, roundTripped);
     if (differences.length) {
       problems.push({
@@ -540,7 +593,7 @@ if (optionsSweep) {
           ...simulate(seed++, classData, level, undefined, undefined, {
             groupKey: group.key,
             optionId: option.id,
-          }),
+          })
         );
         optionCount++;
       }
@@ -582,7 +635,7 @@ if (content) {
     allProblems.push(...simulate(seed++, undefined, 5, undefined, background));
   }
   console.log(
-    `Content: ${remasterAncestries.length} ancestries and ${remasterBackgrounds.length} backgrounds at levels 1 and 5.`,
+    `Content: ${remasterAncestries.length} ancestries and ${remasterBackgrounds.length} backgrounds at levels 1 and 5.`
   );
 }
 for (let seed = 1; seed <= seeds; seed++) allProblems.push(...simulate(seed));
@@ -594,8 +647,17 @@ for (const problem of allProblems) {
   list.push(problem);
   grouped.set(key, list);
 }
-console.log(`Simulated ${seeds} characters; ${allProblems.length} problems in ${grouped.size} groups.`);
-for (const [key, list] of [...grouped.entries()].sort((a, b) => b[1].length - a[1].length).slice(0, 40)) {
+console.log(
+  `Simulated ${seeds} characters; ${allProblems.length} problems in ${grouped.size} groups.`
+);
+for (const [key, list] of [...grouped.entries()]
+  .sort((a, b) => b[1].length - a[1].length)
+  .slice(0, 40)) {
   console.log(`\n${list.length}x ${key}`);
-  console.log(list.slice(0, 4).map((problem) => `  seed ${problem.seed}: ${problem.character}`).join("\n"));
+  console.log(
+    list
+      .slice(0, 4)
+      .map((problem) => `  seed ${problem.seed}: ${problem.character}`)
+      .join("\n")
+  );
 }

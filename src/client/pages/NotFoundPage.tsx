@@ -18,7 +18,9 @@ export function NotFoundPage() {
           The page you're looking for has wandered off. The hall is still where you left it.
         </p>
         <div className="row" style={{ justifyContent: "center", marginTop: 24 }}>
-          <Link to="/" className="btn btn-primary btn-md"><Home size={15} /> Back to the hall</Link>
+          <Link to="/" className="btn btn-primary btn-md">
+            <Home size={15} /> Back to the hall
+          </Link>
         </div>
       </div>
     </div>

@@ -61,7 +61,7 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
       try {
         transaction(() => {
           db.prepare(
-            "INSERT INTO users (id, username, display_name, password_hash, avatar_url, is_admin, created_at) VALUES (?, ?, ?, ?, NULL, ?, ?)",
+            "INSERT INTO users (id, username, display_name, password_hash, avatar_url, is_admin, created_at) VALUES (?, ?, ?, ?, NULL, ?, ?)"
           ).run(id, username, displayName, hashPassword(password), bootstrap ? 1 : 0, now());
           if (invite && !consumeRegistrationInvite(invite.id, id)) {
             throw new Error("That invite code has already been used.");
@@ -83,14 +83,20 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
         actor: toPublicUser(row),
         targetType: "user",
         targetId: id,
-        detail: bootstrap ? "first user; instance administrator" : invite ? `invite ${invite.code}` : "open registration",
+        detail: bootstrap
+          ? "first user; instance administrator"
+          : invite
+            ? `invite ${invite.code}`
+            : "open registration",
         request,
       });
       const token = createSession(id);
       setSessionCookie(reply, token);
       return reply.send({ user: toPublicUser(row) });
     } catch (error) {
-      return reply.code(400).send({ error: error instanceof Error ? error.message : "Could not create account." });
+      return reply
+        .code(400)
+        .send({ error: error instanceof Error ? error.message : "Could not create account." });
     }
   });
 
@@ -144,12 +150,16 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
     if (!request.user) return reply.code(401).send({ error: "Sign in to continue." });
     const body = (request.body ?? {}) as Record<string, unknown>;
     const displayName = safeString(body.displayName, request.user.displayName, 40);
-    const avatarUrl = body.avatarUrl === null ? null : safeString(body.avatarUrl, request.user.avatarUrl ?? "", 500);
-    if (displayName.length < 2) return reply.code(400).send({ error: "Display name is too short." });
+    const avatarUrl =
+      body.avatarUrl === null
+        ? null
+        : safeString(body.avatarUrl, request.user.avatarUrl ?? "", 500);
+    if (displayName.length < 2)
+      return reply.code(400).send({ error: "Display name is too short." });
     db.prepare("UPDATE users SET display_name = ?, avatar_url = ? WHERE id = ?").run(
       displayName,
       avatarUrl,
-      request.user.id,
+      request.user.id
     );
     logAudit({
       action: "auth.profile_update",
@@ -168,14 +178,19 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
     const body = (request.body ?? {}) as Record<string, unknown>;
     const currentPassword = typeof body.currentPassword === "string" ? body.currentPassword : "";
     const row = db.prepare("SELECT * FROM users WHERE id = ?").get(request.user.id);
-    if (!row || !verifyPassword(currentPassword, (row as { password_hash: string }).password_hash)) {
+    if (
+      !row ||
+      !verifyPassword(currentPassword, (row as { password_hash: string }).password_hash)
+    ) {
       return reply.code(400).send({ error: "Your current password is incorrect." });
     }
     let newPassword: string;
     try {
       newPassword = validatePassword(body.newPassword);
     } catch (error) {
-      return reply.code(400).send({ error: error instanceof Error ? error.message : "Choose a longer password." });
+      return reply
+        .code(400)
+        .send({ error: error instanceof Error ? error.message : "Choose a longer password." });
     }
     if (newPassword === currentPassword) {
       return reply.code(400).send({ error: "Choose a password you have not used here before." });
@@ -183,7 +198,7 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
     transaction(() => {
       db.prepare("UPDATE users SET password_hash = ? WHERE id = ?").run(
         hashPassword(newPassword),
-        request.user!.id,
+        request.user!.id
       );
       // Sign out every other device; then issue a fresh session for this one.
       db.prepare("DELETE FROM sessions WHERE user_id = ?").run(request.user!.id);

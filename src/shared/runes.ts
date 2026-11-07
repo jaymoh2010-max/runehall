@@ -1,13 +1,7 @@
 import type { Equipment } from "./types";
 
 export type RuneCategory =
-  | "weaponPotency"
-  | "striking"
-  | "armorPotency"
-  | "resilient"
-  | "shield"
-  | "property"
-  | null;
+  "weaponPotency" | "striking" | "armorPotency" | "resilient" | "shield" | "property" | null;
 
 export interface RuneEffects {
   weaponPotency: number;
@@ -66,7 +60,7 @@ export function strikingDiceForRune(item: Equipment): number {
 
 export function summarizeRunes(
   runeIds: string[] | undefined,
-  equipment: Record<string, Equipment>,
+  equipment: Record<string, Equipment>
 ): RuneEffects {
   if (!runeIds?.length) return { ...EMPTY_EFFECTS, property: [], shield: [] };
   const effects: RuneEffects = { ...EMPTY_EFFECTS, property: [], shield: [] };
@@ -84,7 +78,10 @@ export function summarizeRunes(
         effects.armorPotency = Math.max(effects.armorPotency, potencyValue(rune.name));
         break;
       case "resilient":
-        effects.resilient = Math.max(effects.resilient, potencyValue(rune.name) || strikingDiceForRune(rune) - 1);
+        effects.resilient = Math.max(
+          effects.resilient,
+          potencyValue(rune.name) || strikingDiceForRune(rune) - 1
+        );
         break;
       case "shield":
         effects.shield.push(rune);
@@ -101,7 +98,7 @@ export function summarizeRunes(
 
 export function propertyRuneSlots(
   runeIds: string[] | undefined,
-  equipment: Record<string, Equipment>,
+  equipment: Record<string, Equipment>
 ): number {
   const effects = summarizeRunes(runeIds, equipment);
   return Math.max(effects.weaponPotency, effects.armorPotency);
@@ -109,7 +106,7 @@ export function propertyRuneSlots(
 
 export function propertyRuneCount(
   runeIds: string[] | undefined,
-  equipment: Record<string, Equipment>,
+  equipment: Record<string, Equipment>
 ): number {
   return summarizeRunes(runeIds, equipment).property.length;
 }
@@ -121,7 +118,7 @@ export function propertyRuneCount(
 export function attachRuneIds(
   runeIds: string[] | undefined,
   rune: Equipment,
-  equipment: Record<string, Equipment>,
+  equipment: Record<string, Equipment>
 ): string[] {
   const existing = runeIds ?? [];
   const category = runeCategory(rune);
@@ -147,7 +144,7 @@ const DAMAGE_RUNES: { match: RegExp; formula: string; type: string }[] = [
 ];
 
 export function propertyRuneDamage(
-  rune: Equipment,
+  rune: Equipment
 ): { formula: string; type: string; label: string } | null {
   const entry = DAMAGE_RUNES.find((candidate) => candidate.match.test(rune.name));
   if (!entry) return null;
@@ -163,7 +160,7 @@ export interface ShieldRuneBonus {
 
 export function shieldRuneBonus(
   runeIds: string[] | undefined,
-  equipment: Record<string, Equipment>,
+  equipment: Record<string, Equipment>
 ): ShieldRuneBonus {
   const reinforcing = (runeIds ?? [])
     .map((id) => equipment[id])

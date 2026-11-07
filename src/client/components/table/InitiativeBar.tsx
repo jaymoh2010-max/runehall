@@ -71,7 +71,9 @@ export function InitiativeBar({
       <div className="initiative-track">
         {entries.length ? (
           entries.map((entry, index) => {
-            const token = entry.tokenId ? tokens.find((item) => item.id === entry.tokenId) ?? null : null;
+            const token = entry.tokenId
+              ? (tokens.find((item) => item.id === entry.tokenId) ?? null)
+              : null;
             const groupTokens = entry.groupId
               ? tokens.filter((item) => item.groupId === entry.groupId)
               : [];
@@ -82,7 +84,11 @@ export function InitiativeBar({
                 ? (token.hpCurrent / token.hpMax) * 100
                 : null;
             const conditions = group
-              ? [...new Set(groupTokens.flatMap((item) => item.conditions.map(tokenConditionLabel)))]
+              ? [
+                  ...new Set(
+                    groupTokens.flatMap((item) => item.conditions.map(tokenConditionLabel))
+                  ),
+                ]
               : (token?.conditions ?? []).map(tokenConditionLabel);
             const hpLabel = group
               ? group.max > 0
@@ -146,7 +152,8 @@ export function InitiativeBar({
                         <ArrowUp size={10} />
                       </span>
                     ) : null}
-                    {index < entries.length - 1 && entries[index + 1].initiative === entry.initiative ? (
+                    {index < entries.length - 1 &&
+                    entries[index + 1].initiative === entry.initiative ? (
                       <span
                         className="initiative-reroll"
                         role="button"
@@ -289,7 +296,9 @@ export function InitiativeBar({
           })
         ) : (
           <span className="initiative-empty">
-            {isGm ? "No initiative order yet. Roll for the table to begin." : "Waiting for the GM to roll initiative."}
+            {isGm
+              ? "No initiative order yet. Roll for the table to begin."
+              : "Waiting for the GM to roll initiative."}
           </span>
         )}
       </div>
@@ -297,15 +306,26 @@ export function InitiativeBar({
         <div className="initiative-controls">
           {entries.length ? (
             <>
-              <IconButton label="Previous turn" onClick={onPrevious}><ChevronLeft size={16} /></IconButton>
-              <IconButton label="Next turn" onClick={onNext}><ChevronRight size={16} /></IconButton>
+              <IconButton label="Previous turn" onClick={onPrevious}>
+                <ChevronLeft size={16} />
+              </IconButton>
+              <IconButton label="Next turn" onClick={onNext}>
+                <ChevronRight size={16} />
+              </IconButton>
             </>
           ) : null}
-          <Button size="sm" variant={entries.length ? "ghost" : "primary"} icon={<Dices size={14} />} onClick={onRoll}>
+          <Button
+            size="sm"
+            variant={entries.length ? "ghost" : "primary"}
+            icon={<Dices size={14} />}
+            onClick={onRoll}
+          >
             Roll initiative
           </Button>
           {entries.length ? (
-            <IconButton label="Clear initiative" onClick={onClear}><RotateCcw size={14} /></IconButton>
+            <IconButton label="Clear initiative" onClick={onClear}>
+              <RotateCcw size={14} />
+            </IconButton>
           ) : null}
         </div>
       ) : (

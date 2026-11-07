@@ -19,12 +19,9 @@ export const db = {
   prepare(query: string) {
     const statement = sqlite.prepare(query);
     return {
-      get: (...params: unknown[]): any =>
-        statement.get(...(params as never[])) as any,
-      all: (...params: unknown[]): any[] =>
-        statement.all(...(params as never[])) as any[],
-      run: (...params: unknown[]): any =>
-        statement.run(...(params as never[])) as any,
+      get: (...params: unknown[]): any => statement.get(...(params as never[])) as any,
+      all: (...params: unknown[]): any[] => statement.all(...(params as never[])) as any[],
+      run: (...params: unknown[]): any => statement.run(...(params as never[])) as any,
     };
   },
 };
@@ -47,9 +44,11 @@ export function applyMigrations(): { applied: number[]; current: number } {
     );
   `);
   const appliedVersions = new Set(
-    (db.prepare("SELECT version FROM schema_migrations ORDER BY version").all() as { version: number }[]).map(
-      (row) => Number(row.version),
-    ),
+    (
+      db.prepare("SELECT version FROM schema_migrations ORDER BY version").all() as {
+        version: number;
+      }[]
+    ).map((row) => Number(row.version))
   );
   const applied: number[] = [];
   for (const migration of migrations) {
@@ -57,9 +56,11 @@ export function applyMigrations(): { applied: number[]; current: number } {
     db.exec("BEGIN");
     try {
       db.exec(migration.sql);
-      db.prepare(
-        "INSERT INTO schema_migrations (version, name, applied_at) VALUES (?, ?, ?)",
-      ).run(migration.version, migration.name, now());
+      db.prepare("INSERT INTO schema_migrations (version, name, applied_at) VALUES (?, ?, ?)").run(
+        migration.version,
+        migration.name,
+        now()
+      );
       db.exec("COMMIT");
       applied.push(migration.version);
       console.log(`[db] applied migration ${migration.version}: ${migration.name}`);
@@ -72,7 +73,7 @@ export function applyMigrations(): { applied: number[]; current: number } {
       throw new Error(
         `Migration ${migration.version} (${migration.name}) failed: ${
           error instanceof Error ? error.message : String(error)
-        }`,
+        }`
       );
     }
   }
@@ -341,11 +342,11 @@ export function createDefaultScene(campaignId: string, gmId: string): string {
   const ts = now();
   db.prepare(
     `INSERT INTO scenes (id, campaign_id, name, image_url, width, height, grid_size, grid_offset_x, grid_offset_y, fog_enabled, fog_revealed, sort_order, created_at, updated_at)
-     VALUES (?, ?, 'The First Step', NULL, 1600, 1000, 70, 0, 0, 1, '[]', 0, ?, ?)`,
+     VALUES (?, ?, 'The First Step', NULL, 1600, 1000, 70, 0, 0, 1, '[]', 0, ?, ?)`
   ).run(id, campaignId, ts, ts);
   db.prepare(
     `INSERT OR REPLACE INTO campaign_state (campaign_id, active_scene_id, initiative, round, turn_index, updated_at)
-     VALUES (?, ?, '[]', 1, 0, ?)`,
+     VALUES (?, ?, '[]', 1, 0, ?)`
   ).run(campaignId, id, ts);
   db.prepare(`UPDATE campaigns SET last_played_at = ? WHERE id = ?`).run(ts, campaignId);
   return id;

@@ -51,7 +51,7 @@ describe("backup manifests", () => {
     const file = path.join(directory, "abc.txt");
     fs.writeFileSync(file, "abc");
     expect(sha256File(file)).toBe(
-      "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+      "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
     );
   });
 
@@ -94,7 +94,7 @@ describe("backup manifests", () => {
   it("accepts legacy manifests without per-file checksums", () => {
     const directory = temporaryDirectory();
     expect(
-      verifyBackupManifest(directory, { format: "runehall-backup", version: 1, files: [] }),
+      verifyBackupManifest(directory, { format: "runehall-backup", version: 1, files: [] })
     ).toEqual({ ok: true, legacy: true, checked: 0, errors: [] });
   });
 

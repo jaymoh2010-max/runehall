@@ -17,9 +17,7 @@ import sanitizeHtml from "sanitize-html";
 const args = process.argv.slice(2);
 const sourceArg = args.indexOf("--source");
 const REPO =
-  sourceArg >= 0
-    ? path.resolve(args[sourceArg + 1])
-    : path.join(os.tmpdir(), "pf2e-data");
+  sourceArg >= 0 ? path.resolve(args[sourceArg + 1]) : path.join(os.tmpdir(), "pf2e-data");
 const PACKS = path.join(REPO, "packs", "pf2e");
 const OUT = path.resolve("data", "compendium");
 const LANG_DIR = path.join(REPO, "static", "lang");
@@ -57,7 +55,10 @@ for (const file of ["en.json", "re-en.json", "action-en.json"]) {
 // remaster overrides should win over the base file
 if (fs.existsSync(path.join(LANG_DIR, "re-en.json"))) {
   try {
-    Object.assign(LOCALE, flatten(JSON.parse(fs.readFileSync(path.join(LANG_DIR, "re-en.json"), "utf8"))));
+    Object.assign(
+      LOCALE,
+      flatten(JSON.parse(fs.readFileSync(path.join(LANG_DIR, "re-en.json"), "utf8")))
+    );
   } catch {}
 }
 
@@ -93,10 +94,7 @@ function expandEmbeds(html, depth = 0) {
     const uuid = String(body).trim().split(/\s+/)[0] || "";
     const id = uuid.split(".").pop() || "";
     const source = EMBED_SOURCES.get(id);
-    const embedded =
-      source?.system?.description?.value ||
-      source?.system?.description?.gm ||
-      "";
+    const embedded = source?.system?.description?.value || source?.system?.description?.gm || "";
     return embedded ? expandEmbeds(embedded, depth + 1) : label || "";
   });
 }
@@ -119,7 +117,10 @@ function expandMacros(html) {
   out = out.replace(
     /\[\[\/([a-z]+)\s*([^\]]*)\]\](?:\{([^}]*)\})?/gi,
     (_match, command, body, display) => {
-      const tokens = String(body || "").trim().split(/\s+/).filter(Boolean);
+      const tokens = String(body || "")
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean);
       if (["r", "gmr", "br", "dr"].includes(command.toLowerCase())) {
         const formula = (tokens[0] || "").replace(/^\{|\}$/g, "");
         const label = tokens.slice(1).join(" ").replace(/^#/, "");
@@ -134,13 +135,21 @@ function expandMacros(html) {
         .map((token) => titleCase(token.slice(4)));
       const name = titleCase(slug);
       return keys.length ? `${name} (${keys.join(", ")})` : name;
-    },
+    }
   );
 
-  out = out.replace(/@UUID\[([^\]]+)\](?:\{([^}]*)\})?/g, (m, body, label) => stripUuid(m, body, label));
-  out = out.replace(/@Compendium\[([^\]]+)\](?:\{([^}]*)\})?/g, (m, body, label) => stripUuid(m, body, label));
-  out = out.replace(/@Actor\[([^\]]+)\](?:\{([^}]*)\})?/g, (m, body, label) => stripUuid(m, body, label));
-  out = out.replace(/@Item\[([^\]]+)\](?:\{([^}]*)\})?/g, (m, body, label) => stripUuid(m, body, label));
+  out = out.replace(/@UUID\[([^\]]+)\](?:\{([^}]*)\})?/g, (m, body, label) =>
+    stripUuid(m, body, label)
+  );
+  out = out.replace(/@Compendium\[([^\]]+)\](?:\{([^}]*)\})?/g, (m, body, label) =>
+    stripUuid(m, body, label)
+  );
+  out = out.replace(/@Actor\[([^\]]+)\](?:\{([^}]*)\})?/g, (m, body, label) =>
+    stripUuid(m, body, label)
+  );
+  out = out.replace(/@Item\[([^\]]+)\](?:\{([^}]*)\})?/g, (m, body, label) =>
+    stripUuid(m, body, label)
+  );
   out = out.replace(/@Damage\[([^\]]+)\](?:\{([^}]*)\})?/g, (m, body, label) => {
     if (label) return label;
     const type = body.match(/\[([a-z-]+)\]$/)?.[1];
@@ -165,9 +174,37 @@ function cleanHtml(value) {
   if (!html.trim()) return "";
   html = sanitizeHtml(html, {
     allowedTags: [
-      "p", "br", "hr", "strong", "em", "b", "i", "u", "s", "ul", "ol", "li",
-      "blockquote", "code", "pre", "table", "thead", "tbody", "tfoot", "tr",
-      "th", "td", "h1", "h2", "h3", "h4", "h5", "h6", "caption", "sup", "sub",
+      "p",
+      "br",
+      "hr",
+      "strong",
+      "em",
+      "b",
+      "i",
+      "u",
+      "s",
+      "ul",
+      "ol",
+      "li",
+      "blockquote",
+      "code",
+      "pre",
+      "table",
+      "thead",
+      "tbody",
+      "tfoot",
+      "tr",
+      "th",
+      "td",
+      "h1",
+      "h2",
+      "h3",
+      "h4",
+      "h5",
+      "h6",
+      "caption",
+      "sup",
+      "sub",
     ],
     allowedAttributes: {},
     disallowedTagsMode: "discard",
@@ -179,7 +216,11 @@ function cleanHtml(value) {
 }
 
 function textOf(value) {
-  return cleanHtml(value).replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim();
+  return cleanHtml(value)
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 // ---------------------------------------------------------------------------
@@ -193,7 +234,9 @@ function titleCase(value) {
   return String(value)
     .split(/[-_ ]+/)
     .filter(Boolean)
-    .map((part) => (part.length <= 3 && part === part.toUpperCase() ? part : part[0].toUpperCase() + part.slice(1)))
+    .map((part) =>
+      part.length <= 3 && part === part.toUpperCase() ? part : part[0].toUpperCase() + part.slice(1)
+    )
     .join(" ");
 }
 
@@ -350,7 +393,7 @@ function proficienciesFromRules(rules) {
       const definition = JSON.stringify(rule.definition ?? []);
       const groupSpecific = /item:group:|rulesSelections/.test(definition);
       const broad = ["simple", "martial", "unarmed"].filter((category) =>
-        definition.includes(`item:category:${category}`),
+        definition.includes(`item:category:${category}`)
       );
       // Fighter weapon mastery/legend list all three broad categories. Other
       // group-specific rules (gunslinger firearms, swashbuckler polearms) are
@@ -416,7 +459,9 @@ function traits(system) {
   return {
     rarity: system?.traits?.rarity || "common",
     traits: Array.isArray(system?.traits?.value) ? system.traits.value.filter(Boolean) : [],
-    otherTags: Array.isArray(system?.traits?.otherTags) ? system.traits.otherTags.filter(Boolean) : [],
+    otherTags: Array.isArray(system?.traits?.otherTags)
+      ? system.traits.otherTags.filter(Boolean)
+      : [],
   };
 }
 
@@ -471,7 +516,8 @@ function walkJson(dir) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) files.push(...walkJson(full));
-    else if (entry.isFile() && entry.name.endsWith(".json") && !entry.name.startsWith("_")) files.push(full);
+    else if (entry.isFile() && entry.name.endsWith(".json") && !entry.name.startsWith("_"))
+      files.push(full);
   }
   return files;
 }
@@ -587,7 +633,11 @@ for (const file of walkJson(path.join(PACKS, "actions"))) {
   const j = readJson(file);
   if (j?.type === "action") raw.actions.push(j);
 }
-for (const pack of ["pathfinder-monster-core", "pathfinder-monster-core-2", "pathfinder-npc-core"]) {
+for (const pack of [
+  "pathfinder-monster-core",
+  "pathfinder-monster-core-2",
+  "pathfinder-npc-core",
+]) {
   for (const file of walkJson(path.join(PACKS, pack))) {
     const j = readJson(file);
     if (j?.type === "npc") raw.monsters.push({ ...j, __pack: pack });
@@ -603,7 +653,7 @@ for (const items of Object.values(raw)) {
 console.log(
   Object.entries(raw)
     .map(([k, v]) => `${k}: ${v.length}`)
-    .join(", "),
+    .join(", ")
 );
 
 // ---------------------------------------------------------------------------
@@ -626,13 +676,15 @@ function baseItem(j, idPrefix, type) {
 }
 
 const ancestryFeatureMap = indexByName(
-  raw.ancestryFeatures.map((j) => ({ ...baseItem(j, "af", "ancestryFeature"), raw: j })),
+  raw.ancestryFeatures.map((j) => ({ ...baseItem(j, "af", "ancestryFeature"), raw: j }))
 );
 const classFeatureItems = raw.classFeatures
   .map((j) => ({ ...baseItem(j, "cf", "classFeature"), raw: j }))
   .sort(byNamePreference);
 const classFeatureMap = indexByName(classFeatureItems);
-const featItems = raw.feats.map((j) => ({ ...baseItem(j, "feat", "feat"), raw: j })).sort(byNamePreference);
+const featItems = raw.feats
+  .map((j) => ({ ...baseItem(j, "feat", "feat"), raw: j }))
+  .sort(byNamePreference);
 const featMap = indexByName(featItems);
 
 // --- Ancestries ------------------------------------------------------------
@@ -648,7 +700,9 @@ const ancestries = raw.ancestries
       .filter((rule) => rule.selector && rule.selector !== "land")
       .map((rule) => ({ type: rule.selector, value: Number(rule.value ?? 0) }))
       .filter((entry) => Number.isFinite(entry.value) && entry.value > 0);
-    const speed = landSpeedRule ? Number(landSpeedRule.value ?? s.speed ?? 25) : Number(s.speed ?? 25);
+    const speed = landSpeedRule
+      ? Number(landSpeedRule.value ?? s.speed ?? 25)
+      : Number(s.speed ?? 25);
     const features = items
       .map((item) => {
         const uuidName = nameFromUuid(item.uuid);
@@ -658,7 +712,12 @@ const ancestries = raw.ancestries
           pickByName(ancestryFeatureMap, uuidName) ||
           pickByName(featMap, uuidName);
         return resolved
-          ? { id: resolved.id, name: resolved.name, level: resolved.level, description: resolved.description }
+          ? {
+              id: resolved.id,
+              name: resolved.name,
+              level: resolved.level,
+              description: resolved.description,
+            }
           : null;
       })
       .filter(Boolean);
@@ -744,12 +803,18 @@ const BACKGROUND_SKILL_CHOICES = {
     { prompt: "Choose Deception or Thievery", options: ["deception", "thievery"], count: 1 },
   ],
   "Child Of Notoriety": [
-    { prompt: "Choose Diplomacy or Intimidation", options: ["diplomacy", "intimidation"], count: 1 },
+    {
+      prompt: "Choose Diplomacy or Intimidation",
+      options: ["diplomacy", "intimidation"],
+      count: 1,
+    },
   ],
   "Child of the Polis": [
     { prompt: "Choose Diplomacy or Society", options: ["diplomacy", "society"], count: 1 },
   ],
-  Conservator: [{ prompt: "Choose Crafting or Thievery", options: ["crafting", "thievery"], count: 1 }],
+  Conservator: [
+    { prompt: "Choose Crafting or Thievery", options: ["crafting", "thievery"], count: 1 },
+  ],
   "Raised by Belief": [
     { prompt: "Choose your deity's divine skill", options: [...SKILL_IDS], count: 1 },
   ],
@@ -759,7 +824,7 @@ function grantedFeatOptionsFromDescription(description) {
   const text = textOf(description);
   const names = [
     ...text.matchAll(
-      /(?:gain|gains)\s+(?:the\s+)?([A-Z][A-Za-z'’ -]{2,80}?)\s+(?:skill |general |ancestry )?feat/gi,
+      /(?:gain|gains)\s+(?:the\s+)?([A-Z][A-Za-z'’ -]{2,80}?)\s+(?:skill |general |ancestry )?feat/gi
     ),
   ]
     .map((match) => match[1].trim())
@@ -788,11 +853,19 @@ const BACKGROUND_LORE_CHOICES = {
     { prompt: "Choose a Lore skill (not about a magical subject)", options: [], count: 1 },
   ],
   "Anti-Thrune Saboteur": [
-    { prompt: "Choose Cheliax Lore or Engineering Lore", options: ["Cheliax Lore", "Engineering Lore"], count: 1 },
+    {
+      prompt: "Choose Cheliax Lore or Engineering Lore",
+      options: ["Cheliax Lore", "Engineering Lore"],
+      count: 1,
+    },
   ],
   Blessed: [{ prompt: "Choose a Lore skill associated with your deity", options: [], count: 1 }],
   "Child Of Notoriety": [
-    { prompt: "Choose Genealogy Lore or Underworld Lore", options: ["Genealogy Lore", "Underworld Lore"], count: 1 },
+    {
+      prompt: "Choose Genealogy Lore or Underworld Lore",
+      options: ["Genealogy Lore", "Underworld Lore"],
+      count: 1,
+    },
   ],
   "Child of the Polis": [
     { prompt: "Choose a Lore skill for an Iblydan city-state", options: [], count: 1 },
@@ -812,7 +885,11 @@ const BACKGROUND_LORE_CHOICES = {
     },
   ],
   Conservator: [
-    { prompt: "Choose Accounting Lore or Underworld Lore", options: ["Accounting Lore", "Underworld Lore"], count: 1 },
+    {
+      prompt: "Choose Accounting Lore or Underworld Lore",
+      options: ["Accounting Lore", "Underworld Lore"],
+      count: 1,
+    },
   ],
   "Crown of Chaos": [
     { prompt: "Choose a Lore skill about the terrain where you grew up", options: [], count: 1 },
@@ -850,9 +927,15 @@ const BACKGROUND_LORE_CHOICES = {
       count: 1,
     },
   ],
-  "Fated Rival": [{ prompt: "Choose two Lore skills related to your rival", options: [], count: 2 }],
+  "Fated Rival": [
+    { prompt: "Choose two Lore skills related to your rival", options: [], count: 2 },
+  ],
   "Hammered by Fate": [
-    { prompt: "Choose Daemon, Demon, or Devil Lore", options: ["Daemon Lore", "Demon Lore", "Devil Lore"], count: 1 },
+    {
+      prompt: "Choose Daemon, Demon, or Devil Lore",
+      options: ["Daemon Lore", "Demon Lore", "Devil Lore"],
+      count: 1,
+    },
   ],
   "Keys to Destiny": [
     {
@@ -874,9 +957,7 @@ const BACKGROUND_LORE_CHOICES = {
   "Raised by Belief": [
     { prompt: "Choose a Lore skill related to your deity", options: [], count: 1 },
   ],
-  "Reborn Soul": [
-    { prompt: "Choose two Lore skills from your past life", options: [], count: 2 },
-  ],
+  "Reborn Soul": [{ prompt: "Choose two Lore skills from your past life", options: [], count: 2 }],
   "Time Traveler": [
     { prompt: "Choose three Lore skills from your old time", options: [], count: 3 },
   ],
@@ -890,14 +971,17 @@ const backgrounds = raw.backgrounds
     const lore = [];
     const trained = new Set();
     const trainedSkills = s.trainedSkills ?? {};
-    if (Array.isArray(trainedSkills.value)) for (const skill of trainedSkills.value) trained.add(skill);
+    if (Array.isArray(trainedSkills.value))
+      for (const skill of trainedSkills.value) trained.add(skill);
     for (const skill of staticSkillRanks(s.rules)) trained.add(skill);
     for (const [key, values] of Object.entries(trainedSkills)) {
       if (key === "value" || !Array.isArray(values)) continue;
       for (const v of values) lore.push(/lore$/i.test(v) ? v : `${v} ${titleCase(key)}`);
     }
     if (typeof trainedSkills.custom === "string" && trainedSkills.custom.trim()) {
-      lore.push(/lore$/i.test(trainedSkills.custom) ? trainedSkills.custom : `${trainedSkills.custom} Lore`);
+      lore.push(
+        /lore$/i.test(trainedSkills.custom) ? trainedSkills.custom : `${trainedSkills.custom} Lore`
+      );
     }
     const skillChoices = skillChoicesFromRules(s.rules);
     const extraLore = BACKGROUND_FIXED_LORE[j.name] ?? [];
@@ -905,15 +989,17 @@ const backgrounds = raw.backgrounds
     const loreChoices = BACKGROUND_LORE_CHOICES[j.name] ?? [];
     const extraFeatChoices = BACKGROUND_FEAT_CHOICES[j.name] ?? [];
     const fixedFeatName = BACKGROUND_FIXED_FEATS[j.name];
-    const granted = Object.values(s.items ?? {})
-      .map((item) => {
-        const found = pickByName(featMap, item.name) || pickByName(featMap, nameFromUuid(item.uuid));
-        return found ? { id: found.id, name: found.name, level: found.level } : { id: null, name: item.name, level: item.level ?? 0 };
-      });
+    const granted = Object.values(s.items ?? {}).map((item) => {
+      const found = pickByName(featMap, item.name) || pickByName(featMap, nameFromUuid(item.uuid));
+      return found
+        ? { id: found.id, name: found.name, level: found.level }
+        : { id: null, name: item.name, level: item.level ?? 0 };
+    });
     const featChoices = [];
     if (fixedFeatName && !granted.length) {
       const fixedFeat = pickByName(featMap, fixedFeatName);
-      if (fixedFeat) granted.push({ id: fixedFeat.id, name: fixedFeat.name, level: fixedFeat.level });
+      if (fixedFeat)
+        granted.push({ id: fixedFeat.id, name: fixedFeat.name, level: fixedFeat.level });
     }
     if (extraFeatChoices.length) {
       const resolved = extraFeatChoices
@@ -964,7 +1050,10 @@ function featureSummary(item) {
     description: item.description,
     traits: item.traits,
     otherTags: item.otherTags,
-    proficiencies: mergeProficiencies(sub?.proficiencies, proficienciesFromRules(item.raw?.system?.rules)),
+    proficiencies: mergeProficiencies(
+      sub?.proficiencies,
+      proficienciesFromRules(item.raw?.system?.rules)
+    ),
     keyOptions: sub?.keyOptions ?? null,
     suppressedFeatures: sub?.suppressedFeatures ?? null,
     senses: sub?.senses ?? null,
@@ -996,7 +1085,7 @@ function choiceGroupsFor(feature) {
     const tags = [...filters.matchAll(/item:tag:([a-z0-9-]+)/g)].map((m) => m[1]);
     for (const tag of tags) {
       const options = classFeatureItems.filter(
-        (item) => item.traits.includes(tag) || item.otherTags.includes(tag),
+        (item) => item.traits.includes(tag) || item.otherTags.includes(tag)
       );
       if (!options.length) continue;
       const deduped = [];
@@ -1082,9 +1171,7 @@ const classes = raw.classes
     for (const feature of featureRefs) {
       for (const group of feature.choiceGroups) {
         const duplicate = choiceGroups.find(
-          (g) =>
-            g.sourceFeature?.name === group.sourceFeature?.name &&
-            g.prompt === group.prompt,
+          (g) => g.sourceFeature?.name === group.sourceFeature?.name && g.prompt === group.prompt
         );
         if (!duplicate) choiceGroups.push(group);
         else if (group.options.length > duplicate.options.length) {
@@ -1096,14 +1183,16 @@ const classes = raw.classes
     choiceGroups.sort(
       (a, b) =>
         (a.sourceFeature?.level ?? 0) - (b.sourceFeature?.level ?? 0) ||
-        a.prompt.localeCompare(b.prompt),
+        a.prompt.localeCompare(b.prompt)
     );
     return {
       id: `cls:${j._id}`,
       name: j.name,
       type: "class",
       hp: Number(s.hp ?? 0),
-      keyAbility: Array.isArray(s.keyAbility?.value) ? s.keyAbility.value.filter((a) => ABILITY_SET.has(a)) : [],
+      keyAbility: Array.isArray(s.keyAbility?.value)
+        ? s.keyAbility.value.filter((a) => ABILITY_SET.has(a))
+        : [],
       perception: Number(s.perception ?? 1),
       savingThrows: {
         fortitude: Number(s.savingThrows?.fortitude ?? 1),
@@ -1134,7 +1223,9 @@ const classes = raw.classes
         skill: (s.skillFeatLevels?.value ?? []).map(Number),
         general: (s.generalFeatLevels?.value ?? [3, 7, 11, 15, 19]).map(Number),
       },
-      skillIncreaseLevels: (s.skillIncreaseLevels?.value ?? [3, 5, 7, 9, 11, 13, 15, 17, 19]).map(Number),
+      skillIncreaseLevels: (s.skillIncreaseLevels?.value ?? [3, 5, 7, 9, 11, 13, 15, 17, 19]).map(
+        Number
+      ),
       spellcasting: Number(s.spellcasting ?? 0),
       features: featureRefs.sort((a, b) => a.level - b.level || a.name.localeCompare(b.name)),
       choiceGroups,
@@ -1194,11 +1285,16 @@ const feats = featItems
       playtest: f.playtest,
       actionType: action.actionType,
       actions: action.actions,
-      prerequisites: (s.prerequisites?.value ?? []).map((p) => (typeof p === "string" ? textOf(p) : textOf(p?.value ?? ""))).filter(Boolean),
+      prerequisites: (s.prerequisites?.value ?? [])
+        .map((p) => (typeof p === "string" ? textOf(p) : textOf(p?.value ?? "")))
+        .filter(Boolean),
       description: f.description,
     };
   })
-  .sort((a, b) => a.category.localeCompare(b.category) || a.level - b.level || a.name.localeCompare(b.name));
+  .sort(
+    (a, b) =>
+      a.category.localeCompare(b.category) || a.level - b.level || a.name.localeCompare(b.name)
+  );
 
 // --- Spells ----------------------------------------------------------------
 function normalizeDamage(damage, fallbackType = "untyped") {
@@ -1275,7 +1371,9 @@ const spells = raw.spells
       duration: s.duration?.value ?? "",
       cost: s.cost?.value ?? "",
       requirements: s.requirements ?? "",
-      defense: s.defense ? { save: s.defense.save?.statistic ?? null, basic: Boolean(s.defense.save?.basic) } : null,
+      defense: s.defense
+        ? { save: s.defense.save?.statistic ?? null, basic: Boolean(s.defense.save?.basic) }
+        : null,
       damage,
       damageText: spellDamageText(damage),
       heightening,
@@ -1314,7 +1412,11 @@ const equipment = raw.equipment
       out.weapon = {
         category: s.category || "simple",
         group: s.group || "",
-        damage: { dice: Number(s.damage?.dice ?? 1), die: s.damage?.die || "d4", type: s.damage?.damageType || "untyped" },
+        damage: {
+          dice: Number(s.damage?.dice ?? 1),
+          die: s.damage?.die || "d4",
+          type: s.damage?.damageType || "untyped",
+        },
         range: s.range ?? null,
         reload: s.reload?.value ?? null,
         hands: s.usage?.value?.includes("two-hand") ? 2 : 1,
@@ -1366,7 +1468,11 @@ const deities = raw.deities
       domains: Array.isArray(s.domains?.primary) ? s.domains.primary : [],
       alternateDomains: Array.isArray(s.domains?.alternate) ? s.domains.alternate : [],
       font: Array.isArray(s.font) ? s.font : [],
-      skill: Array.isArray(s.skill) ? s.skill.filter((value) => typeof value === "string") : s.skill ? [s.skill] : [],
+      skill: Array.isArray(s.skill)
+        ? s.skill.filter((value) => typeof value === "string")
+        : s.skill
+          ? [s.skill]
+          : [],
       weapons: Array.isArray(s.weapons) ? s.weapons : [],
       spells: s.spells ?? {},
       sanctification: s.sanctification ?? {},
@@ -1417,12 +1523,23 @@ const actions = raw.actions
 // --- Monsters --------------------------------------------------------------
 function monsterSizeCells(size) {
   switch ((size || "").toLowerCase()) {
-    case "tiny": return 1;
-    case "sm": case "small": case "med": case "medium": return 1;
-    case "lg": case "large": return 2;
-    case "huge": return 3;
-    case "grg": case "gargantuan": return 4;
-    default: return 1;
+    case "tiny":
+      return 1;
+    case "sm":
+    case "small":
+    case "med":
+    case "medium":
+      return 1;
+    case "lg":
+    case "large":
+      return 2;
+    case "huge":
+      return 3;
+    case "grg":
+    case "gargantuan":
+      return 4;
+    default:
+      return 1;
   }
 }
 
@@ -1502,11 +1619,14 @@ for (const j of raw.monsters) {
   if (!monsterMap.has(key)) monsterMap.set(key, monster);
   else {
     const existing = monsterMap.get(key);
-    const rank = (m) => (m.source.includes("Monster Core") ? 2 : m.source.includes("NPC Core") ? 1 : 0);
+    const rank = (m) =>
+      m.source.includes("Monster Core") ? 2 : m.source.includes("NPC Core") ? 1 : 0;
     if (rank(monster) > rank(existing)) monsterMap.set(key, monster);
   }
 }
-const monsters = [...monsterMap.values()].sort((a, b) => a.level - b.level || a.name.localeCompare(b.name));
+const monsters = [...monsterMap.values()].sort(
+  (a, b) => a.level - b.level || a.name.localeCompare(b.name)
+);
 
 // ---------------------------------------------------------------------------
 // Write files
@@ -1515,7 +1635,9 @@ function write(name, data) {
   const file = path.join(OUT, name);
   fs.writeFileSync(file, JSON.stringify(data));
   const size = fs.statSync(file).size;
-  console.log(`  ${name.padEnd(24)} ${String(data.length).padStart(6)} entries  ${(size / 1024).toFixed(0)} KB`);
+  console.log(
+    `  ${name.padEnd(24)} ${String(data.length).padStart(6)} entries  ${(size / 1024).toFixed(0)} KB`
+  );
 }
 
 console.log("\nWriting compendium:");
@@ -1578,5 +1700,8 @@ const manifest = {
 };
 fs.writeFileSync(path.join(OUT, "manifest.json"), JSON.stringify(manifest, null, 2));
 console.log("\nManifest:", JSON.stringify(manifest.count, null, 2));
-if (sourceCommit) console.log(`Source commit: ${sourceRef || sourceCommit}${sourceDirty ? " (dirty working tree)" : ""}`);
+if (sourceCommit)
+  console.log(
+    `Source commit: ${sourceRef || sourceCommit}${sourceDirty ? " (dirty working tree)" : ""}`
+  );
 console.log(`\nDone. Compendium written to ${OUT}`);

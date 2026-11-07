@@ -23,7 +23,7 @@ import { clamp, newId, now, parseJson, safeInt, safeString, sanitizeUserText } f
 
 function gmRequires(
   request: { user: { id: string } | null },
-  campaignId: string,
+  campaignId: string
 ): { row: CampaignRow | null; error?: string; code?: number } {
   if (!request.user) return { row: null, error: "Sign in to continue.", code: 401 };
   const row = getCampaign(campaignId);
@@ -75,7 +75,7 @@ function ensureState(campaignId: string) {
     .prepare("SELECT id FROM scenes WHERE campaign_id = ? ORDER BY sort_order ASC LIMIT 1")
     .get(campaignId) as { id: string } | undefined;
   db.prepare(
-    "INSERT INTO campaign_state (campaign_id, active_scene_id, initiative, round, turn_index, updated_at) VALUES (?, ?, '[]', 1, 0, ?)",
+    "INSERT INTO campaign_state (campaign_id, active_scene_id, initiative, round, turn_index, updated_at) VALUES (?, ?, '[]', 1, 0, ?)"
   ).run(campaignId, firstScene?.id ?? null, now());
   return db.prepare("SELECT * FROM campaign_state WHERE campaign_id = ?").get(campaignId) as {
     campaign_id: string;
@@ -145,7 +145,7 @@ function initiativeEntriesForTokens(tokens: TokenRow[]): InitiativeEntry[] {
   return [
     ...singles.map((token) => initiativeEntryForToken(token)),
     ...[...groups.values()].map((members) =>
-      members.length > 1 ? initiativeEntryForGroup(members) : initiativeEntryForToken(members[0]),
+      members.length > 1 ? initiativeEntryForGroup(members) : initiativeEntryForToken(members[0])
     ),
   ];
 }
@@ -154,7 +154,11 @@ function sortInitiative(entries: InitiativeEntry[]): InitiativeEntry[] {
   return sortInitiativeEntries(entries);
 }
 
-function nextSortOrder(table: "encounters" | "encounter_combatants", column: string, id: string): number {
+function nextSortOrder(
+  table: "encounters" | "encounter_combatants",
+  column: string,
+  id: string
+): number {
   const row = db
     .prepare(`SELECT COALESCE(MAX(sort_order), 0) + 1 AS next FROM ${table} WHERE ${column} = ?`)
     .get(id) as { next: number };
@@ -167,7 +171,9 @@ export async function registerEncounterRoutes(app: FastifyInstance): Promise<voi
     const access = gmRequires(request, id);
     if (!access.row) return reply.code(access.code ?? 403).send({ error: access.error });
     const rows = db
-      .prepare("SELECT * FROM encounters WHERE campaign_id = ? ORDER BY sort_order ASC, updated_at DESC")
+      .prepare(
+        "SELECT * FROM encounters WHERE campaign_id = ? ORDER BY sort_order ASC, updated_at DESC"
+      )
       .all(id) as EncounterRow[];
     return reply.send({ encounters: rows.map(serializeEncounter) });
   });
@@ -187,7 +193,7 @@ export async function registerEncounterRoutes(app: FastifyInstance): Promise<voi
     const ts = now();
     db.prepare(
       `INSERT INTO encounters (id, campaign_id, name, description, scene_id, sort_order, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       encounterId,
       id,
@@ -196,7 +202,7 @@ export async function registerEncounterRoutes(app: FastifyInstance): Promise<voi
       sceneId,
       nextSortOrder("encounters", "campaign_id", id),
       ts,
-      ts,
+      ts
     );
     touchCampaign(id);
     return reply.code(201).send({ encounter: serializeEncounter(getEncounter(id, encounterId)!) });
@@ -209,7 +215,8 @@ export async function registerEncounterRoutes(app: FastifyInstance): Promise<voi
     const existing = getEncounter(id, encounterId);
     if (!existing) return reply.code(404).send({ error: "Encounter not found." });
     const body = (request.body ?? {}) as Record<string, unknown>;
-    const name = body.name === undefined ? existing.name : safeString(body.name, existing.name, 100);
+    const name =
+      body.name === undefined ? existing.name : safeString(body.name, existing.name, 100);
     const description =
       body.description === undefined
         ? existing.description
@@ -222,7 +229,7 @@ export async function registerEncounterRoutes(app: FastifyInstance): Promise<voi
           : null;
     }
     db.prepare(
-      "UPDATE encounters SET name = ?, description = ?, scene_id = ?, updated_at = ? WHERE id = ?",
+      "UPDATE encounters SET name = ?, description = ?, scene_id = ?, updated_at = ? WHERE id = ?"
     ).run(name, description, sceneId, now(), encounterId);
     touchCampaign(id);
     return reply.send({ encounter: serializeEncounter(getEncounter(id, encounterId)!) });
@@ -232,7 +239,8 @@ export async function registerEncounterRoutes(app: FastifyInstance): Promise<voi
     const { id, encounterId } = request.params as { id: string; encounterId: string };
     const access = gmRequires(request, id);
     if (!access.row) return reply.code(access.code ?? 403).send({ error: access.error });
-    if (!getEncounter(id, encounterId)) return reply.code(404).send({ error: "Encounter not found." });
+    if (!getEncounter(id, encounterId))
+      return reply.code(404).send({ error: "Encounter not found." });
     db.prepare("DELETE FROM encounters WHERE id = ?").run(encounterId);
     touchCampaign(id);
     return reply.send({ ok: true });
@@ -248,7 +256,7 @@ export async function registerEncounterRoutes(app: FastifyInstance): Promise<voi
     const ts = now();
     db.prepare(
       `INSERT INTO encounters (id, campaign_id, name, description, scene_id, sort_order, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       duplicateId,
       id,
@@ -257,18 +265,18 @@ export async function registerEncounterRoutes(app: FastifyInstance): Promise<voi
       source.scene_id,
       nextSortOrder("encounters", "campaign_id", id),
       ts,
-      ts,
+      ts
     );
     const combatants = db
       .prepare(
-        "SELECT * FROM encounter_combatants WHERE encounter_id = ? ORDER BY sort_order ASC, created_at ASC",
+        "SELECT * FROM encounter_combatants WHERE encounter_id = ? ORDER BY sort_order ASC, created_at ASC"
       )
       .all(encounterId) as EncounterCombatantRow[];
     for (const combatant of combatants) {
       db.prepare(
         `INSERT INTO encounter_combatants
           (id, encounter_id, monster_id, name, level, count, hp, ac, perception, notes, wave, sort_order, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).run(
         newId("encm"),
         duplicateId,
@@ -283,13 +291,11 @@ export async function registerEncounterRoutes(app: FastifyInstance): Promise<voi
         Math.max(1, Math.round(combatant.wave ?? 1)),
         combatant.sort_order,
         ts,
-        ts,
+        ts
       );
     }
     touchCampaign(id);
-    return reply
-      .code(201)
-      .send({ encounter: serializeEncounter(getEncounter(id, duplicateId)!) });
+    return reply.code(201).send({ encounter: serializeEncounter(getEncounter(id, duplicateId)!) });
   });
 
   app.post("/api/campaigns/:id/encounters/:encounterId/combatants", async (request, reply) => {
@@ -333,7 +339,7 @@ export async function registerEncounterRoutes(app: FastifyInstance): Promise<voi
     db.prepare(
       `INSERT INTO encounter_combatants
         (id, encounter_id, monster_id, name, level, count, hp, ac, perception, notes, wave, sort_order, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       combatantId,
       encounterId,
@@ -348,7 +354,7 @@ export async function registerEncounterRoutes(app: FastifyInstance): Promise<voi
       wave,
       nextSortOrder("encounter_combatants", "encounter_id", encounterId),
       ts,
-      ts,
+      ts
     );
     db.prepare("UPDATE encounters SET updated_at = ? WHERE id = ?").run(ts, encounterId);
     touchCampaign(id);
@@ -371,7 +377,9 @@ export async function registerEncounterRoutes(app: FastifyInstance): Promise<voi
       if (!existing) return reply.code(404).send({ error: "Combatant not found." });
       const body = (request.body ?? {}) as Record<string, unknown>;
       const count =
-        body.count === undefined ? existing.count : clamp(safeInt(body.count, existing.count, 1, 50), 1, 50);
+        body.count === undefined
+          ? existing.count
+          : clamp(safeInt(body.count, existing.count, 1, 50), 1, 50);
       const name =
         body.name === undefined ? existing.name : safeString(body.name, existing.name, 100);
       const level =
@@ -379,17 +387,24 @@ export async function registerEncounterRoutes(app: FastifyInstance): Promise<voi
           ? existing.level
           : clamp(safeInt(body.level, existing.level, -1, 30), -1, 30);
       const hp =
-        body.hp === undefined ? existing.hp : body.hp === null ? null : safeInt(body.hp, 0, 0, 1_000_000);
+        body.hp === undefined
+          ? existing.hp
+          : body.hp === null
+            ? null
+            : safeInt(body.hp, 0, 0, 1_000_000);
       const ac =
-        body.ac === undefined ? existing.ac : body.ac === null ? null : safeInt(body.ac, 0, -100, 1000);
+        body.ac === undefined
+          ? existing.ac
+          : body.ac === null
+            ? null
+            : safeInt(body.ac, 0, -100, 1000);
       const perception =
         body.perception === undefined
           ? existing.perception
           : body.perception === null
             ? null
             : safeInt(body.perception, 0, -100, 1000);
-      const notes =
-        body.notes === undefined ? existing.notes : sanitizeUserText(body.notes, 2000);
+      const notes = body.notes === undefined ? existing.notes : sanitizeUserText(body.notes, 2000);
       const wave =
         body.wave === undefined
           ? Math.max(1, Math.round(existing.wave ?? 1))
@@ -397,14 +412,14 @@ export async function registerEncounterRoutes(app: FastifyInstance): Promise<voi
       db.prepare(
         `UPDATE encounter_combatants
          SET name = ?, level = ?, count = ?, hp = ?, ac = ?, perception = ?, notes = ?, wave = ?, updated_at = ?
-         WHERE id = ?`,
+         WHERE id = ?`
       ).run(name, level, count, hp, ac, perception, notes, wave, now(), combatantId);
       db.prepare("UPDATE encounters SET updated_at = ? WHERE id = ?").run(now(), encounterId);
       touchCampaign(id);
       return reply.send({
         combatant: serializeEncounterCombatant(getCombatant(encounterId, combatantId)!),
       });
-    },
+    }
   );
 
   app.delete(
@@ -424,7 +439,7 @@ export async function registerEncounterRoutes(app: FastifyInstance): Promise<voi
       db.prepare("UPDATE encounters SET updated_at = ? WHERE id = ?").run(now(), encounterId);
       touchCampaign(id);
       return reply.send({ ok: true });
-    },
+    }
   );
 
   app.post("/api/campaigns/:id/encounters/:encounterId/launch", async (request, reply) => {
@@ -447,10 +462,13 @@ export async function registerEncounterRoutes(app: FastifyInstance): Promise<voi
       (requestedScene ? sceneBelongs(requestedScene, id) : null) ??
       (state.active_scene_id ? sceneBelongs(state.active_scene_id, id) : null) ??
       (db
-        .prepare("SELECT * FROM scenes WHERE campaign_id = ? ORDER BY sort_order ASC, created_at ASC LIMIT 1")
+        .prepare(
+          "SELECT * FROM scenes WHERE campaign_id = ? ORDER BY sort_order ASC, created_at ASC LIMIT 1"
+        )
         .get(id) as SceneRow | undefined) ??
       null;
-    if (!scene) return reply.code(400).send({ error: "Create a scene before launching an encounter." });
+    if (!scene)
+      return reply.code(400).send({ error: "Create a scene before launching an encounter." });
 
     const existingEntries =
       mode === "reinforce" ? parseJson<InitiativeEntry[]>(state.initiative, []) : [];
@@ -467,13 +485,15 @@ export async function registerEncounterRoutes(app: FastifyInstance): Promise<voi
 
     const allCombatants = db
       .prepare(
-        "SELECT * FROM encounter_combatants WHERE encounter_id = ? ORDER BY sort_order ASC, created_at ASC",
+        "SELECT * FROM encounter_combatants WHERE encounter_id = ? ORDER BY sort_order ASC, created_at ASC"
       )
       .all(encounterId) as EncounterCombatantRow[];
     const combatants =
       wave === null
         ? allCombatants
-        : allCombatants.filter((combatant) => Math.max(1, Math.round(combatant.wave ?? 1)) === wave);
+        : allCombatants.filter(
+            (combatant) => Math.max(1, Math.round(combatant.wave ?? 1)) === wave
+          );
     if (!allCombatants.length) {
       return reply.code(400).send({ error: "Add at least one combatant before launching." });
     }
@@ -500,7 +520,7 @@ export async function registerEncounterRoutes(app: FastifyInstance): Promise<voi
     for (const combatant of combatants) {
       nameTotals.set(
         combatant.name,
-        (nameTotals.get(combatant.name) ?? 0) + Math.max(1, Math.min(50, combatant.count)),
+        (nameTotals.get(combatant.name) ?? 0) + Math.max(1, Math.min(50, combatant.count))
       );
     }
     const nameProgress = new Map<string, number>();
@@ -512,8 +532,16 @@ export async function registerEncounterRoutes(app: FastifyInstance): Promise<voi
       for (let copy = 0; copy < count; copy += 1) {
         const column = index % columns;
         const row = Math.floor(index / columns);
-        const x = clamp(startX + column * spacing, spacing / 2, Math.max(spacing / 2, scene.width - spacing / 2));
-        const y = clamp(startY + row * spacing, spacing / 2, Math.max(spacing / 2, scene.height - spacing / 2));
+        const x = clamp(
+          startX + column * spacing,
+          spacing / 2,
+          Math.max(spacing / 2, scene.width - spacing / 2)
+        );
+        const y = clamp(
+          startY + row * spacing,
+          spacing / 2,
+          Math.max(spacing / 2, scene.height - spacing / 2)
+        );
         const tokenId = newId("tok");
         const ts = now();
         const baseName = combatant.name.slice(0, 70);
@@ -526,7 +554,7 @@ export async function registerEncounterRoutes(app: FastifyInstance): Promise<voi
         db.prepare(
           `INSERT INTO tokens
             (id, scene_id, name, image_url, character_id, owner_id, x, y, size, color, hp_current, hp_max, ac, initiative_bonus, group_id, group_name, conditions, hidden, locked, sort_order, created_at, updated_at)
-           VALUES (?, ?, ?, NULL, NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '[]', 0, 0, ?, ?, ?)`,
+           VALUES (?, ?, ?, NULL, NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '[]', 0, 0, ?, ?, ?)`
         ).run(
           tokenId,
           scene.id,
@@ -543,16 +571,18 @@ export async function registerEncounterRoutes(app: FastifyInstance): Promise<voi
           combatant.name,
           Date.now(),
           ts,
-          ts,
+          ts
         );
-        createdTokens.push(db.prepare("SELECT * FROM tokens WHERE id = ?").get(tokenId) as TokenRow);
+        createdTokens.push(
+          db.prepare("SELECT * FROM tokens WHERE id = ?").get(tokenId) as TokenRow
+        );
         index += 1;
       }
     }
 
     const sceneTokens = db
       .prepare(
-        "SELECT * FROM tokens WHERE scene_id = ? AND hidden = 0 ORDER BY sort_order ASC, created_at ASC",
+        "SELECT * FROM tokens WHERE scene_id = ? AND hidden = 0 ORDER BY sort_order ASC, created_at ASC"
       )
       .all(scene.id) as TokenRow[];
     let entries: InitiativeEntry[];
@@ -560,19 +590,19 @@ export async function registerEncounterRoutes(app: FastifyInstance): Promise<voi
     let turnIndex = 0;
     if (mode === "reinforce") {
       const activeId = existingEntries[state.turn_index]?.id ?? null;
-      entries = sortInitiative([
-        ...existingEntries,
-        ...initiativeEntriesForTokens(createdTokens),
-      ]);
+      entries = sortInitiative([...existingEntries, ...initiativeEntriesForTokens(createdTokens)]);
       round = existingEntries.length ? Math.max(1, state.round) : 1;
       turnIndex = activeId
-        ? Math.max(0, entries.findIndex((entry) => entry.id === activeId))
+        ? Math.max(
+            0,
+            entries.findIndex((entry) => entry.id === activeId)
+          )
         : 0;
     } else {
       entries = sortInitiative(initiativeEntriesForTokens(sceneTokens));
     }
     db.prepare(
-      "UPDATE campaign_state SET active_scene_id = ?, initiative = ?, round = ?, turn_index = ?, updated_at = ? WHERE campaign_id = ?",
+      "UPDATE campaign_state SET active_scene_id = ?, initiative = ?, round = ?, turn_index = ?, updated_at = ? WHERE campaign_id = ?"
     ).run(scene.id, JSON.stringify(entries), round, turnIndex, now(), id);
 
     for (const token of createdTokens) {

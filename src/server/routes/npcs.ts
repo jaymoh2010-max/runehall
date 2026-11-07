@@ -6,7 +6,7 @@ import { clamp, newId, now, safeInt, safeString, sanitizeUserText } from "../uti
 
 function gmCampaign(
   request: { user: { id: string } | null },
-  campaignId: string,
+  campaignId: string
 ): { row: ReturnType<typeof getCampaign>; error?: string; code?: number } {
   if (!request.user) return { row: null, error: "Sign in to continue.", code: 401 };
   const row = getCampaign(campaignId);
@@ -35,7 +35,9 @@ function imageUrl(value: unknown): string | null | undefined {
 
 function nextSortOrder(campaignId: string): number {
   const row = db
-    .prepare("SELECT COALESCE(MAX(sort_order), 0) + 1 AS next FROM campaign_npcs WHERE campaign_id = ?")
+    .prepare(
+      "SELECT COALESCE(MAX(sort_order), 0) + 1 AS next FROM campaign_npcs WHERE campaign_id = ?"
+    )
     .get(campaignId) as { next: number };
   return row.next;
 }
@@ -56,7 +58,9 @@ function activeScene(campaignId: string): SceneRow | null {
   return (
     requested ??
     (db
-      .prepare("SELECT * FROM scenes WHERE campaign_id = ? ORDER BY sort_order ASC, created_at ASC LIMIT 1")
+      .prepare(
+        "SELECT * FROM scenes WHERE campaign_id = ? ORDER BY sort_order ASC, created_at ASC LIMIT 1"
+      )
       .get(campaignId) as SceneRow | undefined) ??
     null
   );
@@ -68,7 +72,9 @@ export async function registerNpcRoutes(app: FastifyInstance): Promise<void> {
     const access = gmCampaign(request, id);
     if (!access.row) return reply.code(access.code ?? 403).send({ error: access.error });
     const rows = db
-      .prepare("SELECT * FROM campaign_npcs WHERE campaign_id = ? ORDER BY sort_order ASC, name ASC")
+      .prepare(
+        "SELECT * FROM campaign_npcs WHERE campaign_id = ? ORDER BY sort_order ASC, name ASC"
+      )
       .all(id) as CampaignNpcRow[];
     return reply.send({ npcs: rows.map(serializeCampaignNpc) });
   });
@@ -85,7 +91,7 @@ export async function registerNpcRoutes(app: FastifyInstance): Promise<void> {
     db.prepare(
       `INSERT INTO campaign_npcs
         (id, campaign_id, name, level, hp, ac, perception, size, color, image_url, description, sort_order, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       npcId,
       id,
@@ -102,12 +108,10 @@ export async function registerNpcRoutes(app: FastifyInstance): Promise<void> {
       sanitizeUserText(body.description, 20_000),
       nextSortOrder(id),
       ts,
-      ts,
+      ts
     );
     touchCampaign(id);
-    return reply
-      .code(201)
-      .send({ npc: serializeCampaignNpc(getNpc(id, npcId)!) });
+    return reply.code(201).send({ npc: serializeCampaignNpc(getNpc(id, npcId)!) });
   });
 
   app.patch("/api/campaigns/:id/npcs/:npcId", async (request, reply) => {
@@ -117,14 +121,15 @@ export async function registerNpcRoutes(app: FastifyInstance): Promise<void> {
     const existing = getNpc(id, npcId);
     if (!existing) return reply.code(404).send({ error: "NPC not found." });
     const body = (request.body ?? {}) as Record<string, unknown>;
-    const name = body.name === undefined ? existing.name : safeString(body.name, existing.name, 120);
+    const name =
+      body.name === undefined ? existing.name : safeString(body.name, existing.name, 120);
     if (!name) return reply.code(400).send({ error: "Give the NPC a name." });
     const nextImage = imageUrl(body.imageUrl);
     db.prepare(
       `UPDATE campaign_npcs
        SET name = ?, level = ?, hp = ?, ac = ?, perception = ?, size = ?, color = ?,
            image_url = ?, description = ?, updated_at = ?
-       WHERE id = ?`,
+       WHERE id = ?`
     ).run(
       name,
       body.level === undefined
@@ -154,7 +159,7 @@ export async function registerNpcRoutes(app: FastifyInstance): Promise<void> {
         ? existing.description
         : sanitizeUserText(body.description, 20_000),
       now(),
-      npcId,
+      npcId
     );
     touchCampaign(id);
     return reply.send({ npc: serializeCampaignNpc(getNpc(id, npcId)!) });
@@ -177,18 +182,18 @@ export async function registerNpcRoutes(app: FastifyInstance): Promise<void> {
     const npc = getNpc(id, npcId);
     if (!npc) return reply.code(404).send({ error: "NPC not found." });
     const body = (request.body ?? {}) as Record<string, unknown>;
-    const requestedScene = typeof body.sceneId === "string" && body.sceneId
-      ? sceneBelongs(body.sceneId, id)
-      : null;
+    const requestedScene =
+      typeof body.sceneId === "string" && body.sceneId ? sceneBelongs(body.sceneId, id) : null;
     const scene = requestedScene ?? activeScene(id);
-    if (!scene) return reply.code(400).send({ error: "Create a scene before placing an NPC token." });
+    if (!scene)
+      return reply.code(400).send({ error: "Create a scene before placing an NPC token." });
 
     const tokenId = newId("tok");
     const ts = now();
     db.prepare(
       `INSERT INTO tokens
         (id, scene_id, name, image_url, character_id, owner_id, x, y, size, color, hp_current, hp_max, ac, initiative_bonus, group_id, group_name, conditions, hidden, locked, sort_order, created_at, updated_at)
-       VALUES (?, ?, ?, ?, NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, '[]', 0, 0, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, '[]', 0, 0, ?, ?, ?)`
     ).run(
       tokenId,
       scene.id,
@@ -204,7 +209,7 @@ export async function registerNpcRoutes(app: FastifyInstance): Promise<void> {
       npc.perception,
       Date.now(),
       ts,
-      ts,
+      ts
     );
     const token = db.prepare("SELECT * FROM tokens WHERE id = ?").get(tokenId) as TokenRow;
     app.broadcastCampaign(id, "token:created", serializeToken(token));

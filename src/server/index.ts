@@ -56,7 +56,7 @@ app.decorate(
     campaignId: string,
     event: string,
     payload: unknown,
-    target: "all" | "gm" | "players" = "all",
+    target: "all" | "gm" | "players" = "all"
   ) => {
     const typed = app.io as unknown as TypedServer;
     if (!typed) return;
@@ -73,7 +73,7 @@ app.decorate(
     } else {
       anyIo.to(`campaign:${campaignId}`).emit(event, payload);
     }
-  },
+  }
 );
 
 setRevisionBroadcaster((campaignId, revision) => {
@@ -132,7 +132,7 @@ if (auditRetentionDays > 0) {
   if (pruned.deleted > 0) {
     app.log.info(
       { deleted: pruned.deleted, retentionDays: auditRetentionDays },
-      "Pruned expired audit entries",
+      "Pruned expired audit entries"
     );
   }
 }

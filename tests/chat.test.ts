@@ -31,7 +31,10 @@ describe("chat filters", () => {
   });
 
   it("filters talk, rolls, and requests", () => {
-    expect(filterChatMessages(messages, "talk").map((entry) => entry.id)).toEqual(["talk", "secret"]);
+    expect(filterChatMessages(messages, "talk").map((entry) => entry.id)).toEqual([
+      "talk",
+      "secret",
+    ]);
     expect(filterChatMessages(messages, "rolls").map((entry) => entry.id)).toEqual(["roll"]);
     expect(filterChatMessages(messages, "requests").map((entry) => entry.id)).toEqual(["request"]);
   });

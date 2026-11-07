@@ -11,7 +11,13 @@ interface EvalContext {
 
 type Node =
   | { kind: "number"; value: number }
-  | { kind: "dice"; count: number; sides: number; keep: { mode: "kh" | "kl"; n: number } | null; sign: 1 | -1 }
+  | {
+      kind: "dice";
+      count: number;
+      sides: number;
+      keep: { mode: "kh" | "kl"; n: number } | null;
+      sign: 1 | -1;
+    }
   | { kind: "unary"; sign: 1 | -1; node: Node }
   | { kind: "binary"; op: "+" | "-" | "*"; left: Node; right: Node };
 
@@ -34,7 +40,9 @@ function tokenize(input: string): Token[] {
       const raw = dice[0];
       const count = Number(dice[1] || 1);
       const sides = Number(dice[2]);
-      const keep = dice[3] ? { mode: dice[3].toLowerCase() as "kh" | "kl", n: Number(dice[4]) } : null;
+      const keep = dice[3]
+        ? { mode: dice[3].toLowerCase() as "kh" | "kl", n: Number(dice[4]) }
+        : null;
       if (count < 1 || count > 100) throw new Error("Dice count must be between 1 and 100.");
       if (sides < 2 || sides > 1000) throw new Error("Dice sides must be between 2 and 1000.");
       tokens.push({ type: "dice", value: JSON.stringify({ count, sides, keep }) });
@@ -192,11 +200,7 @@ function evaluate(node: Node, ctx: EvalContext): number {
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
-export function getDegreeOfSuccess(
-  total: number,
-  dc: number,
-  d20: number | null,
-): DegreeOfSuccess {
+export function getDegreeOfSuccess(total: number, dc: number, d20: number | null): DegreeOfSuccess {
   let level = 0; // 0 crit fail, 1 fail, 2 success, 3 crit success
   if (total >= dc + 10) level = 3;
   else if (total >= dc) level = 2;
@@ -224,8 +228,7 @@ export function describeRoll(result: RollResult): string {
   const parts: string[] = [];
   for (const term of result.terms) {
     const rolls = term.results.join(", ");
-    const kept =
-      term.kept.length !== term.results.length ? ` → keep ${term.kept.join(", ")}` : "";
+    const kept = term.kept.length !== term.results.length ? ` → keep ${term.kept.join(", ")}` : "";
     parts.push(`${term.count}d${term.sides} (${rolls}${kept})`);
   }
   for (const constant of result.constants) {
@@ -237,7 +240,7 @@ export function describeRoll(result: RollResult): string {
 
 export function rollFormula(
   formula: string,
-  options: { dc?: number | null; label?: string; rng?: Rng } = {},
+  options: { dc?: number | null; label?: string; rng?: Rng } = {}
 ): RollResult {
   const clean = String(formula || "").trim();
   if (!clean) throw new Error("Enter a dice formula, e.g. 1d20+7.");

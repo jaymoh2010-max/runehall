@@ -104,12 +104,7 @@ import {
   Textarea,
   Toggle,
 } from "../../ui";
-import {
-  DeityPicker,
-  EquipmentPicker,
-  FeatPicker,
-  SpellPicker,
-} from "../pickers";
+import { DeityPicker, EquipmentPicker, FeatPicker, SpellPicker } from "../pickers";
 import { ContentSourceToggle } from "../ContentSourceToggle";
 import { RunePicker } from "../RunePicker";
 import {
@@ -121,12 +116,7 @@ import {
 import { summarizeRunes } from "../../../../shared/runes";
 import type { BuilderProps, StepId } from "../shared";
 import { STEPS } from "../shared";
-import {
-  StepHeading,
-  ValidationNote,
-  SearchInput,
-  MiniFeatureList,
-} from "../shared";
+import { StepHeading, ValidationNote, SearchInput, MiniFeatureList } from "../shared";
 
 export function ReviewStep({
   draft,
@@ -156,8 +146,16 @@ export function ReviewStep({
           {errors.length ? <CircleAlert size={28} /> : <CheckCircle2 size={28} />}
         </div>
         <div>
-          <h2>{errors.length ? `${errors.length} thing${errors.length === 1 ? "" : "s"} still need attention` : "Your hero is ready"}</h2>
-          <p>{errors.length ? "Fix the items below, or finish them with your GM." : "Every required choice is made. Open the character sheet, or jump into a campaign table."}</p>
+          <h2>
+            {errors.length
+              ? `${errors.length} thing${errors.length === 1 ? "" : "s"} still need attention`
+              : "Your hero is ready"}
+          </h2>
+          <p>
+            {errors.length
+              ? "Fix the items below, or finish them with your GM."
+              : "Every required choice is made. Open the character sheet, or jump into a campaign table."}
+          </p>
         </div>
       </Card>
 
@@ -165,28 +163,84 @@ export function ReviewStep({
         <Card className="review-list">
           <h3>Choices</h3>
           <dl>
-            <div><dt>Ancestry</dt><dd>{context.ancestry?.name || "—"}</dd></div>
-            <div><dt>Heritage</dt><dd>{context.heritage?.name || "—"}</dd></div>
-            <div><dt>Background</dt><dd>{context.background?.name || "—"}</dd></div>
-            <div><dt>Class</dt><dd>{context.classData?.name || "—"}</dd></div>
-            <div><dt>Deity</dt><dd>{context.deity?.name || "—"}</dd></div>
-            <div><dt>Level</dt><dd>{draft.level}</dd></div>
-            <div><dt>Feats chosen</dt><dd>{Object.values(draft.feats.ancestry).length + Object.values(draft.feats.class).length + Object.values(draft.feats.skill).length + Object.values(draft.feats.general).length}</dd></div>
-            <div><dt>Spells chosen</dt><dd>{draft.spells.cantrips.length + draft.spells.known.length}</dd></div>
-            <div><dt>Equipment</dt><dd>{draft.equipment.length} entries</dd></div>
+            <div>
+              <dt>Ancestry</dt>
+              <dd>{context.ancestry?.name || "—"}</dd>
+            </div>
+            <div>
+              <dt>Heritage</dt>
+              <dd>{context.heritage?.name || "—"}</dd>
+            </div>
+            <div>
+              <dt>Background</dt>
+              <dd>{context.background?.name || "—"}</dd>
+            </div>
+            <div>
+              <dt>Class</dt>
+              <dd>{context.classData?.name || "—"}</dd>
+            </div>
+            <div>
+              <dt>Deity</dt>
+              <dd>{context.deity?.name || "—"}</dd>
+            </div>
+            <div>
+              <dt>Level</dt>
+              <dd>{draft.level}</dd>
+            </div>
+            <div>
+              <dt>Feats chosen</dt>
+              <dd>
+                {Object.values(draft.feats.ancestry).length +
+                  Object.values(draft.feats.class).length +
+                  Object.values(draft.feats.skill).length +
+                  Object.values(draft.feats.general).length}
+              </dd>
+            </div>
+            <div>
+              <dt>Spells chosen</dt>
+              <dd>{draft.spells.cantrips.length + draft.spells.known.length}</dd>
+            </div>
+            <div>
+              <dt>Equipment</dt>
+              <dd>{draft.equipment.length} entries</dd>
+            </div>
           </dl>
         </Card>
         <Card className="review-list">
           <h3>Numbers</h3>
           <dl>
-            <div><dt>Hit points</dt><dd>{derived.maxHp}</dd></div>
-            <div><dt>Armor class</dt><dd>{derived.ac}</dd></div>
-            <div><dt>Perception</dt><dd>{signed(derived.perception)}</dd></div>
-            <div><dt>Fortitude</dt><dd>{signed(derived.saves.fortitude)}</dd></div>
-            <div><dt>Reflex</dt><dd>{signed(derived.saves.reflex)}</dd></div>
-            <div><dt>Will</dt><dd>{signed(derived.saves.will)}</dd></div>
-            <div><dt>Class DC</dt><dd>{derived.classDc}</dd></div>
-            <div><dt>Spell DC</dt><dd>{derived.spellDc ?? "—"}</dd></div>
+            <div>
+              <dt>Hit points</dt>
+              <dd>{derived.maxHp}</dd>
+            </div>
+            <div>
+              <dt>Armor class</dt>
+              <dd>{derived.ac}</dd>
+            </div>
+            <div>
+              <dt>Perception</dt>
+              <dd>{signed(derived.perception)}</dd>
+            </div>
+            <div>
+              <dt>Fortitude</dt>
+              <dd>{signed(derived.saves.fortitude)}</dd>
+            </div>
+            <div>
+              <dt>Reflex</dt>
+              <dd>{signed(derived.saves.reflex)}</dd>
+            </div>
+            <div>
+              <dt>Will</dt>
+              <dd>{signed(derived.saves.will)}</dd>
+            </div>
+            <div>
+              <dt>Class DC</dt>
+              <dd>{derived.classDc}</dd>
+            </div>
+            <div>
+              <dt>Spell DC</dt>
+              <dd>{derived.spellDc ?? "—"}</dd>
+            </div>
           </dl>
         </Card>
       </div>
@@ -196,10 +250,19 @@ export function ReviewStep({
           <h3>Outstanding items</h3>
           <div className="issues-list">
             {errors.map((issue, index) => (
-              <button key={`e-${index}`} type="button" className="issue-row error" onClick={() => issue.step && setStep(issue.step as StepId)}>
+              <button
+                key={`e-${index}`}
+                type="button"
+                className="issue-row error"
+                onClick={() => issue.step && setStep(issue.step as StepId)}
+              >
                 <CircleAlert size={15} />
                 <span>{issue.message}</span>
-                {issue.step ? <span className="issue-jump">Go to {STEPS.find((step) => step.id === issue.step)?.label ?? issue.step}</span> : null}
+                {issue.step ? (
+                  <span className="issue-jump">
+                    Go to {STEPS.find((step) => step.id === issue.step)?.label ?? issue.step}
+                  </span>
+                ) : null}
               </button>
             ))}
             {warnings.map((issue, index) => (
@@ -215,12 +278,20 @@ export function ReviewStep({
       <Card className="review-actions-card">
         <div>
           <h3>Character file</h3>
-          <p className="muted small">Export a portable JSON copy. Import it into another campaign or keep it as a backup.</p>
+          <p className="muted small">
+            Export a portable JSON copy. Import it into another campaign or keep it as a backup.
+          </p>
         </div>
         <div className="row wrap">
-          <Button icon={<Download size={15} />} onClick={onExport}>Export JSON</Button>
-          <Button icon={<FileUp size={15} />} onClick={() => fileRef.current?.click()}>Import JSON</Button>
-          <Button variant="danger" icon={<Trash2 size={15} />} onClick={onDelete}>Delete</Button>
+          <Button icon={<Download size={15} />} onClick={onExport}>
+            Export JSON
+          </Button>
+          <Button icon={<FileUp size={15} />} onClick={() => fileRef.current?.click()}>
+            Import JSON
+          </Button>
+          <Button variant="danger" icon={<Trash2 size={15} />} onClick={onDelete}>
+            Delete
+          </Button>
           <input
             ref={fileRef}
             type="file"
@@ -235,7 +306,9 @@ export function ReviewStep({
         </div>
       </Card>
       <div className="step-actions">
-        <Button variant="ghost" onClick={() => setStep("details")}>Back</Button>
+        <Button variant="ghost" onClick={() => setStep("details")}>
+          Back
+        </Button>
       </div>
     </div>
   );

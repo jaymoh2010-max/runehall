@@ -57,7 +57,7 @@ export function LootBuilder({
 
   const selected = useMemo(
     () => parcels.find((parcel) => parcel.id === selectedId) ?? null,
-    [parcels, selectedId],
+    [parcels, selectedId]
   );
   const draftCopper =
     Math.max(0, Number(gpDraft) || 0) * 100 +
@@ -76,7 +76,7 @@ export function LootBuilder({
         setSelectedId((current) =>
           current && result.parcels.some((parcel) => parcel.id === current)
             ? current
-            : result.parcels[0]?.id ?? null,
+            : (result.parcels[0]?.id ?? null)
         );
       })
       .catch((err) => {
@@ -121,7 +121,7 @@ export function LootBuilder({
           params.set("legacy", "1");
         }
         const result = await api<{ items: Equipment[]; total: number }>(
-          `/api/compendium/equipment?${params.toString()}`,
+          `/api/compendium/equipment?${params.toString()}`
         );
         setItems(result.items);
         setItemTotal(result.total);
@@ -170,7 +170,7 @@ export function LootBuilder({
             sp: Number(spDraft) || 0,
             cp: Number(cpDraft) || 0,
           },
-        },
+        }
       );
       replaceParcel(result.parcel);
       toast("Loot parcel saved.", "success");
@@ -204,7 +204,7 @@ export function LootBuilder({
     try {
       const result = await api<{ parcel: LootParcel }>(
         `/api/campaigns/${campaignId}/loot/${selected.id}/items`,
-        { method: "POST", body: { itemId: item.id, quantity: 1 } },
+        { method: "POST", body: { itemId: item.id, quantity: 1 } }
       );
       replaceParcel(result.parcel);
     } catch (err) {
@@ -219,7 +219,7 @@ export function LootBuilder({
     try {
       const result = await api<{ parcel: LootParcel }>(
         `/api/campaigns/${campaignId}/loot/${selected.id}/items`,
-        { method: "PATCH", body: { itemId, quantity } },
+        { method: "PATCH", body: { itemId, quantity } }
       );
       replaceParcel(result.parcel);
     } catch (err) {
@@ -232,7 +232,7 @@ export function LootBuilder({
     try {
       const result = await api<{ parcel: LootParcel }>(
         `/api/campaigns/${campaignId}/loot/${selected.id}/items/${encodeURIComponent(itemId)}`,
-        { method: "DELETE" },
+        { method: "DELETE" }
       );
       replaceParcel(result.parcel);
     } catch (err) {
@@ -258,7 +258,7 @@ export function LootBuilder({
             sp: Number(spDraft) || 0,
             cp: Number(cpDraft) || 0,
           },
-        },
+        }
       );
       replaceParcel(saved.parcel);
       if (lootIsEmpty(saved.parcel)) {
@@ -267,7 +267,7 @@ export function LootBuilder({
       }
       const result = await api<{ parcel: LootParcel; character: CharacterRecord }>(
         `/api/campaigns/${campaignId}/loot/${selected.id}/distribute`,
-        { method: "POST", body: { characterId: recipientId } },
+        { method: "POST", body: { characterId: recipientId } }
       );
       replaceParcel(result.parcel);
       onCharacterUpdated(result.character);
@@ -298,14 +298,21 @@ export function LootBuilder({
         <div>
           <PageEyebrow>GM preparation</PageEyebrow>
           <h2>Loot parcels</h2>
-          <p>Build a treasure parcel, then hand it to a character. Items and coins land on the sheet immediately.</p>
+          <p>
+            Build a treasure parcel, then hand it to a character. Items and coins land on the sheet
+            immediately.
+          </p>
         </div>
         <Button variant="primary" icon={<Plus size={15} />} loading={busy} onClick={createParcel}>
           New parcel
         </Button>
       </div>
 
-      {error ? <div className="auth-error" style={{ marginBottom: 14 }}>{error}</div> : null}
+      {error ? (
+        <div className="auth-error" style={{ marginBottom: 14 }}>
+          {error}
+        </div>
+      ) : null}
 
       {loading ? (
         <Spinner label="Opening the treasury…" />
@@ -315,7 +322,12 @@ export function LootBuilder({
           title="No loot prepared"
           description="Create a parcel for the next hoard, quest reward, or shop stock."
           action={
-            <Button variant="primary" icon={<Plus size={15} />} loading={busy} onClick={createParcel}>
+            <Button
+              variant="primary"
+              icon={<Plus size={15} />}
+              loading={busy}
+              onClick={createParcel}
+            >
               Create the first parcel
             </Button>
           }
@@ -342,7 +354,11 @@ export function LootBuilder({
                       {formatCp(lootCopper(parcel))}
                     </span>
                   </span>
-                  {parcel.status === "distributed" ? <Tag tone="green">Given</Tag> : <Coins size={14} />}
+                  {parcel.status === "distributed" ? (
+                    <Tag tone="green">Given</Tag>
+                  ) : (
+                    <Coins size={14} />
+                  )}
                 </button>
               ))}
             </div>
@@ -350,7 +366,11 @@ export function LootBuilder({
 
           <div className="encounter-workspace">
             {!selected ? (
-              <EmptyState icon={<Coins size={28} />} title="Choose a parcel" description="Select a parcel or create a new one." />
+              <EmptyState
+                icon={<Coins size={28} />}
+                title="Choose a parcel"
+                description="Select a parcel or create a new one."
+              />
             ) : (
               <>
                 <Card className="loot-header">
@@ -399,7 +419,12 @@ export function LootBuilder({
                         Save
                       </Button>
                     ) : null}
-                    <Button size="sm" variant="ghost" icon={<Trash2 size={13} />} onClick={deleteParcel}>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      icon={<Trash2 size={13} />}
+                      onClick={deleteParcel}
+                    >
                       Delete
                     </Button>
                   </div>
@@ -424,7 +449,9 @@ export function LootBuilder({
                       <Badge tone="gold">{formatCp(draftCopper)}</Badge>
                     </div>
                     {!selected.items.length ? (
-                      <p className="muted small">No items yet. Add equipment from the compendium.</p>
+                      <p className="muted small">
+                        No items yet. Add equipment from the compendium.
+                      </p>
                     ) : (
                       <div className="encounter-roster-list">
                         {selected.items.map((item) => (
@@ -467,7 +494,9 @@ export function LootBuilder({
                         <div>
                           <strong>Given to {selected.distributedToName || "a character"}</strong>
                           <p className="tiny muted">
-                            {selected.distributedAt ? `Distributed ${formatDate(selected.distributedAt)}.` : "This parcel is closed."}
+                            {selected.distributedAt
+                              ? `Distributed ${formatDate(selected.distributedAt)}.`
+                              : "This parcel is closed."}
                           </p>
                         </div>
                       ) : (
@@ -481,7 +510,10 @@ export function LootBuilder({
                             </p>
                           </div>
                           <div className="loot-distribute-controls">
-                            <Select value={recipientId} onChange={(event) => setRecipientId(event.target.value)}>
+                            <Select
+                              value={recipientId}
+                              onChange={(event) => setRecipientId(event.target.value)}
+                            >
                               <option value="">Choose a character…</option>
                               {characters.map((character) => (
                                 <option key={character.id} value={character.id}>
@@ -511,7 +543,11 @@ export function LootBuilder({
                         <h3>Add equipment</h3>
                       </div>
                       <Badge tone="violet">
-                        {itemLoading ? "Searching…" : itemTotal > items.length ? `${items.length} of ${itemTotal}` : `${items.length} results`}
+                        {itemLoading
+                          ? "Searching…"
+                          : itemTotal > items.length
+                            ? `${items.length} of ${itemTotal}`
+                            : `${items.length} results`}
                       </Badge>
                     </div>
                     <div className="encounter-search">
@@ -530,7 +566,9 @@ export function LootBuilder({
                       <div className="encounter-monster-list">
                         {items.map((item) => (
                           <div key={item.id} className="encounter-monster-row">
-                            <span className="encounter-monster-mark"><Sparkles size={14} /></span>
+                            <span className="encounter-monster-mark">
+                              <Sparkles size={14} />
+                            </span>
                             <div className="grow">
                               <strong>{item.name}</strong>
                               <span className="tiny muted">
@@ -548,7 +586,9 @@ export function LootBuilder({
                             </Button>
                           </div>
                         ))}
-                        {!items.length ? <p className="muted small">No equipment matches that search.</p> : null}
+                        {!items.length ? (
+                          <p className="muted small">No equipment matches that search.</p>
+                        ) : null}
                       </div>
                     )}
                   </Card>

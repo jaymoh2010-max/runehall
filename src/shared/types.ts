@@ -78,7 +78,10 @@ export const SKILLS: SkillDefinition[] = [
   { id: "thievery", name: "Thievery", ability: "dex", armorPenalty: true },
 ];
 
-export const SKILL_BY_ID = Object.fromEntries(SKILLS.map((s) => [s.id, s])) as Record<SkillId, SkillDefinition>;
+export const SKILL_BY_ID = Object.fromEntries(SKILLS.map((s) => [s.id, s])) as Record<
+  SkillId,
+  SkillDefinition
+>;
 
 export const SAVE_LABELS: Record<SaveKey, string> = {
   fortitude: "Fortitude",
@@ -882,12 +885,7 @@ export interface CampaignThread {
 }
 
 export type SessionStatus = "scheduled" | "played" | "canceled";
-export type SessionAttendanceStatus =
-  | "attended"
-  | "late"
-  | "absent"
-  | "excused"
-  | "unmarked";
+export type SessionAttendanceStatus = "attended" | "late" | "absent" | "excused" | "unmarked";
 
 export interface SessionAgendaItem {
   id: string;
@@ -1137,11 +1135,7 @@ export interface CampaignTable {
   revision: number;
 }
 
-export type DegreeOfSuccess =
-  | "critical-success"
-  | "success"
-  | "failure"
-  | "critical-failure";
+export type DegreeOfSuccess = "critical-success" | "success" | "failure" | "critical-failure";
 
 export interface DiceTerm {
   type: "dice";
@@ -1201,28 +1195,77 @@ export interface PresenceUser {
 export interface ClientToServerEvents {
   "campaign:join": (payload: { campaignId: string }, ack?: (ok: unknown) => void) => void;
   "campaign:leave": (payload: { campaignId: string }) => void;
-  "token:move": (payload: { campaignId: string; sceneId: string; tokenId: string; x: number; y: number }) => void;
-  "token:create": (payload: { campaignId: string; sceneId: string; token: Partial<Token> }, ack?: (token: Token | null) => void) => void;
+  "token:move": (payload: {
+    campaignId: string;
+    sceneId: string;
+    tokenId: string;
+    x: number;
+    y: number;
+  }) => void;
+  "token:create": (
+    payload: { campaignId: string; sceneId: string; token: Partial<Token> },
+    ack?: (token: Token | null) => void
+  ) => void;
   "token:update": (payload: { campaignId: string; token: Partial<Token> & { id: string } }) => void;
   "token:delete": (payload: { campaignId: string; tokenId: string }) => void;
-  "fog:update": (payload: { campaignId: string; sceneId: string; cells: string[]; mode: "reveal" | "hide" | "replace" }) => void;
+  "fog:update": (payload: {
+    campaignId: string;
+    sceneId: string;
+    cells: string[];
+    mode: "reveal" | "hide" | "replace";
+  }) => void;
   "scene:activate": (payload: { campaignId: string; sceneId: string }) => void;
   "scene:update": (payload: { campaignId: string; scene: Partial<Scene> & { id: string } }) => void;
-  "scene:create": (payload: { campaignId: string; scene: Partial<Scene> }, ack?: (scene: Scene | null) => void) => void;
+  "scene:create": (
+    payload: { campaignId: string; scene: Partial<Scene> },
+    ack?: (scene: Scene | null) => void
+  ) => void;
   "scene:delete": (payload: { campaignId: string; sceneId: string }) => void;
   "scene:reorder": (payload: { campaignId: string; sceneIds: string[] }) => void;
   "template:add": (payload: { campaignId: string; sceneId: string; template: AoeTemplate }) => void;
   "template:clear": (payload: { campaignId: string; sceneId: string }) => void;
-  "chat:send": (payload: { campaignId: string; content: string; visibility?: "all" | "gm" }, ack?: (message: ChatMessage | null) => void) => void;
-  "dice:roll": (payload: { campaignId: string; formula: string; label?: string; dc?: number | null; visibility?: "all" | "gm"; characterId?: string | null; requestId?: string | null }, ack?: (message: ChatMessage | null) => void) => void;
-  "dice:request": (payload: { campaignId: string; formula: string; label?: string; dc?: number | null; group?: boolean }, ack?: (message: ChatMessage | null) => void) => void;
-  "initiative:roll": (payload: { campaignId: string; sceneId: string; tokenIds?: string[] }) => void;
-  "initiative:update": (payload: { campaignId: string; entries: InitiativeEntry[]; round?: number; turnIndex?: number }) => void;
+  "chat:send": (
+    payload: { campaignId: string; content: string; visibility?: "all" | "gm" },
+    ack?: (message: ChatMessage | null) => void
+  ) => void;
+  "dice:roll": (
+    payload: {
+      campaignId: string;
+      formula: string;
+      label?: string;
+      dc?: number | null;
+      visibility?: "all" | "gm";
+      characterId?: string | null;
+      requestId?: string | null;
+    },
+    ack?: (message: ChatMessage | null) => void
+  ) => void;
+  "dice:request": (
+    payload: {
+      campaignId: string;
+      formula: string;
+      label?: string;
+      dc?: number | null;
+      group?: boolean;
+    },
+    ack?: (message: ChatMessage | null) => void
+  ) => void;
+  "initiative:roll": (payload: {
+    campaignId: string;
+    sceneId: string;
+    tokenIds?: string[];
+  }) => void;
+  "initiative:update": (payload: {
+    campaignId: string;
+    entries: InitiativeEntry[];
+    round?: number;
+    turnIndex?: number;
+  }) => void;
   "initiative:next": (payload: { campaignId: string; direction?: 1 | -1 }) => void;
   "initiative:add": (payload: { campaignId: string; tokenId: string; value?: number }) => void;
   "initiative:reroll": (payload: { campaignId: string; entryId: string }) => void;
   "initiative:remove": (payload: { campaignId: string; entryId: string }) => void;
-  "pointer": (payload: { campaignId: string; sceneId: string; x: number; y: number }) => void;
+  pointer: (payload: { campaignId: string; sceneId: string; x: number; y: number }) => void;
 }
 
 export interface ServerToClientEvents {
@@ -1231,7 +1274,11 @@ export interface ServerToClientEvents {
   "token:created": (token: Token) => void;
   "token:updated": (token: Token) => void;
   "token:deleted": (payload: { tokenId: string; sceneId: string }) => void;
-  "fog:updated": (payload: { sceneId: string; cells: string[]; mode: "reveal" | "hide" | "replace" }) => void;
+  "fog:updated": (payload: {
+    sceneId: string;
+    cells: string[];
+    mode: "reveal" | "hide" | "replace";
+  }) => void;
   "scene:activated": (payload: { sceneId: string }) => void;
   "scene:updated": (scene: Scene) => void;
   "scene:created": (scene: Scene) => void;
@@ -1239,9 +1286,23 @@ export interface ServerToClientEvents {
   "scenes:reordered": (scenes: Scene[]) => void;
   "scene:templates": (payload: { sceneId: string; templates: AoeTemplate[] }) => void;
   "chat:message": (message: ChatMessage) => void;
-  "initiative:updated": (payload: { entries: InitiativeEntry[]; round: number; turnIndex: number }) => void;
-  "pointer:show": (payload: { userId: string; displayName: string; sceneId: string; x: number; y: number }) => void;
-  "character:updated": (payload: { characterId: string; summary: CharacterSummary | null; name: string }) => void;
+  "initiative:updated": (payload: {
+    entries: InitiativeEntry[];
+    round: number;
+    turnIndex: number;
+  }) => void;
+  "pointer:show": (payload: {
+    userId: string;
+    displayName: string;
+    sceneId: string;
+    x: number;
+    y: number;
+  }) => void;
+  "character:updated": (payload: {
+    characterId: string;
+    summary: CharacterSummary | null;
+    name: string;
+  }) => void;
   "character:created": (payload: { character: CharacterRecord }) => void;
   "campaign:revision": (payload: { revision: number }) => void;
   "error:toast": (payload: { message: string }) => void;

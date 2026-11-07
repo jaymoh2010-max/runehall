@@ -5,7 +5,7 @@ import { logAudit } from "../audit";
 
 function gmAccess(
   request: { user: { id: string } | null },
-  campaignId: string,
+  campaignId: string
 ): { error?: string; code?: number } {
   if (!request.user) return { error: "Sign in to continue.", code: 401 };
   if (!getCampaign(campaignId)) return { error: "Campaign not found.", code: 404 };

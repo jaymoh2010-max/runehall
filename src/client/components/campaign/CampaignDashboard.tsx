@@ -161,12 +161,12 @@ export function CampaignDashboard({
 
   const completed = useMemo(
     () => characters.filter((character) => character.summary),
-    [characters],
+    [characters]
   );
   const averageLevel = completed.length
     ? Math.round(
         completed.reduce((total, character) => total + (character.summary?.level ?? 0), 0) /
-          completed.length,
+          completed.length
       )
     : null;
   const incomplete = characters.length - completed.length;
@@ -219,7 +219,7 @@ export function CampaignDashboard({
             nextSessionNotes: notes,
             threads,
           },
-        },
+        }
       );
       setDashboard(result.dashboard);
       setThreads(result.dashboard.threads);
@@ -242,7 +242,7 @@ export function CampaignDashboard({
       if (Number.isFinite(toTimestamp)) params.set("to", String(toTimestamp));
       const query = params.toString();
       const result = await api<{ recap: SessionRecap }>(
-        `/api/campaigns/${campaignId}/recap${query ? `?${query}` : ""}`,
+        `/api/campaigns/${campaignId}/recap${query ? `?${query}` : ""}`
       );
       setSessionRecap(result.recap);
       setRecapDraft(result.recap.draft);
@@ -277,7 +277,7 @@ export function CampaignDashboard({
     try {
       const result = await api<{ dashboard: CampaignDashboardData }>(
         `/api/campaigns/${campaignId}/dashboard`,
-        { method: "PATCH", body: { lastSessionSummary: text } },
+        { method: "PATCH", body: { lastSessionSummary: text } }
       );
       setDashboard(result.dashboard);
       setLastSummary(result.dashboard.lastSessionSummary);
@@ -299,18 +299,15 @@ export function CampaignDashboard({
       const title = sessionRecap?.sessionTitle
         ? `Session recap — ${sessionRecap.sessionTitle}`
         : `Session recap — ${new Date().toLocaleDateString()}`;
-      const result = await api<{ entry: JournalEntry }>(
-        `/api/campaigns/${campaignId}/journal`,
-        {
-          method: "POST",
-          body: {
-            title: title.slice(0, 140),
-            content: text,
-            visible: true,
-            kind: "handout",
-          },
+      const result = await api<{ entry: JournalEntry }>(`/api/campaigns/${campaignId}/journal`, {
+        method: "POST",
+        body: {
+          title: title.slice(0, 140),
+          content: text,
+          visible: true,
+          kind: "handout",
         },
-      );
+      });
       onJournalCreated(result.entry);
       setRecapHandoutSaved(true);
       toast("Recap saved as a shared handout.", "success");
@@ -324,20 +321,22 @@ export function CampaignDashboard({
   const addThread = () => {
     const text = newThread.trim();
     if (!text) return;
-    setThreads((current) => [
-      ...current,
-      { id: newThreadId(), text, done: false, visible: true },
-    ]);
+    setThreads((current) => [...current, { id: newThreadId(), text, done: false, visible: true }]);
     setNewThread("");
   };
 
   const updateThread = (id: string, patch: Partial<CampaignThread>) => {
     setThreads((current) =>
-      current.map((thread) => (thread.id === id ? { ...thread, ...patch } : thread)),
+      current.map((thread) => (thread.id === id ? { ...thread, ...patch } : thread))
     );
   };
 
-  if (loading) return <div className="page-inner"><Spinner label="Opening the campaign dashboard…" /></div>;
+  if (loading)
+    return (
+      <div className="page-inner">
+        <Spinner label="Opening the campaign dashboard…" />
+      </div>
+    );
   if (error || !dashboard) {
     return (
       <div className="page-inner">
@@ -383,7 +382,9 @@ export function CampaignDashboard({
                   Generate recap
                 </Button>
               ) : null}
-              <Tag tone={lastSummary ? "gold" : "neutral"}>{lastSummary ? "Recorded" : "Empty"}</Tag>
+              <Tag tone={lastSummary ? "gold" : "neutral"}>
+                {lastSummary ? "Recorded" : "Empty"}
+              </Tag>
             </div>
           </div>
           {isGm ? (
@@ -412,7 +413,11 @@ export function CampaignDashboard({
           </div>
           {isGm ? (
             <Field label="Date and time">
-              <Input type="datetime-local" value={nextAt} onChange={(event) => setNextAt(event.target.value)} />
+              <Input
+                type="datetime-local"
+                value={nextAt}
+                onChange={(event) => setNextAt(event.target.value)}
+              />
             </Field>
           ) : null}
           {isGm ? (
@@ -466,7 +471,9 @@ export function CampaignDashboard({
                   checkinSummary.no
                     ? `${checkinSummary.no} ${checkinSummary.no === 1 ? "person can't" : "people can't"} make it.`
                     : "",
-                ].filter(Boolean).join(" ") || "Everyone checked in."}
+                ]
+                  .filter(Boolean)
+                  .join(" ") || "Everyone checked in."}
                 {ownCheckin?.status === "unanswered" ? " Your check-in is missing." : ""}
               </p>
               {ownCheckin?.status === "unanswered" ? (
@@ -482,21 +489,46 @@ export function CampaignDashboard({
             </div>
           ) : null}
           <div className="dashboard-quick">
-            <Button size="sm" variant="secondary" icon={<Map size={14} />} onClick={() => onNavigate("table")}>
+            <Button
+              size="sm"
+              variant="secondary"
+              icon={<Map size={14} />}
+              onClick={() => onNavigate("table")}
+            >
               Open table
             </Button>
-            <Button size="sm" variant="ghost" icon={<Users size={14} />} onClick={() => onNavigate("party")}>
+            <Button
+              size="sm"
+              variant="ghost"
+              icon={<Users size={14} />}
+              onClick={() => onNavigate("party")}
+            >
               Party
             </Button>
-            <Button size="sm" variant="ghost" icon={<ScrollText size={14} />} onClick={() => onNavigate("journal")}>
+            <Button
+              size="sm"
+              variant="ghost"
+              icon={<ScrollText size={14} />}
+              onClick={() => onNavigate("journal")}
+            >
               Journal
             </Button>
             {isGm ? (
               <>
-                <Button size="sm" variant="ghost" icon={<Skull size={14} />} onClick={() => onNavigate("encounters")}>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  icon={<Skull size={14} />}
+                  onClick={() => onNavigate("encounters")}
+                >
                   Encounters
                 </Button>
-                <Button size="sm" variant="ghost" icon={<Coins size={14} />} onClick={() => onNavigate("loot")}>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  icon={<Coins size={14} />}
+                  onClick={() => onNavigate("loot")}
+                >
                   Loot
                 </Button>
               </>
@@ -524,7 +556,11 @@ export function CampaignDashboard({
           {characters.length ? (
             <div className="dashboard-party-grid">
               {characters.map((character) => (
-                <Link key={character.id} to={`/characters/${character.id}`} className="dashboard-hero">
+                <Link
+                  key={character.id}
+                  to={`/characters/${character.id}`}
+                  className="dashboard-hero"
+                >
                   <Avatar name={character.name} src={character.summary?.portraitUrl} size={38} />
                   <span className="dashboard-hero-main">
                     <strong>{character.name}</strong>
@@ -535,10 +571,14 @@ export function CampaignDashboard({
                     </span>
                     {character.summary ? (
                       <span className="dashboard-hero-stats">
-                        <span>{character.summary.currentHp}/{character.summary.hp} HP</span>
+                        <span>
+                          {character.summary.currentHp}/{character.summary.hp} HP
+                        </span>
                         <span>AC {character.summary.ac}</span>
                         {character.summary.conditions.length ? (
-                          <span className="dashboard-condition">{character.summary.conditions.join(", ")}</span>
+                          <span className="dashboard-condition">
+                            {character.summary.conditions.join(", ")}
+                          </span>
                         ) : null}
                       </span>
                     ) : null}
@@ -555,7 +595,9 @@ export function CampaignDashboard({
           <div className="row-between">
             <div>
               <PageEyebrow>Open clues & quests</PageEyebrow>
-              <h3>{openThreads} open {openThreads === 1 ? "thread" : "threads"}</h3>
+              <h3>
+                {openThreads} open {openThreads === 1 ? "thread" : "threads"}
+              </h3>
             </div>
             <Swords size={19} />
           </div>
@@ -588,7 +630,12 @@ export function CampaignDashboard({
                         {thread.visible ? <Eye size={13} /> : <EyeOff size={13} />}
                         <span>{thread.visible ? "Shared" : "GM only"}</span>
                       </button>
-                      <IconButton label="Remove thread" onClick={() => setThreads((current) => current.filter((item) => item.id !== thread.id))}>
+                      <IconButton
+                        label="Remove thread"
+                        onClick={() =>
+                          setThreads((current) => current.filter((item) => item.id !== thread.id))
+                        }
+                      >
                         <Trash2 size={13} />
                       </IconButton>
                     </>
@@ -598,14 +645,18 @@ export function CampaignDashboard({
                         {thread.done ? <Check size={13} /> : null}
                       </span>
                       <span className="dashboard-thread-text">{thread.text}</span>
-                      <Tag tone={thread.done ? "green" : "gold"}>{thread.done ? "Done" : "Open"}</Tag>
+                      <Tag tone={thread.done ? "green" : "gold"}>
+                        {thread.done ? "Done" : "Open"}
+                      </Tag>
                     </>
                   )}
                 </div>
               ))}
             </div>
           ) : (
-            <p className="muted small">No clues or quests yet. Add the threads the party is chasing.</p>
+            <p className="muted small">
+              No clues or quests yet. Add the threads the party is chasing.
+            </p>
           )}
 
           {isGm ? (
@@ -621,7 +672,13 @@ export function CampaignDashboard({
                   }
                 }}
               />
-              <Button size="sm" variant="secondary" icon={<Plus size={13} />} onClick={addThread} disabled={!newThread.trim()}>
+              <Button
+                size="sm"
+                variant="secondary"
+                icon={<Plus size={13} />}
+                onClick={addThread}
+                disabled={!newThread.trim()}
+              >
                 Add thread
               </Button>
             </div>
@@ -645,12 +702,18 @@ export function CampaignDashboard({
             <ProgressBar
               value={setupDone}
               max={setupTasks.length}
-              label={<span>{setupDone} of {setupTasks.length} steps complete</span>}
+              label={
+                <span>
+                  {setupDone} of {setupTasks.length} steps complete
+                </span>
+              }
             />
             <div className="dashboard-setup-list">
               {setupTasks.map((task) => (
                 <div key={task.id} className={`dashboard-setup-step ${task.done ? "is-done" : ""}`}>
-                  <span className="dashboard-setup-check">{task.done ? <Check size={12} /> : null}</span>
+                  <span className="dashboard-setup-check">
+                    {task.done ? <Check size={12} /> : null}
+                  </span>
                   <span className="grow">{task.label}</span>
                   {task.done ? (
                     <Tag tone="green">Done</Tag>

@@ -104,12 +104,7 @@ import {
   Textarea,
   Toggle,
 } from "../../ui";
-import {
-  DeityPicker,
-  EquipmentPicker,
-  FeatPicker,
-  SpellPicker,
-} from "../pickers";
+import { DeityPicker, EquipmentPicker, FeatPicker, SpellPicker } from "../pickers";
 import { ContentSourceToggle } from "../ContentSourceToggle";
 import { RunePicker } from "../RunePicker";
 import {
@@ -120,12 +115,7 @@ import {
 } from "../../../../shared/content";
 import { summarizeRunes } from "../../../../shared/runes";
 import type { BuilderProps } from "../shared";
-import {
-  StepHeading,
-  ValidationNote,
-  SearchInput,
-  MiniFeatureList,
-} from "../shared";
+import { StepHeading, ValidationNote, SearchInput, MiniFeatureList } from "../shared";
 
 export function AncestryStep({
   draft,
@@ -146,7 +136,8 @@ export function AncestryStep({
   const selected = staticData.ancestries.find((a) => a.id === draft.ancestryId) ?? null;
   const visible = staticData.ancestries.filter((ancestry) => {
     if (!legacy && !ancestry.remaster) return false;
-    if (!expanded && ancestry.id !== draft.ancestryId && !isCoreSource(ancestry.source)) return false;
+    if (!expanded && ancestry.id !== draft.ancestryId && !isCoreSource(ancestry.source))
+      return false;
     const q = query.trim().toLowerCase();
     return !q || `${ancestry.name} ${ancestry.traits.join(" ")}`.toLowerCase().includes(q);
   });
@@ -211,7 +202,9 @@ export function AncestryStep({
               </span>
               <span className="selection-source">{ancestry.source}</span>
             </span>
-            {draft.ancestryId === ancestry.id ? <CheckCircle2 size={17} className="selection-check" /> : null}
+            {draft.ancestryId === ancestry.id ? (
+              <CheckCircle2 size={17} className="selection-check" />
+            ) : null}
           </button>
         ))}
       </div>
@@ -242,7 +235,9 @@ export function AncestryStep({
               <RichText html={selected.description} />
               <h3 style={{ marginTop: 18, marginBottom: 9 }}>Traits</h3>
               <div className="chip-row">
-                {selected.traits.map((trait) => <Tag key={trait}>{traitLabel(trait)}</Tag>)}
+                {selected.traits.map((trait) => (
+                  <Tag key={trait}>{traitLabel(trait)}</Tag>
+                ))}
               </div>
               <h3 style={{ marginTop: 18, marginBottom: 9 }}>Languages</h3>
               <p className="muted small">
@@ -257,13 +252,19 @@ export function AncestryStep({
               <div className="boost-summary">
                 {selected.boosts.map((boost, index) =>
                   boost.fixed ? (
-                    <Tag key={index} tone="green">{boost.from.map((a) => ABILITY_SHORT[a]).join(" / ")} +2</Tag>
+                    <Tag key={index} tone="green">
+                      {boost.from.map((a) => ABILITY_SHORT[a]).join(" / ")} +2
+                    </Tag>
                   ) : (
-                    <Tag key={index} tone="gold">Free boost</Tag>
-                  ),
+                    <Tag key={index} tone="gold">
+                      Free boost
+                    </Tag>
+                  )
                 )}
                 {selected.flaws.map((flaw) => (
-                  <Tag key={flaw} tone="red">{ABILITY_SHORT[flaw]} −2</Tag>
+                  <Tag key={flaw} tone="red">
+                    {ABILITY_SHORT[flaw]} −2
+                  </Tag>
                 ))}
               </div>
               <h3 style={{ marginTop: 18, marginBottom: 9 }}>Ancestry features</h3>
@@ -271,8 +272,14 @@ export function AncestryStep({
             </div>
           </div>
           <div className="step-actions">
-            <Button variant="ghost" onClick={() => setStep("ancestry")} disabled>Back</Button>
-            <Button variant="primary" onClick={() => setStep("heritage")} icon={<ArrowRight size={15} />}>
+            <Button variant="ghost" onClick={() => setStep("ancestry")} disabled>
+              Back
+            </Button>
+            <Button
+              variant="primary"
+              onClick={() => setStep("heritage")}
+              icon={<ArrowRight size={15} />}
+            >
               Choose a heritage
             </Button>
           </div>
@@ -280,7 +287,9 @@ export function AncestryStep({
       ) : (
         <div className="detail-placeholder">
           <Dna size={25} />
-          <p>Select an ancestry to inspect its boosts, hit points, languages, and ancestry features.</p>
+          <p>
+            Select an ancestry to inspect its boosts, hit points, languages, and ancestry features.
+          </p>
         </div>
       )}
     </div>

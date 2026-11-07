@@ -9,10 +9,7 @@ export function normalizeAuditRetentionDays(value: unknown): number {
 }
 
 /** `null` means retention is disabled and entries are kept forever. */
-export function auditRetentionCutoff(
-  days: number,
-  nowValue = Date.now(),
-): number | null {
+export function auditRetentionCutoff(days: number, nowValue = Date.now()): number | null {
   const normalized = normalizeAuditRetentionDays(days);
   return normalized > 0 ? nowValue - normalized * 86_400_000 : null;
 }
@@ -52,7 +49,7 @@ export function auditCsv(entries: AuditEntry[]): string {
         entry.ip,
       ]
         .map(csvCell)
-        .join(","),
+        .join(",")
     );
   }
   return `${lines.join("\r\n")}\r\n`;

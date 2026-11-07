@@ -105,34 +105,29 @@ export function EncounterBuilder({
 
   const defaults = useMemo(
     () => partyDefaults(characters.map((character) => character.summary?.level ?? null)),
-    [characters],
+    [characters]
   );
   const partyLevel = partyLevelOverride ?? defaults.partyLevel;
   const partySize = partySizeOverride ?? defaults.partySize;
 
   const selected = useMemo(
     () => encounters.find((encounter) => encounter.id === selectedId) ?? null,
-    [encounters, selectedId],
+    [encounters, selectedId]
   );
 
   const budget = useMemo(
-    () =>
-      encounterBudget(
-        selected?.combatants ?? [],
-        partyLevel,
-        partySize,
-      ),
-    [selected?.combatants, partyLevel, partySize],
+    () => encounterBudget(selected?.combatants ?? [], partyLevel, partySize),
+    [selected?.combatants, partyLevel, partySize]
   );
 
   const creatureCount = useMemo(
     () => (selected?.combatants ?? []).reduce((total, combatant) => total + combatant.count, 0),
-    [selected?.combatants],
+    [selected?.combatants]
   );
 
   const waveSummaries = useMemo(
     () => encounterWaveSummaries(selected?.combatants ?? []),
-    [selected?.combatants],
+    [selected?.combatants]
   );
 
   const launchCombatants = useMemo(() => {
@@ -144,12 +139,12 @@ export function EncounterBuilder({
 
   const launchCreatures = useMemo(
     () => launchCombatants.reduce((total, combatant) => total + combatant.count, 0),
-    [launchCombatants],
+    [launchCombatants]
   );
 
   const launchBudget = useMemo(
     () => encounterBudget(launchCombatants, partyLevel, partySize),
-    [launchCombatants, partyLevel, partySize],
+    [launchCombatants, partyLevel, partySize]
   );
 
   const activeLaunchSceneId =
@@ -166,7 +161,7 @@ export function EncounterBuilder({
         setSelectedId((current) =>
           current && result.encounters.some((encounter) => encounter.id === current)
             ? current
-            : result.encounters[0]?.id ?? null,
+            : (result.encounters[0]?.id ?? null)
         );
       })
       .catch((err) => {
@@ -204,7 +199,7 @@ export function EncounterBuilder({
         }
         const result = await api<{ items: Monster[]; total: number }>(
           `/api/compendium/monsters?${params.toString()}`,
-          { signal: controller.signal },
+          { signal: controller.signal }
         );
         if (cancelled) return;
         setMonsters(result.items);
@@ -225,21 +220,24 @@ export function EncounterBuilder({
 
   const replaceEncounter = (encounter: Encounter) => {
     setEncounters((current) =>
-      current.map((entry) => (entry.id === encounter.id ? encounter : entry)),
+      current.map((entry) => (entry.id === encounter.id ? encounter : entry))
     );
   };
 
   const createEncounter = async () => {
     setBusy(true);
     try {
-      const result = await api<{ encounter: Encounter }>(`/api/campaigns/${campaignId}/encounters`, {
-        method: "POST",
-        body: {
-          name: "New encounter",
-          description: "",
-          sceneId: scenes[0]?.id ?? null,
-        },
-      });
+      const result = await api<{ encounter: Encounter }>(
+        `/api/campaigns/${campaignId}/encounters`,
+        {
+          method: "POST",
+          body: {
+            name: "New encounter",
+            description: "",
+            sceneId: scenes[0]?.id ?? null,
+          },
+        }
+      );
       setEncounters((current) => [...current, result.encounter]);
       setSelectedId(result.encounter.id);
       toast("Encounter created.", "success");
@@ -256,7 +254,7 @@ export function EncounterBuilder({
     try {
       const result = await api<{ encounter: Encounter }>(
         `/api/campaigns/${campaignId}/encounters/${selected.id}`,
-        { method: "PATCH", body: patch },
+        { method: "PATCH", body: patch }
       );
       replaceEncounter(result.encounter);
       toast("Encounter saved.", "success");
@@ -290,7 +288,7 @@ export function EncounterBuilder({
     try {
       const result = await api<{ encounter: Encounter }>(
         `/api/campaigns/${campaignId}/encounters/${selected.id}/duplicate`,
-        { method: "POST" },
+        { method: "POST" }
       );
       setEncounters((current) => [...current, result.encounter]);
       setSelectedId(result.encounter.id);
@@ -308,14 +306,17 @@ export function EncounterBuilder({
     try {
       const result = await api<{ combatant: EncounterCombatant }>(
         `/api/campaigns/${campaignId}/encounters/${selected.id}/combatants`,
-        { method: "POST", body: { monsterId: monster.id, count: 1, wave: Number(bestiaryWave) || 1 } },
+        {
+          method: "POST",
+          body: { monsterId: monster.id, count: 1, wave: Number(bestiaryWave) || 1 },
+        }
       );
       setEncounters((current) =>
         current.map((encounter) =>
           encounter.id === selected.id
             ? { ...encounter, combatants: [...encounter.combatants, result.combatant] }
-            : encounter,
-        ),
+            : encounter
+        )
       );
     } catch (err) {
       toast(errorMessage(err), "error");
@@ -329,7 +330,7 @@ export function EncounterBuilder({
     try {
       const result = await api<{ combatant: EncounterCombatant }>(
         `/api/campaigns/${campaignId}/encounters/${selected.id}/combatants/${combatant.id}`,
-        { method: "PATCH", body: patch },
+        { method: "PATCH", body: patch }
       );
       setEncounters((current) =>
         current.map((encounter) =>
@@ -337,11 +338,11 @@ export function EncounterBuilder({
             ? {
                 ...encounter,
                 combatants: encounter.combatants.map((entry) =>
-                  entry.id === result.combatant.id ? result.combatant : entry,
+                  entry.id === result.combatant.id ? result.combatant : entry
                 ),
               }
-            : encounter,
-        ),
+            : encounter
+        )
       );
     } catch (err) {
       toast(errorMessage(err), "error");
@@ -353,7 +354,7 @@ export function EncounterBuilder({
     try {
       await api(
         `/api/campaigns/${campaignId}/encounters/${selected.id}/combatants/${combatant.id}`,
-        { method: "DELETE" },
+        { method: "DELETE" }
       );
       setEncounters((current) =>
         current.map((encounter) =>
@@ -362,8 +363,8 @@ export function EncounterBuilder({
                 ...encounter,
                 combatants: encounter.combatants.filter((entry) => entry.id !== combatant.id),
               }
-            : encounter,
-        ),
+            : encounter
+        )
       );
     } catch (err) {
       toast(errorMessage(err), "error");
@@ -395,13 +396,13 @@ export function EncounterBuilder({
             wave: launchWave === "all" ? null : Number(launchWave),
             mode: launchMode,
           },
-        },
+        }
       );
       toast(
         result.mode === "reinforce"
           ? `Reinforcements arrived: ${result.combatants} combatants.`
           : `Launched ${result.combatants} combatants.`,
-        "success",
+        "success"
       );
       setLaunchOpen(false);
       onLaunched(result);
@@ -437,12 +438,21 @@ export function EncounterBuilder({
               : " XP mode shows the PF2e budget and difficulty."}
           </p>
         </div>
-        <Button variant="primary" icon={<Plus size={15} />} loading={busy} onClick={createEncounter}>
+        <Button
+          variant="primary"
+          icon={<Plus size={15} />}
+          loading={busy}
+          onClick={createEncounter}
+        >
           New encounter
         </Button>
       </div>
 
-      {error ? <div className="auth-error" style={{ marginBottom: 14 }}>{error}</div> : null}
+      {error ? (
+        <div className="auth-error" style={{ marginBottom: 14 }}>
+          {error}
+        </div>
+      ) : null}
 
       {loading ? (
         <Spinner label="Opening the encounter bench…" />
@@ -452,7 +462,12 @@ export function EncounterBuilder({
           title="No encounters prepared"
           description="Create an encounter, add monsters from the bestiary, and launch it when the party is ready."
           action={
-            <Button variant="primary" icon={<Plus size={15} />} loading={busy} onClick={createEncounter}>
+            <Button
+              variant="primary"
+              icon={<Plus size={15} />}
+              loading={busy}
+              onClick={createEncounter}
+            >
               Create the first encounter
             </Button>
           }
@@ -466,7 +481,10 @@ export function EncounterBuilder({
             </div>
             <div className="encounter-list-items">
               {encounters.map((encounter) => {
-                const count = encounter.combatants.reduce((total, combatant) => total + combatant.count, 0);
+                const count = encounter.combatants.reduce(
+                  (total, combatant) => total + combatant.count,
+                  0
+                );
                 return (
                   <button
                     key={encounter.id}
@@ -478,7 +496,9 @@ export function EncounterBuilder({
                       <strong>{encounter.name}</strong>
                       <span className="tiny muted">
                         {count} {count === 1 ? "creature" : "creatures"}
-                        {encounter.sceneId ? ` · ${scenes.find((scene) => scene.id === encounter.sceneId)?.name ?? "Scene"}` : ""}
+                        {encounter.sceneId
+                          ? ` · ${scenes.find((scene) => scene.id === encounter.sceneId)?.name ?? "Scene"}`
+                          : ""}
                       </span>
                     </span>
                     <Swords size={14} />
@@ -490,22 +510,33 @@ export function EncounterBuilder({
 
           <div className="encounter-workspace">
             {!selected ? (
-              <EmptyState icon={<Swords size={28} />} title="Choose an encounter" description="Select a saved fight or create a new one." />
+              <EmptyState
+                icon={<Swords size={28} />}
+                title="Choose an encounter"
+                description="Select a saved fight or create a new one."
+              />
             ) : (
               <>
                 <Card className="encounter-header">
                   <div className="encounter-header-main">
                     <Field label="Encounter name">
-                      <Input value={nameDraft} onChange={(event) => setNameDraft(event.target.value)} />
+                      <Input
+                        value={nameDraft}
+                        onChange={(event) => setNameDraft(event.target.value)}
+                      />
                     </Field>
                     <Field label="Scene" hint="Where the fight will be placed.">
                       <Select
                         value={selected.sceneId ?? ""}
-                        onChange={(event) => void saveEncounter({ sceneId: event.target.value || null })}
+                        onChange={(event) =>
+                          void saveEncounter({ sceneId: event.target.value || null })
+                        }
                       >
                         <option value="">Active scene</option>
                         {scenes.map((scene) => (
-                          <option key={scene.id} value={scene.id}>{scene.name}</option>
+                          <option key={scene.id} value={scene.id}>
+                            {scene.name}
+                          </option>
                         ))}
                       </Select>
                     </Field>
@@ -521,10 +552,20 @@ export function EncounterBuilder({
                     >
                       Save
                     </Button>
-                    <Button size="sm" variant="ghost" icon={<Copy size={13} />} onClick={duplicateEncounter}>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      icon={<Copy size={13} />}
+                      onClick={duplicateEncounter}
+                    >
                       Duplicate
                     </Button>
-                    <Button size="sm" variant="ghost" icon={<Trash2 size={13} />} onClick={deleteEncounter}>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      icon={<Trash2 size={13} />}
+                      onClick={deleteEncounter}
+                    >
                       Delete
                     </Button>
                   </div>
@@ -557,7 +598,10 @@ export function EncounterBuilder({
                     )}
                   </div>
                   <div className="encounter-party-controls">
-                    <Field label="Party level" hint="Defaults to the average of finished characters.">
+                    <Field
+                      label="Party level"
+                      hint="Defaults to the average of finished characters."
+                    >
                       <Input
                         type="number"
                         min={1}
@@ -565,7 +609,7 @@ export function EncounterBuilder({
                         value={partyLevel}
                         onChange={(event) =>
                           setPartyLevelOverride(
-                            Math.max(1, Math.min(20, Number(event.target.value) || 1)),
+                            Math.max(1, Math.min(20, Number(event.target.value) || 1))
                           )
                         }
                       />
@@ -578,12 +622,16 @@ export function EncounterBuilder({
                         value={partySize}
                         onChange={(event) =>
                           setPartySizeOverride(
-                            Math.max(1, Math.min(10, Number(event.target.value) || 1)),
+                            Math.max(1, Math.min(10, Number(event.target.value) || 1))
                           )
                         }
                       />
                     </Field>
-                    <Stat label="Combatants" value={creatureCount} hint={`${selected.combatants.length} roster rows`} />
+                    <Stat
+                      label="Combatants"
+                      value={creatureCount}
+                      hint={`${selected.combatants.length} roster rows`}
+                    />
                   </div>
                   <div className="encounter-party-presets">
                     <span className="tiny muted">Quick party size</span>
@@ -621,19 +669,21 @@ export function EncounterBuilder({
                         />
                       </div>
                       <div className="encounter-thresholds">
-                        {(["trivial", "low", "moderate", "severe", "extreme"] as const).map((difficulty) => (
-                          <span
-                            key={difficulty}
-                            className={`encounter-threshold ${budget.difficulty === difficulty ? "is-active" : ""}`}
-                          >
-                            <span>{ENCOUNTER_DIFFICULTY_LABELS[difficulty]}</span>
-                            <strong>{budget.thresholds[difficulty]} XP</strong>
-                          </span>
-                        ))}
+                        {(["trivial", "low", "moderate", "severe", "extreme"] as const).map(
+                          (difficulty) => (
+                            <span
+                              key={difficulty}
+                              className={`encounter-threshold ${budget.difficulty === difficulty ? "is-active" : ""}`}
+                            >
+                              <span>{ENCOUNTER_DIFFICULTY_LABELS[difficulty]}</span>
+                              <strong>{budget.thresholds[difficulty]} XP</strong>
+                            </span>
+                          )
+                        )}
                       </div>
                       <p className="tiny muted">
-                        Each PC earns <strong>{budget.awardXp} XP</strong> if they overcome this encounter.
-                        Party-size adjustments change the budget, not the award.{" "}
+                        Each PC earns <strong>{budget.awardXp} XP</strong> if they overcome this
+                        encounter. Party-size adjustments change the budget, not the award.{" "}
                         {budget.nextThreshold
                           ? `${budget.nextThreshold - budget.awardXp} XP to the next tier.`
                           : "This fight is past the extreme budget."}
@@ -641,8 +691,8 @@ export function EncounterBuilder({
                     </>
                   ) : (
                     <p className="tiny muted">
-                      Encounter XP is hidden in milestone mode. Level the party from the Party tab when the
-                      story calls for it.
+                      Encounter XP is hidden in milestone mode. Level the party from the Party tab
+                      when the story calls for it.
                     </p>
                   )}
                 </Card>
@@ -665,13 +715,14 @@ export function EncounterBuilder({
                     </div>
                     {!selected.combatants.length ? (
                       <p className="muted small">
-                        Add monsters from the bestiary or a custom NPC. Counts make it easy to run a group.
+                        Add monsters from the bestiary or a custom NPC. Counts make it easy to run a
+                        group.
                       </p>
                     ) : (
                       <div className="encounter-roster-list">
                         {waveSummaries.map((wave) => {
                           const waveCombatants = selected.combatants.filter(
-                            (combatant) => combatant.wave === wave.wave,
+                            (combatant) => combatant.wave === wave.wave
                           );
                           const waveXp = encounterAwardXp(waveCombatants, partyLevel);
                           return (
@@ -690,19 +741,27 @@ export function EncounterBuilder({
                                       <strong>{combatant.name}</strong>
                                       <Tag tone="neutral">Level {combatant.level}</Tag>
                                       {xpMode === "xp" ? (
-                                        <Tag tone="gold">{combatantXp(combatant, partyLevel)} XP</Tag>
+                                        <Tag tone="gold">
+                                          {combatantXp(combatant, partyLevel)} XP
+                                        </Tag>
                                       ) : null}
                                     </div>
                                     <span className="tiny muted">
                                       {combatant.hp !== null ? `${combatant.hp} HP` : "HP not set"}
                                       {combatant.ac !== null ? ` · AC ${combatant.ac}` : ""}
-                                      {combatant.perception !== null ? ` · Perception ${combatant.perception}` : ""}
+                                      {combatant.perception !== null
+                                        ? ` · Perception ${combatant.perception}`
+                                        : ""}
                                     </span>
                                   </div>
                                   <div className="encounter-count">
                                     <IconButton
                                       label="Remove one"
-                                      onClick={() => void updateCombatant(combatant, { count: combatant.count - 1 })}
+                                      onClick={() =>
+                                        void updateCombatant(combatant, {
+                                          count: combatant.count - 1,
+                                        })
+                                      }
                                       disabled={combatant.count <= 1}
                                     >
                                       <Minus size={13} />
@@ -710,16 +769,26 @@ export function EncounterBuilder({
                                     <span>{combatant.count}</span>
                                     <IconButton
                                       label="Add one"
-                                      onClick={() => void updateCombatant(combatant, { count: combatant.count + 1 })}
+                                      onClick={() =>
+                                        void updateCombatant(combatant, {
+                                          count: combatant.count + 1,
+                                        })
+                                      }
                                     >
                                       <Plus size={13} />
                                     </IconButton>
                                   </div>
                                   <div className="encounter-row-actions">
-                                    <IconButton label={`Edit ${combatant.name}`} onClick={() => setCombatantEditor(combatant)}>
+                                    <IconButton
+                                      label={`Edit ${combatant.name}`}
+                                      onClick={() => setCombatantEditor(combatant)}
+                                    >
                                       <Pencil size={13} />
                                     </IconButton>
-                                    <IconButton label={`Remove ${combatant.name}`} onClick={() => void removeCombatant(combatant)}>
+                                    <IconButton
+                                      label={`Remove ${combatant.name}`}
+                                      onClick={() => void removeCombatant(combatant)}
+                                    >
                                       <Trash2 size={13} />
                                     </IconButton>
                                   </div>
@@ -798,7 +867,9 @@ export function EncounterBuilder({
                       <div className="encounter-monster-list">
                         {monsters.map((monster) => (
                           <div key={monster.id} className="encounter-monster-row">
-                            <span className="encounter-monster-mark"><Skull size={14} /></span>
+                            <span className="encounter-monster-mark">
+                              <Skull size={14} />
+                            </span>
                             <div className="grow">
                               <strong>{monster.name}</strong>
                               <span className="tiny muted">
@@ -853,7 +924,10 @@ export function EncounterBuilder({
       >
         {selected ? (
           <>
-            <Field label="Scene" hint="The wave is placed on this scene and broadcast to the table.">
+            <Field
+              label="Scene"
+              hint="The wave is placed on this scene and broadcast to the table."
+            >
               <Select
                 value={launchSceneId}
                 onChange={(event) => setLaunchSceneId(event.target.value)}
@@ -869,10 +943,15 @@ export function EncounterBuilder({
                 <p className="tiny danger-text">Create a scene before launching this encounter.</p>
               ) : null}
               {launchMode === "reinforce" && activeLaunchSceneId ? (
-                <p className="tiny muted">Reinforcements join the active scene and initiative order.</p>
+                <p className="tiny muted">
+                  Reinforcements join the active scene and initiative order.
+                </p>
               ) : null}
             </Field>
-            <Field label="Wave" hint="Launch one wave now and bring later waves in when they arrive.">
+            <Field
+              label="Wave"
+              hint="Launch one wave now and bring later waves in when they arrive."
+            >
               <div className="encounter-wave-options">
                 <button
                   type="button"
@@ -903,7 +982,7 @@ export function EncounterBuilder({
                       {xpMode === "xp"
                         ? ` · ${encounterAwardXp(
                             selected.combatants.filter((combatant) => combatant.wave === wave.wave),
-                            partyLevel,
+                            partyLevel
                           )} XP`
                         : ""}
                     </span>
@@ -967,14 +1046,14 @@ export function EncounterBuilder({
           } else {
             const result = await api<{ combatant: EncounterCombatant }>(
               `/api/campaigns/${campaignId}/encounters/${selected.id}/combatants`,
-              { method: "POST", body: payload },
+              { method: "POST", body: payload }
             );
             setEncounters((current) =>
               current.map((encounter) =>
                 encounter.id === selected.id
                   ? { ...encounter, combatants: [...encounter.combatants, result.combatant] }
-                  : encounter,
-              ),
+                  : encounter
+              )
             );
           }
           setCombatantEditor(null);
@@ -1018,7 +1097,7 @@ function CombatantModal({
     setPerception(
       editing?.perception === null || editing?.perception === undefined
         ? ""
-        : String(editing.perception),
+        : String(editing.perception)
     );
     setNotes(editing?.notes ?? "");
     setError("");
@@ -1058,7 +1137,9 @@ function CombatantModal({
       subtitle="Use this for NPCs, hazards, or monsters that are not in the bestiary."
       footer={
         <>
-          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
           <Button variant="primary" loading={busy} onClick={submit}>
             {editing ? "Save combatant" : "Add to encounter"}
           </Button>
@@ -1072,26 +1153,65 @@ function CombatantModal({
         </Field>
         <div className="form-grid two">
           <Field label="Level">
-            <Input type="number" min={-1} max={30} value={level} onChange={(event) => setLevel(event.target.value)} />
+            <Input
+              type="number"
+              min={-1}
+              max={30}
+              value={level}
+              onChange={(event) => setLevel(event.target.value)}
+            />
           </Field>
           <Field label="Count">
-            <Input type="number" min={1} max={50} value={count} onChange={(event) => setCount(event.target.value)} />
+            <Input
+              type="number"
+              min={1}
+              max={50}
+              value={count}
+              onChange={(event) => setCount(event.target.value)}
+            />
           </Field>
           <Field label="Wave" hint="Bring reinforcements in later.">
-            <Input type="number" min={1} max={20} value={wave} onChange={(event) => setWave(event.target.value)} />
+            <Input
+              type="number"
+              min={1}
+              max={20}
+              value={wave}
+              onChange={(event) => setWave(event.target.value)}
+            />
           </Field>
           <Field label="HP">
-            <Input type="number" min={0} value={hp} onChange={(event) => setHp(event.target.value)} placeholder="Optional" />
+            <Input
+              type="number"
+              min={0}
+              value={hp}
+              onChange={(event) => setHp(event.target.value)}
+              placeholder="Optional"
+            />
           </Field>
           <Field label="AC">
-            <Input type="number" value={ac} onChange={(event) => setAc(event.target.value)} placeholder="Optional" />
+            <Input
+              type="number"
+              value={ac}
+              onChange={(event) => setAc(event.target.value)}
+              placeholder="Optional"
+            />
           </Field>
           <Field label="Perception" hint="Used for initiative.">
-            <Input type="number" value={perception} onChange={(event) => setPerception(event.target.value)} placeholder="Optional" />
+            <Input
+              type="number"
+              value={perception}
+              onChange={(event) => setPerception(event.target.value)}
+              placeholder="Optional"
+            />
           </Field>
         </div>
         <Field label="Notes">
-          <Textarea rows={3} value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Tactics, abilities, or reminders." />
+          <Textarea
+            rows={3}
+            value={notes}
+            onChange={(event) => setNotes(event.target.value)}
+            placeholder="Tactics, abilities, or reminders."
+          />
         </Field>
       </form>
     </Modal>

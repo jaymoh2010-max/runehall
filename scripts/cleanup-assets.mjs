@@ -74,7 +74,7 @@ const files = fs.existsSync(uploadsDir)
 const unused = files.filter((file) => !referenced.has(file));
 const totalBytes = unused.reduce(
   (total, file) => total + fs.statSync(path.join(uploadsDir, file)).size,
-  0,
+  0
 );
 
 console.log(`Upload directory: ${uploadsDir}`);
@@ -85,7 +85,9 @@ console.log(`Unused files:     ${unused.length} (${(totalBytes / 1024 / 1024).to
 const list = verbose ? unused : unused.slice(0, 50);
 for (const file of list) {
   const bytes = fs.statSync(path.join(uploadsDir, file)).size;
-  console.log(`  ${shouldDelete ? "delete" : "unused"}  ${file}  (${(bytes / 1024).toFixed(1)} KB)`);
+  console.log(
+    `  ${shouldDelete ? "delete" : "unused"}  ${file}  (${(bytes / 1024).toFixed(1)} KB)`
+  );
 }
 if (!verbose && unused.length > list.length) {
   console.log(`  …and ${unused.length - list.length} more. Use --verbose to list them all.`);

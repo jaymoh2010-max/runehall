@@ -62,7 +62,10 @@ export function VttToolbar({
   onNextScene?: () => void;
   setSceneManagerOpen: (open: boolean) => void;
   fogBrush: "reveal" | "hide" | null;
-  setFogBrush: (brush: "reveal" | "hide" | null | ((current: "reveal" | "hide" | null) => "reveal" | "hide" | null)) => void;
+  setFogBrush: (
+    brush:
+      "reveal" | "hide" | null | ((current: "reveal" | "hide" | null) => "reveal" | "hide" | null)
+  ) => void;
   brushSize: number;
   setBrushSize: (size: number) => void;
   measureMode: boolean;
@@ -91,19 +94,40 @@ export function VttToolbar({
       <div className="vtt-toolbar-left">
         {isGm ? (
           <>
-            <Select value={activeSceneId ?? ""} onChange={(event) => activateScene(event.target.value)} className="scene-select">
-              {scenes.map((scene) => <option key={scene.id} value={scene.id}>{scene.name}</option>)}
+            <Select
+              value={activeSceneId ?? ""}
+              onChange={(event) => activateScene(event.target.value)}
+              className="scene-select"
+            >
+              {scenes.map((scene) => (
+                <option key={scene.id} value={scene.id}>
+                  {scene.name}
+                </option>
+              ))}
             </Select>
-            <IconButton label="Previous scene" onClick={onPreviousScene} disabled={!onPreviousScene}>
+            <IconButton
+              label="Previous scene"
+              onClick={onPreviousScene}
+              disabled={!onPreviousScene}
+            >
               <ChevronLeft size={14} />
             </IconButton>
             <IconButton label="Next scene" onClick={onNextScene} disabled={!onNextScene}>
               <ChevronRight size={14} />
             </IconButton>
-            <Button size="sm" variant="ghost" icon={<Grid3X3 size={14} />} onClick={() => setSceneManagerOpen(true)}>Scenes</Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              icon={<Grid3X3 size={14} />}
+              onClick={() => setSceneManagerOpen(true)}
+            >
+              Scenes
+            </Button>
           </>
         ) : (
-          <div className="vtt-scene-label"><Map size={14} /> {activeSceneName}</div>
+          <div className="vtt-scene-label">
+            <Map size={14} /> {activeSceneName}
+          </div>
         )}
         {isGm ? (
           <>
@@ -128,13 +152,26 @@ export function VttToolbar({
             >
               Hide
             </Button>
-            <Select value={brushSize} onChange={(event) => setBrushSize(Number(event.target.value))} className="brush-select" title="Fog brush size">
+            <Select
+              value={brushSize}
+              onChange={(event) => setBrushSize(Number(event.target.value))}
+              className="brush-select"
+              title="Fog brush size"
+            >
               <option value={1}>1×1</option>
               <option value={3}>3×3</option>
               <option value={5}>5×5</option>
             </Select>
             <div className="toolbar-sep" />
-            <Button size="sm" variant="ghost" icon={<Plus size={14} />} onClick={() => setAddTokenOpen(true)} title="Add token (T)">Token</Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              icon={<Plus size={14} />}
+              onClick={() => setAddTokenOpen(true)}
+              title="Add token (T)"
+            >
+              Token
+            </Button>
             <Button
               size="sm"
               variant="ghost"
@@ -147,13 +184,17 @@ export function VttToolbar({
             </Button>
             <Select
               value={templateKind ?? ""}
-              onChange={(event) => setTemplateKind((event.target.value || null) as TemplateKind | null)}
+              onChange={(event) =>
+                setTemplateKind((event.target.value || null) as TemplateKind | null)
+              }
               className="template-select"
               title="Area template"
             >
               <option value="">Template</option>
               {(Object.keys(TEMPLATE_LABELS) as TemplateKind[]).map((kind) => (
-                <option key={kind} value={kind}>{TEMPLATE_LABELS[kind]}</option>
+                <option key={kind} value={kind}>
+                  {TEMPLATE_LABELS[kind]}
+                </option>
               ))}
             </Select>
             {templateKind ? (
@@ -163,11 +204,21 @@ export function VttToolbar({
                 className="brush-select"
                 title="Template size"
               >
-                {TEMPLATE_SIZES.map((size) => <option key={size} value={size}>{size} ft.</option>)}
+                {TEMPLATE_SIZES.map((size) => (
+                  <option key={size} value={size}>
+                    {size} ft.
+                  </option>
+                ))}
               </Select>
             ) : null}
             {hasTemplate ? (
-              <Button size="sm" variant="ghost" icon={<X size={14} />} onClick={onClearTemplate} title="Clear area template">
+              <Button
+                size="sm"
+                variant="ghost"
+                icon={<X size={14} />}
+                onClick={onClearTemplate}
+                title="Clear area template"
+              >
                 Clear
               </Button>
             ) : null}
@@ -199,21 +250,37 @@ export function VttToolbar({
           }
         >
           <span className="vtt-connection-dot" />
-          {connectionStatus === "online" ? "Live" : connectionStatus === "connecting" ? "Reconnecting…" : "Offline"}
+          {connectionStatus === "online"
+            ? "Live"
+            : connectionStatus === "connecting"
+              ? "Reconnecting…"
+              : "Offline"}
         </span>
         <div className="vtt-presence">
           {presence.slice(0, 6).map((person) => (
-            <span key={person.socketId} className="vtt-presence-user" title={`${person.displayName} · ${person.role === "gm" ? "GM" : "Player"}`}>
+            <span
+              key={person.socketId}
+              className="vtt-presence-user"
+              title={`${person.displayName} · ${person.role === "gm" ? "GM" : "Player"}`}
+            >
               <Avatar name={person.displayName} src={person.avatarUrl} size={26} />
               <span className={`presence-dot ${person.role}`} />
             </span>
           ))}
           {presence.length > 6 ? <span className="tiny muted">+{presence.length - 6}</span> : null}
         </div>
-        <IconButton label={leftOpen ? "Hide token panel (P)" : "Show token panel (P)"} onClick={() => setLeftOpen((open) => !open)} className={leftOpen ? "is-active" : ""}>
+        <IconButton
+          label={leftOpen ? "Hide token panel (P)" : "Show token panel (P)"}
+          onClick={() => setLeftOpen((open) => !open)}
+          className={leftOpen ? "is-active" : ""}
+        >
           <Users size={16} />
         </IconButton>
-        <IconButton label={rightOpen ? "Hide chat (C)" : "Show chat (C)"} onClick={() => setRightOpen((open) => !open)} className={rightOpen ? "is-active" : ""}>
+        <IconButton
+          label={rightOpen ? "Hide chat (C)" : "Show chat (C)"}
+          onClick={() => setRightOpen((open) => !open)}
+          className={rightOpen ? "is-active" : ""}
+        >
           <MessageSquare size={16} />
         </IconButton>
         <IconButton
@@ -228,7 +295,7 @@ export function VttToolbar({
           onClick={() =>
             toast(
               "Shortcuts: R reveal · H hide · M measure · A area · T token · E edit · I initiative · ←/→ turn · F full screen · C chat · P party · Esc clear",
-              "info",
+              "info"
             )
           }
         >

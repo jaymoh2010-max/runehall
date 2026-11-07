@@ -119,7 +119,9 @@ export function LibraryPage() {
           if (tab === "items") url = `/api/compendium/equipment?${params}`;
           if (tab === "bestiary") url = `/api/compendium/monsters?${params}`;
         }
-        const result = await api<{ items: Entry[]; total?: number; next?: number | null }>(url, { signal: controller.signal });
+        const result = await api<{ items: Entry[]; total?: number; next?: number | null }>(url, {
+          signal: controller.signal,
+        });
         if (cancelled) return;
         if (offset === 0) {
           setItems(result.items);
@@ -149,7 +151,9 @@ export function LibraryPage() {
         <div>
           <PageEyebrow>The archive</PageEyebrow>
           <h1>Library</h1>
-          <p className="sub">Every feat, spell, item, creature, and deity available to your table.</p>
+          <p className="sub">
+            Every feat, spell, item, creature, and deity available to your table.
+          </p>
         </div>
         <div className="library-count">
           <Dices size={15} />
@@ -180,7 +184,14 @@ export function LibraryPage() {
         </div>
         <div className="search-box library-search">
           <Search size={16} />
-          <Input value={query} onChange={(event) => { setQuery(event.target.value); setOffset(0); }} placeholder={`Search ${TABS.find((entry) => entry.id === tab)?.label.toLowerCase()}…`} />
+          <Input
+            value={query}
+            onChange={(event) => {
+              setQuery(event.target.value);
+              setOffset(0);
+            }}
+            placeholder={`Search ${TABS.find((entry) => entry.id === tab)?.label.toLowerCase()}…`}
+          />
         </div>
         {tab !== "deities" ? (
           <Toggle
@@ -220,14 +231,24 @@ export function LibraryPage() {
                 {"gmDescription" in item && item.gmDescription ? (
                   <Tag tone="violet">GM source</Tag>
                 ) : null}
-                {item.rarity && item.rarity !== "common" ? <RarityTag rarity={item.rarity} /> : null}
+                {item.rarity && item.rarity !== "common" ? (
+                  <RarityTag rarity={item.rarity} />
+                ) : null}
               </button>
             </HoverCard>
           ))}
-          {!loading && !items.length ? <EmptyState icon={<Search size={24} />} title="Nothing found" description="Try a different search term." /> : null}
+          {!loading && !items.length ? (
+            <EmptyState
+              icon={<Search size={24} />}
+              title="Nothing found"
+              description="Try a different search term."
+            />
+          ) : null}
           {loading ? <Spinner label="Searching the archive…" /> : null}
           {next !== null && !loading ? (
-            <Button variant="ghost" size="sm" block onClick={() => setOffset(next)}>Load more ({items.length} of {total})</Button>
+            <Button variant="ghost" size="sm" block onClick={() => setOffset(next)}>
+              Load more ({items.length} of {total})
+            </Button>
           ) : null}
         </div>
         <div className="library-detail card">
@@ -245,7 +266,11 @@ export function LibraryPage() {
               }
             />
           ) : (
-            <EmptyState icon={<BookOpen size={28} />} title="Select an entry" description="Choose something from the archive to read it." />
+            <EmptyState
+              icon={<BookOpen size={28} />}
+              title="Select an entry"
+              description="Choose something from the archive to read it."
+            />
           )}
         </div>
       </div>

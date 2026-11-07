@@ -18,7 +18,7 @@ describe("session agenda", () => {
         { text: "" },
         { text: "Bargain with the ferryman" },
         null,
-      ]),
+      ])
     ).toEqual([
       { id: "a1", text: "Open the gate", done: true },
       { id: "agenda_3", text: "Bargain with the ferryman", done: false },
@@ -39,7 +39,7 @@ describe("session check-ins", () => {
         checkin("b", "maybe"),
         checkin("c", "no"),
         checkin("d", "unanswered"),
-      ]),
+      ])
     ).toEqual({ yes: 1, maybe: 1, no: 1, unanswered: 1 });
   });
 

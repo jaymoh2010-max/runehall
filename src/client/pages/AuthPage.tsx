@@ -55,7 +55,8 @@ export function AuthPage({ mode }: { mode: "login" | "register" }) {
       return;
     }
     try {
-      if (isRegister) await register(username.trim(), displayName.trim(), password, inviteCode.trim());
+      if (isRegister)
+        await register(username.trim(), displayName.trim(), password, inviteCode.trim());
       else await login(username.trim(), password);
       navigate(from, { replace: true });
     } catch (err) {
@@ -76,10 +77,14 @@ export function AuthPage({ mode }: { mode: "login" | "register" }) {
           <div className="page-eyebrow">
             <Sparkles size={12} /> Gather your table
           </div>
-          <h1>{isRegister ? "Every legend starts with a name." : "The hall is warm. Your seat is waiting."}</h1>
+          <h1>
+            {isRegister
+              ? "Every legend starts with a name."
+              : "The hall is warm. Your seat is waiting."}
+          </h1>
           <p>
-            Build a character that actually adds up, put it on a shared map, and let the dice fall where they may.
-            Runehall keeps the whole table in one place.
+            Build a character that actually adds up, put it on a shared map, and let the dice fall
+            where they may. Runehall keeps the whole table in one place.
           </p>
         </div>
         <div className="auth-side-quote">
@@ -121,65 +126,65 @@ export function AuthPage({ mode }: { mode: "login" | "register" }) {
               </Link>
             </div>
           ) : (
-          <form className="auth-form" onSubmit={submit}>
-            {error ? <div className="auth-error">{error}</div> : null}
-            <Field label="Username">
-              <Input
-                autoComplete="username"
-                value={username}
-                onChange={(event) => setUsername(event.target.value)}
-                placeholder="e.g. rune_weaver"
-                required
-                autoFocus
-              />
-            </Field>
-            {isRegister ? (
-              <Field label="Display name" hint="This is what your table sees.">
+            <form className="auth-form" onSubmit={submit}>
+              {error ? <div className="auth-error">{error}</div> : null}
+              <Field label="Username">
                 <Input
-                  value={displayName}
-                  onChange={(event) => setDisplayName(event.target.value)}
-                  placeholder="e.g. Mara"
+                  autoComplete="username"
+                  value={username}
+                  onChange={(event) => setUsername(event.target.value)}
+                  placeholder="e.g. rune_weaver"
                   required
+                  autoFocus
                 />
               </Field>
-            ) : null}
-            <Field label="Password" hint={isRegister ? "At least 8 characters." : undefined}>
-              <Input
-                type="password"
-                autoComplete={isRegister ? "new-password" : "current-password"}
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                placeholder="••••••••"
-                required
-              />
-            </Field>
-            {isRegister ? (
-              <Field label="Confirm password">
+              {isRegister ? (
+                <Field label="Display name" hint="This is what your table sees.">
+                  <Input
+                    value={displayName}
+                    onChange={(event) => setDisplayName(event.target.value)}
+                    placeholder="e.g. Mara"
+                    required
+                  />
+                </Field>
+              ) : null}
+              <Field label="Password" hint={isRegister ? "At least 8 characters." : undefined}>
                 <Input
                   type="password"
-                  autoComplete="new-password"
-                  value={confirm}
-                  onChange={(event) => setConfirm(event.target.value)}
+                  autoComplete={isRegister ? "new-password" : "current-password"}
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
                   placeholder="••••••••"
                   required
                 />
               </Field>
-            ) : null}
-            {isRegister && registration?.inviteRequired ? (
-              <Field label="Invite code" hint="Codes are single-use and case-insensitive.">
-                <Input
-                  value={inviteCode}
-                  onChange={(event) => setInviteCode(event.target.value.toUpperCase())}
-                  placeholder="ABCDEFG"
-                  autoComplete="one-time-code"
-                  required
-                />
-              </Field>
-            ) : null}
-            <Button type="submit" variant="primary" size="lg" loading={busy} block>
-              {isRegister ? "Create account" : "Sign in"} <ChevronRight size={17} />
-            </Button>
-          </form>
+              {isRegister ? (
+                <Field label="Confirm password">
+                  <Input
+                    type="password"
+                    autoComplete="new-password"
+                    value={confirm}
+                    onChange={(event) => setConfirm(event.target.value)}
+                    placeholder="••••••••"
+                    required
+                  />
+                </Field>
+              ) : null}
+              {isRegister && registration?.inviteRequired ? (
+                <Field label="Invite code" hint="Codes are single-use and case-insensitive.">
+                  <Input
+                    value={inviteCode}
+                    onChange={(event) => setInviteCode(event.target.value.toUpperCase())}
+                    placeholder="ABCDEFG"
+                    autoComplete="one-time-code"
+                    required
+                  />
+                </Field>
+              ) : null}
+              <Button type="submit" variant="primary" size="lg" loading={busy} block>
+                {isRegister ? "Create account" : "Sign in"} <ChevronRight size={17} />
+              </Button>
+            </form>
           )}
 
           <div className="auth-switch">
@@ -196,11 +201,15 @@ export function AuthPage({ mode }: { mode: "login" | "register" }) {
             )}
           </div>
           <div className="auth-hint" style={{ marginTop: 22 }}>
-            Accounts are stored locally in Runehall's SQLite database. Passwords are hashed with scrypt. When you
-            host the site later, use HTTPS before sharing it outside your network.
+            Accounts are stored locally in Runehall's SQLite database. Passwords are hashed with
+            scrypt. When you host the site later, use HTTPS before sharing it outside your network.
           </div>
           <div style={{ marginTop: 18 }}>
-            <Link to="/" className="tiny muted" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+            <Link
+              to="/"
+              className="tiny muted"
+              style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+            >
               <ArrowLeft size={13} /> Back to the landing page
             </Link>
           </div>

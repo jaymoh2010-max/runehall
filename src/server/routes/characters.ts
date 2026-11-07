@@ -1,5 +1,10 @@
 import type { FastifyInstance } from "fastify";
-import { characterSummary, computeCharacter, emptyCharacterDraft, normalizeCharacterDraft } from "../../shared/rules";
+import {
+  characterSummary,
+  computeCharacter,
+  emptyCharacterDraft,
+  normalizeCharacterDraft,
+} from "../../shared/rules";
 import type { CharacterDraft, CharacterSummary } from "../../shared/types";
 import {
   canEditCharacter,
@@ -44,21 +49,23 @@ function syncCharacterDraft(
   app: FastifyInstance,
   row: CharacterRow,
   draft: CharacterDraft,
-  summary: CharacterSummary,
+  summary: CharacterSummary
 ): void {
   if (!row.campaign_id) return;
   // Keep any linked table tokens in step with the sheet.
-  const linkedTokens = db.prepare("SELECT * FROM tokens WHERE character_id = ?").all(row.id) as TokenRow[];
+  const linkedTokens = db
+    .prepare("SELECT * FROM tokens WHERE character_id = ?")
+    .all(row.id) as TokenRow[];
   for (const token of linkedTokens) {
     db.prepare(
-      "UPDATE tokens SET name = ?, hp_max = ?, hp_current = ?, ac = ?, updated_at = ? WHERE id = ?",
+      "UPDATE tokens SET name = ?, hp_max = ?, hp_current = ?, ac = ?, updated_at = ? WHERE id = ?"
     ).run(
       draft.name,
       summary.hp,
       draft.play.hp === null ? summary.hp : Math.max(0, Math.min(summary.hp, draft.play.hp)),
       summary.ac,
       now(),
-      token.id,
+      token.id
     );
     const updatedToken = db.prepare("SELECT * FROM tokens WHERE id = ?").get(token.id) as TokenRow;
     app.broadcastCampaign(row.campaign_id, "token:updated", serializeToken(updatedToken));
@@ -81,7 +88,7 @@ export async function registerCharacterRoutes(app: FastifyInstance): Promise<voi
         .prepare(
           `SELECT c.*, u.display_name AS owner_name FROM characters c
            JOIN users u ON u.id = c.user_id
-           WHERE c.campaign_id = ? ORDER BY c.name COLLATE NOCASE`,
+           WHERE c.campaign_id = ? ORDER BY c.name COLLATE NOCASE`
         )
         .all(query.campaignId) as (import("../db").CharacterRow & { owner_name: string })[];
       return reply.send({
@@ -89,7 +96,7 @@ export async function registerCharacterRoutes(app: FastifyInstance): Promise<voi
           serializeCharacter(row, row.owner_name, {
             canEdit: canEditCharacter(row, request.user!.id),
             canView: true,
-          }),
+          })
         ),
       });
     }
@@ -97,7 +104,7 @@ export async function registerCharacterRoutes(app: FastifyInstance): Promise<voi
       .prepare(
         `SELECT c.*, u.display_name AS owner_name FROM characters c
          JOIN users u ON u.id = c.user_id
-         WHERE c.user_id = ? ORDER BY c.updated_at DESC`,
+         WHERE c.user_id = ? ORDER BY c.updated_at DESC`
       )
       .all(request.user.id) as (import("../db").CharacterRow & { owner_name: string })[];
     return reply.send({
@@ -105,7 +112,7 @@ export async function registerCharacterRoutes(app: FastifyInstance): Promise<voi
         serializeCharacter(row, row.owner_name, {
           canEdit: row.user_id === request.user!.id,
           canView: true,
-        }),
+        })
       ),
     });
   });
@@ -130,11 +137,14 @@ export async function registerCharacterRoutes(app: FastifyInstance): Promise<voi
     const id = newId("char");
     const ts = now();
     db.prepare(
-      "INSERT INTO characters (id, user_id, campaign_id, name, data, summary, created_at, updated_at) VALUES (?, ?, ?, ?, ?, NULL, ?, ?)",
+      "INSERT INTO characters (id, user_id, campaign_id, name, data, summary, created_at, updated_at) VALUES (?, ?, ?, ?, ?, NULL, ?, ?)"
     ).run(id, request.user.id, campaignId, name, JSON.stringify(draft), ts, ts);
     const row = getCharacter(id);
     if (!row) return reply.code(500).send({ error: "Could not create character." });
-    const created = serializeCharacter(row, request.user.displayName, { canEdit: true, canView: true });
+    const created = serializeCharacter(row, request.user.displayName, {
+      canEdit: true,
+      canView: true,
+    });
     if (campaignId) {
       app.broadcastCampaign(campaignId, "character:created", { character: created });
     }
@@ -197,12 +207,19 @@ export async function registerCharacterRoutes(app: FastifyInstance): Promise<voi
       !force && expectedRevision !== null
         ? db
             .prepare(
-              "UPDATE characters SET name = ?, data = ?, summary = ?, updated_at = ?, revision = revision + 1 WHERE id = ? AND revision = ?",
+              "UPDATE characters SET name = ?, data = ?, summary = ?, updated_at = ?, revision = revision + 1 WHERE id = ? AND revision = ?"
             )
-            .run(draft.name, JSON.stringify(draft), JSON.stringify(summary), updatedAt, id, expectedRevision)
+            .run(
+              draft.name,
+              JSON.stringify(draft),
+              JSON.stringify(summary),
+              updatedAt,
+              id,
+              expectedRevision
+            )
         : db
             .prepare(
-              "UPDATE characters SET name = ?, data = ?, summary = ?, updated_at = ?, revision = revision + 1 WHERE id = ?",
+              "UPDATE characters SET name = ?, data = ?, summary = ?, updated_at = ?, revision = revision + 1 WHERE id = ?"
             )
             .run(draft.name, JSON.stringify(draft), JSON.stringify(summary), updatedAt, id);
     if (Number(update.changes ?? 0) === 0 && !force && expectedRevision !== null) {
@@ -280,10 +297,11 @@ export async function registerCharacterRoutes(app: FastifyInstance): Promise<voi
     if (typeof body.itemId === "string" && body.itemId.trim()) {
       const itemId = body.itemId.trim().slice(0, 200);
       const owned = sourceDraft.equipment.find((entry) => entry.itemId === itemId);
-      if (!owned) return reply.code(400).send({ error: "That item is not in this character's pack." });
+      if (!owned)
+        return reply.code(400).send({ error: "That item is not in this character's pack." });
       const quantity = Math.max(
         1,
-        Math.min(owned.quantity, Math.floor(Number(body.quantity) || 1)),
+        Math.min(owned.quantity, Math.floor(Number(body.quantity) || 1))
       );
       const result = removeItemQuantity(sourceDraft, itemId, quantity);
       if (!result.moved) return reply.code(400).send({ error: "That item is not in this pack." });
@@ -304,7 +322,8 @@ export async function registerCharacterRoutes(app: FastifyInstance): Promise<voi
     }
     if (amountCp > 0) {
       const remaining = spendCurrency(sourceDraft.currency, amountCp);
-      if (!remaining) return reply.code(400).send({ error: "That character doesn't have that many coins." });
+      if (!remaining)
+        return reply.code(400).send({ error: "That character doesn't have that many coins." });
       sourceDraft = { ...sourceDraft, currency: remaining };
       targetDraft = {
         ...targetDraft,
@@ -322,22 +341,22 @@ export async function registerCharacterRoutes(app: FastifyInstance): Promise<voi
     db.exec("BEGIN");
     try {
       db.prepare(
-        "UPDATE characters SET name = ?, data = ?, summary = ?, updated_at = ?, revision = revision + 1 WHERE id = ?",
+        "UPDATE characters SET name = ?, data = ?, summary = ?, updated_at = ?, revision = revision + 1 WHERE id = ?"
       ).run(
         sourceDraft.name,
         JSON.stringify(sourceDraft),
         JSON.stringify(sourceSummary),
         updatedAt,
-        source.id,
+        source.id
       );
       db.prepare(
-        "UPDATE characters SET name = ?, data = ?, summary = ?, updated_at = ?, revision = revision + 1 WHERE id = ?",
+        "UPDATE characters SET name = ?, data = ?, summary = ?, updated_at = ?, revision = revision + 1 WHERE id = ?"
       ).run(
         targetDraft.name,
         JSON.stringify(targetDraft),
         JSON.stringify(targetSummary),
         updatedAt,
-        target.id,
+        target.id
       );
       db.exec("COMMIT");
     } catch (error) {
@@ -404,7 +423,7 @@ export async function registerCharacterRoutes(app: FastifyInstance): Promise<voi
     const ts = now();
     const summary = summarize(draft);
     db.prepare(
-      "INSERT INTO characters (id, user_id, campaign_id, name, data, summary, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+      "INSERT INTO characters (id, user_id, campaign_id, name, data, summary, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
     ).run(
       newCharacterId,
       request.user.id,
@@ -413,11 +432,14 @@ export async function registerCharacterRoutes(app: FastifyInstance): Promise<voi
       JSON.stringify(draft),
       JSON.stringify(summary),
       ts,
-      ts,
+      ts
     );
     const created = getCharacter(newCharacterId)!;
     return reply.code(201).send({
-      character: serializeCharacter(created, request.user.displayName, { canEdit: true, canView: true }),
+      character: serializeCharacter(created, request.user.displayName, {
+        canEdit: true,
+        canView: true,
+      }),
     });
   });
 

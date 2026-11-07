@@ -71,7 +71,7 @@ export function clampPartySize(value: number): number {
 export const PARTY_SIZE_PRESETS = [3, 4, 5, 6] as const;
 
 export function encounterWaveSummaries(
-  combatants: Pick<EncounterCombatant, "wave" | "count">[],
+  combatants: Pick<EncounterCombatant, "wave" | "count">[]
 ): EncounterWaveSummary[] {
   const waves = new Map<number, EncounterWaveSummary>();
   for (const combatant of combatants) {
@@ -95,21 +95,19 @@ export function creatureXp(creatureLevel: number, partyLevel: number): number {
 
 export function combatantXp(
   combatant: Pick<EncounterCombatant, "level" | "count">,
-  partyLevel: number,
+  partyLevel: number
 ): number {
   return creatureXp(combatant.level, partyLevel) * Math.max(1, Math.round(combatant.count));
 }
 
 export function encounterAwardXp(
   combatants: Pick<EncounterCombatant, "level" | "count">[],
-  partyLevel: number,
+  partyLevel: number
 ): number {
   return combatants.reduce((total, combatant) => total + combatantXp(combatant, partyLevel), 0);
 }
 
-export function encounterBudgetThresholds(
-  partySize: number,
-): EncounterBudget["thresholds"] {
+export function encounterBudgetThresholds(partySize: number): EncounterBudget["thresholds"] {
   const size = clampPartySize(partySize);
   const offset = size - 4;
   const threshold = (difficulty: keyof typeof DIFFICULTY_BUDGETS) => {
@@ -139,7 +137,7 @@ export function classifyEncounter(totalXp: number, partySize: number): Encounter
 export function encounterBudget(
   combatants: Pick<EncounterCombatant, "level" | "count">[],
   partyLevel: number,
-  partySize: number,
+  partySize: number
 ): EncounterBudget {
   const level = clampPartyLevel(partyLevel);
   const size = clampPartySize(partySize);
@@ -179,7 +177,9 @@ export interface PartyDefaults {
  */
 export function partyDefaults(levels: (number | null | undefined)[]): PartyDefaults {
   const valid = levels
-    .map((level) => (typeof level === "number" && Number.isFinite(level) ? clampPartyLevel(level) : null))
+    .map((level) =>
+      typeof level === "number" && Number.isFinite(level) ? clampPartyLevel(level) : null
+    )
     .filter((level): level is number => level !== null);
   // A campaign with no characters yet still deserves a usable planning default.
   const partySize = levels.length ? Math.max(valid.length, levels.length) : 4;

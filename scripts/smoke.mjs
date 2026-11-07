@@ -75,7 +75,9 @@ async function api(pathname, { method = "GET", body, cookie } = {}) {
   });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error(`${method} ${pathname} failed (${response.status}): ${JSON.stringify(payload)}`);
+    throw new Error(
+      `${method} ${pathname} failed (${response.status}): ${JSON.stringify(payload)}`
+    );
   }
   return { payload, cookie: cookiesFrom(response) };
 }
@@ -98,7 +100,10 @@ function waitForEvent(socket, event, predicate = () => true, timeout = 5000) {
 
 function emitAck(socket, event, payload, timeout = 5000) {
   return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error(`Timed out waiting for ${event} ack`)), timeout);
+    const timer = setTimeout(
+      () => reject(new Error(`Timed out waiting for ${event} ack`)),
+      timeout
+    );
     socket.emit(event, payload, (value) => {
       clearTimeout(timer);
       resolve(value);
@@ -261,7 +266,12 @@ async function main() {
   });
   const auditResult = await api("/api/admin/audit?limit=100", { cookie: gmCookie });
   const actions = new Set(auditResult.payload.entries.map((entry) => entry.action));
-  for (const required of ["auth.register", "auth.login", "auth.password_change", "admin.invite_create"]) {
+  for (const required of [
+    "auth.register",
+    "auth.login",
+    "auth.password_change",
+    "admin.invite_create",
+  ]) {
     if (!actions.has(required)) throw new Error(`Audit log is missing ${required}`);
   }
 
@@ -359,7 +369,8 @@ async function main() {
     cookie: playerCookie,
     body: { code: campaign.inviteCode, characterId: character.id },
   });
-  if (joinResult.payload.campaign.role !== "player") throw new Error("Player role missing after join");
+  if (joinResult.payload.campaign.role !== "player")
+    throw new Error("Player role missing after join");
   if (joinResult.payload.character?.data?.contentMode !== "expanded") {
     throw new Error("Player character did not inherit the campaign ruleset");
   }
@@ -440,7 +451,9 @@ async function main() {
   }
   log("campaign import created a new campaign and remapped ownership");
 
-  const swordSearch = await api("/api/compendium/equipment?q=longsword&limit=1", { cookie: gmCookie });
+  const swordSearch = await api("/api/compendium/equipment?q=longsword&limit=1", {
+    cookie: gmCookie,
+  });
   const sword = swordSearch.payload.items[0];
   if (!sword) throw new Error("Smoke equipment search returned no longsword");
   const lootParcel = (
@@ -463,18 +476,25 @@ async function main() {
     cookie: gmCookie,
     body: { gp: 5, sp: 3, cp: 2 },
   });
-  const distributedLoot = await api(`/api/campaigns/${campaign.id}/loot/${lootParcel.id}/distribute`, {
-    method: "POST",
-    cookie: gmCookie,
-    body: { characterId: character.id },
-  });
+  const distributedLoot = await api(
+    `/api/campaigns/${campaign.id}/loot/${lootParcel.id}/distribute`,
+    {
+      method: "POST",
+      cookie: gmCookie,
+      body: { characterId: character.id },
+    }
+  );
   if (distributedLoot.payload.parcel.status !== "distributed") {
     throw new Error("Loot parcel did not close after distribution");
   }
   const lootedSheet = await api(`/api/characters/${character.id}`, { cookie: playerCookie });
-  const lootedStack = lootedSheet.payload.character.data.equipment.find((entry) => entry.itemId === sword.id);
-  if (!lootedStack || lootedStack.quantity !== 2) throw new Error("Loot item missing from the sheet");
-  if (lootedSheet.payload.character.data.currency.gp !== 5) throw new Error("Loot coins missing from the sheet");
+  const lootedStack = lootedSheet.payload.character.data.equipment.find(
+    (entry) => entry.itemId === sword.id
+  );
+  if (!lootedStack || lootedStack.quantity !== 2)
+    throw new Error("Loot item missing from the sheet");
+  if (lootedSheet.payload.character.data.currency.gp !== 5)
+    throw new Error("Loot coins missing from the sheet");
   const playerLoot = await fetch(`${base}/api/campaigns/${campaign.id}/loot`, {
     headers: { cookie: playerCookie },
   });
@@ -542,9 +562,17 @@ async function main() {
     cookie: gmCookie,
     body: { title: "Smoke Secret Handout", content: "GM only.", visible: false, kind: "handout" },
   });
-  const playerJournal = await api(`/api/campaigns/${campaign.id}/journal`, { cookie: playerCookie });
-  const sharedHandout = playerJournal.payload.entries.find((entry) => entry.title === "Smoke Handout");
-  if (!sharedHandout || sharedHandout.kind !== "handout" || sharedHandout.attachments.length !== 1) {
+  const playerJournal = await api(`/api/campaigns/${campaign.id}/journal`, {
+    cookie: playerCookie,
+  });
+  const sharedHandout = playerJournal.payload.entries.find(
+    (entry) => entry.title === "Smoke Handout"
+  );
+  if (
+    !sharedHandout ||
+    sharedHandout.kind !== "handout" ||
+    sharedHandout.attachments.length !== 1
+  ) {
     throw new Error("Shared handout or attachment missing from the player journal");
   }
   if (playerJournal.payload.entries.some((entry) => entry.title === "Smoke Secret Handout")) {
@@ -554,7 +582,7 @@ async function main() {
 
   const pixel = Buffer.from(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9ZlwAAAABJRU5ErkJggg==",
-    "base64",
+    "base64"
   );
   const uploadImageFile = async (name) => {
     const form = new FormData();
@@ -565,12 +593,15 @@ async function main() {
       body: form,
     });
     const payload = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(`Asset upload failed (${response.status}): ${JSON.stringify(payload)}`);
+    if (!response.ok)
+      throw new Error(`Asset upload failed (${response.status}): ${JSON.stringify(payload)}`);
     return payload;
   };
   const firstAsset = await uploadImageFile("smoke-asset.png");
   const initialAssets = await api(`/api/campaigns/${campaign.id}/assets`, { cookie: gmCookie });
-  const unusedAsset = initialAssets.payload.assets.find((asset) => asset.filename === firstAsset.filename);
+  const unusedAsset = initialAssets.payload.assets.find(
+    (asset) => asset.filename === firstAsset.filename
+  );
   if (!unusedAsset || !unusedAsset.unused || !unusedAsset.deletable) {
     throw new Error("Uploaded asset did not appear as unused and deletable");
   }
@@ -582,25 +613,30 @@ async function main() {
       content: "Uses a library image.",
       visible: true,
       kind: "handout",
-      attachments: [
-        { name: "Library image", url: firstAsset.url, mimeType: firstAsset.mimeType },
-      ],
+      attachments: [{ name: "Library image", url: firstAsset.url, mimeType: firstAsset.mimeType }],
     },
   });
   const usedAssets = await api(`/api/campaigns/${campaign.id}/assets`, { cookie: gmCookie });
-  const usedAsset = usedAssets.payload.assets.find((asset) => asset.filename === firstAsset.filename);
-  if (!usedAsset || usedAsset.unused || usedAsset.deletable || !usedAsset.usage.includes("Journal: Smoke Asset Handout")) {
+  const usedAsset = usedAssets.payload.assets.find(
+    (asset) => asset.filename === firstAsset.filename
+  );
+  if (
+    !usedAsset ||
+    usedAsset.unused ||
+    usedAsset.deletable ||
+    !usedAsset.usage.includes("Journal: Smoke Asset Handout")
+  ) {
     throw new Error("Asset usage was not reflected in the library");
   }
   const attachedDelete = await fetch(
     `${base}/api/campaigns/${campaign.id}/assets/${encodeURIComponent(firstAsset.filename)}`,
-    { method: "DELETE", headers: { cookie: gmCookie } },
+    { method: "DELETE", headers: { cookie: gmCookie } }
   );
   if (attachedDelete.status !== 409) throw new Error("Referenced asset could be deleted");
   const secondAsset = await uploadImageFile("smoke-unused-asset.png");
   const removedAsset = await api(
     `/api/campaigns/${campaign.id}/assets/${encodeURIComponent(secondAsset.filename)}`,
-    { method: "DELETE", cookie: gmCookie },
+    { method: "DELETE", cookie: gmCookie }
   );
   if (!removedAsset.payload.ok) throw new Error("Unused asset was not deleted");
   const remainingAssets = await api(`/api/campaigns/${campaign.id}/assets`, { cookie: gmCookie });
@@ -630,7 +666,9 @@ async function main() {
   if (dashboardResult.payload.dashboard?.threads.length !== 2) {
     throw new Error("Dashboard threads were not saved");
   }
-  const playerDashboard = await api(`/api/campaigns/${campaign.id}/dashboard`, { cookie: playerCookie });
+  const playerDashboard = await api(`/api/campaigns/${campaign.id}/dashboard`, {
+    cookie: playerCookie,
+  });
   const playerThreads = playerDashboard.payload.dashboard?.threads ?? [];
   if (!playerThreads.some((thread) => thread.text === "Find the next clue")) {
     throw new Error("Shared dashboard thread missing for the player");
@@ -665,35 +703,40 @@ async function main() {
   if (!smokeSession || smokeSession.notes !== "GM-only smoke notes.") {
     throw new Error("Session was not scheduled correctly");
   }
-  await api(
-    `/api/campaigns/${campaign.id}/sessions/${smokeSession.id}/attendance/${player.id}`,
-    { method: "PUT", cookie: gmCookie, body: { status: "attended" } },
-  );
-  const agendaResult = await api(
-    `/api/campaigns/${campaign.id}/sessions/${smokeSession.id}`,
-    {
-      method: "PATCH",
-      cookie: gmCookie,
-      body: {
-        agenda: [
-          { id: "a1", text: "Open on the ferryman's bargain", done: false },
-          { id: "a2", text: "Have the vault map ready", done: true },
-        ],
-      },
+  await api(`/api/campaigns/${campaign.id}/sessions/${smokeSession.id}/attendance/${player.id}`, {
+    method: "PUT",
+    cookie: gmCookie,
+    body: { status: "attended" },
+  });
+  const agendaResult = await api(`/api/campaigns/${campaign.id}/sessions/${smokeSession.id}`, {
+    method: "PATCH",
+    cookie: gmCookie,
+    body: {
+      agenda: [
+        { id: "a1", text: "Open on the ferryman's bargain", done: false },
+        { id: "a2", text: "Have the vault map ready", done: true },
+      ],
     },
-  );
+  });
   if (agendaResult.payload.session.agenda.length !== 2) {
     throw new Error("Session agenda was not saved");
   }
-  const checkin = await api(
-    `/api/campaigns/${campaign.id}/sessions/${smokeSession.id}/checkin`,
-    { method: "PUT", cookie: playerCookie, body: { status: "yes" } },
-  );
-  if (checkin.payload.session.checkins.find((entry) => entry.userId === player.id)?.status !== "yes") {
+  const checkin = await api(`/api/campaigns/${campaign.id}/sessions/${smokeSession.id}/checkin`, {
+    method: "PUT",
+    cookie: playerCookie,
+    body: { status: "yes" },
+  });
+  if (
+    checkin.payload.session.checkins.find((entry) => entry.userId === player.id)?.status !== "yes"
+  ) {
     throw new Error("Player check-in was not saved");
   }
-  const playerSessions = await api(`/api/campaigns/${campaign.id}/sessions`, { cookie: playerCookie });
-  const playerSession = playerSessions.payload.sessions.find((session) => session.id === smokeSession.id);
+  const playerSessions = await api(`/api/campaigns/${campaign.id}/sessions`, {
+    cookie: playerCookie,
+  });
+  const playerSession = playerSessions.payload.sessions.find(
+    (session) => session.id === smokeSession.id
+  );
   if (!playerSession || playerSession.attendance[0]?.status !== "attended") {
     throw new Error("Player attendance was not reflected in their session view");
   }
@@ -712,13 +755,18 @@ async function main() {
   if (gmSession.checkins.find((entry) => entry.userId === player.id)?.status !== "yes") {
     throw new Error("GM session view did not include the player check-in");
   }
-  await api(
-    `/api/campaigns/${campaign.id}/sessions/${smokeSession.id}/checkin`,
-    { method: "PUT", cookie: playerCookie, body: { status: "unanswered" } },
-  );
+  await api(`/api/campaigns/${campaign.id}/sessions/${smokeSession.id}/checkin`, {
+    method: "PUT",
+    cookie: playerCookie,
+    body: { status: "unanswered" },
+  });
   const clearedCheckin = await api(`/api/campaigns/${campaign.id}/sessions`, { cookie: gmCookie });
-  const clearedSession = clearedCheckin.payload.sessions.find((session) => session.id === smokeSession.id);
-  if (clearedSession.checkins.find((entry) => entry.userId === player.id)?.status !== "unanswered") {
+  const clearedSession = clearedCheckin.payload.sessions.find(
+    (session) => session.id === smokeSession.id
+  );
+  if (
+    clearedSession.checkins.find((entry) => entry.userId === player.id)?.status !== "unanswered"
+  ) {
     throw new Error("Player check-in could not be cleared");
   }
   if (playerSession.notes) throw new Error("Player received GM-only session notes");
@@ -769,7 +817,8 @@ async function main() {
   const playerNpcs = await fetch(`${base}/api/campaigns/${campaign.id}/npcs`, {
     headers: { cookie: playerCookie },
   });
-  if (playerNpcs.status !== 403) throw new Error("Player should not be able to read the NPC library");
+  if (playerNpcs.status !== 403)
+    throw new Error("Player should not be able to read the NPC library");
   log("NPC statblock placed a token and stayed GM-only");
 
   const gmSocket = await connectSocket(gmCookie);
@@ -781,7 +830,7 @@ async function main() {
   const movedPromise = waitForEvent(
     gmSocket,
     "token:moved",
-    (event) => event.tokenId && event.x === 200 && event.y === 180,
+    (event) => event.tokenId && event.x === 200 && event.y === 180
   );
   const token = await emitAck(gmSocket, "token:create", {
     campaignId: campaign.id,
@@ -799,7 +848,7 @@ async function main() {
   const revisionPromise = waitForEvent(
     gmSocket,
     "campaign:revision",
-    (payload) => typeof payload.revision === "number",
+    (payload) => typeof payload.revision === "number"
   );
   playerSocket.emit("token:move", {
     campaignId: campaign.id,
@@ -818,7 +867,7 @@ async function main() {
   const chatPromise = waitForEvent(
     gmSocket,
     "chat:message",
-    (message) => message.type === "chat" && message.content === "Smoke test message",
+    (message) => message.type === "chat" && message.content === "Smoke test message"
   );
   const chatAck = await emitAck(playerSocket, "chat:send", {
     campaignId: campaign.id,
@@ -831,7 +880,7 @@ async function main() {
   const requestPromise = waitForEvent(
     playerSocket,
     "chat:message",
-    (message) => message.type === "request" && message.data?.label === "Smoke Perception",
+    (message) => message.type === "request" && message.data?.label === "Smoke Perception"
   );
   const requestAck = await emitAck(gmSocket, "dice:request", {
     campaignId: campaign.id,
@@ -875,7 +924,7 @@ async function main() {
   const secretPromise = waitForEvent(
     gmSocket,
     "chat:message",
-    (message) => message.type === "roll" && message.content === "Smoke Secret",
+    (message) => message.type === "roll" && message.content === "Smoke Secret"
   );
   gmSocket.emit("dice:roll", {
     campaignId: campaign.id,
@@ -907,7 +956,7 @@ async function main() {
   };
   const recapResult = await api(
     `/api/campaigns/${campaign.id}/recap?from=${recapWindow.from}&to=${recapWindow.to}`,
-    { cookie: gmCookie },
+    { cookie: gmCookie }
   );
   const recap = recapResult.payload.recap;
   if (!recap?.draft?.includes("Smoke Recap Session")) {
@@ -927,14 +976,14 @@ async function main() {
   }
   const playerRecap = await fetch(
     `${base}/api/campaigns/${campaign.id}/recap?from=${recapWindow.from}&to=${recapWindow.to}`,
-    { headers: { cookie: playerCookie } },
+    { headers: { cookie: playerCookie } }
   );
   if (playerRecap.status !== 403) throw new Error("Player could generate a GM recap");
   log("session recap assembled player-safe records for the GM");
 
   const duplicateResult = await api(
     `/api/campaigns/${campaign.id}/journal/${sharedHandout.id}/duplicate`,
-    { method: "POST", cookie: gmCookie },
+    { method: "POST", cookie: gmCookie }
   );
   if (duplicateResult.payload.entry?.title !== "Smoke Handout (copy)") {
     throw new Error("Journal entry was not duplicated");
@@ -944,24 +993,24 @@ async function main() {
   }
   const playerDuplicate = await fetch(
     `${base}/api/campaigns/${campaign.id}/journal/${sharedHandout.id}/duplicate`,
-    { method: "POST", headers: { cookie: playerCookie } },
+    { method: "POST", headers: { cookie: playerCookie } }
   );
   if (playerDuplicate.status !== 403) throw new Error("Player could duplicate a journal entry");
   log("journal handouts can be duplicated by the GM only");
 
-  const initiativePromise = waitForEvent(
-    playerSocket,
-    "initiative:updated",
-    (payload) => payload.entries.some((entry) => entry.tokenId === token.id),
+  const initiativePromise = waitForEvent(playerSocket, "initiative:updated", (payload) =>
+    payload.entries.some((entry) => entry.tokenId === token.id)
   );
-  gmSocket.emit("initiative:roll", { campaignId: campaign.id, sceneId: scene.id, tokenIds: [token.id] });
+  gmSocket.emit("initiative:roll", {
+    campaignId: campaign.id,
+    sceneId: scene.id,
+    tokenIds: [token.id],
+  });
   const initiative = await initiativePromise;
   const entry = initiative.entries.find((item) => item.tokenId === token.id);
   if (!entry) throw new Error("Token missing from initiative order");
-  const rerollPromise = waitForEvent(
-    playerSocket,
-    "initiative:updated",
-    (payload) => payload.entries.some((item) => item.id === entry.id),
+  const rerollPromise = waitForEvent(playerSocket, "initiative:updated", (payload) =>
+    payload.entries.some((item) => item.id === entry.id)
   );
   gmSocket.emit("initiative:reroll", { campaignId: campaign.id, entryId: entry.id });
   await rerollPromise;
@@ -1005,10 +1054,8 @@ async function main() {
   if (goblinOne?.groupName !== "Smoke Goblins" || goblinTwo?.groupId !== smokeGroup) {
     throw new Error("Group metadata missing from smoke tokens");
   }
-  const groupInitiativePromise = waitForEvent(
-    playerSocket,
-    "initiative:updated",
-    (payload) => payload.entries.some((entry) => entry.groupId === smokeGroup),
+  const groupInitiativePromise = waitForEvent(playerSocket, "initiative:updated", (payload) =>
+    payload.entries.some((entry) => entry.groupId === smokeGroup)
   );
   gmSocket.emit("initiative:roll", {
     campaignId: campaign.id,
@@ -1022,13 +1069,15 @@ async function main() {
   }
   log("monster groups shared one initiative roll");
 
-  const beforeReconnect = await api(`/api/campaigns/${campaign.id}/table`, { cookie: playerCookie });
+  const beforeReconnect = await api(`/api/campaigns/${campaign.id}/table`, {
+    cookie: playerCookie,
+  });
   playerSocket.disconnect();
   await delay(150);
   const offlineMove = waitForEvent(
     gmSocket,
     "token:moved",
-    (event) => event.tokenId === token.id && event.x === 420 && event.y === 360,
+    (event) => event.tokenId === token.id && event.x === 420 && event.y === 360
   );
   gmSocket.emit("token:move", {
     campaignId: campaign.id,
@@ -1040,7 +1089,9 @@ async function main() {
   await offlineMove;
   const reconnectedPlayer = await connectSocket(playerCookie);
   await emitAck(reconnectedPlayer, "campaign:join", { campaignId: campaign.id });
-  const reconnectedTable = await api(`/api/campaigns/${campaign.id}/table`, { cookie: playerCookie });
+  const reconnectedTable = await api(`/api/campaigns/${campaign.id}/table`, {
+    cookie: playerCookie,
+  });
   const reconnectedToken = reconnectedTable.payload.tokens.find((entry) => entry.id === token.id);
   if (!reconnectedToken || reconnectedToken.x !== 420 || reconnectedToken.y !== 360) {
     throw new Error("Reconnected client did not receive the authoritative token position");
@@ -1075,7 +1126,7 @@ async function main() {
   if (waveOne.wave !== 1 || waveTwo.wave !== 2) throw new Error("Encounter waves were not saved");
   const movedWave = await api(
     `/api/campaigns/${campaign.id}/encounters/${smokeEncounter.id}/combatants/${waveTwo.id}`,
-    { method: "PATCH", cookie: gmCookie, body: { wave: 3, count: 2 } },
+    { method: "PATCH", cookie: gmCookie, body: { wave: 3, count: 2 } }
   );
   if (movedWave.payload.combatant.wave !== 3) throw new Error("Encounter wave was not updated");
   const duplicateEncounter = (
@@ -1093,28 +1144,31 @@ async function main() {
   }
   const firstLaunch = await api(
     `/api/campaigns/${campaign.id}/encounters/${smokeEncounter.id}/launch`,
-    { method: "POST", cookie: gmCookie, body: { sceneId: scene.id, wave: 1, mode: "fresh" } },
+    { method: "POST", cookie: gmCookie, body: { sceneId: scene.id, wave: 1, mode: "fresh" } }
   );
   if (firstLaunch.payload.mode !== "fresh" || firstLaunch.payload.combatants !== 2) {
     throw new Error("Wave one did not launch as a fresh encounter");
   }
   const waveOneEntries = firstLaunch.payload.initiative.filter((entry) =>
-    String(entry.name).startsWith("Wave One Guard"),
+    String(entry.name).startsWith("Wave One Guard")
   );
   if (
     waveOneEntries.length !== 1 ||
     !waveOneEntries[0].groupId ||
     !String(waveOneEntries[0].name).includes("×2")
   ) {
-    throw new Error("Encounter launch did not group a multi-creature wave into one initiative entry");
+    throw new Error(
+      "Encounter launch did not group a multi-creature wave into one initiative entry"
+    );
   }
   const beforeReinforcement = await api(`/api/campaigns/${campaign.id}/table`, {
     cookie: gmCookie,
   });
-  const activeBefore = beforeReinforcement.payload.initiative[beforeReinforcement.payload.turnIndex];
+  const activeBefore =
+    beforeReinforcement.payload.initiative[beforeReinforcement.payload.turnIndex];
   const reinforcement = await api(
     `/api/campaigns/${campaign.id}/encounters/${smokeEncounter.id}/launch`,
-    { method: "POST", cookie: gmCookie, body: { sceneId: scene.id, wave: 3, mode: "reinforce" } },
+    { method: "POST", cookie: gmCookie, body: { sceneId: scene.id, wave: 3, mode: "reinforce" } }
   );
   const activeAfter = reinforcement.payload.initiative[reinforcement.payload.turnIndex];
   if (
@@ -1127,7 +1181,7 @@ async function main() {
     throw new Error("Reinforcement wave did not preserve the active initiative turn");
   }
   const reinforcedEntries = reinforcement.payload.initiative.filter((entry) =>
-    String(entry.name).startsWith("Wave Two Guard"),
+    String(entry.name).startsWith("Wave Two Guard")
   );
   if (
     reinforcedEntries.length !== 1 ||
@@ -1162,10 +1216,7 @@ try {
 } finally {
   if (child && child.exitCode === null) {
     child.kill("SIGTERM");
-    await Promise.race([
-      new Promise((resolve) => child.once("exit", resolve)),
-      delay(1500),
-    ]);
+    await Promise.race([new Promise((resolve) => child.once("exit", resolve)), delay(1500)]);
     if (child.exitCode === null) child.kill("SIGKILL");
   }
   try {
@@ -1176,7 +1227,10 @@ try {
       retryDelay: 200,
     });
   } catch (error) {
-    console.warn(`Could not remove temporary smoke directory ${tempDir}:`, error instanceof Error ? error.message : error);
+    console.warn(
+      `Could not remove temporary smoke directory ${tempDir}:`,
+      error instanceof Error ? error.message : error
+    );
   }
   process.exit(exitCode);
 }

@@ -56,7 +56,9 @@ if (!sourceCheck.ok) {
   process.exit(1);
 }
 if (sourceCheck.legacy) {
-  console.error("This is a legacy backup without checksums. Create a new backup before shipping it off-machine.");
+  console.error(
+    "This is a legacy backup without checksums. Create a new backup before shipping it off-machine."
+  );
   process.exit(1);
 }
 
@@ -77,10 +79,7 @@ if (fs.existsSync(final)) {
   }
   console.log(`Already shipped and verified: ${final}`);
 } else {
-  const temporary = path.join(
-    destination,
-    `.incoming-${archiveName}-${process.pid}-${Date.now()}`,
-  );
+  const temporary = path.join(destination, `.incoming-${archiveName}-${process.pid}-${Date.now()}`);
   try {
     fs.cpSync(source, temporary, { recursive: true, errorOnExist: true });
     const copyCheck = verifyBackupManifest(temporary, manifest);
