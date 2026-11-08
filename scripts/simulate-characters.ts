@@ -18,6 +18,7 @@ import {
   spellSlotsFor,
 } from "../src/shared/rules";
 import { validateFormula } from "../src/shared/dice";
+import { automationForEquipment, automationForFeat } from "../src/shared/automation";
 import { SKILLS } from "../src/shared/types";
 import type {
   Ancestry,
@@ -51,6 +52,12 @@ const remasterClasses = classes.filter((entry) => entry.remaster);
 const remasterFeats = feats.filter((entry) => entry.remaster);
 const remasterSpells = spells.filter((entry) => entry.remaster);
 const featNames = feats.map((entry) => entry.name.toLowerCase());
+
+// Automation gap tally across every simulated selection, so the most common
+// "manual" options stay visible to the developer.
+const automationTally = { full: 0, partial: 0, manual: 0 };
+const manualFeatFrequency = new Map<string, number>();
+const manualItemFrequency = new Map<string, number>();
 
 function mulberry32(seed: number) {
   let value = seed >>> 0;
@@ -534,6 +541,17 @@ function simulate(
   const selectedEquipment: Equipment[] = [];
   chooseEquipment(rng, draft, context, selectedEquipment);
 
+  for (const feat of selectedFeats) {
+    const level = automationForFeat(feat).level;
+    automationTally[level]++;
+    if (level === "manual")
+      manualFeatFrequency.set(feat.name, (manualFeatFrequency.get(feat.name) ?? 0) + 1);
+  }
+  for (const item of selectedEquipment) {
+    if (automationForEquipment(item).level === "manual")
+      manualItemFrequency.set(item.name, (manualItemFrequency.get(item.name) ?? 0) + 1);
+  }
+
   try {
     const normalized = normalizeCharacterDraft(JSON.parse(JSON.stringify(draft)), draft.name);
     const roundTripped = normalizeCharacterDraft(
@@ -650,6 +668,19 @@ for (const problem of allProblems) {
 console.log(
   `Simulated ${seeds} characters; ${allProblems.length} problems in ${grouped.size} groups.`
 );
+console.log(
+  `\nFeat automation across selections: ${automationTally.full} full / ${automationTally.partial} partial / ${automationTally.manual} manual.`
+);
+const topManualFeats = [...manualFeatFrequency.entries()].sort((a, b) => b[1] - a[1]).slice(0, 15);
+if (topManualFeats.length) {
+  console.log("Most common manual feats selected:");
+  for (const [name, count] of topManualFeats) console.log(`  ${count}x ${name}`);
+}
+const topManualItems = [...manualItemFrequency.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10);
+if (topManualItems.length) {
+  console.log("Most common manual items selected:");
+  for (const [name, count] of topManualItems) console.log(`  ${count}x ${name}`);
+}
 for (const [key, list] of [...grouped.entries()]
   .sort((a, b) => b[1].length - a[1].length)
   .slice(0, 40)) {
