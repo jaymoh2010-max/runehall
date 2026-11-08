@@ -1,5 +1,5 @@
 import type { Equipment, Feat } from "./types";
-import { featEffect } from "./effects";
+import { featEffect, itemEffect } from "./effects";
 
 export type AutomationLevel = "full" | "partial" | "manual";
 
@@ -66,6 +66,26 @@ export function automationForFeat(feat: Feat): AutomationInfo {
 }
 
 export function automationForEquipment(item: Equipment): AutomationInfo {
+  const effect = itemEffect(item.id);
+  if (effect) {
+    const numeric =
+      Boolean(effect.skillItemBonus) ||
+      Boolean(effect.perceptionItemBonus) ||
+      Boolean(effect.saveItemBonus) ||
+      Boolean(effect.acItemBonus) ||
+      Boolean(effect.hpPerLevel) ||
+      Boolean(effect.speed);
+    return numeric
+      ? {
+          level: "partial",
+          reason:
+            "Runehall applies the item bonus; activated or conditional effects may need tracking.",
+        }
+      : {
+          level: "manual",
+          reason: "This item's effects are not applied to the sheet automatically.",
+        };
+  }
   const isBaseGear =
     item.level === 0 &&
     !item.traits?.includes("magical") &&

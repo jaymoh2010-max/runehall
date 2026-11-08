@@ -28,7 +28,7 @@ import {
   type ValidationIssue,
 } from "./types";
 import { propertyRuneDamage, shieldRuneBonus, summarizeRunes } from "./runes";
-import { collectFeatEffects } from "./effects";
+import { collectFeatEffects, collectItemEffects } from "./effects";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -1618,6 +1618,9 @@ export function computeCharacter(
   ) as Record<AbilityKey, number>;
   const prof = buildProficiencies(draft, context);
   const featMods = collectFeatEffects(Object.keys(context.feats));
+  const itemMods = collectItemEffects(
+    draft.equipment.filter((entry) => entry.equipped).map((entry) => entry.itemId)
+  );
   const caster = casterInfo(classData);
   const keyOptions = classKeyOptions(draft, classData);
   const key =
@@ -1846,7 +1849,8 @@ export function computeCharacter(
     const mod =
       proficiencyBonus(rank, draft.level) +
       abilityMods[skill.ability] +
-      (skill.armorPenalty ? armorCheckPenalty : 0);
+      (skill.armorPenalty ? armorCheckPenalty : 0) +
+      (itemMods.skillItemBonus?.[skill.id] ?? 0);
     return {
       id: skill.id,
       name: skill.name,
@@ -1962,25 +1966,41 @@ export function computeCharacter(
       armor.armor.acBonus +
       armorRunes.armorPotency +
       proficiencyBonus(prof.defenses[armorCategory] ?? 0, draft.level) +
-      shieldBonus;
+      shieldBonus +
+      (itemMods.acItemBonus ?? 0);
     if (!meetsArmorStrength) speed += armor.armor.speedPenalty || 0;
   } else {
     ac =
       10 +
       abilityMods.dex +
       proficiencyBonus(prof.defenses.unarmored ?? 0, draft.level) +
-      shieldBonus;
+      shieldBonus +
+      (itemMods.acItemBonus ?? 0);
   }
   if (shield?.shield?.speedPenalty) speed += shield.shield.speedPenalty;
   speed = Math.max(5, speed);
 
   const saves: Record<SaveKey, number> = {
     fortitude:
-      proficiencyBonus(prof.fortitude, draft.level) + abilityMods.con + armorRunes.resilient,
-    reflex: proficiencyBonus(prof.reflex, draft.level) + abilityMods.dex + armorRunes.resilient,
-    will: proficiencyBonus(prof.will, draft.level) + abilityMods.wis + armorRunes.resilient,
+      proficiencyBonus(prof.fortitude, draft.level) +
+      abilityMods.con +
+      armorRunes.resilient +
+      (itemMods.saveItemBonus?.fortitude ?? 0),
+    reflex:
+      proficiencyBonus(prof.reflex, draft.level) +
+      abilityMods.dex +
+      armorRunes.resilient +
+      (itemMods.saveItemBonus?.reflex ?? 0),
+    will:
+      proficiencyBonus(prof.will, draft.level) +
+      abilityMods.wis +
+      armorRunes.resilient +
+      (itemMods.saveItemBonus?.will ?? 0),
   };
-  const perception = proficiencyBonus(prof.perception, draft.level) + abilityMods.wis;
+  const perception =
+    proficiencyBonus(prof.perception, draft.level) +
+    abilityMods.wis +
+    (itemMods.perceptionItemBonus ?? 0);
   const classDc = classData
     ? 10 + proficiencyBonus(prof.classDc, draft.level) + keyMod
     : 10 + keyMod;
