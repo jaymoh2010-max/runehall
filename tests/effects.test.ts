@@ -23,6 +23,8 @@ const byName = <T extends { name: string }>(items: T[], name: string): T => {
 
 const toughness = byName(feats, "Toughness");
 const fleet = byName(feats, "Fleet");
+const incredibleInitiative = byName(feats, "Incredible Initiative");
+const untrainedImprovisation = byName(feats, "Untrained Improvisation");
 const human = byName(ancestries, "Human");
 const warrior = byName(backgrounds, "Warrior");
 const fighter = byName(classes, "Fighter");
@@ -85,5 +87,39 @@ describe("curated feat effects", () => {
     );
     expect(applied.maxHp).toBe(baseline.maxHp + 1);
     expect(applied.speed).toBe(baseline.speed + 5);
+  });
+
+  it("applies Incredible Initiative as a separate initiative bonus", () => {
+    const baseline = computeCharacter(fighterDraft(), context({}));
+    const applied = computeCharacter(
+      fighterDraft(),
+      context({ [incredibleInitiative.id]: incredibleInitiative })
+    );
+    expect(applied.initiative).toBe(applied.perception + 2);
+    expect(applied.initiative).toBe(baseline.initiative + 2);
+    expect(applied.perception).toBe(baseline.perception);
+  });
+
+  it("applies Untrained Improvisation to untrained skill checks", () => {
+    const baselineDraft = fighterDraft();
+    baselineDraft.level = 5;
+    const appliedDraft = fighterDraft();
+    appliedDraft.level = 5;
+    const baseline = computeCharacter(baselineDraft, context({}));
+    const applied = computeCharacter(
+      appliedDraft,
+      context({ [untrainedImprovisation.id]: untrainedImprovisation })
+    );
+    const baselineArcana = baseline.skills.find((skill) => skill.id === "arcana");
+    const appliedArcana = applied.skills.find((skill) => skill.id === "arcana");
+    expect(baselineArcana?.rank).toBe(0);
+    expect(appliedArcana?.rank).toBe(0);
+    expect(appliedArcana?.mod).toBe((baselineArcana?.mod ?? 0) + Math.floor(5 / 2));
+    expect(applied.initiative).toBe(baseline.initiative);
+  });
+
+  it("labels the new curated feats as fully automated", () => {
+    expect(automationForFeat(incredibleInitiative).level).toBe("full");
+    expect(automationForFeat(untrainedImprovisation).level).toBe("full");
   });
 });

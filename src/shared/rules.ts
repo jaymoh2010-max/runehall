@@ -1846,8 +1846,14 @@ export function computeCharacter(
 
   const derivedSkills: DerivedSkill[] = SKILLS.map((skill) => {
     const rank = ranks[skill.id] ?? 0;
+    const proficiency =
+      rank > 0
+        ? proficiencyBonus(rank, draft.level)
+        : featMods.untrainedImprovisation
+          ? Math.floor(draft.level / 2)
+          : 0;
     const mod =
-      proficiencyBonus(rank, draft.level) +
+      proficiency +
       abilityMods[skill.ability] +
       (skill.armorPenalty ? armorCheckPenalty : 0) +
       (itemMods.skillItemBonus?.[skill.id] ?? 0);
@@ -2001,6 +2007,7 @@ export function computeCharacter(
     proficiencyBonus(prof.perception, draft.level) +
     abilityMods.wis +
     (itemMods.perceptionItemBonus ?? 0);
+  const initiative = perception + (featMods.initiativeBonus ?? 0);
   const classDc = classData
     ? 10 + proficiencyBonus(prof.classDc, draft.level) + keyMod
     : 10 + keyMod;
@@ -2404,6 +2411,7 @@ export function computeCharacter(
     speed,
     otherSpeeds: ancestry?.otherSpeeds ?? [],
     perception,
+    initiative,
     saves,
     skills: derivedSkills,
     lore,

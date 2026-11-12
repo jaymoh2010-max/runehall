@@ -868,6 +868,7 @@ export function CharacterBuilderPage() {
               <Stat label="AC" value={derived.ac} tone="gold" />
               <Stat label="Speed" value={`${derived.speed}'`} />
               <Stat label="Perception" value={signed(derived.perception)} />
+              <Stat label="Initiative" value={signed(derived.initiative)} />
             </div>
             <div className="summary-issues">
               {errors.length ? (

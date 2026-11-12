@@ -753,6 +753,7 @@ export interface DerivedCharacter {
   speed: number;
   otherSpeeds: { type: string; value: number }[];
   perception: number;
+  initiative: number;
   saves: Record<SaveKey, number>;
   skills: DerivedSkill[];
   lore: DerivedLore[];

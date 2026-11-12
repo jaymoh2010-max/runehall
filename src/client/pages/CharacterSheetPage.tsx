@@ -554,6 +554,7 @@ export function CharacterSheetPage() {
           <div className="sheet-quick-stats">
             <Stat label="AC" value={derived.ac} tone="gold" />
             <Stat label="Perception" value={signed(derived.perception)} />
+            <Stat label="Initiative" value={signed(derived.initiative)} />
             <Stat label="Class DC" value={derived.classDc} />
             <Stat label="Speed" value={`${derived.speed} ft.`} />
             {(derived.otherSpeeds ?? []).map((entry) => (
@@ -613,6 +614,16 @@ export function CharacterSheetPage() {
                 <span>Perception</span>
                 <strong>{signed(derived.perception)}</strong>
                 <span className="tiny muted">{PROFICIENCY_NAMES[derived.prof.perception]}</span>
+                <Dices size={14} />
+              </button>
+              <button
+                type="button"
+                className="roll-card"
+                onClick={() => roll(`1d20${signed(derived.initiative)}`, "Initiative")}
+              >
+                <span>Initiative</span>
+                <strong>{signed(derived.initiative)}</strong>
+                <span className="tiny muted">Perception-based</span>
                 <Dices size={14} />
               </button>
               <div className="roll-card is-static">

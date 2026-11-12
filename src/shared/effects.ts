@@ -19,6 +19,10 @@ export interface EffectModifiers {
   languages?: string[];
   /** Always-on bonuses the sheet cannot fully model; surfaced as notes. */
   notes?: string[];
+  /** Circumstance bonus to initiative (highest wins). */
+  initiativeBonus?: number;
+  /** Untrained skills use half level instead of +0 (Untrained Improvisation). */
+  untrainedImprovisation?: boolean;
   /** Item bonuses to skills (highest per skill wins). */
   skillItemBonus?: Partial<Record<SkillId, number>>;
   /** Item bonus to Perception. */
@@ -38,6 +42,10 @@ export const FEAT_EFFECTS: Record<string, EffectModifiers> = {
   "feat:AmP0qu7c5dlBSath": { hpPerLevel: 1 },
   // Fleet — +5 feet Speed.
   "feat:Ux73dmoF8KnavyUD": { speed: 5 },
+  // Incredible Initiative — +2 circumstance bonus to initiative rolls.
+  "feat:2kwXTUjYYhoAGySr": { initiativeBonus: 2 },
+  // Untrained Improvisation — untrained skill checks use half your level.
+  "feat:9jGaBxLUtevZYcZO": { untrainedImprovisation: true },
 };
 
 /**
@@ -56,6 +64,31 @@ export const ITEM_EFFECTS: Record<string, EffectModifiers> = {
   "item:2gYZiUw9yjtb0yJY": { skillItemBonus: { intimidation: 1 } },
   // Ventriloquist's Ring — +1 item bonus to Deception.
   "item:1r6StS0irdvi5JHY": { skillItemBonus: { deception: 1 } },
+  // Greater Crafter's Eyepiece — +2 item bonus to Crafting.
+  "item:JSYtBZ7XblyAEFoV": { skillItemBonus: { crafting: 2 } },
+  // Greater Healer's Gloves — +2 item bonus to Medicine.
+  "item:0GOHTXBxs6H6ARBz": { skillItemBonus: { medicine: 2 } },
+  // Greater Boots of Elvenkind — +2 item bonus to Acrobatics.
+  "item:8NgA4PFFXZPZ9SSg": { skillItemBonus: { acrobatics: 2 } },
+  // Cloak of Elvenkind — +1 item bonus to Stealth.
+  "item:MNBnZn0b80Q7yHJM": { skillItemBonus: { stealth: 1 } },
+  // Amulet of the Third Eye — +2 item bonus to Perception.
+  "item:mNgScZVAq037JuNb": { perceptionItemBonus: 2 },
+  // Bands of Force — +1 item bonus to AC and saving throws.
+  "item:02q8s6sSicMkhs1l": {
+    acItemBonus: 1,
+    saveItemBonus: { fortitude: 1, reflex: 1, will: 1 },
+  },
+  // Bands of Force (Greater) — +2 item bonus to AC and saving throws.
+  "item:8mhSUxEvNuXDP8Ki": {
+    acItemBonus: 2,
+    saveItemBonus: { fortitude: 2, reflex: 2, will: 2 },
+  },
+  // Bands of Force (Major) — +3 item bonus to AC and saving throws.
+  "item:rqJzQawe3CbXiWnG": {
+    acItemBonus: 3,
+    saveItemBonus: { fortitude: 3, reflex: 3, will: 3 },
+  },
 };
 
 export function featEffect(id: string): EffectModifiers | undefined {
@@ -77,6 +110,9 @@ export function mergeEffects(effects: (EffectModifiers | undefined)[]): EffectMo
     if (effect.languages?.length)
       merged.languages = [...(merged.languages ?? []), ...effect.languages];
     if (effect.notes?.length) merged.notes = [...(merged.notes ?? []), ...effect.notes];
+    if (effect.initiativeBonus)
+      merged.initiativeBonus = Math.max(merged.initiativeBonus ?? 0, effect.initiativeBonus);
+    if (effect.untrainedImprovisation) merged.untrainedImprovisation = true;
     if (effect.skillItemBonus) {
       merged.skillItemBonus ??= {};
       for (const [skill, bonus] of Object.entries(effect.skillItemBonus)) {

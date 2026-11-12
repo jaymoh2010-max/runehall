@@ -124,6 +124,7 @@ test("GM creates a campaign and builds a character through the lazy routes", asy
   await page.getByRole("link", { name: "Open character sheet" }).click();
   await expect(page).toHaveURL(/\/characters\/[^/]+$/, { timeout: 15_000 });
   await expect(page.getByRole("heading", { name: "E2E Hero" })).toBeVisible();
+  await expect(page.getByText("Initiative").first()).toBeVisible();
 });
 
 test("lazy library, compendium entry, rules, and account routes load", async ({ page }) => {
