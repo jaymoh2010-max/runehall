@@ -649,6 +649,84 @@ async function main() {
   if (playerAssets.status !== 403) throw new Error("Player could read the GM asset library");
   log("campaign assets track usage and delete unused files");
 
+  const uploadsPath = path.join(tempDir, "uploads");
+  const filesBeforeRejects = new Set(fs.existsSync(uploadsPath) ? fs.readdirSync(uploadsPath) : []);
+  const rawUpload = async ({
+    body,
+    mimeType = "image/png",
+    filename = "edge.png",
+    cookie = gmCookie,
+    campaignId = campaign.id,
+  }) => {
+    const form = new FormData();
+    form.append("file", new Blob([body], { type: mimeType }), filename);
+    const response = await fetch(`${base}/api/uploads`, {
+      method: "POST",
+      headers: {
+        ...(cookie ? { cookie } : {}),
+        ...(campaignId ? { "x-campaign-id": campaignId } : {}),
+      },
+      body: form,
+    });
+    const payload = await response.json().catch(() => ({}));
+    return { status: response.status, payload };
+  };
+
+  const notAnImage = await rawUpload({ body: Buffer.from("<script>alert(1)</script>") });
+  if (notAnImage.status !== 415) {
+    throw new Error(`Non-image upload was accepted (${notAnImage.status})`);
+  }
+  const mismatchedType = await rawUpload({
+    body: pixel,
+    mimeType: "image/jpeg",
+    filename: "mismatch.jpg",
+  });
+  if (mismatchedType.status !== 415) {
+    throw new Error(`Mismatched image type was accepted (${mismatchedType.status})`);
+  }
+  const unsupportedType = await rawUpload({
+    body: pixel,
+    mimeType: "text/plain",
+    filename: "note.txt",
+  });
+  if (unsupportedType.status !== 415) {
+    throw new Error(`Unsupported upload type was accepted (${unsupportedType.status})`);
+  }
+  const emptyUpload = await rawUpload({ body: Buffer.alloc(0) });
+  if (emptyUpload.status !== 400) {
+    throw new Error(`Empty upload was accepted (${emptyUpload.status})`);
+  }
+  const hugeDimensions = Buffer.from(pixel);
+  hugeDimensions.writeUInt32BE(12_001, 16);
+  hugeDimensions.writeUInt32BE(1, 20);
+  const oversizedDimensions = await rawUpload({ body: hugeDimensions });
+  if (oversizedDimensions.status !== 413) {
+    throw new Error(`Oversized dimensions were accepted (${oversizedDimensions.status})`);
+  }
+  const oversizedFile = Buffer.concat([pixel, Buffer.alloc(15 * 1024 * 1024)]);
+  const oversized = await rawUpload({ body: oversizedFile, filename: "huge.png" });
+  if (oversized.status !== 400 && oversized.status !== 413) {
+    throw new Error(`Oversized file was accepted (${oversized.status})`);
+  }
+  const unauthenticated = await rawUpload({ body: pixel, cookie: null });
+  if (unauthenticated.status !== 401) {
+    throw new Error(`Unauthenticated upload was accepted (${unauthenticated.status})`);
+  }
+  const foreignCampaign = await rawUpload({
+    body: pixel,
+    cookie: playerCookie,
+    campaignId: "campaign_missing",
+  });
+  if (foreignCampaign.status !== 403) {
+    throw new Error(`Upload to a foreign campaign was accepted (${foreignCampaign.status})`);
+  }
+  const filesAfterRejects = new Set(fs.existsSync(uploadsPath) ? fs.readdirSync(uploadsPath) : []);
+  const leaked = [...filesAfterRejects].filter((file) => !filesBeforeRejects.has(file));
+  if (leaked.length) {
+    throw new Error(`Rejected uploads left files behind: ${leaked.join(", ")}`);
+  }
+  log("upload validation rejects bad types, sizes, and foreign campaigns without leaking files");
+
   const dashboardResult = await api(`/api/campaigns/${campaign.id}/dashboard`, {
     method: "PATCH",
     cookie: gmCookie,
