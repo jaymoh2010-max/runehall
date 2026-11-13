@@ -258,8 +258,8 @@ Then immediately add **guided level-up**: a dedicated “Level up” flow that e
   - The dashboard's Characters section accepts a pathbuilder2e.com JSON export.
   - Matches ancestry, heritage, background, class, deity, feats, skills, gear, spells, lores, and money by name against the local compendium.
   - Returns a report of unmatched names and warnings instead of guessing.
-  - Weapon/armor/shield runes (potency, striking, resilient, reinforcing, and property runes) and prepared-slot duplicates are imported.
-  - Pets, familiars, dual-class, and play state remain manual; imported characters open in the builder for review.
+  - Weapon/armor/shield runes (potency, striking, resilient, reinforcing, and property runes), prepared-slot duplicates, and pets/familiars (as companions) are imported.
+  - Dual-class and play state remain manual; pet statblocks need review, and imported characters open in the builder for review.
 - [x] **Asset cleanup**
   - `npm run cleanup-assets` scans every database table for `/uploads/` references and reports unused files.
   - Dry-run by default; `--delete` removes only unreferenced files, and `--verbose` lists them all.

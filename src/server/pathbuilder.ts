@@ -1,9 +1,17 @@
-import { emptyCharacterDraft, baseAbilityScores, flexibleBoosts } from "../shared/rules";
+import {
+  emptyCharacterDraft,
+  baseAbilityScores,
+  casterInfo,
+  flexibleBoosts,
+  spellSlotsFor,
+} from "../shared/rules";
+import { newId } from "./util";
 import { featGrant } from "../shared/effects";
 import {
   ABILITIES,
   SKILLS,
   type AbilityKey,
+  type CharacterCompanion,
   type CharacterDraft,
   type ContentMode,
   type SpellTradition,
@@ -185,6 +193,12 @@ export function importPathbuilder(
     match("class");
   } else if (text(build.class)) {
     unmatched.push(`Class: ${text(build.class)}`);
+  }
+  const dualClass = text(build.dualClass);
+  if (dualClass) {
+    warnings.push(
+      `Dual-class (${dualClass}) is not supported; only ${classData?.name ?? "the primary class"} was imported.`
+    );
   }
 
   const deity = lookup(nameMap(deities), build.deity);
@@ -467,6 +481,30 @@ export function importPathbuilder(
         }
       }
     }
+    if (
+      classData &&
+      casterTradition &&
+      text(caster.name).toLowerCase() === classData.name.toLowerCase()
+    ) {
+      const derivedSlots = spellSlotsFor(
+        draft.level,
+        casterInfo(classData).progression,
+        classData.name
+      );
+      const perDay = arr(caster.perDay).map((value) => Math.max(0, Math.round(num(value))));
+      if (derivedSlots) {
+        const length = Math.max(derivedSlots.length, perDay.length);
+        const differs = Array.from(
+          { length },
+          (_, index) => (derivedSlots[index] ?? 0) !== (perDay[index] ?? 0)
+        ).some(Boolean);
+        if (differs) {
+          warnings.push(
+            `Pathbuilder lists per-day slots ${JSON.stringify(perDay)} for ${caster.name}, but Runehall derives ${JSON.stringify(derivedSlots)}; bonus or archetype slots may need review.`
+          );
+        }
+      }
+    }
   }
   for (const entry of Object.values(obj(build.focus))) {
     for (const caster of Object.values(obj(entry))) {
@@ -484,8 +522,48 @@ export function importPathbuilder(
     );
   }
 
-  if (arr(build.pets).length || arr(build.familiars).length) {
-    warnings.push("Pets and familiars were not imported; add them from the character sheet.");
+  const companionKind = (value: unknown): CharacterCompanion["kind"] => {
+    const raw = text(value).toLowerCase();
+    if (raw.includes("familiar")) return "familiar";
+    if (raw.includes("eidolon")) return "eidolon";
+    if (raw.includes("summon")) return "summon";
+    return "animal";
+  };
+  const importCompanion = (raw: Obj, fallbackKind: CharacterCompanion["kind"]) => {
+    const name =
+      text(raw.name, 120) ||
+      text(raw.type, 120) ||
+      (fallbackKind === "familiar" ? "Familiar" : "Companion");
+    const abilities = arr(raw.abilities)
+      .map((ability) => text(ability, 80))
+      .filter(Boolean);
+    const equipmentNames = arr(raw.equipment)
+      .map((item) => (Array.isArray(item) ? text(item[0], 80) : text(item, 80)))
+      .filter(Boolean);
+    const details = [
+      text(raw.type, 80),
+      ...abilities,
+      equipmentNames.length ? `Equipment: ${equipmentNames.join(", ")}` : "",
+    ].filter(Boolean);
+    draft.companions.push({
+      id: newId("comp"),
+      name,
+      kind: fallbackKind === "familiar" ? "familiar" : companionKind(raw.type),
+      level: Math.max(0, Math.min(20, Math.round(num(raw.level, draft.level)))),
+      hpCurrent: null,
+      hpMax: null,
+      ac: null,
+      monsterId: null,
+      notes: details.join(" · "),
+    });
+    match("companion");
+  };
+  for (const familiar of arr<Obj>(build.familiars)) importCompanion(familiar, "familiar");
+  for (const pet of arr<Obj>(build.pets)) importCompanion(pet, "animal");
+  if (draft.companions.length) {
+    warnings.push(
+      "Pets and familiars were imported as companions; their HP, AC, and statblocks still need review."
+    );
   }
 
   const context = contextForDraft(draft);

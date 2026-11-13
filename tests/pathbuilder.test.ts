@@ -241,4 +241,36 @@ describe("Pathbuilder import", () => {
     expect(shield?.runes).toContain(reinforcingMinor.id);
     expect(report.unmatched).toEqual([]);
   });
+
+  it("imports familiars and pets as companions", () => {
+    const { draft, report } = importPathbuilder({
+      ...build,
+      familiars: [{ type: "Familiar", name: "Mote", abilities: ["Familiar Focus"] }],
+      pets: [{ type: "Animal Companion", name: "Bear", level: 5 }],
+    });
+    expect(draft.companions.map((companion) => companion.name)).toEqual(["Mote", "Bear"]);
+    expect(draft.companions[0].kind).toBe("familiar");
+    expect(draft.companions[1].kind).toBe("animal");
+    expect(report.matched.companion).toBe(2);
+    expect(report.warnings.join(" ")).toContain("companions");
+  });
+
+  it("warns about unsupported dual-class and per-day slot differences", () => {
+    const { report } = importPathbuilder({
+      ...build,
+      class: "Wizard",
+      dualClass: "Fighter",
+      spellCasters: [
+        {
+          name: "Wizard",
+          magicTradition: "arcane",
+          spellcastingType: "prepared",
+          perDay: [9, 9, 9],
+          spells: [],
+        },
+      ],
+    });
+    expect(report.warnings.join(" ")).toContain("Dual-class (Fighter)");
+    expect(report.warnings.join(" ")).toContain("per-day slots");
+  });
 });
