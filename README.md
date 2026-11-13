@@ -62,33 +62,60 @@ Runehall is built for a private group of roughly 4–10 players and a GM. It run
 
 ---
 
-## Quick start
+## Build from source
 
 ### Requirements
 - **Node.js 26+** (Runehall uses the built-in `node:sqlite` module; no native database dependency).
 - npm 11+ (bundled with Node 26).
+- Git.
 - Windows, macOS, or Linux.
+- Optional: Docker Desktop / Docker Engine with Compose for the container build.
 
-### Development
+### 1. Clone and install
 ```bash
-npm install
+git clone <your-repository-url> runehall
+cd runehall
+npm ci
+```
+`npm ci` uses the committed `package-lock.json` for a reproducible install.
+
+### 2. Run in development
+```bash
 npm run dev
 ```
 Open **http://localhost:5173**. The API and Socket.IO server run on port 3001; Vite proxies `/api`, `/uploads`, and `/socket.io`.
 
-### Production-style local run
+### 3. Build for production
 ```bash
 npm run build
 npm start
 ```
 Open **http://localhost:3001**. The Fastify server serves the built client, API, uploads, and websocket server from one process.
 
-### Browser tests
+### 4. Run with Docker
 ```bash
-npx playwright install chromium
-npm run e2e
+docker build -t runehall .
+docker run -d --name runehall \
+  -p 3001:3001 \
+  -v runehall-data:/app/data \
+  -v runehall-backups:/app/backups \
+  runehall
 ```
-The suite builds the client, starts its own server on port 5199 with a temporary database, and runs the GM/player flows in Chromium. It never touches `data/`.
+Or use Compose from the repository root:
+```bash
+docker compose up -d --build
+```
+The compose path keeps SQLite, the compendium, uploads, and backups in `./data` and `./backups`.
+
+### 5. Verify the build
+```bash
+npm run check        # types, lint, format, unit tests, production build, bundle budget
+npm run smoke        # GM/player API + socket smoke test
+npx playwright install chromium
+npm run e2e          # browser flows in Chromium
+npm run verify:data  # compendium and SQLite integrity
+```
+GitHub Actions runs the verify job, the browser E2E job, the restore drill, and a Docker image health check on pushes and pull requests.
 
 ### First five minutes
 1. **Register** an account.
