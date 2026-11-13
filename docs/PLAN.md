@@ -62,7 +62,7 @@ The target table size is one GM plus 4–10 players. That means the product shou
 - Shared session schedule with GM-managed attendance, GM-only agenda checklists, player check-ins, and automatic Overview date/check-in reminders.
 - Persistent bestiary palette with drag-to-map group placement.
 - GM screen with level/simple DCs, condition lookup, secret rolls, and player roll requests.
-- Campaign import with ID remapping and player-account matching, plus a dry-run-first unused-asset cleanup command for legacy files.
+- Campaign import with ID remapping and player-account matching, Pathbuilder 2e character import with a best-effort unmatched report, and a dry-run-first unused-asset cleanup command for legacy files.
 - Next: off-machine backup shipping and optional scale adapters.
 
 ### Phase 4 — Reliability and trust (in progress)

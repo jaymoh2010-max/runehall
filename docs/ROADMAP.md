@@ -254,6 +254,11 @@ Then immediately add **guided level-up**: a dedicated “Level up” flow that e
   - Matches player accounts by username; unmatched character owners fall back to the importing GM.
   - Imports characters, scenes, tokens, journal/handouts, encounters, loot, dashboard, NPCs, sessions, attendance, messages, and initiative state.
   - Uploaded image files are not copied; use a full backup archive to move assets between machines.
+- [x] **Pathbuilder 2e character import**
+  - The dashboard's Characters section accepts a pathbuilder2e.com JSON export.
+  - Matches ancestry, heritage, background, class, deity, feats, skills, gear, spells, lores, and money by name against the local compendium.
+  - Returns a report of unmatched names and warnings instead of guessing.
+  - Magic runes, prepared-slot details, pets, and familiars remain manual; imported characters open in the builder for review.
 - [x] **Asset cleanup**
   - `npm run cleanup-assets` scans every database table for `/uploads/` references and reports unused files.
   - Dry-run by default; `--delete` removes only unreferenced files, and `--verbose` lists them all.

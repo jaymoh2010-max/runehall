@@ -21,6 +21,7 @@ import {
   rulesetIncludesLegacy,
 } from "../../shared/content";
 import { contextForDraft } from "../compendium";
+import { importPathbuilder } from "../pathbuilder";
 import { db, type CharacterRow, type TokenRow } from "../db";
 import { serializeCharacter, serializeToken, touchCampaign } from "../serialize";
 import {
@@ -149,6 +150,68 @@ export async function registerCharacterRoutes(app: FastifyInstance): Promise<voi
       app.broadcastCampaign(campaignId, "character:created", { character: created });
     }
     return reply.code(201).send({ character: created });
+  });
+
+  app.post("/api/characters/import/pathbuilder", async (request, reply) => {
+    if (!request.user) return reply.code(401).send({ error: "Sign in to continue." });
+    const body = (request.body ?? {}) as Record<string, unknown>;
+    let parsed: unknown = body.json;
+    if (typeof parsed === "string") {
+      try {
+        parsed = JSON.parse(parsed);
+      } catch {
+        return reply.code(400).send({ error: "That file is not valid JSON." });
+      }
+    }
+    if (!parsed || typeof parsed !== "object") {
+      return reply.code(400).send({ error: "Choose a Pathbuilder JSON export." });
+    }
+    const payload = parsed as Record<string, unknown>;
+    const build =
+      payload.build && typeof payload.build === "object"
+        ? (payload.build as Record<string, unknown>)
+        : null;
+    if (!build) {
+      return reply
+        .code(400)
+        .send({ error: "That JSON does not look like a Pathbuilder character export." });
+    }
+    const campaignId = typeof body.campaignId === "string" ? body.campaignId : null;
+    if (campaignId && !getMembership(campaignId, request.user.id)) {
+      return reply.code(403).send({ error: "You are not a member of that campaign." });
+    }
+    let contentMode: "core" | "expanded" = "expanded";
+    let includeLegacy = false;
+    if (campaignId) {
+      const campaign = getCampaign(campaignId);
+      if (campaign) {
+        const ruleset = normalizeCampaignRuleset(campaign.ruleset);
+        contentMode = rulesetContentMode(ruleset);
+        includeLegacy = rulesetIncludesLegacy(ruleset);
+      }
+    }
+    let result;
+    try {
+      result = importPathbuilder(build, { contentMode, includeLegacy });
+    } catch {
+      return reply.code(400).send({ error: "Runehall could not read that Pathbuilder export." });
+    }
+    const draft = normalizeCharacterDraft(result.draft, result.draft.name);
+    const id = newId("char");
+    const ts = now();
+    db.prepare(
+      "INSERT INTO characters (id, user_id, campaign_id, name, data, summary, created_at, updated_at) VALUES (?, ?, ?, ?, ?, NULL, ?, ?)"
+    ).run(id, request.user.id, campaignId, draft.name, JSON.stringify(draft), ts, ts);
+    const row = getCharacter(id);
+    if (!row) return reply.code(500).send({ error: "Could not create character." });
+    const created = serializeCharacter(row, request.user.displayName, {
+      canEdit: true,
+      canView: true,
+    });
+    if (campaignId) {
+      app.broadcastCampaign(campaignId, "character:created", { character: created });
+    }
+    return reply.code(201).send({ character: created, report: result.report });
   });
 
   app.get("/api/characters/:id", async (request, reply) => {

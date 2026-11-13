@@ -35,6 +35,11 @@ import {
   Textarea,
 } from "../components/ui";
 
+type PathbuilderImport = {
+  character: { id: string; name: string };
+  report: { matched: Record<string, number>; unmatched: string[]; warnings: string[] };
+};
+
 export function DashboardPage() {
   const user = useSession((state) => state.user);
   const toast = useToasts((state) => state.push);
@@ -57,6 +62,11 @@ export function DashboardPage() {
   } | null>(null);
   const [importBusy, setImportBusy] = useState(false);
   const [importError, setImportError] = useState("");
+  const [pathbuilderOpen, setPathbuilderOpen] = useState(false);
+  const [pathbuilderJson, setPathbuilderJson] = useState("");
+  const [pathbuilderBusy, setPathbuilderBusy] = useState(false);
+  const [pathbuilderError, setPathbuilderError] = useState("");
+  const [pathbuilderReport, setPathbuilderReport] = useState<PathbuilderImport | null>(null);
 
   const [campaignName, setCampaignName] = useState("");
   const [campaignDescription, setCampaignDescription] = useState("");
@@ -137,6 +147,43 @@ export function DashboardPage() {
       setImportError(errorMessage(error));
     } finally {
       setImportBusy(false);
+    }
+  };
+
+  const closePathbuilder = () => {
+    setPathbuilderOpen(false);
+    setPathbuilderJson("");
+    setPathbuilderReport(null);
+    setPathbuilderError("");
+  };
+
+  const choosePathbuilderFile = async (file: File | null) => {
+    setPathbuilderError("");
+    setPathbuilderReport(null);
+    if (!file) return;
+    try {
+      setPathbuilderJson(await file.text());
+    } catch {
+      setPathbuilderError("That file could not be read.");
+    }
+  };
+
+  const importPathbuilder = async () => {
+    if (!pathbuilderJson.trim()) return;
+    setPathbuilderBusy(true);
+    setPathbuilderError("");
+    try {
+      const result = await api<PathbuilderImport>("/api/characters/import/pathbuilder", {
+        method: "POST",
+        body: { json: pathbuilderJson },
+      });
+      setPathbuilderReport(result);
+      toast(`Imported ${result.character.name}.`, "success");
+      await load();
+    } catch (err) {
+      setPathbuilderError(errorMessage(err));
+    } finally {
+      setPathbuilderBusy(false);
     }
   };
 
@@ -394,17 +441,30 @@ export function DashboardPage() {
             <PageEyebrow>Your heroes</PageEyebrow>
             <h2 style={{ marginTop: 5 }}>Characters</h2>
           </div>
-          <Button
-            variant="primary"
-            size="sm"
-            icon={<Plus size={15} />}
-            onClick={() => {
-              setFormError("");
-              setCharacterOpen(true);
-            }}
-          >
-            New character
-          </Button>
+          <div className="row wrap" style={{ gap: 8 }}>
+            <Button
+              size="sm"
+              icon={<Upload size={15} />}
+              onClick={() => {
+                setPathbuilderError("");
+                setPathbuilderReport(null);
+                setPathbuilderOpen(true);
+              }}
+            >
+              Import Pathbuilder
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              icon={<Plus size={15} />}
+              onClick={() => {
+                setFormError("");
+                setCharacterOpen(true);
+              }}
+            >
+              New character
+            </Button>
+          </div>
         </div>
 
         {characters.length === 0 ? (
@@ -705,6 +765,108 @@ export function DashboardPage() {
             </Select>
           </Field>
         </form>
+      </Modal>
+
+      <Modal
+        open={pathbuilderOpen}
+        onClose={closePathbuilder}
+        title="Import from Pathbuilder"
+        subtitle="Choose a Pathbuilder 2e JSON export. Runehall maps the names it recognizes and reports anything it cannot."
+        wide
+        footer={
+          pathbuilderReport ? (
+            <>
+              <Button variant="ghost" onClick={closePathbuilder}>
+                Close
+              </Button>
+              <Button
+                variant="primary"
+                onClick={() => {
+                  const id = pathbuilderReport.character.id;
+                  closePathbuilder();
+                  navigate(`/characters/${id}/edit`);
+                }}
+              >
+                Open builder
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button variant="ghost" onClick={closePathbuilder}>
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                loading={pathbuilderBusy}
+                disabled={!pathbuilderJson.trim()}
+                onClick={() => void importPathbuilder()}
+              >
+                Import character
+              </Button>
+            </>
+          )
+        }
+      >
+        {pathbuilderReport ? (
+          <div className="stack">
+            <p className="muted small">
+              Imported {pathbuilderReport.character.name}. Review the builder before play.
+            </p>
+            <p className="tiny muted">
+              Matched{" "}
+              {Object.values(pathbuilderReport.report.matched).reduce(
+                (sum, count) => sum + count,
+                0
+              )}{" "}
+              options.
+            </p>
+            {pathbuilderReport.report.unmatched.length ? (
+              <div>
+                <strong className="small">Not matched</strong>
+                <ul className="tiny muted">
+                  {pathbuilderReport.report.unmatched.slice(0, 40).map((name) => (
+                    <li key={name}>{name}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+            {pathbuilderReport.report.warnings.length ? (
+              <div>
+                <strong className="small">Review these</strong>
+                <ul className="tiny muted">
+                  {pathbuilderReport.report.warnings.slice(0, 40).map((warning) => (
+                    <li key={warning}>{warning}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+          </div>
+        ) : (
+          <div className="stack">
+            {pathbuilderError ? <div className="auth-error">{pathbuilderError}</div> : null}
+            <Field
+              label="Pathbuilder JSON file"
+              hint="In Pathbuilder 2e, open the character and use Export → JSON."
+            >
+              <Input
+                type="file"
+                accept=".json,application/json"
+                onChange={(event) => void choosePathbuilderFile(event.target.files?.[0] ?? null)}
+              />
+            </Field>
+            <Field label="Or paste the JSON">
+              <Textarea
+                value={pathbuilderJson}
+                onChange={(event) => setPathbuilderJson(event.target.value)}
+                placeholder='{"success":true,"build":{...}}'
+                rows={8}
+              />
+            </Field>
+            <p className="tiny muted">
+              Runehall matches names against its local compendium. Nothing is sent to a third party.
+            </p>
+          </div>
+        )}
       </Modal>
     </div>
   );

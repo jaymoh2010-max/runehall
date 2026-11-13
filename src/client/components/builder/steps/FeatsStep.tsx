@@ -162,6 +162,7 @@ export function FeatsStep({
     params.set("levelMax", String(grant.level));
     params.set("limit", "200");
     if (grant.category === "ancestry" && ancestryTrait) params.set("trait", ancestryTrait);
+    if (grant.category === "class" && classTrait) params.set("trait", classTrait);
     if (!draft.includeLegacy) params.set("legacy", "0");
     if (draft.contentMode === "core") params.set("core", "1");
     api<{ items: Feat[] }>(`/api/compendium/feats?${params.toString()}`)

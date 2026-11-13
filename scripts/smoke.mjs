@@ -451,6 +451,79 @@ async function main() {
   }
   log("campaign import created a new campaign and remapped ownership");
 
+  const pathbuilderBuild = {
+    name: "Smoke Pathbuilder Hero",
+    class: "Fighter",
+    level: 1,
+    ancestry: "Human",
+    heritage: "Versatile Human",
+    background: "Warrior",
+    keyability: "str",
+    abilities: {
+      str: 18,
+      dex: 14,
+      con: 14,
+      int: 10,
+      wis: 12,
+      cha: 8,
+      breakdown: {
+        ancestryFree: ["Str", "Dex"],
+        ancestryBoosts: [],
+        ancestryFlaws: [],
+        backgroundBoosts: ["Str", "Con"],
+        classBoosts: ["Str"],
+        mapLevelledBoosts: { 1: ["Str", "Dex", "Con", "Wis"] },
+      },
+    },
+    proficiencies: { athletics: 2, acrobatics: 2 },
+    feats: [["Toughness", null, "General Feat", 1]],
+    equipment: [["Backpack", 1, "Invested"]],
+    weapons: [],
+    armor: [],
+    money: { gp: 5, sp: 0, cp: 0 },
+    spellCasters: [],
+    focus: {},
+  };
+  const pathbuilderImport = await api("/api/characters/import/pathbuilder", {
+    method: "POST",
+    cookie: playerCookie,
+    body: { json: JSON.stringify({ success: true, build: pathbuilderBuild }) },
+  });
+  const importedHero = pathbuilderImport.payload.character;
+  if (
+    !importedHero?.id ||
+    importedHero.name !== "Smoke Pathbuilder Hero" ||
+    importedHero.data?.level !== 1 ||
+    !importedHero.data?.ancestryId ||
+    !importedHero.data?.feats?.general?.["1"] ||
+    !importedHero.data?.equipment?.length
+  ) {
+    throw new Error("Pathbuilder import did not create the expected draft");
+  }
+  if (pathbuilderImport.payload.report?.unmatched?.length) {
+    throw new Error(
+      `Pathbuilder import left names unmatched: ${pathbuilderImport.payload.report.unmatched.join(", ")}`
+    );
+  }
+  const badPathbuilder = await fetch(`${base}/api/characters/import/pathbuilder`, {
+    method: "POST",
+    headers: { "content-type": "application/json", cookie: playerCookie },
+    body: JSON.stringify({ json: "{not json" }),
+  });
+  if (badPathbuilder.status !== 400) {
+    throw new Error(`Invalid Pathbuilder JSON was accepted (${badPathbuilder.status})`);
+  }
+  const wrongShape = await fetch(`${base}/api/characters/import/pathbuilder`, {
+    method: "POST",
+    headers: { "content-type": "application/json", cookie: playerCookie },
+    body: JSON.stringify({ json: JSON.stringify({ hello: "world" }) }),
+  });
+  if (wrongShape.status !== 400) {
+    throw new Error(`Non-Pathbuilder JSON was accepted (${wrongShape.status})`);
+  }
+  await api(`/api/characters/${importedHero.id}`, { method: "DELETE", cookie: playerCookie });
+  log("Pathbuilder JSON import creates a mapped character and rejects invalid JSON");
+
   const swordSearch = await api("/api/compendium/equipment?q=longsword&limit=1", {
     cookie: gmCookie,
   });

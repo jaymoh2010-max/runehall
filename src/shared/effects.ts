@@ -62,6 +62,12 @@ export const FEAT_GRANTS: Record<string, FeatGrantDefinition> = {
     category: "ancestry",
     level: 1,
   },
+  // Natural Ambition — gain a 1st-level class feat.
+  "feat:PodajLVxqYSAqVox": {
+    prompt: "Choose a 1st-level class feat",
+    category: "class",
+    level: 1,
+  },
 };
 
 export function featGrant(id: string): FeatGrantDefinition | undefined {
