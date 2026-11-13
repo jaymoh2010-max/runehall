@@ -2470,6 +2470,7 @@ export function computeCharacter(
   ].filter(
     (value, index, arr) => arr.findIndex((x) => x.toLowerCase() === value.toLowerCase()) === index
   );
+  const notes = [...new Set([...(featMods.notes ?? []), ...(itemMods.notes ?? [])])];
 
   const className = classData?.name.toLowerCase();
   const font = divineFontInfo(draft.level, classData?.name);
@@ -2516,6 +2517,7 @@ export function computeCharacter(
     size: ancestry?.size ?? "med",
     languages,
     senses,
+    notes,
     equipment: draft.equipment,
     bulk: {
       total: Math.round(bulkTotal * 10) / 10,

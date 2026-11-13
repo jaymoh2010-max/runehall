@@ -772,6 +772,8 @@ export interface DerivedCharacter {
   size: string;
   languages: string[];
   senses: string[];
+  /** Manual tracking notes for partly automated feat/item effects. */
+  notes: string[];
   equipment: CharacterEquipment[];
   bulk: { total: number; capacity: number; encumbered: boolean; max: number };
   wealth: { budget: number; spent: number; remaining: number; currencyCp: number };

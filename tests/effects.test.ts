@@ -323,4 +323,22 @@ describe("curated feat effects", () => {
       )
     ).toBe(true);
   });
+
+  it("surfaces non-numeric feat effects as tracking notes", () => {
+    const diehard = byName(feats, "Diehard");
+    const robustHealth = byName(feats, "Robust Health");
+    const applied = computeCharacter(
+      fighterDraft(),
+      context({ [diehard.id]: diehard, [robustHealth.id]: robustHealth })
+    );
+    expect(applied.notes).toHaveLength(2);
+    expect(applied.notes.join(" ")).toContain("dying 5");
+    expect(applied.notes.join(" ")).toContain("Battle Medicine");
+    expect(automationForFeat(diehard).level).toBe("partial");
+  });
+
+  it("does not add notes for fully numeric feats", () => {
+    const applied = computeCharacter(fighterDraft(), context({ [toughness.id]: toughness }));
+    expect(applied.notes).toEqual([]);
+  });
 });

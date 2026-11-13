@@ -845,6 +845,20 @@ export function CharacterSheetPage() {
             </Card>
           ) : null}
 
+          {derived.notes.length ? (
+            <Card className="sheet-section">
+              <div className="sheet-section-head">
+                <h2>Tracking notes</h2>
+                <span className="tiny muted">Partly automated; track these during play</span>
+              </div>
+              <ul className="sheet-note-list">
+                {derived.notes.map((note) => (
+                  <li key={note}>{note}</li>
+                ))}
+              </ul>
+            </Card>
+          ) : null}
+
           <Card className="sheet-section">
             <div className="sheet-section-head">
               <h2>Feats &amp; features</h2>

@@ -1279,6 +1279,15 @@
 .summary-stat-grid .stat-value {
   font-size: 1.05rem;
 }
+.sheet-note-list {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
 .summary-issues {
   display: flex;
   align-items: center;

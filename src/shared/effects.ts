@@ -87,6 +87,26 @@ export const FEAT_EFFECTS: Record<string, EffectModifiers> = {
   "feat:BStw1cANwx5baL6d": { armorProficiency: true },
   // Weapon Proficiency — train martial weapons, or a chosen advanced weapon.
   [WEAPON_PROFICIENCY_ID]: { weaponProficiency: true },
+  // Diehard — you die at dying 5 instead of dying 4.
+  "feat:I0BhPWqYf1bbzEYg": { notes: ["Die at dying 5 instead of dying 4."] },
+  // Robust Health — extra healing and a shorter Battle Medicine immunity.
+  "feat:yTLGclKtWVFZLKIz": {
+    notes: [
+      "Regain extra HP from Treat Wounds or Battle Medicine equal to your level; Battle Medicine immunity lasts 1 hour instead of 1 day.",
+    ],
+  },
+  // Fast Recovery — faster rest healing and disease/poison stage reduction.
+  "feat:N8Xz5fuW6o7GW124": {
+    notes: [
+      "Double HP from resting; reduce disease or poison stage by 2 on a success and 3 on a critical success (1/2 for virulent).",
+    ],
+  },
+  // Breath Control — longer breath holding and a bonus against inhaled threats.
+  "feat:aJUXbe9HJVvv0Mxa": {
+    notes: [
+      "Hold your breath 25× longer; +1 circumstance to saves against inhaled threats, and a success becomes a critical success.",
+    ],
+  },
 };
 
 /**
