@@ -1641,6 +1641,11 @@ export function computeCharacter(
     else if (key === "reflex") prof.reflex = Math.max(prof.reflex, value);
     else if (key === "will") prof.will = Math.max(prof.will, value);
   }
+  if (featMods.armorProficiency) {
+    const categories = ["light", "medium", "heavy"] as const;
+    const next = categories.find((category) => prof.defenses[category] === 0) ?? "heavy";
+    prof.defenses[next] = Math.max(prof.defenses[next], draft.level >= 13 ? 2 : 1);
+  }
   const itemMods = collectItemEffects(
     draft.equipment.filter((entry) => entry.equipped).map((entry) => entry.itemId)
   );
@@ -1676,7 +1681,7 @@ export function computeCharacter(
 
   for (const featId of activeFeatIds) {
     const definition = FEAT_CHOICES[featId];
-    if (definition && !draft.featChoices[featId]?.length) {
+    if (definition && !draft.featChoices[featId]?.[0]?.trim()) {
       const name = context.feats[featId]?.name ?? "Feat";
       issue("warning", `${name}: ${definition.prompt}.`, "feats");
     }
@@ -1936,6 +1941,13 @@ export function computeCharacter(
         rank,
       });
     }
+  }
+  for (const entry of featMods.lore ?? []) {
+    lore.push({
+      name: entry.name,
+      mod: proficiencyBonus(entry.rank, draft.level) + abilityMods.int,
+      rank: entry.rank,
+    });
   }
   if (lore.length) {
     // background lore may duplicate custom entries

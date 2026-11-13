@@ -49,6 +49,7 @@ export function automationForFeat(feat: Feat): AutomationInfo {
       Boolean(effect.speed) ||
       Boolean(effect.initiativeBonus) ||
       Boolean(effect.untrainedImprovisation) ||
+      Boolean(effect.armorProficiency) ||
       Boolean(effect.senses?.length) ||
       Boolean(effect.languages?.length);
     return numeric

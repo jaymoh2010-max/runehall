@@ -32,9 +32,12 @@ const fleet = byName(feats, "Fleet");
 const incredibleInitiative = byName(feats, "Incredible Initiative");
 const untrainedImprovisation = byName(feats, "Untrained Improvisation");
 const cannyAcumen = byName(feats, "Canny Acumen");
+const additionalLore = byName(feats, "Additional Lore");
+const armorProficiency = byName(feats, "Armor Proficiency");
 const human = byName(ancestries, "Human");
 const warrior = byName(backgrounds, "Warrior");
 const fighter = byName(classes, "Fighter");
+const wizard = byName(classes, "Wizard");
 
 function fighterDraft() {
   const draft = emptyCharacterDraft("Effects Fighter");
@@ -54,6 +57,29 @@ function context(featMap: Record<string, Feat>): CharacterContext {
     ancestry: human,
     background: warrior,
     classData: fighter,
+    feats: featMap,
+    spells: {},
+    equipment: {},
+  };
+}
+
+function wizardDraft() {
+  const draft = emptyCharacterDraft("Effects Wizard");
+  draft.ancestryId = human.id;
+  draft.backgroundId = warrior.id;
+  draft.classId = wizard.id;
+  draft.keyAbility = "int";
+  draft.boosts.ancestry = ["int", "dex"];
+  draft.boosts.background = ["int", "con"];
+  draft.boosts.free = ["int", "dex", "con", "wis"];
+  return draft;
+}
+
+function wizardContext(featMap: Record<string, Feat>): CharacterContext {
+  return {
+    ancestry: human,
+    background: warrior,
+    classData: wizard,
     feats: featMap,
     spells: {},
     equipment: {},
@@ -161,5 +187,43 @@ describe("curated feat effects", () => {
       )
     ).toBe(true);
     expect(automationForFeat(cannyAcumen).level).toBe("full");
+  });
+
+  it("applies Additional Lore as a free-text lore choice", () => {
+    expect(featChoice(additionalLore.id)?.kind).toBe("text");
+    const draft = fighterDraft();
+    draft.featChoices[additionalLore.id] = ["Undead"];
+    const applied = computeCharacter(draft, context({ [additionalLore.id]: additionalLore }));
+    expect(applied.lore.find((lore) => lore.name === "Undead Lore")?.rank).toBe(1);
+    expect(automationForFeat(additionalLore).level).toBe("full");
+  });
+
+  it("scales Additional Lore with level", () => {
+    const draft = fighterDraft();
+    draft.level = 7;
+    draft.featChoices[additionalLore.id] = ["Undead Lore"];
+    const applied = computeCharacter(draft, context({ [additionalLore.id]: additionalLore }));
+    expect(applied.lore.find((lore) => lore.name === "Undead Lore")?.rank).toBe(3);
+  });
+
+  it("trains the next armor category with Armor Proficiency", () => {
+    const baseline = computeCharacter(wizardDraft(), wizardContext({}));
+    expect(baseline.prof.defenses.light).toBe(0);
+    const trained = computeCharacter(
+      wizardDraft(),
+      wizardContext({ [armorProficiency.id]: armorProficiency })
+    );
+    expect(trained.prof.defenses.light).toBe(1);
+    expect(automationForFeat(armorProficiency).level).toBe("full");
+  });
+
+  it("makes Armor Proficiency expert at 13th level", () => {
+    const draft = wizardDraft();
+    draft.level = 13;
+    const applied = computeCharacter(
+      draft,
+      wizardContext({ [armorProficiency.id]: armorProficiency })
+    );
+    expect(applied.prof.defenses.light).toBe(2);
   });
 });

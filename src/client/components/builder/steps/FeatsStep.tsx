@@ -213,26 +213,43 @@ export function FeatsStep({
                   ) : null}
                   {choice ? (
                     <Field label={choice.prompt} hint="Runehall applies your choice to the sheet.">
-                      <Select
-                        value={draft.featChoices[feat.id]?.[0] ?? ""}
-                        onChange={(event) => {
-                          const value = event.target.value;
-                          update((current) => ({
-                            ...current,
-                            featChoices: {
-                              ...current.featChoices,
-                              [feat.id]: value ? [value] : [],
-                            },
-                          }));
-                        }}
-                      >
-                        <option value="">Choose…</option>
-                        {choice.options.map((option) => (
-                          <option key={option.id} value={option.id}>
-                            {option.label}
-                          </option>
-                        ))}
-                      </Select>
+                      {choice.kind === "text" ? (
+                        <Input
+                          value={draft.featChoices[feat.id]?.[0] ?? ""}
+                          placeholder={choice.placeholder}
+                          onChange={(event) => {
+                            const value = event.target.value;
+                            update((current) => ({
+                              ...current,
+                              featChoices: {
+                                ...current.featChoices,
+                                [feat.id]: value ? [value] : [],
+                              },
+                            }));
+                          }}
+                        />
+                      ) : (
+                        <Select
+                          value={draft.featChoices[feat.id]?.[0] ?? ""}
+                          onChange={(event) => {
+                            const value = event.target.value;
+                            update((current) => ({
+                              ...current,
+                              featChoices: {
+                                ...current.featChoices,
+                                [feat.id]: value ? [value] : [],
+                              },
+                            }));
+                          }}
+                        >
+                          <option value="">Choose…</option>
+                          {choice.options.map((option) => (
+                            <option key={option.id} value={option.id}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </Select>
+                      )}
                     </Field>
                   ) : null}
                   <RichText html={feat.description} />

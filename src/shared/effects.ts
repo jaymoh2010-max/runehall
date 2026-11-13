@@ -33,6 +33,10 @@ export interface EffectModifiers {
   acItemBonus?: number;
   /** Proficiency-rank floors keyed by perception, fortitude, reflex, or will. */
   proficiencyRanks?: Record<string, number>;
+  /** Train the next untrained armor category (Armor Proficiency). */
+  armorProficiency?: boolean;
+  /** Lore skills granted by a choice or effect. */
+  lore?: { name: string; rank: number }[];
 }
 
 /**
@@ -48,6 +52,8 @@ export const FEAT_EFFECTS: Record<string, EffectModifiers> = {
   "feat:2kwXTUjYYhoAGySr": { initiativeBonus: 2 },
   // Untrained Improvisation — untrained skill checks use half your level.
   "feat:9jGaBxLUtevZYcZO": { untrainedImprovisation: true },
+  // Armor Proficiency — train the next untrained armor category.
+  "feat:BStw1cANwx5baL6d": { armorProficiency: true },
 };
 
 /**
@@ -104,9 +110,18 @@ export interface FeatChoiceOption {
 
 export interface FeatChoiceDefinition {
   prompt: string;
+  /** A fixed select list, or a free-text field (for example, a Lore name). */
+  kind?: "select" | "text";
+  placeholder?: string;
   options: FeatChoiceOption[];
   /** Turn the chosen option into sheet modifiers for the character's level. */
   apply: (choice: string, level: number) => EffectModifiers;
+}
+
+function loreName(value: string): string {
+  const clean = value.trim();
+  if (!clean) return "";
+  return /\blore$/i.test(clean) ? clean : `${clean} Lore`;
 }
 
 /**
@@ -124,6 +139,20 @@ export const FEAT_CHOICES: Record<string, FeatChoiceDefinition> = {
       { id: "perception", label: "Perception" },
     ],
     apply: (choice, level) => ({ proficiencyRanks: { [choice]: level >= 17 ? 3 : 2 } }),
+  },
+  // Additional Lore — trained in a chosen Lore, scaling at 3rd/7th/15th.
+  "feat:BocFD2KV0qgUC76x": {
+    prompt: "Lore subcategory",
+    kind: "text",
+    placeholder: "e.g. Undead Lore",
+    options: [],
+    apply: (choice, level) => {
+      const name = loreName(choice);
+      if (!name) return {};
+      return {
+        lore: [{ name, rank: level >= 15 ? 4 : level >= 7 ? 3 : level >= 3 ? 2 : 1 }],
+      };
+    },
   },
 };
 
@@ -192,6 +221,8 @@ export function mergeEffects(effects: (EffectModifiers | undefined)[]): EffectMo
         merged.proficiencyRanks[key] = Math.max(merged.proficiencyRanks[key] ?? 0, rank ?? 0);
       }
     }
+    if (effect.armorProficiency) merged.armorProficiency = true;
+    if (effect.lore?.length) merged.lore = [...(merged.lore ?? []), ...effect.lore];
   }
   return merged;
 }
