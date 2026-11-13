@@ -340,11 +340,44 @@ export function importPathbuilder(
   }
 
   const equipmentMap = nameMap(equipment);
+  const findRune = (rawName: string) => {
+    const direct = lookupEquipment(equipmentMap, rawName);
+    if (direct) return direct;
+    return lookupEquipment(
+      equipmentMap,
+      rawName.replace(/^Reinforcing\s*\(/i, "Reinforcing Rune (")
+    );
+  };
+  const runeIdsFor = (names: string[]) => {
+    const ids: string[] = [];
+    for (const name of names) {
+      if (!name) continue;
+      const rune = findRune(name);
+      if (rune) ids.push(rune.id);
+      else unmatched.push(`Rune: ${name}`);
+    }
+    return [...new Set(ids)];
+  };
+  const strikingRune = (value: string) => {
+    const raw = value.toLowerCase();
+    if (!raw) return null;
+    if (raw.includes("major")) return "Striking (Major)";
+    if (raw.includes("greater")) return "Striking (Greater)";
+    return "Striking";
+  };
+  const resilientRune = (value: string) => {
+    const raw = value.toLowerCase();
+    if (!raw) return null;
+    if (raw.includes("major")) return "Resilient (Major)";
+    if (raw.includes("greater")) return "Resilient (Greater)";
+    return "Resilient";
+  };
   const addEquipment = (
     rawName: unknown,
     quantity: unknown,
     equipped: boolean,
-    invested: boolean
+    invested: boolean,
+    runeNames: string[] = []
   ) => {
     const name = text(rawName, 160);
     if (!name) return;
@@ -353,17 +386,20 @@ export function importPathbuilder(
       unmatched.push(`Equipment: ${name}`);
       return;
     }
+    const runes = runeIdsFor(runeNames);
     const existing = draft.equipment.find((entry) => entry.itemId === item.id);
     if (existing) {
       existing.quantity += Math.max(1, Math.round(num(quantity, 1)));
       existing.equipped = existing.equipped || equipped;
       existing.invested = existing.invested || invested;
+      if (runes.length) existing.runes = [...new Set([...(existing.runes ?? []), ...runes])];
     } else {
       draft.equipment.push({
         itemId: item.id,
         quantity: Math.max(1, Math.round(num(quantity, 1))),
         equipped,
         invested,
+        ...(runes.length ? { runes } : {}),
       });
     }
     match("equipment");
@@ -374,47 +410,60 @@ export function importPathbuilder(
     addEquipment(entry[0], entry[1], false, invested);
   }
   for (const weapon of arr<Obj>(build.weapons)) {
-    addEquipment(weapon.name, weapon.qty, true, true);
+    const runeNames: string[] = [];
+    const potency = Math.max(0, Math.min(3, Math.round(num(weapon.pot))));
+    if (potency) runeNames.push(`Weapon Potency (+${potency})`);
+    const striking = strikingRune(text(weapon.str));
+    if (striking) runeNames.push(striking);
+    for (const rune of arr(weapon.runes)) runeNames.push(text(rune));
+    addEquipment(weapon.name, weapon.qty, true, true, runeNames);
   }
   for (const armor of arr<Obj>(build.armor)) {
-    addEquipment(armor.name, armor.qty, Boolean(armor.worn), true);
-  }
-  if (
-    arr(build.weapons).some((weapon) => num((weapon as Obj).pot) > 0) ||
-    arr(build.armor).some((armor) => num((armor as Obj).pot) > 0 || text((armor as Obj).res))
-  ) {
-    warnings.push("Magic weapon/armor runes were not imported; add them in the Gear step.");
+    const isShield = text(armor.prof).toLowerCase() === "shield";
+    const runeNames: string[] = [];
+    const potency = Math.max(0, Math.min(3, Math.round(num(armor.pot))));
+    if (potency && !isShield) runeNames.push(`Armor Potency (+${potency})`);
+    const resilient = resilientRune(text(armor.res));
+    if (resilient) runeNames.push(resilient);
+    for (const rune of arr(armor.runes)) runeNames.push(text(rune));
+    addEquipment(armor.name, armor.qty, Boolean(armor.worn), true, runeNames);
   }
 
   const spellMap = nameMap(spells);
   const spellSets = {
     cantrips: new Set<string>(draft.spells.cantrips),
     known: new Set<string>(draft.spells.known),
-    prepared: new Set<string>(draft.spells.prepared),
     focus: new Set<string>(draft.spells.focus),
   };
   const addSpell = (rawName: unknown, target: Set<string>) => {
     const name = text(rawName, 160);
-    if (!name) return;
+    if (!name) return null;
     const spell = lookup(spellMap, name);
     if (!spell) {
       unmatched.push(`Spell: ${name}`);
-      return;
+      return null;
     }
     target.add(spell.id);
     match("spell");
+    return spell.id;
   };
+  const prepared: string[] = [];
+  let preparedCasters = 0;
   for (const caster of arr<Obj>(build.spellCasters)) {
-    if (!draft.spells.tradition) draft.spells.tradition = tradition(caster.magicTradition);
+    const casterTradition = tradition(caster.magicTradition);
+    const isPrepared = text(caster.spellcastingType).toLowerCase() === "prepared";
+    if (isPrepared && casterTradition) preparedCasters += 1;
+    if (!draft.spells.tradition && casterTradition) draft.spells.tradition = casterTradition;
     for (const group of arr<Obj>(caster.spells)) {
       const rank = Math.max(0, Math.round(num(group.spellLevel, 0)));
       for (const name of arr(group.list)) {
-        if (rank === 0) addSpell(name, spellSets.cantrips);
-        else {
-          addSpell(name, spellSets.known);
-          if (text(caster.spellcastingType).toLowerCase() === "prepared") {
-            addSpell(name, spellSets.prepared);
-          }
+        if (!casterTradition) {
+          addSpell(name, spellSets.focus);
+        } else if (rank === 0) {
+          addSpell(name, spellSets.cantrips);
+        } else {
+          const id = addSpell(name, spellSets.known);
+          if (isPrepared && id) prepared.push(id);
         }
       }
     }
@@ -427,8 +476,13 @@ export function importPathbuilder(
   }
   draft.spells.cantrips = [...spellSets.cantrips];
   draft.spells.known = [...spellSets.known];
-  draft.spells.prepared = [...spellSets.prepared];
+  draft.spells.prepared = prepared;
   draft.spells.focus = [...spellSets.focus];
+  if (preparedCasters) {
+    warnings.push(
+      "Prepared casters import their prepared list; add any missing spellbook spells in the Spells step."
+    );
+  }
 
   if (arr(build.pets).length || arr(build.familiars).length) {
     warnings.push("Pets and familiars were not imported; add them from the character sheet.");

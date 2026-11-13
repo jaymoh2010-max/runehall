@@ -9,6 +9,7 @@ import type {
   Equipment,
   Feat,
   Heritage,
+  Spell,
 } from "../src/shared/types";
 
 function read<T>(file: string): T[] {
@@ -27,6 +28,7 @@ const warrior = byName(read<Background>("backgrounds.json"), "Warrior");
 const fighter = byName(read<ClassData>("classes.json"), "Fighter");
 const feats = read<Feat>("feats.json");
 const equipment = read<Equipment>("equipment.json");
+const spells = read<Spell>("spells.json");
 const toughness = byName(feats, "Toughness");
 const fleet = byName(feats, "Fleet");
 const naturalAmbition = byName(feats, "Natural Ambition");
@@ -34,7 +36,15 @@ const reachSpell = byName(feats, "Reach Spell");
 const doubleSlice = byName(feats, "Double Slice");
 const longsword = byName(equipment, "Longsword");
 const hideArmor = byName(equipment, "Hide Armor");
+const steelShield = byName(equipment, "Steel Shield");
 const backpack = byName(equipment, "Backpack");
+const weaponPotency1 = byName(equipment, "Weapon Potency (+1)");
+const strikingGreater = byName(equipment, "Striking (Greater)");
+const flaming = byName(equipment, "Flaming");
+const armorPotency1 = byName(equipment, "Armor Potency (+1)");
+const resilient = byName(equipment, "Resilient");
+const reinforcingMinor = byName(equipment, "Reinforcing Rune (Minor)");
+const heal = byName(spells, "Heal");
 
 const build = {
   name: "Imported Hero",
@@ -170,6 +180,65 @@ describe("Pathbuilder import", () => {
     expect(draft.spells.known).toContain("spell:rfZpqmj0AIIdkVIs");
     expect(draft.spells.prepared).toContain("spell:rfZpqmj0AIIdkVIs");
     expect(draft.spells.focus).toContain("spell:sxQZ6yqTn0czJxVd");
+    expect(report.unmatched).toEqual([]);
+  });
+
+  it("preserves prepared-slot duplicates and warns about spellbooks", () => {
+    const { draft, report } = importPathbuilder({
+      ...build,
+      spellCasters: [
+        {
+          name: "Wizard",
+          magicTradition: "arcane",
+          spellcastingType: "prepared",
+          spells: [{ spellLevel: 1, list: ["Heal", "Heal"] }],
+        },
+      ],
+    });
+    expect(draft.spells.prepared.filter((id) => id === heal.id)).toHaveLength(2);
+    expect(draft.spells.known.filter((id) => id === heal.id)).toHaveLength(1);
+    expect(report.warnings.join(" ")).toContain("prepared list");
+  });
+
+  it("routes focus-only casters to the focus list", () => {
+    const { draft } = importPathbuilder({
+      ...build,
+      spellCasters: [
+        {
+          name: "Focus Spells",
+          magicTradition: "focus",
+          spellcastingType: "",
+          spells: [{ spellLevel: 1, list: ["Heal"] }],
+        },
+      ],
+    });
+    expect(draft.spells.focus).toContain(heal.id);
+    expect(draft.spells.known).not.toContain(heal.id);
+  });
+
+  it("maps weapon, armor, and shield runes", () => {
+    const { draft, report } = importPathbuilder({
+      ...build,
+      weapons: [{ name: "Longsword", qty: 1, pot: 1, str: "greater", runes: ["Flaming"] }],
+      armor: [
+        { name: "Hide", qty: 1, pot: 1, res: "resilient", worn: true, runes: [] },
+        {
+          name: "Steel Shield",
+          qty: 1,
+          prof: "shield",
+          worn: true,
+          runes: ["Reinforcing (Minor)"],
+        },
+      ],
+    });
+    const sword = draft.equipment.find((entry) => entry.itemId === longsword.id);
+    expect(sword?.runes).toEqual(
+      expect.arrayContaining([weaponPotency1.id, strikingGreater.id, flaming.id])
+    );
+    const armor = draft.equipment.find((entry) => entry.itemId === hideArmor.id);
+    expect(armor?.runes).toEqual(expect.arrayContaining([armorPotency1.id, resilient.id]));
+    const shield = draft.equipment.find((entry) => entry.itemId === steelShield.id);
+    expect(shield?.runes).toContain(reinforcingMinor.id);
     expect(report.unmatched).toEqual([]);
   });
 });
