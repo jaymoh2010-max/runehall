@@ -1,5 +1,7 @@
 # Runehall
 
+[![CI](https://github.com/jaymoh2010-max/runehall/actions/workflows/ci.yml/badge.svg)](https://github.com/jaymoh2010-max/runehall/actions/workflows/ci.yml)
+
 An all-in-one, local-first **Pathfinder Second Edition** table: a character builder, shared battle map, server-rolled dice table, campaign journal, and rules compendium.
 
 Runehall is built for a private group of roughly 4–10 players and a GM. It runs on one machine, stores everything in a local SQLite database, and is designed to be easy to put on a home network or a small server later.
@@ -73,7 +75,7 @@ Runehall is built for a private group of roughly 4–10 players and a GM. It run
 
 ### 1. Clone and install
 ```bash
-git clone <your-repository-url> runehall
+git clone https://github.com/jaymoh2010-max/runehall.git runehall
 cd runehall
 npm ci
 ```
