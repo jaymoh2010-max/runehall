@@ -177,3 +177,23 @@ test("player registers, joins with the invite code, and sees a player-safe table
   await expect(adminPage.getByText(player.displayName)).toBeVisible();
   await adminContext.close();
 });
+
+test("Pathbuilder JSON import creates a character from the dashboard", async ({ page }) => {
+  await signIn(page, admin);
+  await page.getByRole("button", { name: "Import Pathbuilder" }).click();
+
+  const dialog = page.getByRole("dialog", { name: "Import from Pathbuilder" });
+  await expect(dialog).toBeVisible();
+  await dialog
+    .getByLabel("Pathbuilder JSON file")
+    .setInputFiles("tests/e2e/fixtures/pathbuilder.json");
+  await expect(dialog.getByRole("button", { name: "Import character" })).toBeEnabled();
+  await dialog.getByRole("button", { name: "Import character" }).click();
+
+  await expect(dialog.getByText("Imported Pathbuilder E2E Hero.")).toBeVisible();
+  await dialog.getByRole("button", { name: "Open builder" }).click();
+  await expect(page).toHaveURL(/\/characters\/[^/]+\/edit$/, { timeout: 15_000 });
+  await expect(page.getByRole("heading", { name: "Pathbuilder E2E Hero" })).toBeVisible({
+    timeout: 15_000,
+  });
+});

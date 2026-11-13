@@ -1,0 +1,36 @@
+{
+  "success": true,
+  "build": {
+    "name": "Pathbuilder E2E Hero",
+    "class": "Fighter",
+    "level": 1,
+    "ancestry": "Human",
+    "heritage": "Versatile Human",
+    "background": "Warrior",
+    "keyability": "str",
+    "abilities": {
+      "str": 18,
+      "dex": 14,
+      "con": 14,
+      "int": 10,
+      "wis": 12,
+      "cha": 8,
+      "breakdown": {
+        "ancestryFree": ["Str", "Dex"],
+        "ancestryBoosts": [],
+        "ancestryFlaws": [],
+        "backgroundBoosts": ["Str", "Con"],
+        "classBoosts": ["Str"],
+        "mapLevelledBoosts": { "1": ["Str", "Dex", "Con", "Wis"] }
+      }
+    },
+    "proficiencies": { "athletics": 2, "acrobatics": 2 },
+    "feats": [["Toughness", null, "General Feat", 1]],
+    "equipment": [["Backpack", 1, "Invested"]],
+    "weapons": [],
+    "armor": [],
+    "money": { "gp": 5, "sp": 0, "cp": 0 },
+    "spellCasters": [],
+    "focus": {}
+  }
+}
