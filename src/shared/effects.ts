@@ -41,12 +41,39 @@ export interface EffectModifiers {
   lore?: { name: string; rank: number }[];
 }
 
+export const WEAPON_PROFICIENCY_ID = "feat:x9wxQ61HNkAVbDHr";
+
+export interface FeatGrantDefinition {
+  prompt: string;
+  /** Restrict the granted feat pool. */
+  category: "ancestry" | "class" | "skill" | "general";
+  level: number;
+}
+
+/**
+ * Feats that grant another feat. The builder stores the granted feat id in
+ * draft.featChoices; contextForDraft resolves it into the character's feat map
+ * so its own effects apply.
+ */
+export const FEAT_GRANTS: Record<string, FeatGrantDefinition> = {
+  // Ancestral Paragon — gain a 1st-level ancestry feat.
+  "feat:m7KjpkAAh9PptJsY": {
+    prompt: "Choose a 1st-level ancestry feat",
+    category: "ancestry",
+    level: 1,
+  },
+};
+
+export function featGrant(id: string): FeatGrantDefinition | undefined {
+  return FEAT_GRANTS[id];
+}
+
+export const GRANTED_FEAT_IDS = Object.keys(FEAT_GRANTS);
+
 /**
  * Verified feat effects, keyed by compendium id. Add one entry per feat as it
  * is verified; automation.ts reads the same table to label the feat "Automated".
  */
-export const WEAPON_PROFICIENCY_ID = "feat:x9wxQ61HNkAVbDHr";
-
 export const FEAT_EFFECTS: Record<string, EffectModifiers> = {
   // Toughness — increase maximum HP by your level.
   "feat:AmP0qu7c5dlBSath": { hpPerLevel: 1 },

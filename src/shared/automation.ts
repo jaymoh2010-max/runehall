@@ -1,5 +1,5 @@
 import type { Equipment, Feat } from "./types";
-import { featChoice, featEffect, itemEffect } from "./effects";
+import { featChoice, featEffect, featGrant, itemEffect } from "./effects";
 
 export type AutomationLevel = "full" | "partial" | "manual";
 
@@ -61,6 +61,12 @@ export function automationForFeat(feat: Feat): AutomationInfo {
     return {
       level: "full",
       reason: "Choose the option in the builder; Runehall applies it to the sheet.",
+    };
+  }
+  if (featGrant(feat.id)) {
+    return {
+      level: "full",
+      reason: "Choose the granted feat in the builder; its effects apply to the sheet.",
     };
   }
   if (MECHANICAL_TEXT.test(plainText(feat.description))) {

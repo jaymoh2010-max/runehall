@@ -30,6 +30,8 @@ import {
 import { propertyRuneDamage, shieldRuneBonus, summarizeRunes } from "./runes";
 import {
   FEAT_CHOICES,
+  FEAT_GRANTS,
+  GRANTED_FEAT_IDS,
   WEAPON_PROFICIENCY_ID,
   collectFeatChoiceEffects,
   collectFeatEffects,
@@ -1711,6 +1713,12 @@ export function computeCharacter(
   ) {
     issue("warning", "Weapon Proficiency: choose an advanced weapon.", "feats");
   }
+  for (const grantId of GRANTED_FEAT_IDS) {
+    if (activeFeatIds.includes(grantId) && !draft.featChoices[grantId]?.[0]?.trim()) {
+      const name = context.feats[grantId]?.name ?? "Feat";
+      issue("warning", `${name}: ${FEAT_GRANTS[grantId].prompt}.`, "feats");
+    }
+  }
 
   // --- Ability boosts ------------------------------------------------------
   if (ancestry) {
@@ -2404,6 +2412,19 @@ export function computeCharacter(
       ? [{ name: selectedBackgroundFeat.name, id: selectedBackgroundFeat.id }]
       : []),
   ];
+  for (const [grantId, grant] of Object.entries(FEAT_GRANTS)) {
+    if (!activeFeatIds.includes(grantId)) continue;
+    const chosenId = draft.featChoices[grantId]?.[0];
+    const feat = chosenId ? context.feats[chosenId] : null;
+    if (
+      feat &&
+      feat.id !== grantId &&
+      feat.category === grant.category &&
+      feat.level <= grant.level
+    ) {
+      grantedFeats.push({ name: feat.name, id: feat.id });
+    }
+  }
 
   let focusPointsMax =
     caster.progression !== "none" ||

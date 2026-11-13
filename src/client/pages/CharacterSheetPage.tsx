@@ -892,7 +892,7 @@ export function CharacterSheetPage() {
                 <div key={feat.name} className="sheet-feature static">
                   <span>
                     <strong>{feat.name}</strong>
-                    <span className="tiny muted"> · granted by background</span>
+                    <span className="tiny muted"> · granted</span>
                   </span>
                 </div>
               ))}

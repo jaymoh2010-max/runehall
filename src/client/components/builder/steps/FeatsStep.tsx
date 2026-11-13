@@ -107,7 +107,7 @@ import {
 import { DeityPicker, EquipmentPicker, FeatPicker, SpellPicker } from "../pickers";
 import { ContentSourceToggle } from "../ContentSourceToggle";
 import { RunePicker } from "../RunePicker";
-import { featChoice, WEAPON_PROFICIENCY_ID } from "../../../../shared/effects";
+import { featChoice, featGrant, WEAPON_PROFICIENCY_ID } from "../../../../shared/effects";
 import {
   isCoreSource,
   rulesetContentMode,
@@ -133,6 +133,49 @@ export function FeatsStep({
   const ancestryTrait = ancestry?.name.toLowerCase().replace(/\s+/g, "-");
   const classTrait = classData?.name.toLowerCase();
   const issues = derived.validation.filter((issue) => issue.step === "feats");
+  const selectedFeatList = [
+    ...Object.values(draft.feats.ancestry),
+    ...Object.values(draft.feats.class),
+    ...Object.values(draft.feats.skill),
+    ...Object.values(draft.feats.general),
+    ...draft.feats.extras,
+  ]
+    .map((id) => context.feats[id])
+    .filter((feat): feat is Feat => Boolean(feat));
+  const grantEntry = selectedFeatList
+    .map((feat) => ({ feat, grant: featGrant(feat.id) }))
+    .find((entry) => entry.grant);
+  const grantFeatId = grantEntry?.feat.id ?? null;
+  const [grantOptions, setGrantOptions] = useState<Feat[]>([]);
+
+  useEffect(() => {
+    if (!grantFeatId) {
+      setGrantOptions([]);
+      return;
+    }
+    const grant = featGrant(grantFeatId);
+    if (!grant) return;
+    let cancelled = false;
+    const params = new URLSearchParams();
+    params.set("category", grant.category);
+    params.set("levelMin", "1");
+    params.set("levelMax", String(grant.level));
+    params.set("limit", "200");
+    if (grant.category === "ancestry" && ancestryTrait) params.set("trait", ancestryTrait);
+    if (!draft.includeLegacy) params.set("legacy", "0");
+    if (draft.contentMode === "core") params.set("core", "1");
+    api<{ items: Feat[] }>(`/api/compendium/feats?${params.toString()}`)
+      .then((result) => {
+        if (!cancelled) setGrantOptions(result.items);
+      })
+      .catch(() => {
+        if (!cancelled) setGrantOptions([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [grantFeatId, ancestryTrait, draft.includeLegacy, draft.contentMode]);
+
   return (
     <div className="step">
       <StepHeading
@@ -275,6 +318,35 @@ export function FeatsStep({
                       />
                     </Field>
                   ) : null}
+                  {grantFeatId === feat.id && grantEntry?.grant ? (
+                    <Field
+                      label={grantEntry.grant.prompt}
+                      hint="The granted feat's effects apply to your sheet."
+                    >
+                      <Select
+                        value={draft.featChoices[feat.id]?.[0] ?? ""}
+                        onChange={(event) => {
+                          const value = event.target.value;
+                          update((current) => ({
+                            ...current,
+                            featChoices: {
+                              ...current.featChoices,
+                              [feat.id]: value ? [value] : [],
+                            },
+                          }));
+                        }}
+                      >
+                        <option value="">Choose…</option>
+                        {grantOptions
+                          .filter((option) => option.id !== feat.id)
+                          .map((option) => (
+                            <option key={option.id} value={option.id}>
+                              {option.name}
+                            </option>
+                          ))}
+                      </Select>
+                    </Field>
+                  ) : null}
                   <RichText html={feat.description} />
                 </div>
               ) : null}
@@ -285,7 +357,7 @@ export function FeatsStep({
       {!slots.length ? <p className="muted small">No feat slots at this level.</p> : null}
       {derived.grantedFeats.length ? (
         <Card className="granted-feats">
-          <h3>Granted by your background</h3>
+          <h3>Granted feats</h3>
           <div className="chip-row" style={{ marginTop: 8 }}>
             {derived.grantedFeats.map((feat) => (
               <Tag key={feat.name} tone="gold">

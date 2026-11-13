@@ -18,6 +18,7 @@ import type {
   Spell,
 } from "../shared/types";
 import { isCoreSource } from "../shared/content";
+import { FEAT_GRANTS } from "../shared/effects";
 import {
   COMPENDIUM_KIND_ORDER,
   compendiumKindFromId,
@@ -448,6 +449,20 @@ export function contextForDraft(draft: CharacterDraft): CharacterContext {
     if (granted.id) {
       const feat = maps.feat.get(granted.id);
       if (feat) featMap[granted.id] = feat;
+    }
+  }
+  for (const [grantId, grant] of Object.entries(FEAT_GRANTS)) {
+    if (!featMap[grantId]) continue;
+    const chosenId = draft.featChoices[grantId]?.[0];
+    if (!chosenId) continue;
+    const feat = maps.feat.get(chosenId);
+    if (
+      feat &&
+      feat.id !== grantId &&
+      feat.category === grant.category &&
+      feat.level <= grant.level
+    ) {
+      featMap[feat.id] = feat;
     }
   }
 
