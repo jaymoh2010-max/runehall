@@ -1,5 +1,5 @@
 import type { Equipment, Feat } from "./types";
-import { featEffect, itemEffect } from "./effects";
+import { featChoice, featEffect, itemEffect } from "./effects";
 
 export type AutomationLevel = "full" | "partial" | "manual";
 
@@ -54,6 +54,12 @@ export function automationForFeat(feat: Feat): AutomationInfo {
     return numeric
       ? { level: "full", reason: "Runehall applies this feat's mechanics to the sheet." }
       : { level: "partial", reason: "Runehall records the effect as a note for the table." };
+  }
+  if (featChoice(feat.id)) {
+    return {
+      level: "full",
+      reason: "Choose the option in the builder; Runehall applies it to the sheet.",
+    };
   }
   if (MECHANICAL_TEXT.test(plainText(feat.description))) {
     return {

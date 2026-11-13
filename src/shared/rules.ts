@@ -28,7 +28,13 @@ import {
   type ValidationIssue,
 } from "./types";
 import { propertyRuneDamage, shieldRuneBonus, summarizeRunes } from "./runes";
-import { collectFeatEffects, collectItemEffects } from "./effects";
+import {
+  FEAT_CHOICES,
+  collectFeatChoiceEffects,
+  collectFeatEffects,
+  collectItemEffects,
+  mergeEffects,
+} from "./effects";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -448,6 +454,7 @@ export function emptyCharacterDraft(name = "New Hero"): CharacterDraft {
       extras: [],
     },
     classChoices: {},
+    featChoices: {},
     spells: {
       tradition: null,
       cantrips: [],
@@ -527,6 +534,10 @@ export function normalizeCharacterDraft(input: unknown, fallbackName = "New Hero
   const classChoices: Record<string, string[]> = {};
   for (const [key, value] of Object.entries(choicesRaw))
     classChoices[key] = arr<string>(value).filter((x) => typeof x === "string");
+  const featChoicesRaw = obj(raw.featChoices);
+  const featChoices: Record<string, string[]> = {};
+  for (const [key, value] of Object.entries(featChoicesRaw))
+    featChoices[key] = arr<string>(value).filter((x) => typeof x === "string");
 
   type NormalizedEquipment = {
     itemId: string;
@@ -602,6 +613,7 @@ export function normalizeCharacterDraft(input: unknown, fallbackName = "New Hero
       extras: arr<string>(feats.extras).filter((x) => typeof x === "string"),
     },
     classChoices,
+    featChoices,
     spells: {
       tradition: TRADITIONS.includes(spells.tradition as SpellTradition)
         ? (spells.tradition as SpellTradition)
@@ -1617,7 +1629,18 @@ export function computeCharacter(
     ABILITIES.map((ability) => [ability, abilityMod(abilities[ability])])
   ) as Record<AbilityKey, number>;
   const prof = buildProficiencies(draft, context);
-  const featMods = collectFeatEffects(Object.keys(context.feats));
+  const activeFeatIds = Object.keys(context.feats);
+  const featMods = mergeEffects([
+    collectFeatEffects(activeFeatIds),
+    collectFeatChoiceEffects(draft.featChoices, activeFeatIds, draft.level),
+  ]);
+  for (const [key, rank] of Object.entries(featMods.proficiencyRanks ?? {})) {
+    const value = Math.max(0, Math.min(4, Math.round(rank)));
+    if (key === "perception") prof.perception = Math.max(prof.perception, value);
+    else if (key === "fortitude") prof.fortitude = Math.max(prof.fortitude, value);
+    else if (key === "reflex") prof.reflex = Math.max(prof.reflex, value);
+    else if (key === "will") prof.will = Math.max(prof.will, value);
+  }
   const itemMods = collectItemEffects(
     draft.equipment.filter((entry) => entry.equipped).map((entry) => entry.itemId)
   );
@@ -1650,6 +1673,14 @@ export function computeCharacter(
     issue("error", "Choose your key ability score.", "abilities");
   if (classData && keyOptions.length === 0 && !key)
     issue("warning", "This class needs a key ability score; select one manually.", "abilities");
+
+  for (const featId of activeFeatIds) {
+    const definition = FEAT_CHOICES[featId];
+    if (definition && !draft.featChoices[featId]?.length) {
+      const name = context.feats[featId]?.name ?? "Feat";
+      issue("warning", `${name}: ${definition.prompt}.`, "feats");
+    }
+  }
 
   // --- Ability boosts ------------------------------------------------------
   if (ancestry) {

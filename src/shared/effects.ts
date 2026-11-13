@@ -31,6 +31,8 @@ export interface EffectModifiers {
   saveItemBonus?: Partial<Record<SaveKey, number>>;
   /** Item bonus to AC. */
   acItemBonus?: number;
+  /** Proficiency-rank floors keyed by perception, fortitude, reflex, or will. */
+  proficiencyRanks?: Record<string, number>;
 }
 
 /**
@@ -95,6 +97,56 @@ export function featEffect(id: string): EffectModifiers | undefined {
   return FEAT_EFFECTS[id];
 }
 
+export interface FeatChoiceOption {
+  id: string;
+  label: string;
+}
+
+export interface FeatChoiceDefinition {
+  prompt: string;
+  options: FeatChoiceOption[];
+  /** Turn the chosen option into sheet modifiers for the character's level. */
+  apply: (choice: string, level: number) => EffectModifiers;
+}
+
+/**
+ * Choice-driven feats. The builder stores the pick in draft.featChoices and
+ * computeCharacter applies the result, so the badge can stay "Automated".
+ */
+export const FEAT_CHOICES: Record<string, FeatChoiceDefinition> = {
+  // Canny Acumen — expert in one save or Perception, master at 17th level.
+  "feat:i4yRvVwvXbGZDsD1": {
+    prompt: "Choose a save or Perception",
+    options: [
+      { id: "fortitude", label: "Fortitude" },
+      { id: "reflex", label: "Reflex" },
+      { id: "will", label: "Will" },
+      { id: "perception", label: "Perception" },
+    ],
+    apply: (choice, level) => ({ proficiencyRanks: { [choice]: level >= 17 ? 3 : 2 } }),
+  },
+};
+
+export function featChoice(id: string): FeatChoiceDefinition | undefined {
+  return FEAT_CHOICES[id];
+}
+
+/** Merge choice-driven feat effects for the selected feats. */
+export function collectFeatChoiceEffects(
+  featChoices: Record<string, string[] | undefined>,
+  selectedFeatIds: Iterable<string>,
+  level: number
+): EffectModifiers {
+  const ids = [...selectedFeatIds];
+  return mergeEffects(
+    ids.map((id) => {
+      const definition = FEAT_CHOICES[id];
+      const choice = featChoices[id]?.[0];
+      return definition && choice ? definition.apply(choice, level) : undefined;
+    })
+  );
+}
+
 export function itemEffect(id: string): EffectModifiers | undefined {
   return ITEM_EFFECTS[id];
 }
@@ -134,6 +186,12 @@ export function mergeEffects(effects: (EffectModifiers | undefined)[]): EffectMo
     }
     if (effect.acItemBonus)
       merged.acItemBonus = Math.max(merged.acItemBonus ?? 0, effect.acItemBonus);
+    if (effect.proficiencyRanks) {
+      merged.proficiencyRanks ??= {};
+      for (const [key, rank] of Object.entries(effect.proficiencyRanks)) {
+        merged.proficiencyRanks[key] = Math.max(merged.proficiencyRanks[key] ?? 0, rank ?? 0);
+      }
+    }
   }
   return merged;
 }

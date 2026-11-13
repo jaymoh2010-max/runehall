@@ -2,7 +2,13 @@ import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { automationForFeat } from "../src/shared/automation";
-import { FEAT_EFFECTS, collectFeatEffects, mergeEffects } from "../src/shared/effects";
+import {
+  FEAT_EFFECTS,
+  collectFeatChoiceEffects,
+  collectFeatEffects,
+  featChoice,
+  mergeEffects,
+} from "../src/shared/effects";
 import { computeCharacter, emptyCharacterDraft } from "../src/shared/rules";
 import type { Ancestry, Background, CharacterContext, ClassData, Feat } from "../src/shared/types";
 
@@ -25,6 +31,7 @@ const toughness = byName(feats, "Toughness");
 const fleet = byName(feats, "Fleet");
 const incredibleInitiative = byName(feats, "Incredible Initiative");
 const untrainedImprovisation = byName(feats, "Untrained Improvisation");
+const cannyAcumen = byName(feats, "Canny Acumen");
 const human = byName(ancestries, "Human");
 const warrior = byName(backgrounds, "Warrior");
 const fighter = byName(classes, "Fighter");
@@ -121,5 +128,38 @@ describe("curated feat effects", () => {
   it("labels the new curated feats as fully automated", () => {
     expect(automationForFeat(incredibleInitiative).level).toBe("full");
     expect(automationForFeat(untrainedImprovisation).level).toBe("full");
+  });
+
+  it("applies a choice-driven feat to the chosen proficiency", () => {
+    expect(featChoice(cannyAcumen.id)?.options.map((option) => option.id)).toContain("will");
+    expect(collectFeatChoiceEffects({ [cannyAcumen.id]: ["will"] }, [cannyAcumen.id], 1)).toEqual({
+      proficiencyRanks: { will: 2 },
+    });
+
+    const draft = fighterDraft();
+    draft.featChoices[cannyAcumen.id] = ["will"];
+    const applied = computeCharacter(draft, context({ [cannyAcumen.id]: cannyAcumen }));
+    expect(applied.prof.will).toBe(2);
+    expect(applied.saves.will).toBeGreaterThan(
+      computeCharacter(fighterDraft(), context({})).saves.will
+    );
+  });
+
+  it("raises a choice-driven proficiency to master at 17th level", () => {
+    const draft = fighterDraft();
+    draft.level = 17;
+    draft.featChoices[cannyAcumen.id] = ["will"];
+    const applied = computeCharacter(draft, context({ [cannyAcumen.id]: cannyAcumen }));
+    expect(applied.prof.will).toBe(3);
+  });
+
+  it("warns when a choice-driven feat has no choice", () => {
+    const derived = computeCharacter(fighterDraft(), context({ [cannyAcumen.id]: cannyAcumen }));
+    expect(
+      derived.validation.some(
+        (validation) => validation.step === "feats" && validation.message.includes("Canny Acumen")
+      )
+    ).toBe(true);
+    expect(automationForFeat(cannyAcumen).level).toBe("full");
   });
 });

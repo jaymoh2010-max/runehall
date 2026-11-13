@@ -107,6 +107,7 @@ import {
 import { DeityPicker, EquipmentPicker, FeatPicker, SpellPicker } from "../pickers";
 import { ContentSourceToggle } from "../ContentSourceToggle";
 import { RunePicker } from "../RunePicker";
+import { featChoice } from "../../../../shared/effects";
 import {
   isCoreSource,
   rulesetContentMode,
@@ -143,6 +144,7 @@ export function FeatsStep({
         {slots.map((slot) => {
           const featId = draft.feats[slot.category]?.[String(slot.level)];
           const feat = featId ? context.feats[featId] : null;
+          const choice = feat ? featChoice(feat.id) : undefined;
           const label = `${slot.category === "class" ? "Class" : slot.category === "ancestry" ? "Ancestry" : slot.category === "skill" ? "Skill" : "General"} feat`;
           return (
             <Card
@@ -184,6 +186,9 @@ export function FeatsStep({
                           return {
                             ...current,
                             feats: { ...current.feats, [slot.category]: bucket },
+                            featChoices: Object.fromEntries(
+                              Object.entries(current.featChoices).filter(([id]) => id !== feat.id)
+                            ),
                           };
                         })
                       }
@@ -205,6 +210,30 @@ export function FeatsStep({
                     <div className="prereq-inline">
                       <strong>Requires:</strong> {feat.prerequisites.join("; ")}
                     </div>
+                  ) : null}
+                  {choice ? (
+                    <Field label={choice.prompt} hint="Runehall applies your choice to the sheet.">
+                      <Select
+                        value={draft.featChoices[feat.id]?.[0] ?? ""}
+                        onChange={(event) => {
+                          const value = event.target.value;
+                          update((current) => ({
+                            ...current,
+                            featChoices: {
+                              ...current.featChoices,
+                              [feat.id]: value ? [value] : [],
+                            },
+                          }));
+                        }}
+                      >
+                        <option value="">Choose…</option>
+                        {choice.options.map((option) => (
+                          <option key={option.id} value={option.id}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </Select>
+                    </Field>
                   ) : null}
                   <RichText html={feat.description} />
                 </div>

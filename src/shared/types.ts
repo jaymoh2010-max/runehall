@@ -610,6 +610,8 @@ export interface CharacterDraft {
     extras: string[];
   };
   classChoices: Record<string, string[]>;
+  /** Per-feat option picks for choice-driven feats, keyed by feat id. */
+  featChoices: Record<string, string[]>;
   spells: {
     tradition: SpellTradition | null;
     cantrips: string[];
