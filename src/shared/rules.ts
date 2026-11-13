@@ -30,6 +30,7 @@ import {
 import { propertyRuneDamage, shieldRuneBonus, summarizeRunes } from "./runes";
 import {
   FEAT_CHOICES,
+  WEAPON_PROFICIENCY_ID,
   collectFeatChoiceEffects,
   collectFeatEffects,
   collectItemEffects,
@@ -1570,6 +1571,13 @@ function isBomb(item: Equipment): boolean {
   return item.weapon?.group === "bomb" || item.traits.includes("bomb");
 }
 
+export function weaponSlug(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
 function attackRankFor(
   item: Equipment,
   prof: DerivedCharacter["prof"],
@@ -1578,11 +1586,8 @@ function attackRankFor(
 ): number {
   if (!item.weapon) return 0;
   let rank = prof.attacks[item.weapon.category || "simple"] ?? 0;
-  const weaponSlug = item.name
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-  rank = Math.max(rank, prof.attacks[`weapon-base-${weaponSlug}`] ?? 0);
+  const slug = weaponSlug(item.name);
+  rank = Math.max(rank, prof.attacks[`weapon-base-${slug}`] ?? 0);
   if (isBomb(item)) rank = Math.max(rank, prof.attacks["weapon-base-alchemical-bomb"] ?? 0);
   if (matchesDeityWeapon(item, deity)) {
     rank = Math.max(rank, prof.attacks.favoredWeapon ?? 0);
@@ -1629,6 +1634,7 @@ export function computeCharacter(
     ABILITIES.map((ability) => [ability, abilityMod(abilities[ability])])
   ) as Record<AbilityKey, number>;
   const prof = buildProficiencies(draft, context);
+  const hadMartialTraining = prof.attacks.martial >= 1;
   const activeFeatIds = Object.keys(context.feats);
   const featMods = mergeEffects([
     collectFeatEffects(activeFeatIds),
@@ -1645,6 +1651,18 @@ export function computeCharacter(
     const categories = ["light", "medium", "heavy"] as const;
     const next = categories.find((category) => prof.defenses[category] === 0) ?? "heavy";
     prof.defenses[next] = Math.max(prof.defenses[next], draft.level >= 13 ? 2 : 1);
+  }
+  if (featMods.weaponProficiency) {
+    const rank = draft.level >= 11 ? 2 : 1;
+    if (!hadMartialTraining) {
+      prof.attacks.martial = Math.max(prof.attacks.martial, rank);
+    } else {
+      const weapon = draft.featChoices[WEAPON_PROFICIENCY_ID]?.[0]?.trim();
+      if (weapon) {
+        const key = `weapon-base-${weaponSlug(weapon)}`;
+        prof.attacks[key] = Math.max(prof.attacks[key] ?? 0, rank);
+      }
+    }
   }
   const itemMods = collectItemEffects(
     draft.equipment.filter((entry) => entry.equipped).map((entry) => entry.itemId)
@@ -1685,6 +1703,13 @@ export function computeCharacter(
       const name = context.feats[featId]?.name ?? "Feat";
       issue("warning", `${name}: ${definition.prompt}.`, "feats");
     }
+  }
+  if (
+    activeFeatIds.includes(WEAPON_PROFICIENCY_ID) &&
+    hadMartialTraining &&
+    !draft.featChoices[WEAPON_PROFICIENCY_ID]?.[0]?.trim()
+  ) {
+    issue("warning", "Weapon Proficiency: choose an advanced weapon.", "feats");
   }
 
   // --- Ability boosts ------------------------------------------------------

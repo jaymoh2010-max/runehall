@@ -9,8 +9,15 @@ import {
   featChoice,
   mergeEffects,
 } from "../src/shared/effects";
-import { computeCharacter, emptyCharacterDraft } from "../src/shared/rules";
-import type { Ancestry, Background, CharacterContext, ClassData, Feat } from "../src/shared/types";
+import { computeCharacter, emptyCharacterDraft, proficiencyBonus } from "../src/shared/rules";
+import type {
+  Ancestry,
+  Background,
+  CharacterContext,
+  ClassData,
+  Equipment,
+  Feat,
+} from "../src/shared/types";
 
 function read<T>(file: string): T[] {
   return JSON.parse(fs.readFileSync(path.resolve("data", "compendium", file), "utf8")) as T[];
@@ -20,6 +27,7 @@ const feats = read<Feat>("feats.json");
 const ancestries = read<Ancestry>("ancestries.json");
 const backgrounds = read<Background>("backgrounds.json");
 const classes = read<ClassData>("classes.json");
+const equipment = read<Equipment>("equipment.json");
 
 const byName = <T extends { name: string }>(items: T[], name: string): T => {
   const found = items.find((item) => item.name === name);
@@ -34,10 +42,13 @@ const untrainedImprovisation = byName(feats, "Untrained Improvisation");
 const cannyAcumen = byName(feats, "Canny Acumen");
 const additionalLore = byName(feats, "Additional Lore");
 const armorProficiency = byName(feats, "Armor Proficiency");
+const weaponProficiency = byName(feats, "Weapon Proficiency");
 const human = byName(ancestries, "Human");
 const warrior = byName(backgrounds, "Warrior");
 const fighter = byName(classes, "Fighter");
 const wizard = byName(classes, "Wizard");
+const rogue = byName(classes, "Rogue");
+const aldori = byName(equipment, "Aldori Dueling Sword");
 
 function fighterDraft() {
   const draft = emptyCharacterDraft("Effects Fighter");
@@ -83,6 +94,29 @@ function wizardContext(featMap: Record<string, Feat>): CharacterContext {
     feats: featMap,
     spells: {},
     equipment: {},
+  };
+}
+
+function rogueDraft() {
+  const draft = emptyCharacterDraft("Effects Rogue");
+  draft.ancestryId = human.id;
+  draft.backgroundId = warrior.id;
+  draft.classId = rogue.id;
+  draft.keyAbility = "dex";
+  draft.boosts.ancestry = ["dex", "cha"];
+  draft.boosts.background = ["str", "con"];
+  draft.boosts.free = ["dex", "con", "wis", "cha"];
+  return draft;
+}
+
+function rogueContext(featMap: Record<string, Feat>, items: Equipment[] = []): CharacterContext {
+  return {
+    ancestry: human,
+    background: warrior,
+    classData: rogue,
+    feats: featMap,
+    spells: {},
+    equipment: Object.fromEntries(items.map((item) => [item.id, item])),
   };
 }
 
@@ -225,5 +259,68 @@ describe("curated feat effects", () => {
       wizardContext({ [armorProficiency.id]: armorProficiency })
     );
     expect(applied.prof.defenses.light).toBe(2);
+  });
+
+  it("trains martial weapons with Weapon Proficiency when needed", () => {
+    const baseline = computeCharacter(wizardDraft(), wizardContext({}));
+    expect(baseline.prof.attacks.martial).toBe(0);
+    const applied = computeCharacter(
+      wizardDraft(),
+      wizardContext({ [weaponProficiency.id]: weaponProficiency })
+    );
+    expect(applied.prof.attacks.martial).toBe(1);
+    expect(automationForFeat(weaponProficiency).level).toBe("full");
+  });
+
+  it("trains a chosen advanced weapon when martial is already trained", () => {
+    const draft = rogueDraft();
+    draft.featChoices[weaponProficiency.id] = ["Aldori Dueling Sword"];
+    const applied = computeCharacter(
+      draft,
+      rogueContext({ [weaponProficiency.id]: weaponProficiency })
+    );
+    expect(applied.prof.attacks["weapon-base-aldori-dueling-sword"]).toBe(1);
+  });
+
+  it("makes the chosen advanced weapon expert at 11th level", () => {
+    const draft = rogueDraft();
+    draft.level = 11;
+    draft.featChoices[weaponProficiency.id] = ["Aldori Dueling Sword"];
+    const applied = computeCharacter(
+      draft,
+      rogueContext({ [weaponProficiency.id]: weaponProficiency })
+    );
+    expect(applied.prof.attacks["weapon-base-aldori-dueling-sword"]).toBe(2);
+  });
+
+  it("uses the chosen weapon proficiency in the attack bonus", () => {
+    const baselineDraft = rogueDraft();
+    baselineDraft.equipment = [{ itemId: aldori.id, quantity: 1, equipped: true }];
+    const draft = rogueDraft();
+    draft.featChoices[weaponProficiency.id] = ["Aldori Dueling Sword"];
+    draft.equipment = [{ itemId: aldori.id, quantity: 1, equipped: true }];
+    const baseline = computeCharacter(baselineDraft, rogueContext({}, [aldori]));
+    const applied = computeCharacter(
+      draft,
+      rogueContext({ [weaponProficiency.id]: weaponProficiency }, [aldori])
+    );
+    const baselineAttack = baseline.attacks.find((attack) => attack.sourceItemId === aldori.id);
+    const appliedAttack = applied.attacks.find((attack) => attack.sourceItemId === aldori.id);
+    expect(appliedAttack?.attackBonus).toBe(
+      (baselineAttack?.attackBonus ?? 0) + proficiencyBonus(1, 1)
+    );
+  });
+
+  it("warns when Weapon Proficiency needs an advanced weapon choice", () => {
+    const derived = computeCharacter(
+      rogueDraft(),
+      rogueContext({ [weaponProficiency.id]: weaponProficiency })
+    );
+    expect(
+      derived.validation.some(
+        (validation) =>
+          validation.step === "feats" && validation.message.includes("Weapon Proficiency")
+      )
+    ).toBe(true);
   });
 });

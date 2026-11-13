@@ -35,6 +35,8 @@ export interface EffectModifiers {
   proficiencyRanks?: Record<string, number>;
   /** Train the next untrained armor category (Armor Proficiency). */
   armorProficiency?: boolean;
+  /** Train martial weapons, or a chosen advanced weapon (Weapon Proficiency). */
+  weaponProficiency?: boolean;
   /** Lore skills granted by a choice or effect. */
   lore?: { name: string; rank: number }[];
 }
@@ -43,6 +45,8 @@ export interface EffectModifiers {
  * Verified feat effects, keyed by compendium id. Add one entry per feat as it
  * is verified; automation.ts reads the same table to label the feat "Automated".
  */
+export const WEAPON_PROFICIENCY_ID = "feat:x9wxQ61HNkAVbDHr";
+
 export const FEAT_EFFECTS: Record<string, EffectModifiers> = {
   // Toughness — increase maximum HP by your level.
   "feat:AmP0qu7c5dlBSath": { hpPerLevel: 1 },
@@ -54,6 +58,8 @@ export const FEAT_EFFECTS: Record<string, EffectModifiers> = {
   "feat:9jGaBxLUtevZYcZO": { untrainedImprovisation: true },
   // Armor Proficiency — train the next untrained armor category.
   "feat:BStw1cANwx5baL6d": { armorProficiency: true },
+  // Weapon Proficiency — train martial weapons, or a chosen advanced weapon.
+  [WEAPON_PROFICIENCY_ID]: { weaponProficiency: true },
 };
 
 /**
@@ -222,6 +228,7 @@ export function mergeEffects(effects: (EffectModifiers | undefined)[]): EffectMo
       }
     }
     if (effect.armorProficiency) merged.armorProficiency = true;
+    if (effect.weaponProficiency) merged.weaponProficiency = true;
     if (effect.lore?.length) merged.lore = [...(merged.lore ?? []), ...effect.lore];
   }
   return merged;

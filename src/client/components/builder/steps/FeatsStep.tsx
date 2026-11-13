@@ -107,7 +107,7 @@ import {
 import { DeityPicker, EquipmentPicker, FeatPicker, SpellPicker } from "../pickers";
 import { ContentSourceToggle } from "../ContentSourceToggle";
 import { RunePicker } from "../RunePicker";
-import { featChoice } from "../../../../shared/effects";
+import { featChoice, WEAPON_PROFICIENCY_ID } from "../../../../shared/effects";
 import {
   isCoreSource,
   rulesetContentMode,
@@ -145,6 +145,8 @@ export function FeatsStep({
           const featId = draft.feats[slot.category]?.[String(slot.level)];
           const feat = featId ? context.feats[featId] : null;
           const choice = feat ? featChoice(feat.id) : undefined;
+          const needsWeaponChoice =
+            feat?.id === WEAPON_PROFICIENCY_ID && Number(classData?.attacks.martial ?? 0) >= 1;
           const label = `${slot.category === "class" ? "Class" : slot.category === "ancestry" ? "Ancestry" : slot.category === "skill" ? "Skill" : "General"} feat`;
           return (
             <Card
@@ -250,6 +252,27 @@ export function FeatsStep({
                           ))}
                         </Select>
                       )}
+                    </Field>
+                  ) : null}
+                  {needsWeaponChoice ? (
+                    <Field
+                      label="Advanced weapon"
+                      hint="You're already trained in martial weapons, so name the advanced weapon to train."
+                    >
+                      <Input
+                        value={draft.featChoices[feat.id]?.[0] ?? ""}
+                        placeholder="e.g. Aldori Dueling Sword"
+                        onChange={(event) => {
+                          const value = event.target.value;
+                          update((current) => ({
+                            ...current,
+                            featChoices: {
+                              ...current.featChoices,
+                              [feat.id]: value ? [value] : [],
+                            },
+                          }));
+                        }}
+                      />
                     </Field>
                   ) : null}
                   <RichText html={feat.description} />

@@ -50,6 +50,7 @@ export function automationForFeat(feat: Feat): AutomationInfo {
       Boolean(effect.initiativeBonus) ||
       Boolean(effect.untrainedImprovisation) ||
       Boolean(effect.armorProficiency) ||
+      Boolean(effect.weaponProficiency) ||
       Boolean(effect.senses?.length) ||
       Boolean(effect.languages?.length);
     return numeric
