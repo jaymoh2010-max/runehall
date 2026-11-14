@@ -197,3 +197,38 @@ test("Pathbuilder JSON import creates a character from the dashboard", async ({ 
     timeout: 15_000,
   });
 });
+
+test("GM places a token, chats, rolls, and opens the scenes manager", async ({ page }) => {
+  await signIn(page, admin);
+  await page.goto(campaignPath);
+  await expect(page.getByRole("heading", { name: campaignName })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "The First Step" })).toBeVisible({
+    timeout: 15_000,
+  });
+
+  await page.getByRole("button", { name: "Add token", exact: true }).click();
+  const addToken = page.getByRole("dialog", { name: "Add a token" });
+  await expect(addToken).toBeVisible();
+  await addToken.getByRole("button", { name: "Place" }).first().click();
+  await expect(page.getByRole("button", { name: /E2E Hero, character token/ })).toBeVisible({
+    timeout: 15_000,
+  });
+
+  await page.getByPlaceholder(/Message the table/).fill("E2E table hello");
+  await page.getByRole("button", { name: "Send" }).click();
+  await expect(page.getByText("E2E table hello")).toBeVisible();
+
+  await page.getByRole("button", { name: "Dice tray" }).click();
+  await page.getByPlaceholder("1d20+5").fill("1d20");
+  await page.getByPlaceholder("Perception").fill("E2E roll");
+  await page.getByRole("button", { name: "Roll", exact: true }).click();
+  await page.getByRole("button", { name: "Table talk" }).click();
+  await expect(page.locator(".chat-roll").getByText("E2E roll", { exact: true })).toBeVisible();
+  await expect(page.locator(".chat-roll").getByText("1d20", { exact: true })).toBeVisible();
+
+  await page.getByRole("button", { name: "Scenes" }).click();
+  const scenes = page.getByRole("dialog", { name: "Scenes" });
+  await expect(scenes).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(scenes).toBeHidden();
+});
