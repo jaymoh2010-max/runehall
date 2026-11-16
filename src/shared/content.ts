@@ -82,13 +82,15 @@ export function rulesetDescription(ruleset: CampaignRuleset | null | undefined):
 export const XP_MODE_OPTIONS: { value: XpMode; label: string; description: string }[] = [
   {
     value: "milestone",
-    label: "Milestone",
-    description: "You decide when the party levels up. Encounter XP budgets stay hidden.",
+    label: "Milestone (GM decides)",
+    description:
+      "Default. You decide when the party or an individual character levels up. Encounter budgets and XP awards stay hidden.",
   },
   {
     value: "xp",
-    label: "XP budget",
-    description: "Use PF2e encounter budgets and difficulty while you prepare fights.",
+    label: "XP tracking (GM levels up)",
+    description:
+      "Track PF2e encounter budgets and award XP. Characters still level up only when the GM chooses.",
   },
 ];
 

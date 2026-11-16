@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
+  Award,
   BookOpen,
   CalendarClock,
   CalendarDays,
@@ -45,6 +46,7 @@ import type {
   XpMode,
 } from "../../shared/types";
 import { CAMPAIGN_RULESET_OPTIONS, XP_MODE_OPTIONS, rulesetLabel } from "../../shared/content";
+import { xpProgress } from "../../shared/xp";
 import { api, copyText, formatDate, uploadImage } from "../api";
 import { errorMessage } from "../stores";
 import { useSession, useToasts } from "../stores";
@@ -53,6 +55,7 @@ import {
   Badge,
   Button,
   Card,
+  Checkbox,
   EmptyState,
   ErrorState,
   Field,
@@ -60,6 +63,7 @@ import {
   LoadingScreen,
   Modal,
   PageEyebrow,
+  ProgressBar,
   RichText,
   Select,
   Spinner,
@@ -160,7 +164,14 @@ export function CampaignPage() {
   const [settingsXpMode, setSettingsXpMode] = useState<XpMode>("milestone");
   const [inviteOpen, setInviteOpen] = useState(false);
   const [levelUpBusy, setLevelUpBusy] = useState(false);
+  const [levelingId, setLevelingId] = useState<string | null>(null);
   const [restBusy, setRestBusy] = useState(false);
+  const [xpOpen, setXpOpen] = useState(false);
+  const [xpAmount, setXpAmount] = useState("20");
+  const [xpReason, setXpReason] = useState("");
+  const [xpRecipientIds, setXpRecipientIds] = useState<string[]>([]);
+  const [xpBusy, setXpBusy] = useState(false);
+  const [xpError, setXpError] = useState("");
 
   const isGm = campaign?.role === "gm";
   const tab: Tab =
@@ -545,28 +556,42 @@ export function CampaignPage() {
     }
   };
 
-  const levelUpParty = async () => {
+  const levelUpCharacters = async (characterId?: string) => {
     if (!id || !campaign) return;
-    if (
-      !window.confirm(
-        "Advance every character in this campaign by one level? Players can finish their new choices in the builder."
-      )
-    ) {
-      return;
-    }
-    setLevelUpBusy(true);
+    const target = characterId ? characters.find((entry) => entry.id === characterId) : null;
+    const message = target
+      ? `Advance ${target.name} by one level? The GM controls advancement, and this consumes up to 1,000 XP.`
+      : "Advance every character in this campaign by one level? The GM controls advancement, and each character consumes up to 1,000 XP.";
+    if (!window.confirm(message)) return;
+    if (target) setLevelingId(target.id);
+    else setLevelUpBusy(true);
     try {
       const result = await api<{
         leveled: number;
         atMaxLevel: number;
         skipped: number;
         characters: CharacterRecord[];
-      }>(`/api/campaigns/${id}/level-up`, { method: "POST" });
+      }>(`/api/campaigns/${id}/level-up`, {
+        method: "POST",
+        body: target ? { characterId: target.id } : {},
+      });
       setCharacters(result.characters);
       setTableData((current) =>
         current ? { ...current, characters: result.characters } : current
       );
-      if (result.leveled > 0) {
+      if (target) {
+        const updated = result.characters.find((entry) => entry.id === target.id);
+        if (result.leveled > 0) {
+          toast(
+            `Advanced ${target.name} to level ${updated?.summary?.level ?? "the next level"}.`,
+            "success"
+          );
+        } else if (result.atMaxLevel > 0) {
+          toast(`${target.name} is already at level 20.`, "info");
+        } else {
+          toast(`Could not advance ${target.name}. Check their draft in the builder.`, "info");
+        }
+      } else if (result.leveled > 0) {
         toast(
           `Advanced ${result.leveled} ${result.leveled === 1 ? "character" : "characters"} by one level.`,
           "success"
@@ -579,7 +604,69 @@ export function CampaignPage() {
     } catch (err) {
       toast(errorMessage(err), "error");
     } finally {
+      setLevelingId(null);
       setLevelUpBusy(false);
+    }
+  };
+
+  const openXpAward = () => {
+    setXpAmount("20");
+    setXpReason("");
+    setXpRecipientIds(characters.map((character) => character.id));
+    setXpError("");
+    setXpOpen(true);
+  };
+
+  const toggleXpRecipient = (characterId: string, checked: boolean) => {
+    setXpRecipientIds((current) =>
+      checked
+        ? [...new Set([...current, characterId])]
+        : current.filter((entry) => entry !== characterId)
+    );
+  };
+
+  const awardXp = async () => {
+    if (!id) return;
+    const amount = Math.max(0, Math.floor(Number(xpAmount) || 0));
+    if (amount < 1) {
+      setXpError("Award at least 1 XP.");
+      return;
+    }
+    if (!xpRecipientIds.length) {
+      setXpError("Choose at least one character.");
+      return;
+    }
+    setXpBusy(true);
+    setXpError("");
+    try {
+      const result = await api<{
+        amount: number;
+        recipients: number;
+        skipped: number;
+        characters: CharacterRecord[];
+      }>(`/api/campaigns/${id}/award-xp`, {
+        method: "POST",
+        body: {
+          amount,
+          characterIds: xpRecipientIds,
+          reason: xpReason.trim(),
+        },
+      });
+      setCharacters(result.characters);
+      setTableData((current) =>
+        current ? { ...current, characters: result.characters } : current
+      );
+      setXpOpen(false);
+      toast(
+        `Awarded ${result.amount} XP to ${result.recipients} ${
+          result.recipients === 1 ? "character" : "characters"
+        }. Level-ups remain GM-triggered.`,
+        "success"
+      );
+    } catch (err) {
+      setXpError(errorMessage(err));
+    } finally {
+      setXpBusy(false);
     }
   };
 
@@ -794,11 +881,19 @@ export function CampaignPage() {
               <div>
                 <PageEyebrow>The party</PageEyebrow>
                 <h2>Who's at the table?</h2>
-                <p>Every hero in this campaign. Open a sheet or make a new character.</p>
+                <p>
+                  Every hero in this campaign. The GM controls advancement; XP never levels a
+                  character automatically.
+                </p>
               </div>
               <div className="row wrap" style={{ gap: 8 }}>
                 {isGm ? (
                   <>
+                    {campaign.xpMode === "xp" ? (
+                      <Button variant="secondary" icon={<Award size={15} />} onClick={openXpAward}>
+                        Award XP
+                      </Button>
+                    ) : null}
                     <Button
                       variant="secondary"
                       icon={<Moon size={15} />}
@@ -811,7 +906,7 @@ export function CampaignPage() {
                       variant="secondary"
                       icon={<Sparkles size={15} />}
                       loading={levelUpBusy}
-                      onClick={levelUpParty}
+                      onClick={() => void levelUpCharacters()}
                     >
                       Level up party
                     </Button>
@@ -823,49 +918,92 @@ export function CampaignPage() {
               </div>
             </div>
             <div className="party-grid">
-              {characters.map((character) => (
-                <article key={character.id} className="party-card card">
-                  <div className="party-card-top">
-                    <Avatar name={character.name} src={character.summary?.portraitUrl} size={58} />
-                    <div className="grow">
-                      <div className="row wrap" style={{ gap: 7 }}>
-                        <h3>{character.name}</h3>
-                        {character.permissions?.canEdit ? (
-                          <Badge tone="gold">Editable</Badge>
+              {characters.map((character) => {
+                const progress = character.summary
+                  ? xpProgress(character.summary.xp ?? 0, character.summary.level)
+                  : null;
+                return (
+                  <article key={character.id} className="party-card card">
+                    <div className="party-card-top">
+                      <Avatar
+                        name={character.name}
+                        src={character.summary?.portraitUrl}
+                        size={58}
+                      />
+                      <div className="grow">
+                        <div className="row wrap" style={{ gap: 7 }}>
+                          <h3>{character.name}</h3>
+                          {character.permissions?.canEdit ? (
+                            <Badge tone="gold">Editable</Badge>
+                          ) : null}
+                        </div>
+                        <p className="tiny muted">
+                          {character.summary
+                            ? `Level ${character.summary.level} ${character.summary.className || ""} · ${character.summary.ancestry || "No ancestry"}`
+                            : "Unfinished character"}
+                        </p>
+                        <p className="tiny muted">
+                          {character.ownerName ? `Played by ${character.ownerName}` : ""}
+                        </p>
+                      </div>
+                    </div>
+                    {character.summary ? (
+                      <div className="party-stats">
+                        <Stat label="HP" value={character.summary.hp} tone="red" />
+                        <Stat label="AC" value={character.summary.ac} tone="gold" />
+                        <Stat label="Speed" value={`${character.summary.speed} ft.`} />
+                      </div>
+                    ) : null}
+                    {campaign.xpMode === "xp" && progress ? (
+                      <div className="party-xp">
+                        <div className="row-between">
+                          <span className="tiny muted">XP</span>
+                          <strong>
+                            {progress.xp.toLocaleString()}
+                            {progress.required !== null
+                              ? ` / ${progress.required.toLocaleString()}`
+                              : ""}
+                          </strong>
+                        </div>
+                        {progress.required !== null ? (
+                          <ProgressBar
+                            value={Math.min(progress.xp, progress.required)}
+                            max={progress.required}
+                          />
+                        ) : null}
+                        {progress.ready ? <Badge tone="gold">Ready to level</Badge> : null}
+                        {progress.required === null ? (
+                          <span className="tiny muted">Maximum level</span>
                         ) : null}
                       </div>
-                      <p className="tiny muted">
-                        {character.summary
-                          ? `Level ${character.summary.level} ${character.summary.className || ""} · ${character.summary.ancestry || "No ancestry"}`
-                          : "Unfinished character"}
-                      </p>
-                      <p className="tiny muted">
-                        {character.ownerName ? `Played by ${character.ownerName}` : ""}
-                      </p>
-                    </div>
-                  </div>
-                  {character.summary ? (
-                    <div className="party-stats">
-                      <Stat label="HP" value={character.summary.hp} tone="red" />
-                      <Stat label="AC" value={character.summary.ac} tone="gold" />
-                      <Stat label="Speed" value={`${character.summary.speed} ft.`} />
-                    </div>
-                  ) : null}
-                  <div className="party-card-actions">
-                    <Link to={`/characters/${character.id}`} className="btn btn-secondary btn-sm">
-                      <ScrollText size={14} /> Sheet
-                    </Link>
-                    {character.permissions?.canEdit ? (
-                      <Link
-                        to={`/characters/${character.id}/edit`}
-                        className="btn btn-ghost btn-sm"
-                      >
-                        <Pencil size={14} /> Edit
-                      </Link>
                     ) : null}
-                  </div>
-                </article>
-              ))}
+                    <div className="party-card-actions">
+                      <Link to={`/characters/${character.id}`} className="btn btn-secondary btn-sm">
+                        <ScrollText size={14} /> Sheet
+                      </Link>
+                      {character.permissions?.canEdit ? (
+                        <Link
+                          to={`/characters/${character.id}/edit`}
+                          className="btn btn-ghost btn-sm"
+                        >
+                          <Pencil size={14} /> Edit
+                        </Link>
+                      ) : null}
+                      {isGm ? (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          icon={<Sparkles size={14} />}
+                          loading={levelingId === character.id}
+                          onClick={() => void levelUpCharacters(character.id)}
+                        >
+                          Level up
+                        </Button>
+                      ) : null}
+                    </div>
+                  </article>
+                );
+              })}
               {!characters.length ? (
                 <EmptyState
                   icon={<Users size={30} />}
@@ -1132,7 +1270,7 @@ export function CampaignPage() {
                     isGm
                       ? XP_MODE_OPTIONS.find((option) => option.value === settingsXpMode)
                           ?.description
-                      : "Set by the campaign GM. It controls whether encounter XP budgets are shown."
+                      : "Set by the campaign GM. It controls whether encounter XP budgets and awards are shown."
                   }
                 >
                   <Select
@@ -1157,10 +1295,10 @@ export function CampaignPage() {
                 <div className="settings-note">
                   <Sparkles size={15} />
                   <p>
-                    Switch to <strong>XP budget</strong> to see PF2e encounter difficulty while
-                    preparing. Switch back to <strong>Milestone</strong> to hide those numbers.
-                    Either way, the party only advances when you choose{" "}
-                    <strong>Level up party</strong> on the Party tab.
+                    Switch to <strong>XP tracking</strong> to see PF2e encounter difficulty and
+                    award XP. <strong>Milestone</strong> hides those numbers. Either way, no
+                    character levels up automatically; use <strong>Level up party</strong> or the{" "}
+                    <strong>Level up</strong> button on a party card when you decide.
                   </p>
                 </div>
               ) : null}
@@ -1511,6 +1649,105 @@ export function CampaignPage() {
             ))}
           </div>
         )}
+      </Modal>
+
+      <Modal
+        open={xpOpen}
+        onClose={() => setXpOpen(false)}
+        title="Award XP"
+        subtitle="Track experience without advancing anyone automatically. Level-ups stay in the GM's hands."
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setXpOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              icon={<Award size={15} />}
+              loading={xpBusy}
+              onClick={() => void awardXp()}
+            >
+              Award XP
+            </Button>
+          </>
+        }
+      >
+        <div className="stack">
+          {xpError ? <div className="auth-error">{xpError}</div> : null}
+          <Field
+            label="XP amount"
+            hint="PF2e encounter awards: trivial 10, low 15, moderate 20, severe 30, extreme 40."
+          >
+            <Input
+              type="number"
+              min={1}
+              max={100000}
+              value={xpAmount}
+              onChange={(event) => setXpAmount(event.target.value)}
+            />
+          </Field>
+          <div className="xp-quick">
+            {[10, 15, 20, 30, 40].map((value) => (
+              <Button
+                key={value}
+                type="button"
+                size="sm"
+                variant="ghost"
+                onClick={() => setXpAmount(String(value))}
+              >
+                {value} XP
+              </Button>
+            ))}
+          </div>
+          <Field label="Reason (optional)">
+            <Input
+              value={xpReason}
+              onChange={(event) => setXpReason(event.target.value)}
+              placeholder="Moderate encounter · Session 12"
+            />
+          </Field>
+          <div className="row-between">
+            <strong>Recipients</strong>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={() => setXpRecipientIds(characters.map((character) => character.id))}
+            >
+              Select all
+            </Button>
+          </div>
+          <div className="xp-recipients">
+            {characters.map((character) => (
+              <Checkbox
+                key={character.id}
+                checked={xpRecipientIds.includes(character.id)}
+                onChange={(checked) => toggleXpRecipient(character.id, checked)}
+                label={
+                  <span>
+                    {character.name}
+                    {character.summary ? (
+                      <span className="tiny muted">
+                        {" "}
+                        · Level {character.summary.level} · {character.summary.xp ?? 0} XP
+                      </span>
+                    ) : null}
+                  </span>
+                }
+              />
+            ))}
+            {!characters.length ? (
+              <p className="muted small">No characters in this campaign yet.</p>
+            ) : null}
+          </div>
+          <div className="settings-note">
+            <Award size={16} />
+            <span>
+              XP never triggers a level-up. Use <strong>Level up</strong> on a party card or{" "}
+              <strong>Level up party</strong> when you decide.
+            </span>
+          </div>
+        </div>
       </Modal>
 
       <Modal

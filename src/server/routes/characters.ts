@@ -7,6 +7,7 @@ import {
 } from "../../shared/rules";
 import type { CharacterDraft, CharacterSummary } from "../../shared/types";
 import {
+  canAdvanceCharacter,
   canEditCharacter,
   canViewCharacter,
   getCampaign,
@@ -97,6 +98,7 @@ export async function registerCharacterRoutes(app: FastifyInstance): Promise<voi
           serializeCharacter(row, row.owner_name, {
             canEdit: canEditCharacter(row, request.user!.id),
             canView: true,
+            canAdvance: canAdvanceCharacter(row, request.user!.id),
           })
         ),
       });
@@ -113,6 +115,7 @@ export async function registerCharacterRoutes(app: FastifyInstance): Promise<voi
         serializeCharacter(row, row.owner_name, {
           canEdit: row.user_id === request.user!.id,
           canView: true,
+          canAdvance: canAdvanceCharacter(row, request.user!.id),
         })
       ),
     });
@@ -145,6 +148,7 @@ export async function registerCharacterRoutes(app: FastifyInstance): Promise<voi
     const created = serializeCharacter(row, request.user.displayName, {
       canEdit: true,
       canView: true,
+      canAdvance: canAdvanceCharacter(row, request.user.id),
     });
     if (campaignId) {
       app.broadcastCampaign(campaignId, "character:created", { character: created });
@@ -207,6 +211,7 @@ export async function registerCharacterRoutes(app: FastifyInstance): Promise<voi
     const created = serializeCharacter(row, request.user.displayName, {
       canEdit: true,
       canView: true,
+      canAdvance: canAdvanceCharacter(row, request.user.id),
     });
     if (campaignId) {
       app.broadcastCampaign(campaignId, "character:created", { character: created });
@@ -227,6 +232,7 @@ export async function registerCharacterRoutes(app: FastifyInstance): Promise<voi
       character: serializeCharacter(row, owner?.display_name ?? "", {
         canEdit: canEditCharacter(row, request.user.id),
         canView: true,
+        canAdvance: canAdvanceCharacter(row, request.user.id),
       }),
     });
   });
@@ -252,10 +258,17 @@ export async function registerCharacterRoutes(app: FastifyInstance): Promise<voi
         character: serializeCharacter(row, owner?.display_name ?? "", {
           canEdit: true,
           canView: true,
+          canAdvance: canAdvanceCharacter(row, request.user.id),
         }),
       });
     }
+    const existingDraft = parseDraft(parseJson(row.data, {}), row.name);
     const draft = parseDraft(body.data, row.name);
+    if (draft.level !== existingDraft.level && !canAdvanceCharacter(row, request.user.id)) {
+      return reply
+        .code(403)
+        .send({ error: "Only the GM can change a campaign character's level." });
+    }
     if (row.campaign_id) {
       const campaign = getCampaign(row.campaign_id);
       if (campaign) {
@@ -293,6 +306,7 @@ export async function registerCharacterRoutes(app: FastifyInstance): Promise<voi
         character: serializeCharacter(current, owner?.display_name ?? "", {
           canEdit: true,
           canView: true,
+          canAdvance: canAdvanceCharacter(current, request.user.id),
         }),
       });
     }
@@ -304,6 +318,7 @@ export async function registerCharacterRoutes(app: FastifyInstance): Promise<voi
       character: serializeCharacter(updated!, owner?.display_name ?? "", {
         canEdit: true,
         canView: true,
+        canAdvance: canAdvanceCharacter(updated!, request.user.id),
       }),
     });
   });
@@ -439,10 +454,12 @@ export async function registerCharacterRoutes(app: FastifyInstance): Promise<voi
       from: serializeCharacter(updatedSource, sourceOwner?.display_name ?? "", {
         canEdit: true,
         canView: true,
+        canAdvance: canAdvanceCharacter(updatedSource, request.user.id),
       }),
       to: serializeCharacter(updatedTarget, targetOwner?.display_name ?? "", {
         canEdit: canEditCharacter(updatedTarget, request.user.id),
         canView: true,
+        canAdvance: canAdvanceCharacter(updatedTarget, request.user.id),
       }),
     });
   });
@@ -502,6 +519,7 @@ export async function registerCharacterRoutes(app: FastifyInstance): Promise<voi
       character: serializeCharacter(created, request.user.displayName, {
         canEdit: true,
         canView: true,
+        canAdvance: canAdvanceCharacter(created, request.user.id),
       }),
     });
   });

@@ -388,7 +388,7 @@ export function DashboardPage() {
                     </Badge>
                     <Badge tone="violet">{rulesetLabel(campaign.ruleset)}</Badge>
                     <Badge tone={campaign.xpMode === "xp" ? "green" : "neutral"}>
-                      {campaign.xpMode === "xp" ? "XP budget" : "Milestone"}
+                      {campaign.xpMode === "xp" ? "XP tracking" : "GM decides"}
                     </Badge>
                     {campaign.lastPlayedAt ? (
                       <span className="tiny muted">Played {formatDate(campaign.lastPlayedAt)}</span>

@@ -50,6 +50,7 @@ import {
 import { DEGREE_LABELS, mod, rollFormula } from "../../shared/dice";
 import { currencyToCp } from "../../shared/inventory";
 import { applyLongRest } from "../../shared/rest";
+import { xpProgress } from "../../shared/xp";
 import { spellTraditionLabel, stripHtml } from "../../shared/compendium";
 import { conditionLabel } from "../../shared/tokens";
 import { api, ApiError, formatCp } from "../api";
@@ -514,6 +515,7 @@ export function CharacterSheetPage() {
   const selectedOptions = selectedChoiceOptions(draft, classData);
   const hp = derived.currentHp;
   const fortune = draft.play;
+  const xp = xpProgress(draft.play.xp, draft.level);
 
   return (
     <div className="page sheet-page">
@@ -1361,6 +1363,15 @@ export function CharacterSheetPage() {
                   ))}
                 </div>
               </div>
+              {xp.xp > 0 ? (
+                <div className="point-row" title="The GM awards XP and decides when to level up.">
+                  <span>XP</span>
+                  <strong>
+                    {xp.xp.toLocaleString()}
+                    {xp.required !== null ? ` / ${xp.required.toLocaleString()}` : ""}
+                  </strong>
+                </div>
+              ) : null}
               {derived.focusPointsMax > 0 ? (
                 <div className="point-row">
                   <span>Focus points</span>

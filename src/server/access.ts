@@ -62,6 +62,15 @@ export function canEditCharacter(character: CharacterRow, userId: string): boole
   return isCampaignGm(character.campaign_id, userId);
 }
 
+/**
+ * Campaign advancement belongs to the GM. Characters outside a campaign are
+ * advanced by their owner; campaign characters are advanced only by the GM.
+ */
+export function canAdvanceCharacter(character: CharacterRow, userId: string): boolean {
+  if (!character.campaign_id) return character.user_id === userId;
+  return isCampaignGm(character.campaign_id, userId);
+}
+
 export function campaignMemberCount(campaignId: string): number {
   const row = db
     .prepare("SELECT COUNT(*) AS count FROM campaign_members WHERE campaign_id = ?")

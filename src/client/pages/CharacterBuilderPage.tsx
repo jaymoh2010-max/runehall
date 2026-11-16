@@ -482,6 +482,7 @@ export function CharacterBuilderPage() {
     : draft.includeLegacy;
   const legacyLocked = Boolean(campaignRuleset);
   const nextLevel = Math.min(20, draft.level + 1);
+  const canAdvance = character?.permissions?.canAdvance !== false;
   const levelUpItems: LevelUpTask[] = [];
   if (nextLevel !== draft.level) {
     for (const milestone of [5, 10, 15, 20]) {
@@ -684,6 +685,11 @@ export function CharacterBuilderPage() {
           </div>
         </div>
         <div className="builder-header-actions">
+          {!canAdvance ? (
+            <span title="Only the campaign GM can change this character's level.">
+              <Badge tone="neutral">GM levels up</Badge>
+            </span>
+          ) : null}
           <Field label="Level">
             <Select
               value={draft.level}
@@ -692,6 +698,7 @@ export function CharacterBuilderPage() {
                 setLevelUpPlan(null);
               }}
               className="level-select"
+              disabled={!canAdvance}
             >
               {Array.from({ length: 20 }, (_, index) => index + 1).map((level) => (
                 <option key={level} value={level}>
@@ -705,7 +712,8 @@ export function CharacterBuilderPage() {
             size="sm"
             icon={<TrendingUp size={15} />}
             onClick={() => setLevelUpOpen(true)}
-            disabled={draft.level >= 20}
+            disabled={!canAdvance || draft.level >= 20}
+            title={canAdvance ? undefined : "The campaign GM controls level-ups."}
           >
             Level up
           </Button>
@@ -1053,6 +1061,7 @@ export function CharacterBuilderPage() {
               variant="primary"
               icon={<TrendingUp size={15} />}
               onClick={() => completeLevelUp()}
+              disabled={!canAdvance}
             >
               Level up
             </Button>

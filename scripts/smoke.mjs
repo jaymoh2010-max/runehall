@@ -466,6 +466,47 @@ async function main() {
     throw new Error("Party long rest reported no characters rested");
   log("party long rest heals, clears temporary HP, and reduces rest conditions");
 
+  const awardedXp = await api(`/api/campaigns/${campaign.id}/award-xp`, {
+    method: "POST",
+    cookie: gmCookie,
+    body: { amount: 1250, characterIds: [character.id], reason: "Smoke XP" },
+  });
+  const xpCharacter = awardedXp.payload.characters.find((entry) => entry.id === character.id);
+  if (!xpCharacter || xpCharacter.summary?.xp !== 1250) {
+    throw new Error("GM XP award did not reach the character summary");
+  }
+  const playerAward = await fetch(`${base}/api/campaigns/${campaign.id}/award-xp`, {
+    method: "POST",
+    headers: { "content-type": "application/json", cookie: playerCookie },
+    body: JSON.stringify({ amount: 100, characterIds: [character.id] }),
+  });
+  if (playerAward.status !== 403) throw new Error("Player was able to award XP");
+  const leveledCharacter = await api(`/api/campaigns/${campaign.id}/level-up`, {
+    method: "POST",
+    cookie: gmCookie,
+    body: { characterId: character.id },
+  });
+  const advanced = leveledCharacter.payload.characters.find((entry) => entry.id === character.id);
+  if (
+    leveledCharacter.payload.leveled !== 1 ||
+    !advanced ||
+    advanced.summary?.level !== 2 ||
+    advanced.summary?.xp !== 250
+  ) {
+    throw new Error("Individual level-up did not spend 1,000 XP and advance one level");
+  }
+  log("XP awards are GM-only and individual level-ups spend 1,000 XP");
+
+  const playerLevelChange = await fetch(`${base}/api/characters/${character.id}`, {
+    method: "PUT",
+    headers: { "content-type": "application/json", cookie: playerCookie },
+    body: JSON.stringify({ data: { ...advanced.data, level: 3 }, force: true }),
+  });
+  if (playerLevelChange.status !== 403) {
+    throw new Error("Player was able to change a campaign character's level");
+  }
+  log("players cannot change campaign character levels");
+
   const exported = await api(`/api/campaigns/${campaign.id}/export`, { cookie: gmCookie });
   if (exported.payload.format !== "runehall-campaign" || !exported.payload.characters?.length) {
     throw new Error("Campaign export did not contain the expected data");

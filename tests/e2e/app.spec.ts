@@ -143,6 +143,38 @@ test("GM creates a campaign and builds a character through the lazy routes", asy
   await expect(page.getByText(/Long rest complete/)).toBeVisible();
 });
 
+test("GM controls advancement and milestone mode hides XP awards", async ({ page }) => {
+  await signIn(page, admin);
+  await page.goto(campaignPath);
+  await page.getByRole("button", { name: /^Party/ }).click();
+  await expect(page.getByRole("heading", { name: "Who's at the table?" })).toBeVisible();
+  await expect(page.getByText(/The GM controls advancement/)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Award XP" })).toHaveCount(0);
+
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.getByRole("button", { name: "Level up", exact: true }).first().click();
+  await expect(page.getByText(/Advanced E2E Hero to level 2/)).toBeVisible({ timeout: 15_000 });
+});
+
+test("GM awards XP in XP tracking mode without automatic level-up", async ({ page }) => {
+  await signIn(page, admin);
+  await page.goto(`${campaignPath}?tab=settings`);
+  await page.getByLabel("Advancement").selectOption({ label: "XP tracking (GM levels up)" });
+  await page.getByRole("button", { name: "Save changes" }).click();
+  await expect(page.getByText("Campaign settings saved.")).toBeVisible();
+
+  await page.getByRole("button", { name: /^Party/ }).click();
+  await page.getByRole("button", { name: "Award XP", exact: true }).click();
+  const xpDialog = page.getByRole("dialog", { name: "Award XP" });
+  await expect(xpDialog).toBeVisible();
+  await xpDialog.getByLabel("XP amount").fill("1000");
+  await xpDialog.getByRole("button", { name: "Award XP", exact: true }).click();
+
+  await expect(page.getByText(/Awarded 1000 XP/)).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText("Ready to level")).toBeVisible();
+  await expect(page.getByText(/Level 2/).first()).toBeVisible();
+});
+
 test("lazy library, compendium entry, rules, and account routes load", async ({ page }) => {
   await signIn(page, admin);
   await page.goto("/library");

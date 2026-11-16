@@ -650,6 +650,7 @@ export interface CharacterSummary {
   spellDc: number | null;
   heroPoints: number;
   focusPoints: number;
+  xp: number;
   conditions: string[];
   portraitUrl: string | null;
 }
@@ -668,7 +669,7 @@ export interface CharacterRecord {
   /** Optimistic-lock version, incremented on every save. */
   revision: number;
   ownerName?: string;
-  permissions?: { canEdit: boolean; canView: boolean };
+  permissions?: { canEdit: boolean; canView: boolean; canAdvance?: boolean };
 }
 
 // ---------------------------------------------------------------------------

@@ -534,6 +534,14 @@ Acceptance: a GM can prepare a full session in Runehall and start it with one â€
   - Advancing or stepping back a turn resets movement; the GM also has an explicit reset control.
   - Corrections made through the token editor do not count as movement.
   - Covered by shared movement unit tests and a two-socket smoke check of diagonal carryover and turn reset.
+- [x] **GM-controlled advancement and XP awards**
+  - The default advancement mode is Milestone, where the GM decides when the party or an individual character levels up.
+  - Optional XP tracking adds PF2e encounter budgets plus an award flow for one character, several characters, or the whole party.
+  - XP awards never trigger a level-up; the GM uses **Level up** on a party card or **Level up party**.
+  - Advancing a character consumes up to 1,000 XP and preserves any excess.
+  - Party cards show XP progress when tracking is enabled, and the character sheet shows awarded XP.
+  - Campaign characters can only change level through the GM; the builder disables level changes for players, and the server rejects attempts to bypass it. Uncampaigned characters stay owner-editable.
+  - XP awards are GM-only, audited, and covered by unit tests, the two-user smoke test, and the browser suite.
 - [x] **Browser E2E**
   - Playwright covers first-user registration, Hall controls (retention, CSV export, filtering), campaign creation, the invite code, the character builder and sheet, lazy library/compendium/rules/account routes, a second player joining with the invite code, and table interactions (token placement, chat, dice rolls, and the scenes manager).
   - Player-safe campaign navigation is checked: GM-only tabs are absent for the player, and the GM sees the new member in Settings.

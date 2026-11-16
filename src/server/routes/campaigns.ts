@@ -49,6 +49,7 @@ import {
 } from "../../shared/content";
 import { characterSummary, computeCharacter, normalizeCharacterDraft } from "../../shared/rules";
 import { applyLongRest, type LongRestResult } from "../../shared/rest";
+import { consumeLevelXp } from "../../shared/xp";
 import {
   isJournalKind,
   normalizeJournalAttachments,
@@ -58,7 +59,7 @@ import { contextForDraft } from "../compendium";
 import { campaignSessionsFor } from "../sessionData";
 import { importCampaign } from "../campaignImport";
 import { logAudit } from "../audit";
-import { inviteCode, newId, now, parseJson, safeString, sanitizeUserText } from "../util";
+import { inviteCode, newId, now, parseJson, safeInt, safeString, sanitizeUserText } from "../util";
 
 function campaignCounts(row: CampaignRow) {
   return {
@@ -526,13 +527,21 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
     const row = getCampaign(id);
     if (!row) return reply.code(404).send({ error: "Campaign not found." });
     if (roleFor(row, request.user.id) !== "gm") {
-      return reply.code(403).send({ error: "Only the GM can advance the party." });
+      return reply.code(403).send({ error: "Only the GM can advance characters." });
     }
-    const characterRows = db
-      .prepare("SELECT * FROM characters WHERE campaign_id = ?")
-      .all(id) as CharacterRow[];
+    const body = (request.body ?? {}) as Record<string, unknown>;
+    const characterId = typeof body.characterId === "string" ? body.characterId : null;
+    const characterRows = characterId
+      ? (db
+          .prepare("SELECT * FROM characters WHERE campaign_id = ? AND id = ?")
+          .all(id, characterId) as CharacterRow[])
+      : (db.prepare("SELECT * FROM characters WHERE campaign_id = ?").all(id) as CharacterRow[]);
     if (!characterRows.length) {
-      return reply.code(400).send({ error: "There are no characters in this campaign yet." });
+      return reply.code(characterId ? 404 : 400).send({
+        error: characterId
+          ? "That character is not in this campaign."
+          : "There are no characters in this campaign yet.",
+      });
     }
 
     let leveled = 0;
@@ -553,6 +562,7 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
       const before = characterSummary(draft, contextForDraft(draft));
       const wasFull = draft.play.hp === null || draft.play.hp >= before.hp;
       draft.level += 1;
+      draft.play.xp = consumeLevelXp(draft.play.xp);
       const after = characterSummary(draft, contextForDraft(draft));
       draft.play.hp = wasFull ? null : Math.min(draft.play.hp ?? after.hp, after.hp);
       const summary = characterSummary(draft, contextForDraft(draft));
@@ -598,10 +608,83 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
       actor: request.user,
       targetType: "campaign",
       targetId: id,
-      detail: `${leveled} advanced, ${atMaxLevel} at max, ${skipped} skipped`,
+      detail: characterId
+        ? `${characterRows[0]?.name ?? "Character"}: ${leveled ? "advanced" : atMaxLevel ? "at max level" : "skipped"}`
+        : `${leveled} advanced, ${atMaxLevel} at max, ${skipped} skipped`,
       request,
     });
     return reply.send({ leveled, atMaxLevel, skipped, characters });
+  });
+
+  app.post("/api/campaigns/:id/award-xp", async (request, reply) => {
+    if (!request.user) return reply.code(401).send({ error: "Sign in to continue." });
+    const { id } = request.params as { id: string };
+    const row = getCampaign(id);
+    if (!row) return reply.code(404).send({ error: "Campaign not found." });
+    if (roleFor(row, request.user.id) !== "gm") {
+      return reply.code(403).send({ error: "Only the GM can award XP." });
+    }
+    const body = (request.body ?? {}) as Record<string, unknown>;
+    const amount = safeInt(body.amount, 0, 1, 100_000);
+    if (amount < 1) return reply.code(400).send({ error: "Award at least 1 XP." });
+    const characterIds = Array.isArray(body.characterIds)
+      ? [
+          ...new Set(
+            body.characterIds.filter((value): value is string => typeof value === "string")
+          ),
+        ]
+      : [];
+    if (!characterIds.length) {
+      return reply.code(400).send({ error: "Choose at least one character." });
+    }
+    const reason = sanitizeUserText(body.reason, 200);
+    const rows = db
+      .prepare("SELECT * FROM characters WHERE campaign_id = ?")
+      .all(id) as CharacterRow[];
+    const selected = rows.filter((character) => characterIds.includes(character.id));
+    if (!selected.length) {
+      return reply.code(400).send({ error: "Those characters are not in this campaign." });
+    }
+
+    let recipients = 0;
+    let skipped = 0;
+    for (const character of selected) {
+      let draft;
+      try {
+        draft = normalizeCharacterDraft(JSON.parse(character.data), character.name);
+      } catch {
+        skipped += 1;
+        continue;
+      }
+      draft.play.xp = Math.max(0, Math.round(draft.play.xp + amount));
+      const summary = characterSummary(draft, contextForDraft(draft));
+      db.prepare(
+        "UPDATE characters SET data = ?, summary = ?, updated_at = ?, revision = revision + 1 WHERE id = ?"
+      ).run(JSON.stringify(draft), JSON.stringify(summary), now(), character.id);
+      app.broadcastCampaign(id, "character:updated", {
+        characterId: character.id,
+        summary,
+        name: draft.name,
+      });
+      recipients += 1;
+    }
+
+    touchCampaign(id);
+    const characters = campaignCharacters(id).map((character) =>
+      serializeCharacter(character, character.owner_name, {
+        canEdit: true,
+        canView: true,
+      })
+    );
+    logAudit({
+      action: "campaign.award_xp",
+      actor: request.user,
+      targetType: "campaign",
+      targetId: id,
+      detail: `${amount} XP to ${recipients} characters${reason ? `: ${reason}` : ""}`,
+      request,
+    });
+    return reply.send({ amount, recipients, skipped, characters });
   });
 
   app.post("/api/campaigns/:id/long-rest", async (request, reply) => {

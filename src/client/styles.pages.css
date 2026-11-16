@@ -3181,8 +3181,40 @@
 .party-stats .stat-value {
   font-size: 1.05rem;
 }
+.party-xp {
+  display: grid;
+  gap: 5px;
+  margin-bottom: 12px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.015);
+}
+.party-xp .progress-wrap {
+  margin: 0;
+}
+.party-xp > .badge {
+  justify-self: start;
+}
+.xp-quick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: -4px;
+}
+.xp-recipients {
+  display: grid;
+  gap: 6px;
+  max-height: 240px;
+  overflow-y: auto;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.015);
+}
 .party-card-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
 }
 .journal-layout {

@@ -61,6 +61,7 @@ Runehall is built for a private group of roughly 4–10 players and a GM. It run
 - Shareable invite links (`/join/:code`) and codes. Signed-out friends create an account or sign in, then choose or create a character before joining.
 - LAN-aware invite links so players on other devices can join a locally hosted table.
 - GM/player roles, member management, player read-only views, party roster, journal visibility, and campaign settings.
+- **GM-controlled advancement by default.** Milestone mode hides XP and leaves every level-up to the GM. Optional XP tracking awards experience to selected characters, but never levels anyone automatically; the GM advances the whole party or one character when they choose. Campaign characters cannot be advanced from the builder by their owners; uncampaigned characters remain owner-editable.
 - The GM can apply a long rest to the whole party from the Party tab; linked tokens and character summaries update together.
 - Shared library and quick rules reference.
 

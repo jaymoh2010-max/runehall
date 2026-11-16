@@ -2614,6 +2614,7 @@ export function characterSummary(draft: CharacterDraft, context: CharacterContex
     spellDc: derived.spellDc,
     heroPoints: draft.play.heroPoints,
     focusPoints: draft.play.focusPoints,
+    xp: draft.play.xp,
     conditions: draft.play.conditions.map(
       (condition) =>
         `${condition.name}${condition.value ? ` ${condition.value}` : ""}${condition.duration ? ` (${condition.duration}r)` : ""}`
