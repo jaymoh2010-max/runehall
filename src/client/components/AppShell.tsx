@@ -44,6 +44,8 @@ export function AppShell() {
         <nav className="topnav">
           <NavLink
             to="/campaigns"
+            aria-label="My Campaigns"
+            title="My Campaigns"
             className={({ isActive }) => `topnav-link ${isActive ? "is-active" : ""}`}
           >
             <Swords size={16} />
@@ -51,6 +53,8 @@ export function AppShell() {
           </NavLink>
           <NavLink
             to="/library"
+            aria-label="Library"
+            title="Library"
             className={({ isActive }) => `topnav-link ${isActive ? "is-active" : ""}`}
           >
             <BookOpen size={16} />
@@ -58,6 +62,8 @@ export function AppShell() {
           </NavLink>
           <NavLink
             to="/rules"
+            aria-label="Rules"
+            title="Rules"
             className={({ isActive }) => `topnav-link ${isActive ? "is-active" : ""}`}
           >
             <Shield size={16} />
@@ -66,6 +72,8 @@ export function AppShell() {
           {user?.isAdmin ? (
             <NavLink
               to="/admin"
+              aria-label="Admin"
+              title="Admin"
               className={({ isActive }) => `topnav-link ${isActive ? "is-active" : ""}`}
             >
               <ShieldCheck size={16} />

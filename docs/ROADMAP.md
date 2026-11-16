@@ -17,7 +17,7 @@
 - **Content volume needs curation.** The builder exposes 540 backgrounds and 29 classes by default. That is impressive, but overwhelming; not every option has the same automation quality.
 - **Test coverage is unit + smoke + browser E2E + simulation.** Dice, rules math, compendium integrity, content tiers, security, and migrations are unit-tested; the GM/player campaign flow and registration/admin flows have an automated smoke test; Playwright covers registration, admin audit controls, campaign creation, the character builder and sheet, compendium routes, player-safe campaign access, and table interactions (token placement, chat, dice rolls, and the scenes manager). Upload edge cases (bad signatures, mismatched/unsupported types, empty files, oversized files and dimensions, foreign campaigns, and cleanup after rejection) are covered by the smoke test.
 - **Code health has guardrails.** Route-level splitting keeps the entry bundle near 107â€“122 KB gzip, and `npm run check` now covers types, lint (ESLint), formatting (Prettier), tests, build, and bundle budgets. The table state layer is tested; some large components remain.
-- **Operations are on solid footing.** The Docker image is built and health-checked in CI, backup shipping is checksum-verified and automated, the restore drill runs end to end, the audit log supports retention and CSV export, and Playwright covers the main GM/player browser flows. Confirming the drill on a clean CI runner remains. Uploads validate magic bytes and image dimensions.
+- **Operations are on solid footing.** The Docker image is built and health-checked in CI, backup shipping is checksum-verified and automated, the restore drill has passed on a clean CI runner, the audit log supports retention and CSV export, and Playwright covers the main GM/player browser flows. Uploads validate magic bytes and image dimensions.
 
 ### Highest-risk issues (fix before adding lots of features)
 1. Losing campaign data or failing to upgrade a database.
@@ -498,7 +498,7 @@ Acceptance: a GM can prepare a full session in Runehall and start it with one â€
 - [x] **Verify the Docker build and run in CI or on a Docker host**
   - Built and ran the Node 26 Alpine image on Windows Docker Desktop.
   - Verified health, registration, campaign/character data, uploads, backup, restore, and restart persistence.
-  - Reduced the image from about 675 MB to 456 MB by avoiding a recursive `/app` chown.
+  - Reduced the image from about 675 MB to 456 MB by avoiding a recursive `/app` chown, then to **358 MB** by moving build-only packages to `devDependencies`.
   - Added a CI job that builds the image and waits for `/api/health`.
 - [x] **Off-machine backup shipping with checksum verification**
   - `backup.json` now records per-file SHA-256 hashes and a deterministic archive digest.
@@ -525,8 +525,16 @@ Acceptance: a GM can prepare a full session in Runehall and start it with one â€
   - ESLint (flat config) with Babel parser and `eslint-plugin-react-hooks` runs as `npm run lint`; rules-of-hooks is an error, and exhaustive-deps reports as warnings.
   - Prettier enforces formatting with `npm run format:check`; `npm run format` rewrites files.
   - Both are wired into `npm run check`; `src`, `scripts`, and `tests` were normalized in one pass.
-- [ ] Confirm the restore drill on the project's clean CI runner once a remote is configured.
-- [ ] Only then consider Postgres/S3 adapters or OAuth.
+- [x] **Operational polish**
+  - Icon-only navigation links keep accessible names below 980px via `aria-label`.
+  - Build-only packages moved to `devDependencies`; the production image dropped from **458 MB to 358 MB**.
+  - Dependabot watches npm and GitHub Actions weekly.
+  - A weekly **Rules simulation** workflow runs the full character matrix.
+  - `npm audit` is clean.
+- [x] **Confirmed on a clean CI runner**
+  - The public repository is [jaymoh2010-max/runehall](https://github.com/jaymoh2010-max/runehall).
+  - The `verify` job (including the restore drill), the Docker health job, and the browser E2E job all pass on fresh GitHub runners.
+- [ ] Consider Postgres/S3 adapters or OAuth only after the local deployment is proven.
 
 **Acceptance:** clean-machine deploy and restore drill pass end to end.
 
@@ -554,10 +562,11 @@ That is more trustworthy than silently showing a number that may be missing a +1
 
 ## Recommended next session
 
-Sprint 12 is nearly complete. Remaining:
+Sprint 12 is complete. Next improvements:
 
-1. confirm the automated restore drill on a clean CI runner,
-2. keep the Docker and browser E2E jobs green,
-3. defer Postgres/S3 adapters and OAuth until the local deployment is proven.
+1. keep the Docker, browser E2E, and weekly simulation jobs green,
+2. merge Dependabot updates and keep dependencies current,
+3. refactor the largest modules (`rules.ts`, `CharacterSheetPage`, `CampaignPage`) incrementally,
+4. defer Postgres/S3 adapters and OAuth until the local deployment is proven.
 
 Keep the two-user smoke test and browser E2E suite green as new socket events are added.

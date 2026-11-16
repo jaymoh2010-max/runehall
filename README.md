@@ -117,7 +117,7 @@ npx playwright install chromium
 npm run e2e          # browser flows in Chromium
 npm run verify:data  # compendium and SQLite integrity
 ```
-GitHub Actions runs the verify job, the browser E2E job, the restore drill, and a Docker image health check on pushes and pull requests.
+GitHub Actions runs the verify job, the browser E2E job, the restore drill, and a Docker image health check on pushes and pull requests. A separate weekly **Rules simulation** workflow runs the full character matrix. Dependabot watches npm and GitHub Actions.
 
 ### First five minutes
 1. **Register** an account.
@@ -245,9 +245,10 @@ This is a substantial, playable foundation — not a complete Pathbuilder/Foundr
 - **Some upstream entries have no separate rules text.** About 189 generic treasure/gear items and seven creatures have empty descriptions in the Foundry source export; the library shows their statistics and an explicit fallback rather than inventing text. Thirteen recovered entries use GM-facing source text and are labeled **GM source text**. Twenty-eight control attacks legitimately have no damage, and 716 spells have no tradition because they are focus, ritual, or class-locked.
 
 ### Good next steps
-1. **Hosting verification:** confirm the automated restore drill on a clean CI runner and keep the Docker check green.
-2. **Rules automation:** close the remaining subclass, feat, and item effect gaps.
-3. **Optional scale:** Postgres/S3 adapters and OAuth only when the local deployment is proven.
+1. **Keep the deployment green:** keep the Docker, browser E2E, and weekly rules-simulation jobs green, and merge Dependabot updates.
+2. **Maintainability:** split the largest modules (`rules.ts`, `CharacterSheetPage`, `CampaignPage`) incrementally.
+3. **Rules automation:** close the remaining subclass, feat, and item effect gaps.
+4. **Optional scale:** Postgres/S3 adapters and OAuth only when the local deployment is proven.
 
 ---
 

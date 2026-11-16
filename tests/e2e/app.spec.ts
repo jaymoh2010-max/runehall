@@ -83,6 +83,14 @@ test("administrator updates audit retention, exports CSV, and filters the log", 
   ).toHaveCount(1);
 });
 
+test("icon-only navigation keeps accessible names", async ({ page }) => {
+  await page.setViewportSize({ width: 900, height: 800 });
+  await signIn(page, admin);
+  for (const name of ["My Campaigns", "Library", "Rules", "Admin"]) {
+    await expect(page.getByRole("link", { name })).toBeVisible();
+  }
+});
+
 test("GM creates a campaign and builds a character through the lazy routes", async ({ page }) => {
   await signIn(page, admin);
   await page.getByRole("button", { name: "Create campaign", exact: true }).click();
