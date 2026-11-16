@@ -34,15 +34,15 @@ Runehall is built for a private group of roughly 4–10 players and a GM. It run
 - At-the-table sheet with clickable skill/save/attack/spell rolls, HP, temp HP, hero points, focus points, conditions, and notes.
 
 ### Shared table
-- Scene maps with automatic dimensions and grid sizing.
+- Scene maps with automatic dimensions, interactive grid calibration, and map scaling.
 - Pan, zoom, fit, grid overlay, and snap-to-grid token movement.
 - Token creation from party characters, the bestiary, or custom markers.
 - Token editor via right-click or the side panel: art upload, HP/AC, size, color, owner, hidden/locked, conditions, and linked-character HP sync.
 - A party roster rail beside the map: hover a portrait to see live HP, AC, saves, perception, speed, class/spell DC, hero points, and conditions; click to select that character's token. Online/offline dots show who is currently connected.
 - Player token ownership and locking; GM controls for hidden tokens and HP.
 - Brush-based fog of war with reveal/hide modes and three brush sizes.
-- Scene duplication, live grid calibration preview, and fog alignment for offset grids.
-- Distance measurement, pointer pings, and live presence.
+- Scene duplication, drag-to-calibrate grid alignment, map scaling, and fog alignment for offset grids.
+- PF2e distance measurement with 5/10 alternating diagonals, pointer pings, and live presence.
 - Server-side dice with PF2e degrees of success, secret GM rolls/whispers, and persistent table chat.
 - GM roll requests with one-click player prefill in the dice tray.
 - Initiative tracker with GM rolls, individual reroll, current turn, round counter, add/remove, next/previous, HP, and condition counts.

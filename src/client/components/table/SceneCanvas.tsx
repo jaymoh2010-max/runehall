@@ -10,6 +10,7 @@ import {
 } from "react";
 import { Maximize, Minus, Move, Plus, Ruler } from "lucide-react";
 import type { CharacterRecord, Monster, Scene, Token } from "../../../shared/types";
+import { measureGridDistance } from "../../../shared/measurement";
 import { Tag } from "../ui";
 import { HoverCard } from "../HoverCard";
 import { BESTIARY_DRAG_TYPE, type BestiaryDragPayload } from "./bestiaryDrag";
@@ -481,11 +482,15 @@ export function SceneCanvas({
   const dragPosition = (token: Token) =>
     dragging?.positions[token.id] ?? { x: token.x, y: token.y };
 
-  const measureDistance = measuring
-    ? Math.max(Math.abs(measuring.x - measuring.startX), Math.abs(measuring.y - measuring.startY))
-    : 0;
-  const measureSquares = measureDistance / scene.gridSize;
-  const measureFeet = Math.round(measureSquares * 5);
+  const measurement = measuring
+    ? measureGridDistance(
+        measuring.x - measuring.startX,
+        measuring.y - measuring.startY,
+        scene.gridSize
+      )
+    : null;
+  const measureSquares = measurement ? Math.max(1, measurement.squares) : 0;
+  const measureFeet = measurement ? Math.max(5, measurement.feet) : 0;
   const templateStroke = 2 / Math.max(zoom, 0.4);
   const renderTemplate = (value: AoeTemplate, draft = false): ReactElement => {
     const radius = templateRadiusPx(value.size, scene.gridSize);
@@ -754,12 +759,17 @@ export function SceneCanvas({
         {measuring ? (
           <div
             className="measure-label"
+            title={
+              measurement?.usesDiagonals
+                ? "PF2e diagonals cost 5 ft, then 10 ft, alternating. The count restarts for each ruler measurement."
+                : undefined
+            }
             style={{
               left: (measuring.startX + measuring.x) / 2,
               top: (measuring.startY + measuring.y) / 2 - 8,
             }}
           >
-            {Math.max(1, Math.round(measureSquares))} sq · {Math.max(5, measureFeet)} ft.
+            {measureSquares} sq · {measureFeet} ft.
           </div>
         ) : null}
       </div>

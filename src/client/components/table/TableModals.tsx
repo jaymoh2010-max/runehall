@@ -1,4 +1,11 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
 import {
   ArrowDown,
   ArrowUp,
@@ -493,9 +500,7 @@ export function SceneManagerModal({
     const image = new Image();
     image.onload = () => {
       setDimensions({ width: image.naturalWidth, height: image.naturalHeight });
-      const ratio = image.naturalWidth / image.naturalHeight;
-      setGridSize(String(Math.max(20, Math.round(image.naturalWidth / 24))));
-      if (ratio > 2.4) setGridSize(String(Math.max(20, Math.round(image.naturalHeight / 14))));
+      setGridSize(String(estimateGridSize(image.naturalWidth, image.naturalHeight)));
     };
     image.src = url;
   };
@@ -764,6 +769,36 @@ export function SceneManagerModal({
 // ---------------------------------------------------------------------------
 // Scene editor
 // ---------------------------------------------------------------------------
+type CalibrationDrag = {
+  /** Image-space position where the drag started. */
+  startX: number;
+  startY: number;
+  x: number;
+  y: number;
+  /** Screen-space starting point, used to ignore accidental clicks. */
+  clientX: number;
+  clientY: number;
+};
+
+function clampNumber(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
+}
+
+/** Keep an offset centered around zero without changing which grid lines it describes. */
+function normalizeGridOffset(value: number, gridSize: number): number {
+  if (!Number.isFinite(value) || !Number.isFinite(gridSize) || gridSize <= 0) return 0;
+  const remainder = ((value % gridSize) + gridSize) % gridSize;
+  const centered = remainder > gridSize / 2 ? remainder - gridSize : remainder;
+  return Math.round(centered * 10) / 10;
+}
+
+/** Rough starting guess for a map; the GM can calibrate it precisely. */
+function estimateGridSize(width: number, height: number): number {
+  const ratio = width / Math.max(1, height);
+  const estimate = ratio > 2.4 ? Math.round(height / 14) : Math.round(width / 24);
+  return clampNumber(estimate, 20, 300);
+}
+
 export function SceneEditModal({
   open,
   onClose,
@@ -786,6 +821,9 @@ export function SceneEditModal({
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [dimensions, setDimensions] = useState({ width: 1600, height: 1000 });
+  const [calibration, setCalibration] = useState<CalibrationDrag | null>(null);
+  const [calibrationSquares, setCalibrationSquares] = useState("4");
+  const [scalePercent, setScalePercent] = useState("100");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
@@ -800,6 +838,9 @@ export function SceneEditModal({
     setFile(null);
     setPreview(null);
     setDimensions({ width: scene.width, height: scene.height });
+    setCalibration(null);
+    setCalibrationSquares("4");
+    setScalePercent("100");
     setError("");
   }, [scene, open]);
 
@@ -807,12 +848,99 @@ export function SceneEditModal({
 
   const pickFile = (picked: File | null) => {
     setFile(picked);
+    setCalibration(null);
     if (!picked) return setPreview(null);
     const url = URL.createObjectURL(picked);
     setPreview(url);
     const image = new Image();
-    image.onload = () => setDimensions({ width: image.naturalWidth, height: image.naturalHeight });
+    image.onload = () => {
+      setDimensions({ width: image.naturalWidth, height: image.naturalHeight });
+      setGridSize(String(estimateGridSize(image.naturalWidth, image.naturalHeight)));
+      setOffsetX("0");
+      setOffsetY("0");
+    };
     image.src = url;
+  };
+
+  const calibrationPoint = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    return {
+      x: clampNumber(
+        ((event.clientX - rect.left) / Math.max(1, rect.width)) * dimensions.width,
+        0,
+        dimensions.width
+      ),
+      y: clampNumber(
+        ((event.clientY - rect.top) / Math.max(1, rect.height)) * dimensions.height,
+        0,
+        dimensions.height
+      ),
+    };
+  };
+
+  const startCalibration = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0) return;
+    const point = calibrationPoint(event);
+    setCalibration({
+      startX: point.x,
+      startY: point.y,
+      x: point.x,
+      y: point.y,
+      clientX: event.clientX,
+      clientY: event.clientY,
+    });
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const moveCalibration = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (!calibration) return;
+    const point = calibrationPoint(event);
+    setCalibration((current) => (current ? { ...current, x: point.x, y: point.y } : current));
+  };
+
+  const cancelCalibration = () => setCalibration(null);
+
+  const finishCalibration = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (!calibration) return;
+    const drag = calibration;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    setCalibration(null);
+    if (Math.hypot(event.clientX - drag.clientX, event.clientY - drag.clientY) < 6) return;
+    const squares = clampNumber(Math.round(Number(calibrationSquares) || 4), 1, 50);
+    const end = calibrationPoint(event);
+    const distance = Math.hypot(end.x - drag.startX, end.y - drag.startY);
+    if (distance < 1) return;
+    const nextGridSize = clampNumber(Math.round(distance / squares), 20, 300);
+    setGridSize(String(nextGridSize));
+    setOffsetX(String(normalizeGridOffset(drag.startX, nextGridSize)));
+    setOffsetY(String(normalizeGridOffset(drag.startY, nextGridSize)));
+    toast(
+      `Calibrated ${nextGridSize}px grid from ${squares} square${squares === 1 ? "" : "s"}.`,
+      "success"
+    );
+  };
+
+  const applyScale = () => {
+    const requested = clampNumber(Number(scalePercent) || 100, 10, 400) / 100;
+    const currentGridSize = clampNumber(Number(gridSize) || scene.gridSize, 20, 300);
+    const nextGridSize = clampNumber(Math.round(currentGridSize * requested), 20, 300);
+    const factor = nextGridSize / currentGridSize;
+    setCalibration(null);
+    setScalePercent("100");
+    if (Math.abs(factor - 1) < 0.001) return;
+    setGridSize(String(nextGridSize));
+    setDimensions((current) => ({
+      width: clampNumber(Math.round(current.width * factor), 100, 10_000),
+      height: clampNumber(Math.round(current.height * factor), 100, 10_000),
+    }));
+    setOffsetX((current) =>
+      String(normalizeGridOffset((Number(current) || 0) * factor, nextGridSize))
+    );
+    setOffsetY((current) =>
+      String(normalizeGridOffset((Number(current) || 0) * factor, nextGridSize))
+    );
   };
 
   const save = async (event: FormEvent) => {
@@ -887,9 +1015,29 @@ export function SceneEditModal({
           />
         </div>
         <div className="grid-calibration">
+          <div className="grid-calibration-head">
+            <strong>Grid calibration</strong>
+            <label className="grid-calibration-squares">
+              <span className="tiny muted">Squares in drag</span>
+              <Input
+                type="number"
+                min={1}
+                max={50}
+                value={calibrationSquares}
+                onChange={(event) => setCalibrationSquares(event.target.value)}
+                aria-label="Squares in calibration drag"
+              />
+            </label>
+          </div>
           <div
-            className="grid-calibration-canvas"
+            className={`grid-calibration-canvas ${calibration ? "is-calibrating" : ""}`}
             style={{ aspectRatio: `${dimensions.width} / ${dimensions.height}` }}
+            onPointerDown={startCalibration}
+            onPointerMove={moveCalibration}
+            onPointerUp={finishCalibration}
+            onPointerCancel={cancelCalibration}
+            aria-label="Grid calibration preview. Drag across map squares to set grid size and offset."
+            title="Drag across map squares to calibrate the grid."
           >
             {preview || scene.imageUrl ? (
               <img src={preview ?? scene.imageUrl ?? ""} alt="" />
@@ -940,18 +1088,55 @@ export function SceneEditModal({
                 );
               })()}
             </svg>
+            {calibration ? (
+              <>
+                <svg
+                  className="grid-calibration-drag"
+                  viewBox={`0 0 ${dimensions.width} ${dimensions.height}`}
+                  preserveAspectRatio="none"
+                  aria-hidden="true"
+                >
+                  <line
+                    x1={calibration.startX}
+                    y1={calibration.startY}
+                    x2={calibration.x}
+                    y2={calibration.y}
+                    stroke="#e5ca91"
+                    strokeWidth={2}
+                    strokeDasharray="7 5"
+                    vectorEffect="non-scaling-stroke"
+                  />
+                </svg>
+                <span
+                  className="grid-calibration-point"
+                  style={{
+                    left: `${(calibration.startX / dimensions.width) * 100}%`,
+                    top: `${(calibration.startY / dimensions.height) * 100}%`,
+                  }}
+                />
+                <span
+                  className="grid-calibration-point"
+                  style={{
+                    left: `${(calibration.x / dimensions.width) * 100}%`,
+                    top: `${(calibration.y / dimensions.height) * 100}%`,
+                  }}
+                />
+              </>
+            ) : null}
           </div>
           <p className="tiny muted">
-            Live grid preview — adjust size and offsets to align with the map.
+            Drag across {calibrationSquares || "4"} squares, starting on a grid intersection, to set
+            the grid size and offsets. Fine-tune with the numeric fields below.
           </p>
         </div>
         <div className="form-grid">
-          <Field label="Grid size (px)">
+          <Field label="Grid size (px)" hint="One square is 5 feet.">
             <Input
               type="number"
               value={gridSize}
               min={20}
               max={300}
+              aria-label="Grid size in pixels"
               onChange={(event) => setGridSize(event.target.value)}
             />
           </Field>
@@ -993,6 +1178,25 @@ export function SceneEditModal({
                 setDimensions((d) => ({ ...d, height: Number(event.target.value) || 1000 }))
               }
             />
+          </Field>
+          <Field
+            label="Scale map (%)"
+            hint="Resizes canvas, grid, and offsets together. Placed tokens keep their positions."
+          >
+            <div className="row" style={{ gap: 6 }}>
+              <Input
+                type="number"
+                min={10}
+                max={400}
+                step={5}
+                value={scalePercent}
+                aria-label="Scale map percent"
+                onChange={(event) => setScalePercent(event.target.value)}
+              />
+              <Button type="button" variant="ghost" onClick={applyScale}>
+                Apply
+              </Button>
+            </div>
           </Field>
         </div>
         <div className="modal-foot" style={{ margin: "4px -22px -20px", paddingTop: 14 }}>

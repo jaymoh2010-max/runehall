@@ -103,6 +103,9 @@ The character builder is already good enough for a core campaign at low levels. 
 - [x] **Scene polish (core)**
   - Scene duplication copies grid, fog, and tokens.
   - Grid calibration shows a live SVG overlay while adjusting grid size and offsets.
+  - Drag across a chosen number of map squares to set the grid pitch and both offsets in one gesture.
+  - The scale control resizes the canvas, grid, and offsets together so large maps stay manageable without losing alignment.
+  - The ruler uses PF2e diagonal movement: 5 feet, then 10 feet, alternating.
   - Fog now renders at capped scene resolution with offset-aware cells, so non-zero grid offsets align.
   - Verified duplication and the calibration preview in the browser.
   - Remaining: scene reordering, activate-on-create, background color, thumbnails, and player-safe preview.

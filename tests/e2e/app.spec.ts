@@ -237,6 +237,37 @@ test("GM places a token, chats, rolls, and opens the scenes manager", async ({ p
   await page.getByRole("button", { name: "Scenes" }).click();
   const scenes = page.getByRole("dialog", { name: "Scenes" });
   await expect(scenes).toBeVisible();
+
+  await scenes.getByRole("button", { name: "Edit" }).first().click();
+  const sceneEditor = page.getByRole("dialog", { name: /Edit/ });
+  await expect(sceneEditor.getByText("Grid calibration")).toBeVisible();
+  await expect(sceneEditor.getByLabel("Squares in calibration drag")).toHaveValue("4");
+  await expect(sceneEditor.getByLabel("Scale map percent")).toHaveValue("100");
+
+  const gridSizeInput = sceneEditor.getByLabel("Grid size in pixels");
+  await expect(gridSizeInput).toHaveValue("70");
+  const calibrationBox = await sceneEditor.locator(".grid-calibration-canvas").boundingBox();
+  expect(calibrationBox).not.toBeNull();
+  if (calibrationBox) {
+    await page.mouse.move(
+      calibrationBox.x + calibrationBox.width * 0.2,
+      calibrationBox.y + calibrationBox.height * 0.5
+    );
+    await page.mouse.down();
+    await page.mouse.move(
+      calibrationBox.x + calibrationBox.width * 0.8,
+      calibrationBox.y + calibrationBox.height * 0.5,
+      { steps: 6 }
+    );
+    await page.mouse.up();
+  }
+  await expect(gridSizeInput).not.toHaveValue("70");
+
+  await page.keyboard.press("Escape");
+  await expect(sceneEditor).toBeHidden();
+
+  await page.getByRole("button", { name: "Scenes" }).click();
+  await expect(scenes).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(scenes).toBeHidden();
 });
