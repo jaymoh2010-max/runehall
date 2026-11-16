@@ -10,6 +10,7 @@ import {
   Dices,
   Heart,
   Minus,
+  Moon,
   Pencil,
   Plus,
   Printer,
@@ -48,6 +49,7 @@ import {
 } from "../../shared/rules";
 import { DEGREE_LABELS, mod, rollFormula } from "../../shared/dice";
 import { currencyToCp } from "../../shared/inventory";
+import { applyLongRest } from "../../shared/rest";
 import { spellTraditionLabel, stripHtml } from "../../shared/compendium";
 import { conditionLabel } from "../../shared/tokens";
 import { api, ApiError, formatCp } from "../api";
@@ -132,6 +134,8 @@ export function CharacterSheetPage() {
   const [transferBusy, setTransferBusy] = useState(false);
   const [transferError, setTransferError] = useState("");
   const [transferLoading, setTransferLoading] = useState(false);
+  const [restOpen, setRestOpen] = useState(false);
+  const [restRough, setRestRough] = useState(false);
   const [conflict, setConflict] = useState<CharacterRecord | null>(null);
   const initialized = useRef(false);
   const skipInitialSave = useRef(true);
@@ -309,6 +313,25 @@ export function CharacterSheetPage() {
       draftRef.current = next;
       return next;
     });
+  };
+
+  const restPreview = draft && derived ? applyLongRest(draft, derived, { rough: restRough }) : null;
+
+  const takeLongRest = () => {
+    if (!draft || !derived) return;
+    const result = applyLongRest(draft, derived, { rough: restRough });
+    skipInitialSave.current = false;
+    draftRef.current = result.draft;
+    setDraft(result.draft);
+    setRestOpen(false);
+    setRestRough(false);
+    void saveDraft();
+    toast(
+      result.summary.healed > 0
+        ? `Long rest complete: +${result.summary.healed} HP, spell slots and focus reset.`
+        : "Long rest complete: spell slots and focus reset.",
+      "success"
+    );
   };
 
   const openTransfer = (mode: "item" | "coins", itemId: string | null = null) => {
@@ -513,6 +536,16 @@ export function CharacterSheetPage() {
           >
             Print / PDF
           </Button>
+          {canEdit ? (
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={<Moon size={14} />}
+              onClick={() => setRestOpen(true)}
+            >
+              Long rest
+            </Button>
+          ) : null}
           {character.permissions?.canEdit ? (
             <Link to={`/characters/${character.id}/edit`} className="btn btn-primary btn-sm">
               <Pencil size={14} /> Edit character
@@ -1586,6 +1619,116 @@ export function CharacterSheetPage() {
           ))}
         </div>
       )}
+
+      <Modal
+        open={restOpen}
+        onClose={() => {
+          setRestOpen(false);
+          setRestRough(false);
+        }}
+        title="Take a long rest"
+        subtitle="Eight hours of rest followed by daily preparations."
+        footer={
+          <>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setRestOpen(false);
+                setRestRough(false);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button variant="primary" icon={<Moon size={14} />} onClick={takeLongRest}>
+              Take long rest
+            </Button>
+          </>
+        }
+      >
+        {restPreview ? (
+          <div className="stack">
+            <ul className="rest-preview">
+              <li>
+                <span>Hit Points</span>
+                <strong>
+                  {restPreview.summary.hpBefore} → {restPreview.summary.hpAfter}
+                  {restPreview.summary.healed > 0
+                    ? ` (+${restPreview.summary.healed})`
+                    : " (already full)"}
+                </strong>
+              </li>
+              {restPreview.summary.tempHpCleared > 0 ? (
+                <li>
+                  <span>Temporary HP</span>
+                  <strong>{restPreview.summary.tempHpCleared} cleared</strong>
+                </li>
+              ) : null}
+              {restPreview.summary.slotsRestored > 0 ? (
+                <li>
+                  <span>Spell slots</span>
+                  <strong>{restPreview.summary.slotsRestored} restored</strong>
+                </li>
+              ) : null}
+              {restPreview.summary.divineFontRestored > 0 ? (
+                <li>
+                  <span>Divine font</span>
+                  <strong>{restPreview.summary.divineFontRestored} restored</strong>
+                </li>
+              ) : null}
+              {restPreview.summary.focusMax > 0 ? (
+                <li>
+                  <span>Focus points</span>
+                  <strong>
+                    {restPreview.summary.focusBefore} → {restPreview.summary.focusAfter}
+                  </strong>
+                </li>
+              ) : null}
+              {restPreview.summary.removedConditions.length ? (
+                <li>
+                  <span>Conditions ending</span>
+                  <strong>{restPreview.summary.removedConditions.join(", ")}</strong>
+                </li>
+              ) : null}
+              {restPreview.summary.reducedConditions.length ? (
+                <li>
+                  <span>Conditions reduced</span>
+                  <strong>
+                    {restPreview.summary.reducedConditions
+                      .map((entry) => `${entry.name} ${entry.from} → ${entry.to}`)
+                      .join(", ")}
+                  </strong>
+                </li>
+              ) : null}
+              {restPreview.summary.shieldLowered ? (
+                <li>
+                  <span>Stance</span>
+                  <strong>Shield lowered</strong>
+                </li>
+              ) : null}
+            </ul>
+            <Toggle
+              checked={restRough}
+              onChange={setRestRough}
+              label="Rough rest (half healing)"
+              title="Use this when the night was uncomfortable, interrupted, or spent without shelter."
+            />
+            <p className="tiny muted">
+              Prepared spells stay selected so you can adjust them for the new day. Hero points and
+              XP are unchanged, and companion HP is not touched. Other conditions are left for the
+              GM to adjudicate.
+            </p>
+            {restPreview.summary.hpBefore === 0 ? (
+              <div className="settings-note">
+                <CircleAlert size={16} />
+                <span>
+                  This character is at 0 HP. The rest will heal them and clear dying or unconscious
+                  once they are above 0 HP.
+                </span>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+      </Modal>
 
       <Modal
         open={transferOpen}

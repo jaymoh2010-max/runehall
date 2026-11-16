@@ -32,6 +32,7 @@ Runehall is built for a private group of roughly 4–10 players and a GM. It run
 - Autosaves every change; portable JSON export/import.
 - Route-level code splitting keeps the initial client small, with a gzip bundle budget in CI checks. Dialogs trap and restore focus, the app has a skip link, and reduced-motion preferences are honored.
 - At-the-table sheet with clickable skill/save/attack/spell rolls, HP, temp HP, hero points, focus points, conditions, and notes.
+- One-click **Long rest**: heals CON modifier (minimum 1) × level, clears temporary HP, resets spell slots, divine font, focus points, and shield, removes fatigued, and reduces doomed/drained by 1.
 
 ### Shared table
 - Scene maps with automatic dimensions, interactive grid calibration, and map scaling.
@@ -60,6 +61,7 @@ Runehall is built for a private group of roughly 4–10 players and a GM. It run
 - Shareable invite links (`/join/:code`) and codes. Signed-out friends create an account or sign in, then choose or create a character before joining.
 - LAN-aware invite links so players on other devices can join a locally hosted table.
 - GM/player roles, member management, player read-only views, party roster, journal visibility, and campaign settings.
+- The GM can apply a long rest to the whole party from the Party tab; linked tokens and character summaries update together.
 - Shared library and quick rules reference.
 
 ---

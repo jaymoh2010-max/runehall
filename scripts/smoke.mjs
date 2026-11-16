@@ -427,6 +427,45 @@ async function main() {
   }
   log("character saves use optimistic revisions and reject stale writes");
 
+  const restDraft = JSON.parse(JSON.stringify(forcedSave.payload.character.data));
+  restDraft.play.hp = 0;
+  restDraft.play.tempHp = 4;
+  restDraft.play.heroPoints = 2;
+  restDraft.play.conditions = [
+    { name: "Fatigued", value: null, duration: null },
+    { name: "Drained", value: 2, duration: null },
+  ];
+  await api(`/api/characters/${character.id}`, {
+    method: "PUT",
+    cookie: playerCookie,
+    body: { data: restDraft, force: true },
+  });
+  const partyRest = await api(`/api/campaigns/${campaign.id}/long-rest`, {
+    method: "POST",
+    cookie: gmCookie,
+  });
+  const restedCharacter = partyRest.payload.characters.find((entry) => entry.id === character.id);
+  if (!restedCharacter) throw new Error("Party long rest did not return the character");
+  if (restedCharacter.data.play.tempHp !== 0) {
+    throw new Error("Party long rest did not clear temporary HP");
+  }
+  if (restedCharacter.data.play.heroPoints !== 2) {
+    throw new Error("Party long rest changed hero points");
+  }
+  if (restedCharacter.data.play.conditions.some((entry) => entry.name === "Fatigued")) {
+    throw new Error("Party long rest did not remove fatigued");
+  }
+  const drained = restedCharacter.data.play.conditions.find((entry) => entry.name === "Drained");
+  if (!drained || drained.value !== 1) {
+    throw new Error("Party long rest did not reduce drained by 1");
+  }
+  if (restedCharacter.summary.currentHp !== restedCharacter.summary.hp) {
+    throw new Error("Party long rest did not heal the character to maximum HP");
+  }
+  if (partyRest.payload.rested < 1)
+    throw new Error("Party long rest reported no characters rested");
+  log("party long rest heals, clears temporary HP, and reduces rest conditions");
+
   const exported = await api(`/api/campaigns/${campaign.id}/export`, { cookie: gmCookie });
   if (exported.payload.format !== "runehall-campaign" || !exported.payload.characters?.length) {
     throw new Error("Campaign export did not contain the expected data");

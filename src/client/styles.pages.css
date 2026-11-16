@@ -2461,6 +2461,30 @@
   gap: 5px;
   z-index: 30;
 }
+.rest-preview {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+  padding: 12px 14px;
+  list-style: none;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.015);
+}
+.rest-preview li {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 14px;
+  font-size: 0.84rem;
+}
+.rest-preview li > span {
+  color: var(--muted);
+}
+.rest-preview li > strong {
+  text-align: right;
+  color: var(--gold-bright);
+}
 
 /* ==========================================================================
    Fatal error boundary

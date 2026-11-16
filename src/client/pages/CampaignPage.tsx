@@ -16,6 +16,7 @@ import {
   Images,
   LayoutGrid,
   LogOut,
+  Moon,
   Pencil,
   Plus,
   RefreshCw,
@@ -159,6 +160,7 @@ export function CampaignPage() {
   const [settingsXpMode, setSettingsXpMode] = useState<XpMode>("milestone");
   const [inviteOpen, setInviteOpen] = useState(false);
   const [levelUpBusy, setLevelUpBusy] = useState(false);
+  const [restBusy, setRestBusy] = useState(false);
 
   const isGm = campaign?.role === "gm";
   const tab: Tab =
@@ -581,6 +583,50 @@ export function CampaignPage() {
     }
   };
 
+  const longRestParty = async () => {
+    if (!id || !campaign) return;
+    if (
+      !window.confirm(
+        "Apply a long rest to every character in this campaign? This heals, resets spell slots and focus, clears temporary HP, removes fatigued, and reduces doomed and drained by 1."
+      )
+    ) {
+      return;
+    }
+    setRestBusy(true);
+    try {
+      const result = await api<{
+        rested: number;
+        skipped: number;
+        healed: number;
+        conditionsRemoved: number;
+        conditionsReduced: number;
+        slotsRestored: number;
+        focusRestored: number;
+        characters: CharacterRecord[];
+      }>(`/api/campaigns/${id}/long-rest`, { method: "POST" });
+      setCharacters(result.characters);
+      setTableData((current) =>
+        current ? { ...current, characters: result.characters } : current
+      );
+      if (result.rested > 0) {
+        toast(
+          `Long rest complete for ${result.rested} ${
+            result.rested === 1 ? "character" : "characters"
+          }: +${result.healed} HP, ${result.slotsRestored} spell slots restored, ${result.conditionsRemoved} conditions removed${
+            result.conditionsReduced ? `, ${result.conditionsReduced} reduced` : ""
+          }.`,
+          "success"
+        );
+      } else {
+        toast("No characters could rest. Check their drafts in the builder.", "info");
+      }
+    } catch (err) {
+      toast(errorMessage(err), "error");
+    } finally {
+      setRestBusy(false);
+    }
+  };
+
   const handleCharacterUpdated = (character: CharacterRecord) => {
     setCharacters((current) =>
       current.map((entry) => (entry.id === character.id ? character : entry))
@@ -752,14 +798,24 @@ export function CampaignPage() {
               </div>
               <div className="row wrap" style={{ gap: 8 }}>
                 {isGm ? (
-                  <Button
-                    variant="secondary"
-                    icon={<Sparkles size={15} />}
-                    loading={levelUpBusy}
-                    onClick={levelUpParty}
-                  >
-                    Level up party
-                  </Button>
+                  <>
+                    <Button
+                      variant="secondary"
+                      icon={<Moon size={15} />}
+                      loading={restBusy}
+                      onClick={longRestParty}
+                    >
+                      Long rest party
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      icon={<Sparkles size={15} />}
+                      loading={levelUpBusy}
+                      onClick={levelUpParty}
+                    >
+                      Level up party
+                    </Button>
+                  </>
                 ) : null}
                 <Button variant="primary" icon={<Plus size={15} />} onClick={createCharacter}>
                   New character

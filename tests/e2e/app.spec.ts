@@ -133,6 +133,14 @@ test("GM creates a campaign and builds a character through the lazy routes", asy
   await expect(page).toHaveURL(/\/characters\/[^/]+$/, { timeout: 15_000 });
   await expect(page.getByRole("heading", { name: "E2E Hero" })).toBeVisible();
   await expect(page.getByText("Initiative").first()).toBeVisible();
+
+  await page.getByRole("button", { name: "Long rest" }).click();
+  const restDialog = page.getByRole("dialog", { name: "Take a long rest" });
+  await expect(restDialog).toBeVisible();
+  await expect(restDialog.getByText("Hit Points")).toBeVisible();
+  await restDialog.getByRole("button", { name: "Take long rest" }).click();
+  await expect(restDialog).toBeHidden();
+  await expect(page.getByText(/Long rest complete/)).toBeVisible();
 });
 
 test("lazy library, compendium entry, rules, and account routes load", async ({ page }) => {

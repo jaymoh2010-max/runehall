@@ -520,6 +520,13 @@ Acceptance: a GM can prepare a full session in Runehall and start it with one â€
   - `npm run restore-drill` creates real campaign and upload data on an isolated server, takes a live backup, ships it, rejects a corrupted copy, restores into a fresh data directory, and boots the restored server.
   - The restored campaign ID, name, invite code, uploaded asset metadata, and file bytes are compared with the originals.
   - CI runs the drill on a fresh runner after the smoke test.
+- [x] **Long rest and daily preparations**
+  - Character sheets preview and apply an 8-hour long rest: heal CON modifier (minimum 1) Ã— level, clear temporary HP, reset spell slots, divine font, focus points, and shield, and remove rest-recoverable conditions.
+  - Fatigued ends, doomed and drained decrease by 1, wounded ends at full HP, and dying/unconscious clear once HP is above 0.
+  - Prepared spells stay selected for review, and hero points and XP are untouched.
+  - A rough-rest option halves natural healing, with a minimum of 1.
+  - GMs can apply the same rest to the whole party from the Party tab, with linked tokens and summaries updated.
+  - Covered by shared unit tests, the two-user smoke test, and the character-sheet browser flow.
 - [x] **Browser E2E**
   - Playwright covers first-user registration, Hall controls (retention, CSV export, filtering), campaign creation, the invite code, the character builder and sheet, lazy library/compendium/rules/account routes, a second player joining with the invite code, and table interactions (token placement, chat, dice rolls, and the scenes manager).
   - Player-safe campaign navigation is checked: GM-only tabs are absent for the player, and the GM sees the new member in Settings.

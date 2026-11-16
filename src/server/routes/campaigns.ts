@@ -47,7 +47,8 @@ import {
   rulesetContentMode,
   rulesetIncludesLegacy,
 } from "../../shared/content";
-import { characterSummary, normalizeCharacterDraft } from "../../shared/rules";
+import { characterSummary, computeCharacter, normalizeCharacterDraft } from "../../shared/rules";
+import { applyLongRest, type LongRestResult } from "../../shared/rest";
 import {
   isJournalKind,
   normalizeJournalAttachments,
@@ -601,6 +602,104 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
       request,
     });
     return reply.send({ leveled, atMaxLevel, skipped, characters });
+  });
+
+  app.post("/api/campaigns/:id/long-rest", async (request, reply) => {
+    if (!request.user) return reply.code(401).send({ error: "Sign in to continue." });
+    const { id } = request.params as { id: string };
+    const row = getCampaign(id);
+    if (!row) return reply.code(404).send({ error: "Campaign not found." });
+    if (roleFor(row, request.user.id) !== "gm") {
+      return reply.code(403).send({ error: "Only the GM can rest the party." });
+    }
+    const characterRows = db
+      .prepare("SELECT * FROM characters WHERE campaign_id = ?")
+      .all(id) as CharacterRow[];
+    if (!characterRows.length) {
+      return reply.code(400).send({ error: "There are no characters in this campaign yet." });
+    }
+
+    let rested = 0;
+    let skipped = 0;
+    let healed = 0;
+    let conditionsRemoved = 0;
+    let conditionsReduced = 0;
+    let slotsRestored = 0;
+    let focusRestored = 0;
+    for (const character of characterRows) {
+      let result: LongRestResult;
+      try {
+        const draft = normalizeCharacterDraft(JSON.parse(character.data), character.name);
+        result = applyLongRest(draft, computeCharacter(draft, contextForDraft(draft)));
+      } catch {
+        skipped += 1;
+        continue;
+      }
+      const summary = characterSummary(result.draft, contextForDraft(result.draft));
+      db.prepare(
+        "UPDATE characters SET data = ?, summary = ?, updated_at = ?, revision = revision + 1 WHERE id = ?"
+      ).run(JSON.stringify(result.draft), JSON.stringify(summary), now(), character.id);
+
+      const linkedTokens = db
+        .prepare("SELECT * FROM tokens WHERE character_id = ?")
+        .all(character.id) as TokenRow[];
+      for (const token of linkedTokens) {
+        db.prepare(
+          "UPDATE tokens SET name = ?, hp_max = ?, hp_current = ?, ac = ?, updated_at = ? WHERE id = ?"
+        ).run(
+          result.draft.name,
+          summary.hp,
+          result.draft.play.hp === null
+            ? summary.hp
+            : Math.max(0, Math.min(summary.hp, result.draft.play.hp)),
+          summary.ac,
+          now(),
+          token.id
+        );
+        const updatedToken = db
+          .prepare("SELECT * FROM tokens WHERE id = ?")
+          .get(token.id) as TokenRow;
+        app.broadcastCampaign(id, "token:updated", serializeToken(updatedToken));
+      }
+
+      app.broadcastCampaign(id, "character:updated", {
+        characterId: character.id,
+        summary,
+        name: result.draft.name,
+      });
+      rested += 1;
+      healed += result.summary.healed;
+      conditionsRemoved += result.summary.removedConditions.length;
+      conditionsReduced += result.summary.reducedConditions.length;
+      slotsRestored += result.summary.slotsRestored;
+      focusRestored += Math.max(0, result.summary.focusAfter - result.summary.focusBefore);
+    }
+
+    touchCampaign(id);
+    const characters = campaignCharacters(id).map((character) =>
+      serializeCharacter(character, character.owner_name, {
+        canEdit: true,
+        canView: true,
+      })
+    );
+    logAudit({
+      action: "campaign.long_rest",
+      actor: request.user,
+      targetType: "campaign",
+      targetId: id,
+      detail: `${rested} rested, ${healed} HP healed, ${conditionsRemoved} conditions removed, ${conditionsReduced} reduced`,
+      request,
+    });
+    return reply.send({
+      rested,
+      skipped,
+      healed,
+      conditionsRemoved,
+      conditionsReduced,
+      slotsRestored,
+      focusRestored,
+      characters,
+    });
   });
 
   // ---- Journal ------------------------------------------------------------
