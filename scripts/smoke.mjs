@@ -1292,6 +1292,69 @@ async function main() {
   reconnectedPlayer.close();
   log("disconnected client caught up from the authoritative snapshot");
 
+  const movementSetup = waitForEvent(
+    gmSocket,
+    "initiative:updated",
+    (payload) => payload.entries.length === 1 && payload.entries[0].id === "init_move_test"
+  );
+  gmSocket.emit("initiative:update", {
+    campaignId: campaign.id,
+    entries: [
+      {
+        id: "init_move_test",
+        tokenId: token.id,
+        name: "Smoke Hero",
+        initiative: 20,
+        color: "#c8a96b",
+        ownerId: player.id,
+        sceneId: scene.id,
+        movementUsed: 0,
+        diagonalSteps: 0,
+      },
+    ],
+    round: 1,
+    turnIndex: 0,
+  });
+  await movementSetup;
+
+  const firstMove = waitForEvent(gmSocket, "initiative:updated", (payload) => {
+    const active = payload.entries[payload.turnIndex];
+    return (
+      active?.id === "init_move_test" && active.movementUsed === 15 && active.diagonalSteps === 2
+    );
+  });
+  gmSocket.emit("token:move", {
+    campaignId: campaign.id,
+    sceneId: scene.id,
+    tokenId: token.id,
+    x: 560,
+    y: 500,
+  });
+  await firstMove;
+
+  const secondMove = waitForEvent(gmSocket, "initiative:updated", (payload) => {
+    const active = payload.entries[payload.turnIndex];
+    return (
+      active?.id === "init_move_test" && active.movementUsed === 20 && active.diagonalSteps === 3
+    );
+  });
+  gmSocket.emit("token:move", {
+    campaignId: campaign.id,
+    sceneId: scene.id,
+    tokenId: token.id,
+    x: 630,
+    y: 570,
+  });
+  await secondMove;
+
+  const movementReset = waitForEvent(gmSocket, "initiative:updated", (payload) => {
+    const active = payload.entries[payload.turnIndex];
+    return active?.id === "init_move_test" && active.movementUsed === 0;
+  });
+  gmSocket.emit("initiative:next", { campaignId: campaign.id, direction: 1 });
+  await movementReset;
+  log("movement carries the 5/10 diagonal count across moves and resets on the next turn");
+
   const smokeEncounter = (
     await api(`/api/campaigns/${campaign.id}/encounters`, {
       method: "POST",

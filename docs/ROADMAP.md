@@ -527,6 +527,13 @@ Acceptance: a GM can prepare a full session in Runehall and start it with one â€
   - A rough-rest option halves natural healing, with a minimum of 1.
   - GMs can apply the same rest to the whole party from the Party tab, with linked tokens and summaries updated.
   - Covered by shared unit tests, the two-user smoke test, and the character-sheet browser flow.
+- [x] **Per-turn movement tracking**
+  - Moving the active combatant's token adds straight-line grid distance to their turn.
+  - The diagonal count carries across separate moves in the same turn, so the first diagonal costs 5 feet and the second 10.
+  - The active initiative chip shows movement used against character Speed and turns red when over budget.
+  - Advancing or stepping back a turn resets movement; the GM also has an explicit reset control.
+  - Corrections made through the token editor do not count as movement.
+  - Covered by shared movement unit tests and a two-socket smoke check of diagonal carryover and turn reset.
 - [x] **Browser E2E**
   - Playwright covers first-user registration, Hall controls (retention, CSV export, filtering), campaign creation, the invite code, the character builder and sheet, lazy library/compendium/rules/account routes, a second player joining with the invite code, and table interactions (token placement, chat, dice rolls, and the scenes manager).
   - Player-safe campaign navigation is checked: GM-only tabs are absent for the player, and the GM sees the new member in Settings.

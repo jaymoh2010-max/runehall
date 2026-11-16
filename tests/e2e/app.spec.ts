@@ -230,6 +230,10 @@ test("GM places a token, chats, rolls, and opens the scenes manager", async ({ p
     timeout: 15_000,
   });
 
+  await page.getByRole("button", { name: "Roll initiative" }).click();
+  await expect(page.getByText("0 / 25 ft.", { exact: true })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole("button", { name: "Reset movement" })).toBeVisible();
+
   await page.getByPlaceholder(/Message the table/).fill("E2E table hello");
   await page.getByRole("button", { name: "Send" }).click();
   await expect(page.getByText("E2E table hello")).toBeVisible();

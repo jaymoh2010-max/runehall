@@ -6,6 +6,7 @@ import {
   Clock,
   Dices,
   Flag,
+  Footprints,
   RefreshCw,
   RotateCcw,
   Sparkles,
@@ -14,7 +15,7 @@ import {
   X,
   Zap,
 } from "lucide-react";
-import type { InitiativeEntry, Token } from "../../../shared/types";
+import type { CharacterRecord, InitiativeEntry, Token } from "../../../shared/types";
 import { Badge, Button, IconButton } from "../ui";
 import { signed } from "../../../shared/rules";
 import { groupHp, tokenConditionLabel } from "../../../shared/tokens";
@@ -22,6 +23,7 @@ import { groupHp, tokenConditionLabel } from "../../../shared/tokens";
 export function InitiativeBar({
   entries,
   tokens,
+  characters,
   round,
   turnIndex,
   isGm,
@@ -37,10 +39,12 @@ export function InitiativeBar({
   onClearState,
   onMove,
   onTriggerReady,
+  onResetMovement,
   onSelectToken,
 }: {
   entries: InitiativeEntry[];
   tokens: Token[];
+  characters: CharacterRecord[];
   round: number;
   turnIndex: number;
   isGm: boolean;
@@ -56,6 +60,7 @@ export function InitiativeBar({
   onClearState: (entryId: string) => void;
   onMove: (entryId: string, direction: -1 | 1) => void;
   onTriggerReady: (entryId: string) => void;
+  onResetMovement: () => void;
   onSelectToken: (tokenId: string) => void;
 }) {
   const active = entries[turnIndex] ?? null;
@@ -97,11 +102,24 @@ export function InitiativeBar({
               : token && token.hpMax !== null
                 ? `${token.hpCurrent ?? "?"} / ${token.hpMax} HP`
                 : null;
+            const character = token?.characterId
+              ? (characters.find((record) => record.id === token.characterId) ?? null)
+              : null;
+            const speed = character?.summary?.speed ?? null;
+            const movementUsed = Math.max(0, Math.round(entry.movementUsed ?? 0));
+            const overSpeed = speed !== null && movementUsed > speed;
+            const movementLabel =
+              movementUsed > 0 || (index === turnIndex && speed !== null)
+                ? `${movementUsed}${speed !== null ? ` / ${speed}` : ""} ft.`
+                : null;
             const detail = [
               entry.tokenId ? "Click to select token" : entry.name,
               group ? `${group.count} creatures` : null,
               hpLabel,
               !group && token?.ac !== null && token?.ac !== undefined ? `AC ${token.ac}` : null,
+              movementLabel
+                ? `Movement: ${movementUsed}${speed !== null ? ` / ${speed}` : ""} ft.${overSpeed ? " (over Speed)" : ""}`
+                : null,
               conditions.length ? `Conditions: ${conditions.join(", ")}` : null,
             ]
               .filter(Boolean)
@@ -122,6 +140,18 @@ export function InitiativeBar({
                 <span className="initiative-name">{entry.name}</span>
                 <strong>{signed(entry.initiative)}</strong>
                 {hpLabel ? <span className="initiative-hp">{hpLabel}</span> : null}
+                {movementLabel ? (
+                  <span
+                    className={`initiative-movement ${overSpeed ? "is-over" : ""}`}
+                    title={
+                      overSpeed
+                        ? "Movement exceeds this combatant's Speed"
+                        : "Straight-line movement used this turn"
+                    }
+                  >
+                    {movementLabel}
+                  </span>
+                ) : null}
                 {conditions.length ? (
                   <span className="initiative-condition-count" title={conditions.join(", ")}>
                     <Sparkles size={10} /> {conditions.length}
@@ -306,6 +336,9 @@ export function InitiativeBar({
         <div className="initiative-controls">
           {entries.length ? (
             <>
+              <IconButton label="Reset movement" onClick={onResetMovement} disabled={!active}>
+                <Footprints size={16} />
+              </IconButton>
               <IconButton label="Previous turn" onClick={onPrevious}>
                 <ChevronLeft size={16} />
               </IconButton>

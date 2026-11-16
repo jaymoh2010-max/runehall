@@ -46,7 +46,7 @@ Runehall is built for a private group of roughly 4–10 players and a GM. It run
 - PF2e distance measurement with 5/10 alternating diagonals, pointer pings, and live presence.
 - Server-side dice with PF2e degrees of success, secret GM rolls/whispers, and persistent table chat.
 - GM roll requests with one-click player prefill in the dice tray.
-- Initiative tracker with GM rolls, individual reroll, current turn, round counter, add/remove, next/previous, HP, and condition counts.
+- Initiative tracker with GM rolls, individual reroll, current turn, round counter, add/remove, next/previous, HP, condition counts, and per-turn movement tracking with PF2e 5/10 diagonal carryover and Speed warnings.
 - Keyboard shortcuts and a distraction-free full-screen/theater table mode.
 - Character sheets can roll directly into the campaign log.
 

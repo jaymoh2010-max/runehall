@@ -1074,6 +1074,10 @@ export interface InitiativeEntry {
   delayed?: boolean;
   /** The combatant readied an action. */
   readied?: boolean;
+  /** Feet moved during the current turn. */
+  movementUsed?: number;
+  /** Diagonal steps taken during the current turn, for PF2e 5/10 diagonals. */
+  diagonalSteps?: number;
 }
 
 export type JournalKind = "note" | "handout";

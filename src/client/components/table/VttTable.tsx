@@ -504,6 +504,15 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
     );
   };
 
+  const resetMovement = () => {
+    if (!initiative.length) return;
+    emitInitiative(
+      initiative.map((entry, index) =>
+        index === turnIndex ? { ...entry, movementUsed: 0, diagonalSteps: 0 } : entry
+      )
+    );
+  };
+
   const moveInitiativeEntry = (entryId: string, direction: -1 | 1) => {
     const index = initiative.findIndex((entry) => entry.id === entryId);
     const target = index + direction;
@@ -807,6 +816,7 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
           <InitiativeBar
             entries={initiative}
             tokens={tokens}
+            characters={characters}
             round={round}
             turnIndex={turnIndex}
             isGm={isGm}
@@ -822,6 +832,7 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
             onClearState={clearInitiativeState}
             onMove={moveInitiativeEntry}
             onTriggerReady={triggerReady}
+            onResetMovement={resetMovement}
             onSelectToken={setSelectedTokenId}
           />
         </div>

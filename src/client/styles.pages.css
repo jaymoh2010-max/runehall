@@ -6340,6 +6340,19 @@
   background: rgba(210, 115, 115, 0.07);
   color: #e7b1b1;
 }
+.initiative-movement {
+  border-radius: 999px;
+  border: 1px solid rgba(200, 169, 107, 0.22);
+  background: rgba(200, 169, 107, 0.06);
+  color: var(--gold-bright);
+  font-size: 0.62rem;
+  padding: 1px 5px;
+}
+.initiative-movement.is-over {
+  border-color: rgba(210, 115, 115, 0.38);
+  background: rgba(210, 115, 115, 0.1);
+  color: #e7b1b1;
+}
 .initiative-condition-count {
   display: inline-flex;
   align-items: center;

@@ -8,6 +8,7 @@ import { characterSummary, computeCharacter, normalizeCharacterDraft } from "../
 import { rollFormula, validateFormula } from "../shared/dice";
 import { normalizeTokenConditions, tickTokenConditions } from "../shared/tokens";
 import { sortInitiativeEntries } from "../shared/initiative";
+import { applyGridMovement } from "../shared/movement";
 import { normalizeAoeTemplate, normalizeAoeTemplates } from "../shared/templates";
 import type {
   ClientToServerEvents,
@@ -167,6 +168,8 @@ function initiativeEntryForToken(row: TokenRow, value?: number): InitiativeEntry
     sceneId: row.scene_id,
     groupId: row.group_id,
     perception: bonus,
+    movementUsed: 0,
+    diagonalSteps: 0,
   };
 }
 
@@ -185,6 +188,8 @@ function initiativeEntryForGroup(rows: TokenRow[]): InitiativeEntry {
     sceneId: anchor.scene_id,
     groupId: anchor.group_id,
     perception: bonus,
+    movementUsed: 0,
+    diagonalSteps: 0,
   };
 }
 
@@ -430,6 +435,21 @@ export function registerSocketServer(io: TypedServer): void {
       }
       const nx = clamp(Number(x) || 0, 0, scene.width);
       const ny = clamp(Number(y) || 0, 0, scene.height);
+      const state = ensureState(campaignId);
+      const entries = serializeInitiative(JSON.parse(state.initiative || "[]"));
+      const active = entries[state.turn_index];
+      const movement =
+        active && active.sceneId === sceneId && active.tokenId === tokenId
+          ? applyGridMovement(
+              {
+                movementUsed: active.movementUsed ?? 0,
+                diagonalSteps: active.diagonalSteps ?? 0,
+              },
+              nx - row.x,
+              ny - row.y,
+              scene.grid_size
+            )
+          : null;
       db.prepare("UPDATE tokens SET x = ?, y = ?, updated_at = ? WHERE id = ?").run(
         nx,
         ny,
@@ -437,6 +457,17 @@ export function registerSocketServer(io: TypedServer): void {
         tokenId
       );
       io.to(room(campaignId)).emit("token:moved", { tokenId, sceneId, x: nx, y: ny });
+      if (active && movement && movement.step.feet > 0) {
+        entries[state.turn_index] = {
+          ...active,
+          movementUsed: movement.movementUsed,
+          diagonalSteps: movement.diagonalSteps,
+        };
+        db.prepare(
+          "UPDATE campaign_state SET initiative = ?, updated_at = ? WHERE campaign_id = ?"
+        ).run(JSON.stringify(entries), now(), campaignId);
+        broadcastInitiative(io, campaignId, ensureState(campaignId));
+      }
       touchCampaign(campaignId);
     });
 
@@ -878,15 +909,27 @@ export function registerSocketServer(io: TypedServer): void {
                   : undefined,
               delayed: entry.delayed === true,
               readied: entry.readied === true,
+              movementUsed: safeInt(entry.movementUsed, 0, 0, 100_000),
+              diagonalSteps: safeInt(entry.diagonalSteps, 0, 0, 10_000),
             }))
         : [];
       const current = ensureState(campaignId);
+      const nextTurn = safeInt(turnIndex, 0, 0, Math.max(0, clean.length - 1));
+      const previousEntries = serializeInitiative(JSON.parse(current.initiative || "[]"));
+      const previousActiveId = previousEntries[current.turn_index]?.id ?? null;
+      const nextActiveId = clean[nextTurn]?.id ?? null;
+      // A new combatant's turn starts with a fresh movement count. Tie-order
+      // changes keep the same active id and preserve the current total.
+      const normalized =
+        previousActiveId === nextActiveId
+          ? clean
+          : clean.map((entry) => ({ ...entry, movementUsed: 0, diagonalSteps: 0 }));
       db.prepare(
         "UPDATE campaign_state SET initiative = ?, round = ?, turn_index = ?, updated_at = ? WHERE campaign_id = ?"
       ).run(
-        JSON.stringify(clean),
+        JSON.stringify(normalized),
         safeInt(round, current.round, 1, 999),
-        safeInt(turnIndex, 0, 0, Math.max(0, clean.length - 1)),
+        nextTurn,
         now(),
         campaignId
       );
@@ -909,6 +952,18 @@ export function registerSocketServer(io: TypedServer): void {
       } else if (turn < 0) {
         turn = entries.length - 1;
         round = Math.max(1, round - 1);
+      }
+      // Movement is per turn. Reset both the turn that just ended and the
+      // turn that is starting (the latter matters when stepping backward).
+      if (entries[state.turn_index]) {
+        entries[state.turn_index] = {
+          ...entries[state.turn_index],
+          movementUsed: 0,
+          diagonalSteps: 0,
+        };
+      }
+      if (entries[turn]) {
+        entries[turn] = { ...entries[turn], movementUsed: 0, diagonalSteps: 0 };
       }
       if (entries[turn]?.readied) {
         entries[turn] = { ...entries[turn], readied: false };
@@ -965,6 +1020,8 @@ export function registerSocketServer(io: TypedServer): void {
             ? initiativeEntryForToken(row)
             : { ...current, initiative: rollFormula("1d20", {}).d20 ?? 10 }),
         id: current.id,
+        movementUsed: current.movementUsed ?? 0,
+        diagonalSteps: current.diagonalSteps ?? 0,
       };
       entries.sort((a, b) => b.initiative - a.initiative || a.name.localeCompare(b.name));
       const nextTurn = activeId
@@ -983,9 +1040,9 @@ export function registerSocketServer(io: TypedServer): void {
     socket.on("initiative:remove", ({ campaignId, entryId }) => {
       if (!requireGm(socket, campaignId)) return;
       const state = ensureState(campaignId);
-      const entries = serializeInitiative(JSON.parse(state.initiative || "[]")).filter(
-        (entry) => entry.id !== entryId
-      );
+      const entries = serializeInitiative(JSON.parse(state.initiative || "[]"))
+        .filter((entry) => entry.id !== entryId)
+        .map((entry) => ({ ...entry, movementUsed: 0, diagonalSteps: 0 }));
       db.prepare(
         "UPDATE campaign_state SET initiative = ?, turn_index = 0, updated_at = ? WHERE campaign_id = ?"
       ).run(JSON.stringify(entries), now(), campaignId);
