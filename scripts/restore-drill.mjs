@@ -89,7 +89,9 @@ async function stopServer(server) {
 }
 
 async function waitForServer(server) {
-  const deadline = Date.now() + 30_000;
+  // The first tsx boot in a cold container can take a while; the earlier
+  // 30-second window was too tight for the Docker restore drill.
+  const deadline = Date.now() + 60_000;
   while (Date.now() < deadline) {
     if (server.child.exitCode !== null) {
       throw new Error(`Server exited during startup.\n${server.state.output}`);
@@ -102,7 +104,7 @@ async function waitForServer(server) {
     }
     await delay(250);
   }
-  throw new Error(`Server did not become healthy within 30 seconds.\n${server.state.output}`);
+  throw new Error(`Server did not become healthy within 60 seconds.\n${server.state.output}`);
 }
 
 function cookiesFrom(response) {
