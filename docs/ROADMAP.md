@@ -13,7 +13,7 @@
 ### What is still prototype-level
 - **Rules automation is partial.** Feat prerequisites are enforced for mechanical requirements, while complex/story prerequisites are flagged for review; some subclass/feature/item effects are manual; companions and split-caster casting restrictions are not automated. This can make a sheet look correct while missing situational bonuses.
 - **Realtime recovery is revision-aware.** Reconnects refetch the authoritative table, campaign revisions detect missed events, character saves reject stale writes, and the table socket/state layer now lives in a tested hook with pure event reducers.
-- **Table polish is deep.** AoE templates, condition values/durations, multi-select, group drag, bulk actions, scene playlists, generated thumbnails, combat-log filters, group checks, delay/ready/ties, first-run setup, GM-drawn walls/doors, line-of-sight fog, per-token vision radii, and explored-area memory are built. Light levels, darkvision, and per-player current vision remain future work.
+- **Table polish is deep.** AoE templates, condition values/durations, multi-select, group drag, bulk actions, scene playlists, generated thumbnails, combat-log filters, group checks, delay/ready/ties, first-run setup, GM-drawn walls/doors, line-of-sight fog, per-token vision radii, light sources, normal/low-light/darkvision senses, shared/per-player vision, and explored-area memory are built. Full light-color rendering and concealment automation remain future work.
 - **Content volume needs curation.** The builder exposes 540 backgrounds and 29 classes by default. That is impressive, but overwhelming; not every option has the same automation quality.
 - **Test coverage is unit + smoke + browser E2E + simulation.** Dice, rules math, compendium integrity, content tiers, security, and migrations are unit-tested; the GM/player campaign flow and registration/admin flows have an automated smoke test; Playwright covers registration, admin audit controls, campaign creation, the character builder and sheet, compendium routes, player-safe campaign access, and table interactions (token placement, chat, dice rolls, and the scenes manager). Upload edge cases (bad signatures, mismatched/unsupported types, empty files, oversized files and dimensions, foreign campaigns, and cleanup after rejection) are covered by the smoke test.
 - **Code health has guardrails.** Route-level splitting keeps the entry bundle near 107â€“122 KB gzip, and `npm run check` now covers types, lint (ESLint), formatting (Prettier), tests, build, and bundle budgets. The table state layer is tested; some large components remain.
@@ -422,8 +422,10 @@ Acceptance: a GM can prepare a full session in Runehall and start it with one â€
 - [x] **Walls, doors, and line-of-sight fog**
   - The GM can draw grid-snapped walls and doors, click a door to open or close it, right-click a wall to delete it, and clear all walls.
   - Walls and closed doors block sight; open doors do not.
-  - Optional line-of-sight fog makes players see cells visible from character tokens using each token's vision radius (default 60 ft). Earlier explored cells stay dimly visible per player in local storage.
-  - Walls, doors, and line-of-sight are window/shared-party aids; light levels, darkvision, and per-player current vision remain future work.
+  - Optional line-of-sight fog makes players see cells visible from their tokens using each token's vision radius, light radius, and normal/low-light/darkvision senses. Earlier explored cells stay dimly visible per player in local storage.
+  - Scenes can use shared party vision or per-player vision; per-player scenes use each player's owned tokens. GM preview falls back to shared vision.
+  - Ambient light is configurable as bright, dim, or darkness. Token light sources create bright light and a dim ring outside it.
+  - Dim light is rendered as a lighter fog rather than full black. Concealment and light-color rendering are not automated.
   - Wall data is persisted per scene, copied on duplication, exported/imported with campaigns, and broadcast to connected clients.
   - Movement does not collide with walls yet.
   - Covered by shared vision tests, a two-socket smoke check, and a browser wall-drawing flow.

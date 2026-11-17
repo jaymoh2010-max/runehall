@@ -1022,6 +1022,10 @@ export interface Scene {
   walls: Wall[];
   /** Use wall-based line-of-sight fog for players instead of manual reveal only. */
   losEnabled: boolean;
+  /** Ambient light level used by the token lighting model. */
+  ambientLight: AmbientLight;
+  /** Shared party perception or each player sees only from their own tokens. */
+  visionScope: PartyVisionScope;
   sortOrder: number;
   createdAt: number;
   updatedAt: number;
@@ -1048,6 +1052,10 @@ export interface Wall {
   open?: boolean;
 }
 
+export type AmbientLight = "bright" | "dim" | "darkness";
+export type TokenVisionMode = "normal" | "low-light" | "darkvision";
+export type PartyVisionScope = "shared" | "per-player";
+
 export interface Token {
   id: string;
   sceneId: string;
@@ -1061,6 +1069,10 @@ export interface Token {
   size: number;
   /** Per-token sight radius in feet. 0 disables vision from this token. */
   visionRadius: number;
+  /** Light emitted by this token in feet of bright light. 0 emits no light. */
+  lightRadius: number;
+  /** Senses used when calculating what this token can see. */
+  visionMode: TokenVisionMode;
   color: string;
   hpCurrent: number | null;
   hpMax: number | null;

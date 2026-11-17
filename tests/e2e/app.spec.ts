@@ -270,6 +270,8 @@ test("GM places a token, chats, rolls, and opens the scenes manager", async ({ p
   await page.getByRole("button", { name: "Edit token" }).click();
   const tokenEditor = page.getByRole("dialog", { name: /Edit “E2E Hero”/ });
   await expect(tokenEditor.getByLabel(/Vision radius/)).toHaveValue("60");
+  await expect(tokenEditor.getByLabel(/Senses/)).toHaveValue("normal");
+  await expect(tokenEditor.getByLabel(/Light radius/)).toHaveValue("0");
   await page.keyboard.press("Escape");
   await expect(tokenEditor).toBeHidden();
 
@@ -313,6 +315,8 @@ test("GM places a token, chats, rolls, and opens the scenes manager", async ({ p
   const sceneEditor = page.getByRole("dialog", { name: /Edit/ });
   await expect(sceneEditor.getByText("Grid calibration")).toBeVisible();
   await expect(sceneEditor.getByText("Line-of-sight fog")).toBeVisible();
+  await expect(sceneEditor.getByText("Ambient light")).toBeVisible();
+  await expect(sceneEditor.getByText("Vision scope")).toBeVisible();
   await expect(sceneEditor.getByLabel("Squares in calibration drag")).toHaveValue("4");
   await expect(sceneEditor.getByLabel("Scale map percent")).toHaveValue("100");
 

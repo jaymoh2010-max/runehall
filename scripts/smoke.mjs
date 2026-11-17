@@ -1081,7 +1081,7 @@ async function main() {
   await api(`/api/scenes/${scene.id}`, {
     method: "PATCH",
     cookie: gmCookie,
-    body: { losEnabled: true },
+    body: { losEnabled: true, ambientLight: "darkness", visionScope: "per-player" },
   });
   playerSocket.emit("scene:walls", {
     campaignId: campaign.id,
@@ -1091,10 +1091,15 @@ async function main() {
   await delay(200);
   const wallsTable = await api(`/api/campaigns/${campaign.id}/table`, { cookie: gmCookie });
   const wallsScene = wallsTable.payload.scenes.find((entry) => entry.id === scene.id);
-  if (!wallsScene?.losEnabled || wallsScene.walls?.length !== 1) {
-    throw new Error("Wall persistence or line-of-sight setting was not saved");
+  if (
+    !wallsScene?.losEnabled ||
+    wallsScene.walls?.length !== 1 ||
+    wallsScene.ambientLight !== "darkness" ||
+    wallsScene.visionScope !== "per-player"
+  ) {
+    throw new Error("Wall persistence or lighting/vision settings were not saved");
   }
-  log("GM walls persist, players cannot replace them, and line-of-sight is saved");
+  log("GM walls persist, players cannot replace them, and lighting/vision settings are saved");
 
   const movedPromise = waitForEvent(
     gmSocket,
@@ -1111,11 +1116,15 @@ async function main() {
       y: 100,
       size: 1,
       visionRadius: 30,
+      lightRadius: 20,
+      visionMode: "darkvision",
       color: "#c8a96b",
     },
   });
   if (!token) throw new Error("GM could not create a character token");
-  if (token.visionRadius !== 30) throw new Error("Token vision radius was not saved");
+  if (token.visionRadius !== 30 || token.lightRadius !== 20 || token.visionMode !== "darkvision") {
+    throw new Error("Token vision/light settings were not saved");
+  }
   const revisionPromise = waitForEvent(
     gmSocket,
     "campaign:revision",

@@ -1,7 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { ImagePlus, Minus, Plus, Shield, Swords, Trash2, Upload, UserRound } from "lucide-react";
-import type { CampaignMember, CharacterRecord, Token, TokenCondition } from "../../../shared/types";
+import type {
+  CampaignMember,
+  CharacterRecord,
+  Token,
+  TokenCondition,
+  TokenVisionMode,
+} from "../../../shared/types";
 import { tokenConditionLabel } from "../../../shared/tokens";
+import { TOKEN_VISION_OPTIONS } from "../../../shared/lighting";
 import { uploadImage } from "../../api";
 import { errorMessage, useToasts } from "../../stores";
 import { Avatar, Button, Field, Input, Modal, Select, Tag, Toggle } from "../ui";
@@ -38,6 +45,8 @@ export function TokenEditModal({
   const [ac, setAc] = useState("");
   const [size, setSize] = useState("1");
   const [visionRadius, setVisionRadius] = useState("60");
+  const [lightRadius, setLightRadius] = useState("0");
+  const [visionMode, setVisionMode] = useState<TokenVisionMode>("normal");
   const [color, setColor] = useState("#c8a96b");
   const [ownerId, setOwnerId] = useState("");
   const [hidden, setHidden] = useState(false);
@@ -58,6 +67,8 @@ export function TokenEditModal({
     setAc(token.ac === null ? "" : String(token.ac));
     setSize(String(token.size));
     setVisionRadius(String(token.visionRadius ?? 60));
+    setLightRadius(String(token.lightRadius ?? 0));
+    setVisionMode(token.visionMode ?? "normal");
     setColor(token.color);
     setOwnerId(token.ownerId ?? "");
     setHidden(token.hidden);
@@ -127,6 +138,8 @@ export function TokenEditModal({
       ac: ac === "" ? null : Number(ac),
       size: Number(size) || 1,
       visionRadius: Math.max(0, Math.min(240, Math.round(Number(visionRadius) || 0))),
+      lightRadius: Math.max(0, Math.min(240, Math.round(Number(lightRadius) || 0))),
+      visionMode,
       color,
       ownerId: ownerId || null,
       hidden,
@@ -267,7 +280,7 @@ export function TokenEditModal({
             </Field>
             <Field
               label="Vision radius (ft)"
-              hint="0 disables this token's vision. Line-of-sight is shared by the party."
+              hint="0 disables vision. The scene can share party vision or use per-player vision."
             >
               <Input
                 type="number"
@@ -276,6 +289,31 @@ export function TokenEditModal({
                 step={5}
                 value={visionRadius}
                 onChange={(event) => setVisionRadius(event.target.value)}
+              />
+            </Field>
+            <Field label="Senses">
+              <Select
+                value={visionMode}
+                onChange={(event) => setVisionMode(event.target.value as TokenVisionMode)}
+              >
+                {TOKEN_VISION_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <Field
+              label="Light radius (ft)"
+              hint="Bright light; dim light extends to twice this radius."
+            >
+              <Input
+                type="number"
+                min={0}
+                max={240}
+                step={5}
+                value={lightRadius}
+                onChange={(event) => setLightRadius(event.target.value)}
               />
             </Field>
           </div>

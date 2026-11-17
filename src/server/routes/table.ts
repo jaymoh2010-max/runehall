@@ -22,6 +22,7 @@ import {
   touchCampaign,
 } from "../serialize";
 import { clamp, now, safeInt, safeString } from "../util";
+import { normalizeAmbientLight, normalizePartyVisionScope } from "../../shared/lighting";
 
 function ensureState(campaignId: string) {
   const state = db.prepare("SELECT * FROM campaign_state WHERE campaign_id = ?").get(campaignId) as
@@ -205,8 +206,8 @@ export async function registerTableRoutes(app: FastifyInstance): Promise<void> {
     const ts = now();
     const name = `${source.name} (copy)`.slice(0, 80);
     db.prepare(
-      `INSERT INTO scenes (id, campaign_id, name, image_url, thumbnail_url, width, height, grid_size, grid_offset_x, grid_offset_y, fog_enabled, fog_revealed, templates, walls, los_enabled, sort_order, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO scenes (id, campaign_id, name, image_url, thumbnail_url, width, height, grid_size, grid_offset_x, grid_offset_y, fog_enabled, fog_revealed, templates, walls, los_enabled, ambient_light, vision_scope, sort_order, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       sceneId,
       source.campaign_id,
@@ -223,6 +224,8 @@ export async function registerTableRoutes(app: FastifyInstance): Promise<void> {
       source.templates,
       source.walls,
       source.los_enabled,
+      source.ambient_light,
+      source.vision_scope,
       order.next,
       ts,
       ts
@@ -232,8 +235,8 @@ export async function registerTableRoutes(app: FastifyInstance): Promise<void> {
       .all(id) as TokenRow[];
     for (const token of sourceTokens) {
       db.prepare(
-        `INSERT INTO tokens (id, scene_id, name, image_url, character_id, owner_id, x, y, size, vision_radius, color, hp_current, hp_max, ac, initiative_bonus, group_id, group_name, conditions, hidden, locked, sort_order, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        `INSERT INTO tokens (id, scene_id, name, image_url, character_id, owner_id, x, y, size, vision_radius, light_radius, vision_mode, color, hp_current, hp_max, ac, initiative_bonus, group_id, group_name, conditions, hidden, locked, sort_order, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).run(
         `tok_${Math.random().toString(16).slice(2, 14)}${Date.now().toString(16)}`,
         sceneId,
@@ -245,6 +248,8 @@ export async function registerTableRoutes(app: FastifyInstance): Promise<void> {
         token.y,
         token.size,
         token.vision_radius,
+        token.light_radius,
+        token.vision_mode,
         token.color,
         token.hp_current,
         token.hp_max,
@@ -311,8 +316,16 @@ export async function registerTableRoutes(app: FastifyInstance): Promise<void> {
         : clamp(Number(body.gridOffsetY) || 0, -gridSize, gridSize);
     const fogEnabled = body.fogEnabled === undefined ? row.fog_enabled : body.fogEnabled ? 1 : 0;
     const losEnabled = body.losEnabled === undefined ? row.los_enabled : body.losEnabled ? 1 : 0;
+    const ambientLight =
+      body.ambientLight === undefined
+        ? normalizeAmbientLight(row.ambient_light)
+        : normalizeAmbientLight(body.ambientLight);
+    const visionScope =
+      body.visionScope === undefined
+        ? normalizePartyVisionScope(row.vision_scope)
+        : normalizePartyVisionScope(body.visionScope);
     db.prepare(
-      `UPDATE scenes SET name = ?, image_url = ?, thumbnail_url = ?, width = ?, height = ?, grid_size = ?, grid_offset_x = ?, grid_offset_y = ?, fog_enabled = ?, los_enabled = ?, updated_at = ? WHERE id = ?`
+      `UPDATE scenes SET name = ?, image_url = ?, thumbnail_url = ?, width = ?, height = ?, grid_size = ?, grid_offset_x = ?, grid_offset_y = ?, fog_enabled = ?, los_enabled = ?, ambient_light = ?, vision_scope = ?, updated_at = ? WHERE id = ?`
     ).run(
       name,
       imageUrl,
@@ -324,6 +337,8 @@ export async function registerTableRoutes(app: FastifyInstance): Promise<void> {
       gridOffsetY,
       fogEnabled,
       losEnabled,
+      ambientLight,
+      visionScope,
       now(),
       id
     );

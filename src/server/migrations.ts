@@ -436,4 +436,14 @@ export const migrations: Migration[] = [
       ALTER TABLE tokens ADD COLUMN vision_radius INTEGER NOT NULL DEFAULT 60;
     `,
   },
+  {
+    version: 20,
+    name: "lighting_and_vision_senses",
+    sql: `
+      ALTER TABLE scenes ADD COLUMN ambient_light TEXT NOT NULL DEFAULT 'bright';
+      ALTER TABLE scenes ADD COLUMN vision_scope TEXT NOT NULL DEFAULT 'shared';
+      ALTER TABLE tokens ADD COLUMN light_radius INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE tokens ADD COLUMN vision_mode TEXT NOT NULL DEFAULT 'normal';
+    `,
+  },
 ];

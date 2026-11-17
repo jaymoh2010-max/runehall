@@ -11,6 +11,7 @@ import { sortInitiativeEntries } from "../shared/initiative";
 import { applyGridMovement } from "../shared/movement";
 import { normalizeAoeTemplate, normalizeAoeTemplates } from "../shared/templates";
 import { normalizeWalls } from "../shared/walls";
+import { normalizeTokenVisionMode } from "../shared/lighting";
 import type {
   ClientToServerEvents,
   InitiativeEntry,
@@ -331,11 +332,13 @@ function createToken(
       ? null
       : safeInt(incoming.initiativeBonus, 0, -100, 1000);
   const visionRadius = clamp(safeInt(incoming.visionRadius, 60, 0, 240), 0, 240);
+  const lightRadius = clamp(safeInt(incoming.lightRadius, 0, 0, 240), 0, 240);
+  const visionMode = normalizeTokenVisionMode(incoming.visionMode);
   const groupId = incoming.groupId ? safeString(incoming.groupId, "", 80) || null : null;
   const groupName = groupId ? safeString(incoming.groupName, name, 80) : null;
   db.prepare(
-    `INSERT INTO tokens (id, scene_id, name, image_url, character_id, owner_id, x, y, size, vision_radius, color, hp_current, hp_max, ac, initiative_bonus, group_id, group_name, conditions, hidden, locked, sort_order, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO tokens (id, scene_id, name, image_url, character_id, owner_id, x, y, size, vision_radius, light_radius, vision_mode, color, hp_current, hp_max, ac, initiative_bonus, group_id, group_name, conditions, hidden, locked, sort_order, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     id,
     sceneId,
@@ -347,6 +350,8 @@ function createToken(
     y,
     size,
     visionRadius,
+    lightRadius,
+    visionMode,
     safeString(incoming.color, "#c8a96b", 30),
     hpCurrent,
     hpMax,
@@ -512,6 +517,15 @@ export function registerSocketServer(io: TypedServer): void {
             "vision_radius",
             clamp(safeInt(token.visionRadius, row.vision_radius ?? 60, 0, 240), 0, 240)
           );
+        }
+        if (token.lightRadius !== undefined) {
+          add(
+            "light_radius",
+            clamp(safeInt(token.lightRadius, row.light_radius ?? 0, 0, 240), 0, 240)
+          );
+        }
+        if (token.visionMode !== undefined) {
+          add("vision_mode", normalizeTokenVisionMode(token.visionMode));
         }
         if (token.color !== undefined) add("color", safeString(token.color, row.color, 30));
         if (token.hpMax !== undefined)

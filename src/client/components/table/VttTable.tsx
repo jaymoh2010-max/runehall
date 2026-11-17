@@ -788,6 +788,9 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
               {scenes.find((scene) => scene.id === activeSceneId)?.name ?? "another scene"}
             </strong>
             .
+            {activeScene.visionScope === "per-player"
+              ? " Per-player scenes use shared party vision in preview."
+              : ""}
           </span>
           <Button size="sm" variant="ghost" onClick={exitPreview}>
             Exit preview
@@ -854,6 +857,7 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
             wallMode={previewing ? false : wallMode}
             wallKind={wallKind}
             onWalls={saveWalls}
+            previewMode={previewing}
             onPing={(x, y) =>
               getSocket().emit("pointer", { campaignId, sceneId: activeScene.id, x, y })
             }

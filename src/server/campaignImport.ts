@@ -9,6 +9,11 @@ import {
   rulesetIncludesLegacy,
 } from "../shared/content";
 import { normalizeCampaignThreads } from "../shared/dashboard";
+import {
+  normalizeAmbientLight,
+  normalizePartyVisionScope,
+  normalizeTokenVisionMode,
+} from "../shared/lighting";
 import { normalizeJournalAttachments, normalizeJournalKind } from "../shared/journal";
 import { normalizeLootItems } from "../shared/loot";
 import { normalizeTokenConditions } from "../shared/tokens";
@@ -186,8 +191,8 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
       const sceneId = newId("scene");
       db.prepare(
         `INSERT INTO scenes
-          (id, campaign_id, name, image_url, thumbnail_url, width, height, grid_size, grid_offset_x, grid_offset_y, fog_enabled, fog_revealed, templates, walls, los_enabled, sort_order, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          (id, campaign_id, name, image_url, thumbnail_url, width, height, grid_size, grid_offset_x, grid_offset_y, fog_enabled, fog_revealed, templates, walls, los_enabled, ambient_light, vision_scope, sort_order, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).run(
         sceneId,
         campaignId,
@@ -210,6 +215,8 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
         JSON.stringify(normalizeAoeTemplates(scene.templates)),
         JSON.stringify(normalizeWalls(scene.walls)),
         scene.losEnabled === true ? 1 : 0,
+        normalizeAmbientLight(scene.ambientLight),
+        normalizePartyVisionScope(scene.visionScope),
         numberValue(scene.sortOrder, sceneMap.size),
         ts,
         ts
@@ -248,8 +255,8 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
       const tokenId = newId("tok");
       db.prepare(
         `INSERT INTO tokens
-          (id, scene_id, name, image_url, character_id, owner_id, x, y, size, vision_radius, color, hp_current, hp_max, ac, initiative_bonus, group_id, group_name, conditions, hidden, locked, sort_order, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          (id, scene_id, name, image_url, character_id, owner_id, x, y, size, vision_radius, light_radius, vision_mode, color, hp_current, hp_max, ac, initiative_bonus, group_id, group_name, conditions, hidden, locked, sort_order, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).run(
         tokenId,
         sceneId,
@@ -261,6 +268,8 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
         numberValue(token.y, 0),
         clamp(numberValue(token.size, 1, 1, 6), 1, 6),
         clamp(numberValue(token.visionRadius, 60, 0, 240), 0, 240),
+        clamp(numberValue(token.lightRadius, 0, 0, 240), 0, 240),
+        normalizeTokenVisionMode(token.visionMode),
         text(token.color, "#c8a96b", 30),
         token.hpCurrent === null || token.hpCurrent === undefined
           ? null

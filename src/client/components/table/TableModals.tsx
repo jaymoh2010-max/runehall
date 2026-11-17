@@ -22,7 +22,15 @@ import {
   Upload,
   Users,
 } from "lucide-react";
-import type { CharacterRecord, Monster, Scene, Token } from "../../../shared/types";
+import type {
+  AmbientLight,
+  CharacterRecord,
+  Monster,
+  PartyVisionScope,
+  Scene,
+  Token,
+} from "../../../shared/types";
+import { AMBIENT_LIGHT_OPTIONS, PARTY_VISION_OPTIONS } from "../../../shared/lighting";
 import { stripHtml } from "../../../shared/compendium";
 import { HoverCard } from "../HoverCard";
 import { api, uploadImage } from "../../api";
@@ -819,6 +827,8 @@ export function SceneEditModal({
   const [offsetY, setOffsetY] = useState("0");
   const [fogEnabled, setFogEnabled] = useState(true);
   const [losEnabled, setLosEnabled] = useState(false);
+  const [ambientLight, setAmbientLight] = useState<AmbientLight>("bright");
+  const [visionScope, setVisionScope] = useState<PartyVisionScope>("shared");
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [dimensions, setDimensions] = useState({ width: 1600, height: 1000 });
@@ -837,6 +847,8 @@ export function SceneEditModal({
     setOffsetY(String(scene.gridOffsetY));
     setFogEnabled(scene.fogEnabled);
     setLosEnabled(Boolean(scene.losEnabled));
+    setAmbientLight(scene.ambientLight ?? "bright");
+    setVisionScope(scene.visionScope ?? "shared");
     setFile(null);
     setPreview(null);
     setDimensions({ width: scene.width, height: scene.height });
@@ -971,6 +983,8 @@ export function SceneEditModal({
           gridOffsetY: Number(offsetY) || 0,
           fogEnabled,
           losEnabled,
+          ambientLight,
+          visionScope,
           imageUrl,
           thumbnailUrl,
           width: dimensions.width,
@@ -1159,6 +1173,33 @@ export function SceneEditModal({
               onChange={setLosEnabled}
               label={losEnabled ? "Dynamic" : "Manual reveal"}
             />
+          </Field>
+          <Field label="Ambient light" hint="Used by token light sources and vision senses.">
+            <Select
+              value={ambientLight}
+              onChange={(event) => setAmbientLight(event.target.value as AmbientLight)}
+            >
+              {AMBIENT_LIGHT_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Field
+            label="Vision scope"
+            hint="Shared lets the party see through any friendly token. Per-player uses each player's own tokens."
+          >
+            <Select
+              value={visionScope}
+              onChange={(event) => setVisionScope(event.target.value as PartyVisionScope)}
+            >
+              {PARTY_VISION_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </Select>
           </Field>
           <Field label="Grid offset X">
             <Input

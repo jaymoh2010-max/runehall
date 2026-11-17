@@ -17,6 +17,11 @@ import type {
   Token,
 } from "../shared/types";
 import { normalizeCampaignRuleset, normalizeXpMode } from "../shared/content";
+import {
+  normalizeAmbientLight,
+  normalizePartyVisionScope,
+  normalizeTokenVisionMode,
+} from "../shared/lighting";
 import { normalizeLootItems } from "../shared/loot";
 import { normalizeJournalAttachments, normalizeJournalKind } from "../shared/journal";
 import { normalizeCampaignThreads } from "../shared/dashboard";
@@ -135,6 +140,8 @@ export function serializeScene(row: SceneRow): Scene {
     templates: normalizeAoeTemplates(parseJson(row.templates, [])),
     walls: normalizeWalls(parseJson(row.walls, [])),
     losEnabled: Boolean(row.los_enabled),
+    ambientLight: normalizeAmbientLight(row.ambient_light),
+    visionScope: normalizePartyVisionScope(row.vision_scope),
     sortOrder: row.sort_order,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -154,6 +161,8 @@ export function serializeToken(row: TokenRow, ownerName?: string): Token {
     y: row.y,
     size: row.size,
     visionRadius: Number(row.vision_radius ?? 60),
+    lightRadius: Number(row.light_radius ?? 0),
+    visionMode: normalizeTokenVisionMode(row.vision_mode),
     color: row.color,
     hpCurrent: row.hp_current,
     hpMax: row.hp_max,

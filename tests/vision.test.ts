@@ -5,7 +5,12 @@ import {
   normalizeWalls,
   wallBlocksSight,
 } from "../src/shared/walls";
-import { hasLineOfSight, segmentsIntersect, visibleCells } from "../src/shared/vision";
+import {
+  hasLineOfSight,
+  computeVision,
+  segmentsIntersect,
+  visibleCells,
+} from "../src/shared/vision";
 import type { Wall } from "../src/shared/types";
 
 const wall = (overrides: Partial<Wall> = {}): Wall => ({
@@ -97,5 +102,43 @@ describe("line of sight", () => {
 
   it("returns no vision without a party token", () => {
     expect(visibleCells(scene, [], []).size).toBe(0);
+  });
+
+  it("applies ambient light, token light, and senses", () => {
+    const origin = { x: 100, y: 50, radius: 80 };
+    const lights = [{ x: 100, y: 50, radius: 20 }];
+    const normal = computeVision(scene, [], [{ ...origin, mode: "normal" }], {
+      ambientLight: "darkness",
+      lights,
+    });
+    expect(normal.bright.has("4,2")).toBe(true);
+    expect(normal.dim.has("6,2")).toBe(true);
+    expect(normal.visible.has("7,2")).toBe(false);
+
+    const lowLight = computeVision(scene, [], [{ ...origin, mode: "low-light" }], {
+      ambientLight: "darkness",
+      lights,
+    });
+    expect(lowLight.bright.has("6,2")).toBe(true);
+    expect(lowLight.visible.has("7,2")).toBe(false);
+
+    const darkvision = computeVision(scene, [], [{ ...origin, mode: "darkvision" }], {
+      ambientLight: "darkness",
+      lights,
+    });
+    expect(darkvision.dim.has("7,2")).toBe(true);
+  });
+
+  it("does not let light bleed through walls", () => {
+    const visible = computeVision(
+      scene,
+      [wall({ x1: 110, y1: 0, x2: 110, y2: 100 })],
+      [{ x: 50, y: 50, radius: 200, mode: "normal" }],
+      {
+        ambientLight: "darkness",
+        lights: [{ x: 150, y: 50, radius: 100 }],
+      }
+    );
+    expect(visible.visible.has("4,2")).toBe(false);
   });
 });

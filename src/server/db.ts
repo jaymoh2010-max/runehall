@@ -159,6 +159,8 @@ export interface SceneRow {
   templates: string;
   walls: string;
   los_enabled: number;
+  ambient_light: string;
+  vision_scope: string;
   sort_order: number;
   created_at: number;
   updated_at: number;
@@ -175,6 +177,8 @@ export interface TokenRow {
   y: number;
   size: number;
   vision_radius: number;
+  light_radius: number;
+  vision_mode: string;
   color: string;
   hp_current: number | null;
   hp_max: number | null;

@@ -12,7 +12,7 @@ import { Maximize, Minus, Move, Plus, Ruler } from "lucide-react";
 import type { CharacterRecord, Monster, Scene, Token, Wall, WallKind } from "../../../shared/types";
 import { measureGridDistance } from "../../../shared/measurement";
 import { nearestWall } from "../../../shared/walls";
-import { visibleCells } from "../../../shared/vision";
+import { computeVision } from "../../../shared/vision";
 import { loadExplored, saveExplored } from "./explored";
 import { Tag } from "../ui";
 import { HoverCard } from "../HoverCard";
@@ -47,6 +47,7 @@ interface SceneCanvasProps {
   wallMode: boolean;
   wallKind: WallKind;
   onWalls: (walls: Wall[]) => void;
+  previewMode?: boolean;
   onPing: (x: number, y: number) => void;
   remotePointer: { x: number; y: number; name: string; ts: number } | null;
   onDropMonster?: (monster: Monster, count: number, x: number, y: number) => void;
@@ -80,6 +81,7 @@ export function SceneCanvas({
   wallMode,
   wallKind,
   onWalls,
+  previewMode = false,
   onPing,
   remotePointer,
   onDropMonster,
@@ -145,26 +147,41 @@ export function SceneCanvas({
     for (const character of characters) map.set(character.id, character);
     return map;
   }, [characters]);
-  const visionCellSet = useMemo(() => {
+  const vision = useMemo(() => {
     if (isGm || !scene.fogEnabled || !scene.losEnabled) return null;
+    const lights = tokens
+      .filter((token) => !token.hidden && (token.lightRadius ?? 0) > 0)
+      .map((token) => ({
+        x: token.x,
+        y: token.y,
+        radius: ((token.lightRadius ?? 0) / 5) * scene.gridSize,
+      }));
+    const perPlayer = scene.visionScope === "per-player" && !previewMode;
     const origins = tokens
-      .filter(
-        (token) =>
-          !token.hidden &&
-          (token.characterId || token.ownerId === userId) &&
-          (token.visionRadius ?? 60) > 0
+      .filter((token) => !token.hidden && (token.visionRadius ?? 60) > 0)
+      .filter((token) =>
+        perPlayer
+          ? token.ownerId === userId
+          : Boolean(token.characterId) || token.ownerId === userId
       )
       .map((token) => ({
         x: token.x,
         y: token.y,
         radius: ((token.visionRadius ?? 60) / 5) * scene.gridSize,
+        mode: token.visionMode ?? "normal",
       }));
-    return visibleCells(scene, scene.walls, origins);
+    return computeVision(scene, scene.walls, origins, {
+      ambientLight: scene.ambientLight ?? "bright",
+      lights,
+    });
   }, [
     isGm,
+    previewMode,
     userId,
     scene.fogEnabled,
     scene.losEnabled,
+    scene.visionScope,
+    scene.ambientLight,
     scene.width,
     scene.height,
     scene.gridSize,
@@ -196,11 +213,11 @@ export function SceneCanvas({
   ]);
 
   useEffect(() => {
-    if (isGm || !scene.fogEnabled || !scene.losEnabled || !visionCellSet?.size) return;
+    if (isGm || !scene.fogEnabled || !scene.losEnabled || !vision?.visible.size) return;
     setExploredCells((current) => {
       let changed = false;
       const next = new Set(current);
-      for (const cell of visionCellSet) {
+      for (const cell of vision.visible) {
         if (!next.has(cell)) {
           next.add(cell);
           changed = true;
@@ -210,7 +227,7 @@ export function SceneCanvas({
       saveExplored(scene, userId, next);
       return next;
     });
-  }, [visionCellSet, isGm, scene, userId]);
+  }, [vision, isGm, scene, userId]);
 
   useEffect(() => {
     setFogPreview(new Set(scene.revealed));
@@ -291,13 +308,20 @@ export function SceneCanvas({
       context.clearRect(rect.x, rect.y, rect.size, rect.size);
       context.fillRect(rect.x, rect.y, rect.size, rect.size);
     }
-    for (const cell of visionCellSet ?? []) {
+    context.fillStyle = "rgba(5, 7, 11, 0.32)";
+    for (const cell of vision?.dim ?? []) {
+      const rect = cellRect(cell);
+      if (!rect) continue;
+      context.clearRect(rect.x, rect.y, rect.size, rect.size);
+      context.fillRect(rect.x, rect.y, rect.size, rect.size);
+    }
+    for (const cell of vision?.bright ?? []) {
       const rect = cellRect(cell);
       if (rect) context.clearRect(rect.x, rect.y, rect.size, rect.size);
     }
   }, [
     fogPreview,
-    visionCellSet,
+    vision,
     exploredCells,
     isGm,
     scene.width,
