@@ -1,0 +1,157 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1536" height="1024" viewBox="0 0 1536 1024">
+  <defs>
+    <pattern id="tiles" width="64" height="64" patternUnits="userSpaceOnUse">
+      <rect width="64" height="64" fill="#3a3b3f"/>
+      <rect x="1" y="1" width="30" height="30" fill="#45464b"/>
+      <rect x="33" y="1" width="30" height="30" fill="#3f4045"/>
+      <rect x="1" y="33" width="30" height="30" fill="#414247"/>
+      <rect x="33" y="33" width="30" height="30" fill="#4a4b50"/>
+      <path d="M0 32h64M32 0v64" stroke="#292a2e" stroke-width="2" opacity=".8"/>
+      <path d="M10 8l12 8M44 20l10 8M18 40l10 8M42 42l12 10" stroke="#5b5c61" stroke-width="1.2" opacity=".45"/>
+    </pattern>
+    <pattern id="wallStone" width="64" height="64" patternUnits="userSpaceOnUse">
+      <rect width="64" height="64" fill="#28292d"/>
+      <rect x="1" y="1" width="62" height="29" fill="#33353a"/>
+      <rect x="1" y="34" width="29" height="29" fill="#2d2f34"/>
+      <rect x="34" y="34" width="29" height="29" fill="#3a3c41"/>
+      <path d="M0 33h64M32 33v31" stroke="#1a1b1e" stroke-width="2"/>
+    </pattern>
+    <radialGradient id="candleGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#ffd179" stop-opacity=".8"/>
+      <stop offset=".45" stop-color="#e08a35" stop-opacity=".25"/>
+      <stop offset="1" stop-color="#e08a35" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="greenGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#8ff2b3" stop-opacity=".55"/>
+      <stop offset=".55" stop-color="#38a36a" stop-opacity=".18"/>
+      <stop offset="1" stop-color="#38a36a" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="7" flood-color="#000" flood-opacity=".7"/>
+    </filter>
+    <filter id="grain">
+      <feTurbulence baseFrequency=".8" numOctaves="2" seed="51" type="fractalNoise"/>
+      <feColorMatrix type="saturate" values="0"/>
+      <feComponentTransfer><feFuncA type="linear" slope=".08"/></feComponentTransfer>
+    </filter>
+  </defs>
+
+  <rect width="1536" height="1024" fill="#141518"/>
+  <rect x="64" y="64" width="1408" height="896" fill="url(#tiles)"/>
+  <rect x="64" y="64" width="1408" height="896" fill="#141518" opacity=".18"/>
+
+  <g fill="url(#wallStone)">
+    <rect width="1536" height="64"/>
+    <rect y="960" width="1536" height="64"/>
+    <rect width="64" height="1024"/>
+    <rect x="1472" width="64" height="1024"/>
+  </g>
+  <g stroke="#151619" stroke-width="6" opacity=".85">
+    <path d="M0 64h1536M0 960h1536M64 0v1024M1472 0v1024"/>
+  </g>
+  <rect x="704" y="960" width="192" height="64" fill="#25262b"/>
+  <rect x="704" y="960" width="192" height="16" fill="#43454a"/>
+  <rect x="0" y="448" width="64" height="192" fill="#25262b"/>
+  <rect x="0" y="448" width="16" height="192" fill="#43454a"/>
+
+  <g fill="#5a5c63" stroke="#2b2d32" stroke-width="4">
+    <rect x="64" y="64" width="64" height="896"/>
+    <rect x="1408" y="64" width="64" height="896"/>
+    <rect x="64" y="64" width="1408" height="64"/>
+    <rect x="64" y="896" width="1408" height="64"/>
+  </g>
+  <g fill="#31333a" stroke="#16171a" stroke-width="4">
+    <rect x="160" y="128" width="64" height="64"/>
+    <rect x="480" y="128" width="64" height="64"/>
+    <rect x="992" y="128" width="64" height="64"/>
+    <rect x="1312" y="128" width="64" height="64"/>
+    <rect x="160" y="832" width="64" height="64"/>
+    <rect x="480" y="832" width="64" height="64"/>
+    <rect x="992" y="832" width="64" height="64"/>
+    <rect x="1312" y="832" width="64" height="64"/>
+  </g>
+  <g fill="#777a82" opacity=".55">
+    <rect x="168" y="136" width="48" height="12"/>
+    <rect x="488" y="136" width="48" height="12"/>
+    <rect x="1000" y="136" width="48" height="12"/>
+    <rect x="1320" y="136" width="48" height="12"/>
+    <rect x="168" y="840" width="48" height="12"/>
+    <rect x="488" y="840" width="48" height="12"/>
+    <rect x="1000" y="840" width="48" height="12"/>
+    <rect x="1320" y="840" width="48" height="12"/>
+  </g>
+
+  <g filter="url(#softShadow)">
+    <ellipse cx="768" cy="512" rx="270" ry="190" fill="#2d2f35"/>
+    <ellipse cx="768" cy="512" rx="244" ry="170" fill="#3a3c42"/>
+    <ellipse cx="768" cy="512" rx="214" ry="148" fill="#44464c"/>
+    <ellipse cx="768" cy="512" rx="184" ry="126" fill="#4d4f55"/>
+    <rect x="700" y="430" width="136" height="164" rx="8" fill="#26272c"/>
+    <rect x="714" y="444" width="108" height="136" rx="6" fill="#5c5e65"/>
+    <path d="M740 470h56v84h-56z" fill="#32343a" opacity=".7"/>
+  </g>
+  <ellipse cx="768" cy="512" rx="230" ry="160" fill="url(#greenGlow)"/>
+
+  <g filter="url(#softShadow)">
+    <g fill="#34363c" stroke="#1c1d21" stroke-width="4">
+      <rect x="180" y="270" width="190" height="74" rx="8"/>
+      <rect x="180" y="430" width="190" height="74" rx="8"/>
+      <rect x="180" y="590" width="190" height="74" rx="8"/>
+      <rect x="1166" y="270" width="190" height="74" rx="8"/>
+      <rect x="1166" y="430" width="190" height="74" rx="8"/>
+      <rect x="1166" y="590" width="190" height="74" rx="8"/>
+    </g>
+    <g fill="#6a6c73">
+      <rect x="192" y="282" width="166" height="50" rx="5"/>
+      <rect x="192" y="442" width="166" height="50" rx="5"/>
+      <rect x="192" y="602" width="166" height="50" rx="5"/>
+      <rect x="1178" y="282" width="166" height="50" rx="5"/>
+      <rect x="1178" y="442" width="166" height="50" rx="5"/>
+      <rect x="1178" y="602" width="166" height="50" rx="5"/>
+    </g>
+    <g fill="#8b8d94" opacity=".55">
+      <path d="M274 286v42M274 446v42M274 606v42M1260 286v42M1260 446v42M1260 606v42" stroke="#3c3e44" stroke-width="3"/>
+    </g>
+  </g>
+
+  <g fill="#2c2d32" stroke="#151619" stroke-width="4">
+    <rect x="460" y="132" width="72" height="72"/>
+    <rect x="1004" y="820" width="72" height="72"/>
+  </g>
+  <g fill="#6b6d74">
+    <rect x="472" y="144" width="48" height="48"/>
+    <rect x="1016" y="832" width="48" height="48"/>
+  </g>
+
+  <g>
+    <ellipse cx="360" cy="790" rx="80" ry="60" fill="url(#candleGlow)"/>
+    <ellipse cx="1176" cy="790" rx="80" ry="60" fill="url(#candleGlow)"/>
+    <g fill="#d8c49a">
+      <rect x="350" y="760" width="8" height="42" rx="3"/>
+      <rect x="366" y="748" width="8" height="54" rx="3"/>
+      <rect x="382" y="768" width="8" height="34" rx="3"/>
+      <rect x="1166" y="760" width="8" height="42" rx="3"/>
+      <rect x="1182" y="748" width="8" height="54" rx="3"/>
+      <rect x="1198" y="768" width="8" height="34" rx="3"/>
+    </g>
+    <g fill="#ffd27d">
+      <ellipse cx="354" cy="754" rx="4" ry="7"/>
+      <ellipse cx="370" cy="742" rx="4" ry="7"/>
+      <ellipse cx="386" cy="762" rx="4" ry="7"/>
+      <ellipse cx="1170" cy="754" rx="4" ry="7"/>
+      <ellipse cx="1186" cy="742" rx="4" ry="7"/>
+      <ellipse cx="1202" cy="762" rx="4" ry="7"/>
+    </g>
+  </g>
+
+  <g fill="none" stroke="#8e9097" stroke-width="3" opacity=".35">
+    <path d="M92 92c60 8 84 42 96 96M1444 92c-60 8-84 42-96 96M92 932c60-8 84-42 96-96M1444 932c-60-8-84-42-96-96"/>
+    <path d="M104 104l28 46M1432 104l-28 46M104 920l28-46M1432 920l-28-46"/>
+  </g>
+  <g stroke="#1f2024" stroke-width="3" fill="none" opacity=".7">
+    <path d="M560 720l84 34 52-18M840 250l62 42 58-10M420 570l50 32 42-8M1080 650l-58 36-48-8"/>
+  </g>
+
+  <path d="M0 0h1536v1024H0z" filter="url(#grain)" opacity=".14"/>
+  <ellipse cx="768" cy="512" rx="760" ry="500" fill="none" stroke="#050607" stroke-width="130" opacity=".5"/>
+</svg>

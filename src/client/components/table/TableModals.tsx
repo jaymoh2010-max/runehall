@@ -30,6 +30,14 @@ import type {
   Scene,
   Token,
 } from "../../../shared/types";
+import {
+  BUILTIN_MAP_CATEGORIES,
+  BUILTIN_MAPS,
+  builtinMapCategoryLabel,
+  builtinMapSquares,
+  type BuiltinMap,
+  type BuiltinMapCategory,
+} from "../../../shared/builtinMaps";
 import { AMBIENT_LIGHT_OPTIONS, PARTY_VISION_OPTIONS } from "../../../shared/lighting";
 import { stripHtml } from "../../../shared/compendium";
 import { HoverCard } from "../HoverCard";
@@ -479,12 +487,22 @@ export function SceneManagerModal({
   const [gridSize, setGridSize] = useState("70");
   const [activateOnCreate, setActivateOnCreate] = useState(true);
   const [file, setFile] = useState<File | null>(null);
-  const [preview, setPreview] = useState<string | null>(null);
+  const [uploadPreview, setUploadPreview] = useState<string | null>(null);
+  const [selectedBuiltinId, setSelectedBuiltinId] = useState<string | null>(null);
+  const [mapCategory, setMapCategory] = useState<"all" | BuiltinMapCategory>("all");
   const [dimensions, setDimensions] = useState({ width: 1600, height: 1000 });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [draggingSceneId, setDraggingSceneId] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  const selectedBuiltin = selectedBuiltinId
+    ? (BUILTIN_MAPS.find((map) => map.id === selectedBuiltinId) ?? null)
+    : null;
+  const visibleBuiltinMaps =
+    mapCategory === "all"
+      ? BUILTIN_MAPS
+      : BUILTIN_MAPS.filter((map) => map.category === mapCategory);
 
   useEffect(() => {
     if (!open) {
@@ -492,19 +510,42 @@ export function SceneManagerModal({
       setName("");
       setActivateOnCreate(true);
       setFile(null);
-      setPreview(null);
+      setUploadPreview(null);
+      setSelectedBuiltinId(null);
+      setMapCategory("all");
       setError("");
     }
   }, [open]);
 
-  const pickFile = (picked: File | null) => {
-    setFile(picked);
-    if (!picked) {
-      setPreview(null);
+  const selectBuiltin = (map: BuiltinMap | null) => {
+    if (uploadPreview) URL.revokeObjectURL(uploadPreview);
+    setFile(null);
+    setUploadPreview(null);
+    setSelectedBuiltinId(map?.id ?? null);
+    if (!map) {
+      setDimensions({ width: 1600, height: 1000 });
+      setGridSize("70");
       return;
     }
+    setDimensions({ width: map.width, height: map.height });
+    setGridSize(String(map.gridSize));
+    setName((current) => {
+      const trimmed = current.trim();
+      return !trimmed || BUILTIN_MAPS.some((entry) => entry.name === trimmed) ? map.name : current;
+    });
+  };
+
+  const pickFile = (picked: File | null) => {
+    setFile(picked);
+    setSelectedBuiltinId(null);
+    if (!picked) {
+      if (uploadPreview) URL.revokeObjectURL(uploadPreview);
+      setUploadPreview(null);
+      return;
+    }
+    if (uploadPreview) URL.revokeObjectURL(uploadPreview);
     const url = URL.createObjectURL(picked);
-    setPreview(url);
+    setUploadPreview(url);
     const image = new Image();
     image.onload = () => {
       setDimensions({ width: image.naturalWidth, height: image.naturalHeight });
@@ -518,12 +559,13 @@ export function SceneManagerModal({
     setBusy(true);
     setError("");
     try {
-      let imageUrl: string | null = null;
-      let thumbnailUrl: string | null = null;
+      let imageUrl = selectedBuiltin?.imageUrl ?? null;
+      let thumbnailUrl = selectedBuiltin?.thumbnailUrl ?? null;
       if (file) {
         const thumbnailFile = await createThumbnailFile(file);
         const uploaded = await uploadImage(file, campaignId);
         imageUrl = uploaded.url;
+        thumbnailUrl = null;
         if (thumbnailFile) {
           const thumbnail = await uploadImage(thumbnailFile, campaignId);
           thumbnailUrl = thumbnail.url;
@@ -532,7 +574,7 @@ export function SceneManagerModal({
       const result = await api<{ scene: Scene }>(`/api/campaigns/${campaignId}/scenes`, {
         method: "POST",
         body: {
-          name: name.trim() || "New Scene",
+          name: name.trim() || selectedBuiltin?.name || "New Scene",
           imageUrl,
           thumbnailUrl,
           width: dimensions.width,
@@ -697,13 +739,60 @@ export function SceneManagerModal({
               placeholder="e.g. The Sunken Crypt"
             />
           </Field>
-          <div className="map-upload-zone" onClick={() => fileRef.current?.click()}>
-            {preview ? (
-              <img src={preview} alt="" />
+          <div className="map-library">
+            <div className="row-between">
+              <div>
+                <strong>Map library</strong>
+                <p className="tiny muted">Grid-aligned tactical maps. Click one to use it.</p>
+              </div>
+              <Button type="button" size="sm" variant="ghost" onClick={() => selectBuiltin(null)}>
+                Blank canvas
+              </Button>
+            </div>
+            <div className="map-library-categories">
+              {BUILTIN_MAP_CATEGORIES.map((category) => (
+                <button
+                  key={category.id}
+                  type="button"
+                  className={mapCategory === category.id ? "is-active" : ""}
+                  onClick={() => setMapCategory(category.id)}
+                >
+                  {category.label}
+                </button>
+              ))}
+            </div>
+            <div className="map-library-grid">
+              {visibleBuiltinMaps.map((map) => {
+                const squares = builtinMapSquares(map);
+                const selected = map.id === selectedBuiltinId;
+                return (
+                  <button
+                    key={map.id}
+                    type="button"
+                    className={`map-library-card ${selected ? "is-selected" : ""}`}
+                    title={map.description}
+                    onClick={() => selectBuiltin(selected ? null : map)}
+                  >
+                    <img src={map.thumbnailUrl} alt="" loading="lazy" decoding="async" />
+                    <span className="map-library-copy">
+                      <strong>{map.name}</strong>
+                      <span className="tiny muted">
+                        {builtinMapCategoryLabel(map.category)} · {squares.cols}×{squares.rows}{" "}
+                        squares
+                      </span>
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          <div className="map-upload-zone compact" onClick={() => fileRef.current?.click()}>
+            {uploadPreview ? (
+              <img src={uploadPreview} alt="" />
             ) : (
               <>
-                <ImagePlus size={30} />
-                <strong>Upload a map</strong>
+                <ImagePlus size={24} />
+                <strong>Upload a custom map</strong>
                 <span className="tiny muted">PNG, JPG, WebP, GIF, or AVIF · up to 15 MB</span>
               </>
             )}
@@ -724,6 +813,11 @@ export function SceneManagerModal({
                 Remove
               </Button>
             </div>
+          ) : null}
+          {selectedBuiltin ? (
+            <p className="tiny muted">
+              Selected: <strong>{selectedBuiltin.name}</strong> — {selectedBuiltin.description}
+            </p>
           ) : null}
           <div className="form-grid">
             <Field label="Grid size (px)" hint="Leave room for drag and measurement.">

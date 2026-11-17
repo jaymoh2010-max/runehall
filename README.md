@@ -36,6 +36,7 @@ Runehall is built for a private group of roughly 4–10 players and a GM. It run
 
 ### Shared table
 - Scene maps with automatic dimensions, interactive grid calibration, and map scaling.
+- Categorized built-in battle maps for taverns, caverns, forests, mountains, battlefields, and crypts, plus custom uploads and blank scenes.
 - Pan, zoom, fit, grid overlay, and snap-to-grid token movement.
 - Token creation from party characters, the bestiary, or custom markers.
 - Token editor via right-click or the side panel: art upload, HP/AC, size, color, owner, hidden/locked, conditions, and linked-character HP sync.

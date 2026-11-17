@@ -311,6 +311,21 @@ test("GM places a token, chats, rolls, and opens the scenes manager", async ({ p
   const scenes = page.getByRole("dialog", { name: "Scenes" });
   await expect(scenes).toBeVisible();
 
+  await scenes.getByRole("button", { name: "New scene" }).click();
+  await expect(scenes.getByText("Map library")).toBeVisible();
+  const builtinCard = scenes.getByRole("button", { name: /The Gilded Tankard/ });
+  await expect(builtinCard).toBeVisible();
+  await expect(builtinCard.locator("img")).toHaveJSProperty("naturalWidth", 1536);
+  await builtinCard.click();
+  await expect(scenes.getByLabel("Scene name")).toHaveValue("The Gilded Tankard");
+  await scenes.getByRole("button", { name: "Create scene" }).click();
+  await expect(scenes).toBeHidden();
+  await expect(page.getByRole("heading", { name: "The Gilded Tankard" })).toBeVisible({
+    timeout: 15_000,
+  });
+
+  await page.getByRole("button", { name: "Scenes" }).click();
+  await expect(scenes).toBeVisible();
   await scenes.getByRole("button", { name: "Edit" }).first().click();
   const sceneEditor = page.getByRole("dialog", { name: /Edit/ });
   await expect(sceneEditor.getByText("Grid calibration")).toBeVisible();

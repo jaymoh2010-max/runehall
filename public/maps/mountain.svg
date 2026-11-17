@@ -1,0 +1,102 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1536" height="1024" viewBox="0 0 1536 1024">
+  <defs>
+    <linearGradient id="rockBase" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#5b5650"/>
+      <stop offset=".5" stop-color="#3d3a36"/>
+      <stop offset="1" stop-color="#242424"/>
+    </linearGradient>
+    <linearGradient id="cliffFace" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#6b655c"/>
+      <stop offset=".45" stop-color="#47433d"/>
+      <stop offset="1" stop-color="#2a2927"/>
+    </linearGradient>
+    <linearGradient id="path" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#b49a70"/>
+      <stop offset=".5" stop-color="#927b58"/>
+      <stop offset="1" stop-color="#756346"/>
+    </linearGradient>
+    <radialGradient id="snowGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#f4f7fb" stop-opacity=".9"/>
+      <stop offset=".7" stop-color="#dfe8f2" stop-opacity=".55"/>
+      <stop offset="1" stop-color="#dfe8f2" stop-opacity="0"/>
+    </radialGradient>
+    <pattern id="rock" width="96" height="96" patternUnits="userSpaceOnUse">
+      <rect width="96" height="96" fill="#49453f"/>
+      <path d="M0 28l22-12 28 10 24-8 22 12M8 66l26-8 18 10 22-8 18 6" stroke="#35322e" stroke-width="4" fill="none" opacity=".7"/>
+      <path d="M18 0l-6 18 8 18-4 20M70 18l8 18-6 20 8 16" stroke="#5d5850" stroke-width="2" fill="none" opacity=".6"/>
+    </pattern>
+    <pattern id="pathStone" width="64" height="64" patternUnits="userSpaceOnUse">
+      <rect width="64" height="64" fill="#8c7857"/>
+      <path d="M0 20l18-6 14 8 18-4 14 6M0 48l18-4 16 8 18-6 12 4" stroke="#6e5d43" stroke-width="3" fill="none" opacity=".55"/>
+      <circle cx="14" cy="62" r="2" fill="#b39a72" opacity=".5"/>
+      <circle cx="50" cy="34" r="2" fill="#b39a72" opacity=".4"/>
+    </pattern>
+    <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="8" flood-color="#000" flood-opacity=".6"/>
+    </filter>
+    <filter id="grain">
+      <feTurbulence baseFrequency=".75" numOctaves="2" seed="31" type="fractalNoise"/>
+      <feColorMatrix type="saturate" values="0"/>
+      <feComponentTransfer><feFuncA type="linear" slope=".09"/></feComponentTransfer>
+    </filter>
+  </defs>
+
+  <rect width="1536" height="1024" fill="#1c1c1c"/>
+  <rect width="1536" height="1024" fill="url(#rockBase)"/>
+  <rect width="1536" height="1024" fill="url(#rock)" opacity=".7"/>
+
+  <path d="M0 0h470l84 118-66 110 92 140-70 150 104 158-72 168 52 180H0z" fill="url(#cliffFace)" filter="url(#softShadow)"/>
+  <path d="M470 0l86 118-66 110 92 140-70 150 104 158-72 168 52 180" fill="none" stroke="#817a70" stroke-width="10" opacity=".55"/>
+  <path d="M1536 0h-310l-64 118 54 96-88 142 70 142-92 158 62 150-40 218h408z" fill="url(#cliffFace)" filter="url(#softShadow)"/>
+  <path d="M1226 0l-64 118 54 96-88 142 70 142-92 158 62 150-40 218" fill="none" stroke="#817a70" stroke-width="10" opacity=".55"/>
+
+  <path d="M420 300c140-36 260-12 350 52 112 80 232 84 372 42l116 290c-146 68-274 58-390-20-116-78-238-96-382-52z" fill="#10151a" opacity=".92"/>
+  <path d="M470 342c120-18 218 6 300 62 96 66 194 72 312 40l54 140c-122 42-236 30-336-34-104-66-206-78-320-56z" fill="#1b2833" opacity=".65"/>
+  <path d="M512 386c104-8 186 14 260 62 82 54 164 60 252 38" fill="none" stroke="#416173" stroke-width="6" opacity=".35"/>
+
+  <path d="M690 1044c40-110 10-190-46-260-54-68-48-132 16-198 66-68 140-106 156-184 10-48-8-92-44-136" fill="none" stroke="#3c2f20" stroke-width="132" stroke-linecap="round" opacity=".55"/>
+  <path d="M690 1044c40-110 10-190-46-260-54-68-48-132 16-198 66-68 140-106 156-184 10-48-8-92-44-136" fill="none" stroke="url(#pathStone)" stroke-width="112" stroke-linecap="round"/>
+  <path d="M690 1044c40-110 10-190-46-260-54-68-48-132 16-198 66-68 140-106 156-184 10-48-8-92-44-136" fill="none" stroke="#d0b78d" stroke-width="46" stroke-linecap="round" opacity=".2"/>
+  <path d="M604 790c-88-24-140-72-156-142 36-14 78-10 114 10 44 24 66 58 72 100M706 530c-44-64-42-122 6-176 58 30 96 76 102 132-30 26-66 40-108 44" fill="none" stroke="#8a7659" stroke-width="8" opacity=".45"/>
+
+  <g filter="url(#softShadow)">
+    <path d="M864 606l188-18 18 54-188 20z" fill="#5d574f"/>
+    <path d="M884 612l150-14 10 30-150 16z" fill="#827a6d"/>
+    <path d="M884 612l150-14" stroke="#a99e8c" stroke-width="4" opacity=".6"/>
+    <path d="M912 650v64M1016 644v64" stroke="#4b463f" stroke-width="10"/>
+  </g>
+
+  <g fill="url(#snowGlow)" opacity=".85">
+    <path d="M180 96l96-26 74 48-82 34z"/>
+    <path d="M274 214l88-18 54 42-104 24z"/>
+    <path d="M1300 104l104-18 82 52-118 18z"/>
+    <path d="M1260 250l90-12 54 44-100 14z"/>
+    <path d="M600 70l70-18 46 30-64 18z"/>
+    <path d="M980 932l92-16 50 40-108 18z"/>
+  </g>
+
+  <g fill="#2e4a36" stroke="#1a2d21" stroke-width="3">
+    <g transform="translate(180 700)">
+      <path d="M0-78l-46 70h92z"/><path d="M0-38l-56 82h112z"/><path d="M0 8l-64 92h128z"/><rect x="-6" y="100" width="12" height="28" fill="#5a3b24"/>
+    </g>
+    <g transform="translate(260 760)">
+      <path d="M0-60l-38 58h76z"/><path d="M0-28l-46 68h92z"/><rect x="-5" y="46" width="10" height="24" fill="#5a3b24"/>
+    </g>
+    <g transform="translate(1320 700)">
+      <path d="M0-70l-42 66h84z"/><path d="M0-34l-52 76h104z"/><path d="M0 8l-60 84h120z"/><rect x="-6" y="92" width="12" height="26" fill="#5a3b24"/>
+    </g>
+    <g transform="translate(1240 790)">
+      <path d="M0-56l-36 56h72z"/><path d="M0-26l-44 64h88z"/><rect x="-5" y="40" width="10" height="22" fill="#5a3b24"/>
+    </g>
+  </g>
+
+  <g fill="#6b665e" stroke="#47433d" stroke-width="4">
+    <path d="M500 160l40-26 40 22-10 30-52 4z"/>
+    <path d="M1080 820l46-24 44 28-12 32-56 2z"/>
+    <path d="M980 170l34-18 32 20-8 26-46 2z"/>
+    <path d="M760 900l38-20 36 22-8 28-50 2z"/>
+  </g>
+
+  <path d="M0 0h1536v1024H0z" filter="url(#grain)" opacity=".16"/>
+  <ellipse cx="768" cy="512" rx="760" ry="500" fill="none" stroke="#0a0c0d" stroke-width="130" opacity=".5"/>
+</svg>
