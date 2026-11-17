@@ -1018,6 +1018,10 @@ export interface Scene {
   revealed: string[];
   /** Shared area templates placed on this scene. */
   templates: AoeTemplate[];
+  /** GM-drawn walls and doors. Walls and closed doors block sight. */
+  walls: Wall[];
+  /** Use wall-based line-of-sight fog for players instead of manual reveal only. */
+  losEnabled: boolean;
   sortOrder: number;
   createdAt: number;
   updatedAt: number;
@@ -1029,6 +1033,19 @@ export interface TokenCondition {
   value?: number | null;
   /** Remaining duration in rounds, when tracked. */
   duration?: number | null;
+}
+
+export type WallKind = "wall" | "door";
+
+export interface Wall {
+  id: string;
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  kind: WallKind;
+  /** Only meaningful for doors. Open doors no longer block sight. */
+  open?: boolean;
 }
 
 export interface Token {
@@ -1234,6 +1251,7 @@ export interface ClientToServerEvents {
   "scene:reorder": (payload: { campaignId: string; sceneIds: string[] }) => void;
   "template:add": (payload: { campaignId: string; sceneId: string; template: AoeTemplate }) => void;
   "template:clear": (payload: { campaignId: string; sceneId: string }) => void;
+  "scene:walls": (payload: { campaignId: string; sceneId: string; walls: Wall[] }) => void;
   "chat:send": (
     payload: { campaignId: string; content: string; visibility?: "all" | "gm" },
     ack?: (message: ChatMessage | null) => void
@@ -1295,6 +1313,7 @@ export interface ServerToClientEvents {
   "scene:deleted": (payload: { sceneId: string }) => void;
   "scenes:reordered": (scenes: Scene[]) => void;
   "scene:templates": (payload: { sceneId: string; templates: AoeTemplate[] }) => void;
+  "scene:walls": (payload: { sceneId: string; walls: Wall[] }) => void;
   "chat:message": (message: ChatMessage) => void;
   "initiative:updated": (payload: {
     entries: InitiativeEntry[];

@@ -9,8 +9,10 @@ import {
   type ReactElement,
 } from "react";
 import { Maximize, Minus, Move, Plus, Ruler } from "lucide-react";
-import type { CharacterRecord, Monster, Scene, Token } from "../../../shared/types";
+import type { CharacterRecord, Monster, Scene, Token, Wall, WallKind } from "../../../shared/types";
 import { measureGridDistance } from "../../../shared/measurement";
+import { nearestWall } from "../../../shared/walls";
+import { visibleCells } from "../../../shared/vision";
 import { Tag } from "../ui";
 import { HoverCard } from "../HoverCard";
 import { BESTIARY_DRAG_TYPE, type BestiaryDragPayload } from "./bestiaryDrag";
@@ -41,6 +43,9 @@ interface SceneCanvasProps {
   fogBrush: FogMode | null;
   brushSize: number;
   measureMode: boolean;
+  wallMode: boolean;
+  wallKind: WallKind;
+  onWalls: (walls: Wall[]) => void;
   onPing: (x: number, y: number) => void;
   remotePointer: { x: number; y: number; name: string; ts: number } | null;
   onDropMonster?: (monster: Monster, count: number, x: number, y: number) => void;
@@ -71,6 +76,9 @@ export function SceneCanvas({
   fogBrush,
   brushSize,
   measureMode,
+  wallMode,
+  wallKind,
+  onWalls,
   onPing,
   remotePointer,
   onDropMonster,
@@ -106,6 +114,13 @@ export function SceneCanvas({
     y: number;
   } | null>(null);
   const [fogPreview, setFogPreview] = useState<Set<string>>(() => new Set(scene.revealed));
+  const [wallDraft, setWallDraft] = useState<{
+    x1: number;
+    y1: number;
+    x2: number;
+    y2: number;
+  } | null>(null);
+  const wallClickStart = useRef<{ x: number; y: number } | null>(null);
   const [templateDraft, setTemplateDraft] = useState<{
     x: number;
     y: number;
@@ -128,6 +143,31 @@ export function SceneCanvas({
     for (const character of characters) map.set(character.id, character);
     return map;
   }, [characters]);
+  const visionCellSet = useMemo(() => {
+    if (isGm || !scene.fogEnabled || !scene.losEnabled) return null;
+    const origins = tokens
+      .filter((token) => token.characterId && !token.hidden)
+      .map((token) => ({ x: token.x, y: token.y }));
+    return visibleCells(scene, scene.walls, origins);
+  }, [
+    isGm,
+    scene.fogEnabled,
+    scene.losEnabled,
+    scene.width,
+    scene.height,
+    scene.gridSize,
+    scene.gridOffsetX,
+    scene.gridOffsetY,
+    scene.walls,
+    tokens,
+  ]);
+
+  useEffect(() => {
+    if (!wallMode) {
+      setWallDraft(null);
+      wallClickStart.current = null;
+    }
+  }, [wallMode]);
 
   useEffect(() => {
     setFogPreview(new Set(scene.revealed));
@@ -183,7 +223,8 @@ export function SceneCanvas({
     context.fillStyle = isGm ? "rgba(5, 7, 11, 0.78)" : "rgba(5, 7, 11, 0.985)";
     context.fillRect(0, 0, width, height);
     const cellSize = scene.gridSize * fogScale;
-    for (const cell of fogPreview) {
+    const fogCells = isGm || !scene.losEnabled ? fogPreview : (visionCellSet ?? new Set<string>());
+    for (const cell of fogCells) {
       const [cx, cy] = cell.split(",").map(Number);
       if (!Number.isFinite(cx) || !Number.isFinite(cy)) continue;
       context.clearRect(
@@ -195,6 +236,7 @@ export function SceneCanvas({
     }
   }, [
     fogPreview,
+    visionCellSet,
     isGm,
     scene.width,
     scene.height,
@@ -202,6 +244,7 @@ export function SceneCanvas({
     scene.gridOffsetX,
     scene.gridOffsetY,
     scene.fogEnabled,
+    scene.losEnabled,
   ]);
 
   const scenePoint = (clientX: number, clientY: number) => {
@@ -216,6 +259,23 @@ export function SceneCanvas({
   const snap = (value: number, offset: number) => {
     const cell = Math.round((value - offset - scene.gridSize / 2) / scene.gridSize);
     return offset + cell * scene.gridSize + scene.gridSize / 2;
+  };
+
+  const snapWall = (x: number, y: number) => {
+    const grid = Math.max(1, scene.gridSize);
+    return {
+      x: Math.max(
+        0,
+        Math.min(scene.width, scene.gridOffsetX + Math.round((x - scene.gridOffsetX) / grid) * grid)
+      ),
+      y: Math.max(
+        0,
+        Math.min(
+          scene.height,
+          scene.gridOffsetY + Math.round((y - scene.gridOffsetY) / grid) * grid
+        )
+      ),
+    };
   };
 
   const onViewportDragOver = (event: ReactDragEvent<HTMLDivElement>) => {
@@ -264,6 +324,19 @@ export function SceneCanvas({
     if (event.button !== 0) return;
     const target = event.target as HTMLElement;
     if (target.closest(".scene-token")) return;
+    if (wallMode && isGm) {
+      const point = scenePoint(event.clientX, event.clientY);
+      const snapped = snapWall(point.x, point.y);
+      wallClickStart.current = { x: event.clientX, y: event.clientY };
+      setWallDraft({
+        x1: snapped.x,
+        y1: snapped.y,
+        x2: snapped.x,
+        y2: snapped.y,
+      });
+      viewportRef.current?.setPointerCapture(event.pointerId);
+      return;
+    }
     if (templateKind && isGm) {
       const point = scenePoint(event.clientX, event.clientY);
       const draft = {
@@ -321,6 +394,12 @@ export function SceneCanvas({
   };
 
   const onViewportPointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (wallDraft) {
+      const point = scenePoint(event.clientX, event.clientY);
+      const snapped = snapWall(point.x, point.y);
+      setWallDraft((current) => (current ? { ...current, x2: snapped.x, y2: snapped.y } : current));
+      return;
+    }
     if (templateDraftRef.current) {
       const point = scenePoint(event.clientX, event.clientY);
       const draft = templateDraftRef.current;
@@ -373,6 +452,40 @@ export function SceneCanvas({
   };
 
   const onViewportPointerUp = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (wallDraft) {
+      const draft = wallDraft;
+      const start = wallClickStart.current;
+      wallClickStart.current = null;
+      setWallDraft(null);
+      viewportRef.current?.releasePointerCapture(event.pointerId);
+      const screenDistance = start
+        ? Math.hypot(event.clientX - start.x, event.clientY - start.y)
+        : 0;
+      if (screenDistance < 6) {
+        const point = scenePoint(event.clientX, event.clientY);
+        const hit = nearestWall(scene.walls, point.x, point.y, 10 / Math.max(zoom, 0.4));
+        if (hit?.kind === "door") {
+          onWalls(
+            scene.walls.map((wall) => (wall.id === hit.id ? { ...wall, open: !wall.open } : wall))
+          );
+        }
+        return;
+      }
+      const endPoint = scenePoint(event.clientX, event.clientY);
+      const end = snapWall(endPoint.x, endPoint.y);
+      if (Math.hypot(end.x - draft.x1, end.y - draft.y1) < scene.gridSize / 4) return;
+      const wall: Wall = {
+        id: `wall_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`,
+        x1: draft.x1,
+        y1: draft.y1,
+        x2: end.x,
+        y2: end.y,
+        kind: wallKind,
+        ...(wallKind === "door" ? { open: false } : {}),
+      };
+      onWalls([...scene.walls, wall].slice(-500));
+      return;
+    }
     if (templateDraftRef.current) {
       const draft = templateDraftRef.current;
       templateDraftRef.current = null;
@@ -415,6 +528,16 @@ export function SceneCanvas({
     if (measuring) {
       viewportRef.current?.releasePointerCapture(event.pointerId);
     }
+  };
+
+  const onViewportPointerCancel = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (wallDraft) {
+      setWallDraft(null);
+      wallClickStart.current = null;
+      viewportRef.current?.releasePointerCapture(event.pointerId);
+      return;
+    }
+    onViewportPointerUp(event);
   };
 
   const onTokenPointerDown = (event: ReactPointerEvent<HTMLDivElement>, token: Token) => {
@@ -546,17 +669,24 @@ export function SceneCanvas({
   return (
     <div
       ref={viewportRef}
-      className={`scene-viewport ${fogBrush ? "is-fogging" : ""} ${measureMode ? "is-measuring" : ""} ${templateKind ? "is-templating" : ""}`}
+      className={`scene-viewport ${fogBrush ? "is-fogging" : ""} ${measureMode ? "is-measuring" : ""} ${wallMode ? "is-walling" : ""} ${templateKind ? "is-templating" : ""}`}
       onWheel={onWheel}
       onPointerDown={onViewportPointerDown}
       onPointerMove={onViewportPointerMove}
       onPointerUp={onViewportPointerUp}
-      onPointerCancel={onViewportPointerUp}
+      onPointerCancel={onViewportPointerCancel}
       onDragOver={onViewportDragOver}
       onDrop={onViewportDrop}
       onContextMenu={(event) => {
         event.preventDefault();
         const point = scenePoint(event.clientX, event.clientY);
+        if (wallMode && isGm) {
+          const hit = nearestWall(scene.walls, point.x, point.y, 10 / Math.max(zoom, 0.4));
+          if (hit) {
+            onWalls(scene.walls.filter((wall) => wall.id !== hit.id));
+            return;
+          }
+        }
         onPing(point.x, point.y);
       }}
     >
@@ -721,6 +851,44 @@ export function SceneCanvas({
             style={{ width: scene.width, height: scene.height }}
           />
         ) : null}
+        {isGm && (scene.walls.length || wallDraft) ? (
+          <svg className="wall-layer" width={scene.width} height={scene.height} aria-hidden="true">
+            {scene.walls.map((wall) => {
+              const open = wall.kind === "door" && wall.open;
+              return (
+                <line
+                  key={wall.id}
+                  x1={wall.x1}
+                  y1={wall.y1}
+                  x2={wall.x2}
+                  y2={wall.y2}
+                  className={`wall-line ${wall.kind} ${open ? "is-open" : ""}`}
+                  stroke={open ? "#7fbe95" : wall.kind === "door" ? "#d08a5a" : "#e5ca91"}
+                  strokeWidth={3 / Math.max(zoom, 0.4)}
+                  strokeDasharray={
+                    wall.kind === "door"
+                      ? `${8 / Math.max(zoom, 0.4)} ${5 / Math.max(zoom, 0.4)}`
+                      : undefined
+                  }
+                  strokeLinecap="round"
+                />
+              );
+            })}
+            {wallDraft ? (
+              <line
+                x1={wallDraft.x1}
+                y1={wallDraft.y1}
+                x2={wallDraft.x2}
+                y2={wallDraft.y2}
+                className="wall-line is-draft"
+                stroke="#f0d9a8"
+                strokeWidth={2.5 / Math.max(zoom, 0.4)}
+                strokeDasharray={`${7 / Math.max(zoom, 0.4)} ${5 / Math.max(zoom, 0.4)}`}
+                strokeLinecap="round"
+              />
+            ) : null}
+          </svg>
+        ) : null}
         {scene.templates.length || draftTemplate ? (
           <svg className="template-layer" width={scene.width} height={scene.height}>
             {scene.templates.map((entry, index) => (
@@ -811,7 +979,13 @@ export function SceneCanvas({
             <Move size={11} /> {TEMPLATE_LABELS[templateKind]} template · click and drag
           </Tag>
         ) : null}
-        {!fogBrush && !measureMode && !templateKind ? (
+        {wallMode ? (
+          <Tag tone="gold">
+            <Move size={11} /> {wallKind === "door" ? "Door" : "Wall"} · drag to draw · click a door
+            to open · right-click to delete
+          </Tag>
+        ) : null}
+        {!fogBrush && !measureMode && !templateKind && !wallMode ? (
           <span>Drag to pan · Shift-drag to select · wheel to zoom · right-click to ping</span>
         ) : null}
       </div>

@@ -266,6 +266,26 @@ test("GM places a token, chats, rolls, and opens the scenes manager", async ({ p
   await expect(page.getByText("0 / 25 ft.", { exact: true })).toBeVisible({ timeout: 15_000 });
   await expect(page.getByRole("button", { name: "Reset movement" })).toBeVisible();
 
+  await page.getByRole("button", { name: "Walls", exact: true }).click();
+  const sceneSurface = page.locator(".scene-surface");
+  const surfaceBox = await sceneSurface.boundingBox();
+  expect(surfaceBox).not.toBeNull();
+  if (surfaceBox) {
+    await page.mouse.move(
+      surfaceBox.x + surfaceBox.width * 0.1,
+      surfaceBox.y + surfaceBox.height * 0.85
+    );
+    await page.mouse.down();
+    await page.mouse.move(
+      surfaceBox.x + surfaceBox.width * 0.3,
+      surfaceBox.y + surfaceBox.height * 0.85,
+      { steps: 4 }
+    );
+    await page.mouse.up();
+  }
+  await expect(page.locator(".wall-layer .wall-line")).toHaveCount(1);
+  await page.getByRole("button", { name: "Walls", exact: true }).click();
+
   await page.getByPlaceholder(/Message the table/).fill("E2E table hello");
   await page.getByRole("button", { name: "Send" }).click();
   await expect(page.getByText("E2E table hello")).toBeVisible();
@@ -285,6 +305,7 @@ test("GM places a token, chats, rolls, and opens the scenes manager", async ({ p
   await scenes.getByRole("button", { name: "Edit" }).first().click();
   const sceneEditor = page.getByRole("dialog", { name: /Edit/ });
   await expect(sceneEditor.getByText("Grid calibration")).toBeVisible();
+  await expect(sceneEditor.getByText("Line-of-sight fog")).toBeVisible();
   await expect(sceneEditor.getByLabel("Squares in calibration drag")).toHaveValue("4");
   await expect(sceneEditor.getByLabel("Scale map percent")).toHaveValue("100");
 

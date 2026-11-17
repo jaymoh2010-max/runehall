@@ -818,6 +818,7 @@ export function SceneEditModal({
   const [offsetX, setOffsetX] = useState("0");
   const [offsetY, setOffsetY] = useState("0");
   const [fogEnabled, setFogEnabled] = useState(true);
+  const [losEnabled, setLosEnabled] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [dimensions, setDimensions] = useState({ width: 1600, height: 1000 });
@@ -835,6 +836,7 @@ export function SceneEditModal({
     setOffsetX(String(scene.gridOffsetX));
     setOffsetY(String(scene.gridOffsetY));
     setFogEnabled(scene.fogEnabled);
+    setLosEnabled(Boolean(scene.losEnabled));
     setFile(null);
     setPreview(null);
     setDimensions({ width: scene.width, height: scene.height });
@@ -968,6 +970,7 @@ export function SceneEditModal({
           gridOffsetX: Number(offsetX) || 0,
           gridOffsetY: Number(offsetY) || 0,
           fogEnabled,
+          losEnabled,
           imageUrl,
           thumbnailUrl,
           width: dimensions.width,
@@ -1145,6 +1148,16 @@ export function SceneEditModal({
               checked={fogEnabled}
               onChange={setFogEnabled}
               label={fogEnabled ? "Enabled" : "Disabled"}
+            />
+          </Field>
+          <Field
+            label="Line-of-sight fog"
+            hint="Players see up to 24 squares from character tokens. Walls and closed doors block sight."
+          >
+            <Toggle
+              checked={losEnabled}
+              onChange={setLosEnabled}
+              label={losEnabled ? "Dynamic" : "Manual reveal"}
             />
           </Field>
           <Field label="Grid offset X">

@@ -20,6 +20,7 @@ import { normalizeCampaignRuleset, normalizeXpMode } from "../shared/content";
 import { normalizeLootItems } from "../shared/loot";
 import { normalizeJournalAttachments, normalizeJournalKind } from "../shared/journal";
 import { normalizeCampaignThreads } from "../shared/dashboard";
+import { normalizeWalls } from "../shared/walls";
 import {
   isSessionCheckinStatus,
   normalizeAttendanceStatus,
@@ -132,6 +133,8 @@ export function serializeScene(row: SceneRow): Scene {
     fogEnabled: Boolean(row.fog_enabled),
     revealed: parseJson<string[]>(row.fog_revealed, []),
     templates: normalizeAoeTemplates(parseJson(row.templates, [])),
+    walls: normalizeWalls(parseJson(row.walls, [])),
+    losEnabled: Boolean(row.los_enabled),
     sortOrder: row.sort_order,
     createdAt: row.created_at,
     updatedAt: row.updated_at,

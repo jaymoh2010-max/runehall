@@ -13,7 +13,7 @@
 ### What is still prototype-level
 - **Rules automation is partial.** Feat prerequisites are enforced for mechanical requirements, while complex/story prerequisites are flagged for review; some subclass/feature/item effects are manual; companions and split-caster casting restrictions are not automated. This can make a sheet look correct while missing situational bonuses.
 - **Realtime recovery is revision-aware.** Reconnects refetch the authoritative table, campaign revisions detect missed events, character saves reject stale writes, and the table socket/state layer now lives in a tested hook with pure event reducers.
-- **Table polish is deep.** AoE templates, condition values/durations, multi-select, group drag, bulk actions, scene playlists, generated thumbnails, combat-log filters, group checks, delay/ready/ties, and first-run setup are built. Walls, doors, and dynamic lighting remain future work.
+- **Table polish is deep.** AoE templates, condition values/durations, multi-select, group drag, bulk actions, scene playlists, generated thumbnails, combat-log filters, group checks, delay/ready/ties, first-run setup, GM-drawn walls/doors, and line-of-sight fog are built. Dynamic lighting and darkvision remain future work.
 - **Content volume needs curation.** The builder exposes 540 backgrounds and 29 classes by default. That is impressive, but overwhelming; not every option has the same automation quality.
 - **Test coverage is unit + smoke + browser E2E + simulation.** Dice, rules math, compendium integrity, content tiers, security, and migrations are unit-tested; the GM/player campaign flow and registration/admin flows have an automated smoke test; Playwright covers registration, admin audit controls, campaign creation, the character builder and sheet, compendium routes, player-safe campaign access, and table interactions (token placement, chat, dice rolls, and the scenes manager). Upload edge cases (bad signatures, mismatched/unsupported types, empty files, oversized files and dimensions, foreign campaigns, and cleanup after rejection) are covered by the smoke test.
 - **Code health has guardrails.** Route-level splitting keeps the entry bundle near 107–122 KB gzip, and `npm run check` now covers types, lint (ESLint), formatting (Prettier), tests, build, and bundle budgets. The table state layer is tested; some large components remain.
@@ -101,7 +101,7 @@ The character builder is already good enough for a core campaign at low levels. 
   - Verified by creating a token, setting 24/30 HP, AC 18, and Frightened 1, then seeing those values in the token panel and initiative chip.
   - Remaining: drag-and-drop image onto a token, temp HP, and a full right-click context menu instead of opening the editor directly.
 - [x] **Scene polish (core)**
-  - Scene duplication copies grid, fog, and tokens.
+  - Scene duplication copies grid, fog, tokens, templates, and walls.
   - Grid calibration shows a live SVG overlay while adjusting grid size and offsets.
   - Drag across a chosen number of map squares to set the grid pitch and both offsets in one gesture.
   - The scale control resizes the canvas, grid, and offsets together so large maps stay manageable without losing alignment.
@@ -122,7 +122,7 @@ The character builder is already good enough for a core campaign at low levels. 
 - [x] **Table ergonomics (core)**
   - Focusable, keyboard-operable map tokens; party rail avatars remain keyboard accessible.
   - Full-screen button with a theater-mode fallback for embedded browsers.
-  - Shortcuts: R/H fog, M measure, T token, E edit, I initiative, ←/→ turn, F full screen, C chat, P party, Esc clear.
+  - Shortcuts: R/H fog, M measure, W walls, T token, E edit, I initiative, ←/→ turn, F full screen, C chat, P party, Esc clear.
   - Verified measure/chat/party toggles and theater mode in the browser.
   - Remaining: pan/fit/chat-focus hotkeys and a shortcut cheatsheet beyond the toolbar hint.
 - [x] **Party rail enhancements (core)**
@@ -419,7 +419,13 @@ Acceptance: a GM can prepare a full session in Runehall and start it with one �
   - Tied entries use Perception as the default tie break and can still be reordered manually.
   - Remaining: ready-trigger text/conditions and full PF2e Perception tie automation.
 - [ ] Decide the token HP ↔ sheet HP source of truth, or make sync explicitly two-way.
-- [ ] Optional first pass at walls/doors with manual reveal before dynamic lighting.
+- [x] **Walls, doors, and line-of-sight fog**
+  - The GM can draw grid-snapped walls and doors, click a door to open or close it, right-click a wall to delete it, and clear all walls.
+  - Walls and closed doors block sight; open doors do not.
+  - Optional line-of-sight fog makes players see only cells visible from character tokens, up to 24 squares, with no explored-area memory yet.
+  - Wall data is persisted per scene, copied on duplication, exported/imported with campaigns, and broadcast to connected clients.
+  - Line-of-sight uses the shared party view rather than per-token darkvision or light sources. Movement does not collide with walls yet.
+  - Covered by shared vision tests, a two-socket smoke check, and a browser wall-drawing flow.
 
 **Acceptance:** a complete combat with an AoE template, condition values, multiple selected tokens, and a filtered log needs no other tool.
 

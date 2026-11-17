@@ -205,8 +205,8 @@ export async function registerTableRoutes(app: FastifyInstance): Promise<void> {
     const ts = now();
     const name = `${source.name} (copy)`.slice(0, 80);
     db.prepare(
-      `INSERT INTO scenes (id, campaign_id, name, image_url, thumbnail_url, width, height, grid_size, grid_offset_x, grid_offset_y, fog_enabled, fog_revealed, sort_order, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO scenes (id, campaign_id, name, image_url, thumbnail_url, width, height, grid_size, grid_offset_x, grid_offset_y, fog_enabled, fog_revealed, templates, walls, los_enabled, sort_order, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       sceneId,
       source.campaign_id,
@@ -220,6 +220,9 @@ export async function registerTableRoutes(app: FastifyInstance): Promise<void> {
       source.grid_offset_y,
       source.fog_enabled,
       source.fog_revealed,
+      source.templates,
+      source.walls,
+      source.los_enabled,
       order.next,
       ts,
       ts
@@ -306,8 +309,9 @@ export async function registerTableRoutes(app: FastifyInstance): Promise<void> {
         ? row.grid_offset_y
         : clamp(Number(body.gridOffsetY) || 0, -gridSize, gridSize);
     const fogEnabled = body.fogEnabled === undefined ? row.fog_enabled : body.fogEnabled ? 1 : 0;
+    const losEnabled = body.losEnabled === undefined ? row.los_enabled : body.losEnabled ? 1 : 0;
     db.prepare(
-      `UPDATE scenes SET name = ?, image_url = ?, thumbnail_url = ?, width = ?, height = ?, grid_size = ?, grid_offset_x = ?, grid_offset_y = ?, fog_enabled = ?, updated_at = ? WHERE id = ?`
+      `UPDATE scenes SET name = ?, image_url = ?, thumbnail_url = ?, width = ?, height = ?, grid_size = ?, grid_offset_x = ?, grid_offset_y = ?, fog_enabled = ?, los_enabled = ?, updated_at = ? WHERE id = ?`
     ).run(
       name,
       imageUrl,
@@ -318,6 +322,7 @@ export async function registerTableRoutes(app: FastifyInstance): Promise<void> {
       gridOffsetX,
       gridOffsetY,
       fogEnabled,
+      losEnabled,
       now(),
       id
     );

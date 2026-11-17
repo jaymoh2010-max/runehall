@@ -42,6 +42,7 @@ Runehall is built for a private group of roughly 4–10 players and a GM. It run
 - A party roster rail beside the map: hover a portrait to see live HP, AC, saves, perception, speed, class/spell DC, hero points, and conditions; click to select that character's token. Online/offline dots show who is currently connected.
 - Player token ownership and locking; GM controls for hidden tokens and HP.
 - Brush-based fog of war with reveal/hide modes and three brush sizes.
+- GM-drawn walls and doors with a click-to-open door state and optional 24-square line-of-sight fog for players.
 - Scene duplication, drag-to-calibrate grid alignment, map scaling, and fog alignment for offset grids.
 - PF2e distance measurement with 5/10 alternating diagonals, pointer pings, and live presence.
 - Server-side dice with PF2e degrees of success, secret GM rolls/whispers, and persistent table chat.

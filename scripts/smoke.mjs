@@ -1058,6 +1058,44 @@ async function main() {
   await emitAck(playerSocket, "campaign:join", { campaignId: campaign.id });
   log("both realtime sockets joined the campaign");
 
+  const smokeWall = {
+    id: "wall_smoke",
+    x1: 0,
+    y1: 0,
+    x2: 200,
+    y2: 0,
+    kind: "wall",
+  };
+  const wallsPromise = waitForEvent(
+    gmSocket,
+    "scene:walls",
+    (payload) =>
+      payload.sceneId === scene.id && payload.walls?.some((wall) => wall.id === "wall_smoke")
+  );
+  gmSocket.emit("scene:walls", {
+    campaignId: campaign.id,
+    sceneId: scene.id,
+    walls: [smokeWall],
+  });
+  await wallsPromise;
+  await api(`/api/scenes/${scene.id}`, {
+    method: "PATCH",
+    cookie: gmCookie,
+    body: { losEnabled: true },
+  });
+  playerSocket.emit("scene:walls", {
+    campaignId: campaign.id,
+    sceneId: scene.id,
+    walls: [],
+  });
+  await delay(200);
+  const wallsTable = await api(`/api/campaigns/${campaign.id}/table`, { cookie: gmCookie });
+  const wallsScene = wallsTable.payload.scenes.find((entry) => entry.id === scene.id);
+  if (!wallsScene?.losEnabled || wallsScene.walls?.length !== 1) {
+    throw new Error("Wall persistence or line-of-sight setting was not saved");
+  }
+  log("GM walls persist, players cannot replace them, and line-of-sight is saved");
+
   const movedPromise = waitForEvent(
     gmSocket,
     "token:moved",

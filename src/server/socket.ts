@@ -10,6 +10,7 @@ import { normalizeTokenConditions, tickTokenConditions } from "../shared/tokens"
 import { sortInitiativeEntries } from "../shared/initiative";
 import { applyGridMovement } from "../shared/movement";
 import { normalizeAoeTemplate, normalizeAoeTemplates } from "../shared/templates";
+import { normalizeWalls } from "../shared/walls";
 import type {
   ClientToServerEvents,
   InitiativeEntry,
@@ -749,6 +750,26 @@ export function registerSocketServer(io: TypedServer): void {
         sceneId
       );
       io.to(room(campaignId)).emit("scene:templates", { sceneId, templates: [] });
+      touchCampaign(campaignId);
+    });
+
+    socket.on("scene:walls", ({ campaignId, sceneId, walls }) => {
+      if (!requireGm(socket, campaignId)) return;
+      const scene = sceneBelongs(sceneId, campaignId);
+      if (!scene) return;
+      const normalized = normalizeWalls(walls).map((wall) => ({
+        ...wall,
+        x1: clamp(wall.x1, 0, scene.width),
+        y1: clamp(wall.y1, 0, scene.height),
+        x2: clamp(wall.x2, 0, scene.width),
+        y2: clamp(wall.y2, 0, scene.height),
+      }));
+      db.prepare("UPDATE scenes SET walls = ?, updated_at = ? WHERE id = ?").run(
+        JSON.stringify(normalized),
+        now(),
+        sceneId
+      );
+      io.to(room(campaignId)).emit("scene:walls", { sceneId, walls: normalized });
       touchCampaign(campaignId);
     });
 

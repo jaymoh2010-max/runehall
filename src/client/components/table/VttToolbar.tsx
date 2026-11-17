@@ -1,5 +1,6 @@
 import {
   BookOpen,
+  BrickWall,
   ChevronLeft,
   ChevronRight,
   Eye,
@@ -15,7 +16,7 @@ import {
   Users,
   X,
 } from "lucide-react";
-import type { PresenceUser, Scene } from "../../../shared/types";
+import type { PresenceUser, Scene, WallKind } from "../../../shared/types";
 import { TEMPLATE_LABELS, TEMPLATE_SIZES, type TemplateKind } from "../../../shared/templates";
 import { Avatar, Button, IconButton, Select } from "../ui";
 
@@ -34,6 +35,11 @@ export function VttToolbar({
   setBrushSize,
   measureMode,
   setMeasureMode,
+  wallMode,
+  setWallMode,
+  wallKind,
+  setWallKind,
+  onClearWalls,
   setAddTokenOpen,
   bestiaryOpen,
   setBestiaryOpen,
@@ -70,6 +76,11 @@ export function VttToolbar({
   setBrushSize: (size: number) => void;
   measureMode: boolean;
   setMeasureMode: (value: boolean | ((current: boolean) => boolean)) => void;
+  wallMode: boolean;
+  setWallMode: (value: boolean) => void;
+  wallKind: WallKind;
+  setWallKind: (kind: WallKind) => void;
+  onClearWalls: () => void;
   setAddTokenOpen: (open: boolean) => void;
   bestiaryOpen: boolean;
   setBestiaryOpen: (open: boolean | ((current: boolean) => boolean)) => void;
@@ -162,6 +173,38 @@ export function VttToolbar({
               <option value={3}>3×3</option>
               <option value={5}>5×5</option>
             </Select>
+            <Button
+              size="sm"
+              variant="ghost"
+              className={wallMode ? "is-active" : ""}
+              icon={<BrickWall size={14} />}
+              onClick={() => setWallMode(!wallMode)}
+              title="Draw walls and doors (W)"
+            >
+              Walls
+            </Button>
+            {wallMode ? (
+              <>
+                <Select
+                  value={wallKind}
+                  onChange={(event) => setWallKind(event.target.value as WallKind)}
+                  className="brush-select"
+                  title="Wall or door"
+                >
+                  <option value="wall">Wall</option>
+                  <option value="door">Door</option>
+                </Select>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  icon={<X size={14} />}
+                  onClick={onClearWalls}
+                  title="Remove all walls and doors"
+                >
+                  Clear
+                </Button>
+              </>
+            ) : null}
             <div className="toolbar-sep" />
             <Button
               size="sm"
@@ -294,7 +337,7 @@ export function VttToolbar({
           label="Keyboard shortcuts"
           onClick={() =>
             toast(
-              "Shortcuts: R reveal · H hide · M measure · A area · T token · E edit · I initiative · ←/→ turn · F full screen · C chat · P party · Esc clear",
+              "Shortcuts: R reveal · H hide · M measure · W walls · A area · T token · E edit · I initiative · ←/→ turn · F full screen · C chat · P party · Esc clear",
               "info"
             )
           }

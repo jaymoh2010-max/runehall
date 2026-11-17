@@ -30,6 +30,8 @@ import type {
   PublicUser,
   Scene,
   Token,
+  Wall,
+  WallKind,
 } from "../../../shared/types";
 import { errorMessage, useToasts } from "../../stores";
 import { api } from "../../api";
@@ -94,6 +96,8 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
   const [fogBrush, setFogBrush] = useState<"reveal" | "hide" | null>(null);
   const [brushSize, setBrushSize] = useState(3);
   const [measureMode, setMeasureMode] = useState(false);
+  const [wallMode, setWallMode] = useState(false);
+  const [wallKind, setWallKind] = useState<WallKind>("wall");
   const [sceneManagerOpen, setSceneManagerOpen] = useState(false);
   const [editingScene, setEditingScene] = useState<Scene | null>(null);
   const [addTokenOpen, setAddTokenOpen] = useState(false);
@@ -250,6 +254,28 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
       })
     );
     getSocket().emit("fog:update", { campaignId, sceneId: activeSceneId, cells, mode });
+  };
+
+  const saveWalls = (walls: Wall[]) => {
+    if (!isGm || !activeSceneId) return;
+    setScenes((current) =>
+      current.map((scene) => (scene.id === activeSceneId ? { ...scene, walls } : scene))
+    );
+    getSocket().emit("scene:walls", { campaignId, sceneId: activeSceneId, walls });
+  };
+
+  const clearWalls = () => {
+    if (!isGm) return;
+    if (!window.confirm("Remove all walls and doors from this scene?")) return;
+    saveWalls([]);
+  };
+
+  const enterWallMode = (next: boolean) => {
+    setWallMode(next);
+    if (!next) return;
+    setFogBrush(null);
+    setMeasureMode(false);
+    setTemplateKind(null);
   };
 
   const createToken = (partial: Partial<Token>) => {
@@ -551,6 +577,7 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
       if (event.key === "Escape") {
         setFogBrush(null);
         setMeasureMode(false);
+        setWallMode(false);
         setSelectedTokenId(null);
         setTheaterMode(false);
         setTemplateKind(null);
@@ -565,6 +592,7 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
         event.preventDefault();
         setMeasureMode((current) => !current);
         setFogBrush(null);
+        setWallMode(false);
         return;
       }
       if (key === "a" && isGm) {
@@ -572,6 +600,7 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
         setTemplateKind((current) => (current ? null : "burst"));
         setFogBrush(null);
         setMeasureMode(false);
+        setWallMode(false);
         return;
       }
       if (key === "c") {
@@ -590,12 +619,22 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
         event.preventDefault();
         setFogBrush((current) => (current === "reveal" ? null : "reveal"));
         setMeasureMode(false);
+        setWallMode(false);
         return;
       }
       if (key === "h" && activeScene?.fogEnabled) {
         event.preventDefault();
         setFogBrush((current) => (current === "hide" ? null : "hide"));
         setMeasureMode(false);
+        setWallMode(false);
+        return;
+      }
+      if (key === "w") {
+        event.preventDefault();
+        setWallMode((current) => !current);
+        setFogBrush(null);
+        setMeasureMode(false);
+        setTemplateKind(null);
         return;
       }
       if (key === "t") {
@@ -701,16 +740,30 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
         onNextScene={nextScene ? () => activateScene(nextScene.id) : undefined}
         setSceneManagerOpen={setSceneManagerOpen}
         fogBrush={fogBrush}
-        setFogBrush={setFogBrush}
+        setFogBrush={(next) => {
+          setWallMode(false);
+          setFogBrush(next);
+        }}
         brushSize={brushSize}
         setBrushSize={setBrushSize}
         measureMode={measureMode}
-        setMeasureMode={setMeasureMode}
+        setMeasureMode={(next) => {
+          setWallMode(false);
+          setMeasureMode(next);
+        }}
+        wallMode={wallMode}
+        setWallMode={enterWallMode}
+        wallKind={wallKind}
+        setWallKind={setWallKind}
+        onClearWalls={clearWalls}
         setAddTokenOpen={setAddTokenOpen}
         bestiaryOpen={bestiaryOpen}
         setBestiaryOpen={setBestiaryOpen}
         templateKind={templateKind}
-        setTemplateKind={setTemplateKind}
+        setTemplateKind={(next) => {
+          setWallMode(false);
+          setTemplateKind(next);
+        }}
         templateSize={templateSize}
         setTemplateSize={setTemplateSize}
         hasTemplate={Boolean(activeScene?.templates.length)}
@@ -798,6 +851,9 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
             fogBrush={previewing ? null : activeScene.fogEnabled ? fogBrush : null}
             brushSize={brushSize}
             measureMode={measureMode}
+            wallMode={previewing ? false : wallMode}
+            wallKind={wallKind}
+            onWalls={saveWalls}
             onPing={(x, y) =>
               getSocket().emit("pointer", { campaignId, sceneId: activeScene.id, x, y })
             }

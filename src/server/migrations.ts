@@ -421,4 +421,12 @@ export const migrations: Migration[] = [
       ALTER TABLE scenes ADD COLUMN thumbnail_url TEXT;
     `,
   },
+  {
+    version: 18,
+    name: "scene_walls_and_line_of_sight",
+    sql: `
+      ALTER TABLE scenes ADD COLUMN walls TEXT NOT NULL DEFAULT '[]';
+      ALTER TABLE scenes ADD COLUMN los_enabled INTEGER NOT NULL DEFAULT 0;
+    `,
+  },
 ];

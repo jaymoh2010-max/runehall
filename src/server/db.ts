@@ -157,6 +157,8 @@ export interface SceneRow {
   fog_enabled: number;
   fog_revealed: string;
   templates: string;
+  walls: string;
+  los_enabled: number;
   sort_order: number;
   created_at: number;
   updated_at: number;
