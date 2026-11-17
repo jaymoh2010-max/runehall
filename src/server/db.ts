@@ -174,6 +174,7 @@ export interface TokenRow {
   x: number;
   y: number;
   size: number;
+  vision_radius: number;
   color: string;
   hp_current: number | null;
   hp_max: number | null;

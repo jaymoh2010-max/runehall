@@ -80,6 +80,15 @@ describe("line of sight", () => {
     expect(visible.has("9,4")).toBe(true);
   });
 
+  it("uses each token's own vision radius", () => {
+    const short = visibleCells(scene, [], [{ x: 50, y: 50, radius: 40 }]);
+    expect(short.has("2,2")).toBe(true);
+    expect(short.has("5,2")).toBe(false);
+
+    const long = visibleCells(scene, [], [{ x: 50, y: 50, radius: 200 }]);
+    expect(long.has("5,2")).toBe(true);
+  });
+
   it("hides cells behind a wall", () => {
     const visible = visibleCells(scene, [wall()], [{ x: 50, y: 50 }]);
     expect(visible.has("2,2")).toBe(true);

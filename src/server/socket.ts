@@ -330,11 +330,12 @@ function createToken(
     incoming.initiativeBonus === null || incoming.initiativeBonus === undefined
       ? null
       : safeInt(incoming.initiativeBonus, 0, -100, 1000);
+  const visionRadius = clamp(safeInt(incoming.visionRadius, 60, 0, 240), 0, 240);
   const groupId = incoming.groupId ? safeString(incoming.groupId, "", 80) || null : null;
   const groupName = groupId ? safeString(incoming.groupName, name, 80) : null;
   db.prepare(
-    `INSERT INTO tokens (id, scene_id, name, image_url, character_id, owner_id, x, y, size, color, hp_current, hp_max, ac, initiative_bonus, group_id, group_name, conditions, hidden, locked, sort_order, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO tokens (id, scene_id, name, image_url, character_id, owner_id, x, y, size, vision_radius, color, hp_current, hp_max, ac, initiative_bonus, group_id, group_name, conditions, hidden, locked, sort_order, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     id,
     sceneId,
@@ -345,6 +346,7 @@ function createToken(
     x,
     y,
     size,
+    visionRadius,
     safeString(incoming.color, "#c8a96b", 30),
     hpCurrent,
     hpMax,
@@ -505,6 +507,12 @@ export function registerSocketServer(io: TypedServer): void {
         if (token.x !== undefined) add("x", clamp(Number(token.x) || 0, 0, scene.width));
         if (token.y !== undefined) add("y", clamp(Number(token.y) || 0, 0, scene.height));
         if (token.size !== undefined) add("size", clamp(safeInt(token.size, row.size, 1, 6), 1, 6));
+        if (token.visionRadius !== undefined) {
+          add(
+            "vision_radius",
+            clamp(safeInt(token.visionRadius, row.vision_radius ?? 60, 0, 240), 0, 240)
+          );
+        }
         if (token.color !== undefined) add("color", safeString(token.color, row.color, 30));
         if (token.hpMax !== undefined)
           add("hp_max", token.hpMax === null ? null : safeInt(token.hpMax, 0, 0, 1_000_000));

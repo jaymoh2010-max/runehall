@@ -1152,7 +1152,7 @@ export function SceneEditModal({
           </Field>
           <Field
             label="Line-of-sight fog"
-            hint="Players see up to 24 squares from character tokens. Walls and closed doors block sight."
+            hint="Players see from character tokens using each token's vision radius (default 60 ft). Walls and closed doors block sight."
           >
             <Toggle
               checked={losEnabled}

@@ -4,6 +4,8 @@ import { wallBlocksSight } from "./walls";
 export interface VisionPoint {
   x: number;
   y: number;
+  /** Per-origin sight radius in scene pixels. Falls back to the global option. */
+  radius?: number;
 }
 
 function cross(ax: number, ay: number, bx: number, by: number): number {
@@ -79,12 +81,12 @@ export function visibleCells(
   const grid = Math.max(1, scene.gridSize);
   const cols = Math.max(1, Math.ceil(scene.width / grid));
   const rows = Math.max(1, Math.ceil(scene.height / grid));
-  const maxDistance = Math.max(grid, options.maxDistance ?? grid * 24);
   const blocking = walls.filter(wallBlocksSight);
   const result = new Set<string>();
   if (!origins.length) return result;
 
   for (const origin of origins) {
+    const maxDistance = Math.max(grid, origin.radius ?? options.maxDistance ?? grid * 24);
     const minCx = Math.max(0, Math.floor((origin.x - maxDistance - scene.gridOffsetX) / grid));
     const maxCx = Math.min(
       cols - 1,

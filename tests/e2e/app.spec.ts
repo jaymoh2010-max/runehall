@@ -266,6 +266,13 @@ test("GM places a token, chats, rolls, and opens the scenes manager", async ({ p
   await expect(page.getByText("0 / 25 ft.", { exact: true })).toBeVisible({ timeout: 15_000 });
   await expect(page.getByRole("button", { name: "Reset movement" })).toBeVisible();
 
+  await page.getByRole("button", { name: /E2E Hero, character token/ }).click();
+  await page.getByRole("button", { name: "Edit token" }).click();
+  const tokenEditor = page.getByRole("dialog", { name: /Edit “E2E Hero”/ });
+  await expect(tokenEditor.getByLabel(/Vision radius/)).toHaveValue("60");
+  await page.keyboard.press("Escape");
+  await expect(tokenEditor).toBeHidden();
+
   await page.getByRole("button", { name: "Walls", exact: true }).click();
   const sceneSurface = page.locator(".scene-surface");
   const surfaceBox = await sceneSurface.boundingBox();

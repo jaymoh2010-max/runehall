@@ -1059,6 +1059,8 @@ export interface Token {
   x: number;
   y: number;
   size: number;
+  /** Per-token sight radius in feet. 0 disables vision from this token. */
+  visionRadius: number;
   color: string;
   hpCurrent: number | null;
   hpMax: number | null;

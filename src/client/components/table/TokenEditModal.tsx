@@ -37,6 +37,7 @@ export function TokenEditModal({
   const [hpMax, setHpMax] = useState("");
   const [ac, setAc] = useState("");
   const [size, setSize] = useState("1");
+  const [visionRadius, setVisionRadius] = useState("60");
   const [color, setColor] = useState("#c8a96b");
   const [ownerId, setOwnerId] = useState("");
   const [hidden, setHidden] = useState(false);
@@ -56,6 +57,7 @@ export function TokenEditModal({
     setHpMax(token.hpMax === null ? "" : String(token.hpMax));
     setAc(token.ac === null ? "" : String(token.ac));
     setSize(String(token.size));
+    setVisionRadius(String(token.visionRadius ?? 60));
     setColor(token.color);
     setOwnerId(token.ownerId ?? "");
     setHidden(token.hidden);
@@ -124,6 +126,7 @@ export function TokenEditModal({
             : Math.min(parsedMax, parsedCurrent),
       ac: ac === "" ? null : Number(ac),
       size: Number(size) || 1,
+      visionRadius: Math.max(0, Math.min(240, Math.round(Number(visionRadius) || 0))),
       color,
       ownerId: ownerId || null,
       hidden,
@@ -261,6 +264,19 @@ export function TokenEditModal({
                 <option value="3">Huge</option>
                 <option value="4">Gargantuan</option>
               </Select>
+            </Field>
+            <Field
+              label="Vision radius (ft)"
+              hint="0 disables this token's vision. Line-of-sight is shared by the party."
+            >
+              <Input
+                type="number"
+                min={0}
+                max={240}
+                step={5}
+                value={visionRadius}
+                onChange={(event) => setVisionRadius(event.target.value)}
+              />
             </Field>
           </div>
 

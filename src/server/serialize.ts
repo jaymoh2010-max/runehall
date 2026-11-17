@@ -153,6 +153,7 @@ export function serializeToken(row: TokenRow, ownerName?: string): Token {
     x: row.x,
     y: row.y,
     size: row.size,
+    visionRadius: Number(row.vision_radius ?? 60),
     color: row.color,
     hpCurrent: row.hp_current,
     hpMax: row.hp_max,

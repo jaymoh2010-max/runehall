@@ -13,6 +13,7 @@ import type { CharacterRecord, Monster, Scene, Token, Wall, WallKind } from "../
 import { measureGridDistance } from "../../../shared/measurement";
 import { nearestWall } from "../../../shared/walls";
 import { visibleCells } from "../../../shared/vision";
+import { loadExplored, saveExplored } from "./explored";
 import { Tag } from "../ui";
 import { HoverCard } from "../HoverCard";
 import { BESTIARY_DRAG_TYPE, type BestiaryDragPayload } from "./bestiaryDrag";
@@ -114,6 +115,7 @@ export function SceneCanvas({
     y: number;
   } | null>(null);
   const [fogPreview, setFogPreview] = useState<Set<string>>(() => new Set(scene.revealed));
+  const [exploredCells, setExploredCells] = useState<Set<string>>(() => new Set());
   const [wallDraft, setWallDraft] = useState<{
     x1: number;
     y1: number;
@@ -146,11 +148,21 @@ export function SceneCanvas({
   const visionCellSet = useMemo(() => {
     if (isGm || !scene.fogEnabled || !scene.losEnabled) return null;
     const origins = tokens
-      .filter((token) => token.characterId && !token.hidden)
-      .map((token) => ({ x: token.x, y: token.y }));
+      .filter(
+        (token) =>
+          !token.hidden &&
+          (token.characterId || token.ownerId === userId) &&
+          (token.visionRadius ?? 60) > 0
+      )
+      .map((token) => ({
+        x: token.x,
+        y: token.y,
+        radius: ((token.visionRadius ?? 60) / 5) * scene.gridSize,
+      }));
     return visibleCells(scene, scene.walls, origins);
   }, [
     isGm,
+    userId,
     scene.fogEnabled,
     scene.losEnabled,
     scene.width,
@@ -168,6 +180,37 @@ export function SceneCanvas({
       wallClickStart.current = null;
     }
   }, [wallMode]);
+
+  useEffect(() => {
+    setExploredCells(loadExplored(scene, userId));
+  }, [
+    scene.campaignId,
+    scene.id,
+    scene.width,
+    scene.height,
+    scene.gridSize,
+    scene.gridOffsetX,
+    scene.gridOffsetY,
+    scene.imageUrl,
+    userId,
+  ]);
+
+  useEffect(() => {
+    if (isGm || !scene.fogEnabled || !scene.losEnabled || !visionCellSet?.size) return;
+    setExploredCells((current) => {
+      let changed = false;
+      const next = new Set(current);
+      for (const cell of visionCellSet) {
+        if (!next.has(cell)) {
+          next.add(cell);
+          changed = true;
+        }
+      }
+      if (!changed) return current;
+      saveExplored(scene, userId, next);
+      return next;
+    });
+  }, [visionCellSet, isGm, scene, userId]);
 
   useEffect(() => {
     setFogPreview(new Set(scene.revealed));
@@ -220,23 +263,42 @@ export function SceneCanvas({
     if (!context) return;
     context.clearRect(0, 0, width, height);
     if (!scene.fogEnabled) return;
-    context.fillStyle = isGm ? "rgba(5, 7, 11, 0.78)" : "rgba(5, 7, 11, 0.985)";
-    context.fillRect(0, 0, width, height);
     const cellSize = scene.gridSize * fogScale;
-    const fogCells = isGm || !scene.losEnabled ? fogPreview : (visionCellSet ?? new Set<string>());
-    for (const cell of fogCells) {
+    const cellRect = (cell: string) => {
       const [cx, cy] = cell.split(",").map(Number);
-      if (!Number.isFinite(cx) || !Number.isFinite(cy)) continue;
-      context.clearRect(
-        (scene.gridOffsetX + cx * scene.gridSize) * fogScale,
-        (scene.gridOffsetY + cy * scene.gridSize) * fogScale,
-        cellSize,
-        cellSize
-      );
+      if (!Number.isFinite(cx) || !Number.isFinite(cy)) return null;
+      return {
+        x: (scene.gridOffsetX + cx * scene.gridSize) * fogScale,
+        y: (scene.gridOffsetY + cy * scene.gridSize) * fogScale,
+        size: cellSize,
+      };
+    };
+    if (isGm || !scene.losEnabled) {
+      context.fillStyle = isGm ? "rgba(5, 7, 11, 0.78)" : "rgba(5, 7, 11, 0.985)";
+      context.fillRect(0, 0, width, height);
+      for (const cell of fogPreview) {
+        const rect = cellRect(cell);
+        if (rect) context.clearRect(rect.x, rect.y, rect.size, rect.size);
+      }
+      return;
+    }
+    context.fillStyle = "rgba(5, 7, 11, 0.985)";
+    context.fillRect(0, 0, width, height);
+    context.fillStyle = "rgba(5, 7, 11, 0.7)";
+    for (const cell of exploredCells) {
+      const rect = cellRect(cell);
+      if (!rect) continue;
+      context.clearRect(rect.x, rect.y, rect.size, rect.size);
+      context.fillRect(rect.x, rect.y, rect.size, rect.size);
+    }
+    for (const cell of visionCellSet ?? []) {
+      const rect = cellRect(cell);
+      if (rect) context.clearRect(rect.x, rect.y, rect.size, rect.size);
     }
   }, [
     fogPreview,
     visionCellSet,
+    exploredCells,
     isGm,
     scene.width,
     scene.height,

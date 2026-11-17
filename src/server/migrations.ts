@@ -429,4 +429,11 @@ export const migrations: Migration[] = [
       ALTER TABLE scenes ADD COLUMN los_enabled INTEGER NOT NULL DEFAULT 0;
     `,
   },
+  {
+    version: 19,
+    name: "token_vision_radius",
+    sql: `
+      ALTER TABLE tokens ADD COLUMN vision_radius INTEGER NOT NULL DEFAULT 60;
+    `,
+  },
 ];

@@ -1110,10 +1110,12 @@ async function main() {
       x: 100,
       y: 100,
       size: 1,
+      visionRadius: 30,
       color: "#c8a96b",
     },
   });
   if (!token) throw new Error("GM could not create a character token");
+  if (token.visionRadius !== 30) throw new Error("Token vision radius was not saved");
   const revisionPromise = waitForEvent(
     gmSocket,
     "campaign:revision",
