@@ -4,12 +4,17 @@ import path from "node:path";
 import { pipeline } from "node:stream/promises";
 import type { FastifyInstance } from "fastify";
 import { getCampaign, getCampaignRole } from "../access";
-import { db, type AudioTrackRow, type CampaignRow } from "../db";
+import { db, type AudioLibraryTrackRow, type AudioTrackRow, type CampaignRow } from "../db";
 import { globalAssetReferences } from "../assets";
 import { newId, now, safeString, uploadsDir } from "../util";
 import { inspectImage } from "../imageMeta";
 import { inspectAudio } from "../audioMeta";
-import { serializeAudioState, serializeAudioTrack, touchCampaign } from "../serialize";
+import {
+  serializeAudioLibraryTrack,
+  serializeAudioState,
+  serializeAudioTrack,
+  touchCampaign,
+} from "../serialize";
 import type { CampaignAudioTrack } from "../../shared/types";
 import crypto from "node:crypto";
 
@@ -222,6 +227,74 @@ export async function registerUploadRoutes(app: FastifyInstance): Promise<void> 
       tracks: audioTracksFor(campaignId),
     });
     touchCampaign(campaignId);
+    return reply.code(201).send({ track: serializeAudioTrack(row) });
+  });
+
+  app.get("/api/campaigns/:id/audio/library", async (request, reply) => {
+    if (!request.user) return reply.code(401).send({ error: "Sign in to continue." });
+    const { id } = request.params as { id: string };
+    if (!getCampaign(id)) return reply.code(404).send({ error: "Campaign not found." });
+    if (getCampaignRole(id, request.user.id) !== "gm") {
+      return reply.code(403).send({ error: "Only the GM can browse the music library." });
+    }
+    const rows = db
+      .prepare("SELECT * FROM audio_library_tracks ORDER BY sort_order ASC, title ASC")
+      .all() as AudioLibraryTrackRow[];
+    const campaignUrls = new Set(audioTracksFor(id).map((track) => track.url));
+    return reply.send({
+      tracks: rows.map((row) => serializeAudioLibraryTrack(row, campaignUrls.has(row.url))),
+    });
+  });
+
+  app.post("/api/campaigns/:id/audio/library/:libraryId", async (request, reply) => {
+    if (!request.user) return reply.code(401).send({ error: "Sign in to continue." });
+    const { id, libraryId } = request.params as { id: string; libraryId: string };
+    if (!getCampaign(id)) return reply.code(404).send({ error: "Campaign not found." });
+    if (getCampaignRole(id, request.user.id) !== "gm") {
+      return reply.code(403).send({ error: "Only the GM can add library music." });
+    }
+    const libraryTrack = db
+      .prepare("SELECT * FROM audio_library_tracks WHERE id = ?")
+      .get(libraryId) as AudioLibraryTrackRow | undefined;
+    if (!libraryTrack) return reply.code(404).send({ error: "Library track not found." });
+    const existing = db
+      .prepare("SELECT * FROM campaign_audio_tracks WHERE campaign_id = ? AND url = ?")
+      .get(id, libraryTrack.url) as AudioTrackRow | undefined;
+    if (existing) {
+      return reply.code(409).send({
+        error: "That track is already in the campaign soundtrack.",
+        track: serializeAudioTrack(existing),
+      });
+    }
+    const ts = now();
+    const trackId = newId("audio");
+    const order = db
+      .prepare(
+        "SELECT COALESCE(MAX(sort_order), 0) + 1 AS next FROM campaign_audio_tracks WHERE campaign_id = ?"
+      )
+      .get(id) as { next: number };
+    db.prepare(
+      `INSERT INTO campaign_audio_tracks
+        (id, campaign_id, name, url, mime_type, size, sort_order, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(
+      trackId,
+      id,
+      libraryTrack.title,
+      libraryTrack.url,
+      libraryTrack.mime_type,
+      libraryTrack.size,
+      order.next,
+      ts
+    );
+    const row = db
+      .prepare("SELECT * FROM campaign_audio_tracks WHERE id = ?")
+      .get(trackId) as AudioTrackRow;
+    app.broadcastCampaign(id, "audio:tracks", {
+      campaignId: id,
+      tracks: audioTracksFor(id),
+    });
+    touchCampaign(id);
     return reply.code(201).send({ track: serializeAudioTrack(row) });
   });
 

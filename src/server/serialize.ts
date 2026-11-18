@@ -1,4 +1,5 @@
 import type {
+  AudioLibraryTrack,
   CampaignAudioState,
   CampaignAudioTrack,
   CampaignDashboard,
@@ -22,6 +23,7 @@ import type {
   ValidationIssue,
 } from "../shared/types";
 import { normalizeCampaignRuleset, normalizeXpMode } from "../shared/content";
+import { isAudioMood } from "../shared/audio";
 import {
   normalizeAmbientLight,
   normalizeLightColor,
@@ -46,6 +48,7 @@ import {
 } from "../shared/sessions";
 import {
   db,
+  type AudioLibraryTrackRow,
   type CampaignDashboardRow,
   type AudioTrackRow,
   type CampaignNpcRow,
@@ -110,6 +113,25 @@ export function serializeAudioTrack(row: AudioTrackRow): CampaignAudioTrack {
     size: row.size,
     sortOrder: row.sort_order,
     createdAt: row.created_at,
+  };
+}
+
+export function serializeAudioLibraryTrack(
+  row: AudioLibraryTrackRow,
+  added = false
+): AudioLibraryTrack {
+  return {
+    id: row.id,
+    title: row.title,
+    mood: isAudioMood(row.mood) ? row.mood : "exploration",
+    url: row.url,
+    mimeType: row.mime_type,
+    size: row.size,
+    author: row.author,
+    license: row.license,
+    sourceUrl: row.source_url,
+    sortOrder: row.sort_order,
+    ...(added ? { added: true } : {}),
   };
 }
 

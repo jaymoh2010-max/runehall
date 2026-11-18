@@ -537,4 +537,43 @@ export const migrations: Migration[] = [
         WHERE status = 'pending';
     `,
   },
+  {
+    version: 29,
+    name: "audio_library",
+    sql: `
+      CREATE TABLE IF NOT EXISTS audio_library_tracks (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        mood TEXT NOT NULL CHECK (mood IN ('battle', 'exploration', 'tavern', 'relaxing', 'mystery')),
+        url TEXT NOT NULL,
+        mime_type TEXT NOT NULL,
+        size INTEGER NOT NULL DEFAULT 0,
+        author TEXT NOT NULL DEFAULT '',
+        license TEXT NOT NULL DEFAULT 'CC0 1.0',
+        source_url TEXT NOT NULL DEFAULT '',
+        sort_order INTEGER NOT NULL DEFAULT 0
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_audio_library_mood
+        ON audio_library_tracks(mood, sort_order);
+
+      INSERT OR IGNORE INTO audio_library_tracks
+        (id, title, mood, url, mime_type, size, author, license, source_url, sort_order)
+      VALUES
+        ('lib:battle-theme-a', 'Battle Theme A', 'battle', '/audio-library/battle-theme-a.mp3', 'audio/mpeg', 3289143, 'cynicmusic', 'CC0 1.0', 'https://opengameart.org/content/battle-theme-a', 10),
+        ('lib:jrpg-epic-rock-battle', 'JRPG Epic Rock Battle', 'battle', '/audio-library/jrpg-epic-rock-battle.mp3', 'audio/mpeg', 2893343, 'HydroGene', 'CC0 1.0', 'https://opengameart.org/content/jrpg-epic-rock-battle-theme-1', 20),
+        ('lib:fighting-is-not-an-option', 'Fighting Is Not an Option', 'battle', '/audio-library/fighting-is-not-an-option.mp3', 'audio/mpeg', 1406059, 'Cleyton Kauffman', 'CC0 1.0', 'https://opengameart.org/content/rpg-battle-theme-ii', 30),
+        ('lib:a-new-town', 'A New Town', 'exploration', '/audio-library/a-new-town.mp3', 'audio/mpeg', 766291, 'cynicmusic', 'CC0 1.0', 'https://opengameart.org/content/a-new-town-rpg-theme', 40),
+        ('lib:magic-town', 'Magic Town', 'exploration', '/audio-library/magic-town.mp3', 'audio/mpeg', 1338809, 'controllerhead', 'CC0 1.0', 'https://opengameart.org/content/magic-town', 50),
+        ('lib:mystical-town', 'Mystical Town', 'exploration', '/audio-library/mystical-town.ogg', 'audio/ogg', 1779561, 'symphony', 'CC0 1.0', 'https://opengameart.org/content/mystical-rpg-maker-town-theme', 60),
+        ('lib:tavern', 'Tavern', 'tavern', '/audio-library/tavern.ogg', 'audio/ogg', 1034582, 'yd', 'CC0 1.0', 'https://opengameart.org/content/tavern-0', 70),
+        ('lib:old-tower-inn', 'The Old Tower Inn', 'tavern', '/audio-library/old-tower-inn.mp3', 'audio/mpeg', 2535801, 'RandomMind', 'CC0 1.0', 'https://opengameart.org/content/medieval-the-old-tower-inn', 80),
+        ('lib:heavenly-loop', 'Heavenly Loop', 'relaxing', '/audio-library/heavenly-loop.ogg', 'audio/ogg', 1224922, 'isaiah658', 'CC0 1.0', 'https://opengameart.org/content/heavenly-loop', 90),
+        ('lib:ambient-relaxing-loop', 'Ambient Relaxing Loop', 'relaxing', '/audio-library/ambient-relaxing-loop.ogg', 'audio/ogg', 1284993, 'isaiah658', 'CC0 1.0', 'https://opengameart.org/content/ambient-relaxing-loop', 100),
+        ('lib:town-theme-rpg', 'Town Theme', 'relaxing', '/audio-library/town-theme-rpg.mp3', 'audio/mpeg', 1316581, 'cynicmusic', 'CC0 1.0', 'https://opengameart.org/content/town-theme-rpg', 110),
+        ('lib:dark-cavern-ambient', 'Dark Cavern', 'mystery', '/audio-library/dark-cavern-ambient.ogg', 'audio/ogg', 1693463, 'Paul Wortmann', 'CC0 1.0', 'https://opengameart.org/content/dark-cavern-ambient', 120),
+        ('lib:dungeon-deep', 'Dungeon Deep', 'mystery', '/audio-library/dungeon-deep.mp3', 'audio/mpeg', 1161970, 'Eldritch Grim', 'CC0 1.0', 'https://opengameart.org/content/dungeon-deep-0', 130),
+        ('lib:whispers-in-the-fog', 'Whispers in the Fog', 'mystery', '/audio-library/whispers-in-the-fog.ogg', 'audio/ogg', 204349, 'Ruhinre', 'CC0 1.0', 'https://opengameart.org/content/whispers-in-the-fog', 140);
+    `,
+  },
 ];

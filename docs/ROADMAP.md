@@ -488,12 +488,13 @@ Acceptance: a GM can prepare a full session in Runehall and start it with one â€
   - Duplicates preserve content, kind, visibility, and attachments.
 - [x] **Campaign soundtrack**
   - The GM can upload MP3, OGG, WAV, or WebM tracks (up to 25 MB), list them, play or pause, and remove them.
-  - Playback state is campaign-wide and broadcast to connected clients; the position is synced on play, pause, and track changes using server time so client clock skew cannot mis-seek.
+  - A bundled CC0 music library adds battle, exploration, tavern, relaxing, and mystery tracks. The GM can browse by mood, preview author/license/source links, and add a track without uploading a file.
+  - Playback state is campaign-wide and broadcast to connected clients; the position is synced on play, pause, and track changes using server time so client clock skew cannot mis-seek. Tracks loop.
   - New tracks and deletions are broadcast live, so players do not need to reload to play a track the GM just added.
-  - Players receive a **Join audio** control to satisfy browser autoplay rules, plus a local volume slider.
-  - Uploaded tracks use the campaign upload store, are protected from orphan cleanup, and stay separate from the image asset library. Deleting a track removes its backing file once nothing else references it.
-  - Campaign export includes track metadata; import restores tracks whose audio files already exist in `data/uploads`.
-  - Covered by audio-signature unit tests, a two-socket smoke check of upload, playback, export/import, and deletion, and a browser upload/play/remove flow.
+  - Players receive **Join audio** and **Leave audio** controls to satisfy browser autoplay rules, plus a local volume slider; joining or leaving is local and does not change the table's shared state.
+  - Uploaded tracks use the campaign upload store, are protected from orphan cleanup, and stay separate from the image asset library. Deleting a track removes its uploaded backing file once nothing else references it; bundled library files are never removed.
+  - Campaign export includes track metadata; import restores tracks whose audio files already exist in `data/uploads` or the bundled library.
+  - Covered by audio-signature unit tests, a two-socket smoke check of upload, playback, export/import, and deletion, and a browser upload/play/remove and library-add flow.
 - [x] **Quest handouts and one-time XP rewards**
   - A handout can be marked Active, Completed, or Failed and carry an XP reward.
   - The Journal has a Quests filter and shows the status and reward on the handout.

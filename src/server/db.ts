@@ -242,6 +242,19 @@ export interface AudioTrackRow {
   created_at: number;
 }
 
+export interface AudioLibraryTrackRow {
+  id: string;
+  title: string;
+  mood: string;
+  url: string;
+  mime_type: string;
+  size: number;
+  author: string;
+  license: string;
+  source_url: string;
+  sort_order: number;
+}
+
 export interface JournalRow {
   id: string;
   campaign_id: string;

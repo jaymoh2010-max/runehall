@@ -23,6 +23,30 @@ This product is an independent, unofficial tool compatible with Pathfinder Secon
 - **Cinzel** — SIL Open Font License 1.1, via `@fontsource/cinzel`.
 - **Source Sans 3** — SIL Open Font License 1.1, via `@fontsource/source-sans-3`.
 
+## Bundled music library
+
+The optional campaign music library in `public/audio-library/` contains tracks released under
+Creative Commons Zero 1.0 (CC0). CC0 does not require attribution; the credits below are kept so
+tables can find the original works. Files were downloaded from OpenGameArt on 2026-11-18.
+
+- **Battle Theme A** — cynicmusic — CC0 1.0 — https://opengameart.org/content/battle-theme-a
+- **JRPG Epic Rock Battle** — HydroGene — CC0 1.0 — https://opengameart.org/content/jrpg-epic-rock-battle-theme-1
+- **Fighting Is Not an Option** — Cleyton Kauffman — CC0 1.0 — https://opengameart.org/content/rpg-battle-theme-ii
+- **A New Town** — cynicmusic — CC0 1.0 — https://opengameart.org/content/a-new-town-rpg-theme
+- **Magic Town** — controllerhead — CC0 1.0 — https://opengameart.org/content/magic-town
+- **Mystical Town** — symphony — CC0 1.0 — https://opengameart.org/content/mystical-rpg-maker-town-theme
+- **Tavern** — yd — CC0 1.0 — https://opengameart.org/content/tavern-0
+- **The Old Tower Inn** — RandomMind — CC0 1.0 — https://opengameart.org/content/medieval-the-old-tower-inn
+- **Heavenly Loop** — isaiah658 — CC0 1.0 — https://opengameart.org/content/heavenly-loop
+- **Ambient Relaxing Loop** — isaiah658 — CC0 1.0 — https://opengameart.org/content/ambient-relaxing-loop
+- **Town Theme** — cynicmusic — CC0 1.0 — https://opengameart.org/content/town-theme-rpg
+- **Dark Cavern** — Paul Wortmann — CC0 1.0 — https://opengameart.org/content/dark-cavern-ambient
+- **Dungeon Deep** — Eldritch Grim — CC0 1.0 — https://opengameart.org/content/dungeon-deep-0
+- **Whispers in the Fog** — Ruhinre — CC0 1.0 — https://opengameart.org/content/whispers-in-the-fog
+
+The DM/table can remove library tracks from a campaign without deleting the bundled file. Uploaded
+audio remains the responsibility of the uploader.
+
 ## Software
 
 Runehall uses open-source npm packages including React, Vite, Fastify, Socket.IO, Zustand, React Router, Lucide, sanitize-html, and TypeScript. Their licenses remain with their respective authors; see `node_modules/<package>/LICENSE` after installation.

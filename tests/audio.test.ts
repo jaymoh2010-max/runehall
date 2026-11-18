@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
 import { inspectAudio } from "../src/server/audioMeta";
+import { AUDIO_MOODS, audioMoodLabel, isAudioMood } from "../src/shared/audio";
 
 const bytes = (...values: (number | string)[]): Buffer =>
   Buffer.from(
@@ -29,5 +30,33 @@ describe("audio upload signatures", () => {
   it("is counted by the standalone orphan-cleanup scan", () => {
     const cleanup = fs.readFileSync(path.resolve("scripts", "cleanup-assets.mjs"), "utf8");
     expect(cleanup).toContain('"campaign_audio_tracks"');
+  });
+});
+
+describe("bundled music library", () => {
+  it("exposes stable mood filters", () => {
+    expect(AUDIO_MOODS.map((mood) => mood.id)).toEqual([
+      "battle",
+      "exploration",
+      "tavern",
+      "relaxing",
+      "mystery",
+    ]);
+    expect(audioMoodLabel("battle")).toBe("Battle");
+    expect(isAudioMood("tavern")).toBe(true);
+    expect(isAudioMood("boss")).toBe(false);
+  });
+
+  it("ships valid MP3 and OGG files for every library track", () => {
+    const directory = path.resolve("public", "audio-library");
+    const files = fs
+      .readdirSync(directory)
+      .filter((file) => file.endsWith(".mp3") || file.endsWith(".ogg"));
+    expect(files.length).toBeGreaterThanOrEqual(14);
+    for (const file of files) {
+      const header = fs.readFileSync(path.join(directory, file)).subarray(0, 12);
+      const mime = file.endsWith(".mp3") ? "audio/mpeg" : "audio/ogg";
+      expect(inspectAudio(header, mime), file).toBe(true);
+    }
   });
 });

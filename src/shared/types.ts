@@ -1260,6 +1260,24 @@ export interface CampaignAudioTrack {
   createdAt: number;
 }
 
+export type AudioMood = "battle" | "exploration" | "tavern" | "relaxing" | "mystery";
+
+/** A bundled, openly licensed track the GM can add to a campaign soundtrack. */
+export interface AudioLibraryTrack {
+  id: string;
+  title: string;
+  mood: AudioMood;
+  url: string;
+  mimeType: string;
+  size: number;
+  author: string;
+  license: string;
+  sourceUrl: string;
+  sortOrder: number;
+  /** True when the track is already in the campaign soundtrack. */
+  added?: boolean;
+}
+
 export interface CampaignAudioState {
   trackId: string | null;
   playing: boolean;

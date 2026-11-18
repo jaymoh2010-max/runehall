@@ -6979,6 +6979,17 @@
   padding: 5px 8px;
   cursor: pointer;
 }
+.sound-join.is-on {
+  border-color: rgba(122, 178, 128, 0.45);
+  background: rgba(122, 178, 128, 0.12);
+  color: #a9d3ad;
+}
+.sound-upload-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
 .sound-panel-body {
   display: flex;
   flex-direction: column;
@@ -7018,6 +7029,50 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.sound-track-play.is-static {
+  cursor: default;
+}
+.audio-mood-filter {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+.audio-mood-filter button {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.74rem;
+  padding: 4px 9px;
+  cursor: pointer;
+}
+.audio-mood-filter button.is-active {
+  border-color: rgba(200, 169, 107, 0.5);
+  background: rgba(200, 169, 107, 0.12);
+  color: var(--gold-bright);
+}
+.audio-library-list {
+  display: flex;
+  flex-direction: column;
+  margin-top: 10px;
+  max-height: 52vh;
+  overflow: auto;
+}
+.audio-library-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+.audio-library-row strong {
+  font-size: 0.88rem;
+}
+.audio-library-row p {
+  margin: 2px 0 0;
 }
 .sound-volume {
   display: flex;

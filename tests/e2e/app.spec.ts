@@ -337,7 +337,7 @@ test("Pathbuilder JSON import creates a character from the dashboard", async ({ 
   });
 });
 
-test("GM places a token, chats, rolls, and opens the scenes manager", async ({ page }) => {
+test("GM places a token, chats, rolls, and opens the scenes manager", async ({ page, browser }) => {
   await signIn(page, admin);
   await page.goto(campaignPath);
   await expect(page.getByRole("heading", { name: campaignName })).toBeVisible();
@@ -449,6 +449,36 @@ test("GM places a token, chats, rolls, and opens the scenes manager", async ({ p
   await expect(page.getByText("E2E Theme", { exact: true })).toBeVisible({ timeout: 15_000 });
   await page.getByTitle("Play E2E Theme").click();
   await expect(page.getByText(/E2E Theme · playing/)).toBeVisible({ timeout: 15_000 });
+
+  await page.getByRole("button", { name: "Music library" }).click();
+  const libraryDialog = page.getByRole("dialog", { name: "Music library" });
+  await expect(libraryDialog).toBeVisible();
+  await libraryDialog.getByRole("button", { name: "Battle", exact: true }).click();
+  const battleRow = libraryDialog
+    .locator(".audio-library-row")
+    .filter({ hasText: "Battle Theme A" });
+  await battleRow.getByRole("button", { name: "Add", exact: true }).click();
+  await expect(battleRow.getByRole("button", { name: "Added", exact: true })).toBeVisible({
+    timeout: 15_000,
+  });
+  await libraryDialog.locator(".modal-foot").getByRole("button", { name: "Close" }).click();
+  await expect(libraryDialog).toBeHidden();
+  await expect(page.getByText("Battle Theme A", { exact: true })).toBeVisible();
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.getByTitle("Remove Battle Theme A").click();
+  await expect(page.getByText("Battle Theme A", { exact: true })).toHaveCount(0);
+
+  const playerContext = await browser.newContext();
+  const playerPage = await playerContext.newPage();
+  await signIn(playerPage, player);
+  await playerPage.goto(campaignPath);
+  await expect(playerPage.getByText(/E2E Theme · playing/)).toBeVisible({ timeout: 15_000 });
+  await playerPage.getByRole("button", { name: "Join audio" }).click();
+  await expect(playerPage.getByRole("button", { name: "Leave audio" })).toBeVisible();
+  await playerPage.getByRole("button", { name: "Leave audio" }).click();
+  await expect(playerPage.getByRole("button", { name: "Join audio" })).toBeVisible();
+  await playerContext.close();
+
   page.once("dialog", (dialog) => dialog.accept());
   await page.getByTitle("Remove E2E Theme").click();
   await expect(page.getByText("E2E Theme", { exact: true })).toHaveCount(0);

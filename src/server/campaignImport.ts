@@ -48,6 +48,23 @@ import {
 
 type RecordValue = Record<string, unknown>;
 
+/** Resolve a bundled library track in either the source tree or a built client. */
+function bundledAudioFile(filename: string): string | null {
+  for (const directory of [
+    path.resolve("dist", "client", "audio-library"),
+    path.resolve("public", "audio-library"),
+  ]) {
+    const filePath = path.join(directory, filename);
+    try {
+      const stat = fs.statSync(filePath);
+      if (stat.isFile() && stat.size > 0) return filePath;
+    } catch {
+      // Try the next location.
+    }
+  }
+  return null;
+}
+
 export interface CampaignImportStats {
   characters: number;
   reassignedCharacters: number;
@@ -185,19 +202,36 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
     }
 
     // Soundtrack files are not embedded in the JSON export. Restore metadata
-    // only when the referenced upload already exists on this machine.
+    // only when the referenced upload or bundled library file exists here.
     for (const track of records(payload.audioTracks, 100, "audioTracks")) {
       const rawUrl = text(track.url, "", 500);
-      const match = /^\/uploads\/([A-Za-z0-9._-]+)$/.exec(rawUrl);
-      if (!match) continue;
-      const filename = match[1];
-      if (filename === "." || filename === "..") continue;
       const mimeType = text(track.mimeType, "audio/mpeg", 80);
       if (!["audio/mpeg", "audio/ogg", "audio/wav", "audio/webm"].includes(mimeType)) continue;
+      let size = 0;
+      const uploadMatch = /^\/uploads\/([A-Za-z0-9._-]+)$/.exec(rawUrl);
+      if (uploadMatch) {
+        const filename = uploadMatch[1];
+        if (filename === "." || filename === "..") continue;
+        try {
+          const stat = fs.statSync(path.join(uploadsDir(), filename));
+          if (!stat.isFile() || stat.size === 0) continue;
+          size = stat.size;
+        } catch {
+          continue;
+        }
+      } else {
+        const libraryMatch = /^\/audio-library\/([A-Za-z0-9._-]+)$/.exec(rawUrl);
+        if (!libraryMatch) continue;
+        const filePath = bundledAudioFile(libraryMatch[1]);
+        if (!filePath) continue;
+        try {
+          size = fs.statSync(filePath).size;
+        } catch {
+          continue;
+        }
+        if (size === 0) continue;
+      }
       try {
-        const filePath = path.join(uploadsDir(), filename);
-        const stat = fs.statSync(filePath);
-        if (!stat.isFile() || stat.size === 0) continue;
         db.prepare(
           `INSERT INTO campaign_audio_tracks
             (id, campaign_id, name, url, mime_type, size, sort_order, created_at)
@@ -208,7 +242,7 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
           text(track.name, "Imported track", 140),
           rawUrl,
           mimeType,
-          stat.size,
+          size,
           stats.audioTracks,
           timestamp(track.createdAt, ts)
         );

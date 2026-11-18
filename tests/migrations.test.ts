@@ -117,6 +117,7 @@ describe("migrations", () => {
         "registration_invites",
         "audit_log",
         "campaign_join_requests",
+        "audio_library_tracks",
       ])
     );
 

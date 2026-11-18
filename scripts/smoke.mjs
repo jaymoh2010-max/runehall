@@ -1648,6 +1648,83 @@ async function main() {
   if (playerDowntime.status !== 403) throw new Error("Player granted downtime");
   log("the GM grants downtime and the player spends it on the sheet");
 
+  const libraryResponse = await fetch(`${base}/api/campaigns/${campaign.id}/audio/library`, {
+    headers: { cookie: gmCookie },
+  });
+  if (libraryResponse.status !== 200) {
+    throw new Error(`Music library failed (${libraryResponse.status})`);
+  }
+  const libraryPayload = await libraryResponse.json();
+  if (!Array.isArray(libraryPayload.tracks) || libraryPayload.tracks.length < 14) {
+    throw new Error("Bundled music library is missing tracks");
+  }
+  const battleLibraryTrack = libraryPayload.tracks.find(
+    (track) => track.mood === "battle" && !track.added
+  );
+  if (!battleLibraryTrack?.url?.startsWith("/audio-library/")) {
+    throw new Error("Bundled music library did not expose a battle track");
+  }
+  const libraryFile = await fetch(`${base}${battleLibraryTrack.url}`);
+  if (
+    libraryFile.status !== 200 ||
+    !String(libraryFile.headers.get("content-type") || "").startsWith("audio/")
+  ) {
+    throw new Error("Bundled music file was not served as audio");
+  }
+  const libraryForbidden = await fetch(`${base}/api/campaigns/${campaign.id}/audio/library`, {
+    headers: { cookie: playerCookie },
+  });
+  if (libraryForbidden.status !== 403) {
+    throw new Error("Player browsed the GM-only music library");
+  }
+  const addLibraryResponse = await fetch(
+    `${base}/api/campaigns/${campaign.id}/audio/library/${encodeURIComponent(battleLibraryTrack.id)}`,
+    { method: "POST", headers: { cookie: gmCookie } }
+  );
+  if (addLibraryResponse.status !== 201) {
+    throw new Error(`Adding a library track failed (${addLibraryResponse.status})`);
+  }
+  const addedLibraryTrack = (await addLibraryResponse.json()).track;
+  if (!addedLibraryTrack?.url?.startsWith("/audio-library/")) {
+    throw new Error("Added library track did not keep its bundled URL");
+  }
+  const duplicateLibraryResponse = await fetch(
+    `${base}/api/campaigns/${campaign.id}/audio/library/${encodeURIComponent(battleLibraryTrack.id)}`,
+    { method: "POST", headers: { cookie: gmCookie } }
+  );
+  if (duplicateLibraryResponse.status !== 409) {
+    throw new Error("Duplicate library track was accepted");
+  }
+  const libraryExport = await api(`/api/campaigns/${campaign.id}/export`, {
+    cookie: gmCookie,
+  });
+  const importedLibrary = await api("/api/campaigns/import", {
+    method: "POST",
+    cookie: gmCookie,
+    body: libraryExport.payload,
+  });
+  if (importedLibrary.payload.stats?.audioTracks !== 1) {
+    throw new Error("Campaign import did not carry the bundled library track");
+  }
+  const importedLibraryTable = await api(
+    `/api/campaigns/${importedLibrary.payload.campaign.id}/table`,
+    { cookie: gmCookie }
+  );
+  if (
+    !importedLibraryTable.payload.audioTracks?.some((track) => track.url === addedLibraryTrack.url)
+  ) {
+    throw new Error("Imported campaign lost the bundled library URL");
+  }
+  await api(`/api/campaigns/${importedLibrary.payload.campaign.id}`, {
+    method: "DELETE",
+    cookie: gmCookie,
+  });
+  await api(`/api/campaigns/${campaign.id}/audio/${addedLibraryTrack.id}`, {
+    method: "DELETE",
+    cookie: gmCookie,
+  });
+  log("music library exposes CC0 mood tracks and the GM can add one");
+
   const wav = Buffer.from([
     0x52, 0x49, 0x46, 0x46, 0x24, 0x00, 0x00, 0x00, 0x57, 0x41, 0x56, 0x45, 0x66, 0x6d, 0x74, 0x20,
     0x10, 0x00, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x40, 0x1f, 0x00, 0x00, 0x80, 0x3e, 0x00, 0x00,
