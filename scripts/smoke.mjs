@@ -1083,6 +1083,7 @@ async function main() {
     cookie: gmCookie,
     body: {
       losEnabled: true,
+      wallCollision: true,
       ambientLight: "darkness",
       visionScope: "per-player",
       propCollision: true,
@@ -1098,6 +1099,7 @@ async function main() {
   const wallsScene = wallsTable.payload.scenes.find((entry) => entry.id === scene.id);
   if (
     !wallsScene?.losEnabled ||
+    !wallsScene.wallCollision ||
     wallsScene.walls?.length !== 1 ||
     wallsScene.ambientLight !== "darkness" ||
     wallsScene.visionScope !== "per-player" ||
@@ -1620,6 +1622,58 @@ async function main() {
     body: { propCollision: false },
   });
   log("a detour stops at the last square covered by the remaining Speed");
+
+  const wallStart = { x: speedEvent.x, y: speedEvent.y };
+  const wallTarget = { x: wallStart.x + 140, y: wallStart.y };
+  const wallBarrier = {
+    id: "wall_move_smoke",
+    x1: wallStart.x + 35,
+    y1: wallStart.y - 140,
+    x2: wallStart.x + 35,
+    y2: wallStart.y + 140,
+    kind: "wall",
+  };
+  const wallBarrierPromise = waitForEvent(
+    gmSocket,
+    "scene:walls",
+    (payload) =>
+      payload.sceneId === scene.id && payload.walls?.some((wall) => wall.id === "wall_move_smoke")
+  );
+  gmSocket.emit("scene:walls", {
+    campaignId: campaign.id,
+    sceneId: scene.id,
+    walls: [wallBarrier],
+  });
+  await wallBarrierPromise;
+  const wallMove = waitForEvent(
+    gmSocket,
+    "token:moved",
+    (event) => event.tokenId === token.id && event.x === wallTarget.x && event.y === wallTarget.y
+  );
+  const wallMovement = waitForEvent(gmSocket, "initiative:updated", (payload) => {
+    const active = payload.entries[payload.turnIndex];
+    return active?.id === "init_move_test" && (active.movementUsed ?? 0) > 35;
+  });
+  gmSocket.emit("token:move", {
+    campaignId: campaign.id,
+    sceneId: scene.id,
+    tokenId: token.id,
+    x: wallTarget.x,
+    y: wallTarget.y,
+  });
+  await wallMove;
+  await wallMovement;
+  await api(`/api/scenes/${scene.id}`, {
+    method: "PATCH",
+    cookie: gmCookie,
+    body: { wallCollision: false },
+  });
+  gmSocket.emit("scene:walls", {
+    campaignId: campaign.id,
+    sceneId: scene.id,
+    walls: [],
+  });
+  log("wall collision routes a move around a wall and charges the detour distance");
 
   const smokeEncounter = (
     await api(`/api/campaigns/${campaign.id}/encounters`, {

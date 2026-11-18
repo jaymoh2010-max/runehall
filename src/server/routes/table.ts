@@ -206,8 +206,8 @@ export async function registerTableRoutes(app: FastifyInstance): Promise<void> {
     const ts = now();
     const name = `${source.name} (copy)`.slice(0, 80);
     db.prepare(
-      `INSERT INTO scenes (id, campaign_id, name, image_url, thumbnail_url, width, height, grid_size, grid_offset_x, grid_offset_y, fog_enabled, fog_revealed, templates, walls, los_enabled, ambient_light, vision_scope, props, prop_collision, sort_order, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO scenes (id, campaign_id, name, image_url, thumbnail_url, width, height, grid_size, grid_offset_x, grid_offset_y, fog_enabled, fog_revealed, templates, walls, los_enabled, wall_collision, ambient_light, vision_scope, props, prop_collision, sort_order, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       sceneId,
       source.campaign_id,
@@ -224,6 +224,7 @@ export async function registerTableRoutes(app: FastifyInstance): Promise<void> {
       source.templates,
       source.walls,
       source.los_enabled,
+      source.wall_collision,
       source.ambient_light,
       source.vision_scope,
       source.props,
@@ -318,6 +319,8 @@ export async function registerTableRoutes(app: FastifyInstance): Promise<void> {
         : clamp(Number(body.gridOffsetY) || 0, -gridSize, gridSize);
     const fogEnabled = body.fogEnabled === undefined ? row.fog_enabled : body.fogEnabled ? 1 : 0;
     const losEnabled = body.losEnabled === undefined ? row.los_enabled : body.losEnabled ? 1 : 0;
+    const wallCollision =
+      body.wallCollision === undefined ? row.wall_collision : body.wallCollision ? 1 : 0;
     const ambientLight =
       body.ambientLight === undefined
         ? normalizeAmbientLight(row.ambient_light)
@@ -329,7 +332,7 @@ export async function registerTableRoutes(app: FastifyInstance): Promise<void> {
     const propCollision =
       body.propCollision === undefined ? row.prop_collision : body.propCollision ? 1 : 0;
     db.prepare(
-      `UPDATE scenes SET name = ?, image_url = ?, thumbnail_url = ?, width = ?, height = ?, grid_size = ?, grid_offset_x = ?, grid_offset_y = ?, fog_enabled = ?, los_enabled = ?, ambient_light = ?, vision_scope = ?, prop_collision = ?, updated_at = ? WHERE id = ?`
+      `UPDATE scenes SET name = ?, image_url = ?, thumbnail_url = ?, width = ?, height = ?, grid_size = ?, grid_offset_x = ?, grid_offset_y = ?, fog_enabled = ?, los_enabled = ?, wall_collision = ?, ambient_light = ?, vision_scope = ?, prop_collision = ?, updated_at = ? WHERE id = ?`
     ).run(
       name,
       imageUrl,
@@ -341,6 +344,7 @@ export async function registerTableRoutes(app: FastifyInstance): Promise<void> {
       gridOffsetY,
       fogEnabled,
       losEnabled,
+      wallCollision,
       ambientLight,
       visionScope,
       propCollision,

@@ -23,7 +23,7 @@ import type { PropPreset } from "../../../shared/props";
 import { measureGridDistance } from "../../../shared/measurement";
 import { blockingPropForMove } from "../../../shared/collision";
 import { findPathAroundProps } from "../../../shared/pathfinding";
-import { nearestWall } from "../../../shared/walls";
+import { blockingWallForMove, nearestWall } from "../../../shared/walls";
 import { computeVision } from "../../../shared/vision";
 import { loadExplored, saveExplored } from "./explored";
 import { Tag } from "../ui";
@@ -816,20 +816,27 @@ export function SceneCanvas({
         y: Math.max(memberHalf, Math.min(scene.height - memberHalf, member.y + dy)),
       };
       positions[member.id] = target;
-      if (!scene.propCollision || !props.length) continue;
-      const blocked = blockingPropForMove(
-        props,
-        member,
-        { x: member.x, y: member.y },
-        target,
-        scene.gridSize,
-        true
-      );
-      if (!blocked) continue;
+      if ((!scene.propCollision || !props.length) && !scene.wallCollision) continue;
+      const blockedProp = scene.propCollision
+        ? blockingPropForMove(
+            props,
+            member,
+            { x: member.x, y: member.y },
+            target,
+            scene.gridSize,
+            true
+          )
+        : null;
+      const blockedWall = scene.wallCollision
+        ? blockingWallForMove(scene.walls, { x: member.x, y: member.y }, target)
+        : null;
+      if (!blockedProp && !blockedWall) continue;
       const budget = movementBudgetFor(member);
       const result = findPathAroundProps({
         props,
-        propCollision: true,
+        propCollision: scene.propCollision,
+        walls: scene.walls,
+        wallCollision: scene.wallCollision,
         gridSize: scene.gridSize,
         gridOffsetX: scene.gridOffsetX,
         gridOffsetY: scene.gridOffsetY,
@@ -1282,9 +1289,9 @@ export function SceneCanvas({
             className={`measure-label path-label ${activePath.reachedGoal ? "" : "is-short"}`}
             title={
               activePath.reachedGoal
-                ? "Shortest path around blocking props."
+                ? "Shortest path around blocking props and walls."
                 : activePath.unreachable
-                  ? "The destination cannot be reached around the blocking props."
+                  ? "The destination cannot be reached around the blocking props and walls."
                   : `The rest of the path would exceed the ${activePath.budget ?? 0} ft of movement left this turn.`
             }
             style={{ left: activePathEnd.x, top: activePathEnd.y - 8 }}

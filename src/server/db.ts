@@ -159,6 +159,7 @@ export interface SceneRow {
   templates: string;
   walls: string;
   los_enabled: number;
+  wall_collision: number;
   ambient_light: string;
   vision_scope: string;
   props: string;

@@ -141,6 +141,7 @@ export function serializeScene(row: SceneRow): Scene {
     templates: normalizeAoeTemplates(parseJson(row.templates, [])),
     walls: normalizeWalls(parseJson(row.walls, [])),
     losEnabled: Boolean(row.los_enabled),
+    wallCollision: Boolean(row.wall_collision),
     ambientLight: normalizeAmbientLight(row.ambient_light),
     visionScope: normalizePartyVisionScope(row.vision_scope),
     props: normalizeSceneProps(parseJson(row.props, [])),

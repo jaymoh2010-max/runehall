@@ -12,7 +12,7 @@ import { applyGridPath } from "../shared/movement";
 import { blockingPropForMove } from "../shared/collision";
 import { findPathAroundProps } from "../shared/pathfinding";
 import { normalizeAoeTemplate, normalizeAoeTemplates } from "../shared/templates";
-import { normalizeWalls } from "../shared/walls";
+import { blockingWallForMove, normalizeWalls } from "../shared/walls";
 import { normalizeSceneProps } from "../shared/props";
 import { normalizeTokenVisionMode } from "../shared/lighting";
 import type {
@@ -464,56 +464,63 @@ export function registerSocketServer(io: TypedServer): void {
       let targetX = nx;
       let targetY = ny;
       let pathPoints: Array<{ x: number; y: number }> | null = null;
-      if (scene.prop_collision) {
-        const props = normalizeSceneProps(parseJson(scene.props, []));
-        const blocked = blockingPropForMove(
-          props,
-          { size: row.size },
-          { x: row.x, y: row.y },
-          { x: nx, y: ny },
-          scene.grid_size,
-          true
-        );
-        if (blocked) {
-          const speed = speedForToken(row);
-          const budget =
-            role !== "gm" && activeMatch && speed !== null
-              ? Math.max(0, speed - Math.max(0, active.movementUsed ?? 0))
-              : null;
-          const path = findPathAroundProps({
+      const props = normalizeSceneProps(parseJson(scene.props, []));
+      const walls = normalizeWalls(parseJson(scene.walls, []));
+      const blockedProp = scene.prop_collision
+        ? blockingPropForMove(
             props,
-            propCollision: true,
-            gridSize: scene.grid_size,
-            gridOffsetX: scene.grid_offset_x,
-            gridOffsetY: scene.grid_offset_y,
-            width: scene.width,
-            height: scene.height,
-            tokenSize: row.size,
-            from: { x: row.x, y: row.y },
-            to: { x: nx, y: ny },
-            budget,
-            diagonalStart: activeMatch ? (active.diagonalSteps ?? 0) : 0,
+            { size: row.size },
+            { x: row.x, y: row.y },
+            { x: nx, y: ny },
+            scene.grid_size,
+            true
+          )
+        : null;
+      const blockedWall = scene.wall_collision
+        ? blockingWallForMove(walls, { x: row.x, y: row.y }, { x: nx, y: ny })
+        : null;
+      if (blockedProp || blockedWall) {
+        const speed = speedForToken(row);
+        const budget =
+          role !== "gm" && activeMatch && speed !== null
+            ? Math.max(0, speed - Math.max(0, active.movementUsed ?? 0))
+            : null;
+        const path = findPathAroundProps({
+          props,
+          propCollision: Boolean(scene.prop_collision),
+          walls,
+          wallCollision: Boolean(scene.wall_collision),
+          gridSize: scene.grid_size,
+          gridOffsetX: scene.grid_offset_x,
+          gridOffsetY: scene.grid_offset_y,
+          width: scene.width,
+          height: scene.height,
+          tokenSize: row.size,
+          from: { x: row.x, y: row.y },
+          to: { x: nx, y: ny },
+          budget,
+          diagonalStart: activeMatch ? (active.diagonalSteps ?? 0) : 0,
+        });
+        if (!path.points.length) {
+          const blocker = blockedProp ? blockedProp.name : "the blocking wall";
+          sendError(
+            socket,
+            path.unreachable
+              ? `There is no path around ${blocker}.`
+              : `Not enough movement left to get around ${blocker}.`
+          );
+          io.to(room(campaignId)).emit("token:moved", {
+            tokenId,
+            sceneId,
+            x: row.x,
+            y: row.y,
           });
-          if (!path.points.length) {
-            sendError(
-              socket,
-              path.unreachable
-                ? `There is no path around ${blocked.name}.`
-                : `Not enough movement left to get around ${blocked.name}.`
-            );
-            io.to(room(campaignId)).emit("token:moved", {
-              tokenId,
-              sceneId,
-              x: row.x,
-              y: row.y,
-            });
-            return;
-          }
-          const last = path.points[path.points.length - 1];
-          targetX = last.x;
-          targetY = last.y;
-          pathPoints = path.points;
+          return;
         }
+        const last = path.points[path.points.length - 1];
+        targetX = last.x;
+        targetY = last.y;
+        pathPoints = path.points;
       }
       const movement = activeMatch
         ? applyGridPath(

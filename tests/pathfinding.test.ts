@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { findPathAroundProps, type PathfindingInput } from "../src/shared/pathfinding";
-import type { SceneProp } from "../src/shared/types";
+import type { SceneProp, Wall } from "../src/shared/types";
 
 const CELL = 70;
 
@@ -24,6 +24,12 @@ const point = (col: number, row: number) => ({
   x: (col + 0.5) * CELL,
   y: (row + 0.5) * CELL,
 });
+
+const barrier = (doorOpen: boolean): Wall[] => [
+  { id: "wall_top", x1: 210, y1: 0, x2: 210, y2: 280, kind: "wall" },
+  { id: "door_mid", x1: 210, y1: 280, x2: 210, y2: 420, kind: "door", open: doorOpen },
+  { id: "wall_bottom", x1: 210, y1: 420, x2: 210, y2: 700, kind: "wall" },
+];
 
 const base = (overrides: Partial<PathfindingInput> = {}): PathfindingInput => ({
   props: [],
@@ -166,6 +172,31 @@ describe("prop pathfinding", () => {
     expect(small.reachedGoal).toBe(true);
     expect(large.reachedGoal).toBe(true);
     expect(large.feet).toBeGreaterThan(small.feet);
+  });
+
+  it("routes through an open door in a wall", () => {
+    const result = findPathAroundProps(base({ walls: barrier(true), wallCollision: true }));
+    expect(result.detoured).toBe(true);
+    expect(result.reachedGoal).toBe(true);
+    expect(result.points.at(-1)).toEqual(point(6, 1));
+    expect(result.feet).toBeGreaterThan(25);
+    expect(result.points.some((waypoint) => waypoint.x === point(3, 4).x)).toBe(true);
+  });
+
+  it("treats a closed door as part of the wall", () => {
+    const result = findPathAroundProps(base({ walls: barrier(false), wallCollision: true }));
+    expect(result.detoured).toBe(true);
+    expect(result.reachedGoal).toBe(false);
+    expect(result.unreachable).toBe(true);
+    expect(result.points.at(-1)?.x).toBe(point(2, 1).x);
+  });
+
+  it("ignores walls when wall collision is off", () => {
+    const result = findPathAroundProps(base({ walls: barrier(false), wallCollision: false }));
+    expect(result.detoured).toBe(false);
+    expect(result.reachedGoal).toBe(true);
+    expect(result.feet).toBe(25);
+    expect(result.points).toEqual([point(6, 1)]);
   });
 
   it("keeps PF2e diagonal parity for direct paths", () => {

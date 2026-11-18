@@ -378,6 +378,7 @@ test("GM places a token, chats, rolls, and opens the scenes manager", async ({ p
   const sceneEditor = page.getByRole("dialog", { name: /Edit/ });
   await expect(sceneEditor.getByText("Grid calibration")).toBeVisible();
   await expect(sceneEditor.getByText("Line-of-sight fog")).toBeVisible();
+  await expect(sceneEditor.getByText("Wall collision")).toBeVisible();
   await expect(sceneEditor.getByText("Ambient light")).toBeVisible();
   await expect(sceneEditor.getByText("Vision scope")).toBeVisible();
   await expect(sceneEditor.getByText("Prop collision")).toBeVisible();

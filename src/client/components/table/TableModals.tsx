@@ -921,6 +921,7 @@ export function SceneEditModal({
   const [offsetY, setOffsetY] = useState("0");
   const [fogEnabled, setFogEnabled] = useState(true);
   const [losEnabled, setLosEnabled] = useState(false);
+  const [wallCollision, setWallCollision] = useState(false);
   const [ambientLight, setAmbientLight] = useState<AmbientLight>("bright");
   const [visionScope, setVisionScope] = useState<PartyVisionScope>("shared");
   const [propCollision, setPropCollision] = useState(false);
@@ -942,6 +943,7 @@ export function SceneEditModal({
     setOffsetY(String(scene.gridOffsetY));
     setFogEnabled(scene.fogEnabled);
     setLosEnabled(Boolean(scene.losEnabled));
+    setWallCollision(Boolean(scene.wallCollision));
     setAmbientLight(scene.ambientLight ?? "bright");
     setVisionScope(scene.visionScope ?? "shared");
     setPropCollision(Boolean(scene.propCollision));
@@ -1079,6 +1081,7 @@ export function SceneEditModal({
           gridOffsetY: Number(offsetY) || 0,
           fogEnabled,
           losEnabled,
+          wallCollision,
           ambientLight,
           visionScope,
           propCollision,
@@ -1269,6 +1272,16 @@ export function SceneEditModal({
               checked={losEnabled}
               onChange={setLosEnabled}
               label={losEnabled ? "Dynamic" : "Manual reveal"}
+            />
+          </Field>
+          <Field
+            label="Wall collision"
+            hint="On: walls and closed doors block token movement. Open doors still pass."
+          >
+            <Toggle
+              checked={wallCollision}
+              onChange={setWallCollision}
+              label={wallCollision ? "Walls block" : "Off"}
             />
           </Field>
           <Field label="Ambient light" hint="Used by token light sources and vision senses.">

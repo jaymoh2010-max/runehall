@@ -37,9 +37,87 @@ export function normalizeWalls(value: unknown): Wall[] {
   return walls;
 }
 
+/** Walls and closed doors block movement. Open doors do not. */
+export function wallBlocksMovement(wall: Wall): boolean {
+  return wall.kind === "wall" || !wall.open;
+}
+
 /** Walls and closed doors block sight. Open doors do not. */
 export function wallBlocksSight(wall: Wall): boolean {
-  return wall.kind === "wall" || !wall.open;
+  return wallBlocksMovement(wall);
+}
+
+function cross(ax: number, ay: number, bx: number, by: number): number {
+  return ax * by - ay * bx;
+}
+
+function onSegment(
+  px: number,
+  py: number,
+  ax: number,
+  ay: number,
+  bx: number,
+  by: number
+): boolean {
+  return (
+    px >= Math.min(ax, bx) - 0.001 &&
+    px <= Math.max(ax, bx) + 0.001 &&
+    py >= Math.min(ay, by) - 0.001 &&
+    py <= Math.max(ay, by) + 0.001
+  );
+}
+
+/** Inclusive segment intersection, including collinear endpoint touches. */
+export function segmentsIntersect(
+  ax: number,
+  ay: number,
+  bx: number,
+  by: number,
+  cx: number,
+  cy: number,
+  dx: number,
+  dy: number
+): boolean {
+  const d1 = cross(bx - ax, by - ay, cx - ax, cy - ay);
+  const d2 = cross(bx - ax, by - ay, dx - ax, dy - ay);
+  const d3 = cross(dx - cx, dy - cy, ax - cx, ay - cy);
+  const d4 = cross(dx - cx, dy - cy, bx - cx, by - cy);
+  if (((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) && ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0))) {
+    return true;
+  }
+  if (Math.abs(d1) < 0.001 && onSegment(cx, cy, ax, ay, bx, by)) return true;
+  if (Math.abs(d2) < 0.001 && onSegment(dx, dy, ax, ay, bx, by)) return true;
+  if (Math.abs(d3) < 0.001 && onSegment(ax, ay, cx, cy, dx, dy)) return true;
+  if (Math.abs(d4) < 0.001 && onSegment(bx, by, cx, cy, dx, dy)) return true;
+  return false;
+}
+
+/**
+ * Returns the first wall or closed door that a straight move crosses, or null.
+ * AABB rejection keeps this cheap inside the pathfinder's neighbour loop.
+ */
+export function blockingWallForMove(
+  walls: Wall[],
+  from: { x: number; y: number },
+  to: { x: number; y: number },
+  enabled = true
+): Wall | null {
+  if (!enabled || !walls.length) return null;
+  const minX = Math.min(from.x, to.x) - 0.001;
+  const maxX = Math.max(from.x, to.x) + 0.001;
+  const minY = Math.min(from.y, to.y) - 0.001;
+  const maxY = Math.max(from.y, to.y) + 0.001;
+  for (const wall of walls) {
+    if (!wallBlocksMovement(wall)) continue;
+    if (Math.max(wall.x1, wall.x2) < minX) continue;
+    if (Math.min(wall.x1, wall.x2) > maxX) continue;
+    if (Math.max(wall.y1, wall.y2) < minY) continue;
+    if (Math.min(wall.y1, wall.y2) > maxY) continue;
+    if (segmentsIntersect(from.x, from.y, to.x, to.y, wall.x1, wall.y1, wall.x2, wall.y2)) {
+      return wall;
+    }
+  }
+  return null;
 }
 
 /** Distance from a point to a line segment, used for wall hit-testing. */

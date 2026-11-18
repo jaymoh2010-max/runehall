@@ -6,7 +6,8 @@ import {
   type CollisionRect,
 } from "./collision";
 import { measureGridDistance } from "./measurement";
-import type { SceneProp } from "./types";
+import { blockingWallForMove, wallBlocksMovement } from "./walls";
+import type { SceneProp, Wall } from "./types";
 
 export interface PathPoint {
   x: number;
@@ -16,6 +17,9 @@ export interface PathPoint {
 export interface PathfindingInput {
   props: SceneProp[];
   propCollision: boolean;
+  /** Walls and doors on the scene. Only used when wallCollision is true. */
+  walls?: Wall[];
+  wallCollision?: boolean;
   gridSize: number;
   gridOffsetX: number;
   gridOffsetY: number;
@@ -222,6 +226,7 @@ function markBlockedCells(blocked: Uint8Array, grid: Grid, bounds: CollisionRect
 function searchPath(
   grid: Grid,
   blocked: Uint8Array,
+  walls: Wall[],
   startCell: number,
   goalCell: number,
   startParity: number
@@ -267,6 +272,7 @@ function searchPath(
 
     const col = cell % grid.cols;
     const row = Math.floor(cell / grid.cols);
+    const currentPoint = walls.length ? cellCenter(grid, cell) : null;
     for (let dc = -1; dc <= 1; dc++) {
       for (let dr = -1; dr <= 1; dr++) {
         if (!dc && !dr) continue;
@@ -289,6 +295,9 @@ function searchPath(
         }
         const nextCell = nextRow * grid.cols + nextCol;
         if (blocked[nextCell]) continue;
+        if (currentPoint && blockingWallForMove(walls, currentPoint, cellCenter(grid, nextCell))) {
+          continue;
+        }
 
         const stepCost = diagonal
           ? parity === 0
@@ -377,8 +386,10 @@ export function findPathAroundProps(input: PathfindingInput): PathfindingResult 
   const blocker = input.propCollision
     ? blockingPropForMove(input.props, { size }, from, to, gridSize, true)
     : null;
+  const wallBlocker = input.wallCollision ? blockingWallForMove(input.walls ?? [], from, to) : null;
+  const detoured = Boolean(blocker || wallBlocker);
 
-  if (!blocker && direct.feet <= budget) {
+  if (!detoured && direct.feet <= budget) {
     return {
       points: direct.feet > 0 ? [to] : [],
       feet: direct.feet,
@@ -396,7 +407,7 @@ export function findPathAroundProps(input: PathfindingInput): PathfindingResult 
       feet: 0,
       diagonals: 0,
       reachedGoal: false,
-      detoured: Boolean(blocker),
+      detoured,
       unreachable: true,
     };
   }
@@ -417,13 +428,14 @@ export function findPathAroundProps(input: PathfindingInput): PathfindingResult 
       feet: 0,
       diagonals: 0,
       reachedGoal: true,
-      detoured: Boolean(blocker),
+      detoured,
       unreachable: false,
     };
   }
 
   const startParity = diagonalStart % 2;
-  const main = searchPath(grid, blocked, startCell, goalCell, startParity);
+  const movementWalls = input.wallCollision ? (input.walls ?? []).filter(wallBlocksMovement) : [];
+  const main = searchPath(grid, blocked, movementWalls, startCell, goalCell, startParity);
   const unreachable = !main.reachedGoal;
 
   if (!main.cells.length || (main.cells.length === 1 && unreachable)) {
@@ -432,7 +444,7 @@ export function findPathAroundProps(input: PathfindingInput): PathfindingResult 
       feet: 0,
       diagonals: 0,
       reachedGoal: false,
-      detoured: Boolean(blocker),
+      detoured,
       unreachable,
     };
   }
@@ -455,7 +467,7 @@ export function findPathAroundProps(input: PathfindingInput): PathfindingResult 
     feet: truncated.cost,
     diagonals,
     reachedGoal: main.reachedGoal && truncated.reachedEnd,
-    detoured: Boolean(blocker),
+    detoured,
     unreachable,
   };
 }

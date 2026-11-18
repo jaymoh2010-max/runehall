@@ -1,6 +1,8 @@
 import type { AmbientLight, Scene, TokenVisionMode, Wall } from "./types";
 import { lightLevelAt, visionLevelFor, type LightLevel, type LightSource } from "./lighting";
-import { wallBlocksSight } from "./walls";
+import { segmentsIntersect, wallBlocksSight } from "./walls";
+
+export { segmentsIntersect } from "./walls";
 
 export interface VisionPoint {
   x: number;
@@ -25,51 +27,6 @@ export interface VisionOptions {
   lights?: LightSource[];
   /** Fallback sight radius in scene pixels when an origin has no radius. */
   maxDistance?: number;
-}
-
-function cross(ax: number, ay: number, bx: number, by: number): number {
-  return ax * by - ay * bx;
-}
-
-function onSegment(
-  px: number,
-  py: number,
-  ax: number,
-  ay: number,
-  bx: number,
-  by: number
-): boolean {
-  return (
-    px >= Math.min(ax, bx) - 0.001 &&
-    px <= Math.max(ax, bx) + 0.001 &&
-    py >= Math.min(ay, by) - 0.001 &&
-    py <= Math.max(ay, by) + 0.001
-  );
-}
-
-/** Inclusive segment intersection, including collinear endpoint touches. */
-export function segmentsIntersect(
-  ax: number,
-  ay: number,
-  bx: number,
-  by: number,
-  cx: number,
-  cy: number,
-  dx: number,
-  dy: number
-): boolean {
-  const d1 = cross(bx - ax, by - ay, cx - ax, cy - ay);
-  const d2 = cross(bx - ax, by - ay, dx - ax, dy - ay);
-  const d3 = cross(dx - cx, dy - cy, ax - cx, ay - cy);
-  const d4 = cross(dx - cx, dy - cy, bx - cx, by - cy);
-  if (((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) && ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0))) {
-    return true;
-  }
-  if (Math.abs(d1) < 0.001 && onSegment(cx, cy, ax, ay, bx, by)) return true;
-  if (Math.abs(d2) < 0.001 && onSegment(dx, dy, ax, ay, bx, by)) return true;
-  if (Math.abs(d3) < 0.001 && onSegment(ax, ay, cx, cy, dx, dy)) return true;
-  if (Math.abs(d4) < 0.001 && onSegment(bx, by, cx, cy, dx, dy)) return true;
-  return false;
 }
 
 export function hasLineOfSight(from: VisionPoint, to: VisionPoint, walls: Wall[]): boolean {

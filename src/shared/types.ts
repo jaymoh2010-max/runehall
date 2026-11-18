@@ -1022,6 +1022,8 @@ export interface Scene {
   walls: Wall[];
   /** Use wall-based line-of-sight fog for players instead of manual reveal only. */
   losEnabled: boolean;
+  /** When enabled, walls and closed doors block token movement. */
+  wallCollision: boolean;
   /** Ambient light level used by the token lighting model. */
   ambientLight: AmbientLight;
   /** Shared party perception or each player sees only from their own tokens. */
