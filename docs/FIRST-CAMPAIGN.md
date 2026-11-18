@@ -20,7 +20,7 @@ This is the short checklist for the friend hosting Runehall and for the GM runni
    For an internet-facing server:
 
    - `BOOTSTRAP_TOKEN=<long random one-time setup token>`
-   - `COOKIE_SECURE=1`
+   - `COOKIE_SECURE=0` temporarily for localhost/SSH-tunnel setup
    - `REGISTRATION_MODE=invite` (or `closed` once everyone has an account)
    - `TRUSTED_ORIGINS=https://your-domain.example`
    - Keep `RUNEHALL_BIND=127.0.0.1` so port 3001 is not public.
@@ -38,9 +38,9 @@ This is the short checklist for the friend hosting Runehall and for the GM runni
    `BOOTSTRAP_TOKEN`. That account becomes the instance administrator. Create it **before** exposing
    the site through the proxy, because the first account is always allowed.
 
-5. Put Caddy or Nginx in front for HTTPS. Do **not** publish port 3001 directly to the internet.
-   See [DEPLOY.md](DEPLOY.md) for ready-to-copy proxy examples. Remove `BOOTSTRAP_TOKEN` from `.env`
-   and recreate the container after the administrator exists.
+5. Set `COOKIE_SECURE=1`, remove `BOOTSTRAP_TOKEN` from `.env`, and recreate the container. Then put
+   Caddy or Nginx in front for HTTPS. Do **not** publish port 3001 directly to the internet.
+   See [DEPLOY.md](DEPLOY.md) for ready-to-copy proxy examples.
 
 6. Use **Admin → Hall controls** to create single-use registration invite codes for your friends,
    then take a backup before the first session:

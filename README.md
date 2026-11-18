@@ -194,11 +194,11 @@ docker compose up -d --build
 The compose path keeps SQLite, the compendium, uploads, and backups in `./data` and `./backups`. Put Caddy or Nginx in front for HTTPS, then set `COOKIE_SECURE=1`. Security headers, CSP, origin checks, and auth/upload rate limits are built in. The production image is built and health-checked in CI, and has been verified locally with persistence, backups, and restore. It also prepares `/app/shipped` for an optional off-machine backup mount.
 
 **Hosting for friends:** clone <https://github.com/jaymoh2010-max/runehall.git>, copy
-`.env.example` to `.env`, set `BOOTSTRAP_TOKEN`, `COOKIE_SECURE=1`, and
-`REGISTRATION_MODE=invite` (or `closed`), then run `docker compose up -d --build` behind
-Caddy/Nginx. The compose file binds port 3001 to loopback. Create the first administrator from the
-server or an SSH tunnel before exposing the proxy; it becomes the instance administrator. See
-[docs/DEPLOY.md](docs/DEPLOY.md) for the full
+`.env.example` to `.env`, set `BOOTSTRAP_TOKEN`, `COOKIE_SECURE=0` for localhost/SSH-tunnel setup,
+and `REGISTRATION_MODE=invite` (or `closed`), then run `docker compose up -d --build`. Create the
+first administrator from the server or an SSH tunnel; it becomes the instance administrator. Then
+set `COOKIE_SECURE=1`, remove `BOOTSTRAP_TOKEN`, recreate, and put Caddy/Nginx in front. The compose
+file binds port 3001 to loopback. See [docs/DEPLOY.md](docs/DEPLOY.md) for the full
 clone-to-HTTPS checklist, reverse-proxy examples, updates, backups, and current hosting gaps.
 For the table-facing setup, character creation, and session-1 checklist, see
 [docs/FIRST-CAMPAIGN.md](docs/FIRST-CAMPAIGN.md).

@@ -15,7 +15,7 @@ cd runehall
 cp .env.example .env
 # Edit .env before continuing:
 #   BOOTSTRAP_TOKEN=<long random one-time setup token>
-#   COOKIE_SECURE=1
+#   COOKIE_SECURE=0             (temporarily, for localhost/SSH-tunnel setup)
 #   REGISTRATION_MODE=invite    (or closed after all accounts exist)
 #   TRUSTED_ORIGINS=https://your-domain.example
 # Keep RUNEHALL_BIND=127.0.0.1 and RUNEHALL_PORT=3001 unless you know why not to change them.
@@ -30,7 +30,9 @@ curl http://127.0.0.1:3001/api/health
 
 # 5. Create the first administrator from the server (or an SSH tunnel) BEFORE exposing the proxy
 #    Open http://127.0.0.1:3001/register on the server/SSH tunnel and enter BOOTSTRAP_TOKEN.
-# 6. Put Caddy or Nginx in front for HTTPS, then remove BOOTSTRAP_TOKEN from .env and recreate:
+# 6. Switch to secure cookies, remove BOOTSTRAP_TOKEN, and recreate before exposing:
+#    COOKIE_SECURE=1
+#    BOOTSTRAP_TOKEN=            (remove or comment out)
 docker compose up -d
 ```
 
