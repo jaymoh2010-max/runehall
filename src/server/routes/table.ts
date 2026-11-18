@@ -27,6 +27,7 @@ import {
   serializeMember,
   serializeMessage,
   serializeScene,
+  serializeSceneForPlayers,
   serializeToken,
   touchCampaign,
 } from "../serialize";
@@ -164,7 +165,7 @@ export async function registerTableRoutes(app: FastifyInstance): Promise<void> {
         serializeMember(member, member.role, member.joined_at)
       ),
       characters: memberCharacters,
-      scenes: scenes.map(serializeScene),
+      scenes: scenes.map(role === "player" ? serializeSceneForPlayers : serializeScene),
       tokens: tokenRows.map((token) => serializeToken(token, token.owner_name ?? undefined)),
       activeSceneId:
         state.active_scene_id && sceneIds.has(state.active_scene_id)

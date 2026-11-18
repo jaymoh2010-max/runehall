@@ -1,4 +1,4 @@
-import type { Token, TokenCondition } from "./types";
+import type { CharacterCondition, Token, TokenCondition } from "./types";
 
 export interface GroupHp {
   count: number;
@@ -35,6 +35,29 @@ export function normalizeTokenConditions(value: unknown): TokenCondition[] {
   return conditions;
 }
 
+const LIFE_CONDITIONS = new Set(["dying", "unconscious", "dead", "wounded"]);
+
+/**
+ * Mirror the sheet's life-state conditions onto a linked token without
+ * discarding table-only conditions (Frightened, Off-Guard, and so on).
+ */
+export function syncLifeConditions(
+  tokenConditions: TokenCondition[],
+  sheetConditions: CharacterCondition[]
+): TokenCondition[] {
+  const kept = tokenConditions.filter(
+    (condition) => !LIFE_CONDITIONS.has(condition.name.trim().toLowerCase())
+  );
+  const life = sheetConditions
+    .filter((condition) => LIFE_CONDITIONS.has(condition.name.trim().toLowerCase()))
+    .map((condition) => ({
+      name: condition.name,
+      value: condition.value ?? null,
+      duration: null,
+    }));
+  return [...kept, ...life];
+}
+
 export function conditionLabel(condition: {
   name: string;
   value?: number | null;
@@ -54,20 +77,30 @@ export function tokenConditionSummary(conditions: TokenCondition[]): string {
 }
 
 /**
- * Tick timed conditions at the end of a turn. Conditions without a duration
- * are left alone; a condition whose duration reaches zero is removed.
+ * Tick conditions at the end of a turn. Timed conditions lose a round, and
+ * Frightened also loses one point of value (PF2e reduces frightened by 1 at
+ * the end of each of the affected creature's turns).
  */
 export function tickTokenConditions(conditions: TokenCondition[]): TokenCondition[] {
-  return conditions
-    .map((condition) =>
-      condition.duration !== null && condition.duration !== undefined && condition.duration > 0
-        ? { ...condition, duration: condition.duration - 1 }
-        : condition
-    )
-    .filter(
-      (condition) =>
-        condition.duration === null || condition.duration === undefined || condition.duration > 0
-    );
+  const next: TokenCondition[] = [];
+  for (const condition of conditions) {
+    const name = condition.name.trim().toLowerCase();
+    const updated = { ...condition };
+    if (name === "frightened" && typeof condition.value === "number" && condition.value > 0) {
+      updated.value = condition.value - 1;
+    }
+    if (typeof condition.duration === "number" && condition.duration > 0) {
+      updated.duration = condition.duration - 1;
+    }
+    if (
+      (typeof updated.duration === "number" && updated.duration <= 0) ||
+      (name === "frightened" && typeof updated.value === "number" && updated.value <= 0)
+    ) {
+      continue;
+    }
+    next.push(updated);
+  }
+  return next;
 }
 
 /**

@@ -2481,6 +2481,14 @@
   gap: 6px;
   margin-top: 8px;
 }
+.condition-effects {
+  margin: 7px 0 0;
+  padding-left: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  line-height: 1.35;
+}
 .sheet-meta-card {
   padding: 16px 17px;
 }

@@ -44,6 +44,14 @@ describe("automation labels", () => {
     ).toBe("manual");
   });
 
+  it("marks action and reaction text as manual even without a numeric bonus", () => {
+    expect(
+      automationForFeat(
+        feat({ description: "You can spend 1 action to Recall Knowledge about an enemy." })
+      ).level
+    ).toBe("manual");
+  });
+
   it("marks pure flavor feats as full", () => {
     expect(
       automationForFeat(feat({ description: "You have a knack for local gossip." })).level

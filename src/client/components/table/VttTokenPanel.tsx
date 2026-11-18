@@ -40,6 +40,7 @@ export function VttTokenPanel({
   setTokens,
   selectedToken,
   updateToken,
+  onDamage,
   addSelectedToInitiative,
   setEditingTokenId,
   deleteToken,
@@ -63,6 +64,7 @@ export function VttTokenPanel({
   setTokens: (updater: (current: Token[]) => Token[]) => void;
   selectedToken: Token | null;
   updateToken: (tokenId: string, patch: Partial<Token>) => void;
+  onDamage: (tokenId: string, amount: number, critical?: boolean) => void;
   addSelectedToInitiative: () => void;
   setEditingTokenId: (tokenId: string | null) => void;
   deleteToken: (tokenId: string) => void;
@@ -500,11 +502,8 @@ export function VttTokenPanel({
                   <Button
                     size="sm"
                     variant="ghost"
-                    onClick={() =>
-                      updateToken(selectedToken.id, {
-                        hpCurrent: Math.max(0, (selectedToken.hpCurrent ?? 0) - 1),
-                      })
-                    }
+                    onClick={() => onDamage(selectedToken.id, 1)}
+                    title="Deal 1 damage (temporary HP applies first)"
                   >
                     <Minus size={12} />
                   </Button>

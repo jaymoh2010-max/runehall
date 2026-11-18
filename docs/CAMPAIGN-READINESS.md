@@ -4,6 +4,8 @@
 **Scope:** PF2e Remastered campaign play from session zero through level 20, compared with GM Core/Player Core and common GM/player tooling expectations.  
 **Artifacts:** `scripts/simulate-campaign.ts` (new), `scripts/lib/simHeroes.ts` (new), `npm run simulate:campaign`.
 
+> **Sprint A update:** condition math, temp HP/dying/unconscious, healing reconciliation, Hero Point reroll, Refocus, hidden-prop filtering, and stricter automation labels are implemented in the `sprint-a` worktree. Spell heightening/cast spending, recovery-check automation, encounter cleanup, and movement enforcement remain in Sprint A.
+
 ---
 
 ## Verdict

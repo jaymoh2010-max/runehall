@@ -532,6 +532,30 @@ export interface CharacterCondition {
   duration?: number | null;
 }
 
+/**
+ * Numeric consequences of the character's active conditions. Penalties are
+ * negative numbers and are already merged by type (status vs. circumstance),
+ * so callers can add them directly to the base math.
+ */
+export interface ConditionModifiers {
+  ac: number;
+  saves: Record<SaveKey, number>;
+  perception: number;
+  /** Status penalty that applies to every check and DC. */
+  allChecks: number;
+  /** Penalty to checks and DCs for each ability, including all-check penalties. */
+  checks: Record<AbilityKey, number>;
+  /** Circumstance penalty to attack rolls, e.g. prone. */
+  attackCircumstance: number;
+  maxHp: number;
+  speed: number;
+  dying: number;
+  wounded: number;
+  doomed: number;
+  incapacitated: boolean;
+  notes: string[];
+}
+
 export type CompanionKind = "animal" | "familiar" | "eidolon" | "summon";
 
 export interface CharacterCompanion {
@@ -789,6 +813,8 @@ export interface DerivedCharacter {
   casterProgression: CasterProgression;
   maxSpellRank: number;
   validation: ValidationIssue[];
+  /** Condition math already folded into AC, saves, checks, DCs, HP, and Speed. */
+  conditionEffects: ConditionModifiers;
   xp: number;
 }
 
@@ -1314,6 +1340,12 @@ export interface ClientToServerEvents {
     ack?: (token: Token | null) => void
   ) => void;
   "token:update": (payload: { campaignId: string; token: Partial<Token> & { id: string } }) => void;
+  "token:damage": (payload: {
+    campaignId: string;
+    tokenId: string;
+    amount: number;
+    critical?: boolean;
+  }) => void;
   "token:delete": (payload: { campaignId: string; tokenId: string }) => void;
   "fog:update": (payload: {
     campaignId: string;

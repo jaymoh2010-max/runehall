@@ -50,6 +50,11 @@ import {
 import { DEGREE_LABELS, mod, rollFormula } from "../../shared/dice";
 import { currencyToCp } from "../../shared/inventory";
 import { applyLongRest } from "../../shared/rest";
+import {
+  applyDamageToDraft,
+  applyHealingToDraft,
+  reconcileLifeConditions,
+} from "../../shared/damage";
 import { xpProgress } from "../../shared/xp";
 import { spellTraditionLabel, stripHtml } from "../../shared/compendium";
 import { conditionLabel } from "../../shared/tokens";
@@ -121,6 +126,7 @@ export function CharacterSheetPage() {
   const [error, setError] = useState("");
   const [saveState, setSaveState] = useState<"saved" | "saving" | "error">("saved");
   const [rollLog, setRollLog] = useState<RollResult | null>(null);
+  const [heroPointArmed, setHeroPointArmed] = useState(false);
   const [conditionName, setConditionName] = useState("");
   const [conditionValue, setConditionValue] = useState("");
   const [conditionDuration, setConditionDuration] = useState("");
@@ -316,6 +322,28 @@ export function CharacterSheetPage() {
     });
   };
 
+  const applyDamage = (amount: number) => {
+    if (!derived) return;
+    update((current) => applyDamageToDraft(current, derived.maxHp, amount).draft);
+  };
+
+  const applyHealing = (amount: number) => {
+    if (!derived) return;
+    update((current) => applyHealingToDraft(current, derived.maxHp, amount).draft);
+  };
+
+  const setHp = (nextHp: number) => {
+    if (!derived) return;
+    update((current) => ({
+      ...current,
+      play: {
+        ...current.play,
+        hp: nextHp,
+        conditions: reconcileLifeConditions(current.play.conditions, nextHp, derived.maxHp),
+      },
+    }));
+  };
+
   const restPreview = draft && derived ? applyLongRest(draft, derived, { rough: restRough }) : null;
 
   const takeLongRest = () => {
@@ -426,12 +454,26 @@ export function CharacterSheetPage() {
 
   const roll = (formula: string, label: string, dc?: number | null) => {
     if (!draft) return;
+    let rollLabel = label;
+    if (heroPointArmed) {
+      if (draft.play.heroPoints < 1) {
+        toast("No Hero Points remaining.", "error");
+        setHeroPointArmed(false);
+        return;
+      }
+      rollLabel = `Hero Point reroll: ${label}`;
+      setHeroPointArmed(false);
+      update((current) => ({
+        ...current,
+        play: { ...current.play, heroPoints: Math.max(0, current.play.heroPoints - 1) },
+      }));
+    }
     if (!character?.campaignId) {
       try {
-        const result = rollFormula(formula, { dc: dc ?? null, label });
+        const result = rollFormula(formula, { dc: dc ?? null, label: rollLabel });
         setRollLog(result);
         toast(
-          `${label}: ${result.total}${result.degree ? ` · ${DEGREE_LABELS[result.degree]}` : ""}`,
+          `${rollLabel}: ${result.total}${result.degree ? ` · ${DEGREE_LABELS[result.degree]}` : ""}`,
           "success"
         );
       } catch (err) {
@@ -447,7 +489,7 @@ export function CharacterSheetPage() {
           {
             campaignId: character.campaignId!,
             formula,
-            label,
+            label: rollLabel,
             dc: dc ?? null,
             characterId: character.id,
           },
@@ -456,7 +498,7 @@ export function CharacterSheetPage() {
             if (message.data && "total" in message.data) {
               setRollLog(message.data);
               toast(
-                `${label}: ${message.data.total}${message.data.degree ? ` · ${DEGREE_LABELS[message.data.degree]}` : ""}`,
+                `${rollLabel}: ${message.data.total}${message.data.degree ? ` · ${DEGREE_LABELS[message.data.degree]}` : ""}`,
                 message.data.degree === "critical-failure" || message.data.degree === "failure"
                   ? "error"
                   : "success"
@@ -1227,15 +1269,7 @@ export function CharacterSheetPage() {
                 <Button
                   size="sm"
                   variant="ghost"
-                  onClick={() =>
-                    update((current) => ({
-                      ...current,
-                      play: {
-                        ...current.play,
-                        hp: Math.max(0, (current.play.hp ?? derived.maxHp) - 1),
-                      },
-                    }))
-                  }
+                  onClick={() => applyDamage(1)}
                   disabled={!canEdit}
                 >
                   <Minus size={13} />
@@ -1247,27 +1281,13 @@ export function CharacterSheetPage() {
                   max={derived.maxHp}
                   disabled={!canEdit}
                   onChange={(event) =>
-                    update((current) => ({
-                      ...current,
-                      play: {
-                        ...current.play,
-                        hp: Math.max(0, Math.min(derived.maxHp, Number(event.target.value) || 0)),
-                      },
-                    }))
+                    setHp(Math.max(0, Math.min(derived.maxHp, Number(event.target.value) || 0)))
                   }
                 />
                 <Button
                   size="sm"
                   variant="ghost"
-                  onClick={() =>
-                    update((current) => ({
-                      ...current,
-                      play: {
-                        ...current.play,
-                        hp: Math.min(derived.maxHp, (current.play.hp ?? derived.maxHp) + 1),
-                      },
-                    }))
-                  }
+                  onClick={() => applyHealing(1)}
                   disabled={!canEdit}
                 >
                   <Plus size={13} />
@@ -1277,15 +1297,7 @@ export function CharacterSheetPage() {
                 <Button
                   size="sm"
                   variant="danger"
-                  onClick={() =>
-                    update((current) => ({
-                      ...current,
-                      play: {
-                        ...current.play,
-                        hp: Math.max(0, (current.play.hp ?? derived.maxHp) - 5),
-                      },
-                    }))
-                  }
+                  onClick={() => applyDamage(5)}
                   disabled={!canEdit}
                 >
                   −5
@@ -1293,15 +1305,7 @@ export function CharacterSheetPage() {
                 <Button
                   size="sm"
                   variant="secondary"
-                  onClick={() =>
-                    update((current) => ({
-                      ...current,
-                      play: {
-                        ...current.play,
-                        hp: Math.min(derived.maxHp, (current.play.hp ?? derived.maxHp) + 5),
-                      },
-                    }))
-                  }
+                  onClick={() => applyHealing(5)}
                   disabled={!canEdit}
                 >
                   +5
@@ -1309,12 +1313,7 @@ export function CharacterSheetPage() {
                 <Button
                   size="sm"
                   variant="ghost"
-                  onClick={() =>
-                    update((current) => ({
-                      ...current,
-                      play: { ...current.play, hp: derived.maxHp },
-                    }))
-                  }
+                  onClick={() => setHp(derived.maxHp)}
                   disabled={!canEdit}
                 >
                   Full
@@ -1362,6 +1361,18 @@ export function CharacterSheetPage() {
                     />
                   ))}
                 </div>
+              </div>
+              <div className="point-row">
+                <span>Hero Point reroll</span>
+                <Button
+                  size="sm"
+                  variant={heroPointArmed ? "primary" : "ghost"}
+                  disabled={!canEdit || draft.play.heroPoints < 1}
+                  onClick={() => setHeroPointArmed((armed) => !armed)}
+                  title="Spend 1 Hero Point on your next roll and use the new result."
+                >
+                  {heroPointArmed ? "Armed: roll now" : "Arm next roll"}
+                </Button>
               </div>
               {xp.xp > 0 ? (
                 <div className="point-row" title="The GM awards XP and decides when to level up.">
@@ -1422,6 +1433,26 @@ export function CharacterSheetPage() {
                       />
                     ))}
                   </div>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    disabled={!canEdit || draft.play.focusPoints >= derived.focusPointsMax}
+                    onClick={() =>
+                      update((current) => ({
+                        ...current,
+                        play: {
+                          ...current.play,
+                          focusPoints: Math.min(
+                            derived.focusPointsMax,
+                            current.play.focusPoints + 1
+                          ),
+                        },
+                      }))
+                    }
+                    title="Refocus for 10 minutes to regain 1 Focus Point."
+                  >
+                    Refocus
+                  </Button>
                 </div>
               ) : null}
               <div className="point-row">
@@ -1499,6 +1530,13 @@ export function CharacterSheetPage() {
                   <span className="muted tiny">No active conditions.</span>
                 ) : null}
               </div>
+              {derived.conditionEffects.notes.length ? (
+                <ul className="condition-effects tiny muted">
+                  {derived.conditionEffects.notes.map((note) => (
+                    <li key={note}>{note}</li>
+                  ))}
+                </ul>
+              ) : null}
               {canEdit ? (
                 <div className="condition-add">
                   <Select

@@ -95,6 +95,43 @@ describe("golden sheets", () => {
     expect(derived.skills.find((skill) => skill.id === "athletics")?.mod).toBe(7);
   });
 
+  it("folds status and circumstance conditions into the fighter's math", () => {
+    const draft = emptyCharacterDraft("Conditioned Fighter");
+    draft.ancestryId = human.id;
+    draft.backgroundId = warrior.id;
+    draft.classId = fighter.id;
+    draft.keyAbility = "str";
+    draft.boosts.ancestry = ["str", "dex"];
+    draft.boosts.background = ["str", "con"];
+    draft.boosts.free = ["str", "dex", "con", "wis"];
+    draft.skills.trained = ["athletics", "acrobatics"];
+    draft.equipment = [
+      { itemId: chainMail.id, quantity: 1, equipped: true },
+      { itemId: longsword.id, quantity: 1, equipped: true },
+      { itemId: steelShield.id, quantity: 1, equipped: true },
+    ];
+    draft.play.conditions = [
+      { name: "Frightened", value: 2, duration: null },
+      { name: "Clumsy", value: 1, duration: null },
+      { name: "Off-Guard", value: null, duration: null },
+      { name: "Drained", value: 1, duration: null },
+    ];
+
+    const derived = computeCharacter(
+      draft,
+      contextFor(warrior, fighter, [chainMail, longsword, steelShield])
+    );
+
+    expect(derived.maxHp).toBe(19);
+    expect(derived.ac).toBe(14);
+    expect(derived.saves).toEqual({ fortitude: 5, reflex: 5, will: 2 });
+    expect(derived.perception).toBe(4);
+    expect(derived.classDc).toBe(15);
+    expect(derived.attacks.find((attack) => attack.name === "Longsword")?.attackBonus).toBe(7);
+    expect(derived.skills.find((skill) => skill.id === "athletics")?.mod).toBe(5);
+    expect(derived.conditionEffects.notes.length).toBeGreaterThan(0);
+  });
+
   it("level 1 wizard with Intelligence spellcasting", () => {
     const draft = emptyCharacterDraft("Golden Wizard");
     draft.ancestryId = human.id;

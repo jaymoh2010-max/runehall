@@ -503,6 +503,10 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
     getSocket().emit("token:update", { campaignId, token: { id: tokenId, ...patch } });
   };
 
+  const damageToken = (tokenId: string, amount: number, critical = false) => {
+    getSocket().emit("token:damage", { campaignId, tokenId, amount, critical });
+  };
+
   const bulkHp = (delta: number, full = false) => {
     const selected = tokens.filter(
       (token) => selectedTokenIds.includes(token.id) && token.sceneId === activeSceneId
@@ -510,10 +514,15 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
     for (const token of selected) {
       const max = token.hpMax;
       const current = token.hpCurrent ?? max ?? 0;
-      const next = full
-        ? (max ?? current)
-        : Math.max(0, Math.min(max ?? 1_000_000, current + delta));
-      updateToken(token.id, { hpCurrent: next });
+      if (full) {
+        updateToken(token.id, { hpCurrent: max ?? current });
+      } else if (delta < 0) {
+        damageToken(token.id, Math.abs(delta));
+      } else {
+        updateToken(token.id, {
+          hpCurrent: Math.min(max ?? 1_000_000, current + delta),
+        });
+      }
     }
   };
 
@@ -971,6 +980,7 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
             setTokens={setTokens}
             selectedToken={selectedToken}
             updateToken={updateToken}
+            onDamage={damageToken}
             addSelectedToInitiative={addSelectedToInitiative}
             setEditingTokenId={setEditingTokenId}
             deleteToken={deleteToken}
