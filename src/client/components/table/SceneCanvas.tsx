@@ -22,6 +22,7 @@ import type {
 import type { PropPreset } from "../../../shared/props";
 import { measureGridDistance } from "../../../shared/measurement";
 import { blockingPropForMove } from "../../../shared/collision";
+import { findPathAroundProps } from "../../../shared/pathfinding";
 import { nearestWall } from "../../../shared/walls";
 import { computeVision } from "../../../shared/vision";
 import { loadExplored, saveExplored } from "./explored";
@@ -38,6 +39,22 @@ import {
 
 type FogMode = "reveal" | "hide";
 
+interface DragPath {
+  /** Polyline including the token's starting position. */
+  points: { x: number; y: number }[];
+  feet: number;
+  reachedGoal: boolean;
+  unreachable: boolean;
+  budget: number | null;
+}
+
+interface ActiveMovement {
+  tokenId: string;
+  speed: number | null;
+  movementUsed: number;
+  diagonalSteps: number;
+}
+
 interface SceneCanvasProps {
   scene: Scene;
   tokens: Token[];
@@ -46,6 +63,8 @@ interface SceneCanvasProps {
   userId: string;
   selectedTokenId: string | null;
   selectedTokenIds: string[];
+  /** Movement tracker for the combatant whose turn is active, if any. */
+  activeMovement: ActiveMovement | null;
   onSelectToken: (id: string | null, additive?: boolean) => void;
   onSelectTokens: (ids: string[], additive?: boolean) => void;
   onOpenCharacter: (id: string) => void;
@@ -86,6 +105,7 @@ export function SceneCanvas({
   userId,
   selectedTokenId,
   selectedTokenIds,
+  activeMovement,
   onSelectToken,
   onSelectTokens,
   onOpenCharacter,
@@ -120,6 +140,7 @@ export function SceneCanvas({
   const [dragging, setDragging] = useState<{
     tokenId: string;
     positions: Record<string, { x: number; y: number }>;
+    paths: Record<string, DragPath>;
   } | null>(null);
   const [panning, setPanning] = useState<{
     startX: number;
@@ -165,6 +186,7 @@ export function SceneCanvas({
   const templateDraftRef = useRef<{ x: number; y: number; direction: number } | null>(null);
   const painting = useRef<{ mode: FogMode; cells: Set<string> } | null>(null);
   const fittedScene = useRef<string | null>(null);
+  const dragTarget = useRef<{ tokenId: string; x: number; y: number } | null>(null);
 
   const cols = Math.max(1, Math.ceil(scene.width / scene.gridSize));
   const rows = Math.max(1, Math.ceil(scene.height / scene.gridSize));
@@ -726,6 +748,12 @@ export function SceneCanvas({
     }
   };
 
+  const movementBudgetFor = (member: Token): number | null => {
+    if (isGm || !activeMovement || activeMovement.tokenId !== member.id) return null;
+    if (activeMovement.speed === null) return null;
+    return Math.max(0, activeMovement.speed - Math.max(0, activeMovement.movementUsed));
+  };
+
   const onTokenPointerDown = (event: ReactPointerEvent<HTMLDivElement>, token: Token) => {
     event.stopPropagation();
     const additive = event.shiftKey || event.ctrlKey || event.metaKey;
@@ -753,7 +781,8 @@ export function SceneCanvas({
       if (!isGm && (member.ownerId !== userId || member.locked)) continue;
       positions[id] = { x: member.x, y: member.y };
     }
-    setDragging({ tokenId: token.id, positions });
+    dragTarget.current = null;
+    setDragging({ tokenId: token.id, positions, paths: {} });
     (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
   };
 
@@ -763,46 +792,86 @@ export function SceneCanvas({
     const half = (token.size * scene.gridSize) / 2;
     const nextX = snap(Math.max(half, Math.min(scene.width - half, point.x)), scene.gridOffsetX);
     const nextY = snap(Math.max(half, Math.min(scene.height - half, point.y)), scene.gridOffsetY);
+    if (
+      dragTarget.current &&
+      dragTarget.current.tokenId === token.id &&
+      dragTarget.current.x === nextX &&
+      dragTarget.current.y === nextY
+    ) {
+      return;
+    }
+    dragTarget.current = { tokenId: token.id, x: nextX, y: nextY };
     const dx = nextX - token.x;
     const dy = nextY - token.y;
     const members = Object.keys(dragging.positions)
       .map((id) => tokens.find((entry) => entry.id === id))
       .filter((entry): entry is Token => Boolean(entry));
+    const props = scene.props ?? [];
     const positions: Record<string, { x: number; y: number }> = {};
+    const paths: Record<string, DragPath> = {};
     for (const member of members) {
       const memberHalf = (member.size * scene.gridSize) / 2;
-      positions[member.id] = {
+      const target = {
         x: Math.max(memberHalf, Math.min(scene.width - memberHalf, member.x + dx)),
         y: Math.max(memberHalf, Math.min(scene.height - memberHalf, member.y + dy)),
       };
-    }
-    const props = scene.props ?? [];
-    if (scene.propCollision) {
-      for (const member of members) {
-        const target = positions[member.id];
-        if (
-          target &&
-          blockingPropForMove(
-            props,
-            member,
-            { x: member.x, y: member.y },
-            target,
-            scene.gridSize,
-            true
-          )
-        ) {
-          return;
-        }
+      positions[member.id] = target;
+      if (!scene.propCollision || !props.length) continue;
+      const blocked = blockingPropForMove(
+        props,
+        member,
+        { x: member.x, y: member.y },
+        target,
+        scene.gridSize,
+        true
+      );
+      if (!blocked) continue;
+      const budget = movementBudgetFor(member);
+      const result = findPathAroundProps({
+        props,
+        propCollision: true,
+        gridSize: scene.gridSize,
+        gridOffsetX: scene.gridOffsetX,
+        gridOffsetY: scene.gridOffsetY,
+        width: scene.width,
+        height: scene.height,
+        tokenSize: member.size,
+        from: { x: member.x, y: member.y },
+        to: target,
+        budget,
+        diagonalStart: activeMovement?.tokenId === member.id ? activeMovement.diagonalSteps : 0,
+      });
+      if (!result.points.length) {
+        positions[member.id] = { x: member.x, y: member.y };
+        paths[member.id] = {
+          points: [{ x: member.x, y: member.y }],
+          feet: 0,
+          reachedGoal: false,
+          unreachable: result.unreachable,
+          budget,
+        };
+        continue;
       }
+      positions[member.id] = result.points[result.points.length - 1];
+      paths[member.id] = {
+        points: [{ x: member.x, y: member.y }, ...result.points],
+        feet: result.feet,
+        reachedGoal: result.reachedGoal,
+        unreachable: result.unreachable,
+        budget,
+      };
     }
-    setDragging({ tokenId: token.id, positions });
+    setDragging({ tokenId: token.id, positions, paths });
   };
 
   const onTokenPointerUp = (event: ReactPointerEvent<HTMLDivElement>, token: Token) => {
     if (dragging?.tokenId !== token.id) return;
     for (const [tokenId, position] of Object.entries(dragging.positions)) {
+      const member = tokens.find((entry) => entry.id === tokenId);
+      if (member && Math.hypot(position.x - member.x, position.y - member.y) < 0.5) continue;
       onMoveToken(tokenId, position.x, position.y);
     }
+    dragTarget.current = null;
     setDragging(null);
     (event.currentTarget as HTMLElement).releasePointerCapture(event.pointerId);
   };
@@ -905,6 +974,11 @@ export function SceneCanvas({
     templateDraft && templateKind
       ? { kind: templateKind, size: templateSize, ...templateDraft }
       : null;
+  const activePath = dragging ? (dragging.paths[dragging.tokenId] ?? null) : null;
+  const activePathEnd = activePath?.points[activePath.points.length - 1] ?? null;
+  const activePathLabel = activePath
+    ? `${activePath.feet} ft${activePath.reachedGoal ? "" : activePath.unreachable ? " · no path" : " · speed limit"}`
+    : null;
 
   return (
     <div
@@ -952,6 +1026,27 @@ export function SceneCanvas({
             backgroundPosition: `${scene.gridOffsetX}px ${scene.gridOffsetY}px`,
           }}
         />
+        {dragging && Object.keys(dragging.paths).length ? (
+          <svg className="path-layer" width={scene.width} height={scene.height} aria-hidden="true">
+            {Object.entries(dragging.paths).map(([tokenId, path]) => {
+              const end = path.points[path.points.length - 1];
+              return (
+                <g key={tokenId}>
+                  <polyline
+                    points={path.points.map((entry) => `${entry.x},${entry.y}`).join(" ")}
+                    fill="none"
+                    stroke="#e5ca91"
+                    strokeWidth={2 / Math.max(zoom, 0.4)}
+                    strokeDasharray={`${8 / Math.max(zoom, 0.4)} ${5 / Math.max(zoom, 0.4)}`}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <circle cx={end.x} cy={end.y} r={4 / Math.max(zoom, 0.4)} fill="#e5ca91" />
+                </g>
+              );
+            })}
+          </svg>
+        ) : null}
         {tokens.map((token) => {
           const size = token.size * scene.gridSize;
           const position = dragPosition(token);
@@ -1180,6 +1275,21 @@ export function SceneCanvas({
             }}
           >
             {measureSquares} sq · {measureFeet} ft.
+          </div>
+        ) : null}
+        {activePath && activePathEnd ? (
+          <div
+            className={`measure-label path-label ${activePath.reachedGoal ? "" : "is-short"}`}
+            title={
+              activePath.reachedGoal
+                ? "Shortest path around blocking props."
+                : activePath.unreachable
+                  ? "The destination cannot be reached around the blocking props."
+                  : `The rest of the path would exceed the ${activePath.budget ?? 0} ft of movement left this turn.`
+            }
+            style={{ left: activePathEnd.x, top: activePathEnd.y - 8 }}
+          >
+            {activePathLabel}
           </div>
         ) : null}
       </div>

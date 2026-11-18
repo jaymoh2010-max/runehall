@@ -161,6 +161,21 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
       ),
     [tokens, activeSceneId, previewSceneId, previewing, isGm]
   );
+  const activeMovement = useMemo(() => {
+    const entry = initiative[turnIndex];
+    if (!entry?.tokenId || !activeSceneId || entry.sceneId !== activeSceneId) return null;
+    const token = tokens.find((item) => item.id === entry.tokenId);
+    if (!token) return null;
+    const speed = token.characterId
+      ? characters.find((record) => record.id === token.characterId)?.summary?.speed
+      : null;
+    return {
+      tokenId: token.id,
+      speed: typeof speed === "number" && Number.isFinite(speed) && speed > 0 ? speed : null,
+      movementUsed: Math.max(0, Math.round(entry.movementUsed ?? 0)),
+      diagonalSteps: Math.max(0, Math.round(entry.diagonalSteps ?? 0)),
+    };
+  }, [initiative, turnIndex, activeSceneId, tokens, characters]);
   const selectedToken = sceneTokens.find((token) => token.id === selectedTokenId) ?? null;
   const editingToken = tokens.find((token) => token.id === editingTokenId) ?? null;
 
@@ -986,6 +1001,7 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
             userId={user.id}
             selectedTokenId={selectedTokenId}
             selectedTokenIds={selectedTokenIds}
+            activeMovement={activeMovement}
             onSelectToken={selectToken}
             onSelectTokens={selectTokens}
             onOpenCharacter={(id) => window.open(`/characters/${id}`, "_blank")}

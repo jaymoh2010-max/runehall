@@ -441,9 +441,11 @@ Acceptance: a GM can prepare a full session in Runehall and start it with one â€
   - Built-in prop categories cover furniture, nature, dungeon pieces, and camp equipment.
   - Custom prop images upload through the campaign asset library and count as used assets.
   - A single GM-controlled **Prop collision** switch turns collision on for every prop or off for purely decorative scenes.
-  - When enabled, straight-line token movement is blocked by props; tokens already overlapping a prop can move out. There is no pathfinding, so the GM should drag around large obstacles in steps.
+  - When enabled, a blocked move automatically follows the shortest PF2e grid path around the props instead of being rejected.
+  - On the active combatant's turn, the detour stops at the last square the remaining Speed can pay for, so the token gets as close to the destination as its movement allows. Diagonal steps on the detour keep the 5/10-foot alternation.
+  - A dashed route and distance label preview the detour while dragging; tokens already overlapping a prop can move out.
   - Prop data is persisted per scene, copied on duplication, exported/imported with campaigns, and broadcast to connected clients.
-  - Covered by prop normalization and collision tests, a two-socket smoke check, and a browser placement/collision-toggle flow.
+  - Covered by prop normalization, collision, and pathfinding tests, a two-socket smoke check of detours and Speed limits, and a browser drag/collision-toggle flow.
 
 **Acceptance:** a complete combat with an AoE template, condition values, multiple selected tokens, and a filtered log needs no other tool.
 
@@ -552,7 +554,7 @@ Acceptance: a GM can prepare a full session in Runehall and start it with one â€
   - GMs can apply the same rest to the whole party from the Party tab, with linked tokens and summaries updated.
   - Covered by shared unit tests, the two-user smoke test, and the character-sheet browser flow.
 - [x] **Per-turn movement tracking**
-  - Moving the active combatant's token adds straight-line grid distance to their turn.
+  - Moving the active combatant's token adds grid distance to their turn, using the actual path when a route bends around blocking props.
   - The diagonal count carries across separate moves in the same turn, so the first diagonal costs 5 feet and the second 10.
   - The active initiative chip shows movement used against character Speed and turns red when over budget.
   - Advancing or stepping back a turn resets movement; the GM also has an explicit reset control.

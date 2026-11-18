@@ -1177,10 +1177,10 @@ async function main() {
     throw new Error("Token vision/light settings were not saved");
   }
 
-  const blockedMove = waitForEvent(
+  const detourPromise = waitForEvent(
     gmSocket,
     "token:moved",
-    (event) => event.tokenId === token.id && event.x === 100 && event.y === 100
+    (event) => event.tokenId === token.id && (event.x !== 100 || event.y !== 100)
   );
   playerSocket.emit("token:move", {
     campaignId: campaign.id,
@@ -1189,18 +1189,25 @@ async function main() {
     x: 200,
     y: 180,
   });
-  await blockedMove;
-  const blockedTable = await api(`/api/campaigns/${campaign.id}/table`, { cookie: gmCookie });
-  const blockedToken = blockedTable.payload.tokens.find((entry) => entry.id === token.id);
-  if (!blockedToken || blockedToken.x !== 100 || blockedToken.y !== 100) {
-    throw new Error("Prop collision did not block token movement");
+  const detourEvent = await detourPromise;
+  const detourTable = await api(`/api/campaigns/${campaign.id}/table`, { cookie: gmCookie });
+  const detourToken = detourTable.payload.tokens.find((entry) => entry.id === token.id);
+  if (!detourToken) throw new Error("Token disappeared during a prop detour");
+  if (detourToken.x === 200 && detourToken.y === 180) {
+    throw new Error("Prop collision did not stop the token inside the crate");
+  }
+  if (detourToken.x > 150 && detourToken.x < 250 && detourToken.y > 130 && detourToken.y < 230) {
+    throw new Error("Prop detour ended inside the crate");
+  }
+  if (detourEvent.x !== detourToken.x || detourEvent.y !== detourToken.y) {
+    throw new Error("Detour position did not match the authoritative token state");
   }
   await api(`/api/scenes/${scene.id}`, {
     method: "PATCH",
     cookie: gmCookie,
     body: { propCollision: false },
   });
-  log("prop collision blocks movement until the GM turns it off");
+  log("prop collision routes a move around the crate and stops at the last reachable square");
 
   const movedPromise = waitForEvent(
     gmSocket,
@@ -1526,6 +1533,93 @@ async function main() {
   gmSocket.emit("initiative:next", { campaignId: campaign.id, direction: 1 });
   await movementReset;
   log("movement carries the 5/10 diagonal count across moves and resets on the next turn");
+
+  const speedCrate = {
+    id: "prop_speed",
+    name: "Speed crate",
+    imageUrl: "/props/crate.svg",
+    x: 665,
+    y: 735,
+    width: 100,
+    height: 100,
+    rotation: 0,
+    layer: "ground",
+    visible: true,
+    locked: false,
+    z: 1,
+  };
+  const speedProps = waitForEvent(
+    gmSocket,
+    "scene:props",
+    (payload) =>
+      payload.sceneId === scene.id && payload.props?.some((prop) => prop.id === "prop_speed")
+  );
+  gmSocket.emit("scene:props", {
+    campaignId: campaign.id,
+    sceneId: scene.id,
+    props: [speedCrate],
+  });
+  await speedProps;
+  await api(`/api/scenes/${scene.id}`, {
+    method: "PATCH",
+    cookie: gmCookie,
+    body: { propCollision: true },
+  });
+  const speedSetup = waitForEvent(gmSocket, "initiative:updated", (payload) => {
+    const active = payload.entries[payload.turnIndex];
+    return active?.id === "init_move_test" && active.movementUsed === 20;
+  });
+  gmSocket.emit("initiative:update", {
+    campaignId: campaign.id,
+    entries: [
+      {
+        id: "init_move_test",
+        tokenId: token.id,
+        name: "Smoke Hero",
+        initiative: 20,
+        color: "#c8a96b",
+        ownerId: player.id,
+        sceneId: scene.id,
+        movementUsed: 20,
+        diagonalSteps: 0,
+      },
+    ],
+    round: 1,
+    turnIndex: 0,
+  });
+  await speedSetup;
+
+  const speedPlayer = await connectSocket(playerCookie);
+  await emitAck(speedPlayer, "campaign:join", { campaignId: campaign.id });
+  const speedMove = waitForEvent(gmSocket, "token:moved", (event) => event.tokenId === token.id);
+  const speedMovement = waitForEvent(gmSocket, "initiative:updated", (payload) => {
+    const active = payload.entries[payload.turnIndex];
+    return active?.id === "init_move_test" && active.movementUsed === 25;
+  });
+  speedPlayer.emit("token:move", {
+    campaignId: campaign.id,
+    sceneId: scene.id,
+    tokenId: token.id,
+    x: 665,
+    y: 875,
+  });
+  const speedEvent = await speedMove;
+  await speedMovement;
+  speedPlayer.close();
+  if (speedEvent.x === 665 && speedEvent.y === 875) {
+    throw new Error("A speed-limited detour reached a square beyond the remaining Speed");
+  }
+  const speedTable = await api(`/api/campaigns/${campaign.id}/table`, { cookie: gmCookie });
+  const speedToken = speedTable.payload.tokens.find((entry) => entry.id === token.id);
+  if (!speedToken || speedToken.x !== speedEvent.x || speedToken.y !== speedEvent.y) {
+    throw new Error("Speed-limited detour position did not match the authoritative token state");
+  }
+  await api(`/api/scenes/${scene.id}`, {
+    method: "PATCH",
+    cookie: gmCookie,
+    body: { propCollision: false },
+  });
+  log("a detour stops at the last square covered by the remaining Speed");
 
   const smokeEncounter = (
     await api(`/api/campaigns/${campaign.id}/encounters`, {

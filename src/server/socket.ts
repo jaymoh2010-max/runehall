@@ -8,8 +8,9 @@ import { characterSummary, computeCharacter, normalizeCharacterDraft } from "../
 import { rollFormula, validateFormula } from "../shared/dice";
 import { normalizeTokenConditions, tickTokenConditions } from "../shared/tokens";
 import { sortInitiativeEntries } from "../shared/initiative";
-import { applyGridMovement } from "../shared/movement";
+import { applyGridPath } from "../shared/movement";
 import { blockingPropForMove } from "../shared/collision";
+import { findPathAroundProps } from "../shared/pathfinding";
 import { normalizeAoeTemplate, normalizeAoeTemplates } from "../shared/templates";
 import { normalizeWalls } from "../shared/walls";
 import { normalizeSceneProps } from "../shared/props";
@@ -156,6 +157,15 @@ function perceptionForToken(row: TokenRow): number {
   } catch {
     return 0;
   }
+}
+
+function speedForToken(row: TokenRow): number | null {
+  if (!row.character_id) return null;
+  const character = getCharacter(row.character_id);
+  if (!character) return null;
+  const summary = parseJson(character.summary, null) as { speed?: unknown } | null;
+  const speed = Number(summary?.speed);
+  return Number.isFinite(speed) && speed > 0 ? speed : null;
 }
 
 function initiativeEntryForToken(row: TokenRow, value?: number): InitiativeEntry {
@@ -445,9 +455,19 @@ export function registerSocketServer(io: TypedServer): void {
       }
       const nx = clamp(Number(x) || 0, 0, scene.width);
       const ny = clamp(Number(y) || 0, 0, scene.height);
+      const state = ensureState(campaignId);
+      const entries = serializeInitiative(JSON.parse(state.initiative || "[]"));
+      const active = entries[state.turn_index];
+      const activeMatch = Boolean(
+        active && active.sceneId === sceneId && active.tokenId === tokenId
+      );
+      let targetX = nx;
+      let targetY = ny;
+      let pathPoints: Array<{ x: number; y: number }> | null = null;
       if (scene.prop_collision) {
+        const props = normalizeSceneProps(parseJson(scene.props, []));
         const blocked = blockingPropForMove(
-          normalizeSceneProps(parseJson(scene.props, [])),
+          props,
           { size: row.size },
           { x: row.x, y: row.y },
           { x: nx, y: ny },
@@ -455,39 +475,70 @@ export function registerSocketServer(io: TypedServer): void {
           true
         );
         if (blocked) {
-          sendError(socket, `That path is blocked by ${blocked.name}.`);
-          io.to(room(campaignId)).emit("token:moved", {
-            tokenId,
-            sceneId,
-            x: row.x,
-            y: row.y,
+          const speed = speedForToken(row);
+          const budget =
+            role !== "gm" && activeMatch && speed !== null
+              ? Math.max(0, speed - Math.max(0, active.movementUsed ?? 0))
+              : null;
+          const path = findPathAroundProps({
+            props,
+            propCollision: true,
+            gridSize: scene.grid_size,
+            gridOffsetX: scene.grid_offset_x,
+            gridOffsetY: scene.grid_offset_y,
+            width: scene.width,
+            height: scene.height,
+            tokenSize: row.size,
+            from: { x: row.x, y: row.y },
+            to: { x: nx, y: ny },
+            budget,
+            diagonalStart: activeMatch ? (active.diagonalSteps ?? 0) : 0,
           });
-          return;
+          if (!path.points.length) {
+            sendError(
+              socket,
+              path.unreachable
+                ? `There is no path around ${blocked.name}.`
+                : `Not enough movement left to get around ${blocked.name}.`
+            );
+            io.to(room(campaignId)).emit("token:moved", {
+              tokenId,
+              sceneId,
+              x: row.x,
+              y: row.y,
+            });
+            return;
+          }
+          const last = path.points[path.points.length - 1];
+          targetX = last.x;
+          targetY = last.y;
+          pathPoints = path.points;
         }
       }
-      const state = ensureState(campaignId);
-      const entries = serializeInitiative(JSON.parse(state.initiative || "[]"));
-      const active = entries[state.turn_index];
-      const movement =
-        active && active.sceneId === sceneId && active.tokenId === tokenId
-          ? applyGridMovement(
-              {
-                movementUsed: active.movementUsed ?? 0,
-                diagonalSteps: active.diagonalSteps ?? 0,
-              },
-              nx - row.x,
-              ny - row.y,
-              scene.grid_size
-            )
-          : null;
+      const movement = activeMatch
+        ? applyGridPath(
+            {
+              movementUsed: active.movementUsed ?? 0,
+              diagonalSteps: active.diagonalSteps ?? 0,
+            },
+            { x: row.x, y: row.y },
+            pathPoints ?? [{ x: targetX, y: targetY }],
+            scene.grid_size
+          )
+        : null;
       db.prepare("UPDATE tokens SET x = ?, y = ?, updated_at = ? WHERE id = ?").run(
-        nx,
-        ny,
+        targetX,
+        targetY,
         now(),
         tokenId
       );
-      io.to(room(campaignId)).emit("token:moved", { tokenId, sceneId, x: nx, y: ny });
-      if (active && movement && movement.step.feet > 0) {
+      io.to(room(campaignId)).emit("token:moved", {
+        tokenId,
+        sceneId,
+        x: targetX,
+        y: targetY,
+      });
+      if (active && movement && movement.feet > 0) {
         entries[state.turn_index] = {
           ...active,
           movementUsed: movement.movementUsed,

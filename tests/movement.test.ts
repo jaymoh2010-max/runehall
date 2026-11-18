@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { applyGridMovement, emptyMovement } from "../src/shared/movement";
+import { applyGridMovement, applyGridPath, emptyMovement } from "../src/shared/movement";
 
 describe("PF2e turn movement", () => {
   it("starts with no movement or diagonal steps", () => {
@@ -38,5 +38,40 @@ describe("PF2e turn movement", () => {
   it("rounds a freehand move to the nearest grid squares", () => {
     const update = applyGridMovement(emptyMovement(), 0.4 * 70, 0, 70);
     expect(update.movementUsed).toBe(0);
+  });
+
+  it("adds a populated path with the same diagonal parity as separate moves", () => {
+    const update = applyGridPath(
+      emptyMovement(),
+      { x: 35, y: 35 },
+      [
+        { x: 105, y: 105 },
+        { x: 175, y: 175 },
+        { x: 245, y: 175 },
+      ],
+      70
+    );
+    expect(update).toMatchObject({
+      movementUsed: 20,
+      diagonalSteps: 2,
+      feet: 20,
+      diagonals: 2,
+      overSpeed: false,
+    });
+  });
+
+  it("carries an existing diagonal count into a path", () => {
+    const update = applyGridPath(
+      { movementUsed: 5, diagonalSteps: 1 },
+      { x: 35, y: 35 },
+      [{ x: 105, y: 105 }],
+      70
+    );
+    expect(update).toMatchObject({ movementUsed: 15, diagonalSteps: 2, feet: 10 });
+  });
+
+  it("ignores an empty path", () => {
+    const update = applyGridPath({ movementUsed: 10, diagonalSteps: 1 }, { x: 35, y: 35 }, [], 70);
+    expect(update).toMatchObject({ movementUsed: 10, diagonalSteps: 1, feet: 0 });
   });
 });

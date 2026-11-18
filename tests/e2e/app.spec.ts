@@ -313,6 +313,32 @@ test("GM places a token, chats, rolls, and opens the scenes manager", async ({ p
   await expect(collisionToggle).toBeVisible();
   await collisionToggle.click();
   await expect(page.getByText("Prop collision enabled.")).toBeVisible();
+
+  const tokenButton = page.getByRole("button", { name: /E2E Hero, character token/ });
+  const tokenBox = await tokenButton.boundingBox();
+  const crateBox = await page.locator(".scene-prop").boundingBox();
+  expect(tokenBox).not.toBeNull();
+  expect(crateBox).not.toBeNull();
+  if (tokenBox && crateBox) {
+    await page.mouse.move(tokenBox.x + tokenBox.width / 2, tokenBox.y + tokenBox.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(crateBox.x + crateBox.width / 2, crateBox.y + crateBox.height / 2, {
+      steps: 8,
+    });
+    await expect(page.locator(".path-layer polyline")).toBeVisible();
+    await page.mouse.up();
+  }
+  await expect(page.locator(".path-layer")).toHaveCount(0);
+  const movedBox = await tokenButton.boundingBox();
+  if (movedBox && crateBox) {
+    const overlaps =
+      movedBox.x < crateBox.x + crateBox.width &&
+      movedBox.x + movedBox.width > crateBox.x &&
+      movedBox.y < crateBox.y + crateBox.height &&
+      movedBox.y + movedBox.height > crateBox.y;
+    expect(overlaps).toBe(false);
+  }
+
   await collisionToggle.click();
   await expect(page.getByText("Prop collision disabled.")).toBeVisible();
   await page.getByRole("button", { name: "Props", exact: true }).click();

@@ -42,3 +42,49 @@ export function applyGridMovement(
     overSpeed: typeof speed === "number" && Number.isFinite(speed) && movementUsed > speed,
   };
 }
+
+export interface GridPathUpdate extends MovementState {
+  /** Feet added by this path. */
+  feet: number;
+  /** Diagonal steps added by this path. */
+  diagonals: number;
+  /** True when the total for the turn is now past the supplied Speed. */
+  overSpeed: boolean;
+}
+
+/**
+ * Adds a polyline of grid waypoints to the current turn's movement. The
+ * diagonal parity carries through every segment, so a path of alternating
+ * straight and diagonal steps matches the tabletop 5/10 diagonal rule.
+ */
+export function applyGridPath(
+  current: MovementState,
+  start: { x: number; y: number },
+  points: Array<{ x: number; y: number }>,
+  gridSize: number,
+  speed?: number | null
+): GridPathUpdate {
+  let movementUsed = Math.max(0, Math.round(current.movementUsed));
+  let diagonalSteps = Math.max(0, Math.round(current.diagonalSteps));
+  const startUsed = movementUsed;
+  const startDiagonals = diagonalSteps;
+  let previous = start;
+  for (const point of points) {
+    const update = applyGridMovement(
+      { movementUsed, diagonalSteps },
+      point.x - previous.x,
+      point.y - previous.y,
+      gridSize
+    );
+    movementUsed = update.movementUsed;
+    diagonalSteps = update.diagonalSteps;
+    previous = point;
+  }
+  return {
+    movementUsed,
+    diagonalSteps,
+    feet: movementUsed - startUsed,
+    diagonals: diagonalSteps - startDiagonals,
+    overSpeed: typeof speed === "number" && Number.isFinite(speed) && movementUsed > speed,
+  };
+}
