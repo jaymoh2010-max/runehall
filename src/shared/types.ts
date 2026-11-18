@@ -1401,6 +1401,7 @@ export interface ServerToClientEvents {
   "scene:walls": (payload: { sceneId: string; walls: Wall[] }) => void;
   "scene:props": (payload: { sceneId: string; props: SceneProp[] }) => void;
   "audio:state": (payload: { campaignId: string; state: CampaignAudioState }) => void;
+  "audio:tracks": (payload: { campaignId: string; tracks: CampaignAudioTrack[] }) => void;
   "chat:message": (message: ChatMessage) => void;
   "initiative:updated": (payload: {
     entries: InitiativeEntry[];

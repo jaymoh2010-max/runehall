@@ -1058,6 +1058,20 @@ async function main() {
   await emitAck(playerSocket, "campaign:join", { campaignId: campaign.id });
   log("both realtime sockets joined the campaign");
 
+  // A malformed payload must be rejected without taking down the server for
+  // everyone else at the table.
+  playerSocket.emit("campaign:join", null);
+  playerSocket.emit("scene:reorder", null);
+  playerSocket.emit("scene:create", { campaignId: campaign.id, scene: null });
+  playerSocket.emit("dice:roll", null);
+  playerSocket.emit("dice:request", null);
+  await delay(300);
+  const healthAfterMalformed = await fetch(`${base}/api/health`);
+  if (!healthAfterMalformed.ok) {
+    throw new Error("A malformed socket payload crashed the server");
+  }
+  log("malformed socket payloads are rejected without dropping the table");
+
   const smokeWall = {
     id: "wall_smoke",
     x1: 0,
@@ -1500,6 +1514,18 @@ async function main() {
   ) {
     throw new Error("The in-world calendar did not advance across the month boundary");
   }
+  const calendarPartial = await api(`/api/campaigns/${campaign.id}/calendar`, {
+    method: "PUT",
+    cookie: gmCookie,
+    body: { day: 9 },
+  });
+  if (
+    calendarPartial.payload.worldDate?.year !== 4726 ||
+    calendarPartial.payload.worldDate?.month !== 2 ||
+    calendarPartial.payload.worldDate?.day !== 9
+  ) {
+    throw new Error("A partial calendar update reset the year or month");
+  }
   const playerCalendar = await fetch(`${base}/api/campaigns/${campaign.id}/calendar/advance`, {
     method: "POST",
     headers: { cookie: playerCookie, "content-type": "application/json" },
@@ -1554,6 +1580,9 @@ async function main() {
   ]);
   const audioForm = new FormData();
   audioForm.append("file", new Blob([wav], { type: "audio/wav" }), "smoke-theme.wav");
+  const audioTracksPromise = waitForEvent(playerSocket, "audio:tracks", (payload) =>
+    payload.tracks?.some((track) => track.name === "smoke-theme")
+  );
   const audioUpload = await fetch(`${base}/api/uploads/audio`, {
     method: "POST",
     headers: { cookie: gmCookie, "x-campaign-id": campaign.id },
@@ -1561,6 +1590,10 @@ async function main() {
   });
   if (audioUpload.status !== 201) {
     throw new Error(`Audio upload failed (${audioUpload.status})`);
+  }
+  const uploadedTracks = await audioTracksPromise;
+  if (!uploadedTracks.tracks.some((track) => track.name === "smoke-theme")) {
+    throw new Error("New soundtrack did not reach the connected player");
   }
   const audioTrack = (await audioUpload.json()).track;
   if (!audioTrack?.id || audioTrack.url.startsWith("/uploads/") === false) {
@@ -1600,10 +1633,16 @@ async function main() {
   if (audioAfterPlayer.payload.audioState?.playing !== true) {
     throw new Error("Player changed the shared audio state");
   }
+  const audioTracksCleared = waitForEvent(
+    playerSocket,
+    "audio:tracks",
+    (payload) => payload.tracks?.length === 0
+  );
   const audioDelete = await api(`/api/campaigns/${campaign.id}/audio/${audioTrack.id}`, {
     method: "DELETE",
     cookie: gmCookie,
   });
+  await audioTracksCleared;
   if (!audioDelete.payload.ok) throw new Error("GM could not delete the audio track");
   const audioTableAfter = await api(`/api/campaigns/${campaign.id}/table`, {
     cookie: gmCookie,

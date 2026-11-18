@@ -258,6 +258,9 @@ export function useCampaignTable({ initial, campaignId, toast }: UseCampaignTabl
     const onAudioState = (payload: { campaignId: string; state: CampaignAudioState }) => {
       if (payload.campaignId === campaignId) setAudioState(payload.state);
     };
+    const onAudioTracks = (payload: { campaignId: string; tracks: CampaignAudioTrack[] }) => {
+      if (payload.campaignId === campaignId) setAudioTracks(payload.tracks);
+    };
     const onPointer = (payload: { displayName: string; x: number; y: number }) => {
       setRemotePointer({ x: payload.x, y: payload.y, name: payload.displayName, ts: Date.now() });
       if (pointerTimer.current) window.clearTimeout(pointerTimer.current);
@@ -303,6 +306,7 @@ export function useCampaignTable({ initial, campaignId, toast }: UseCampaignTabl
     socket.on("chat:message", onChatMessage);
     socket.on("initiative:updated", onInitiativeUpdated);
     socket.on("audio:state", onAudioState);
+    socket.on("audio:tracks", onAudioTracks);
     socket.on("pointer:show", onPointer);
     socket.on("character:updated", onCharacterUpdated);
     socket.on("character:created", onCharacterCreated);
@@ -331,6 +335,7 @@ export function useCampaignTable({ initial, campaignId, toast }: UseCampaignTabl
       socket.off("chat:message", onChatMessage);
       socket.off("initiative:updated", onInitiativeUpdated);
       socket.off("audio:state", onAudioState);
+      socket.off("audio:tracks", onAudioTracks);
       socket.off("pointer:show", onPointer);
       socket.off("character:updated", onCharacterUpdated);
       socket.off("character:created", onCharacterCreated);

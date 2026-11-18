@@ -644,6 +644,8 @@ That is more trustworthy than silently showing a number that may be missing a +1
 
 These need a product decision before implementation:
 
+- [ ] **Campaign soundtrack portability** — campaign export/import currently omits `campaign_audio_tracks`; include track metadata and import only files that already exist in `data/uploads`.
+- [ ] **Live campaign metadata** — calendar changes only bump the revision counter, so players sitting on Overview keep the old in-world date until they switch tabs or reload; broadcast a small campaign-summary event if live dates matter.
 - [ ] **Incremental refactors** — split `rules.ts`, `CharacterSheetPage`, and `CampaignPage` where it reduces risk without changing behavior.
 
 ## Recommended next session

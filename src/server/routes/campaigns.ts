@@ -454,7 +454,19 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
     if (body.year === undefined && body.month === undefined && body.day === undefined) {
       return reply.code(400).send({ error: "Choose a year, month, and day." });
     }
-    const worldDate = normalizeGolarionDate(body);
+    // Merge a partial update with the current date rather than resetting the
+    // omitted fields to the calendar's defaults.
+    const merged = {
+      year: body.year === undefined ? row.world_year : body.year,
+      month: body.month === undefined ? row.world_month : body.month,
+      day: body.day === undefined ? row.world_day : body.day,
+    };
+    for (const value of [merged.year, merged.month, merged.day]) {
+      if (value === null || value === "" || !Number.isFinite(Number(value))) {
+        return reply.code(400).send({ error: "Enter a valid in-world date." });
+      }
+    }
+    const worldDate = normalizeGolarionDate(merged);
     db.prepare(
       "UPDATE campaigns SET world_year = ?, world_month = ?, world_day = ?, updated_at = ? WHERE id = ?"
     ).run(worldDate.year, worldDate.month, worldDate.day, now(), id);

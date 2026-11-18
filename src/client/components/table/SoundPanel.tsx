@@ -21,12 +21,15 @@ export function SoundPanel({
 }) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const pendingSeek = useRef<number | null>(null);
   const [open, setOpen] = useState(true);
   const [joined, setJoined] = useState(false);
   const [volume, setVolume] = useState(0.7);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
   const currentTrack = tracks.find((track) => track.id === state.trackId) ?? null;
+  const currentTrackId = currentTrack?.id ?? null;
+  const currentTrackUrl = currentTrack?.url ?? null;
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -37,24 +40,33 @@ export function SoundPanel({
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
-    if (!currentTrack) {
+    if (!currentTrackId || !currentTrackUrl) {
+      pendingSeek.current = null;
       audio.pause();
       audio.removeAttribute("src");
       audio.load();
       return;
     }
-    if (audio.getAttribute("src") !== currentTrack.url) {
-      audio.src = currentTrack.url;
+    if (audio.getAttribute("src") !== currentTrackUrl) {
+      audio.src = currentTrackUrl;
       audio.load();
     }
     const elapsed =
       state.playing && state.updatedAt ? Math.max(0, (Date.now() - state.updatedAt) / 1000) : 0;
     const target = Math.max(0, state.position + elapsed);
-    if (Number.isFinite(target) && Math.abs(audio.currentTime - target) > 1.5) {
-      try {
-        audio.currentTime = target;
-      } catch {
-        // The browser may not have metadata yet; the next state update will sync it.
+    if (Number.isFinite(target)) {
+      // Newly loaded media has no seekable range yet. Remember the target and
+      // apply it once metadata arrives instead of dropping the seek.
+      if (audio.readyState >= 1) {
+        if (Math.abs(audio.currentTime - target) > 1.5) {
+          try {
+            audio.currentTime = target;
+          } catch {
+            pendingSeek.current = target;
+          }
+        }
+      } else {
+        pendingSeek.current = target;
       }
     }
     if (state.playing && joined) {
@@ -62,7 +74,7 @@ export function SoundPanel({
     } else if (!state.playing) {
       audio.pause();
     }
-  }, [currentTrack?.id, currentTrack?.url, state.playing, state.position, state.updatedAt, joined]);
+  }, [currentTrackId, currentTrackUrl, state.playing, state.position, state.updatedAt, joined]);
 
   const sendState = (trackId: string | null, playing: boolean, position: number) => {
     if (!isGm) return;
@@ -114,7 +126,20 @@ export function SoundPanel({
 
   return (
     <div className="sound-panel">
-      <audio ref={audioRef} preload="metadata" />
+      <audio
+        ref={audioRef}
+        preload="metadata"
+        onLoadedMetadata={() => {
+          const audio = audioRef.current;
+          if (!audio || pendingSeek.current === null) return;
+          try {
+            audio.currentTime = pendingSeek.current;
+          } catch {
+            // Ignore a late seek; playback can continue from the browser's position.
+          }
+          pendingSeek.current = null;
+        }}
+      />
       <div className="sound-panel-head">
         <span className="sound-panel-title">
           <Music size={14} /> Soundtrack

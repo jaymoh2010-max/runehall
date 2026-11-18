@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import fs from "node:fs";
+import path from "node:path";
 import { inspectAudio } from "../src/server/audioMeta";
 
 const bytes = (...values: (number | string)[]): Buffer =>
@@ -22,5 +24,10 @@ describe("audio upload signatures", () => {
     expect(inspectAudio(bytes("RIFF", 0, 0, 0, 0, "WAVE"), "audio/mpeg")).toBe(false);
     expect(inspectAudio(bytes("not audio"), "audio/wav")).toBe(false);
     expect(inspectAudio(bytes("OggS"), "audio/mp4")).toBe(false);
+  });
+
+  it("is counted by the standalone orphan-cleanup scan", () => {
+    const cleanup = fs.readFileSync(path.resolve("scripts", "cleanup-assets.mjs"), "utf8");
+    expect(cleanup).toContain('"campaign_audio_tracks"');
   });
 });

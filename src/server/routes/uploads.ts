@@ -9,6 +9,7 @@ import { newId, now, safeString, uploadsDir } from "../util";
 import { inspectImage } from "../imageMeta";
 import { inspectAudio } from "../audioMeta";
 import { serializeAudioState, serializeAudioTrack, touchCampaign } from "../serialize";
+import type { CampaignAudioTrack } from "../../shared/types";
 import crypto from "node:crypto";
 
 const MIME_EXT: Record<string, string> = {
@@ -27,6 +28,15 @@ const AUDIO_MIME_EXT: Record<string, string> = {
 const MAX_DIMENSION = 12_000;
 const MAX_PIXELS = 100_000_000;
 const MAX_HEADER_BYTES = 2 * 1024 * 1024;
+
+function audioTracksFor(campaignId: string): CampaignAudioTrack[] {
+  const rows = db
+    .prepare(
+      "SELECT * FROM campaign_audio_tracks WHERE campaign_id = ? ORDER BY sort_order ASC, created_at ASC"
+    )
+    .all(campaignId) as AudioTrackRow[];
+  return rows.map(serializeAudioTrack);
+}
 
 export async function registerUploadRoutes(app: FastifyInstance): Promise<void> {
   app.post("/api/uploads", async (request, reply) => {
@@ -206,6 +216,10 @@ export async function registerUploadRoutes(app: FastifyInstance): Promise<void> 
     const row = db
       .prepare("SELECT * FROM campaign_audio_tracks WHERE id = ?")
       .get(trackId) as AudioTrackRow;
+    app.broadcastCampaign(campaignId, "audio:tracks", {
+      campaignId,
+      tracks: audioTracksFor(campaignId),
+    });
     touchCampaign(campaignId);
     return reply.code(201).send({ track: serializeAudioTrack(row) });
   });
@@ -229,6 +243,10 @@ export async function registerUploadRoutes(app: FastifyInstance): Promise<void> 
       ).run(now(), now(), id);
     }
     const updated = db.prepare("SELECT * FROM campaigns WHERE id = ?").get(id) as CampaignRow;
+    app.broadcastCampaign(id, "audio:tracks", {
+      campaignId: id,
+      tracks: audioTracksFor(id),
+    });
     app.broadcastCampaign(id, "audio:state", {
       campaignId: id,
       state: serializeAudioState(updated),

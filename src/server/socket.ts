@@ -79,6 +79,27 @@ function requireGm(socket: TypedSocket, campaignId: string): boolean {
   return true;
 }
 
+/**
+ * Register a socket listener that cannot take the process down. A stale or
+ * malformed client payload is reported back to its sender instead of becoming
+ * an uncaught exception that disconnects the whole table.
+ */
+function onSocket<E extends keyof ClientToServerEvents>(
+  socket: TypedSocket,
+  event: E,
+  handler: ClientToServerEvents[E]
+): void {
+  const guarded = ((...args: unknown[]) => {
+    try {
+      (handler as unknown as (...values: unknown[]) => void)(...args);
+    } catch (error) {
+      console.error(`[socket] ${String(event)} failed`, error);
+      sendError(socket, "That action could not be completed. Refresh and try again.");
+    }
+  }) as ClientToServerEvents[E];
+  socket.on(event, guarded as never);
+}
+
 function sceneBelongs(sceneId: string, campaignId: string): SceneRow | null {
   const row = db
     .prepare("SELECT * FROM scenes WHERE id = ? AND campaign_id = ?")
@@ -422,7 +443,12 @@ export function registerSocketServer(io: TypedServer): void {
   });
 
   io.on("connection", (socket: TypedSocket) => {
-    socket.on("campaign:join", ({ campaignId }, ack) => {
+    const on = <E extends keyof ClientToServerEvents>(
+      event: E,
+      handler: ClientToServerEvents[E]
+    ): void => onSocket(socket, event, handler);
+
+    on("campaign:join", ({ campaignId }, ack) => {
       const role = getCampaignRole(campaignId, socket.data.user.id);
       if (!role) {
         sendError(socket, "You're not a member of that campaign.");
@@ -437,7 +463,7 @@ export function registerSocketServer(io: TypedServer): void {
       ack?.({ ok: true, role });
     });
 
-    socket.on("campaign:leave", ({ campaignId }) => {
+    on("campaign:leave", ({ campaignId }) => {
       socket.leave(room(campaignId));
       socket.leave(gmRoom(campaignId));
       socket.data.campaigns.delete(campaignId);
@@ -445,7 +471,7 @@ export function registerSocketServer(io: TypedServer): void {
       emitPresence(io, campaignId);
     });
 
-    socket.on("token:move", ({ campaignId, sceneId, tokenId, x, y }) => {
+    on("token:move", ({ campaignId, sceneId, tokenId, x, y }) => {
       const row = tokenRow(tokenId);
       if (!row || row.scene_id !== sceneId) return;
       const role = getCampaignRole(campaignId, socket.data.user.id);
@@ -562,12 +588,12 @@ export function registerSocketServer(io: TypedServer): void {
       touchCampaign(campaignId);
     });
 
-    socket.on("token:create", ({ campaignId, sceneId, token }, ack) => {
+    on("token:create", ({ campaignId, sceneId, token }, ack) => {
       const created = createToken(socket, io, campaignId, sceneId, token ?? {});
       ack?.(created);
     });
 
-    socket.on("token:update", ({ campaignId, token }) => {
+    on("token:update", ({ campaignId, token }) => {
       if (!token?.id) return;
       const row = tokenRow(token.id);
       if (!row) return;
@@ -685,7 +711,7 @@ export function registerSocketServer(io: TypedServer): void {
       touchCampaign(campaignId);
     });
 
-    socket.on("token:delete", ({ campaignId, tokenId }) => {
+    on("token:delete", ({ campaignId, tokenId }) => {
       if (!requireGm(socket, campaignId)) return;
       const row = tokenRow(tokenId);
       if (!row) return;
@@ -696,7 +722,7 @@ export function registerSocketServer(io: TypedServer): void {
       touchCampaign(campaignId);
     });
 
-    socket.on("fog:update", ({ campaignId, sceneId, cells, mode }) => {
+    on("fog:update", ({ campaignId, sceneId, cells, mode }) => {
       if (!requireGm(socket, campaignId)) return;
       const scene = sceneBelongs(sceneId, campaignId);
       if (!scene) return;
@@ -717,7 +743,7 @@ export function registerSocketServer(io: TypedServer): void {
       touchCampaign(campaignId);
     });
 
-    socket.on("scene:activate", ({ campaignId, sceneId }) => {
+    on("scene:activate", ({ campaignId, sceneId }) => {
       if (!requireGm(socket, campaignId)) return;
       const scene = sceneBelongs(sceneId, campaignId);
       if (!scene) return;
@@ -729,7 +755,7 @@ export function registerSocketServer(io: TypedServer): void {
       touchCampaign(campaignId);
     });
 
-    socket.on("scene:update", ({ campaignId, scene }) => {
+    on("scene:update", ({ campaignId, scene }) => {
       if (!requireGm(socket, campaignId)) return;
       const row = db
         .prepare("SELECT * FROM scenes WHERE id = ? AND campaign_id = ?")
@@ -750,7 +776,7 @@ export function registerSocketServer(io: TypedServer): void {
       touchCampaign(campaignId);
     });
 
-    socket.on("scene:create", ({ campaignId, scene }, ack) => {
+    on("scene:create", ({ campaignId, scene }, ack) => {
       if (!requireGm(socket, campaignId)) {
         ack?.(null);
         return;
@@ -787,7 +813,7 @@ export function registerSocketServer(io: TypedServer): void {
       touchCampaign(campaignId);
     });
 
-    socket.on("scene:delete", ({ campaignId, sceneId }) => {
+    on("scene:delete", ({ campaignId, sceneId }) => {
       if (!requireGm(socket, campaignId)) return;
       const scene = sceneBelongs(sceneId, campaignId);
       if (!scene) return;
@@ -806,7 +832,7 @@ export function registerSocketServer(io: TypedServer): void {
       touchCampaign(campaignId);
     });
 
-    socket.on("scene:reorder", ({ campaignId, sceneIds }) => {
+    on("scene:reorder", ({ campaignId, sceneIds }) => {
       if (!requireGm(socket, campaignId)) return;
       const rows = db.prepare("SELECT id FROM scenes WHERE campaign_id = ?").all(campaignId) as {
         id: string;
@@ -833,7 +859,7 @@ export function registerSocketServer(io: TypedServer): void {
       touchCampaign(campaignId);
     });
 
-    socket.on("template:add", ({ campaignId, sceneId, template }) => {
+    on("template:add", ({ campaignId, sceneId, template }) => {
       if (!requireGm(socket, campaignId)) return;
       const scene = sceneBelongs(sceneId, campaignId);
       if (!scene) return;
@@ -852,7 +878,7 @@ export function registerSocketServer(io: TypedServer): void {
       touchCampaign(campaignId);
     });
 
-    socket.on("template:clear", ({ campaignId, sceneId }) => {
+    on("template:clear", ({ campaignId, sceneId }) => {
       if (!requireGm(socket, campaignId)) return;
       const scene = sceneBelongs(sceneId, campaignId);
       if (!scene) return;
@@ -864,7 +890,7 @@ export function registerSocketServer(io: TypedServer): void {
       touchCampaign(campaignId);
     });
 
-    socket.on("scene:walls", ({ campaignId, sceneId, walls }) => {
+    on("scene:walls", ({ campaignId, sceneId, walls }) => {
       if (!requireGm(socket, campaignId)) return;
       const scene = sceneBelongs(sceneId, campaignId);
       if (!scene) return;
@@ -884,7 +910,7 @@ export function registerSocketServer(io: TypedServer): void {
       touchCampaign(campaignId);
     });
 
-    socket.on("scene:props", ({ campaignId, sceneId, props }) => {
+    on("scene:props", ({ campaignId, sceneId, props }) => {
       if (!requireGm(socket, campaignId)) return;
       const scene = sceneBelongs(sceneId, campaignId);
       if (!scene) return;
@@ -902,7 +928,7 @@ export function registerSocketServer(io: TypedServer): void {
       touchCampaign(campaignId);
     });
 
-    socket.on("audio:update", ({ campaignId, trackId, playing, position }) => {
+    on("audio:update", ({ campaignId, trackId, playing, position }) => {
       if (!requireGm(socket, campaignId)) return;
       const campaign = db.prepare("SELECT * FROM campaigns WHERE id = ?").get(campaignId) as
         CampaignRow | undefined;
@@ -928,7 +954,7 @@ export function registerSocketServer(io: TypedServer): void {
       touchCampaign(campaignId);
     });
 
-    socket.on("chat:send", ({ campaignId, content, visibility }, ack) => {
+    on("chat:send", ({ campaignId, content, visibility }, ack) => {
       if (!getMembership(campaignId, socket.data.user.id)) {
         sendError(socket, "You're not a member of that campaign.");
         ack?.(null);
@@ -957,7 +983,7 @@ export function registerSocketServer(io: TypedServer): void {
       ack?.(message);
     });
 
-    socket.on(
+    on(
       "dice:roll",
       ({ campaignId, formula, label, dc, visibility, characterId, requestId }, ack) => {
         if (!getMembership(campaignId, socket.data.user.id)) {
@@ -1010,7 +1036,7 @@ export function registerSocketServer(io: TypedServer): void {
       }
     );
 
-    socket.on("dice:request", ({ campaignId, formula, label, dc, group }, ack) => {
+    on("dice:request", ({ campaignId, formula, label, dc, group }, ack) => {
       if (!requireGm(socket, campaignId)) {
         ack?.(null);
         return;
@@ -1052,14 +1078,14 @@ export function registerSocketServer(io: TypedServer): void {
       ack?.(message);
     });
 
-    socket.on("initiative:roll", ({ campaignId, sceneId, tokenIds }) => {
+    on("initiative:roll", ({ campaignId, sceneId, tokenIds }) => {
       if (!requireGm(socket, campaignId)) return;
       if (!sceneBelongs(sceneId, campaignId)) return;
       rollInitiative(io, campaignId, sceneId, tokenIds);
       touchCampaign(campaignId);
     });
 
-    socket.on("initiative:update", ({ campaignId, entries, round, turnIndex }) => {
+    on("initiative:update", ({ campaignId, entries, round, turnIndex }) => {
       if (!requireGm(socket, campaignId)) return;
       ensureState(campaignId);
       const clean: InitiativeEntry[] = Array.isArray(entries)
@@ -1113,7 +1139,7 @@ export function registerSocketServer(io: TypedServer): void {
       touchCampaign(campaignId);
     });
 
-    socket.on("initiative:next", ({ campaignId, direction }) => {
+    on("initiative:next", ({ campaignId, direction }) => {
       if (!requireGm(socket, campaignId)) return;
       const state = ensureState(campaignId);
       const entries = serializeInitiative(JSON.parse(state.initiative || "[]"));
@@ -1151,7 +1177,7 @@ export function registerSocketServer(io: TypedServer): void {
       touchCampaign(campaignId);
     });
 
-    socket.on("initiative:add", ({ campaignId, tokenId, value }) => {
+    on("initiative:add", ({ campaignId, tokenId, value }) => {
       if (!requireGm(socket, campaignId)) return;
       const row = tokenRow(tokenId);
       if (!row) return;
@@ -1177,7 +1203,7 @@ export function registerSocketServer(io: TypedServer): void {
       touchCampaign(campaignId);
     });
 
-    socket.on("initiative:reroll", ({ campaignId, entryId }) => {
+    on("initiative:reroll", ({ campaignId, entryId }) => {
       if (!requireGm(socket, campaignId)) return;
       const state = ensureState(campaignId);
       const entries = serializeInitiative(JSON.parse(state.initiative || "[]"));
@@ -1213,7 +1239,7 @@ export function registerSocketServer(io: TypedServer): void {
       touchCampaign(campaignId);
     });
 
-    socket.on("initiative:remove", ({ campaignId, entryId }) => {
+    on("initiative:remove", ({ campaignId, entryId }) => {
       if (!requireGm(socket, campaignId)) return;
       const state = ensureState(campaignId);
       const entries = serializeInitiative(JSON.parse(state.initiative || "[]"))
@@ -1226,7 +1252,7 @@ export function registerSocketServer(io: TypedServer): void {
       touchCampaign(campaignId);
     });
 
-    socket.on("pointer", ({ campaignId, sceneId, x, y }) => {
+    on("pointer", ({ campaignId, sceneId, x, y }) => {
       if (!getMembership(campaignId, socket.data.user.id)) return;
       socket.to(room(campaignId)).emit("pointer:show", {
         userId: socket.data.user.id,

@@ -42,6 +42,7 @@ const tables = [
   "campaign_dashboard",
   "campaign_sessions",
   "session_attendance",
+  "campaign_audio_tracks",
 ];
 
 const db = new DatabaseSync(databasePath);
