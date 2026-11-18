@@ -1,0 +1,147 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1536" height="1024" viewBox="0 0 1536 1024">
+  <defs>
+    <pattern id="sh-water" width="128" height="128" patternUnits="userSpaceOnUse">
+      <rect width="128" height="128" fill="#2d6475"/>
+      <path d="M0 24c20-10 40-10 60 0s40 10 68 0M-12 72c20-10 40-10 60 0s40 10 68 0M20 112c20-10 40-10 60 0s40 10 68 0" fill="none" stroke="#4c8ea0" stroke-width="5" opacity=".55"/>
+      <path d="M0 44c20-8 40-8 60 0s40 8 68 0M8 92c20-8 40-8 60 0s40 8 68 0" fill="none" stroke="#1f4b59" stroke-width="4" opacity=".5"/>
+    </pattern>
+    <pattern id="sh-deck" width="128" height="32" patternUnits="userSpaceOnUse">
+      <rect width="128" height="32" fill="#9a6b40"/>
+      <rect y="1" width="128" height="13" fill="#a97a4d"/>
+      <rect y="17" width="128" height="13" fill="#8c6039"/>
+      <path d="M0 16h128M0 31h128" stroke="#634025" stroke-width="2" opacity=".7"/>
+      <path d="M32 2v12M88 18v12M112 2v12M54 18v12" stroke="#7a5130" stroke-width="2" opacity=".55"/>
+      <circle cx="20" cy="8" r="1.5" fill="#c49a68" opacity=".6"/>
+      <circle cx="72" cy="24" r="1.5" fill="#c49a68" opacity=".5"/>
+    </pattern>
+    <pattern id="sh-cabin" width="64" height="64" patternUnits="userSpaceOnUse">
+      <rect width="64" height="64" fill="#6e4a2c"/>
+      <rect x="2" y="2" width="60" height="26" fill="#7d5734"/>
+      <rect x="2" y="32" width="60" height="30" fill="#634225"/>
+      <path d="M0 31h64M0 63h64" stroke="#452c17" stroke-width="3" opacity=".7"/>
+    </pattern>
+    <radialGradient id="sh-seaGlow" cx="50%" cy="50%" r="60%">
+      <stop offset="0" stop-color="#8ed0dc" stop-opacity=".16"/>
+      <stop offset="1" stop-color="#8ed0dc" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="sh-shadow" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="10" stdDeviation="12" flood-color="#06171d" flood-opacity=".65"/>
+    </filter>
+    <filter id="sh-grain">
+      <feTurbulence baseFrequency=".7" numOctaves="2" seed="21" type="fractalNoise"/>
+      <feColorMatrix type="saturate" values="0"/>
+      <feComponentTransfer><feFuncA type="linear" slope=".07"/></feComponentTransfer>
+    </filter>
+    <radialGradient id="sh-vignette" cx="50%" cy="50%" r="72%">
+      <stop offset="58%" stop-color="#04141a" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#04141a" stop-opacity=".55"/>
+    </radialGradient>
+  </defs>
+
+  <rect width="1536" height="1024" fill="url(#sh-water)"/>
+  <rect width="1536" height="1024" fill="url(#sh-seaGlow)"/>
+
+  <!-- hull shadow and foam -->
+  <g filter="url(#sh-shadow)" opacity=".8">
+    <path d="M110 528c34 160 214 252 418 268h484c222-20 368-120 414-284-46-164-192-264-414-284H528C324 244 144 336 110 528Z" fill="#0c2a33"/>
+  </g>
+  <path d="M96 528c44 188 232 290 440 306h480c228-22 382-132 428-306-46-174-200-284-428-306H536C328 210 140 312 96 528Z" fill="none" stroke="#a8d8df" stroke-width="7" opacity=".45"/>
+  <path d="M112 528c24-132 190-246 424-266h488c234 20 400 134 424 266-24 132-190 246-424 266H536c-234-20-400-134-424-266Z" fill="#4d2f1c"/>
+  <path d="M124 528c24-124 186-232 416-252h488c230 20 392 128 416 252-24 124-186 232-416 252H540c-230-20-392-128-416-252Z" fill="#2b1a10"/>
+
+  <!-- deck -->
+  <path d="M154 528c24-108 180-206 400-224h472c220 18 376 116 400 224-24 108-180 206-400 224H554c-220-18-376-116-400-224Z" fill="url(#sh-deck)" stroke="#5d3a21" stroke-width="6"/>
+  <path d="M170 528c26-94 174-184 388-202h460c214 18 362 108 388 202-26 94-174 184-388 202H558c-214-18-362-108-388-202Z" fill="none" stroke="#c29460" stroke-width="4" opacity=".45"/>
+
+  <!-- rail posts and cannon ports -->
+  <g fill="#c29460" opacity=".8">
+    <circle cx="220" cy="376" r="6"/><circle cx="304" cy="328" r="6"/><circle cx="404" cy="300" r="6"/><circle cx="520" cy="288" r="6"/>
+    <circle cx="220" cy="680" r="6"/><circle cx="304" cy="728" r="6"/><circle cx="404" cy="756" r="6"/><circle cx="520" cy="768" r="6"/>
+    <circle cx="1016" cy="288" r="6"/><circle cx="1132" cy="300" r="6"/><circle cx="1232" cy="328" r="6"/><circle cx="1316" cy="376" r="6"/>
+    <circle cx="1016" cy="768" r="6"/><circle cx="1132" cy="756" r="6"/><circle cx="1232" cy="728" r="6"/><circle cx="1316" cy="680" r="6"/>
+  </g>
+  <g fill="#1c2429" stroke="#0e1418" stroke-width="3">
+    <rect x="248" y="354" width="42" height="28" rx="6"/>
+    <rect x="356" y="320" width="42" height="28" rx="6"/>
+    <rect x="1116" y="320" width="42" height="28" rx="6"/>
+    <rect x="1226" y="354" width="42" height="28" rx="6"/>
+    <rect x="248" y="674" width="42" height="28" rx="6"/>
+    <rect x="356" y="708" width="42" height="28" rx="6"/>
+    <rect x="1116" y="708" width="42" height="28" rx="6"/>
+    <rect x="1226" y="674" width="42" height="28" rx="6"/>
+  </g>
+
+  <!-- stern cabin -->
+  <g filter="url(#sh-shadow)">
+    <rect x="188" y="384" width="176" height="288" rx="14" fill="url(#sh-cabin)" stroke="#422917" stroke-width="7"/>
+    <rect x="212" y="412" width="128" height="62" fill="#365a6a" stroke="#223b46" stroke-width="5"/>
+    <path d="M276 412v62M212 443h128" stroke="#a3794b" stroke-width="4"/>
+    <rect x="212" y="574" width="128" height="66" fill="#365a6a" stroke="#223b46" stroke-width="5"/>
+    <path d="M276 574v66M212 607h128" stroke="#a3794b" stroke-width="4"/>
+    <path d="M188 528h176" stroke="#a3794b" stroke-width="5" opacity=".7"/>
+  </g>
+
+  <!-- masts and rigging -->
+  <g stroke="#d8bd8c" stroke-width="4" opacity=".6">
+    <path d="M512 296L300 174M512 296l-212-84M512 760L300 882M512 760l-212 84"/>
+    <path d="M832 288l-160-128M832 288l160-128M832 768l-160 128M832 768l160 128"/>
+    <path d="M1120 296l212-122M1120 296l212-84M1120 760l212 122M1120 760l212 84"/>
+  </g>
+  <g filter="url(#sh-shadow)">
+    <circle cx="512" cy="528" r="58" fill="#6e4a2c" stroke="#3d2614" stroke-width="8"/>
+    <circle cx="512" cy="528" r="28" fill="#c29460" stroke="#6b4526" stroke-width="6"/>
+    <path d="M512 418v220M402 528h220" stroke="#8d6239" stroke-width="10" stroke-linecap="round"/>
+    <circle cx="832" cy="528" r="64" fill="#6e4a2c" stroke="#3d2614" stroke-width="8"/>
+    <circle cx="832" cy="528" r="30" fill="#c29460" stroke="#6b4526" stroke-width="6"/>
+    <path d="M832 408v240M712 528h240" stroke="#8d6239" stroke-width="11" stroke-linecap="round"/>
+    <circle cx="1120" cy="528" r="50" fill="#6e4a2c" stroke="#3d2614" stroke-width="7"/>
+    <circle cx="1120" cy="528" r="24" fill="#c29460" stroke="#6b4526" stroke-width="5"/>
+    <path d="M1120 430v196M1022 528h196" stroke="#8d6239" stroke-width="9" stroke-linecap="round"/>
+  </g>
+
+  <!-- central hatch and cargo -->
+  <g filter="url(#sh-shadow)">
+    <rect x="712" y="416" width="240" height="224" rx="8" fill="#5a3a22" stroke="#33200f" stroke-width="6"/>
+    <rect x="730" y="434" width="204" height="188" fill="#704a2a" stroke="#986a41" stroke-width="4"/>
+    <path d="M832 434v188M730 528h204" stroke="#4a2e18" stroke-width="5"/>
+    <circle cx="832" cy="528" r="14" fill="#c29460"/>
+  </g>
+  <g filter="url(#sh-shadow)">
+    <rect x="1004" y="596" width="104" height="104" fill="#7b5534" stroke="#4a2e18" stroke-width="5"/>
+    <path d="M1004 648h104M1056 596v104" stroke="#4a2e18" stroke-width="4"/>
+    <rect x="1068" y="640" width="92" height="92" fill="#8d6540" stroke="#4a2e18" stroke-width="5"/>
+    <path d="M1068 686h92M1114 640v92" stroke="#4a2e18" stroke-width="4"/>
+    <circle cx="632" cy="684" r="28" fill="#6e4a2c" stroke="#3d2614" stroke-width="5"/>
+    <path d="M610 684h44M632 662v44" stroke="#a3794b" stroke-width="4"/>
+    <circle cx="700" cy="704" r="22" fill="#6e4a2c" stroke="#3d2614" stroke-width="5"/>
+  </g>
+
+  <!-- ship's wheel and capstan -->
+  <g transform="translate(384 528)" stroke="#c29460" stroke-width="8" fill="none">
+    <circle r="46"/>
+    <path d="M-58 0h116M0-58v116M-41-41l82 82M-41 41l82-82"/>
+    <circle r="16" fill="#5a3a22"/>
+  </g>
+  <g transform="translate(936 664)" stroke="#c29460" stroke-width="7" fill="none">
+    <circle r="34"/>
+    <path d="M-44 0h88M0-44v88"/>
+    <circle r="12" fill="#5a3a22"/>
+  </g>
+
+  <!-- rope coils -->
+  <g fill="none" stroke="#d8bd8c" stroke-width="7" opacity=".75">
+    <circle cx="688" cy="344" r="22"/>
+    <circle cx="688" cy="344" r="12"/>
+    <circle cx="1196" cy="652" r="20"/>
+    <circle cx="1196" cy="652" r="10"/>
+  </g>
+
+  <!-- small boat in the water -->
+  <g transform="translate(1300 892)" filter="url(#sh-shadow)">
+    <path d="M-90 0c20-34 56-50 90-50s70 16 90 50c-24 30-58 44-90 44S-66 30-90 0Z" fill="#5a3a22" stroke="#33200f" stroke-width="5"/>
+    <path d="M-48 0h96M0-32v64" stroke="#c29460" stroke-width="6"/>
+  </g>
+
+  <rect width="1536" height="1024" filter="url(#sh-grain)" opacity=".55"/>
+  <rect width="1536" height="1024" fill="url(#sh-vignette)"/>
+</svg>

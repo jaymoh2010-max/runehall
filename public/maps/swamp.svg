@@ -1,0 +1,147 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1536" height="1024" viewBox="0 0 1536 1024">
+  <defs>
+    <pattern id="sw-water" width="128" height="128" patternUnits="userSpaceOnUse">
+      <rect width="128" height="128" fill="#3d4c38"/>
+      <path d="M0 28c22-12 44-12 66 0s40 12 62 0M-14 82c22-11 44-11 66 0s40 11 62 0M18 118c22-10 44-10 66 0s40 10 62 0" fill="none" stroke="#65775a" stroke-width="4" opacity=".45"/>
+      <path d="M0 46c22-8 44-8 66 0s40 8 62 0M6 98c22-8 44-8 66 0s40 8 62 0" fill="none" stroke="#2b3929" stroke-width="3" opacity=".55"/>
+      <circle cx="20" cy="64" r="2" fill="#7c9068" opacity=".5"/>
+      <circle cx="92" cy="14" r="1.7" fill="#8ca377" opacity=".45"/>
+    </pattern>
+    <pattern id="sw-mud" width="64" height="64" patternUnits="userSpaceOnUse">
+      <rect width="64" height="64" fill="#5c5638"/>
+      <path d="M5 14c12-6 22-6 32 0M30 40c10-5 18-5 28 0M12 54c8-4 14-4 22 0" fill="none" stroke="#6f6945" stroke-width="3" opacity=".6"/>
+      <circle cx="16" cy="34" r="1.8" fill="#47422b" opacity=".6"/>
+      <circle cx="48" cy="22" r="1.5" fill="#7b744f" opacity=".5"/>
+    </pattern>
+    <pattern id="sw-plank" width="64" height="32" patternUnits="userSpaceOnUse">
+      <rect width="64" height="32" fill="#6b5637"/>
+      <rect y="1" width="64" height="13" fill="#7b6340"/>
+      <rect y="17" width="64" height="13" fill="#5e4a2e"/>
+      <path d="M0 16h64M0 31h64" stroke="#3f301c" stroke-width="2" opacity=".7"/>
+      <path d="M18 2v12M46 18v12M30 2v12M54 18v12" stroke="#4f3d25" stroke-width="2" opacity=".6"/>
+    </pattern>
+    <radialGradient id="sw-glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#c4d889" stop-opacity=".18"/>
+      <stop offset="1" stop-color="#c4d889" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="sw-shadow" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="8" stdDeviation="9" flood-color="#10170f" flood-opacity=".55"/>
+    </filter>
+    <filter id="sw-grain">
+      <feTurbulence baseFrequency=".68" numOctaves="2" seed="44" type="fractalNoise"/>
+      <feColorMatrix type="saturate" values="0"/>
+      <feComponentTransfer><feFuncA type="linear" slope=".08"/></feComponentTransfer>
+    </filter>
+    <filter id="sw-blur"><feGaussianBlur stdDeviation="16"/></filter>
+    <radialGradient id="sw-vignette" cx="50%" cy="50%" r="72%">
+      <stop offset="55%" stop-color="#0d140c" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#0d140c" stop-opacity=".6"/>
+    </radialGradient>
+  </defs>
+
+  <rect width="1536" height="1024" fill="url(#sw-water)"/>
+
+  <!-- mud islands -->
+  <g filter="url(#sw-shadow)">
+    <path d="M92 168c84-84 212-92 310-48 82 36 128 118 88 186-42 72-160 110-254 88S28 292 48 228c8-26 22-44 44-60Z" fill="url(#sw-mud)" stroke="#37351f" stroke-width="7"/>
+    <path d="M1080 108c96-62 252-44 336 34 64 60 72 154 0 208-88 66-232 62-316-8-72-60-84-176-20-234Z" fill="url(#sw-mud)" stroke="#37351f" stroke-width="7"/>
+    <path d="M188 712c72-88 226-108 336-54 92 46 118 148 38 210-86 66-248 58-334-10-54-44-76-104-40-146Z" fill="url(#sw-mud)" stroke="#37351f" stroke-width="7"/>
+    <path d="M848 636c86-74 250-72 330 8 62 62 44 168-42 214-110 60-252 24-310-56-42-58-38-124 22-166Z" fill="url(#sw-mud)" stroke="#37351f" stroke-width="7"/>
+    <path d="M620 264c66-42 170-30 216 30 40 52 20 126-44 160-76 40-178 18-206-42-24-52-10-114 34-148Z" fill="url(#sw-mud)" stroke="#37351f" stroke-width="7"/>
+  </g>
+  <g fill="none" stroke="#788a5c" stroke-width="5" opacity=".55">
+    <path d="M104 180c78-66 190-76 278-38M1100 126c88-52 218-36 296 30M206 724c68-70 196-86 294-42M866 652c76-58 216-56 292 8M634 280c56-32 142-24 184 24"/>
+  </g>
+
+  <!-- broken causeway -->
+  <g filter="url(#sw-shadow)">
+    <path d="M184 552l216 38 104-24 80 46 168-18 58 52 150 18 76-44 176 30 88-34 172 22" fill="none" stroke="#4d3d27" stroke-width="72" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M184 552l216 38 104-24 80 46 168-18 58 52 150 18 76-44 176 30 88-34 172 22" fill="none" stroke="url(#sw-plank)" stroke-width="58" stroke-linecap="round" stroke-linejoin="round"/>
+    <g stroke="#3b2d1a" stroke-width="4" opacity=".65">
+      <path d="M260 520v78M340 544v78M420 552v70M540 566v76M640 610v62M790 600v76M900 640v62M1010 616v74M1130 648v56M1240 630v76M1360 632v62"/>
+    </g>
+    <path d="M492 520l46 34-22 42-44-22z" fill="#2e2517" opacity=".6"/>
+    <path d="M1048 672l56 20-18 48-52-14z" fill="#2e2517" opacity=".65"/>
+  </g>
+
+  <!-- dead trees -->
+  <g filter="url(#sw-shadow)">
+    <g transform="translate(360 200)">
+      <path d="M0 0c-6-72 10-122 34-170" fill="none" stroke="#4a3a25" stroke-width="26" stroke-linecap="round"/>
+      <path d="M34-170c-40-30-74-30-104-4M34-170c34-44 74-48 114-14M34-170c-2-38 16-66 48-82M18-92c-34-14-62-6-84 18M24-54c30-18 60-16 84 6" fill="none" stroke="#4a3a25" stroke-width="12" stroke-linecap="round"/>
+      <path d="M34-170c-22-20-42-26-62-18M34-170c22-24 46-28 70-16" fill="none" stroke="#5e4a2e" stroke-width="6" stroke-linecap="round"/>
+    </g>
+    <g transform="translate(1268 744)">
+      <path d="M0 0c-4-64 12-108 32-146" fill="none" stroke="#4a3a25" stroke-width="24" stroke-linecap="round"/>
+      <path d="M32-146c-36-26-66-24-92 0M32-146c30-36 64-36 96-8M32-146c0-30 14-54 40-70M20-80c-28-10-52-2-70 18M26-44c26-14 52-12 72 8" fill="none" stroke="#4a3a25" stroke-width="11" stroke-linecap="round"/>
+    </g>
+    <g transform="translate(700 816)">
+      <path d="M0 0c-2-48 10-82 26-112" fill="none" stroke="#4a3a25" stroke-width="20" stroke-linecap="round"/>
+      <path d="M26-112c-28-22-52-20-72 2M26-112c24-28 52-28 78-4M26-112c0-24 12-42 30-54" fill="none" stroke="#4a3a25" stroke-width="9" stroke-linecap="round"/>
+    </g>
+  </g>
+
+  <!-- sunken shrine -->
+  <g filter="url(#sw-shadow)" transform="translate(1000 356)">
+    <ellipse cx="0" cy="18" rx="142" ry="82" fill="#4b4930" opacity=".75"/>
+    <rect x="-108" y="-58" width="216" height="140" fill="#5f6344" stroke="#383b25" stroke-width="7" opacity=".9"/>
+    <rect x="-84" y="-34" width="168" height="92" fill="none" stroke="#7f8660" stroke-width="4"/>
+    <path d="M-108-58l-26-30M108-58l26-30M-108 82l-26 30M108 82l26 30" stroke="#3d4028" stroke-width="9" stroke-linecap="round"/>
+    <g fill="#7f8660" opacity=".7">
+      <rect x="-26" y="-84" width="52" height="40" rx="8"/>
+      <path d="M-26-64h52" stroke="#4d5136" stroke-width="4"/>
+    </g>
+    <path d="M-84 20h168M0-34v92" stroke="#8a916a" stroke-width="4" opacity=".55"/>
+  </g>
+
+  <!-- reeds and lilies -->
+  <g stroke="#7f8d4c" stroke-width="5" stroke-linecap="round" fill="none" opacity=".85">
+    <path d="M520 484l-22-52M542 496l-4-58M562 504l16-54M588 498l28-40M900 228l-18-46M920 238l2-52M940 246l20-44M1180 884l-20-50M1202 892l0-56M1222 900l18-48M1246 892l26-40"/>
+  </g>
+  <g fill="#6f8a55" opacity=".8">
+    <ellipse cx="602" cy="522" rx="20" ry="12"/>
+    <ellipse cx="656" cy="506" rx="16" ry="10"/>
+    <ellipse cx="840" cy="202" rx="18" ry="11"/>
+    <ellipse cx="1120" cy="850" rx="20" ry="12"/>
+    <ellipse cx="307" cy="356" rx="16" ry="10"/>
+    <ellipse cx="1312" cy="472" rx="18" ry="11"/>
+  </g>
+  <g fill="#d8d2a2" opacity=".75">
+    <circle cx="610" cy="520" r="4"/>
+    <circle cx="648" cy="504" r="3.5"/>
+    <circle cx="846" cy="200" r="4"/>
+    <circle cx="1128" cy="848" r="4"/>
+    <circle cx="1318" cy="470" r="3.5"/>
+  </g>
+
+  <!-- mushrooms and stumps -->
+  <g filter="url(#sw-shadow)">
+    <g transform="translate(272 806)">
+      <ellipse cx="0" cy="24" rx="42" ry="20" fill="#4a3a25"/>
+      <rect x="-36" y="-8" width="72" height="34" rx="10" fill="#5e4a2e" stroke="#3b2d1a" stroke-width="4"/>
+    </g>
+    <g transform="translate(1178 222)">
+      <ellipse cx="0" cy="18" rx="34" ry="16" fill="#4a3a25"/>
+      <rect x="-28" y="-6" width="56" height="26" rx="8" fill="#5e4a2e" stroke="#3b2d1a" stroke-width="4"/>
+    </g>
+    <g fill="#a34f45">
+      <path d="M500 876c-18 0-30-14-30-28h60c0 14-12 28-30 28Z"/>
+      <path d="M548 890c-14 0-24-11-24-22h48c0 11-10 22-24 22Z"/>
+      <path d="M1252 520c-16 0-28-13-28-26h56c0 13-12 26-28 26Z"/>
+    </g>
+    <g fill="#e1c9a0">
+      <circle cx="492" cy="860" r="3"/><circle cx="510" cy="858" r="2.5"/><circle cx="542" cy="878" r="2.5"/><circle cx="1244" cy="506" r="3"/>
+    </g>
+  </g>
+
+  <!-- fog patches -->
+  <g filter="url(#sw-blur)" fill="#b9c7a4" opacity=".16">
+    <ellipse cx="470" cy="432" rx="170" ry="56"/>
+    <ellipse cx="1180" cy="300" rx="150" ry="50"/>
+    <ellipse cx="800" cy="930" rx="210" ry="54"/>
+    <ellipse cx="220" cy="920" rx="140" ry="46"/>
+  </g>
+  <rect width="1536" height="1024" fill="url(#sw-glow)"/>
+  <rect width="1536" height="1024" filter="url(#sw-grain)" opacity=".6"/>
+  <rect width="1536" height="1024" fill="url(#sw-vignette)"/>
+</svg>

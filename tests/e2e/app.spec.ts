@@ -364,6 +364,9 @@ test("GM places a token, chats, rolls, and opens the scenes manager", async ({ p
   const builtinCard = scenes.getByRole("button", { name: /The Gilded Tankard/ });
   await expect(builtinCard).toBeVisible();
   await expect(builtinCard.locator("img")).toHaveJSProperty("naturalWidth", 1536);
+  const villageCard = scenes.getByRole("button", { name: /Willowbrook Crossroads/ });
+  await expect(villageCard).toBeVisible();
+  await expect(villageCard.locator("img")).toHaveJSProperty("naturalWidth", 1536);
   await builtinCard.click();
   await expect(scenes.getByLabel("Scene name")).toHaveValue("The Gilded Tankard");
   await scenes.getByRole("button", { name: "Create scene" }).click();

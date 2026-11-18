@@ -1,5 +1,14 @@
 export type BuiltinMapCategory =
-  "tavern" | "cavern" | "forest" | "mountain" | "battlefield" | "crypt";
+  | "tavern"
+  | "cavern"
+  | "forest"
+  | "mountain"
+  | "battlefield"
+  | "crypt"
+  | "village"
+  | "ship"
+  | "desert"
+  | "swamp";
 
 export interface BuiltinMap {
   id: string;
@@ -25,6 +34,10 @@ export const BUILTIN_MAP_CATEGORIES: {
   { id: "mountain", label: "Mountain" },
   { id: "battlefield", label: "Battlefield" },
   { id: "crypt", label: "Crypt" },
+  { id: "village", label: "Village" },
+  { id: "ship", label: "Ship" },
+  { id: "desert", label: "Desert" },
+  { id: "swamp", label: "Swamp" },
 ];
 
 export const BUILTIN_MAPS: BuiltinMap[] = [
@@ -96,6 +109,54 @@ export const BUILTIN_MAPS: BuiltinMap[] = [
       "A pillared stone crypt with sarcophagi, candlelight, cobwebs, and a raised central dais. Built for undead and old secrets.",
     imageUrl: "/maps/crypt.svg",
     thumbnailUrl: "/maps/crypt.svg",
+    width: 1536,
+    height: 1024,
+    gridSize: 64,
+  },
+  {
+    id: "village",
+    name: "Willowbrook Crossroads",
+    category: "village",
+    description:
+      "A green village crossroads with timber cottages, market stalls, a stone well, carts, and fenced gardens. Good for ambushes, evacuations, and tense negotiations.",
+    imageUrl: "/maps/village.svg",
+    thumbnailUrl: "/maps/village.svg",
+    width: 1536,
+    height: 1024,
+    gridSize: 64,
+  },
+  {
+    id: "ship",
+    name: "The Saltmaiden",
+    category: "ship",
+    description:
+      "The deck of a storm-worn merchant ship, with masts, rigging, cargo, a stern cabin, and open water on every side. Built for boarding actions and mutinies.",
+    imageUrl: "/maps/ship.svg",
+    thumbnailUrl: "/maps/ship.svg",
+    width: 1536,
+    height: 1024,
+    gridSize: 64,
+  },
+  {
+    id: "desert",
+    name: "Sunscour Flats",
+    category: "desert",
+    description:
+      "Rolling dunes cut by a dry riverbed, with a palm oasis, half-buried ruins, and a lonely camp. Open sightlines broken by rock and ruin.",
+    imageUrl: "/maps/desert.svg",
+    thumbnailUrl: "/maps/desert.svg",
+    width: 1536,
+    height: 1024,
+    gridSize: 64,
+  },
+  {
+    id: "swamp",
+    name: "Mirefen Hollow",
+    category: "swamp",
+    description:
+      "A drowned fen of mud islands, dead trees, reeds, and a broken causeway leading to a sunken shrine. Tight footing and plenty of cover.",
+    imageUrl: "/maps/swamp.svg",
+    thumbnailUrl: "/maps/swamp.svg",
     width: 1536,
     height: 1024,
     gridSize: 64,

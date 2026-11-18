@@ -1,0 +1,127 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1536" height="1024" viewBox="0 0 1536 1024">
+  <defs>
+    <pattern id="ds-sand" width="128" height="128" patternUnits="userSpaceOnUse">
+      <rect width="128" height="128" fill="#c9a96b"/>
+      <path d="M0 26c22-10 44-10 66 0s40 10 62 0M-10 78c22-9 44-9 66 0s40 9 62 0M20 118c22-9 44-9 66 0s40 9 62 0" fill="none" stroke="#b8975a" stroke-width="4" opacity=".45"/>
+      <circle cx="18" cy="52" r="2" fill="#ddc08a" opacity=".55"/>
+      <circle cx="76" cy="20" r="1.7" fill="#a88750" opacity=".55"/>
+      <circle cx="104" cy="92" r="2.2" fill="#ddc08a" opacity=".5"/>
+      <circle cx="44" cy="104" r="1.5" fill="#b08d55" opacity=".55"/>
+    </pattern>
+    <linearGradient id="ds-duneLight" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#e1c58c"/>
+      <stop offset="1" stop-color="#bb985a"/>
+    </linearGradient>
+    <linearGradient id="ds-duneShade" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#b08c51"/>
+      <stop offset="1" stop-color="#8f6d3d"/>
+    </linearGradient>
+    <linearGradient id="ds-water" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#4f9aa1"/>
+      <stop offset="1" stop-color="#2e6d77"/>
+    </linearGradient>
+    <pattern id="ds-stone" width="64" height="64" patternUnits="userSpaceOnUse">
+      <rect width="64" height="64" fill="#9a835f"/>
+      <rect x="1" y="1" width="62" height="29" fill="#ac9470"/>
+      <rect x="1" y="34" width="29" height="29" fill="#a28a66"/>
+      <rect x="34" y="34" width="29" height="29" fill="#b59c77"/>
+      <path d="M0 33h64M32 33v31" stroke="#7f6848" stroke-width="2" opacity=".7"/>
+    </pattern>
+    <filter id="ds-shadow" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="8" stdDeviation="8" flood-color="#4d3517" flood-opacity=".45"/>
+    </filter>
+    <filter id="ds-grain">
+      <feTurbulence baseFrequency=".65" numOctaves="2" seed="31" type="fractalNoise"/>
+      <feColorMatrix type="saturate" values="0"/>
+      <feComponentTransfer><feFuncA type="linear" slope=".08"/></feComponentTransfer>
+    </filter>
+    <radialGradient id="ds-vignette" cx="50%" cy="48%" r="72%">
+      <stop offset="58%" stop-color="#4b3315" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#4b3315" stop-opacity=".4"/>
+    </radialGradient>
+  </defs>
+
+  <rect width="1536" height="1024" fill="url(#ds-sand)"/>
+
+  <!-- dune bands -->
+  <path d="M0 214C220 118 430 92 636 140c214 50 386 22 562-28 138-40 260-34 338-6v210c-112-22-236-18-370 24-210 66-410 86-620 34C390 324 200 338 0 420Z" fill="url(#ds-duneLight)" opacity=".85"/>
+  <path d="M0 214C220 118 430 92 636 140c214 50 386 22 562-28 138-40 260-34 338-6" fill="none" stroke="#ead29f" stroke-width="5" opacity=".55"/>
+  <path d="M0 560c190-84 392-112 590-76 234 42 402 26 590-34 144-46 260-42 356-12v154c-106-18-224-10-354 28-206 60-384 72-596 30C392 616 204 630 0 714Z" fill="url(#ds-duneShade)" opacity=".7"/>
+  <path d="M0 560c190-84 392-112 590-76 234 42 402 26 590-34 144-46 260-42 356-12" fill="none" stroke="#d4b477" stroke-width="5" opacity=".55"/>
+  <path d="M0 818c170-64 346-78 526-44 244 46 438 34 638-22 138-40 250-34 372-4v276H0Z" fill="url(#ds-duneLight)" opacity=".4"/>
+
+  <!-- dry riverbed -->
+  <path d="M-40 96c140 84 220 164 330 190 128 30 178-6 302 34 138 44 150 132 276 172 138 44 260 30 388 82 90 38 160 88 240 132" fill="none" stroke="#8c6b3d" stroke-width="96" stroke-linecap="round" opacity=".42"/>
+  <path d="M-40 96c140 84 220 164 330 190 128 30 178-6 302 34 138 44 150 132 276 172 138 44 260 30 388 82 90 38 160 88 240 132" fill="none" stroke="#a98552" stroke-width="72" stroke-linecap="round" opacity=".35"/>
+  <g stroke="#725531" stroke-width="3" opacity=".45">
+    <path d="M210 312l44-22M266 330l38-28M334 352l30-30M630 398l42-20M704 440l36-30M1040 560l44-26M1118 608l34-32M1280 690l46-22"/>
+  </g>
+
+  <!-- oasis -->
+  <g filter="url(#ds-shadow)">
+    <ellipse cx="1090" cy="742" rx="188" ry="112" fill="#7d6037" opacity=".55"/>
+    <ellipse cx="1090" cy="742" rx="164" ry="92" fill="url(#ds-water)" stroke="#245962" stroke-width="6"/>
+    <ellipse cx="1044" cy="714" rx="54" ry="24" fill="#69b2b5" opacity=".35"/>
+    <path d="M980 788c40-18 78-18 118 0s68 18 108 0" fill="none" stroke="#8ed0cd" stroke-width="4" opacity=".5"/>
+  </g>
+  <g>
+    <g transform="translate(958 632)">
+      <path d="M0 0c-6-52 0-88 10-120" fill="none" stroke="#6f5230" stroke-width="14" stroke-linecap="round"/>
+      <path d="M10-120c-44-30-82-22-112 8 40 18 78 16 112-8ZM10-120c42-34 82-28 116 0-44 20-84 20-116 0ZM10-120c-10-40 2-72 34-94 8 38 0 70-34 94ZM10-120c-34-22-72-20-100 6 36 16 70 12 100-6Z" fill="#4f7a3e" stroke="#3a5d2d" stroke-width="4"/>
+    </g>
+    <g transform="translate(1188 650)">
+      <path d="M0 0c-4-46 4-78 14-104" fill="none" stroke="#6f5230" stroke-width="12" stroke-linecap="round"/>
+      <path d="M14-104c-40-26-76-18-104 8 38 16 72 14 104-8ZM14-104c38-28 74-22 104 2-40 18-76 16-104-2ZM14-104c-6-36 6-64 34-82 6 34-2 62-34 82Z" fill="#557f42" stroke="#3a5d2d" stroke-width="4"/>
+    </g>
+    <g transform="translate(1246 754)">
+      <path d="M0 0c-4-34 2-58 10-78" fill="none" stroke="#6f5230" stroke-width="10" stroke-linecap="round"/>
+      <path d="M10-78c-30-20-58-14-78 6 28 12 54 10 78-6ZM10-78c28-22 56-16 78 2-30 14-56 12-78-2Z" fill="#4f7a3e" stroke="#3a5d2d" stroke-width="3"/>
+    </g>
+    <g stroke="#7c8d47" stroke-width="5" stroke-linecap="round" fill="none">
+      <path d="M930 780l-20-44M950 792l-6-52M966 802l14-48M1210 806l-14-48M1230 800l6-52M1250 790l20-40"/>
+    </g>
+  </g>
+
+  <!-- ruins -->
+  <g filter="url(#ds-shadow)">
+    <rect x="300" y="664" width="312" height="208" fill="url(#ds-stone)" stroke="#6f5a3e" stroke-width="7" opacity=".95"/>
+    <rect x="332" y="696" width="248" height="144" fill="#c4ab7d" opacity=".25"/>
+    <path d="M332 696h248v144H332z" fill="none" stroke="#7f6848" stroke-width="4"/>
+    <g fill="url(#ds-stone)" stroke="#6f5a3e" stroke-width="6">
+      <rect x="356" y="560" width="48" height="136"/>
+      <rect x="468" y="584" width="48" height="112"/>
+      <rect x="580" y="540" width="48" height="156"/>
+    </g>
+    <path d="M356 560h48M468 584h48M580 540h48" stroke="#d8c29a" stroke-width="6" opacity=".6"/>
+    <path d="M332 664h-54v-40h54M636 664h54v-40h-54" fill="url(#ds-stone)" stroke="#6f5a3e" stroke-width="5"/>
+    <path d="M356 512c44-38 84-38 128 0M500 544c40-30 76-30 112 0" fill="none" stroke="#8f7752" stroke-width="10" opacity=".5"/>
+  </g>
+
+  <!-- camp and caravan tracks -->
+  <g filter="url(#ds-shadow)" transform="translate(720 760)">
+    <path d="M-96 52l96-116 96 116z" fill="#8a5b3c" stroke="#5b3823" stroke-width="6"/>
+    <path d="M0-64v116" stroke="#c99a6b" stroke-width="5"/>
+    <path d="M-96 52h192" stroke="#5b3823" stroke-width="6"/>
+    <circle cx="148" cy="34" r="18" fill="#3f2c1a"/>
+    <circle cx="184" cy="22" r="12" fill="#3f2c1a"/>
+    <path d="M132 58l-24 38M166 52l-10 46" stroke="#4f3720" stroke-width="5" stroke-linecap="round"/>
+  </g>
+  <g fill="none" stroke="#9c7a49" stroke-width="5" opacity=".5">
+    <path d="M80 880c80-30 160-30 240 0s160 30 240 0"/>
+    <path d="M80 916c80-30 160-30 240 0s160 30 240 0"/>
+  </g>
+
+  <!-- rocks and bones -->
+  <g fill="#8a744f" stroke="#6b5637" stroke-width="5" filter="url(#ds-shadow)">
+    <path d="M112 540l44-40 54 18 18 46-40 34-58-10z"/>
+    <path d="M1368 300l38-30 46 16 12 40-34 28-48-8z"/>
+    <path d="M760 210l30-22 36 14 8 30-28 22-38-8z"/>
+  </g>
+  <g stroke="#e2d2ae" stroke-width="8" stroke-linecap="round" opacity=".8">
+    <path d="M1240 420l44 18M1240 420l-6-28M1284 438l8 26"/>
+    <path d="M360 916l40 12M360 916l-4-24M400 928l6 22"/>
+  </g>
+
+  <rect width="1536" height="1024" filter="url(#ds-grain)" opacity=".55"/>
+  <rect width="1536" height="1024" fill="url(#ds-vignette)"/>
+</svg>
