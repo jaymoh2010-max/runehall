@@ -418,7 +418,11 @@ Acceptance: a GM can prepare a full session in Runehall and start it with one �
   - Readied state expires automatically when that combatant's next turn begins.
   - Tied entries use Perception as the default tie break and can still be reordered manually.
   - Remaining: ready-trigger text/conditions and full PF2e Perception tie automation.
-- [ ] Decide the token HP ↔ sheet HP source of truth, or make sync explicitly two-way.
+- [x] **Token HP ↔ sheet HP source of truth**
+  - Current HP is explicitly two-way: token damage/healing updates the linked character's `play.hp` and summary, and saving the sheet updates every linked token.
+  - Max HP is owned by the character sheet; linked token max HP is read-only in the token editor and panel.
+  - Unlinked monster and NPC tokens keep their own editable max HP.
+  - Covered by the two-socket smoke test.
 - [x] **Walls, doors, and line-of-sight fog**
   - The GM can draw grid-snapped walls and doors, click a door to open or close it, right-click a wall to delete it, and clear all walls.
   - Walls and closed doors block sight; open doors do not.

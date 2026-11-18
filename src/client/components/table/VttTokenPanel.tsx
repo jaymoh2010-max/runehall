@@ -366,10 +366,14 @@ export function VttTokenPanel({
                     }
                   />
                 </Field>
-                <Field label="HP max">
+                <Field
+                  label="HP max"
+                  hint={selectedToken.characterId ? "From the linked character sheet" : undefined}
+                >
                   <Input
                     type="number"
                     value={selectedToken.hpMax ?? ""}
+                    disabled={Boolean(selectedToken.characterId)}
                     onChange={(event) =>
                       setTokens((current) =>
                         current.map((token) =>

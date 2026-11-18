@@ -254,12 +254,20 @@ export function TokenEditModal({
                 </button>
               </div>
             </Field>
-            <Field label="Max HP">
+            <Field
+              label="Max HP"
+              hint={
+                token.characterId
+                  ? "Set on the linked character sheet; the token max HP follows it."
+                  : undefined
+              }
+            >
               <Input
                 value={hpMax}
                 onChange={(event) => setHpMax(event.target.value)}
                 placeholder="—"
                 inputMode="numeric"
+                disabled={Boolean(token.characterId)}
               />
             </Field>
             <Field label="Armor class">

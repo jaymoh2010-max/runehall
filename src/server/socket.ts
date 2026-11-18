@@ -608,8 +608,11 @@ export function registerSocketServer(io: TypedServer): void {
           add("vision_mode", normalizeTokenVisionMode(token.visionMode));
         }
         if (token.color !== undefined) add("color", safeString(token.color, row.color, 30));
-        if (token.hpMax !== undefined)
+        // Linked characters own max HP. Token-level max HP is only editable for
+        // unlinked NPC/monster tokens so the sheet cannot silently drift.
+        if (token.hpMax !== undefined && !row.character_id) {
           add("hp_max", token.hpMax === null ? null : safeInt(token.hpMax, 0, 0, 1_000_000));
+        }
         if (token.ac !== undefined)
           add("ac", token.ac === null ? null : safeInt(token.ac, 0, -100, 1000));
         if (token.initiativeBonus !== undefined) {

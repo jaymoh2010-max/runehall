@@ -1179,6 +1179,56 @@ async function main() {
     throw new Error("Token vision/light settings were not saved");
   }
 
+  const hpTable = await api(`/api/campaigns/${campaign.id}/table`, { cookie: gmCookie });
+  const linkedToken = hpTable.payload.tokens.find((entry) => entry.id === token.id);
+  const linkedCharacter = hpTable.payload.characters.find((entry) => entry.id === character.id);
+  if (!linkedToken || linkedToken.hpMax === null || !linkedCharacter?.summary) {
+    throw new Error("Linked token or character summary missing for HP sync");
+  }
+  const targetHp = Math.max(0, linkedToken.hpMax - 1);
+  const hpUpdate = waitForEvent(
+    gmSocket,
+    "character:updated",
+    (payload) => payload.characterId === character.id && payload.summary.currentHp === targetHp
+  );
+  playerSocket.emit("token:update", {
+    campaignId: campaign.id,
+    token: { id: token.id, hpCurrent: targetHp },
+  });
+  await hpUpdate;
+  const hpCharacter = await api(`/api/characters/${character.id}`, { cookie: playerCookie });
+  if (
+    hpCharacter.payload.character.data.play.hp !== targetHp ||
+    hpCharacter.payload.character.summary.currentHp !== targetHp
+  ) {
+    throw new Error("Token HP did not write back to the linked character sheet");
+  }
+
+  gmSocket.emit("token:update", {
+    campaignId: campaign.id,
+    token: { id: token.id, hpMax: linkedToken.hpMax + 97 },
+  });
+  await delay(200);
+  const maxTable = await api(`/api/campaigns/${campaign.id}/table`, { cookie: gmCookie });
+  const maxToken = maxTable.payload.tokens.find((entry) => entry.id === token.id);
+  if (!maxToken || maxToken.hpMax !== linkedToken.hpMax) {
+    throw new Error("Max HP on a linked token ignored the character sheet");
+  }
+
+  const healedDraft = JSON.parse(JSON.stringify(hpCharacter.payload.character.data));
+  healedDraft.play.hp = linkedToken.hpMax;
+  await api(`/api/characters/${character.id}`, {
+    method: "PUT",
+    cookie: playerCookie,
+    body: { data: healedDraft, force: true },
+  });
+  const healedTable = await api(`/api/campaigns/${campaign.id}/table`, { cookie: gmCookie });
+  const healedToken = healedTable.payload.tokens.find((entry) => entry.id === token.id);
+  if (!healedToken || healedToken.hpCurrent !== linkedToken.hpMax) {
+    throw new Error("Sheet save did not update the linked token HP");
+  }
+  log("token HP writes back to the sheet, sheet saves update tokens, and max HP is sheet-owned");
+
   const detourPromise = waitForEvent(
     gmSocket,
     "token:moved",
