@@ -26,6 +26,7 @@ import { findPathAroundProps } from "../../../shared/pathfinding";
 import { blockingWallForMove, nearestWall } from "../../../shared/walls";
 import { computeVision } from "../../../shared/vision";
 import { lightColorRgba } from "../../../shared/lighting";
+import { evaluateCover } from "../../../shared/cover";
 import { loadExplored, saveExplored } from "./explored";
 import { Tag } from "../ui";
 import { HoverCard } from "../HoverCard";
@@ -203,15 +204,19 @@ export function SceneCanvas({
     for (const character of characters) map.set(character.id, character);
     return map;
   }, [characters]);
+  const tokenLights = useMemo(
+    () =>
+      tokens
+        .filter((token) => !token.hidden && (token.lightRadius ?? 0) > 0)
+        .map((token) => ({
+          x: token.x,
+          y: token.y,
+          radius: ((token.lightRadius ?? 0) / 5) * scene.gridSize,
+        })),
+    [tokens, scene.gridSize]
+  );
   const vision = useMemo(() => {
     if (isGm || !scene.fogEnabled || !scene.losEnabled) return null;
-    const lights = tokens
-      .filter((token) => !token.hidden && (token.lightRadius ?? 0) > 0)
-      .map((token) => ({
-        x: token.x,
-        y: token.y,
-        radius: ((token.lightRadius ?? 0) / 5) * scene.gridSize,
-      }));
     const perPlayer = scene.visionScope === "per-player" && !previewMode;
     const origins = tokens
       .filter((token) => !token.hidden && (token.visionRadius ?? 60) > 0)
@@ -228,7 +233,7 @@ export function SceneCanvas({
       }));
     return computeVision(scene, scene.walls, origins, {
       ambientLight: scene.ambientLight ?? "bright",
-      lights,
+      lights: tokenLights,
     });
   }, [
     isGm,
@@ -245,6 +250,7 @@ export function SceneCanvas({
     scene.gridOffsetY,
     scene.walls,
     tokens,
+    tokenLights,
   ]);
 
   useEffect(() => {
@@ -1014,6 +1020,9 @@ export function SceneCanvas({
     templateDraft && templateKind
       ? { kind: templateKind, size: templateSize, ...templateDraft }
       : null;
+  const coverObserver = selectedTokenId
+    ? (tokens.find((token) => token.id === selectedTokenId) ?? null)
+    : null;
   const activePath = dragging ? (dragging.paths[dragging.tokenId] ?? null) : null;
   const activePathEnd = activePath?.points[activePath.points.length - 1] ?? null;
   const activePathLabel = activePath
@@ -1111,12 +1120,28 @@ export function SceneCanvas({
               ].join("")
             )
             .join(", ");
+          const cover =
+            coverObserver && coverObserver.id !== token.id
+              ? evaluateCover({
+                  attacker: coverObserver,
+                  target: token,
+                  walls: scene.walls,
+                  props: (scene.props ?? []).filter((prop) => isGm || prop.visible),
+                  ambientLight: scene.ambientLight ?? "bright",
+                  lights: tokenLights,
+                })
+              : null;
+          const coverSummary =
+            cover && (cover.cover !== "none" || cover.concealment !== "none")
+              ? `${cover.summary} vs. ${coverObserver?.name ?? "observer"}`
+              : null;
           const tokenMeta = [
             token.hpMax !== null && token.hpCurrent !== null
               ? `HP ${token.hpCurrent}/${token.hpMax}`
               : "",
             token.ac !== null ? `AC ${token.ac}` : "",
             conditions ? `Conditions: ${conditions}` : "",
+            coverSummary ?? "",
           ].filter(Boolean);
           return (
             <HoverCard
