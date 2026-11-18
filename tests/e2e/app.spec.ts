@@ -309,6 +309,12 @@ test("GM places a token, chats, rolls, and opens the scenes manager", async ({ p
   }
   await expect(page.locator(".scene-prop")).toHaveCount(1);
   await expect(page.locator(".scene-prop img").first()).toHaveJSProperty("naturalWidth", 200);
+  const collisionToggle = propPalette.getByRole("switch", { name: /Prop collision/ });
+  await expect(collisionToggle).toBeVisible();
+  await collisionToggle.click();
+  await expect(page.getByText("Prop collision enabled.")).toBeVisible();
+  await collisionToggle.click();
+  await expect(page.getByText("Prop collision disabled.")).toBeVisible();
   await page.getByRole("button", { name: "Props", exact: true }).click();
 
   await page.getByPlaceholder(/Message the table/).fill("E2E table hello");
@@ -348,6 +354,7 @@ test("GM places a token, chats, rolls, and opens the scenes manager", async ({ p
   await expect(sceneEditor.getByText("Line-of-sight fog")).toBeVisible();
   await expect(sceneEditor.getByText("Ambient light")).toBeVisible();
   await expect(sceneEditor.getByText("Vision scope")).toBeVisible();
+  await expect(sceneEditor.getByText("Prop collision")).toBeVisible();
   await expect(sceneEditor.getByLabel("Squares in calibration drag")).toHaveValue("4");
   await expect(sceneEditor.getByLabel("Scale map percent")).toHaveValue("100");
 

@@ -356,6 +356,31 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
     setBestiaryOpen(false);
   }, []);
 
+  const setPropCollision = async (enabled: boolean) => {
+    if (!activeScene || !isGm) return;
+    const sceneId = activeScene.id;
+    setScenes((current) =>
+      current.map((scene) => (scene.id === sceneId ? { ...scene, propCollision: enabled } : scene))
+    );
+    try {
+      const result = await api<{ scene: Scene }>(`/api/scenes/${sceneId}`, {
+        method: "PATCH",
+        body: { propCollision: enabled },
+      });
+      setScenes((current) =>
+        current.map((scene) => (scene.id === result.scene.id ? result.scene : scene))
+      );
+      toast(`Prop collision ${enabled ? "enabled" : "disabled"}.`, "success");
+    } catch (error) {
+      setScenes((current) =>
+        current.map((scene) =>
+          scene.id === sceneId ? { ...scene, propCollision: !enabled } : scene
+        )
+      );
+      toast(errorMessage(error), "error");
+    }
+  };
+
   const createToken = (partial: Partial<Token>) => {
     if (!activeSceneId) return;
     getSocket().emit(
@@ -1003,6 +1028,7 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
               pendingProp={pendingProp}
               layer={propLayer}
               setLayer={setPropLayer}
+              onSetCollision={(enabled) => void setPropCollision(enabled)}
               onPick={(preset) => {
                 setPendingProp(preset);
                 setSelectedPropId(null);

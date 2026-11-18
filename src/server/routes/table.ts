@@ -206,8 +206,8 @@ export async function registerTableRoutes(app: FastifyInstance): Promise<void> {
     const ts = now();
     const name = `${source.name} (copy)`.slice(0, 80);
     db.prepare(
-      `INSERT INTO scenes (id, campaign_id, name, image_url, thumbnail_url, width, height, grid_size, grid_offset_x, grid_offset_y, fog_enabled, fog_revealed, templates, walls, los_enabled, ambient_light, vision_scope, props, sort_order, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO scenes (id, campaign_id, name, image_url, thumbnail_url, width, height, grid_size, grid_offset_x, grid_offset_y, fog_enabled, fog_revealed, templates, walls, los_enabled, ambient_light, vision_scope, props, prop_collision, sort_order, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       sceneId,
       source.campaign_id,
@@ -227,6 +227,7 @@ export async function registerTableRoutes(app: FastifyInstance): Promise<void> {
       source.ambient_light,
       source.vision_scope,
       source.props,
+      source.prop_collision,
       order.next,
       ts,
       ts
@@ -325,8 +326,10 @@ export async function registerTableRoutes(app: FastifyInstance): Promise<void> {
       body.visionScope === undefined
         ? normalizePartyVisionScope(row.vision_scope)
         : normalizePartyVisionScope(body.visionScope);
+    const propCollision =
+      body.propCollision === undefined ? row.prop_collision : body.propCollision ? 1 : 0;
     db.prepare(
-      `UPDATE scenes SET name = ?, image_url = ?, thumbnail_url = ?, width = ?, height = ?, grid_size = ?, grid_offset_x = ?, grid_offset_y = ?, fog_enabled = ?, los_enabled = ?, ambient_light = ?, vision_scope = ?, updated_at = ? WHERE id = ?`
+      `UPDATE scenes SET name = ?, image_url = ?, thumbnail_url = ?, width = ?, height = ?, grid_size = ?, grid_offset_x = ?, grid_offset_y = ?, fog_enabled = ?, los_enabled = ?, ambient_light = ?, vision_scope = ?, prop_collision = ?, updated_at = ? WHERE id = ?`
     ).run(
       name,
       imageUrl,
@@ -340,6 +343,7 @@ export async function registerTableRoutes(app: FastifyInstance): Promise<void> {
       losEnabled,
       ambientLight,
       visionScope,
+      propCollision,
       now(),
       id
     );

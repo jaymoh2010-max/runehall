@@ -440,8 +440,10 @@ Acceptance: a GM can prepare a full session in Runehall and start it with one â€
   - Props can use a **ground** layer under tokens or an **overhead** layer above tokens but below fog.
   - Built-in prop categories cover furniture, nature, dungeon pieces, and camp equipment.
   - Custom prop images upload through the campaign asset library and count as used assets.
+  - A single GM-controlled **Prop collision** switch turns collision on for every prop or off for purely decorative scenes.
+  - When enabled, straight-line token movement is blocked by props; tokens already overlapping a prop can move out. There is no pathfinding, so the GM should drag around large obstacles in steps.
   - Prop data is persisted per scene, copied on duplication, exported/imported with campaigns, and broadcast to connected clients.
-  - Covered by prop normalization tests, a two-socket smoke check, and a browser placement flow.
+  - Covered by prop normalization and collision tests, a two-socket smoke check, and a browser placement/collision-toggle flow.
 
 **Acceptance:** a complete combat with an AoE template, condition values, multiple selected tokens, and a filtered log needs no other tool.
 

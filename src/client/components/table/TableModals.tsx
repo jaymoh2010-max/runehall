@@ -923,6 +923,7 @@ export function SceneEditModal({
   const [losEnabled, setLosEnabled] = useState(false);
   const [ambientLight, setAmbientLight] = useState<AmbientLight>("bright");
   const [visionScope, setVisionScope] = useState<PartyVisionScope>("shared");
+  const [propCollision, setPropCollision] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [dimensions, setDimensions] = useState({ width: 1600, height: 1000 });
@@ -943,6 +944,7 @@ export function SceneEditModal({
     setLosEnabled(Boolean(scene.losEnabled));
     setAmbientLight(scene.ambientLight ?? "bright");
     setVisionScope(scene.visionScope ?? "shared");
+    setPropCollision(Boolean(scene.propCollision));
     setFile(null);
     setPreview(null);
     setDimensions({ width: scene.width, height: scene.height });
@@ -1079,6 +1081,7 @@ export function SceneEditModal({
           losEnabled,
           ambientLight,
           visionScope,
+          propCollision,
           imageUrl,
           thumbnailUrl,
           width: dimensions.width,
@@ -1294,6 +1297,16 @@ export function SceneEditModal({
                 </option>
               ))}
             </Select>
+          </Field>
+          <Field
+            label="Prop collision"
+            hint="On: every prop blocks token movement. Off: props are purely decorative."
+          >
+            <Toggle
+              checked={propCollision}
+              onChange={setPropCollision}
+              label={propCollision ? "All props block" : "Off"}
+            />
           </Field>
           <Field label="Grid offset X">
             <Input

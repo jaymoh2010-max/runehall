@@ -453,4 +453,11 @@ export const migrations: Migration[] = [
       ALTER TABLE scenes ADD COLUMN props TEXT NOT NULL DEFAULT '[]';
     `,
   },
+  {
+    version: 22,
+    name: "scene_prop_collision",
+    sql: `
+      ALTER TABLE scenes ADD COLUMN prop_collision INTEGER NOT NULL DEFAULT 0;
+    `,
+  },
 ];

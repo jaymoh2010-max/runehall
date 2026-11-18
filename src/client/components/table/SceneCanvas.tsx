@@ -21,6 +21,7 @@ import type {
 } from "../../../shared/types";
 import type { PropPreset } from "../../../shared/props";
 import { measureGridDistance } from "../../../shared/measurement";
+import { blockingPropForMove } from "../../../shared/collision";
 import { nearestWall } from "../../../shared/walls";
 import { computeVision } from "../../../shared/vision";
 import { loadExplored, saveExplored } from "./explored";
@@ -774,6 +775,25 @@ export function SceneCanvas({
         x: Math.max(memberHalf, Math.min(scene.width - memberHalf, member.x + dx)),
         y: Math.max(memberHalf, Math.min(scene.height - memberHalf, member.y + dy)),
       };
+    }
+    const props = scene.props ?? [];
+    if (scene.propCollision) {
+      for (const member of members) {
+        const target = positions[member.id];
+        if (
+          target &&
+          blockingPropForMove(
+            props,
+            member,
+            { x: member.x, y: member.y },
+            target,
+            scene.gridSize,
+            true
+          )
+        ) {
+          return;
+        }
+      }
     }
     setDragging({ tokenId: token.id, positions });
   };

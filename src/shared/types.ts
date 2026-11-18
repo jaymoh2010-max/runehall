@@ -1028,6 +1028,8 @@ export interface Scene {
   visionScope: PartyVisionScope;
   /** Decorative ground and overhead props placed by the GM. */
   props: SceneProp[];
+  /** When enabled, every prop on the scene blocks token movement. */
+  propCollision: boolean;
   sortOrder: number;
   createdAt: number;
   updatedAt: number;

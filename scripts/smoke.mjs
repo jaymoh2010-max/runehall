@@ -1081,7 +1081,12 @@ async function main() {
   await api(`/api/scenes/${scene.id}`, {
     method: "PATCH",
     cookie: gmCookie,
-    body: { losEnabled: true, ambientLight: "darkness", visionScope: "per-player" },
+    body: {
+      losEnabled: true,
+      ambientLight: "darkness",
+      visionScope: "per-player",
+      propCollision: true,
+    },
   });
   playerSocket.emit("scene:walls", {
     campaignId: campaign.id,
@@ -1095,20 +1100,21 @@ async function main() {
     !wallsScene?.losEnabled ||
     wallsScene.walls?.length !== 1 ||
     wallsScene.ambientLight !== "darkness" ||
-    wallsScene.visionScope !== "per-player"
+    wallsScene.visionScope !== "per-player" ||
+    wallsScene.propCollision !== true
   ) {
-    throw new Error("Wall persistence or lighting/vision settings were not saved");
+    throw new Error("Wall persistence or lighting/vision/collision settings were not saved");
   }
-  log("GM walls persist, players cannot replace them, and lighting/vision settings are saved");
+  log("GM walls persist, players cannot replace them, and scene settings are saved");
 
   const smokeProp = {
     id: "prop_smoke",
     name: "Crate",
     imageUrl: "/props/crate.svg",
-    x: 120,
-    y: 120,
-    width: 64,
-    height: 64,
+    x: 200,
+    y: 180,
+    width: 100,
+    height: 100,
     rotation: 0,
     layer: "ground",
     visible: true,
@@ -1140,11 +1146,17 @@ async function main() {
   }
   log("GM props persist and players cannot replace scene props");
 
-  const movedPromise = waitForEvent(
-    gmSocket,
-    "token:moved",
-    (event) => event.tokenId && event.x === 200 && event.y === 180
-  );
+  const duplicatedScene = await api(`/api/scenes/${scene.id}/duplicate`, {
+    method: "POST",
+    cookie: gmCookie,
+  });
+  if (
+    duplicatedScene.payload.scene.props?.length !== 1 ||
+    duplicatedScene.payload.scene.propCollision !== true
+  ) {
+    throw new Error("Scene duplication did not preserve props or prop collision");
+  }
+
   const token = await emitAck(gmSocket, "token:create", {
     campaignId: campaign.id,
     sceneId: scene.id,
@@ -1164,6 +1176,37 @@ async function main() {
   if (token.visionRadius !== 30 || token.lightRadius !== 20 || token.visionMode !== "darkvision") {
     throw new Error("Token vision/light settings were not saved");
   }
+
+  const blockedMove = waitForEvent(
+    gmSocket,
+    "token:moved",
+    (event) => event.tokenId === token.id && event.x === 100 && event.y === 100
+  );
+  playerSocket.emit("token:move", {
+    campaignId: campaign.id,
+    sceneId: scene.id,
+    tokenId: token.id,
+    x: 200,
+    y: 180,
+  });
+  await blockedMove;
+  const blockedTable = await api(`/api/campaigns/${campaign.id}/table`, { cookie: gmCookie });
+  const blockedToken = blockedTable.payload.tokens.find((entry) => entry.id === token.id);
+  if (!blockedToken || blockedToken.x !== 100 || blockedToken.y !== 100) {
+    throw new Error("Prop collision did not block token movement");
+  }
+  await api(`/api/scenes/${scene.id}`, {
+    method: "PATCH",
+    cookie: gmCookie,
+    body: { propCollision: false },
+  });
+  log("prop collision blocks movement until the GM turns it off");
+
+  const movedPromise = waitForEvent(
+    gmSocket,
+    "token:moved",
+    (event) => event.tokenId && event.x === 200 && event.y === 180
+  );
   const revisionPromise = waitForEvent(
     gmSocket,
     "campaign:revision",

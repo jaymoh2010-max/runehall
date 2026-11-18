@@ -19,6 +19,7 @@ export function PropPalette({
   pendingProp,
   layer,
   setLayer,
+  onSetCollision,
   onPick,
   onSelect,
   onUpdate,
@@ -32,6 +33,7 @@ export function PropPalette({
   pendingProp: PropPreset | null;
   layer: ScenePropLayer;
   setLayer: (layer: ScenePropLayer) => void;
+  onSetCollision: (enabled: boolean) => void;
   onPick: (preset: PropPreset) => void;
   onSelect: (propId: string | null) => void;
   onUpdate: (propId: string, patch: Partial<SceneProp>) => void;
@@ -110,6 +112,16 @@ export function PropPalette({
           <option value="ground">Ground — under tokens</option>
           <option value="overhead">Overhead — above tokens</option>
         </Select>
+      </Field>
+      <Field
+        label="Prop collision"
+        hint="On: every prop blocks token movement. Off: props are purely decorative."
+      >
+        <Toggle
+          checked={scene.propCollision}
+          onChange={onSetCollision}
+          label={scene.propCollision ? "All props block" : "Off"}
+        />
       </Field>
 
       <div className="prop-category-row">

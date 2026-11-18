@@ -9,6 +9,7 @@ import { rollFormula, validateFormula } from "../shared/dice";
 import { normalizeTokenConditions, tickTokenConditions } from "../shared/tokens";
 import { sortInitiativeEntries } from "../shared/initiative";
 import { applyGridMovement } from "../shared/movement";
+import { blockingPropForMove } from "../shared/collision";
 import { normalizeAoeTemplate, normalizeAoeTemplates } from "../shared/templates";
 import { normalizeWalls } from "../shared/walls";
 import { normalizeSceneProps } from "../shared/props";
@@ -444,6 +445,26 @@ export function registerSocketServer(io: TypedServer): void {
       }
       const nx = clamp(Number(x) || 0, 0, scene.width);
       const ny = clamp(Number(y) || 0, 0, scene.height);
+      if (scene.prop_collision) {
+        const blocked = blockingPropForMove(
+          normalizeSceneProps(parseJson(scene.props, [])),
+          { size: row.size },
+          { x: row.x, y: row.y },
+          { x: nx, y: ny },
+          scene.grid_size,
+          true
+        );
+        if (blocked) {
+          sendError(socket, `That path is blocked by ${blocked.name}.`);
+          io.to(room(campaignId)).emit("token:moved", {
+            tokenId,
+            sceneId,
+            x: row.x,
+            y: row.y,
+          });
+          return;
+        }
+      }
       const state = ensureState(campaignId);
       const entries = serializeInitiative(JSON.parse(state.initiative || "[]"));
       const active = entries[state.turn_index];
