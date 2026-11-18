@@ -559,6 +559,16 @@ export function CharacterSheetPage() {
   const fortune = draft.play;
   const xp = xpProgress(draft.play.xp, draft.level);
   const reviewIssues = derived.validation.filter((issue) => issue.severity === "error");
+  const sheetSections = [
+    { id: "sheet-abilities", label: "Abilities" },
+    { id: "sheet-defenses", label: "Defenses" },
+    { id: "sheet-skills", label: "Skills" },
+    { id: "sheet-attacks", label: "Attacks" },
+    ...(derived.spellDc !== null ? [{ id: "sheet-spells", label: "Spells" }] : []),
+    { id: "sheet-feats", label: "Feats" },
+    { id: "sheet-inventory", label: "Inventory" },
+    { id: "sheet-notes", label: "Notes" },
+  ];
 
   return (
     <div className="page sheet-page">
@@ -661,9 +671,17 @@ export function CharacterSheetPage() {
         </div>
       ) : null}
 
+      <nav className="sheet-jump" aria-label="Sheet sections">
+        {sheetSections.map((section) => (
+          <a key={section.id} href={`#${section.id}`}>
+            {section.label}
+          </a>
+        ))}
+      </nav>
+
       <div className="sheet-layout">
         <div className="sheet-main">
-          <Card className="sheet-section">
+          <Card className="sheet-section" id="sheet-abilities">
             <div className="sheet-section-head">
               <h2>Abilities</h2>
               <span className="tiny muted">Final scores at level {draft.level}</span>
@@ -680,7 +698,7 @@ export function CharacterSheetPage() {
             </div>
           </Card>
 
-          <Card className="sheet-section">
+          <Card className="sheet-section" id="sheet-defenses">
             <div className="sheet-section-head">
               <h2>Defenses</h2>
               <span className="tiny muted">Roll a save against an effect</span>
@@ -747,7 +765,7 @@ export function CharacterSheetPage() {
             ) : null}
           </Card>
 
-          <Card className="sheet-section">
+          <Card className="sheet-section" id="sheet-skills">
             <div className="sheet-section-head">
               <h2>Skills</h2>
               <span className="tiny muted">Click a skill to roll it</span>
@@ -790,7 +808,7 @@ export function CharacterSheetPage() {
             </div>
           </Card>
 
-          <Card className="sheet-section">
+          <Card className="sheet-section" id="sheet-attacks">
             <div className="sheet-section-head">
               <h2>Attacks</h2>
               <span className="tiny muted">Attack and damage</span>
@@ -842,7 +860,7 @@ export function CharacterSheetPage() {
           </Card>
 
           {derived.spellDc !== null ? (
-            <Card className="sheet-section">
+            <Card className="sheet-section" id="sheet-spells">
               <div className="sheet-section-head">
                 <h2>Spells</h2>
                 <span className="tiny muted">
@@ -952,7 +970,7 @@ export function CharacterSheetPage() {
             </Card>
           ) : null}
 
-          <Card className="sheet-section">
+          <Card className="sheet-section" id="sheet-feats">
             <div className="sheet-section-head">
               <h2>Feats &amp; features</h2>
               <span className="tiny muted">
@@ -1009,7 +1027,7 @@ export function CharacterSheetPage() {
             </div>
           </Card>
 
-          <Card className="sheet-section sheet-inventory">
+          <Card className="sheet-section sheet-inventory" id="sheet-inventory">
             <div className="sheet-section-head">
               <h2>Inventory &amp; purse</h2>
               <span className="tiny muted">
@@ -1220,7 +1238,7 @@ export function CharacterSheetPage() {
             </Card>
           ) : null}
 
-          <Card className="sheet-section">
+          <Card className="sheet-section" id="sheet-notes">
             <div className="sheet-section-head">
               <h2>Character notes</h2>
               <span className="tiny muted">Backstory, beliefs, and session notes</span>
@@ -1285,6 +1303,7 @@ export function CharacterSheetPage() {
                 <Button
                   size="sm"
                   variant="ghost"
+                  aria-label="Decrease hit points by 1"
                   onClick={() => applyDamage(1)}
                   disabled={!canEdit}
                 >
@@ -1292,6 +1311,7 @@ export function CharacterSheetPage() {
                 </Button>
                 <Input
                   type="number"
+                  aria-label="Current hit points"
                   value={draft.play.hp ?? derived.maxHp}
                   min={0}
                   max={derived.maxHp}
@@ -1303,6 +1323,7 @@ export function CharacterSheetPage() {
                 <Button
                   size="sm"
                   variant="ghost"
+                  aria-label="Increase hit points by 1"
                   onClick={() => applyHealing(1)}
                   disabled={!canEdit}
                 >
@@ -1374,6 +1395,8 @@ export function CharacterSheetPage() {
                       }
                       disabled={!canEdit}
                       title={`${index + 1} hero point${index ? "s" : ""}`}
+                      aria-label={`Set hero points to ${index + 1}`}
+                      aria-pressed={draft.play.heroPoints === index + 1}
                     />
                   ))}
                 </div>
@@ -1446,6 +1469,8 @@ export function CharacterSheetPage() {
                           }))
                         }
                         disabled={!canEdit}
+                        aria-label={`Set focus points to ${index + 1}`}
+                        aria-pressed={draft.play.focusPoints === index + 1}
                       />
                     ))}
                   </div>
@@ -1475,6 +1500,7 @@ export function CharacterSheetPage() {
                 <span>Shield raised</span>
                 <Toggle
                   checked={draft.play.shieldRaised}
+                  ariaLabel="Shield raised"
                   onChange={(value) =>
                     update((current) => ({
                       ...current,
@@ -1557,6 +1583,7 @@ export function CharacterSheetPage() {
                 <div className="condition-add">
                   <Select
                     value=""
+                    aria-label="Add a condition"
                     onChange={(event) => {
                       if (event.target.value) addCondition(event.target.value);
                     }}

@@ -34,6 +34,18 @@
   gap: 1px;
   min-width: 0;
 }
+.builder-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-height: 16px;
+}
+.builder-meta .badge {
+  padding: 1px 7px;
+  font-size: 0.62rem;
+  letter-spacing: 0.05em;
+}
 .builder-name-input {
   width: min(390px, 40vw);
   border: 0;
@@ -2047,6 +2059,49 @@
 .sheet-quick-stats .stat-value {
   font-size: 1.05rem;
 }
+.sheet-jump {
+  position: sticky;
+  top: var(--topbar-h);
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  width: fit-content;
+  max-width: 100%;
+  margin-top: 14px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(10, 14, 21, 0.94);
+  backdrop-filter: blur(10px);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.sheet-jump::-webkit-scrollbar {
+  display: none;
+}
+.sheet-jump a {
+  flex: 0 0 auto;
+  border-radius: 999px;
+  padding: 5px 12px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.sheet-jump a:hover {
+  color: var(--gold-bright);
+  background: rgba(200, 169, 107, 0.08);
+  text-decoration: none;
+}
+.sheet-jump a:focus-visible {
+  outline: 2px solid var(--gold-deep);
+  outline-offset: 1px;
+}
+.sheet-section {
+  padding: 18px;
+  scroll-margin-top: calc(var(--topbar-h) + 52px);
+}
 .sheet-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 335px;
@@ -2059,9 +2114,6 @@
   flex-direction: column;
   gap: 12px;
   min-width: 0;
-}
-.sheet-section {
-  padding: 18px;
 }
 .sheet-section-head {
   display: flex;
@@ -2467,8 +2519,8 @@
   gap: 5px;
 }
 .point-pip {
-  width: 17px;
-  height: 17px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
   border: 1px solid #596678;
   background: #121822;
@@ -7048,6 +7100,28 @@
   background: #0c1119;
   padding: 3px;
   cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+.token-color-input:hover {
+  border-color: #3a485d;
+}
+.token-color-input:focus-visible {
+  outline: none;
+  border-color: var(--gold-deep);
+  box-shadow: 0 0 0 3px rgba(200, 169, 107, 0.1);
+}
+.token-color-input::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+.token-color-input::-webkit-color-swatch {
+  border: 0;
+  border-radius: calc(var(--radius-sm) - 2px);
+}
+.token-color-input::-moz-color-swatch {
+  border: 0;
+  border-radius: calc(var(--radius-sm) - 2px);
 }
 .token-edit-toggles {
   flex-direction: row;
@@ -7510,6 +7584,7 @@
   }
   .topbar,
   .sheet-topline,
+  .sheet-jump,
   .toast-stack,
   .btn,
   .icon-btn,

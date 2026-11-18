@@ -197,12 +197,14 @@ export function Toggle({
   checked,
   onChange,
   label,
+  ariaLabel,
   disabled,
   title,
 }: {
   checked: boolean;
   onChange: (value: boolean) => void;
   label?: ReactNode;
+  ariaLabel?: string;
   disabled?: boolean;
   title?: string;
 }) {
@@ -212,6 +214,7 @@ export function Toggle({
       className={`toggle ${checked ? "is-on" : ""}`}
       role="switch"
       aria-checked={checked}
+      aria-label={ariaLabel}
       onClick={() => !disabled && onChange(!checked)}
       disabled={disabled}
       title={title}
@@ -227,8 +230,20 @@ export function Toggle({
 // ---------------------------------------------------------------------------
 // Layout / display
 // ---------------------------------------------------------------------------
-export function Card({ children, className = "" }: { children: ReactNode; className?: string }) {
-  return <div className={`card ${className}`}>{children}</div>;
+export function Card({
+  children,
+  className = "",
+  id,
+}: {
+  children: ReactNode;
+  className?: string;
+  id?: string;
+}) {
+  return (
+    <div id={id} className={`card ${className}`}>
+      {children}
+    </div>
+  );
 }
 
 export function SectionTitle({

@@ -432,11 +432,12 @@ export function AddTokenModal({
               </Select>
             </Field>
             <Field label="Color">
-              <Input
+              <input
+                className="token-color-input"
                 type="color"
                 value={customColor}
+                aria-label="Token color"
                 onChange={(event) => setCustomColor(event.target.value)}
-                style={{ padding: 4, height: 42 }}
               />
             </Field>
           </div>

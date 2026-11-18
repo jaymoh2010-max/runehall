@@ -682,16 +682,18 @@ export function CharacterBuilderPage() {
               aria-label="Character name"
               maxLength={120}
             />
-            <span className="tiny muted">
-              {saveState === "saved"
-                ? "Saved"
-                : saveState === "saving"
-                  ? "Saving…"
-                  : saveState === "error"
-                    ? "Save failed"
-                    : "Unsaved changes"}
+            <span className="builder-meta">
+              <span className="tiny muted">
+                {saveState === "saved"
+                  ? "Saved"
+                  : saveState === "saving"
+                    ? "Saving…"
+                    : saveState === "error"
+                      ? "Save failed"
+                      : "Unsaved changes"}
+              </span>
+              {campaignRuleset ? <Badge tone="gold">{rulesetLabel(campaignRuleset)}</Badge> : null}
             </span>
-            {campaignRuleset ? <Badge tone="gold">{rulesetLabel(campaignRuleset)}</Badge> : null}
           </div>
         </div>
         <div className="builder-header-actions">

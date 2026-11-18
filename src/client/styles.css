@@ -514,6 +514,28 @@ hr {
   padding: 7px 9px;
   font-size: 0.88rem;
 }
+.input[type="date"],
+.input[type="datetime-local"],
+.input[type="time"],
+.input[type="month"],
+.input[type="week"] {
+  min-height: 40px;
+}
+.input[type="date"]::-webkit-calendar-picker-indicator,
+.input[type="datetime-local"]::-webkit-calendar-picker-indicator,
+.input[type="time"]::-webkit-calendar-picker-indicator,
+.input[type="month"]::-webkit-calendar-picker-indicator,
+.input[type="week"]::-webkit-calendar-picker-indicator {
+  opacity: 0.55;
+  cursor: pointer;
+}
+.input[type="date"]::-webkit-calendar-picker-indicator:hover,
+.input[type="datetime-local"]::-webkit-calendar-picker-indicator:hover,
+.input[type="time"]::-webkit-calendar-picker-indicator:hover,
+.input[type="month"]::-webkit-calendar-picker-indicator:hover,
+.input[type="week"]::-webkit-calendar-picker-indicator:hover {
+  opacity: 0.95;
+}
 
 .checkbox-row {
   display: flex;
