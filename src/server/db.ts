@@ -161,6 +161,7 @@ export interface SceneRow {
   los_enabled: number;
   ambient_light: string;
   vision_scope: string;
+  props: string;
   sort_order: number;
   created_at: number;
   updated_at: number;

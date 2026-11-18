@@ -446,4 +446,11 @@ export const migrations: Migration[] = [
       ALTER TABLE tokens ADD COLUMN vision_mode TEXT NOT NULL DEFAULT 'normal';
     `,
   },
+  {
+    version: 21,
+    name: "scene_props",
+    sql: `
+      ALTER TABLE scenes ADD COLUMN props TEXT NOT NULL DEFAULT '[]';
+    `,
+  },
 ];

@@ -51,12 +51,13 @@ function addUsage(usages: Map<string, string[]>, filename: string, label: string
 export function campaignAssetUsages(campaignId: string): Map<string, string[]> {
   const usages = new Map<string, string[]>();
   const scenes = db
-    .prepare("SELECT id, name, image_url, thumbnail_url FROM scenes WHERE campaign_id = ?")
+    .prepare("SELECT id, name, image_url, thumbnail_url, props FROM scenes WHERE campaign_id = ?")
     .all(campaignId) as {
     id: string;
     name: string;
     image_url: string | null;
     thumbnail_url: string | null;
+    props: string;
   }[];
   for (const scene of scenes) {
     for (const filename of uploadFilenames(scene.image_url)) {
@@ -64,6 +65,9 @@ export function campaignAssetUsages(campaignId: string): Map<string, string[]> {
     }
     for (const filename of uploadFilenames(scene.thumbnail_url)) {
       addUsage(usages, filename, `Scene thumbnail: ${scene.name}`);
+    }
+    for (const filename of uploadFilenames(scene.props)) {
+      addUsage(usages, filename, `Scene prop: ${scene.name}`);
     }
   }
   const tokens = db

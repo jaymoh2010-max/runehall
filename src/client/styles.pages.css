@@ -5987,6 +5987,161 @@
   background: rgba(10, 14, 20, 0.96);
   box-shadow: 0 14px 40px rgba(0, 0, 0, 0.45);
 }
+.vtt-prop-palette {
+  position: absolute;
+  left: 12px;
+  top: 12px;
+  bottom: 78px;
+  z-index: 8;
+  width: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 11px;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(10, 14, 20, 0.96);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.45);
+}
+.prop-category-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.prop-category-row button {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.68rem;
+  padding: 3px 8px;
+  cursor: pointer;
+}
+.prop-category-row button:hover {
+  border-color: #3d4c62;
+  color: var(--text-2);
+}
+.prop-category-row button.is-active {
+  border-color: var(--gold);
+  background: rgba(200, 169, 107, 0.08);
+  color: var(--gold-bright);
+}
+.prop-library-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+.prop-library-card {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 5px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.015);
+  color: var(--text-2);
+  text-align: left;
+  cursor: pointer;
+}
+.prop-library-card:hover {
+  border-color: #3d4c62;
+}
+.prop-library-card.is-picked {
+  border-color: var(--gold);
+  background: rgba(200, 169, 107, 0.08);
+  box-shadow: 0 0 0 1px rgba(200, 169, 107, 0.3);
+}
+.prop-library-card img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: contain;
+}
+.prop-library-card > span:nth-child(2) {
+  font-size: 0.7rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.prop-upload-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.prop-upload-row .tiny {
+  line-height: 1.25;
+}
+.prop-placement-hint {
+  margin: 0;
+  padding: 6px 8px;
+  border: 1px solid rgba(200, 169, 107, 0.3);
+  border-radius: 6px;
+  background: rgba(200, 169, 107, 0.06);
+  color: var(--gold-bright);
+  font-size: 0.75rem;
+}
+.prop-placed-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  border-top: 1px solid var(--line);
+  padding-top: 7px;
+}
+.prop-placed-list {
+  display: grid;
+  gap: 3px;
+  max-height: 170px;
+  overflow-y: auto;
+}
+.prop-placed-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-2);
+  text-align: left;
+  cursor: pointer;
+}
+.prop-placed-row:hover {
+  border-color: var(--line);
+  background: rgba(255, 255, 255, 0.03);
+}
+.prop-placed-row.is-selected {
+  border-color: rgba(200, 169, 107, 0.5);
+  background: rgba(200, 169, 107, 0.07);
+}
+.prop-placed-row img {
+  width: 30px;
+  height: 30px;
+  object-fit: contain;
+}
+.prop-placed-row .grow {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.prop-placed-row strong {
+  font-size: 0.75rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.prop-editor {
+  display: grid;
+  gap: 7px;
+  border-top: 1px solid var(--line);
+  padding-top: 8px;
+}
+.prop-editor .form-grid {
+  gap: 6px;
+}
+.prop-editor .field {
+  margin: 0;
+}
 .vtt-bestiary-head {
   display: flex;
   align-items: flex-start;
@@ -6122,6 +6277,49 @@
     linear-gradient(to bottom, rgba(235, 225, 195, 0.12) 1px, transparent 1px);
   opacity: 0.7;
   z-index: 2;
+}
+.scene-prop-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.scene-prop-layer.ground {
+  z-index: 1;
+}
+.scene-prop-layer.overhead {
+  z-index: 4;
+}
+.scene-prop {
+  position: absolute;
+  pointer-events: none;
+  transform-origin: center;
+}
+.scene-prop img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+}
+.scene-viewport.is-propping .scene-prop {
+  pointer-events: auto;
+  cursor: grab;
+}
+.scene-viewport.is-propping .scene-prop.is-locked {
+  cursor: default;
+}
+.scene-viewport.is-propping .scene-prop.is-selected {
+  outline: 2px dashed var(--gold-bright);
+  outline-offset: 3px;
+}
+.scene-prop.is-hidden {
+  opacity: 0.35;
+}
+.scene-viewport.is-propping {
+  cursor: default;
+}
+.scene-viewport.is-placing-prop {
+  cursor: crosshair;
 }
 .scene-token {
   position: absolute;

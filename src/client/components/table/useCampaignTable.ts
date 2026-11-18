@@ -229,6 +229,10 @@ export function useCampaignTable({ initial, campaignId, toast }: UseCampaignTabl
       setScenes((current) =>
         current.map((scene) => (scene.id === sceneId ? { ...scene, walls } : scene))
       );
+    const onSceneProps = ({ sceneId, props }: { sceneId: string; props: Scene["props"] }) =>
+      setScenes((current) =>
+        current.map((scene) => (scene.id === sceneId ? { ...scene, props } : scene))
+      );
     const onScenesReordered = (nextScenes: Scene[]) => setScenes(nextScenes);
     const onChatMessage = (message: ChatMessage) =>
       setMessages((current) => applyChatMessage(current, message));
@@ -281,6 +285,7 @@ export function useCampaignTable({ initial, campaignId, toast }: UseCampaignTabl
     socket.on("scene:deleted", onSceneDeleted);
     socket.on("scene:templates", onSceneTemplates);
     socket.on("scene:walls", onSceneWalls);
+    socket.on("scene:props", onSceneProps);
     socket.on("scenes:reordered", onScenesReordered);
     socket.on("chat:message", onChatMessage);
     socket.on("initiative:updated", onInitiativeUpdated);
@@ -307,6 +312,7 @@ export function useCampaignTable({ initial, campaignId, toast }: UseCampaignTabl
       socket.off("scene:deleted", onSceneDeleted);
       socket.off("scene:templates", onSceneTemplates);
       socket.off("scene:walls", onSceneWalls);
+      socket.off("scene:props", onSceneProps);
       socket.off("scenes:reordered", onScenesReordered);
       socket.off("chat:message", onChatMessage);
       socket.off("initiative:updated", onInitiativeUpdated);

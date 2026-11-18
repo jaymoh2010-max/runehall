@@ -1101,6 +1101,45 @@ async function main() {
   }
   log("GM walls persist, players cannot replace them, and lighting/vision settings are saved");
 
+  const smokeProp = {
+    id: "prop_smoke",
+    name: "Crate",
+    imageUrl: "/props/crate.svg",
+    x: 120,
+    y: 120,
+    width: 64,
+    height: 64,
+    rotation: 0,
+    layer: "ground",
+    visible: true,
+    locked: false,
+    z: 1,
+  };
+  const propsPromise = waitForEvent(
+    gmSocket,
+    "scene:props",
+    (payload) =>
+      payload.sceneId === scene.id && payload.props?.some((prop) => prop.id === "prop_smoke")
+  );
+  gmSocket.emit("scene:props", {
+    campaignId: campaign.id,
+    sceneId: scene.id,
+    props: [smokeProp],
+  });
+  await propsPromise;
+  playerSocket.emit("scene:props", {
+    campaignId: campaign.id,
+    sceneId: scene.id,
+    props: [],
+  });
+  await delay(200);
+  const propsTable = await api(`/api/campaigns/${campaign.id}/table`, { cookie: gmCookie });
+  const propsScene = propsTable.payload.scenes.find((entry) => entry.id === scene.id);
+  if (propsScene?.props?.length !== 1 || propsScene.props[0]?.id !== "prop_smoke") {
+    throw new Error("Scene prop persistence or player rejection failed");
+  }
+  log("GM props persist and players cannot replace scene props");
+
   const movedPromise = waitForEvent(
     gmSocket,
     "token:moved",

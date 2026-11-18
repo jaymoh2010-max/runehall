@@ -295,6 +295,22 @@ test("GM places a token, chats, rolls, and opens the scenes manager", async ({ p
   await expect(page.locator(".wall-layer .wall-line")).toHaveCount(1);
   await page.getByRole("button", { name: "Walls", exact: true }).click();
 
+  await page.getByRole("button", { name: "Props", exact: true }).click();
+  const propPalette = page.locator(".vtt-prop-palette");
+  await expect(propPalette).toBeVisible();
+  await propPalette.getByRole("button", { name: /Crate/ }).click();
+  const propSurfaceBox = await sceneSurface.boundingBox();
+  expect(propSurfaceBox).not.toBeNull();
+  if (propSurfaceBox) {
+    await page.mouse.click(
+      propSurfaceBox.x + propSurfaceBox.width * 0.7,
+      propSurfaceBox.y + propSurfaceBox.height * 0.3
+    );
+  }
+  await expect(page.locator(".scene-prop")).toHaveCount(1);
+  await expect(page.locator(".scene-prop img").first()).toHaveJSProperty("naturalWidth", 200);
+  await page.getByRole("button", { name: "Props", exact: true }).click();
+
   await page.getByPlaceholder(/Message the table/).fill("E2E table hello");
   await page.getByRole("button", { name: "Send" }).click();
   await expect(page.getByText("E2E table hello")).toBeVisible();

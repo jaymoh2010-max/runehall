@@ -26,6 +26,7 @@ import { normalizeLootItems } from "../shared/loot";
 import { normalizeJournalAttachments, normalizeJournalKind } from "../shared/journal";
 import { normalizeCampaignThreads } from "../shared/dashboard";
 import { normalizeWalls } from "../shared/walls";
+import { normalizeSceneProps } from "../shared/props";
 import {
   isSessionCheckinStatus,
   normalizeAttendanceStatus,
@@ -142,6 +143,7 @@ export function serializeScene(row: SceneRow): Scene {
     losEnabled: Boolean(row.los_enabled),
     ambientLight: normalizeAmbientLight(row.ambient_light),
     visionScope: normalizePartyVisionScope(row.vision_scope),
+    props: normalizeSceneProps(parseJson(row.props, [])),
     sortOrder: row.sort_order,
     createdAt: row.created_at,
     updatedAt: row.updated_at,

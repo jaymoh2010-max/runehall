@@ -19,6 +19,7 @@ import { normalizeLootItems } from "../shared/loot";
 import { normalizeTokenConditions } from "../shared/tokens";
 import { normalizeAoeTemplates } from "../shared/templates";
 import { normalizeWalls } from "../shared/walls";
+import { normalizeSceneProps } from "../shared/props";
 import {
   isSessionCheckinStatus,
   normalizeAttendanceStatus,
@@ -191,8 +192,8 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
       const sceneId = newId("scene");
       db.prepare(
         `INSERT INTO scenes
-          (id, campaign_id, name, image_url, thumbnail_url, width, height, grid_size, grid_offset_x, grid_offset_y, fog_enabled, fog_revealed, templates, walls, los_enabled, ambient_light, vision_scope, sort_order, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          (id, campaign_id, name, image_url, thumbnail_url, width, height, grid_size, grid_offset_x, grid_offset_y, fog_enabled, fog_revealed, templates, walls, los_enabled, ambient_light, vision_scope, props, sort_order, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).run(
         sceneId,
         campaignId,
@@ -217,6 +218,7 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
         scene.losEnabled === true ? 1 : 0,
         normalizeAmbientLight(scene.ambientLight),
         normalizePartyVisionScope(scene.visionScope),
+        JSON.stringify(normalizeSceneProps(scene.props)),
         numberValue(scene.sortOrder, sceneMap.size),
         ts,
         ts

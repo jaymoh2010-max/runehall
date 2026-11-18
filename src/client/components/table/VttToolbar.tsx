@@ -7,6 +7,7 @@ import {
   EyeOff,
   Grid3X3,
   Keyboard,
+  Layers,
   Map,
   Maximize2,
   MessageSquare,
@@ -40,6 +41,8 @@ export function VttToolbar({
   wallKind,
   setWallKind,
   onClearWalls,
+  propMode,
+  setPropMode,
   setAddTokenOpen,
   bestiaryOpen,
   setBestiaryOpen,
@@ -81,6 +84,8 @@ export function VttToolbar({
   wallKind: WallKind;
   setWallKind: (kind: WallKind) => void;
   onClearWalls: () => void;
+  propMode: boolean;
+  setPropMode: (value: boolean) => void;
   setAddTokenOpen: (open: boolean) => void;
   bestiaryOpen: boolean;
   setBestiaryOpen: (open: boolean | ((current: boolean) => boolean)) => void;
@@ -205,6 +210,16 @@ export function VttToolbar({
                 </Button>
               </>
             ) : null}
+            <Button
+              size="sm"
+              variant="ghost"
+              className={propMode ? "is-active" : ""}
+              icon={<Layers size={14} />}
+              onClick={() => setPropMode(!propMode)}
+              title="Place scene props (G)"
+            >
+              Props
+            </Button>
             <div className="toolbar-sep" />
             <Button
               size="sm"
@@ -337,7 +352,7 @@ export function VttToolbar({
           label="Keyboard shortcuts"
           onClick={() =>
             toast(
-              "Shortcuts: R reveal · H hide · M measure · W walls · A area · T token · E edit · I initiative · ←/→ turn · F full screen · C chat · P party · Esc clear",
+              "Shortcuts: R reveal · H hide · M measure · W walls · G props · A area · T token · E edit · I initiative · ←/→ turn · F full screen · C chat · P party · Esc clear",
               "info"
             )
           }

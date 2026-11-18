@@ -29,10 +29,13 @@ import type {
   Monster,
   PublicUser,
   Scene,
+  SceneProp,
+  ScenePropLayer,
   Token,
   Wall,
   WallKind,
 } from "../../../shared/types";
+import type { PropPreset } from "../../../shared/props";
 import { errorMessage, useToasts } from "../../stores";
 import { api } from "../../api";
 import { getSocket } from "../../socket";
@@ -59,6 +62,7 @@ import { AddTokenModal, SceneEditModal, SceneManagerModal } from "./TableModals"
 import { VttToolbar } from "./VttToolbar";
 import { VttTokenPanel } from "./VttTokenPanel";
 import { BestiaryPalette } from "./BestiaryPalette";
+import { PropPalette } from "./PropPalette";
 import { useCampaignTable } from "./useCampaignTable";
 import type { AoeTemplate, TemplateKind } from "../../../shared/templates";
 
@@ -98,6 +102,11 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
   const [measureMode, setMeasureMode] = useState(false);
   const [wallMode, setWallMode] = useState(false);
   const [wallKind, setWallKind] = useState<WallKind>("wall");
+  const [propMode, setPropMode] = useState(false);
+  const [propPaletteOpen, setPropPaletteOpen] = useState(false);
+  const [propLayer, setPropLayer] = useState<ScenePropLayer>("ground");
+  const [pendingProp, setPendingProp] = useState<PropPreset | null>(null);
+  const [selectedPropId, setSelectedPropId] = useState<string | null>(null);
   const [sceneManagerOpen, setSceneManagerOpen] = useState(false);
   const [editingScene, setEditingScene] = useState<Scene | null>(null);
   const [addTokenOpen, setAddTokenOpen] = useState(false);
@@ -154,6 +163,11 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
   );
   const selectedToken = sceneTokens.find((token) => token.id === selectedTokenId) ?? null;
   const editingToken = tokens.find((token) => token.id === editingTokenId) ?? null;
+
+  useEffect(() => {
+    setSelectedPropId(null);
+    setPendingProp(null);
+  }, [activeSceneId, previewSceneId]);
 
   useEffect(() => {
     setPreviewSceneId(null);
@@ -270,13 +284,77 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
     saveWalls([]);
   };
 
-  const enterWallMode = (next: boolean) => {
+  const enterWallMode = useCallback((next: boolean) => {
     setWallMode(next);
+    setPropMode(false);
+    setPropPaletteOpen(false);
+    setPendingProp(null);
+    setSelectedPropId(null);
     if (!next) return;
     setFogBrush(null);
     setMeasureMode(false);
     setTemplateKind(null);
+  }, []);
+
+  const saveProps = (props: SceneProp[]) => {
+    if (!isGm || !activeSceneId) return;
+    setScenes((current) =>
+      current.map((scene) => (scene.id === activeSceneId ? { ...scene, props } : scene))
+    );
+    getSocket().emit("scene:props", { campaignId, sceneId: activeSceneId, props });
   };
+
+  const placeProp = (x: number, y: number) => {
+    if (!activeScene || !pendingProp) return;
+    const width = Math.max(8, pendingProp.squaresW * activeScene.gridSize);
+    const height = Math.max(8, pendingProp.squaresH * activeScene.gridSize);
+    const z = Math.max(0, ...(activeScene.props ?? []).map((prop) => prop.z)) + 1;
+    const prop: SceneProp = {
+      id: `prop_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`,
+      name: pendingProp.name,
+      imageUrl: pendingProp.imageUrl,
+      x,
+      y,
+      width,
+      height,
+      rotation: 0,
+      layer: propLayer,
+      visible: true,
+      locked: false,
+      z,
+    };
+    saveProps([...(activeScene.props ?? []), prop]);
+    setSelectedPropId(prop.id);
+    setPendingProp(null);
+  };
+
+  const updateProp = (propId: string, patch: Partial<SceneProp>) => {
+    if (!activeScene) return;
+    saveProps(
+      (activeScene.props ?? []).map((prop) => (prop.id === propId ? { ...prop, ...patch } : prop))
+    );
+  };
+
+  const deleteProp = (propId: string) => {
+    if (!activeScene) return;
+    saveProps((activeScene.props ?? []).filter((prop) => prop.id !== propId));
+    setSelectedPropId((current) => (current === propId ? null : current));
+  };
+
+  const enterPropMode = useCallback((next: boolean) => {
+    setPropMode(next);
+    setPropPaletteOpen(next);
+    if (!next) {
+      setPendingProp(null);
+      setSelectedPropId(null);
+      return;
+    }
+    setWallMode(false);
+    setFogBrush(null);
+    setMeasureMode(false);
+    setTemplateKind(null);
+    setBestiaryOpen(false);
+  }, []);
 
   const createToken = (partial: Partial<Token>) => {
     if (!activeSceneId) return;
@@ -578,6 +656,10 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
         setFogBrush(null);
         setMeasureMode(false);
         setWallMode(false);
+        setPropMode(false);
+        setPropPaletteOpen(false);
+        setPendingProp(null);
+        setSelectedPropId(null);
         setSelectedTokenId(null);
         setTheaterMode(false);
         setTemplateKind(null);
@@ -593,6 +675,8 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
         setMeasureMode((current) => !current);
         setFogBrush(null);
         setWallMode(false);
+        setPropMode(false);
+        setPropPaletteOpen(false);
         return;
       }
       if (key === "a" && isGm) {
@@ -601,6 +685,8 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
         setFogBrush(null);
         setMeasureMode(false);
         setWallMode(false);
+        setPropMode(false);
+        setPropPaletteOpen(false);
         return;
       }
       if (key === "c") {
@@ -620,6 +706,8 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
         setFogBrush((current) => (current === "reveal" ? null : "reveal"));
         setMeasureMode(false);
         setWallMode(false);
+        setPropMode(false);
+        setPropPaletteOpen(false);
         return;
       }
       if (key === "h" && activeScene?.fogEnabled) {
@@ -627,14 +715,18 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
         setFogBrush((current) => (current === "hide" ? null : "hide"));
         setMeasureMode(false);
         setWallMode(false);
+        setPropMode(false);
+        setPropPaletteOpen(false);
         return;
       }
       if (key === "w") {
         event.preventDefault();
-        setWallMode((current) => !current);
-        setFogBrush(null);
-        setMeasureMode(false);
-        setTemplateKind(null);
+        enterWallMode(!wallMode);
+        return;
+      }
+      if (key === "g") {
+        event.preventDefault();
+        enterPropMode(!propMode);
         return;
       }
       if (key === "t") {
@@ -668,10 +760,14 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
     activeScene?.fogEnabled,
     activeSceneId,
     campaignId,
+    enterPropMode,
+    enterWallMode,
     initiative.length,
     isGm,
+    propMode,
     selectedTokenId,
     toggleFullscreen,
+    wallMode,
   ]);
 
   const expanded = isFullscreen || theaterMode;
@@ -742,6 +838,10 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
         fogBrush={fogBrush}
         setFogBrush={(next) => {
           setWallMode(false);
+          setPropMode(false);
+          setPropPaletteOpen(false);
+          setPendingProp(null);
+          setSelectedPropId(null);
           setFogBrush(next);
         }}
         brushSize={brushSize}
@@ -749,6 +849,10 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
         measureMode={measureMode}
         setMeasureMode={(next) => {
           setWallMode(false);
+          setPropMode(false);
+          setPropPaletteOpen(false);
+          setPendingProp(null);
+          setSelectedPropId(null);
           setMeasureMode(next);
         }}
         wallMode={wallMode}
@@ -756,12 +860,24 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
         wallKind={wallKind}
         setWallKind={setWallKind}
         onClearWalls={clearWalls}
+        propMode={propMode}
+        setPropMode={enterPropMode}
         setAddTokenOpen={setAddTokenOpen}
         bestiaryOpen={bestiaryOpen}
-        setBestiaryOpen={setBestiaryOpen}
+        setBestiaryOpen={(next) => {
+          setPropMode(false);
+          setPropPaletteOpen(false);
+          setPendingProp(null);
+          setSelectedPropId(null);
+          setBestiaryOpen(next);
+        }}
         templateKind={templateKind}
         setTemplateKind={(next) => {
           setWallMode(false);
+          setPropMode(false);
+          setPropPaletteOpen(false);
+          setPendingProp(null);
+          setSelectedPropId(null);
           setTemplateKind(next);
         }}
         templateSize={templateSize}
@@ -858,6 +974,12 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
             wallKind={wallKind}
             onWalls={saveWalls}
             previewMode={previewing}
+            propMode={previewing ? false : propMode}
+            pendingProp={pendingProp}
+            selectedPropId={selectedPropId}
+            onPlaceProp={placeProp}
+            onSelectProp={setSelectedPropId}
+            onMoveProp={(propId, x, y) => updateProp(propId, { x, y })}
             onPing={(x, y) =>
               getSocket().emit("pointer", { campaignId, sceneId: activeScene.id, x, y })
             }
@@ -871,6 +993,28 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
             <BestiaryPalette
               onAdd={(monster, count) => placeMonster(monster, count)}
               onClose={() => setBestiaryOpen(false)}
+            />
+          ) : null}
+          {isGm && propPaletteOpen && !previewing ? (
+            <PropPalette
+              scene={activeScene}
+              campaignId={campaignId}
+              selectedPropId={selectedPropId}
+              pendingProp={pendingProp}
+              layer={propLayer}
+              setLayer={setPropLayer}
+              onPick={(preset) => {
+                setPendingProp(preset);
+                setSelectedPropId(null);
+              }}
+              onSelect={(propId) => {
+                setSelectedPropId(propId);
+                setPendingProp(null);
+              }}
+              onUpdate={updateProp}
+              onDelete={deleteProp}
+              onClose={() => enterPropMode(false)}
+              toast={toast}
             />
           ) : null}
           <InitiativeBar

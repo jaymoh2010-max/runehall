@@ -9,7 +9,17 @@ import {
   type ReactElement,
 } from "react";
 import { Maximize, Minus, Move, Plus, Ruler } from "lucide-react";
-import type { CharacterRecord, Monster, Scene, Token, Wall, WallKind } from "../../../shared/types";
+import type {
+  CharacterRecord,
+  Monster,
+  Scene,
+  SceneProp,
+  ScenePropLayer,
+  Token,
+  Wall,
+  WallKind,
+} from "../../../shared/types";
+import type { PropPreset } from "../../../shared/props";
 import { measureGridDistance } from "../../../shared/measurement";
 import { nearestWall } from "../../../shared/walls";
 import { computeVision } from "../../../shared/vision";
@@ -48,6 +58,12 @@ interface SceneCanvasProps {
   wallKind: WallKind;
   onWalls: (walls: Wall[]) => void;
   previewMode?: boolean;
+  propMode: boolean;
+  pendingProp: PropPreset | null;
+  selectedPropId: string | null;
+  onPlaceProp: (x: number, y: number) => void;
+  onSelectProp: (propId: string | null) => void;
+  onMoveProp: (propId: string, x: number, y: number) => void;
   onPing: (x: number, y: number) => void;
   remotePointer: { x: number; y: number; name: string; ts: number } | null;
   onDropMonster?: (monster: Monster, count: number, x: number, y: number) => void;
@@ -82,6 +98,12 @@ export function SceneCanvas({
   wallKind,
   onWalls,
   previewMode = false,
+  propMode,
+  pendingProp,
+  selectedPropId,
+  onPlaceProp,
+  onSelectProp,
+  onMoveProp,
   onPing,
   remotePointer,
   onDropMonster,
@@ -125,6 +147,15 @@ export function SceneCanvas({
     y2: number;
   } | null>(null);
   const wallClickStart = useRef<{ x: number; y: number } | null>(null);
+  const [propDrag, setPropDrag] = useState<{
+    id: string;
+    offsetX: number;
+    offsetY: number;
+    startClientX: number;
+    startClientY: number;
+    x: number;
+    y: number;
+  } | null>(null);
   const [templateDraft, setTemplateDraft] = useState<{
     x: number;
     y: number;
@@ -410,6 +441,17 @@ export function SceneCanvas({
     if (event.button !== 0) return;
     const target = event.target as HTMLElement;
     if (target.closest(".scene-token")) return;
+    if (propMode && isGm) {
+      if (pendingProp) {
+        const point = scenePoint(event.clientX, event.clientY);
+        onPlaceProp(
+          Math.max(0, Math.min(scene.width, snap(point.x, scene.gridOffsetX))),
+          Math.max(0, Math.min(scene.height, snap(point.y, scene.gridOffsetY)))
+        );
+        return;
+      }
+      onSelectProp(null);
+    }
     if (wallMode && isGm) {
       const point = scenePoint(event.clientX, event.clientY);
       const snapped = snapWall(point.x, point.y);
@@ -626,6 +668,63 @@ export function SceneCanvas({
     onViewportPointerUp(event);
   };
 
+  const onPropPointerDown = (event: ReactPointerEvent<HTMLDivElement>, prop: SceneProp) => {
+    if (!isGm || !propMode) return;
+    event.stopPropagation();
+    onSelectProp(prop.id);
+    if (prop.locked) return;
+    const point = scenePoint(event.clientX, event.clientY);
+    setPropDrag({
+      id: prop.id,
+      offsetX: point.x - prop.x,
+      offsetY: point.y - prop.y,
+      startClientX: event.clientX,
+      startClientY: event.clientY,
+      x: prop.x,
+      y: prop.y,
+    });
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const onPropPointerMove = (event: ReactPointerEvent<HTMLDivElement>, prop: SceneProp) => {
+    if (!propDrag || propDrag.id !== prop.id) return;
+    event.stopPropagation();
+    const point = scenePoint(event.clientX, event.clientY);
+    setPropDrag((current) =>
+      current
+        ? {
+            ...current,
+            x: point.x - current.offsetX,
+            y: point.y - current.offsetY,
+          }
+        : current
+    );
+  };
+
+  const onPropPointerUp = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (!propDrag) return;
+    event.stopPropagation();
+    const drag = propDrag;
+    setPropDrag(null);
+    event.currentTarget.releasePointerCapture(event.pointerId);
+    const moved =
+      Math.hypot(event.clientX - drag.startClientX, event.clientY - drag.startClientY) > 4;
+    if (!moved) {
+      onSelectProp(drag.id);
+      return;
+    }
+    const x = Math.max(0, Math.min(scene.width, snap(drag.x, scene.gridOffsetX)));
+    const y = Math.max(0, Math.min(scene.height, snap(drag.y, scene.gridOffsetY)));
+    onMoveProp(drag.id, x, y);
+  };
+
+  const onPropPointerCancel = (event: ReactPointerEvent<HTMLDivElement>) => {
+    setPropDrag(null);
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+  };
+
   const onTokenPointerDown = (event: ReactPointerEvent<HTMLDivElement>, token: Token) => {
     event.stopPropagation();
     const additive = event.shiftKey || event.ctrlKey || event.metaKey;
@@ -691,6 +790,41 @@ export function SceneCanvas({
   const dragPosition = (token: Token) =>
     dragging?.positions[token.id] ?? { x: token.x, y: token.y };
 
+  const renderPropLayer = (layer: ScenePropLayer) => {
+    const props = (scene.props ?? [])
+      .filter((prop) => prop.layer === layer && (isGm || prop.visible))
+      .sort((a, b) => a.z - b.z);
+    if (!props.length) return null;
+    return (
+      <div className={`scene-prop-layer ${layer}`}>
+        {props.map((prop) => {
+          const position = propDrag?.id === prop.id ? propDrag : prop;
+          const selected = prop.id === selectedPropId;
+          return (
+            <div
+              key={prop.id}
+              className={`scene-prop ${selected ? "is-selected" : ""} ${prop.visible ? "" : "is-hidden"} ${prop.locked ? "is-locked" : ""}`}
+              style={{
+                left: position.x,
+                top: position.y,
+                width: prop.width,
+                height: prop.height,
+                transform: `translate(-50%, -50%) rotate(${prop.rotation}deg)`,
+                zIndex: prop.z,
+              }}
+              onPointerDown={(event) => onPropPointerDown(event, prop)}
+              onPointerMove={(event) => onPropPointerMove(event, prop)}
+              onPointerUp={onPropPointerUp}
+              onPointerCancel={onPropPointerCancel}
+            >
+              <img src={prop.imageUrl} alt="" draggable={false} />
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
   const measurement = measuring
     ? measureGridDistance(
         measuring.x - measuring.startX,
@@ -755,7 +889,7 @@ export function SceneCanvas({
   return (
     <div
       ref={viewportRef}
-      className={`scene-viewport ${fogBrush ? "is-fogging" : ""} ${measureMode ? "is-measuring" : ""} ${wallMode ? "is-walling" : ""} ${templateKind ? "is-templating" : ""}`}
+      className={`scene-viewport ${fogBrush ? "is-fogging" : ""} ${measureMode ? "is-measuring" : ""} ${wallMode ? "is-walling" : ""} ${propMode ? "is-propping" : ""} ${pendingProp ? "is-placing-prop" : ""} ${templateKind ? "is-templating" : ""}`}
       onWheel={onWheel}
       onPointerDown={onViewportPointerDown}
       onPointerMove={onViewportPointerMove}
@@ -790,6 +924,7 @@ export function SceneCanvas({
         ) : (
           <div className="scene-blank" />
         )}
+        {renderPropLayer("ground")}
         <div
           className="scene-grid"
           style={{
@@ -930,6 +1065,7 @@ export function SceneCanvas({
             <em>{remotePointer.name}</em>
           </div>
         ) : null}
+        {renderPropLayer("overhead")}
         {scene.fogEnabled ? (
           <canvas
             ref={fogCanvasRef}
@@ -1071,7 +1207,15 @@ export function SceneCanvas({
             to open · right-click to delete
           </Tag>
         ) : null}
-        {!fogBrush && !measureMode && !templateKind && !wallMode ? (
+        {propMode ? (
+          <Tag tone="gold">
+            <Move size={11} />{" "}
+            {pendingProp
+              ? `Click to place ${pendingProp.name}`
+              : "Props · drag to move · click to select"}
+          </Tag>
+        ) : null}
+        {!fogBrush && !measureMode && !templateKind && !wallMode && !propMode ? (
           <span>Drag to pan · Shift-drag to select · wheel to zoom · right-click to ping</span>
         ) : null}
       </div>

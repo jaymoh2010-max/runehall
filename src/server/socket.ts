@@ -11,6 +11,7 @@ import { sortInitiativeEntries } from "../shared/initiative";
 import { applyGridMovement } from "../shared/movement";
 import { normalizeAoeTemplate, normalizeAoeTemplates } from "../shared/templates";
 import { normalizeWalls } from "../shared/walls";
+import { normalizeSceneProps } from "../shared/props";
 import { normalizeTokenVisionMode } from "../shared/lighting";
 import type {
   ClientToServerEvents,
@@ -792,6 +793,24 @@ export function registerSocketServer(io: TypedServer): void {
         sceneId
       );
       io.to(room(campaignId)).emit("scene:walls", { sceneId, walls: normalized });
+      touchCampaign(campaignId);
+    });
+
+    socket.on("scene:props", ({ campaignId, sceneId, props }) => {
+      if (!requireGm(socket, campaignId)) return;
+      const scene = sceneBelongs(sceneId, campaignId);
+      if (!scene) return;
+      const normalized = normalizeSceneProps(props).map((prop) => ({
+        ...prop,
+        x: clamp(prop.x, 0, scene.width),
+        y: clamp(prop.y, 0, scene.height),
+      }));
+      db.prepare("UPDATE scenes SET props = ?, updated_at = ? WHERE id = ?").run(
+        JSON.stringify(normalized),
+        now(),
+        sceneId
+      );
+      io.to(room(campaignId)).emit("scene:props", { sceneId, props: normalized });
       touchCampaign(campaignId);
     });
 

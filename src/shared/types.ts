@@ -1026,6 +1026,8 @@ export interface Scene {
   ambientLight: AmbientLight;
   /** Shared party perception or each player sees only from their own tokens. */
   visionScope: PartyVisionScope;
+  /** Decorative ground and overhead props placed by the GM. */
+  props: SceneProp[];
   sortOrder: number;
   createdAt: number;
   updatedAt: number;
@@ -1055,6 +1057,26 @@ export interface Wall {
 export type AmbientLight = "bright" | "dim" | "darkness";
 export type TokenVisionMode = "normal" | "low-light" | "darkvision";
 export type PartyVisionScope = "shared" | "per-player";
+
+export type ScenePropLayer = "ground" | "overhead";
+
+export interface SceneProp {
+  id: string;
+  name: string;
+  imageUrl: string;
+  /** Center position in scene pixels. */
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  /** Rotation in degrees. */
+  rotation: number;
+  layer: ScenePropLayer;
+  visible: boolean;
+  locked: boolean;
+  /** Draw order within the prop layer. */
+  z: number;
+}
 
 export interface Token {
   id: string;
@@ -1266,6 +1288,7 @@ export interface ClientToServerEvents {
   "template:add": (payload: { campaignId: string; sceneId: string; template: AoeTemplate }) => void;
   "template:clear": (payload: { campaignId: string; sceneId: string }) => void;
   "scene:walls": (payload: { campaignId: string; sceneId: string; walls: Wall[] }) => void;
+  "scene:props": (payload: { campaignId: string; sceneId: string; props: SceneProp[] }) => void;
   "chat:send": (
     payload: { campaignId: string; content: string; visibility?: "all" | "gm" },
     ack?: (message: ChatMessage | null) => void
@@ -1328,6 +1351,7 @@ export interface ServerToClientEvents {
   "scenes:reordered": (scenes: Scene[]) => void;
   "scene:templates": (payload: { sceneId: string; templates: AoeTemplate[] }) => void;
   "scene:walls": (payload: { sceneId: string; walls: Wall[] }) => void;
+  "scene:props": (payload: { sceneId: string; props: SceneProp[] }) => void;
   "chat:message": (message: ChatMessage) => void;
   "initiative:updated": (payload: {
     entries: InitiativeEntry[];

@@ -13,7 +13,7 @@
 ### What is still prototype-level
 - **Rules automation is partial.** Feat prerequisites are enforced for mechanical requirements, while complex/story prerequisites are flagged for review; some subclass/feature/item effects are manual; companions and split-caster casting restrictions are not automated. This can make a sheet look correct while missing situational bonuses.
 - **Realtime recovery is revision-aware.** Reconnects refetch the authoritative table, campaign revisions detect missed events, character saves reject stale writes, and the table socket/state layer now lives in a tested hook with pure event reducers.
-- **Table polish is deep.** AoE templates, condition values/durations, multi-select, group drag, bulk actions, scene playlists, generated thumbnails, combat-log filters, group checks, delay/ready/ties, first-run setup, GM-drawn walls/doors, line-of-sight fog, per-token vision radii, light sources, normal/low-light/darkvision senses, shared/per-player vision, explored-area memory, and six categorized built-in battle maps are built. Full light-color rendering and concealment automation remain future work.
+- **Table polish is deep.** AoE templates, condition values/durations, multi-select, group drag, bulk actions, scene playlists, generated thumbnails, combat-log filters, group checks, delay/ready/ties, first-run setup, GM-drawn walls/doors, line-of-sight fog, per-token vision radii, light sources, normal/low-light/darkvision senses, shared/per-player vision, explored-area memory, six categorized built-in battle maps, and layered scene props are built. Full light-color rendering and concealment automation remain future work.
 - **Content volume needs curation.** The builder exposes 540 backgrounds and 29 classes by default. That is impressive, but overwhelming; not every option has the same automation quality.
 - **Test coverage is unit + smoke + browser E2E + simulation.** Dice, rules math, compendium integrity, content tiers, security, and migrations are unit-tested; the GM/player campaign flow and registration/admin flows have an automated smoke test; Playwright covers registration, admin audit controls, campaign creation, the character builder and sheet, compendium routes, player-safe campaign access, and table interactions (token placement, chat, dice rolls, and the scenes manager). Upload edge cases (bad signatures, mismatched/unsupported types, empty files, oversized files and dimensions, foreign campaigns, and cleanup after rejection) are covered by the smoke test.
 - **Code health has guardrails.** Route-level splitting keeps the entry bundle near 107â€“122 KB gzip, and `npm run check` now covers types, lint (ESLint), formatting (Prettier), tests, build, and bundle budgets. The table state layer is tested; some large components remain.
@@ -435,6 +435,13 @@ Acceptance: a GM can prepare a full session in Runehall and start it with one â€
   - The New Scene form filters by category and fills the scene name, dimensions, and grid size when a map is selected.
   - Custom uploads and blank scenes remain available alongside the library.
   - Covered by metadata unit tests and a browser flow that creates a scene from the library and then edits it.
+- [x] **Layered scene props**
+  - The GM can place, drag, resize, rotate, lock, hide, and delete decorative props on the map.
+  - Props can use a **ground** layer under tokens or an **overhead** layer above tokens but below fog.
+  - Built-in prop categories cover furniture, nature, dungeon pieces, and camp equipment.
+  - Custom prop images upload through the campaign asset library and count as used assets.
+  - Prop data is persisted per scene, copied on duplication, exported/imported with campaigns, and broadcast to connected clients.
+  - Covered by prop normalization tests, a two-socket smoke check, and a browser placement flow.
 
 **Acceptance:** a complete combat with an AoE template, condition values, multiple selected tokens, and a filtered log needs no other tool.
 
