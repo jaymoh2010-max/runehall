@@ -692,3 +692,7 @@ for (const [key, list] of [...grouped.entries()]
       .join("\n")
   );
 }
+
+// The weekly simulation job must fail when a rules problem is found; otherwise
+// the workflow can stay green while the report lists crashes.
+if (allProblems.length) process.exitCode = 1;

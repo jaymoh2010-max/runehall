@@ -660,3 +660,13 @@ The current feature queue is complete. Next improvements:
 4. defer Postgres/S3 adapters and OAuth until the local deployment is proven.
 
 Keep the two-user smoke test and browser E2E suite green as new socket events are added.
+
+---
+
+## Campaign readiness review (18 November 2026)
+
+A campaign-level review compared Runehall against PF2e GM Core/Player Core progression and common GM/player needs. It ran two isolated 1–20 campaigns (XP and milestone) through the API and sockets: 66 checks passed, 7 gaps were recorded, and two linked-token bugs were fixed (hidden tokens no longer leak into the player initiative order; a new token for a wounded character starts at the sheet's current HP).
+
+- Full report: [CAMPAIGN-READINESS.md](CAMPAIGN-READINESS.md)
+- Repeatable simulation: `npm run simulate:campaign`
+- Next priority: condition/death/affliction trust, then treasure/advancement economy, then exploration/downtime/social continuity.

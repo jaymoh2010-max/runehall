@@ -7,7 +7,7 @@ import { now, newId, safeInt, safeString, parseJson, clamp, sanitizeUserText } f
 import { characterSummary, computeCharacter, normalizeCharacterDraft } from "../shared/rules";
 import { rollFormula, validateFormula } from "../shared/dice";
 import { normalizeTokenConditions, tickTokenConditions } from "../shared/tokens";
-import { sortInitiativeEntries } from "../shared/initiative";
+import { filterInitiativeForPlayers, sortInitiativeEntries } from "../shared/initiative";
 import { applyGridPath } from "../shared/movement";
 import { blockingPropForMove } from "../shared/collision";
 import { findPathAroundProps } from "../shared/pathfinding";
@@ -184,8 +184,27 @@ function broadcastInitiative(
   campaignId: string,
   state: ReturnType<typeof ensureState>
 ): void {
-  io.to(room(campaignId)).emit("initiative:updated", {
-    entries: serializeInitiative(JSON.parse(state.initiative || "[]")),
+  const fullEntries = serializeInitiative(JSON.parse(state.initiative || "[]"));
+  const hiddenTokenIds = new Set(
+    (
+      db
+        .prepare(
+          `SELECT id FROM tokens WHERE hidden = 1 AND scene_id IN
+           (SELECT id FROM scenes WHERE campaign_id = ?)`
+        )
+        .all(campaignId) as { id: string }[]
+    ).map((row) => row.id)
+  );
+  const playerOrder = filterInitiativeForPlayers(fullEntries, hiddenTokenIds, state.turn_index);
+  // Players never see a hidden combatant, even if it was rolled before being
+  // hidden. The GM still receives the authoritative full order.
+  io.to(room(campaignId)).except(gmRoom(campaignId)).emit("initiative:updated", {
+    entries: playerOrder.entries,
+    round: state.round,
+    turnIndex: playerOrder.turnIndex,
+  });
+  io.to(gmRoom(campaignId)).emit("initiative:updated", {
+    entries: fullEntries,
     round: state.round,
     turnIndex: state.turn_index,
   });
@@ -377,10 +396,18 @@ function createToken(
   }
   if (character?.summary) {
     try {
-      const summary = JSON.parse(character.summary) as { hp?: number; ac?: number };
+      const summary = JSON.parse(character.summary) as {
+        hp?: number;
+        currentHp?: number;
+        ac?: number;
+      };
       if (hpMax === null && typeof summary.hp === "number") hpMax = summary.hp;
       if (ac === null && typeof summary.ac === "number") ac = summary.ac;
-      hpCurrent = hpMax;
+      // A token created for a wounded character starts at the sheet's current
+      // HP, not at full. An explicit hpCurrent from the GM still wins.
+      if (hpCurrent === null) {
+        hpCurrent = typeof summary.currentHp === "number" ? summary.currentHp : hpMax;
+      }
     } catch {}
   }
   const id = newId("tok");

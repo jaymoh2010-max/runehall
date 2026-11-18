@@ -32,6 +32,7 @@ import {
 } from "../serialize";
 import { clamp, now, safeInt, safeString } from "../util";
 import { normalizeAmbientLight, normalizePartyVisionScope } from "../../shared/lighting";
+import { filterInitiativeForPlayers } from "../../shared/initiative";
 
 function ensureState(campaignId: string) {
   const state = db.prepare("SELECT * FROM campaign_state WHERE campaign_id = ?").get(campaignId) as
@@ -129,6 +130,31 @@ export async function registerTableRoutes(app: FastifyInstance): Promise<void> {
       })
     );
 
+    // A token can be rolled into initiative and then hidden. Players must not
+    // receive its entry (or its name) in the table snapshot.
+    const hiddenTokenIds =
+      role === "player" && scenes.length
+        ? new Set(
+            (
+              db
+                .prepare(
+                  `SELECT id FROM tokens WHERE hidden = 1 AND scene_id IN (${scenes
+                    .map(() => "?")
+                    .join(",")})`
+                )
+                .all(...scenes.map((scene) => scene.id)) as { id: string }[]
+            ).map((row) => row.id)
+          )
+        : new Set<string>();
+    const fullInitiative = serializeInitiative(JSON.parse(state.initiative || "[]"));
+    const playerInitiative = filterInitiativeForPlayers(
+      fullInitiative,
+      hiddenTokenIds,
+      state.turn_index
+    );
+    const visibleInitiative = role === "player" ? playerInitiative.entries : fullInitiative;
+    const visibleTurnIndex = role === "player" ? playerInitiative.turnIndex : state.turn_index;
+
     return reply.send({
       campaign: {
         ...campaignSummaryFor(campaign, request.user.id)!,
@@ -144,9 +170,9 @@ export async function registerTableRoutes(app: FastifyInstance): Promise<void> {
         state.active_scene_id && sceneIds.has(state.active_scene_id)
           ? state.active_scene_id
           : (scenes[0]?.id ?? null),
-      initiative: serializeInitiative(JSON.parse(state.initiative || "[]")),
+      initiative: visibleInitiative,
       round: state.round,
-      turnIndex: state.turn_index,
+      turnIndex: visibleTurnIndex,
       messages: messageRows.reverse().map(serializeMessage),
       journal: journalRows.map(serializeJournal),
       audioTracks: audioRows.map(serializeAudioTrack),

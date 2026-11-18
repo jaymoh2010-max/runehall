@@ -28,3 +28,6 @@ jobs:
 
       - name: Run rules simulation
         run: npm run simulate
+
+      - name: Run campaign simulation
+        run: npm run simulate:campaign

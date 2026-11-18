@@ -1,0 +1,197 @@
+# PF2e campaign readiness review
+
+**Reviewed:** 18 November 2026  
+**Scope:** PF2e Remastered campaign play from session zero through level 20, compared with GM Core/Player Core and common GM/player tooling expectations.  
+**Artifacts:** `scripts/simulate-campaign.ts` (new), `scripts/lib/simHeroes.ts` (new), `npm run simulate:campaign`.
+
+---
+
+## Verdict
+
+Runehall is already a strong **campaign table**: invite → join → party roster → character sheet → map/fog/walls/lighting → encounter launch → initiative → chat/dice → loot → journal/handout → session recap is a real, working loop. The simulation played two complete 1–20 campaigns and found the campaign spine, progression plumbing, permissions, calendar, rest, loot, sessions, and export/import working as intended.
+
+It is **not yet a full adventure-path runner or a complete exploration/downtime game**. The largest gaps are:
+
+1. **Rules trust:** conditions, dying/wounded, afflictions, hero/focus points, spell heightening, and most feat/item effects are still manual.
+2. **Campaign economy:** no treasure-by-level budget, item-level parcels, new-character wealth, shops, or cost of living.
+3. **The other two-thirds of play:** exploration/travel/weather, downtime activities, social reputation/factions, and player knowledge all need a first-class model.
+4. **Campaign continuity:** no session-zero/safety tools, private player notes, AP chapter/level scaffolding, or self-contained archive.
+
+---
+
+## What was verified
+
+Two simulated campaigns were run against an isolated server with real accounts and sockets:
+
+- **A: The Ashen Crown** — 4 players, XP advancement, levels 1–20.
+  - Campaign creation/invite/join/ruleset inheritance.
+  - Four classes (fighter, wizard, cleric, rogue) with real ancestry/background/equipment.
+  - Token ownership, movement, hidden-token visibility, linked HP/AC.
+  - Encounter budgets at levels 1/5/10/15/20 (trivial/low/moderate/severe/extreme), grouped initiative, condition duration ticking.
+  - 1,000 XP per level, GM-only party level-up, HP/AC growth, token sync, excess-XP carry, level-20 cap.
+  - Long rest natural healing, condition reduction, temp HP clearing, token sync.
+  - Treasure parcels (GM Core currency column), loot distribution, purse totals.
+  - Downtime grants/spending; Golarion month, year, and leap-day boundaries.
+  - Sessions, attendance, check-ins, recap; shared vs GM-only handouts; one-time quest XP.
+  - Player permission boundaries and optimistic revision conflicts.
+  - Campaign export/import at level 20 (characters, levels, calendar, scenes, journal, loot, sessions, NPCs, XP mode).
+- **B: The Quiet Ledger** — 2 players, milestone advancement.
+  - Story level-ups from 1→20 with no XP requirement.
+  - Quest XP one-time award in milestone mode.
+  - Live campaign metadata to a connected player.
+  - Mid-campaign replacement character advanced to party level.
+  - Sessions/recap/handout in milestone play.
+
+**Result:** 66 passing checks, 0 failing checks, 7 recorded gaps. Two linked-token bugs were found and fixed:
+
+- Hiding a token after initiative was rolled still exposed its name in the player's initiative order. The server now filters hidden combatants from player snapshots and live initiative broadcasts, with a shared helper and unit coverage (`src/shared/initiative.ts`, `src/server/routes/table.ts`, `src/server/socket.ts`, `tests/initiative.test.ts`).
+- Creating a token for a wounded character reset its current HP to full. New tokens now start at the sheet's current HP unless the GM explicitly supplies one (`src/server/socket.ts`).
+
+The weekly character simulation was also run: 1,000 random characters plus the class/level matrix, all 288 subclass options, 296 ancestry/background combinations, and 6,366 feat prerequisite checks produced **0 math problems**. Automation coverage remains the trust issue: across those builds, 4,861 feat selections were fully automated, 535 partly automated, and 17,460 manual. The character simulation now exits non-zero when it finds a problem, so the weekly job can no longer stay green while reporting failures.
+
+Run it with:
+
+```bash
+npm run simulate:campaign
+npm run simulate:campaign -- --report campaign-simulation-report.json
+```
+
+---
+
+## Coverage against a PF2e campaign
+
+| Lifecycle stage | PF2e need | Current support | Status |
+| --- | --- | --- | --- |
+| Session zero | Pitch/tone, content limits, safety tools, allowed sources, house rules, party hooks | Campaign description; ruleset/content mode; first-run checklist | Partial |
+| Scheduling | Cadence, time zones, RSVP, quorum, attendance, reminders | Sessions, check-ins, attendance, next-session date/teaser; no reminders/ICS/time zones | Partial |
+| Player onboarding | Join, bring/create a character, ruleset inheritance | Invite links/codes, account flow, character assignment | Strong |
+| Character build | 1–20 math, ancestry/heritage/background/class, feats/spells/gear/runes | Live math, prerequisites, slots, runes, companions roster, Pathbuilder import | Strong with automation caveats |
+| Advancement | Fast/medium/slow XP, party pool, catch-up, milestones, hazards/accomplishments | Milestone or 1,000-XP mode, per-character XP, GM-only level-up; no speed setting, party pool, catch-up, hazard/accomplishment rows | Partial |
+| Combat | Budgets, hazards, initiative, MAP/actions, conditions, dying, afflictions, cover, AoE | Budget/launch/waves/reinforcements, grouped initiative, conditions with durations, cover/concealment readout, lighting/vision, templates | Partial |
+| Exploration | Travel pace, terrain, weather, watches, foraging/tracking, hex/pointcrawl, discovery | Scenes, fog, walls, light, measurement; no travel/weather/hex/exploration activities | Missing |
+| Social | NPCs, attitude, factions, reputation, rumors, shops, negotiation | NPC statblock library, dashboard threads, quest handouts; no relationships/reputation/factions/shops | Partial |
+| Downtime | Day accounting, Earn Income, Craft, Retrain, rituals, cost of living, shopping | GM grants days; player spends days; activities remain manual | Partial |
+| Treasure | Party budget by level, item levels, parcels, gems/art, wealth audit, ABP | Loot parcels with compendium items/coins, one recipient, sheet updates; no budget/wealth audit/shops/ABP | Partial |
+| Campaign log | Journal, handouts, quests, clues, recap, player knowledge | Journal/handouts with visibility/attachments, quest status/XP, recap draft, dashboard threads; no per-player knowledge or private notes | Partial |
+| World clock | In-world date, downtime, afflictions, sessions | Golarion calendar with leap day and GM advance | Strong |
+| Table | Maps, fog, walls/doors, lighting, tokens, conditions, chat, dice, music | Deep implementation; see table gaps below | Strong with caveats |
+| Archive/portability | Self-contained backup, JSON, assets, restore | SQLite backup/restore drill; campaign JSON metadata; assets referenced by URL; import caps/ownership caveats | Partial |
+| Safety/access | Private limits, consent, player-safe views | GM-only data is separated; no safety profile or content-limit channel | Missing |
+| Adventure path | Chapters, level gates, encounter/quest pacing, AP import | None | Missing |
+
+---
+
+## Prioritized gap register
+
+### P0 — trust and table correctness
+
+These are the items most likely to make a sheet or combat state look right while being wrong.
+
+| Gap | Why it matters | Effort |
+| --- | --- | --- |
+| Dying/wounded/unconscious/doomed state machine | HP 0 currently has no automatic death/recovery flow; players can keep acting. | M |
+| Condition modifiers (frightened, off-guard, enfeebled, clumsy, drained, etc.) | Conditions are labels/durations but do not change AC, saves, attacks, skills, or DCs. | M |
+| Afflictions (poison/disease/curse) with onset, stages, interval, cure | Common in APs and hazards; currently entirely manual. | L |
+| Spell heightening and cast-time resource spending | Cantrips/spells show base rank; casting does not spend slots/focus; font heal/harm is merged. | M |
+| Hero Point reroll, GM award/reset, session reset | Hero points are pips only; no reroll or death-avoidance workflow. | S–M |
+| Focus/Refocus and daily preparations | Focus max is heuristic; no structured rest/prepare workflow beyond the long-rest reset. | M |
+| Temp HP absorption | Temp HP is editable but token damage bypasses it. | S |
+| Feat/item automation coverage and truthful badges | Only a small curated subset of 6,366 feats/5,956 items is automated; some manual effects can still look automated. | XL, ongoing |
+| Encounter cleanup/relaunch | Fresh launches accumulate monster tokens (16→64 on the simulated scene) and there is no “clear encounter” action. | S–M |
+| Hidden data on the table | Hidden-token initiative entries are fixed; hidden props/walls/templates are still serialized to players. | S–M |
+| Movement enforcement | Straight-line moves and off-turn movement are warned about but not enforced; speed is advisory. | M |
+
+### P1 — campaign economy and continuity
+
+| Gap | Recommendation | Effort |
+| --- | --- | --- |
+| Advancement speed | Add fast/medium/slow XP thresholds (800/1,000/1,200) per campaign. | S |
+| Party XP pool and catch-up | Support a shared party total, per-character catch-up doubling, and absent-player awards. | M |
+| Hazard and accomplishment XP | Add simple/complex hazard rows and 10/30/80 accomplishment awards to the encounter/XP workflow. | M |
+| Treasure-by-level engine | Encode GM Core Table 10-9: 2 permanent L+1, 2 permanent L, 2 consumables L+1/L/L−1, currency; show awarded vs. budget. | M |
+| New/replacement character wealth | Add the Table 10-10 starting package or a level-appropriate lump sum; the simulation showed a level-10 replacement with 10 gp instead of ~2,300 gp. | S–M |
+| Shops and settlement levels | Persistent merchants with item level/price/stock, buy/sell, and settlement purchase limits. | M |
+| Downtime activities | Earn Income, Craft, Retrain, rituals, cost of living, per-character queues and approvals. | L |
+| Exploration/travel | Pace/terrain/weather, watches, foraging/tracking, hex/pointcrawl, ETA, encounter checks, discovered/rumored sites. | L |
+| Victory Point clocks | One generic clock/VP primitive for research, influence, chase, infiltration, reputation, and projects. | M |
+| NPC/faction ledger | Attitude, location, faction, secrets, obligations, relationship history, rumors; ideally a graph. | L |
+| Player knowledge layer | Private player notes, known/rumored/secret/disproven clues, per-player reveals, absentee recap. | L |
+| Session zero and safety | Campaign pitch template, content limits, lines/veils/X-card, anonymous safety channel, source/house-rule checklist. | S–M |
+| AP scaffold | Chapters/books, level bands, encounter/quest pacing, treasure checkpoints, AP import/conversion. | L |
+| Self-contained archive | Copy assets/audio into the export, validate URLs, remove import caps, preserve playback state and asset rows. | M |
+| Ownership lifecycle | Leaving/kicking currently leaves `characters.campaign_id` set; add unassignment, GM transfer, co-GM, per-character portability. | S–M |
+| Reminders/calendar | ICS/Discord/webhook reminders, recurring sessions, RSVP deadlines, time zones, per-player attendance history. | M |
+
+### P2 — depth and scale
+
+- Companions, familiars, eidolons, and summons as advancing actors with tokens and commands.
+- Vehicles, mounted combat, kingdom building, mass combat/sieges.
+- Homebrew editor with validation/versioning and shareable packs.
+- Campaign templates, campaign wiki/graph/timeline, campaign-scoped audit.
+- Mobile player view, offline/PWA, Postgres/S3/OAuth when local hosting is outgrown.
+
+---
+
+## Table-specific gaps worth calling out
+
+The VTT is the strongest differentiator, but several PF2e combat expectations are still manual or advisory:
+
+- **Turn economy:** no 3-action/reaction tracker, no MAP or weapon-trait workflow, no attack-target/cover integration.
+- **Effects:** AoE templates are visual only; no target resolution, save/damage cards, auras, or persistent spell effects.
+- **Conditions:** token and sheet condition stores are separate; rest updates token HP/name/AC but not token conditions.
+- **Death/afflictions:** no dying/wounded automation, persistent damage, fast healing/regeneration, or poison/disease stages.
+- **Movement/terrain:** no difficult terrain, squeezing, forced movement, elevation/flying, reach, flanking/off-guard, or token-to-token collision.
+- **Hazards:** traps/hazards are custom combatants at best; no hazard XP or simple/complex hazard model.
+- **Monster actions:** bestiary stats are display-only; no attack/ability buttons or recharge tracking.
+- **Table hygiene:** scene deletion leaves ghost initiative entries; hidden props/walls/templates are sent to players; encounter relaunch duplicates monsters.
+- **Exploration layer:** no time-of-day/weather, hex/travel map, shops, chase tracks, or VP clocks.
+
+---
+
+## Recommended sequence
+
+### Sprint A — make the sheet and table trustworthy
+1. Condition modifier engine + dying/wounded/unconscious + temp HP absorption.
+2. Hero Point reroll/session reset; focus/refocus; structured daily preparations.
+3. Spell heightening and cast-time resource spending.
+4. Encounter cleanup, hidden-data filtering, PC token HP preservation, movement enforcement.
+5. Tighten automation badges so “Automated” can never hide a manual bonus.
+
+**Exit criteria:** a player can be dropped to 0 HP, stabilized, wounded, treated, and rested without a GM spreadsheet; frightened/off-guard/clumsy actually change rolls; a caster can cast at the correct heightened rank and spend the slot.
+
+### Sprint B — campaign economy and progression
+1. Advancement speed, party XP pool, catch-up, hazard/accomplishment XP.
+2. Treasure-by-level budget, item-level parcels, new-character wealth, wealth audit.
+3. Shops/settlement levels, cost of living, downtime activity planner.
+4. Session-zero/safety checklist and private player notes.
+
+**Exit criteria:** a GM can run a level without guessing treasure, equip a replacement PC correctly, and resolve a full downtime phase in-app.
+
+### Sprint C — exploration, social, and continuity
+1. Travel/weather/hex or pointcrawl layer + exploration activities + generic VP clocks.
+2. NPC/faction/reputation ledger and rumor/knowledge states.
+3. Player knowledge base, per-player reveals, absentee recap.
+4. Self-contained archive and ownership lifecycle.
+5. AP chapter/level-gate scaffolding.
+
+**Exit criteria:** a published AP can be prepped chapter by chapter with treasure, NPCs, clues, travel, and level gates in one place.
+
+---
+
+## Rules reference used
+
+- XP and advancement speeds: <https://2e.aonprd.com/Rules.aspx?ID=2648>
+- XP awards, hazards, accomplishments: <https://2e.aonprd.com/Rules.aspx?ID=2649>
+- Group parity/party level: <https://2e.aonprd.com/Rules.aspx?ID=2653>
+- Encounter threats/budgets: <https://2e.aonprd.com/Rules.aspx?ID=2716>, <https://2e.aonprd.com/Rules.aspx?ID=2717>
+- Party treasure by level: <https://2e.aonprd.com/Rules.aspx?ID=2656>
+- Treasure by encounter: <https://2e.aonprd.com/Rules.aspx?ID=2738>
+- Character wealth: <https://2e.aonprd.com/Rules.aspx?ID=2662>
+- Rest and daily preparations: <https://2e.aonprd.com/Rules.aspx?ID=2443>
+- Victory points/subsystems: <https://2e.aonprd.com/Rules.aspx?ID=3028>
+- Campaign structure: <https://2e.aonprd.com/Rules.aspx?ID=2668>
+- Automatic bonus progression: <https://2e.aonprd.com/Rules.aspx?ID=2741>
+- Session zero: <https://2e.aonprd.com/Rules.aspx?ID=2478>
+- Exploration mode: <https://2e.aonprd.com/Rules.aspx?ID=469>
+- Running downtime: <https://2e.aonprd.com/Rules.aspx?ID=2604>
+- Pathfinder Society advancement: <https://paizo.com/pathfindersociety/getstarted>

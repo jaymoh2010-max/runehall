@@ -160,6 +160,7 @@ Players join with the GM's invite link or code from their own accounts. They can
 | `npm run ingest` | Rebuild the compendium from the Foundry PF2e data clone |
 | `npm run verify:data` | Validate compendium counts, required fields, cross-references, inline macros, SQLite integrity, and foreign keys |
 | `npm run simulate` | Generate valid characters across classes, levels, ancestries, backgrounds, subclass options, feats, spells, and gear; report rule/math problems |
+| `npm run simulate:campaign` | Run two isolated 1–20 campaign simulations through the API and sockets; report failures and campaign gaps |
 | `npm run backup` | Snapshot SQLite + uploaded assets into `backups/` |
 | `npm run ship-backup` | Verify and copy the newest backup to another folder or NAS mount |
 | `npm run restore -- --from <dir> --yes` | Restore a backup (server must be stopped) |
@@ -210,7 +211,7 @@ tests/               Dice and PF2e rules-engine tests
 docs/                Product plan, data pipeline, architecture notes
 ```
 
-See [docs/PLAN.md](docs/PLAN.md) for the product/architecture plan, [docs/ROADMAP.md](docs/ROADMAP.md) for the review and step-by-step execution plan, [docs/BACKUP.md](docs/BACKUP.md) for backup/restore, and [docs/DATA.md](docs/DATA.md) for the data pipeline and licensing details.
+See [docs/PLAN.md](docs/PLAN.md) for the product/architecture plan, [docs/ROADMAP.md](docs/ROADMAP.md) for the review and step-by-step execution plan, [docs/CAMPAIGN-READINESS.md](docs/CAMPAIGN-READINESS.md) for the PF2e campaign coverage review and simulation results, [docs/BACKUP.md](docs/BACKUP.md) for backup/restore, and [docs/DATA.md](docs/DATA.md) for the data pipeline and licensing details.
 
 ---
 
