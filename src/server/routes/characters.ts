@@ -205,11 +205,21 @@ export async function registerCharacterRoutes(app: FastifyInstance): Promise<voi
       return reply.code(400).send({ error: "Runehall could not read that Pathbuilder export." });
     }
     const draft = normalizeCharacterDraft(result.draft, result.draft.name);
+    const summary = summarize(draft);
     const id = newId("char");
     const ts = now();
     db.prepare(
-      "INSERT INTO characters (id, user_id, campaign_id, name, data, summary, created_at, updated_at) VALUES (?, ?, ?, ?, ?, NULL, ?, ?)"
-    ).run(id, request.user.id, campaignId, draft.name, JSON.stringify(draft), ts, ts);
+      "INSERT INTO characters (id, user_id, campaign_id, name, data, summary, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+    ).run(
+      id,
+      request.user.id,
+      campaignId,
+      draft.name,
+      JSON.stringify(draft),
+      JSON.stringify(summary),
+      ts,
+      ts
+    );
     const row = getCharacter(id);
     if (!row) return reply.code(500).send({ error: "Could not create character." });
     const created = serializeCharacter(row, request.user.displayName, {

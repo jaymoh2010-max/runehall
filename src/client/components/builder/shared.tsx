@@ -131,6 +131,7 @@ export function StepHeading({
     <div className="step-heading">
       <PageEyebrow>{eyebrow}</PageEyebrow>
       <h1>{title}</h1>
+      <h2 className="sr-only">Step choices</h2>
       <p>{lede}</p>
     </div>
   );

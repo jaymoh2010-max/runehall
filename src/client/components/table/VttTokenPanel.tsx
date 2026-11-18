@@ -105,7 +105,7 @@ export function VttTokenPanel({
       <div className="vtt-left-head">
         <div>
           <span className="tiny muted">Scene</span>
-          <h3>{activeScene.name}</h3>
+          <h2>{activeScene.name}</h2>
         </div>
         {isGm ? (
           <Button size="sm" variant="ghost" onClick={() => setEditingScene(activeScene)}>

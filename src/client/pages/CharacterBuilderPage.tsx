@@ -772,6 +772,7 @@ export function CharacterBuilderPage() {
                 type="button"
                 className={`builder-step ${step === entry.id ? "is-active" : ""} is-${status}`}
                 onClick={() => setStep(entry.id)}
+                aria-label={`${entry.label}, ${status === "done" ? "complete" : status === "error" ? "needs attention" : status === "optional" ? "optional" : "pending"}`}
               >
                 <span className="builder-step-num">
                   {status === "done" ? <Check size={13} /> : index + 1}

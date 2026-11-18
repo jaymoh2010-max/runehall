@@ -23,7 +23,7 @@ export function SoundPanel({
   const fileRef = useRef<HTMLInputElement>(null);
   const pendingSeek = useRef<number | null>(null);
   const receivedRef = useRef<{ key: string; at: number } | null>(null);
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(false);
   const [joined, setJoined] = useState(false);
   const [volume, setVolume] = useState(0.7);
   const [uploading, setUploading] = useState(false);

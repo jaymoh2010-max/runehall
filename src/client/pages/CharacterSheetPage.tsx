@@ -516,6 +516,7 @@ export function CharacterSheetPage() {
   const hp = derived.currentHp;
   const fortune = draft.play;
   const xp = xpProgress(draft.play.xp, draft.level);
+  const reviewIssues = derived.validation.filter((issue) => issue.severity === "error");
 
   return (
     <div className="page sheet-page">
@@ -602,6 +603,21 @@ export function CharacterSheetPage() {
           </div>
         </div>
       </header>
+
+      {reviewIssues.length ? (
+        <div className="sheet-review-banner" role="status">
+          <CircleAlert size={16} />
+          <span>
+            {reviewIssues.length} required choice{reviewIssues.length === 1 ? "" : "s"} still need
+            review.
+          </span>
+          {canEdit ? (
+            <Link to={`/characters/${character.id}/edit`} className="btn btn-secondary btn-sm">
+              Open builder
+            </Link>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="sheet-layout">
         <div className="sheet-main">

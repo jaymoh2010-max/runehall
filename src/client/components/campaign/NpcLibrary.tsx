@@ -11,6 +11,7 @@ import {
   EmptyState,
   Field,
   IconButton,
+  initialsForName,
   Input,
   Modal,
   PageEyebrow,
@@ -382,7 +383,7 @@ function NpcEditor({
               {imageUrl ? (
                 <img src={imageUrl} alt="" loading="lazy" decoding="async" />
               ) : (
-                <span>{(name || "NPC").slice(0, 2).toUpperCase()}</span>
+                <span aria-hidden="true">{initialsForName(name || "NPC")}</span>
               )}
             </div>
             <Button

@@ -28,7 +28,7 @@ import { computeVision } from "../../../shared/vision";
 import { lightColorRgba } from "../../../shared/lighting";
 import { evaluateCover } from "../../../shared/cover";
 import { loadExplored, saveExplored } from "./explored";
-import { Tag } from "../ui";
+import { initialsForName, Tag } from "../ui";
 import { HoverCard } from "../HoverCard";
 import { BESTIARY_DRAG_TYPE, type BestiaryDragPayload } from "./bestiaryDrag";
 import {
@@ -1199,15 +1199,20 @@ export function SceneCanvas({
                 }}
                 tabIndex={0}
                 role="button"
-                aria-label={`${token.name}${token.characterId ? ", character token" : ""}${isGm ? ", right-click to edit" : ""}`}
+                aria-label={`${token.name}${token.characterId ? ", character token" : ""}${
+                  token.hpMax !== null && token.hpCurrent !== null
+                    ? `, ${token.hpCurrent} of ${token.hpMax} hit points`
+                    : ""
+                }${isGm ? ", right-click to edit" : ""}`}
               >
                 {portrait ? (
                   <img src={portrait} alt="" draggable={false} />
                 ) : (
                   <span
-                    style={{ background: `linear-gradient(145deg, ${token.color}33, #11161f)` }}
+                    aria-hidden="true"
+                    style={{ background: `linear-gradient(145deg, ${token.color}55, #11161f)` }}
                   >
-                    {token.name.slice(0, 2).toUpperCase()}
+                    {initialsForName(token.name)}
                   </span>
                 )}
                 <span className="scene-token-name">{token.name}</span>

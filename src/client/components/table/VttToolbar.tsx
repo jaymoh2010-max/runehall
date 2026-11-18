@@ -17,15 +17,12 @@ import {
   Users,
   X,
 } from "lucide-react";
-import type { PresenceUser, Scene, WallKind } from "../../../shared/types";
+import type { PresenceUser, WallKind } from "../../../shared/types";
 import { TEMPLATE_LABELS, TEMPLATE_SIZES, type TemplateKind } from "../../../shared/templates";
 import { Avatar, Button, IconButton, Select } from "../ui";
 
 export function VttToolbar({
   isGm,
-  scenes,
-  activeSceneId,
-  activateScene,
   activeSceneName,
   onPreviousScene,
   onNextScene,
@@ -63,9 +60,6 @@ export function VttToolbar({
   toast,
 }: {
   isGm: boolean;
-  scenes: Scene[];
-  activeSceneId: string | null;
-  activateScene: (sceneId: string) => void;
   activeSceneName: string;
   onPreviousScene?: () => void;
   onNextScene?: () => void;
@@ -110,17 +104,6 @@ export function VttToolbar({
       <div className="vtt-toolbar-left">
         {isGm ? (
           <>
-            <Select
-              value={activeSceneId ?? ""}
-              onChange={(event) => activateScene(event.target.value)}
-              className="scene-select"
-            >
-              {scenes.map((scene) => (
-                <option key={scene.id} value={scene.id}>
-                  {scene.name}
-                </option>
-              ))}
-            </Select>
             <IconButton
               label="Previous scene"
               onClick={onPreviousScene}
@@ -172,6 +155,7 @@ export function VttToolbar({
               value={brushSize}
               onChange={(event) => setBrushSize(Number(event.target.value))}
               className="brush-select"
+              aria-label="Fog brush size"
               title="Fog brush size"
             >
               <option value={1}>1×1</option>
@@ -194,6 +178,7 @@ export function VttToolbar({
                   value={wallKind}
                   onChange={(event) => setWallKind(event.target.value as WallKind)}
                   className="brush-select"
+                  aria-label="Wall or door"
                   title="Wall or door"
                 >
                   <option value="wall">Wall</option>
@@ -246,6 +231,7 @@ export function VttToolbar({
                 setTemplateKind((event.target.value || null) as TemplateKind | null)
               }
               className="template-select"
+              aria-label="Area template"
               title="Area template"
             >
               <option value="">Template</option>
@@ -260,6 +246,7 @@ export function VttToolbar({
                 value={templateSize}
                 onChange={(event) => setTemplateSize(Number(event.target.value))}
                 className="brush-select"
+                aria-label="Template size"
                 title="Template size"
               >
                 {TEMPLATE_SIZES.map((size) => (

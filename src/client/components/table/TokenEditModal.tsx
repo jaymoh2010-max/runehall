@@ -11,7 +11,7 @@ import { tokenConditionLabel } from "../../../shared/tokens";
 import { TOKEN_VISION_OPTIONS } from "../../../shared/lighting";
 import { uploadImage } from "../../api";
 import { errorMessage, useToasts } from "../../stores";
-import { Avatar, Button, Field, Input, Modal, Select, Tag, Toggle } from "../ui";
+import { Avatar, Button, Field, initialsForName, Input, Modal, Select, Tag, Toggle } from "../ui";
 
 interface TokenEditModalProps {
   open: boolean;
@@ -189,7 +189,7 @@ export function TokenEditModal({
             {imageUrl ? (
               <img src={imageUrl} alt="" />
             ) : (
-              <span>{name.slice(0, 2).toUpperCase() || "TO"}</span>
+              <span aria-hidden="true">{initialsForName(name)}</span>
             )}
           </div>
           <Button

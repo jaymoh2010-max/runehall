@@ -576,9 +576,12 @@ async function main() {
     importedHero.data?.level !== 1 ||
     !importedHero.data?.ancestryId ||
     !importedHero.data?.feats?.general?.["1"] ||
-    !importedHero.data?.equipment?.length
+    !importedHero.data?.equipment?.length ||
+    !importedHero.summary ||
+    importedHero.summary.level !== 1 ||
+    importedHero.summary.hp <= 0
   ) {
-    throw new Error("Pathbuilder import did not create the expected draft");
+    throw new Error("Pathbuilder import did not create the expected draft or summary");
   }
   if (pathbuilderImport.payload.report?.unmatched?.length) {
     throw new Error(

@@ -872,9 +872,6 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
     >
       <VttToolbar
         isGm={isGm}
-        scenes={scenes}
-        activeSceneId={activeSceneId}
-        activateScene={activateScene}
         activeSceneName={activeScene.name}
         onPreviousScene={previousScene ? () => activateScene(previousScene.id) : undefined}
         onNextScene={nextScene ? () => activateScene(nextScene.id) : undefined}

@@ -302,6 +302,17 @@ export function ErrorState({ message, onRetry }: { message: string; onRetry?: ()
   );
 }
 
+export function initialsForName(name: string): string {
+  return (
+    name
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0]?.toUpperCase())
+      .join("") || "?"
+  );
+}
+
 export function Avatar({
   name,
   src,
@@ -313,18 +324,13 @@ export function Avatar({
   size?: number;
   className?: string;
 }) {
-  const initials = name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase())
-    .join("");
   return (
     <span
       className={`avatar ${className}`}
       style={{ width: size, height: size, fontSize: Math.max(11, size * 0.32) }}
+      aria-hidden="true"
     >
-      {src ? <img src={src} alt="" loading="lazy" decoding="async" /> : initials || "?"}
+      {src ? <img src={src} alt="" loading="lazy" decoding="async" /> : initialsForName(name)}
     </span>
   );
 }
