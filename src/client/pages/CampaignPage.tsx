@@ -1473,9 +1473,11 @@ export function CampaignPage() {
                       <div>
                         <span className="field-label">Quest reward</span>
                         <p className="tiny muted">
-                          {selectedJournal.questXp > 0
-                            ? `${selectedJournal.questXp} XP when completed.`
-                            : "No XP reward set."}
+                          {campaign.xpMode === "xp"
+                            ? selectedJournal.questXp > 0
+                              ? `${selectedJournal.questXp} XP when completed.`
+                              : "No XP reward set."
+                            : "Milestone campaign: quest XP is not used for advancement."}
                           {selectedJournal.questRewardedAt
                             ? ` Awarded ${formatDate(selectedJournal.questRewardedAt)}.`
                             : ""}
@@ -1484,6 +1486,7 @@ export function CampaignPage() {
                       <div className="row" style={{ gap: 6, alignItems: "center" }}>
                         {selectedJournal.questRewardedAt ? <Tag tone="green">Rewarded</Tag> : null}
                         {isGm &&
+                        campaign.xpMode === "xp" &&
                         selectedJournal.questStatus === "completed" &&
                         selectedJournal.questXp > 0 &&
                         !selectedJournal.questRewardedAt ? (
@@ -1949,7 +1952,11 @@ export function CampaignPage() {
               </Field>
               <Field
                 label="Quest XP"
-                hint="Awarded to the party when completed. 0 disables the reward."
+                hint={
+                  campaign?.xpMode === "xp"
+                    ? "Awarded to the party when completed. 0 disables the reward."
+                    : "Stored for reference only in milestone campaigns."
+                }
               >
                 <Input
                   type="number"

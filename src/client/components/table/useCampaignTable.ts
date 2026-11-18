@@ -76,7 +76,6 @@ export function useCampaignTable({ initial, campaignId, toast }: UseCampaignTabl
 
   const revisionRef = useRef(initial.revision);
   const refreshingRef = useRef(false);
-  const wasConnectedOnce = useRef(false);
   const pointerTimer = useRef<number | null>(null);
   const scenesRef = useRef(scenes);
   const tokensRef = useRef(tokens);
@@ -163,11 +162,9 @@ export function useCampaignTable({ initial, campaignId, toast }: UseCampaignTabl
         return;
       }
       setConnectionStatus("online");
-      if (wasConnectedOnce.current) {
-        void refreshTable();
-      } else {
-        wasConnectedOnce.current = true;
-      }
+      // The initial snapshot may have been loaded before the GM created a
+      // scene or moved tokens. Always reconcile once the room is joined.
+      void refreshTable();
     });
     const onDisconnect = () => setConnectionStatus("offline");
     const onConnectError = () => setConnectionStatus("offline");

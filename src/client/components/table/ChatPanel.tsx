@@ -54,7 +54,8 @@ export function ChatPanel({
   const [formula, setFormula] = useState("1d20+5");
   const [label, setLabel] = useState("Check");
   const [dc, setDc] = useState("");
-  const [gmOnly, setGmOnly] = useState(false);
+  const [chatGmOnly, setChatGmOnly] = useState(false);
+  const [rollGmOnly, setRollGmOnly] = useState(false);
   const [rollError, setRollError] = useState("");
   const [activeRequestId, setActiveRequestId] = useState<string | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
@@ -70,7 +71,7 @@ export function ChatPanel({
     event.preventDefault();
     const clean = text.trim();
     if (!clean) return;
-    onSend(clean, gmOnly);
+    onSend(clean, chatGmOnly);
     setText("");
   };
 
@@ -90,7 +91,7 @@ export function ChatPanel({
       formula.trim(),
       label.trim() || "Roll",
       dc.trim() ? Number(dc) : null,
-      gmOnly,
+      rollGmOnly,
       activeRequestId
     );
     setActiveRequestId(null);
@@ -179,11 +180,11 @@ export function ChatPanel({
               />
             </label>
           </div>
-          <label className={`gm-toggle-row ${gmOnly ? "is-on" : ""}`}>
+          <label className={`gm-toggle-row ${rollGmOnly ? "is-on" : ""}`}>
             <input
               type="checkbox"
-              checked={gmOnly}
-              onChange={(event) => setGmOnly(event.target.checked)}
+              checked={rollGmOnly}
+              onChange={(event) => setRollGmOnly(event.target.checked)}
             />
             <EyeOff size={14} />
             <span>{isGm ? "Secret GM roll" : "Whisper roll to GM"}</span>
@@ -227,9 +228,9 @@ export function ChatPanel({
                 variant="secondary"
                 icon={<Megaphone size={13} />}
                 onClick={requestRoll}
-                disabled={disabled || gmOnly}
+                disabled={disabled || rollGmOnly}
                 title={
-                  gmOnly
+                  rollGmOnly
                     ? "Clear the secret roll option to request an open roll."
                     : "Send this roll request to the table"
                 }
@@ -300,11 +301,11 @@ export function ChatPanel({
           }}
         />
         <div className="chat-compose-foot">
-          <label className={`whisper-small ${gmOnly ? "is-on" : ""}`}>
+          <label className={`whisper-small ${chatGmOnly ? "is-on" : ""}`}>
             <input
               type="checkbox"
-              checked={gmOnly}
-              onChange={(event) => setGmOnly(event.target.checked)}
+              checked={chatGmOnly}
+              onChange={(event) => setChatGmOnly(event.target.checked)}
             />
             <EyeOff size={12} /> {isGm ? "GM only" : "Whisper GM"}
           </label>

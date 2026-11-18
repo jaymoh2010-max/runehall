@@ -132,18 +132,9 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
         ? existing.next_session_notes
         : sanitizeUserText(body.nextSessionNotes, 20_000);
 
-    let nextSessionAt = existing.next_session_at;
-    if (body.nextSessionAt !== undefined) {
-      if (body.nextSessionAt === null || body.nextSessionAt === "") {
-        nextSessionAt = null;
-      } else {
-        const value = Number(body.nextSessionAt);
-        if (!Number.isFinite(value) || value <= 0) {
-          return reply.code(400).send({ error: "Choose a valid next-session date." });
-        }
-        nextSessionAt = Math.round(value);
-      }
-    }
+    // Sessions own the canonical next-session date. Ignore the legacy
+    // dashboard field so the two views cannot drift apart.
+    const nextSessionAt = existing.next_session_at;
 
     const threads =
       body.threads === undefined
@@ -165,6 +156,7 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
       id
     );
     touchCampaign(id);
+    app.broadcastCampaign(id, "dashboard:updated", { campaignId: id });
     const row = ensureDashboard(id);
     return reply.send({ dashboard: serializeCampaignDashboard(row, "gm") });
   });

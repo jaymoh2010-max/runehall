@@ -77,22 +77,28 @@ This is the short checklist for the friend hosting Runehall and for the GM runni
 
 ## GM: session 1 checklist
 
-1. Open the campaign **Overview** and fill in the next session date/teaser if useful.
+1. Open **Sessions** and schedule the next gathering. That calendar is the single source for the
+   Overview's next-session date; add a shared teaser and GM notes on **Overview** if useful.
 2. Open **Party** and confirm every approved character is present and at the expected level.
 3. Open **Table**, pick or create a scene, and upload a map if needed.
 4. Add character tokens from **Add token**, then place monsters from the bestiary or encounter
    builder.
 5. Roll initiative when combat starts. The tracker handles grouped monsters, rounds, movement, HP,
    and conditions.
-6. Use **Table talk** for shared chat, **GM only** for whispers, and the dice tray for public or
-   secret rolls.
+6. Use **Table talk** for shared chat, **GM only** for whispered messages, and the dice tray's
+   **Secret GM roll** toggle for private rolls. The two toggles are independent.
 7. Use the **Soundtrack** panel to upload a track or add one from the bundled CC0 music library.
-   Players click **Join audio** once; they can leave audio locally without pausing the table.
+   Players click **Join audio** once; they can leave audio locally without pausing the table. After
+   a reload, the GM also gets **Join audio** when shared playback is already running.
 8. Distribute treasure from **Loot**, award XP only if using XP mode, and use **Long rest** when the
-   party rests.
+   party rests. Quest XP can only be paid out in XP tracking mode; milestone campaigns store the
+   value for reference.
 9. Record notes, handouts, and quests in **Journal**. Mark handouts visible when players should see
-   them.
-10. Before ending the night, write a short recap and take a backup.
+   them. A paid quest keeps its reward marker even if the handout is edited later.
+10. When combat ends, use **Clear launched** in the encounter launch dialog if monster tokens should
+    leave the scene. A fresh launch also replaces that encounter's earlier tokens on the same scene.
+11. Before ending the night, write a short recap, mark the session played in **Sessions**, and take a
+    backup.
 
 ## Known limits worth telling the table
 
@@ -103,8 +109,10 @@ This is the short checklist for the friend hosting Runehall and for the GM runni
   missing situational bonus.
 - Only Pathbuilder imports go through the GM approval queue. A player who joins without a character
   can create one directly in the campaign; the GM should check the Party tab before play.
-- Launch an encounter once per fight. Relaunching the same encounter on the same scene adds duplicate
-  monster tokens; there is no automatic cleanup button yet.
+- Encounter cleanup only knows tokens launched after this update. Tokens created by older launches
+  have no encounter tag, so remove any existing duplicates once by hand.
+- **Clear launched** removes every token that encounter placed across the campaign's scenes. It
+  intentionally leaves character, NPC, and manually created tokens on the table.
 - The character sheet autosaves after a short delay. Wait for the saved indicator before immediately
   leaving the sheet.
 - There is no travel/weather/hex map layer, shop economy, or AP chapter importer yet.

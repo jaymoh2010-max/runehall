@@ -18,6 +18,40 @@ export function normalizeTieBreaks(entries: InitiativeEntry[]): InitiativeEntry[
 }
 
 /**
+ * Keep initiative chips in step with token and group renames. Group entries
+ * keep their "×N" suffix; renaming one member must not relabel the whole group.
+ */
+export function renameInitiativeEntries(
+  entries: InitiativeEntry[],
+  change: {
+    tokenId: string;
+    name?: string | null;
+    groupId?: string | null;
+    groupName?: string | null;
+  }
+): InitiativeEntry[] {
+  const groupName = change.groupName?.trim() ?? "";
+  const tokenName = change.name?.trim() ?? "";
+  return entries.map((entry) => {
+    if (change.groupId && entry.groupId === change.groupId) {
+      const suffix = entry.name.match(/ ×\d+$/)?.[0] ?? "";
+      if (suffix) {
+        if (!groupName) return entry;
+        const nextName = `${groupName}${suffix}`.slice(0, 80);
+        return nextName === entry.name ? entry : { ...entry, name: nextName };
+      }
+      const nextName = (groupName || tokenName).slice(0, 80);
+      return nextName && nextName !== entry.name ? { ...entry, name: nextName } : entry;
+    }
+    if (change.tokenId && entry.tokenId === change.tokenId && tokenName) {
+      const nextName = tokenName.slice(0, 80);
+      return nextName !== entry.name ? { ...entry, name: nextName } : entry;
+    }
+    return entry;
+  });
+}
+
+/**
  * Remove hidden combatants from the player-facing initiative order without
  * leaking their names. If the hidden combatant is active, players start at the
  * top of the visible order instead of pointing at a missing index.

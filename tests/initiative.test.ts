@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { InitiativeEntry } from "../src/shared/types";
-import { filterInitiativeForPlayers, sortInitiativeEntries } from "../src/shared/initiative";
+import {
+  filterInitiativeForPlayers,
+  renameInitiativeEntries,
+  sortInitiativeEntries,
+} from "../src/shared/initiative";
 
 function entry(
   name: string,
@@ -35,6 +39,49 @@ describe("initiative ordering", () => {
   it("uses Perception as the default tie break", () => {
     const sorted = sortInitiativeEntries([entry("Lower", 15, 0, 2), entry("Higher", 15, 0, 7)]);
     expect(sorted.map((item) => item.name)).toEqual(["Higher", "Lower"]);
+  });
+});
+
+describe("initiative chip renames", () => {
+  it("renames a token entry without touching the rest of the order", () => {
+    const target = { ...entry("Old name", 20), tokenId: "tok_1" };
+    const other = { ...entry("Other", 15), tokenId: "tok_2" };
+    const renamed = renameInitiativeEntries([target, other], {
+      tokenId: "tok_1",
+      name: "New name",
+    });
+    expect(renamed.map((item) => item.name)).toEqual(["New name", "Other"]);
+  });
+
+  it("keeps a group's ×N suffix when its shared label changes", () => {
+    const target = {
+      ...entry("Guard ×3", 20),
+      tokenId: "tok_1",
+      groupId: "grp_1",
+      groupName: "Guard",
+    };
+    const renamed = renameInitiativeEntries([target], {
+      tokenId: "tok_1",
+      name: "Guard 1",
+      groupId: "grp_1",
+      groupName: "Iron Guard",
+    });
+    expect(renamed[0]?.name).toBe("Iron Guard ×3");
+  });
+
+  it("does not relabel a group when only one member is renamed", () => {
+    const target = {
+      ...entry("Guard ×3", 20),
+      tokenId: "tok_1",
+      groupId: "grp_1",
+      groupName: "Guard",
+    };
+    const renamed = renameInitiativeEntries([target], {
+      tokenId: "tok_1",
+      name: "Guard 1",
+      groupId: "grp_1",
+    });
+    expect(renamed[0]?.name).toBe("Guard ×3");
   });
 });
 

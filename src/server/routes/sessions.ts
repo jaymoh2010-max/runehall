@@ -24,15 +24,19 @@ function syncDashboardNextSession(campaignId: string): void {
   const ts = now();
   const next = db
     .prepare(
-      "SELECT scheduled_at FROM campaign_sessions WHERE campaign_id = ? AND status = 'scheduled' AND scheduled_at >= ? ORDER BY scheduled_at ASC LIMIT 1"
+      "SELECT scheduled_at FROM campaign_sessions WHERE campaign_id = ? AND status = 'scheduled' ORDER BY scheduled_at ASC LIMIT 1"
     )
-    .get(campaignId, ts) as { scheduled_at: number } | undefined;
+    .get(campaignId) as { scheduled_at: number } | undefined;
   db.prepare(
     "INSERT OR IGNORE INTO campaign_dashboard (campaign_id, updated_at) VALUES (?, ?)"
   ).run(campaignId, ts);
   db.prepare(
     "UPDATE campaign_dashboard SET next_session_at = ?, updated_at = ? WHERE campaign_id = ?"
   ).run(next?.scheduled_at ?? null, ts, campaignId);
+}
+
+function notifySessionsChanged(app: FastifyInstance, campaignId: string): void {
+  app.broadcastCampaign(campaignId, "sessions:changed", { campaignId });
 }
 
 function sessionFor(campaignId: string, sessionId: string) {
@@ -89,6 +93,7 @@ export async function registerSessionRoutes(app: FastifyInstance): Promise<void>
     );
     syncDashboardNextSession(id);
     touchCampaign(id);
+    notifySessionsChanged(app, id);
     return reply.code(201).send({ session: sessionFor(id, sessionId) });
   });
 
@@ -135,6 +140,7 @@ export async function registerSessionRoutes(app: FastifyInstance): Promise<void>
     );
     syncDashboardNextSession(id);
     touchCampaign(id);
+    notifySessionsChanged(app, id);
     return reply.send({ session: sessionFor(id, sessionId) });
   });
 
@@ -149,6 +155,7 @@ export async function registerSessionRoutes(app: FastifyInstance): Promise<void>
     db.prepare("DELETE FROM campaign_sessions WHERE id = ?").run(sessionId);
     syncDashboardNextSession(id);
     touchCampaign(id);
+    notifySessionsChanged(app, id);
     return reply.send({ ok: true });
   });
 
@@ -178,6 +185,7 @@ export async function registerSessionRoutes(app: FastifyInstance): Promise<void>
          DO UPDATE SET status = excluded.status, note = excluded.note, updated_at = excluded.updated_at`
     ).run(sessionId, userId, body.status, sanitizeUserText(body.note, 500), now());
     touchCampaign(id);
+    notifySessionsChanged(app, id);
     return reply.send({ session: sessionFor(id, sessionId) });
   });
 
@@ -206,6 +214,7 @@ export async function registerSessionRoutes(app: FastifyInstance): Promise<void>
       ).run(sessionId, request.user.id, body.status, now());
     }
     touchCampaign(id);
+    notifySessionsChanged(app, id);
     const session = campaignSessionsFor(id, role, request.user.id).find(
       (entry) => entry.id === sessionId
     );

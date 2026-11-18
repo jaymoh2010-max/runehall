@@ -379,6 +379,32 @@ export function EncounterBuilder({
     setLaunchOpen(true);
   };
 
+  const clearLaunched = async () => {
+    if (!selected) return;
+    if (
+      !window.confirm("Remove every token this encounter launched and their initiative entries?")
+    ) {
+      return;
+    }
+    setBusy(true);
+    try {
+      const result = await api<{ removed: number }>(
+        `/api/campaigns/${campaignId}/encounters/${selected.id}/clear`,
+        { method: "POST" }
+      );
+      toast(
+        result.removed
+          ? `Removed ${result.removed} launched token${result.removed === 1 ? "" : "s"}.`
+          : "No launched tokens were found.",
+        "success"
+      );
+    } catch (err) {
+      toast(errorMessage(err), "error");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const launch = async () => {
     if (!selected) return;
     if (!launchCombatants.length) {
@@ -911,6 +937,14 @@ export function EncounterBuilder({
               Cancel
             </Button>
             <Button
+              variant="ghost"
+              icon={<Trash2 size={14} />}
+              loading={busy}
+              onClick={() => void clearLaunched()}
+            >
+              Clear launched
+            </Button>
+            <Button
               variant="primary"
               icon={<Play size={14} />}
               loading={busy}
@@ -1024,7 +1058,7 @@ export function EncounterBuilder({
                 <span className="tiny muted">
                   {launchMode === "reinforce"
                     ? "Reinforcements arrive at the bottom edge of the scene. The current round and active turn stay put."
-                    : "Starts round 1 and rolls initiative for every visible token on the scene."}
+                    : "Starts round 1 and rolls initiative for every visible token on the scene. Fresh launch also replaces tokens this encounter already placed here."}
                   {xpMode === "xp"
                     ? ` ${launchBudget.awardXp} XP against a ${launchBudget.thresholds.moderate} XP moderate budget.`
                     : ""}

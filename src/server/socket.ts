@@ -12,7 +12,11 @@ import {
   tickTokenConditions,
 } from "../shared/tokens";
 import { applyDamageToDraft, reconcileLifeConditions } from "../shared/damage";
-import { filterInitiativeForPlayers, sortInitiativeEntries } from "../shared/initiative";
+import {
+  filterInitiativeForPlayers,
+  renameInitiativeEntries,
+  sortInitiativeEntries,
+} from "../shared/initiative";
 import { applyGridPath } from "../shared/movement";
 import { blockingPropForMove } from "../shared/collision";
 import { findPathAroundProps } from "../shared/pathfinding";
@@ -214,6 +218,10 @@ function broadcastInitiative(
     round: state.round,
     turnIndex: state.turn_index,
   });
+}
+
+export function broadcastCampaignInitiative(io: TypedServer, campaignId: string): void {
+  broadcastInitiative(io, campaignId, ensureState(campaignId));
 }
 
 function perceptionForToken(row: TokenRow): number {
@@ -752,6 +760,22 @@ export function registerSocketServer(io: TypedServer): void {
         // Hiding a rolled combatant must remove it from the live player
         // initiative order immediately, not only after the next snapshot.
         broadcastInitiative(io, campaignId, ensureState(campaignId));
+      }
+      if (updated && (token.name !== undefined || token.groupName !== undefined)) {
+        const state = ensureState(campaignId);
+        const entries = serializeInitiative(JSON.parse(state.initiative || "[]"));
+        const renamed = renameInitiativeEntries(entries, {
+          tokenId: updated.id,
+          name: updated.name,
+          groupId: updated.group_id,
+          groupName: updated.group_name,
+        });
+        if (renamed.some((entry, index) => entry.name !== entries[index]?.name)) {
+          db.prepare(
+            "UPDATE campaign_state SET initiative = ?, updated_at = ? WHERE campaign_id = ?"
+          ).run(JSON.stringify(renamed), now(), campaignId);
+          broadcastInitiative(io, campaignId, ensureState(campaignId));
+        }
       }
       // A GM changing a linked token's HP is a table action; mirror it into
       // the character sheet so the player's next view is consistent.
