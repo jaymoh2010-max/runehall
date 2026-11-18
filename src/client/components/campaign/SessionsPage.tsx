@@ -12,8 +12,10 @@ import {
   SESSION_CHECKIN_LABELS,
   SESSION_STATUS_LABELS,
   sessionCheckinSummary,
+  sessionTiming,
 } from "../../../shared/sessions";
 import { api } from "../../api";
+import { getSocket } from "../../socket";
 import { errorMessage } from "../../stores";
 import {
   Avatar,
@@ -90,6 +92,7 @@ export function SessionsPage({
   const [attendanceBusy, setAttendanceBusy] = useState<string | null>(null);
   const [checkinBusy, setCheckinBusy] = useState<string | null>(null);
   const [editor, setEditor] = useState<CampaignSession | "new" | null>(null);
+  const [refreshToken, setRefreshToken] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -107,16 +110,25 @@ export function SessionsPage({
     return () => {
       cancelled = true;
     };
+  }, [campaignId, refreshToken]);
+
+  useEffect(() => {
+    const socket = getSocket();
+    const onSessionsChanged = (payload: { campaignId: string }) => {
+      if (payload.campaignId === campaignId) setRefreshToken((value) => value + 1);
+    };
+    socket.on("sessions:changed", onSessionsChanged);
+    return () => {
+      socket.off("sessions:changed", onSessionsChanged);
+    };
   }, [campaignId]);
 
   const { upcoming, past } = useMemo(() => {
-    const now = Date.now();
     const upcomingEntries = sessions
-      .filter((session) => session.status === "scheduled" && session.scheduledAt >= now)
+      .filter((session) => session.status === "scheduled")
       .sort((a, b) => a.scheduledAt - b.scheduledAt);
-    const upcomingIds = new Set(upcomingEntries.map((session) => session.id));
     const pastEntries = sessions
-      .filter((session) => !upcomingIds.has(session.id))
+      .filter((session) => session.status !== "scheduled")
       .sort((a, b) => b.scheduledAt - a.scheduledAt);
     return { upcoming: upcomingEntries, past: pastEntries };
   }, [sessions]);
@@ -200,6 +212,7 @@ export function SessionsPage({
     const attended = session.attendance.filter((entry) => entry.status === "attended").length;
     const late = session.attendance.filter((entry) => entry.status === "late").length;
     const checkinSummary = sessionCheckinSummary(session.checkins);
+    const timing = session.status === "scheduled" ? sessionTiming(session) : null;
     const showCheckins = !isPast && session.status === "scheduled";
     return (
       <Card key={session.id} className="session-card">
@@ -218,12 +231,19 @@ export function SessionsPage({
                       ? "green"
                       : session.status === "canceled"
                         ? "red"
-                        : "gold"
+                        : timing === "overdue"
+                          ? "red"
+                          : timing === "in-progress"
+                            ? "green"
+                            : "gold"
                   }
                 >
-                  {SESSION_STATUS_LABELS[session.status]}
+                  {timing === "overdue"
+                    ? "Overdue"
+                    : timing === "in-progress"
+                      ? "In progress"
+                      : SESSION_STATUS_LABELS[session.status]}
                 </Badge>
-                {isPast && session.status === "scheduled" ? <Tag tone="red">Overdue</Tag> : null}
               </div>
               <p className="tiny muted">
                 {formatSessionTime(session.scheduledAt)} · {session.durationMinutes} min
@@ -439,7 +459,7 @@ export function SessionsPage({
         <>
           <section className="session-section">
             <div className="session-section-head">
-              <h3>Upcoming</h3>
+              <h3>Upcoming &amp; current</h3>
               <Badge tone="gold">{upcoming.length}</Badge>
             </div>
             {upcoming.length ? (

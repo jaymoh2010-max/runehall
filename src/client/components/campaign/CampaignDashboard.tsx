@@ -26,8 +26,9 @@ import type {
 } from "../../../shared/types";
 import { formatGolarionDate, GOLARION_MONTHS, type GolarionDate } from "../../../shared/calendar";
 import { openThreadCount } from "../../../shared/dashboard";
-import { sessionCheckinSummary } from "../../../shared/sessions";
+import { nextScheduledSession, sessionCheckinSummary } from "../../../shared/sessions";
 import { api, formatDate } from "../../api";
+import { getSocket } from "../../socket";
 import { errorMessage } from "../../stores";
 import { JournalBody } from "../JournalBody";
 import {
@@ -105,7 +106,7 @@ export function CampaignDashboard({
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [lastSummary, setLastSummary] = useState("");
-  const [nextAt, setNextAt] = useState("");
+  const [refreshToken, setRefreshToken] = useState(0);
   const [teaser, setTeaser] = useState("");
   const [notes, setNotes] = useState("");
   const [threads, setThreads] = useState<CampaignThread[]>([]);
@@ -144,7 +145,6 @@ export function CampaignDashboard({
         if (cancelled) return;
         setDashboard(result.dashboard);
         setLastSummary(result.dashboard.lastSessionSummary);
-        setNextAt(toDateTimeLocal(result.dashboard.nextSessionAt));
         setTeaser(result.dashboard.nextSessionTeaser);
         setNotes(result.dashboard.nextSessionNotes);
         setThreads(result.dashboard.threads);
@@ -158,24 +158,33 @@ export function CampaignDashboard({
     return () => {
       cancelled = true;
     };
-  }, [campaignId]);
+  }, [campaignId, refreshToken]);
 
   useEffect(() => {
     let cancelled = false;
     api<{ sessions: CampaignSession[] }>(`/api/campaigns/${campaignId}/sessions`)
       .then((result) => {
         if (cancelled) return;
-        const scheduled = result.sessions
-          .filter((session) => session.status === "scheduled")
-          .sort((a, b) => a.scheduledAt - b.scheduledAt);
-        const now = Date.now();
-        setNextSession(scheduled.find((session) => session.scheduledAt >= now) ?? null);
+        setNextSession(nextScheduledSession(result.sessions));
       })
       .catch(() => {
         // The check-in reminder is optional; the dashboard remains usable without it.
       });
     return () => {
       cancelled = true;
+    };
+  }, [campaignId, refreshToken]);
+
+  useEffect(() => {
+    const socket = getSocket();
+    const refresh = (payload: { campaignId: string }) => {
+      if (payload.campaignId === campaignId) setRefreshToken((value) => value + 1);
+    };
+    socket.on("sessions:changed", refresh);
+    socket.on("dashboard:updated", refresh);
+    return () => {
+      socket.off("sessions:changed", refresh);
+      socket.off("dashboard:updated", refresh);
     };
   }, [campaignId]);
 
@@ -234,7 +243,6 @@ export function CampaignDashboard({
           method: "PATCH",
           body: {
             lastSessionSummary: lastSummary,
-            nextSessionAt: nextAt ? new Date(nextAt).getTime() : null,
             nextSessionTeaser: teaser,
             nextSessionNotes: notes,
             threads,
@@ -469,18 +477,19 @@ export function CampaignDashboard({
           <div className="row-between">
             <div>
               <PageEyebrow>Next session</PageEyebrow>
-              <h3>{formatNextSession(dashboard.nextSessionAt)}</h3>
+              <h3>{formatNextSession(nextSession?.scheduledAt ?? null)}</h3>
             </div>
             <CalendarDays size={20} />
           </div>
           {isGm ? (
-            <Field label="Date and time">
-              <Input
-                type="datetime-local"
-                value={nextAt}
-                onChange={(event) => setNextAt(event.target.value)}
-              />
-            </Field>
+            <Button
+              size="sm"
+              variant="ghost"
+              icon={<CalendarDays size={14} />}
+              onClick={() => onNavigate("sessions")}
+            >
+              Schedule in Sessions
+            </Button>
           ) : null}
           {isGm ? (
             <Field label="Shared teaser" hint="A spoiler-free line for the players.">

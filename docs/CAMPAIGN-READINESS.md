@@ -4,7 +4,7 @@
 **Scope:** PF2e Remastered campaign play from session zero through level 20, compared with GM Core/Player Core and common GM/player tooling expectations.  
 **Artifacts:** `scripts/simulate-campaign.ts` (new), `scripts/lib/simHeroes.ts` (new), `npm run simulate:campaign`.
 
-> **Current status (release pass, November 2026):** Many items from the original P0 audit are now implemented: condition modifiers, temp HP absorption, dying/unconscious life state, healing reconciliation, Hero Point reroll, Refocus, hidden-token initiative filtering, hidden-prop filtering, and linked-token HP preservation. Still open for a first campaign: afflictions, full spell heightening/cast-time spending, recovery checks/doomed automation, encounter cleanup/relaunch, hidden walls/templates review, and enforced movement. The tables below preserve the original audit baseline; read the status labels alongside the README and ROADMAP for the current implementation.
+> **Current status (release pass, November 2026):** Many items from the original P0 audit are now implemented: condition modifiers, temp HP absorption, dying/unconscious life state, healing reconciliation, Hero Point reroll, Refocus, hidden-token initiative filtering, hidden-prop filtering, linked-token HP preservation, and encounter cleanup/relaunch. Sessions now stay current until marked played, session changes reach open dashboards live, and the Sessions calendar is the single source for the next-session date. Quest XP is gated to XP tracking mode and a paid reward cannot be reset by editing the handout. Secret chat and secret rolls use independent toggles. Still open for a first campaign: afflictions, full spell heightening/cast-time spending, recovery checks/doomed automation, hidden walls/templates review, and enforced movement. The tables below preserve the original audit baseline; read the status labels alongside the README and ROADMAP for the current implementation.
 
 ---
 
@@ -39,12 +39,12 @@ Two simulated campaigns were run against an isolated server with real accounts a
   - Campaign export/import at level 20 (characters, levels, calendar, scenes, journal, loot, sessions, NPCs, XP mode).
 - **B: The Quiet Ledger** — 2 players, milestone advancement.
   - Story level-ups from 1→20 with no XP requirement.
-  - Quest XP one-time award in milestone mode.
+  - Quest XP one-time award in XP mode; milestone campaigns reject the award and keep the value for reference.
   - Live campaign metadata to a connected player.
   - Mid-campaign replacement character advanced to party level.
   - Sessions/recap/handout in milestone play.
 
-**Result (current release pass):** 68 passing checks, 0 failing checks, 7 recorded gaps. Two linked-token bugs were found and fixed:
+**Result (current release pass):** 68 passing checks, 0 failing checks, 5 recorded gaps. Encounter cleanup is now exercised after every simulated act, and milestone quest XP is verified as blocked. Two linked-token bugs were found and fixed:
 
 - Hiding a token after initiative was rolled still exposed its name in the player's initiative order. The server now filters hidden combatants from player snapshots and live initiative broadcasts, with a shared helper and unit coverage (`src/shared/initiative.ts`, `src/server/routes/table.ts`, `src/server/socket.ts`, `tests/initiative.test.ts`).
 - Creating a token for a wounded character reset its current HP to full. New tokens now start at the sheet's current HP unless the GM explicitly supplies one (`src/server/socket.ts`).
@@ -99,7 +99,7 @@ These are the items most likely to make a sheet or combat state look right while
 | Focus/Refocus and daily preparations | Focus and Refocus exist; structured daily preparation is still manual. | Partial — M |
 | Temp HP absorption | Implemented for token and sheet damage. | Done |
 | Feat/item automation coverage and truthful badges | Only a curated subset of feats/items is automated; manual effects remain common. | Open — XL, ongoing |
-| Encounter cleanup/relaunch | Fresh launches accumulate monster tokens and there is no “clear encounter” action. | Open — S–M |
+| Encounter cleanup/relaunch | Launched tokens carry encounter provenance. A fresh launch replaces that encounter's earlier tokens on the scene, and **Clear launched** removes its tokens and initiative entries without touching linked or manual tokens. Tokens launched before this update require a one-time manual cleanup. | Done |
 | Hidden data on the table | Hidden-token initiative and hidden props are filtered; review hidden walls/templates before relying on them. | Partial — S–M |
 | Movement enforcement | Straight-line moves and off-turn movement are warned about but not enforced; speed is advisory. | Open — M |
 
@@ -145,7 +145,7 @@ The VTT is the strongest differentiator, but several PF2e combat expectations ar
 - **Movement/terrain:** no difficult terrain, squeezing, forced movement, elevation/flying, reach, flanking/off-guard, or token-to-token collision.
 - **Hazards:** traps/hazards are custom combatants at best; no hazard XP or simple/complex hazard model.
 - **Monster actions:** bestiary stats are display-only; no attack/ability buttons or recharge tracking.
-- **Table hygiene:** scene deletion leaves ghost initiative entries; hidden props/walls/templates are sent to players; encounter relaunch duplicates monsters.
+- **Table hygiene:** scene deletion leaves ghost initiative entries; hidden props/walls/templates are sent to players. Encounter relaunch and cleanup are handled for tokens launched after the provenance migration.
 - **Exploration layer:** no time-of-day/weather, hex/travel map, shops, chase tracks, or VP clocks.
 
 ---
@@ -153,13 +153,13 @@ The VTT is the strongest differentiator, but several PF2e combat expectations ar
 ## Recommended sequence
 
 ### Sprint A — make the sheet and table trustworthy
-Already completed: condition modifiers, temp HP/dying/unconscious, healing reconciliation, Hero Point reroll, Refocus, hidden-token/prop filtering, and PC token HP preservation.
+Already completed: condition modifiers, temp HP/dying/unconscious, healing reconciliation, Hero Point reroll, Refocus, hidden-token/prop filtering, PC token HP preservation, and encounter cleanup/relaunch.
 
 Remaining:
 1. Full recovery-check/doomed and affliction automation.
 2. GM Hero Point award/session reset; structured daily preparations.
 3. Spell heightening and cast-time resource spending.
-4. Encounter cleanup, hidden-wall/template review, and movement enforcement.
+4. Hidden-wall/template review and movement enforcement.
 5. Tighten automation badges so “Automated” can never hide a manual bonus.
 
 **Exit criteria:** a player can be dropped to 0 HP, stabilized, wounded, treated, and rested without a GM spreadsheet; frightened/off-guard/clumsy actually change rolls; a caster can cast at the correct heightened rank and spend the slot.

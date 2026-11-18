@@ -1345,12 +1345,9 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
           ? existingXp
           : normalizeQuestXp(body.questXp)
         : 0;
-    const questRewardedAt =
-      questStatus === existingStatus &&
-      questXp === existingXp &&
-      normalizeJournalKind(existing.kind) === kind
-        ? existing.quest_rewarded_at
-        : null;
+    // A paid quest reward stays paid even if the GM later edits the handout;
+    // this prevents a double award through the same entry.
+    const questRewardedAt = existing.quest_rewarded_at;
     db.prepare(
       "UPDATE journal_entries SET title = ?, content = ?, visible = ?, kind = ?, attachments = ?, quest_status = ?, quest_xp = ?, quest_rewarded_at = ?, updated_at = ? WHERE id = ?"
     ).run(
@@ -1425,6 +1422,11 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
     const role = getMembership(id, request.user.id)?.role;
     if (role !== "gm") {
       return reply.code(403).send({ error: "Only the GM can award quest XP." });
+    }
+    const campaign = getCampaign(id);
+    if (!campaign) return reply.code(404).send({ error: "Campaign not found." });
+    if (normalizeXpMode(campaign.xp_mode) !== "xp") {
+      return reply.code(400).send({ error: "Quest XP is only awarded in XP tracking mode." });
     }
     const existing = db
       .prepare("SELECT * FROM journal_entries WHERE id = ? AND campaign_id = ?")

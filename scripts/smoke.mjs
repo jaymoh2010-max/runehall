@@ -888,7 +888,6 @@ async function main() {
     cookie: gmCookie,
     body: {
       lastSessionSummary: "The smoke test party survived the vault.",
-      nextSessionAt: Date.now() + 86_400_000,
       nextSessionTeaser: "The next door is already open.",
       nextSessionNotes: "Only the GM should see this note.",
       threads: [
@@ -1017,7 +1016,42 @@ async function main() {
   if (dashboardAfterSession.payload.dashboard?.nextSessionAt !== scheduledAt) {
     throw new Error("Scheduled session did not sync to the dashboard");
   }
-  log("session schedule and attendance stayed GM-managed");
+  const spoofedDashboard = await api(`/api/campaigns/${campaign.id}/dashboard`, {
+    method: "PATCH",
+    cookie: gmCookie,
+    body: { nextSessionAt: scheduledAt + 86_400_000 },
+  });
+  if (spoofedDashboard.payload.dashboard?.nextSessionAt !== scheduledAt) {
+    throw new Error("Dashboard next-session date drifted from the session calendar");
+  }
+  const pastSessionAt = Date.now() - 2 * 86_400_000;
+  const pastSession = (
+    await api(`/api/campaigns/${campaign.id}/sessions`, {
+      method: "POST",
+      cookie: gmCookie,
+      body: { title: "Past Smoke Session", scheduledAt: pastSessionAt, durationMinutes: 120 },
+    })
+  ).payload.session;
+  const dashboardAfterPast = await api(`/api/campaigns/${campaign.id}/dashboard`, {
+    cookie: gmCookie,
+  });
+  if (dashboardAfterPast.payload.dashboard?.nextSessionAt !== pastSessionAt) {
+    throw new Error("An overdue scheduled session stopped being the next session");
+  }
+  const sessionsWithPast = await api(`/api/campaigns/${campaign.id}/sessions`, {
+    cookie: gmCookie,
+  });
+  const overdueSession = sessionsWithPast.payload.sessions.find(
+    (session) => session.id === pastSession.id
+  );
+  if (!overdueSession || overdueSession.status !== "scheduled") {
+    throw new Error("An overdue scheduled session disappeared from the session list");
+  }
+  await api(`/api/campaigns/${campaign.id}/sessions/${pastSession.id}`, {
+    method: "DELETE",
+    cookie: gmCookie,
+  });
+  log("sessions remain current until played and own the dashboard date");
 
   const npcResult = await api(`/api/campaigns/${campaign.id}/npcs`, {
     method: "POST",
@@ -1542,6 +1576,22 @@ async function main() {
   }
   const beforeQuestXp = await api(`/api/characters/${character.id}`, { cookie: playerCookie });
   const startingXp = beforeQuestXp.payload.character.data.play.xp;
+  const milestoneQuestAward = await fetch(
+    `${base}/api/campaigns/${campaign.id}/journal/${questEntry.id}/award-quest-xp`,
+    {
+      method: "POST",
+      headers: { cookie: gmCookie, "content-type": "application/json" },
+      body: "{}",
+    }
+  );
+  if (milestoneQuestAward.status !== 400) {
+    throw new Error("Milestone campaigns could award quest XP");
+  }
+  await api(`/api/campaigns/${campaign.id}`, {
+    method: "PATCH",
+    cookie: gmCookie,
+    body: { xpMode: "xp" },
+  });
   const questAward = await api(
     `/api/campaigns/${campaign.id}/journal/${questEntry.id}/award-quest-xp`,
     { method: "POST", cookie: gmCookie, body: {} }
@@ -1567,6 +1617,14 @@ async function main() {
   );
   if (repeatQuest.status !== 409) {
     throw new Error("A quest reward could be awarded twice");
+  }
+  const editedQuest = await api(`/api/campaigns/${campaign.id}/journal/${questEntry.id}`, {
+    method: "PUT",
+    cookie: gmCookie,
+    body: { questXp: 60 },
+  });
+  if (editedQuest.payload.entry.questRewardedAt === null) {
+    throw new Error("Editing a paid quest cleared its reward marker");
   }
   const playerQuest = await fetch(
     `${base}/api/campaigns/${campaign.id}/journal/${questEntry.id}/award-quest-xp`,
@@ -2260,7 +2318,101 @@ async function main() {
     headers: { cookie: playerCookie },
   });
   if (playerEncounter.status !== 403) throw new Error("Player could read GM encounter prep");
-  log("encounter waves, reinforcement launches, and duplication are supported");
+
+  // Hidden combatants stay out of the player-facing initiative order even when
+  // a reinforcement launch re-broadcasts the authoritative order.
+  const hiddenWatcher = await connectSocket(playerCookie);
+  await emitAck(hiddenWatcher, "campaign:join", { campaignId: campaign.id });
+  const hiddenCombatant = await emitAck(gmSocket, "token:create", {
+    campaignId: campaign.id,
+    sceneId: scene.id,
+    token: { name: "Smoke Hidden Reinforcer", x: 740, y: 740, size: 1 },
+  });
+  if (!hiddenCombatant?.id) {
+    throw new Error(`Hidden combatant token was not created: ${JSON.stringify(hiddenCombatant)}`);
+  }
+  const hiddenRoll = waitForEvent(gmSocket, "initiative:updated", (payload) =>
+    payload.entries?.some((entry) => entry.tokenId === hiddenCombatant.id)
+  );
+  gmSocket.emit("initiative:roll", { campaignId: campaign.id, sceneId: scene.id });
+  await hiddenRoll.catch((error) => {
+    throw new Error(`Hidden combatant roll failed: ${error.message}`);
+  });
+  const hiddenRemoved = waitForEvent(
+    hiddenWatcher,
+    "token:deleted",
+    (payload) => payload.tokenId === hiddenCombatant.id
+  );
+  gmSocket.emit("token:update", {
+    campaignId: campaign.id,
+    token: { id: hiddenCombatant.id, hidden: true },
+  });
+  await hiddenRemoved.catch((error) => {
+    throw new Error(`Hidden combatant removal failed: ${error.message}`);
+  });
+  const playerReinforcement = waitForEvent(hiddenWatcher, "initiative:updated", (payload) =>
+    payload.entries?.some((entry) => String(entry.name).startsWith("Wave Two Guard"))
+  );
+  await api(`/api/campaigns/${campaign.id}/encounters/${smokeEncounter.id}/launch`, {
+    method: "POST",
+    cookie: gmCookie,
+    body: { sceneId: scene.id, wave: 3, mode: "reinforce" },
+  });
+  const playerReinforcementPayload = await playerReinforcement.catch((error) => {
+    throw new Error(`Reinforcement did not reach the player: ${error.message}`);
+  });
+  if (
+    playerReinforcementPayload.entries.some(
+      (entry) =>
+        entry.tokenId === hiddenCombatant.id ||
+        String(entry.name).includes("Smoke Hidden Reinforcer")
+    )
+  ) {
+    throw new Error("Reinforcement leaked a hidden combatant to players");
+  }
+
+  const freshAgain = await api(
+    `/api/campaigns/${campaign.id}/encounters/${smokeEncounter.id}/launch`,
+    { method: "POST", cookie: gmCookie, body: { sceneId: scene.id, wave: 1, mode: "fresh" } }
+  );
+  if (freshAgain.payload.tokens.length !== 2) {
+    throw new Error("A second fresh launch did not replace the earlier encounter tokens");
+  }
+  const afterFresh = await api(`/api/campaigns/${campaign.id}/table`, { cookie: gmCookie });
+  const staleTokens = afterFresh.payload.tokens.filter((entry) =>
+    String(entry.name).startsWith("Wave Two Guard")
+  );
+  if (
+    staleTokens.length ||
+    !afterFresh.payload.tokens.some((entry) => entry.id === hiddenCombatant.id)
+  ) {
+    throw new Error("Fresh launch did not clear only its own encounter tokens");
+  }
+  const playerClear = await fetch(
+    `${base}/api/campaigns/${campaign.id}/encounters/${smokeEncounter.id}/clear`,
+    { method: "POST", headers: { cookie: playerCookie } }
+  );
+  if (playerClear.status !== 403) throw new Error("Player could clear a launched encounter");
+  const clearedEncounter = await api(
+    `/api/campaigns/${campaign.id}/encounters/${smokeEncounter.id}/clear`,
+    { method: "POST", cookie: gmCookie }
+  );
+  if (clearedEncounter.payload.removed !== 2) {
+    throw new Error("Clearing a launched encounter did not remove its tokens");
+  }
+  const afterClear = await api(`/api/campaigns/${campaign.id}/table`, { cookie: gmCookie });
+  if (
+    afterClear.payload.tokens.some((entry) => String(entry.name).startsWith("Wave One Guard")) ||
+    afterClear.payload.initiative.some((entry) => String(entry.name).startsWith("Wave One Guard"))
+  ) {
+    throw new Error("Encounter clear left launched tokens or initiative entries behind");
+  }
+  if (!afterClear.payload.tokens.some((entry) => entry.id === hiddenCombatant.id)) {
+    throw new Error("Encounter clear removed a token it did not launch");
+  }
+  gmSocket.emit("token:delete", { campaignId: campaign.id, tokenId: hiddenCombatant.id });
+  hiddenWatcher.close();
+  log("encounter waves, reinforcement launches, hidden initiative, and cleanup are supported");
 
   gmSocket.close();
   playerSocket.close();

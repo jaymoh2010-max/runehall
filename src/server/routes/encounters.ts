@@ -13,9 +13,11 @@ import {
 import {
   serializeEncounter,
   serializeEncounterCombatant,
+  serializeInitiative,
   serializeToken,
   touchCampaign,
 } from "../serialize";
+import { broadcastCampaignInitiative, type TypedServer } from "../socket";
 import { tokenEventsFor } from "../tokenEvents";
 import type { EncounterLaunchMode, InitiativeEntry } from "../../shared/types";
 import { rollFormula } from "../../shared/dice";
@@ -85,6 +87,57 @@ function ensureState(campaignId: string) {
     round: number;
     turn_index: number;
   };
+}
+
+function clearLaunchedTokens(
+  app: FastifyInstance,
+  campaignId: string,
+  encounterId: string,
+  sceneId?: string
+): number {
+  const rows = db
+    .prepare(
+      `SELECT t.* FROM tokens t
+       JOIN scenes s ON s.id = t.scene_id
+       WHERE t.encounter_id = ? AND s.campaign_id = ?
+       ${sceneId ? "AND t.scene_id = ?" : ""}`
+    )
+    .all(
+      ...(sceneId ? [encounterId, campaignId, sceneId] : [encounterId, campaignId])
+    ) as TokenRow[];
+  if (!rows.length) return 0;
+  const ids = rows.map((row) => row.id);
+  const placeholders = ids.map(() => "?").join(",");
+  db.prepare(`DELETE FROM tokens WHERE id IN (${placeholders})`).run(...ids);
+
+  const state = ensureState(campaignId);
+  const allEntries = serializeInitiative(JSON.parse(state.initiative || "[]"));
+  const activeId = allEntries[state.turn_index]?.id ?? null;
+  const removedIds = new Set(ids);
+  const entries = allEntries.filter((entry) => !entry.tokenId || !removedIds.has(entry.tokenId));
+  if (entries.length !== allEntries.length) {
+    const nextTurn = activeId
+      ? Math.max(
+          0,
+          entries.findIndex((entry) => entry.id === activeId)
+        )
+      : 0;
+    db.prepare(
+      "UPDATE campaign_state SET initiative = ?, turn_index = ?, updated_at = ? WHERE campaign_id = ?"
+    ).run(JSON.stringify(entries), nextTurn, now(), campaignId);
+  }
+
+  for (const token of rows) {
+    tokenEventsFor(app, campaignId).deleted(
+      { tokenId: token.id, sceneId: token.scene_id },
+      Boolean(token.hidden)
+    );
+  }
+  if (entries.length !== allEntries.length) {
+    broadcastCampaignInitiative(app.io as unknown as TypedServer, campaignId);
+  }
+  touchCampaign(campaignId);
+  return rows.length;
 }
 
 function tokenInitiativeBonus(token: TokenRow): number {
@@ -443,6 +496,16 @@ export async function registerEncounterRoutes(app: FastifyInstance): Promise<voi
     }
   );
 
+  app.post("/api/campaigns/:id/encounters/:encounterId/clear", async (request, reply) => {
+    const { id, encounterId } = request.params as { id: string; encounterId: string };
+    const access = gmRequires(request, id);
+    if (!access.row) return reply.code(access.code ?? 403).send({ error: access.error });
+    if (!getEncounter(id, encounterId)) {
+      return reply.code(404).send({ error: "Encounter not found." });
+    }
+    return reply.send({ removed: clearLaunchedTokens(app, id, encounterId) });
+  });
+
   app.post("/api/campaigns/:id/encounters/:encounterId/launch", async (request, reply) => {
     const { id, encounterId } = request.params as { id: string; encounterId: string };
     const access = gmRequires(request, id);
@@ -501,6 +564,11 @@ export async function registerEncounterRoutes(app: FastifyInstance): Promise<voi
     if (!combatants.length) {
       return reply.code(400).send({ error: `Wave ${wave} has no combatants.` });
     }
+    if (mode === "fresh") {
+      // A fresh launch replaces only the tokens this encounter already placed
+      // on the target scene; linked character and NPC tokens are untouched.
+      clearLaunchedTokens(app, id, encounterId, scene.id);
+    }
 
     const copies = combatants.reduce((total, combatant) => total + Math.max(1, combatant.count), 0);
     if (copies > 200) {
@@ -554,11 +622,12 @@ export async function registerEncounterRoutes(app: FastifyInstance): Promise<voi
         }
         db.prepare(
           `INSERT INTO tokens
-            (id, scene_id, name, image_url, character_id, owner_id, x, y, size, color, hp_current, hp_max, ac, initiative_bonus, group_id, group_name, conditions, hidden, locked, sort_order, created_at, updated_at)
-           VALUES (?, ?, ?, NULL, NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '[]', 0, 0, ?, ?, ?)`
+            (id, scene_id, encounter_id, name, image_url, character_id, owner_id, x, y, size, color, hp_current, hp_max, ac, initiative_bonus, group_id, group_name, conditions, hidden, locked, sort_order, created_at, updated_at)
+           VALUES (?, ?, ?, ?, NULL, NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '[]', 0, 0, ?, ?, ?)`
         ).run(
           tokenId,
           scene.id,
+          encounterId,
           name,
           x,
           y,
@@ -610,7 +679,7 @@ export async function registerEncounterRoutes(app: FastifyInstance): Promise<voi
       tokenEventsFor(app, id).created(serializeToken(token));
     }
     app.broadcastCampaign(id, "scene:activated", { sceneId: scene.id });
-    app.broadcastCampaign(id, "initiative:updated", { entries, round, turnIndex });
+    broadcastCampaignInitiative(app.io as unknown as TypedServer, id);
     touchCampaign(id);
 
     return reply.send({

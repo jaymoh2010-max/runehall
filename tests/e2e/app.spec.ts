@@ -210,6 +210,34 @@ test("GM awards XP in XP tracking mode without automatic level-up", async ({ pag
   await expect(page.getByText(/Level 2/).first()).toBeVisible();
 });
 
+test("GM schedules from Sessions and overdue sessions stay current", async ({ page }) => {
+  await signIn(page, admin);
+  await page.goto(`${campaignPath}?tab=sessions`);
+  await expect(page.getByRole("heading", { name: "Sessions", exact: true })).toBeVisible();
+
+  await page.getByRole("button", { name: "Schedule session" }).click();
+  const dialog = page.getByRole("dialog", { name: "Schedule a session" });
+  await expect(dialog).toBeVisible();
+  await dialog.getByLabel("Title").fill("E2E Overdue Session");
+  await dialog.getByLabel("Date and time").fill("2020-01-05T19:00");
+  await dialog.getByRole("button", { name: "Schedule session" }).click();
+  await expect(page.getByText("Session scheduled.")).toBeVisible();
+
+  const card = page.locator(".session-card").filter({ hasText: "E2E Overdue Session" });
+  await expect(card.getByText("Overdue", { exact: true })).toBeVisible();
+  await expect(card.getByText("Check-in", { exact: true })).toBeVisible();
+  await expect(card.getByRole("button", { name: "Mark played" })).toBeVisible();
+
+  await page
+    .locator(".campaign-tabs")
+    .getByRole("button", { name: /^Overview/ })
+    .click();
+  const nextCard = page.locator(".dashboard-next");
+  await expect(nextCard.getByRole("heading", { level: 3 })).not.toHaveText("Not scheduled");
+  await expect(nextCard.getByRole("button", { name: "Schedule in Sessions" })).toBeVisible();
+  await expect(nextCard.locator('input[type="datetime-local"]')).toHaveCount(0);
+});
+
 test("lazy library, compendium entry, rules, and account routes load", async ({ page }) => {
   await signIn(page, admin);
   await page.goto("/library");
@@ -271,6 +299,18 @@ test("player registers, joins with the invite code, and sees a player-safe table
   await expect(adminDate).not.toHaveText(beforeDate ?? "", { timeout: 15_000 });
   const afterDate = (await adminDate.textContent())?.trim();
   await expect(playerDate).toHaveText(afterDate ?? "", { timeout: 15_000 });
+
+  // A session scheduled by the GM appears for a player already on the page.
+  await page.goto(`${campaignPath}?tab=sessions`);
+  await expect(page.getByRole("heading", { name: "Sessions", exact: true })).toBeVisible();
+  await adminPage.goto(`${campaignPath}?tab=sessions`);
+  await adminPage.getByRole("button", { name: "Schedule session" }).click();
+  const liveDialog = adminPage.getByRole("dialog", { name: "Schedule a session" });
+  await expect(liveDialog).toBeVisible();
+  await liveDialog.getByLabel("Title").fill("E2E Live Session");
+  await liveDialog.getByLabel("Date and time").fill("2031-06-14T18:30");
+  await liveDialog.getByRole("button", { name: "Schedule session" }).click();
+  await expect(page.getByText("E2E Live Session")).toBeVisible({ timeout: 15_000 });
 
   await adminContext.close();
 });

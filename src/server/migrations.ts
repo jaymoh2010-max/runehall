@@ -576,4 +576,12 @@ export const migrations: Migration[] = [
         ('lib:whispers-in-the-fog', 'Whispers in the Fog', 'mystery', '/audio-library/whispers-in-the-fog.ogg', 'audio/ogg', 204349, 'Ruhinre', 'CC0 1.0', 'https://opengameart.org/content/whispers-in-the-fog', 140);
     `,
   },
+  {
+    version: 30,
+    name: "encounter_token_provenance",
+    sql: `
+      ALTER TABLE tokens ADD COLUMN encounter_id TEXT;
+      CREATE INDEX IF NOT EXISTS idx_tokens_encounter ON tokens(encounter_id);
+    `,
+  },
 ];

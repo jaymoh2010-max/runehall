@@ -94,6 +94,10 @@ describe("migrations", () => {
       name: string;
     }[];
     expect(sessionColumns.map((column) => column.name)).toContain("agenda");
+    const tokenColumns = db.prepare("PRAGMA table_info(tokens)").all() as {
+      name: string;
+    }[];
+    expect(tokenColumns.map((column) => column.name)).toContain("encounter_id");
 
     const columns = db.prepare("PRAGMA table_info(users)").all() as { name: string }[];
     expect(columns.map((column) => column.name)).toContain("is_admin");

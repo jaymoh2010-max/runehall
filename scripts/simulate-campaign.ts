@@ -812,7 +812,6 @@ async function runCampaignA(gm: Account, players: Account[]): Promise<void> {
   // --- 1-20 progression -----------------------------------------------------
   let previousSummaries = new Map<string, Json>();
   let parcelCount = 0;
-  const totalTokensAfterActs: number[] = [];
   for (let level = 1; level <= 20; level++) {
     const isActLevel = level === 1 || level % 5 === 0;
     const campaignLabel = `${campaignName} L${level}`;
@@ -890,6 +889,17 @@ async function runCampaignA(gm: Account, players: Account[]): Promise<void> {
             );
           }
         }
+        await api(`/api/campaigns/${campaignId}/encounters/${launched.encounter.id}/clear`, {
+          method: "POST",
+          cookie: gm.cookie,
+        });
+        const cleaned = await getTable(campaignId, gm.cookie);
+        assert(
+          !(cleaned.tokens as Json[]).some((token) =>
+            launched.tokens.some((created) => created.id === token.id)
+          ),
+          "Encounter cleanup left launched tokens behind"
+        );
       }
       const remaining = XP_PER_LEVEL - earned;
       await awardXp(
@@ -900,8 +910,6 @@ async function runCampaignA(gm: Account, players: Account[]): Promise<void> {
         heroes.map((hero) => hero.id)
       );
       earned += remaining;
-      const afterEncounters = await getTable(campaignId, gm.cookie);
-      totalTokensAfterActs.push((afterEncounters.tokens as Json[]).length);
     } else {
       await awardXp(
         campaignId,
@@ -1336,11 +1344,6 @@ async function runCampaignA(gm: Account, players: Account[]): Promise<void> {
   // --- Observations --------------------------------------------------------
   observe(
     campaignName,
-    "Encounter relaunch accumulates scene tokens",
-    `After act-level encounter launches the scene held ${totalTokensAfterActs.join(", ")} tokens. PF2e prep expects the GM to clean up defeated monsters; there is no "clear encounter" action.`
-  );
-  observe(
-    campaignName,
     "Treasure system is currency-only",
     `Simulated ${parcelCount} level-budget parcels using GM Core currency values (${TREASURE_CURRENCY_GP[0]} gp at 1 to ${TREASURE_CURRENCY_GP[19]} gp at 20). The app has no permanent-item/consumable item-level budget or wealth-by-level audit.`
   );
@@ -1414,7 +1417,7 @@ async function runCampaignB(gm: Account, players: Account[]): Promise<void> {
     }
   });
 
-  await check(campaignName, "quest XP is a one-time award", async () => {
+  await check(campaignName, "quest XP is gated in milestone mode", async () => {
     const quest = (
       await api(`/api/campaigns/${campaignId}/journal`, {
         method: "POST",
@@ -1433,25 +1436,13 @@ async function runCampaignB(gm: Account, players: Account[]): Promise<void> {
       method: "POST",
       cookie: gm.cookie,
       body: {},
-    });
-    assertEqual(award.payload.amount, 200, "Quest XP amount");
-    assertEqual(award.payload.recipients, 2, "Quest XP recipients");
-    const repeat = await api(`/api/campaigns/${campaignId}/journal/${quest.id}/award-quest-xp`, {
-      method: "POST",
-      cookie: gm.cookie,
-      body: {},
       expect: null,
     });
-    assert([400, 409].includes(repeat.status), "Quest XP was awarded twice");
+    assertEqual(award.status, 400, "Milestone quest XP award status");
     const table = await getTable(campaignId, gm.cookie);
     for (const hero of heroes) {
-      assertEqual(summaryFor(table, hero.id).xp, 200, `${hero.name} quest XP`);
+      assertEqual(summaryFor(table, hero.id).xp, 0, `${hero.name} milestone quest XP`);
     }
-    observe(
-      campaignName,
-      "Quest XP is visible in milestone mode",
-      "Milestone campaigns hide the XP UI but still store and award quest XP. Decide whether milestone mode should suppress XP rewards or clearly label them as optional."
-    );
   });
 
   await check(campaignName, "live campaign metadata reaches a connected player", async () => {

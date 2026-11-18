@@ -1,4 +1,5 @@
 import type {
+  CampaignSession,
   SessionAgendaItem,
   SessionAttendanceStatus,
   SessionCheckin,
@@ -26,6 +27,24 @@ export const SESSION_CHECKIN_LABELS: Record<SessionCheckinStatus, string> = {
   no: "Can't make it",
   unanswered: "No response",
 };
+
+export type SessionTiming = "upcoming" | "in-progress" | "overdue";
+
+/** Scheduled sessions stay current until the GM marks them played or canceled. */
+export function sessionTiming(session: CampaignSession, nowValue = Date.now()): SessionTiming {
+  if (nowValue < session.scheduledAt) return "upcoming";
+  const end = session.scheduledAt + Math.max(1, session.durationMinutes) * 60_000;
+  return nowValue <= end ? "in-progress" : "overdue";
+}
+
+/** The next scheduled session, even if its start time has already passed. */
+export function nextScheduledSession(sessions: CampaignSession[]): CampaignSession | null {
+  return (
+    [...sessions]
+      .filter((session) => session.status === "scheduled")
+      .sort((a, b) => a.scheduledAt - b.scheduledAt)[0] ?? null
+  );
+}
 
 const MAX_AGENDA_ITEMS = 40;
 const MAX_AGENDA_TEXT = 200;

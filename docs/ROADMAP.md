@@ -413,6 +413,7 @@ Acceptance: a GM can prepare a full session in Runehall and start it with one â€
   - Empty-filter states explain when nothing matches.
   - GM Screen can mark a roll request as a **Group check**.
   - Group check cards are labeled in the shared chat and still open the prefilled dice tray.
+  - Secret chat and secret rolls use independent toggles, so a whispered message no longer makes the next public roll private.
   - Player rolls made from a request are linked back to it, and the request card shows each responder, total, degree of success, and a pass/fail tally for group checks.
   - Remaining: GM-only response filtering and exportable check summaries.
 - [x] **Delay, ready, and initiative ties**
@@ -472,6 +473,7 @@ Acceptance: a GM can prepare a full session in Runehall and start it with one â€
   - Combatants belong to numbered waves, and the roster is grouped by wave with per-wave XP.
   - The launch preview chooses a scene, wave, and initiative mode.
   - Reinforcements roll initiative into the existing order while preserving the current round and active turn.
+  - Launched tokens carry encounter provenance. A fresh launch replaces that encounter's earlier tokens on the scene, and **Clear launched** removes its tokens and initiative entries without touching linked or manual tokens.
   - Party-size presets offer Auto plus 3, 4, 5, and 6 characters.
 - [x] **Session recap draft**
   - The GM can generate an editable recap from the selected time window.
@@ -482,6 +484,8 @@ Acceptance: a GM can prepare a full session in Runehall and start it with one â€
   - Each session can carry a GM-only agenda checklist with done state.
   - Players and the GM can check in as in, maybe, or can't make it.
   - Check-ins are shared with the table; GM notes and the agenda stay private.
+  - Scheduled sessions stay in **Upcoming & current** with check-ins available until the GM marks them played or canceled, showing **In progress** or **Overdue** as time passes.
+  - The Sessions calendar is the single source for the Overview's next-session date; session and dashboard changes broadcast to open tabs.
   - The Overview shows a next-session check-in reminder and outstanding replies.
 - [x] **Reusable handouts**
   - The GM can duplicate any journal entry or handout in one click.
@@ -491,14 +495,15 @@ Acceptance: a GM can prepare a full session in Runehall and start it with one â€
   - A bundled CC0 music library adds battle, exploration, tavern, relaxing, and mystery tracks. The GM can browse by mood, preview author/license/source links, and add a track without uploading a file.
   - Playback state is campaign-wide and broadcast to connected clients; the position is synced on play, pause, and track changes using server time so client clock skew cannot mis-seek. Tracks loop.
   - New tracks and deletions are broadcast live, so players do not need to reload to play a track the GM just added.
-  - Players receive **Join audio** and **Leave audio** controls to satisfy browser autoplay rules, plus a local volume slider; joining or leaving is local and does not change the table's shared state.
+  - Players receive **Join audio** and **Leave audio** controls to satisfy browser autoplay rules, plus a local volume slider; joining or leaving is local and does not change the table's shared state. A GM who reloads while shared playback is running also gets **Join audio** instead of being stuck without a resume control.
   - Uploaded tracks use the campaign upload store, are protected from orphan cleanup, and stay separate from the image asset library. Deleting a track removes its uploaded backing file once nothing else references it; bundled library files are never removed.
   - Campaign export includes track metadata; import restores tracks whose audio files already exist in `data/uploads` or the bundled library.
   - Covered by audio-signature unit tests, a two-socket smoke check of upload, playback, export/import, and deletion, and a browser upload/play/remove and library-add flow.
 - [x] **Quest handouts and one-time XP rewards**
   - A handout can be marked Active, Completed, or Failed and carry an XP reward.
   - The Journal has a Quests filter and shows the status and reward on the handout.
-  - When a quest is Completed, the GM can award its XP to the whole party once; the entry records the award and refuses a second payout.
+  - When a quest is Completed, the GM can award its XP to the whole party once; the entry records the award and refuses a second payout, even after the handout is edited.
+  - Quest XP is only paid out in XP tracking mode; milestone campaigns store the value for reference and reject the award.
   - Quest rewards use the existing character XP field and never trigger automatic leveling.
   - Covered by journal unit tests, a two-user smoke check of the award and double-award guard, and a browser quest/reward flow.
 - [x] **Player-facing inventory and transfers**

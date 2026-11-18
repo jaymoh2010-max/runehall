@@ -1507,6 +1507,8 @@ export interface ServerToClientEvents {
   "journal:created": (entry: JournalEntry) => void;
   "journal:updated": (entry: JournalEntry) => void;
   "journal:deleted": (payload: { entryId: string }) => void;
+  "sessions:changed": (payload: { campaignId: string }) => void;
+  "dashboard:updated": (payload: { campaignId: string }) => void;
   "join-request:created": (payload: {
     requestId: string;
     characterName: string;

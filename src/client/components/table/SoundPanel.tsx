@@ -294,7 +294,7 @@ export function SoundPanel({
           ? `${currentTrack.name}${state.playing ? " · playing" : " · paused"}`
           : "No track selected"}
       </p>
-      {!isGm && currentTrack ? (
+      {currentTrack && (!isGm || (state.playing && !joined)) ? (
         <button
           type="button"
           className={`sound-join ${joined ? "is-on" : ""}`}
