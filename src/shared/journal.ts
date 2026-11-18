@@ -1,6 +1,22 @@
-import type { JournalAttachment, JournalKind } from "./types";
+import type { JournalAttachment, JournalKind, QuestStatus } from "./types";
 
 const MAX_ATTACHMENTS = 12;
+
+export const QUEST_STATUS_OPTIONS: { value: QuestStatus; label: string }[] = [
+  { value: "none", label: "Not a quest" },
+  { value: "active", label: "Active" },
+  { value: "completed", label: "Completed" },
+  { value: "failed", label: "Failed" },
+];
+
+export function normalizeQuestStatus(value: unknown): QuestStatus {
+  return value === "active" || value === "completed" || value === "failed" ? value : "none";
+}
+
+export function normalizeQuestXp(value: unknown): number {
+  const amount = typeof value === "number" && Number.isFinite(value) ? Math.round(value) : 0;
+  return Math.max(0, Math.min(1_000, amount));
+}
 
 export function isJournalKind(value: unknown): value is JournalKind {
   return value === "note" || value === "handout";

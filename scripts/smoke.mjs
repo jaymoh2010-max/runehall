@@ -1425,6 +1425,62 @@ async function main() {
   if (playerDuplicate.status !== 403) throw new Error("Player could duplicate a journal entry");
   log("journal handouts can be duplicated by the GM only");
 
+  const questEntry = (
+    await api(`/api/campaigns/${campaign.id}/journal`, {
+      method: "POST",
+      cookie: gmCookie,
+      body: {
+        title: "Smoke Quest",
+        content: "Recover the brass key.",
+        visible: true,
+        kind: "handout",
+        questStatus: "completed",
+        questXp: 40,
+      },
+    })
+  ).payload.entry;
+  if (questEntry.questStatus !== "completed" || questEntry.questXp !== 40) {
+    throw new Error("Quest fields were not saved on the handout");
+  }
+  const beforeQuestXp = await api(`/api/characters/${character.id}`, { cookie: playerCookie });
+  const startingXp = beforeQuestXp.payload.character.data.play.xp;
+  const questAward = await api(
+    `/api/campaigns/${campaign.id}/journal/${questEntry.id}/award-quest-xp`,
+    { method: "POST", cookie: gmCookie, body: {} }
+  );
+  if (
+    questAward.payload.amount !== 40 ||
+    questAward.payload.recipients < 1 ||
+    questAward.payload.entry.questRewardedAt === null
+  ) {
+    throw new Error("Quest XP was not awarded to the party");
+  }
+  const afterQuestXp = await api(`/api/characters/${character.id}`, { cookie: playerCookie });
+  if (afterQuestXp.payload.character.data.play.xp !== startingXp + 40) {
+    throw new Error("Quest XP did not reach the party character");
+  }
+  const repeatQuest = await fetch(
+    `${base}/api/campaigns/${campaign.id}/journal/${questEntry.id}/award-quest-xp`,
+    {
+      method: "POST",
+      headers: { cookie: gmCookie, "content-type": "application/json" },
+      body: "{}",
+    }
+  );
+  if (repeatQuest.status !== 409) {
+    throw new Error("A quest reward could be awarded twice");
+  }
+  const playerQuest = await fetch(
+    `${base}/api/campaigns/${campaign.id}/journal/${questEntry.id}/award-quest-xp`,
+    {
+      method: "POST",
+      headers: { cookie: playerCookie, "content-type": "application/json" },
+      body: "{}",
+    }
+  );
+  if (playerQuest.status !== 403) throw new Error("Player could award quest XP");
+  log("quest handouts award XP once and record the reward");
+
   const initiativePromise = waitForEvent(playerSocket, "initiative:updated", (payload) =>
     payload.entries.some((entry) => entry.tokenId === token.id)
   );

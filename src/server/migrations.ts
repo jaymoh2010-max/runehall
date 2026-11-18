@@ -474,4 +474,13 @@ export const migrations: Migration[] = [
       ALTER TABLE tokens ADD COLUMN light_color TEXT NOT NULL DEFAULT '#ffd27d';
     `,
   },
+  {
+    version: 25,
+    name: "journal_quest_rewards",
+    sql: `
+      ALTER TABLE journal_entries ADD COLUMN quest_status TEXT NOT NULL DEFAULT 'none';
+      ALTER TABLE journal_entries ADD COLUMN quest_xp INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE journal_entries ADD COLUMN quest_rewarded_at INTEGER;
+    `,
+  },
 ];

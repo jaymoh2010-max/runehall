@@ -219,6 +219,9 @@ export interface JournalRow {
   visible: number;
   kind: string;
   attachments: string;
+  quest_status: string;
+  quest_xp: number;
+  quest_rewarded_at: number | null;
   created_by: string | null;
   created_at: number;
   updated_at: number;

@@ -1165,6 +1165,8 @@ export interface CampaignAsset {
   usedElsewhere: boolean;
 }
 
+export type QuestStatus = "none" | "active" | "completed" | "failed";
+
 export interface JournalEntry {
   id: string;
   campaignId: string;
@@ -1173,6 +1175,12 @@ export interface JournalEntry {
   visible: boolean;
   kind: JournalKind;
   attachments: JournalAttachment[];
+  /** Optional quest tracking on handouts. */
+  questStatus: QuestStatus;
+  /** XP reward paid when the quest is completed. */
+  questXp: number;
+  /** Set once the quest reward has been paid. */
+  questRewardedAt: number | null;
   createdBy: string | null;
   authorName: string;
   createdAt: number;

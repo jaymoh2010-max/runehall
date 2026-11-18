@@ -3,6 +3,8 @@ import {
   isJournalKind,
   normalizeJournalAttachments,
   normalizeJournalKind,
+  normalizeQuestStatus,
+  normalizeQuestXp,
 } from "../src/shared/journal";
 
 describe("journal kinds", () => {
@@ -12,6 +14,24 @@ describe("journal kinds", () => {
     expect(isJournalKind("attachment")).toBe(false);
     expect(normalizeJournalKind("handout")).toBe("handout");
     expect(normalizeJournalKind("nonsense")).toBe("note");
+  });
+});
+
+describe("journal quest rewards", () => {
+  it("accepts known quest states and defaults the rest to none", () => {
+    expect(normalizeQuestStatus("active")).toBe("active");
+    expect(normalizeQuestStatus("completed")).toBe("completed");
+    expect(normalizeQuestStatus("failed")).toBe("failed");
+    expect(normalizeQuestStatus("none")).toBe("none");
+    expect(normalizeQuestStatus("nonsense")).toBe("none");
+  });
+
+  it("clamps XP rewards to a sane range", () => {
+    expect(normalizeQuestXp(30)).toBe(30);
+    expect(normalizeQuestXp(-10)).toBe(0);
+    expect(normalizeQuestXp(5000)).toBe(1000);
+    expect(normalizeQuestXp("40")).toBe(0);
+    expect(normalizeQuestXp(12.6)).toBe(13);
   });
 });
 

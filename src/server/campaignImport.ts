@@ -15,7 +15,12 @@ import {
   normalizePartyVisionScope,
   normalizeTokenVisionMode,
 } from "../shared/lighting";
-import { normalizeJournalAttachments, normalizeJournalKind } from "../shared/journal";
+import {
+  normalizeJournalAttachments,
+  normalizeJournalKind,
+  normalizeQuestStatus,
+  normalizeQuestXp,
+} from "../shared/journal";
 import { normalizeLootItems } from "../shared/loot";
 import { normalizeTokenConditions } from "../shared/tokens";
 import { normalizeAoeTemplates } from "../shared/templates";
@@ -357,8 +362,8 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
     for (const entry of records(payload.journal, 500, "journal")) {
       db.prepare(
         `INSERT INTO journal_entries
-          (id, campaign_id, title, content, visible, kind, attachments, created_by, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          (id, campaign_id, title, content, visible, kind, attachments, quest_status, quest_xp, quest_rewarded_at, created_by, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).run(
         newId("journal"),
         campaignId,
@@ -367,6 +372,9 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
         entry.visible === false ? 0 : 1,
         normalizeJournalKind(entry.kind),
         JSON.stringify(normalizeJournalAttachments(entry.attachments)),
+        normalizeQuestStatus(entry.questStatus),
+        normalizeQuestXp(entry.questXp),
+        entry.questRewardedAt ? timestamp(entry.questRewardedAt, ts) : null,
         userId,
         timestamp(entry.createdAt, ts),
         timestamp(entry.updatedAt, ts)

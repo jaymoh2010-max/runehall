@@ -42,10 +42,12 @@ import type {
   JournalAttachment,
   JournalEntry,
   JournalKind,
+  QuestStatus,
   Token,
   XpMode,
 } from "../../shared/types";
 import { CAMPAIGN_RULESET_OPTIONS, XP_MODE_OPTIONS, rulesetLabel } from "../../shared/content";
+import { QUEST_STATUS_OPTIONS, normalizeQuestXp } from "../../shared/journal";
 import { xpProgress } from "../../shared/xp";
 import { api, copyText, formatDate, uploadImage } from "../api";
 import { errorMessage } from "../stores";
@@ -85,6 +87,14 @@ import { NpcLibrary } from "../components/campaign/NpcLibrary";
 import { SessionsPage } from "../components/campaign/SessionsPage";
 import { GmScreen } from "../components/campaign/GmScreen";
 import { JournalBody } from "../components/JournalBody";
+
+function questStatusLabel(status: QuestStatus): string {
+  return QUEST_STATUS_OPTIONS.find((option) => option.value === status)?.label ?? "Quest";
+}
+
+function questStatusTone(status: QuestStatus): "blue" | "green" | "red" {
+  return status === "completed" ? "green" : status === "failed" ? "red" : "blue";
+}
 
 type Tab =
   | "table"
@@ -147,9 +157,11 @@ export function CampaignPage() {
   const [journalVisible, setJournalVisible] = useState(true);
   const [journalKind, setJournalKind] = useState<JournalKind>("note");
   const [journalAttachments, setJournalAttachments] = useState<JournalAttachment[]>([]);
+  const [journalQuestStatus, setJournalQuestStatus] = useState<QuestStatus>("none");
+  const [journalQuestXp, setJournalQuestXp] = useState("0");
   const [journalBusy, setJournalBusy] = useState(false);
   const [journalUploadBusy, setJournalUploadBusy] = useState(false);
-  const [journalFilter, setJournalFilter] = useState<"all" | JournalKind>("all");
+  const [journalFilter, setJournalFilter] = useState<"all" | JournalKind | "quest">("all");
   const [assetPickerOpen, setAssetPickerOpen] = useState(false);
   const [assetPickerAssets, setAssetPickerAssets] = useState<CampaignAsset[]>([]);
   const [assetPickerLoading, setAssetPickerLoading] = useState(false);
@@ -272,6 +284,8 @@ export function CampaignPage() {
         setJournalVisible(true);
         setJournalKind("note");
         setJournalAttachments([]);
+        setJournalQuestStatus("none");
+        setJournalQuestXp("0");
       }
       return;
     }
@@ -280,11 +294,14 @@ export function CampaignPage() {
     setJournalVisible(journalEditor.visible);
     setJournalKind(journalEditor.kind);
     setJournalAttachments(journalEditor.attachments);
+    setJournalQuestStatus(journalEditor.questStatus ?? "none");
+    setJournalQuestXp(String(journalEditor.questXp ?? 0));
   }, [journalEditor]);
 
   const filteredJournal = useMemo(() => {
     const entries = tableData?.journal ?? [];
     if (journalFilter === "all") return entries;
+    if (journalFilter === "quest") return entries.filter((entry) => entry.questStatus !== "none");
     return entries.filter((entry) => entry.kind === journalFilter);
   }, [tableData, journalFilter]);
 
@@ -390,6 +407,8 @@ export function CampaignPage() {
             visible: journalVisible,
             kind: journalKind,
             attachments: journalAttachments,
+            questStatus: journalKind === "handout" ? journalQuestStatus : "none",
+            questXp: journalKind === "handout" ? normalizeQuestXp(Number(journalQuestXp)) : 0,
           },
         });
         setTableData((current) =>
@@ -407,6 +426,8 @@ export function CampaignPage() {
               visible: journalVisible,
               kind: journalKind,
               attachments: journalAttachments,
+              questStatus: journalKind === "handout" ? journalQuestStatus : "none",
+              questXp: journalKind === "handout" ? normalizeQuestXp(Number(journalQuestXp)) : 0,
             },
           }
         );
@@ -461,6 +482,40 @@ export function CampaignPage() {
       setSelectedJournalId(result.entry.id);
       setJournalFilter("all");
       toast("Journal entry duplicated.", "success");
+    } catch (err) {
+      toast(errorMessage(err), "error");
+    } finally {
+      setJournalBusy(false);
+    }
+  };
+
+  const awardQuestXp = async (entry: JournalEntry) => {
+    if (!id || !isGm) return;
+    setJournalBusy(true);
+    try {
+      const result = await api<{
+        entry: JournalEntry;
+        amount: number;
+        recipients: number;
+        characters: CharacterRecord[];
+      }>(`/api/campaigns/${id}/journal/${entry.id}/award-quest-xp`, { method: "POST" });
+      setTableData((current) =>
+        current
+          ? {
+              ...current,
+              journal: current.journal.map((item) =>
+                item.id === result.entry.id ? result.entry : item
+              ),
+              characters: result.characters,
+            }
+          : current
+      );
+      toast(
+        `Awarded ${result.amount} quest XP to ${result.recipients} character${
+          result.recipients === 1 ? "" : "s"
+        }.`,
+        "success"
+      );
     } catch (err) {
       toast(errorMessage(err), "error");
     } finally {
@@ -1110,6 +1165,14 @@ export function CampaignPage() {
                 >
                   <FileImage size={12} /> Handouts
                 </button>
+                <button
+                  type="button"
+                  className={journalFilter === "quest" ? "is-active" : ""}
+                  aria-pressed={journalFilter === "quest"}
+                  onClick={() => setJournalFilter("quest")}
+                >
+                  <Swords size={12} /> Quests
+                </button>
               </div>
               {filteredJournal.map((entry) => (
                 <button
@@ -1121,6 +1184,11 @@ export function CampaignPage() {
                   <span className="journal-list-title">{entry.title}</span>
                   <span className="journal-list-meta">
                     {entry.kind === "handout" ? <Tag tone="violet">Handout</Tag> : null}
+                    {entry.questStatus !== "none" ? (
+                      <Tag tone={questStatusTone(entry.questStatus)}>
+                        {questStatusLabel(entry.questStatus)}
+                      </Tag>
+                    ) : null}
                     <span className="tiny muted">
                       {formatDate(entry.updatedAt)} · {entry.visible ? "Visible" : "GM only"}
                     </span>
@@ -1131,11 +1199,13 @@ export function CampaignPage() {
                 <p className="muted small">
                   {journalFilter === "handout"
                     ? "No handouts yet. Create one to share a map, letter, or clue."
-                    : journalFilter === "note"
-                      ? "No journal entries yet."
-                      : isGm
-                        ? "Write the first page of the chronicle."
-                        : "The GM hasn't shared any notes yet."}
+                    : journalFilter === "quest"
+                      ? "No quests yet. Mark a handout as a quest to track its status and XP."
+                      : journalFilter === "note"
+                        ? "No journal entries yet."
+                        : isGm
+                          ? "Write the first page of the chronicle."
+                          : "The GM hasn't shared any notes yet."}
                 </p>
               ) : null}
             </div>
@@ -1155,6 +1225,11 @@ export function CampaignPage() {
                         <h2>{selectedJournal.title}</h2>
                         {selectedJournal.kind === "handout" ? (
                           <Tag tone="violet">Handout</Tag>
+                        ) : null}
+                        {selectedJournal.questStatus !== "none" ? (
+                          <Tag tone={questStatusTone(selectedJournal.questStatus)}>
+                            {questStatusLabel(selectedJournal.questStatus)}
+                          </Tag>
                         ) : null}
                       </div>
                       <p className="tiny muted">
@@ -1191,6 +1266,38 @@ export function CampaignPage() {
                       </div>
                     ) : null}
                   </div>
+                  {selectedJournal.questStatus !== "none" ? (
+                    <div className="quest-reward-banner">
+                      <div>
+                        <span className="field-label">Quest reward</span>
+                        <p className="tiny muted">
+                          {selectedJournal.questXp > 0
+                            ? `${selectedJournal.questXp} XP when completed.`
+                            : "No XP reward set."}
+                          {selectedJournal.questRewardedAt
+                            ? ` Awarded ${formatDate(selectedJournal.questRewardedAt)}.`
+                            : ""}
+                        </p>
+                      </div>
+                      <div className="row" style={{ gap: 6, alignItems: "center" }}>
+                        {selectedJournal.questRewardedAt ? <Tag tone="green">Rewarded</Tag> : null}
+                        {isGm &&
+                        selectedJournal.questStatus === "completed" &&
+                        selectedJournal.questXp > 0 &&
+                        !selectedJournal.questRewardedAt ? (
+                          <Button
+                            size="sm"
+                            variant="primary"
+                            icon={<Award size={13} />}
+                            loading={journalBusy}
+                            onClick={() => void awardQuestXp(selectedJournal)}
+                          >
+                            Award XP
+                          </Button>
+                        ) : null}
+                      </div>
+                    </div>
+                  ) : null}
                   {selectedJournal.attachments.length ? (
                     <div className="handout-gallery">
                       {selectedJournal.attachments.map((attachment) => (
@@ -1506,6 +1613,35 @@ export function CampaignPage() {
               }
             />
           </Field>
+          {journalKind === "handout" ? (
+            <div className="form-grid two">
+              <Field label="Quest status" hint="Track this handout as an active quest.">
+                <Select
+                  value={journalQuestStatus}
+                  onChange={(event) => setJournalQuestStatus(event.target.value as QuestStatus)}
+                >
+                  {QUEST_STATUS_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+              <Field
+                label="Quest XP"
+                hint="Awarded to the party when completed. 0 disables the reward."
+              >
+                <Input
+                  type="number"
+                  min={0}
+                  max={1000}
+                  step={5}
+                  value={journalQuestXp}
+                  onChange={(event) => setJournalQuestXp(event.target.value)}
+                />
+              </Field>
+            </div>
+          ) : null}
           <Field label={journalKind === "handout" ? "Caption or description" : "Entry"}>
             <Textarea
               value={journalContent}

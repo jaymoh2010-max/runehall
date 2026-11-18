@@ -416,3 +416,23 @@ test("GM places a token, chats, rolls, and opens the scenes manager", async ({ p
   await page.keyboard.press("Escape");
   await expect(scenes).toBeHidden();
 });
+
+test("GM turns a handout into a completed quest and awards its XP", async ({ page }) => {
+  await signIn(page, admin);
+  await page.goto(campaignPath);
+  await page.getByRole("button", { name: /^Journal/ }).click();
+  await page.getByRole("button", { name: "New entry" }).click();
+  const journalDialog = page.getByRole("dialog");
+  await expect(journalDialog).toBeVisible();
+  await journalDialog.getByRole("button", { name: /Handout/ }).click();
+  await journalDialog.getByLabel("Title").fill("E2E Quest");
+  await journalDialog.getByLabel(/Caption or description/).fill("Recover the silver key.");
+  await journalDialog.getByLabel("Quest status").selectOption("completed");
+  await journalDialog.getByLabel("Quest XP").fill("40");
+  await journalDialog.getByRole("button", { name: "Save handout" }).click();
+  await expect(page.getByRole("heading", { name: "E2E Quest" })).toBeVisible();
+  await expect(page.getByText("40 XP when completed.")).toBeVisible();
+  await page.getByRole("button", { name: "Award XP" }).click();
+  await expect(page.getByText(/Awarded 40 quest XP/)).toBeVisible();
+  await expect(page.getByText("Rewarded")).toBeVisible();
+});

@@ -54,6 +54,8 @@ import {
   isJournalKind,
   normalizeJournalAttachments,
   normalizeJournalKind,
+  normalizeQuestStatus,
+  normalizeQuestXp,
 } from "../../shared/journal";
 import { contextForDraft } from "../compendium";
 import { campaignSessionsFor } from "../sessionData";
@@ -817,12 +819,14 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
     const visible = body.visible !== false;
     const kind = isJournalKind(body.kind) ? body.kind : "note";
     const attachments = normalizeJournalAttachments(body.attachments);
+    const questStatus = kind === "handout" ? normalizeQuestStatus(body.questStatus) : "none";
+    const questXp = kind === "handout" ? normalizeQuestXp(body.questXp) : 0;
     const entryId = newId("journal");
     const ts = now();
     db.prepare(
       `INSERT INTO journal_entries
-        (id, campaign_id, title, content, visible, kind, attachments, created_by, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        (id, campaign_id, title, content, visible, kind, attachments, quest_status, quest_xp, quest_rewarded_at, created_by, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       entryId,
       id,
@@ -831,6 +835,9 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
       visible ? 1 : 0,
       kind,
       JSON.stringify(attachments),
+      questStatus,
+      questXp,
+      null,
       request.user.id,
       ts,
       ts
@@ -870,9 +877,40 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
       body.attachments === undefined
         ? normalizeJournalAttachments(parseJson(existing.attachments, []))
         : normalizeJournalAttachments(body.attachments);
+    const existingStatus = normalizeQuestStatus(existing.quest_status);
+    const existingXp = normalizeQuestXp(existing.quest_xp);
+    const questStatus =
+      kind === "handout"
+        ? body.questStatus === undefined
+          ? existingStatus
+          : normalizeQuestStatus(body.questStatus)
+        : "none";
+    const questXp =
+      kind === "handout"
+        ? body.questXp === undefined
+          ? existingXp
+          : normalizeQuestXp(body.questXp)
+        : 0;
+    const questRewardedAt =
+      questStatus === existingStatus &&
+      questXp === existingXp &&
+      normalizeJournalKind(existing.kind) === kind
+        ? existing.quest_rewarded_at
+        : null;
     db.prepare(
-      "UPDATE journal_entries SET title = ?, content = ?, visible = ?, kind = ?, attachments = ?, updated_at = ? WHERE id = ?"
-    ).run(title, content, visible ? 1 : 0, kind, JSON.stringify(attachments), now(), entryId);
+      "UPDATE journal_entries SET title = ?, content = ?, visible = ?, kind = ?, attachments = ?, quest_status = ?, quest_xp = ?, quest_rewarded_at = ?, updated_at = ? WHERE id = ?"
+    ).run(
+      title,
+      content,
+      visible ? 1 : 0,
+      kind,
+      JSON.stringify(attachments),
+      questStatus,
+      questXp,
+      questRewardedAt,
+      now(),
+      entryId
+    );
     const row = db
       .prepare(
         `SELECT j.*, u.display_name AS author_name FROM journal_entries j
@@ -897,8 +935,8 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
     const ts = now();
     db.prepare(
       `INSERT INTO journal_entries
-        (id, campaign_id, title, content, visible, kind, attachments, created_by, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        (id, campaign_id, title, content, visible, kind, attachments, quest_status, quest_xp, quest_rewarded_at, created_by, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       duplicateId,
       id,
@@ -907,6 +945,9 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
       existing.visible,
       normalizeJournalKind(existing.kind),
       existing.attachments,
+      normalizeQuestStatus(existing.quest_status),
+      normalizeQuestXp(existing.quest_xp),
+      null,
       request.user.id,
       ts,
       ts
@@ -919,6 +960,99 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
       .get(duplicateId) as JournalRow & { author_name: string | null };
     touchCampaign(id);
     return reply.code(201).send({ entry: serializeJournal(row) });
+  });
+
+  app.post("/api/campaigns/:id/journal/:entryId/award-quest-xp", async (request, reply) => {
+    if (!request.user) return reply.code(401).send({ error: "Sign in to continue." });
+    const { id, entryId } = request.params as { id: string; entryId: string };
+    const role = getMembership(id, request.user.id)?.role;
+    if (role !== "gm") {
+      return reply.code(403).send({ error: "Only the GM can award quest XP." });
+    }
+    const existing = db
+      .prepare("SELECT * FROM journal_entries WHERE id = ? AND campaign_id = ?")
+      .get(entryId, id) as JournalRow | undefined;
+    if (!existing) return reply.code(404).send({ error: "Journal entry not found." });
+    if (
+      normalizeJournalKind(existing.kind) !== "handout" ||
+      normalizeQuestStatus(existing.quest_status) !== "completed"
+    ) {
+      return reply.code(400).send({ error: "Complete a quest handout before awarding its XP." });
+    }
+    if (existing.quest_rewarded_at) {
+      return reply.code(409).send({ error: "That quest reward has already been awarded." });
+    }
+    const amount = normalizeQuestXp(existing.quest_xp);
+    if (amount < 1) return reply.code(400).send({ error: "Set a quest XP reward first." });
+    const body = (request.body ?? {}) as Record<string, unknown>;
+    const requested = Array.isArray(body.characterIds)
+      ? body.characterIds.filter((value): value is string => typeof value === "string")
+      : [];
+    const rows = db
+      .prepare("SELECT * FROM characters WHERE campaign_id = ?")
+      .all(id) as CharacterRow[];
+    const selected = requested.length
+      ? rows.filter((character) => requested.includes(character.id))
+      : rows;
+    if (!selected.length) {
+      return reply.code(400).send({ error: "Choose at least one character in this campaign." });
+    }
+    let recipients = 0;
+    let skipped = 0;
+    for (const character of selected) {
+      let draft;
+      try {
+        draft = normalizeCharacterDraft(JSON.parse(character.data), character.name);
+      } catch {
+        skipped += 1;
+        continue;
+      }
+      draft.play.xp = Math.max(0, Math.round(draft.play.xp + amount));
+      const summary = characterSummary(draft, contextForDraft(draft));
+      db.prepare(
+        "UPDATE characters SET data = ?, summary = ?, updated_at = ?, revision = revision + 1 WHERE id = ?"
+      ).run(JSON.stringify(draft), JSON.stringify(summary), now(), character.id);
+      app.broadcastCampaign(id, "character:updated", {
+        characterId: character.id,
+        summary,
+        name: draft.name,
+      });
+      recipients += 1;
+    }
+    const rewardedAt = now();
+    db.prepare("UPDATE journal_entries SET quest_rewarded_at = ?, updated_at = ? WHERE id = ?").run(
+      rewardedAt,
+      rewardedAt,
+      entryId
+    );
+    touchCampaign(id);
+    logAudit({
+      action: "campaign.quest_xp",
+      actor: request.user,
+      targetType: "campaign",
+      targetId: id,
+      detail: `${amount} XP from ${existing.title} to ${recipients} characters`,
+      request,
+    });
+    const row = db
+      .prepare(
+        `SELECT j.*, u.display_name AS author_name FROM journal_entries j
+         LEFT JOIN users u ON u.id = j.created_by WHERE j.id = ?`
+      )
+      .get(entryId) as JournalRow & { author_name: string | null };
+    const characters = campaignCharacters(id).map((character) =>
+      serializeCharacter(character, character.owner_name, {
+        canEdit: true,
+        canView: true,
+      })
+    );
+    return reply.send({
+      entry: serializeJournal(row),
+      amount,
+      recipients,
+      skipped,
+      characters,
+    });
   });
 
   app.delete("/api/campaigns/:id/journal/:entryId", async (request, reply) => {

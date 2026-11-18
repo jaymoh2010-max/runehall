@@ -24,7 +24,12 @@ import {
   normalizeTokenVisionMode,
 } from "../shared/lighting";
 import { normalizeLootItems } from "../shared/loot";
-import { normalizeJournalAttachments, normalizeJournalKind } from "../shared/journal";
+import {
+  normalizeJournalAttachments,
+  normalizeJournalKind,
+  normalizeQuestStatus,
+  normalizeQuestXp,
+} from "../shared/journal";
 import { normalizeCampaignThreads } from "../shared/dashboard";
 import { normalizeWalls } from "../shared/walls";
 import { normalizeSceneProps } from "../shared/props";
@@ -207,6 +212,9 @@ export function serializeJournal(row: JournalRow & { author_name?: string | null
     visible: Boolean(row.visible),
     kind: normalizeJournalKind(row.kind),
     attachments: normalizeJournalAttachments(parseJson(row.attachments, [])),
+    questStatus: normalizeQuestStatus(row.quest_status),
+    questXp: normalizeQuestXp(row.quest_xp),
+    questRewardedAt: row.quest_rewarded_at ?? null,
     createdBy: row.created_by,
     authorName: row.author_name || "The GM",
     createdAt: row.created_at,

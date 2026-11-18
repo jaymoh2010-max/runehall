@@ -3345,6 +3345,20 @@
   font-size: 1.5rem;
   margin-top: 4px;
 }
+.quest-reward-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid rgba(200, 169, 107, 0.3);
+  border-radius: 8px;
+  background: rgba(200, 169, 107, 0.05);
+  padding: 10px 12px;
+  margin-bottom: 15px;
+}
+.quest-reward-banner p {
+  margin: 2px 0 0;
+}
 .journal-body {
   color: var(--text-2);
   font-size: 0.94rem;

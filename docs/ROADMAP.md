@@ -484,6 +484,12 @@ Acceptance: a GM can prepare a full session in Runehall and start it with one â€
 - [x] **Reusable handouts**
   - The GM can duplicate any journal entry or handout in one click.
   - Duplicates preserve content, kind, visibility, and attachments.
+- [x] **Quest handouts and one-time XP rewards**
+  - A handout can be marked Active, Completed, or Failed and carry an XP reward.
+  - The Journal has a Quests filter and shows the status and reward on the handout.
+  - When a quest is Completed, the GM can award its XP to the whole party once; the entry records the award and refuses a second payout.
+  - Quest rewards use the existing character XP field and never trigger automatic leveling.
+  - Covered by journal unit tests, a two-user smoke check of the award and double-award guard, and a browser quest/reward flow.
 - [x] **Player-facing inventory and transfers**
   - The character sheet shows gear stacks, equipped state, bulk, gear value, and the purse.
   - Players can adjust quantities, equip or unequip gear, and remove items from the sheet.
