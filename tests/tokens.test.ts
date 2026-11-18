@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   groupHp,
   normalizeTokenConditions,
+  syncLifeConditions,
   tickTokenConditions,
   tokenConditionLabel,
 } from "../src/shared/tokens";
@@ -84,6 +85,35 @@ describe("token conditions", () => {
     ).toEqual([
       { name: "Clumsy", duration: 1 },
       { name: "Prone", duration: null },
+    ]);
+  });
+
+  it("reduces frightened by one at the end of the turn and removes it at 0", () => {
+    expect(tickTokenConditions([{ name: "Frightened", value: 2, duration: null }])).toEqual([
+      { name: "Frightened", value: 1, duration: null },
+    ]);
+    expect(tickTokenConditions([{ name: "Frightened", value: 1, duration: null }])).toEqual([]);
+  });
+});
+
+describe("life condition sync", () => {
+  it("mirrors dying and unconscious without dropping table conditions", () => {
+    expect(
+      syncLifeConditions(
+        [
+          { name: "Frightened", value: 1, duration: 2 },
+          { name: "Dying", value: 3, duration: null },
+        ],
+        [
+          { name: "Frightened", value: 1, duration: null },
+          { name: "Dying", value: 2, duration: null },
+          { name: "Unconscious", value: null, duration: null },
+        ]
+      )
+    ).toEqual([
+      { name: "Frightened", value: 1, duration: 2 },
+      { name: "Dying", value: 2, duration: null },
+      { name: "Unconscious", value: null, duration: null },
     ]);
   });
 });

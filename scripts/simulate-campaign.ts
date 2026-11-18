@@ -591,6 +591,160 @@ async function runCampaignA(gm: Account, players: Account[]): Promise<void> {
 
   await check(
     campaignName,
+    "token damage absorbs temp HP and applies dying/unconscious at 0 HP",
+    async () => {
+      const sheet = await api(`/api/characters/${heroes[0].id}`, { cookie: players[0].cookie });
+      const draft = JSON.parse(JSON.stringify(sheet.payload.character.data)) as Json;
+      draft.play.hp = 10;
+      draft.play.tempHp = 5;
+      draft.play.conditions = [];
+      await api(`/api/characters/${heroes[0].id}`, {
+        method: "PUT",
+        cookie: players[0].cookie,
+        body: { data: draft, force: true },
+      });
+      const token = tokens.get(heroes[0].id)!;
+      const first = waitForEvent<Json>(
+        gmSocket,
+        "token:updated",
+        (payload) => payload.id === token.id && payload.hpCurrent === 7,
+        4_000
+      );
+      gmSocket.emit("token:damage", { campaignId, tokenId: token.id, amount: 8 });
+      await first;
+      const afterFirst = await api(`/api/characters/${heroes[0].id}`, {
+        cookie: players[0].cookie,
+      });
+      assertEqual(afterFirst.payload.character.data.play.tempHp, 0, "Temp HP after damage");
+      assertEqual(afterFirst.payload.character.summary.currentHp, 7, "HP after temp HP damage");
+
+      const second = waitForEvent<Json>(
+        gmSocket,
+        "token:updated",
+        (payload) => payload.id === token.id && payload.hpCurrent === 0,
+        4_000
+      );
+      gmSocket.emit("token:damage", { campaignId, tokenId: token.id, amount: 20 });
+      await second;
+      const afterSecond = await api(`/api/characters/${heroes[0].id}`, {
+        cookie: players[0].cookie,
+      });
+      assertEqual(afterSecond.payload.character.summary.currentHp, 0, "HP at 0");
+      assert(
+        afterSecond.payload.character.data.play.conditions.some(
+          (condition: Json) => condition.name === "Dying"
+        ),
+        "Damage did not apply Dying"
+      );
+      assert(
+        afterSecond.payload.character.data.play.conditions.some(
+          (condition: Json) => condition.name === "Unconscious"
+        ),
+        "Damage did not apply Unconscious"
+      );
+
+      const healed = waitForEvent<Json>(
+        gmSocket,
+        "token:updated",
+        (payload) =>
+          payload.id === token.id &&
+          payload.hpCurrent === 5 &&
+          !(payload.conditions as Json[]).some((condition) =>
+            ["Dying", "Unconscious"].includes(condition.name)
+          ),
+        4_000
+      );
+      gmSocket.emit("token:update", {
+        campaignId,
+        token: { id: token.id, hpCurrent: 5 },
+      });
+      const healedToken = await healed;
+      assert(
+        !(healedToken.conditions as Json[]).some((condition) =>
+          ["Dying", "Unconscious"].includes(condition.name)
+        ),
+        "Healing above 0 did not clear token life conditions"
+      );
+      const afterHeal = await api(`/api/characters/${heroes[0].id}`, {
+        cookie: players[0].cookie,
+      });
+      assert(
+        !(afterHeal.payload.character.data.play.conditions as Json[]).some((condition) =>
+          ["Dying", "Unconscious"].includes(condition.name)
+        ),
+        "Healing above 0 did not clear sheet life conditions"
+      );
+
+      const restore = JSON.parse(JSON.stringify(afterSecond.payload.character.data)) as Json;
+      restore.play.hp = null;
+      restore.play.tempHp = 0;
+      restore.play.conditions = [];
+      await api(`/api/characters/${heroes[0].id}`, {
+        method: "PUT",
+        cookie: players[0].cookie,
+        body: { data: restore, force: true },
+      });
+    }
+  );
+
+  await check(
+    campaignName,
+    "hidden scene props are filtered from the player table and live updates",
+    async () => {
+      const visible = {
+        id: "prop_visible",
+        name: "Visible Crate",
+        imageUrl: "/uploads/sim-prop.webp",
+        x: 100,
+        y: 100,
+        width: 64,
+        height: 64,
+        rotation: 0,
+        layer: "ground",
+        visible: true,
+        locked: false,
+        z: 1,
+      };
+      const hidden = {
+        ...visible,
+        id: "prop_hidden",
+        name: "Secret Altar",
+        visible: false,
+        z: 2,
+      };
+      const playerEvent = waitForEvent<Json>(
+        playerSocket,
+        "scene:props",
+        (payload) => payload.sceneId === sceneId,
+        4_000
+      );
+      const gmEvent = waitForEvent<Json>(
+        gmSocket,
+        "scene:props",
+        (payload) => payload.sceneId === sceneId,
+        4_000
+      );
+      gmSocket.emit("scene:props", {
+        campaignId,
+        sceneId,
+        props: [visible, hidden],
+      });
+      const [playerPayload, gmPayload] = await Promise.all([playerEvent, gmEvent]);
+      assertEqual(playerPayload.props.length, 1, "Player visible prop count");
+      assertEqual(playerPayload.props[0].name, "Visible Crate", "Player visible prop");
+      assertEqual(gmPayload.props.length, 2, "GM prop count");
+      const playerTable = await getTable(campaignId, players[0].cookie);
+      assertEqual(
+        (playerTable.scenes as Json[]).find((scene) => scene.id === sceneId)?.props.length,
+        1,
+        "Player snapshot prop count"
+      );
+      gmSocket.emit("scene:props", { campaignId, sceneId, props: [] });
+    }
+  );
+
+  await check(
+    campaignName,
     "player can move an owned token but not another player's token",
     async () => {
       const owned = tokens.get(heroes[0].id)!;

@@ -28,6 +28,7 @@ import {
   type ValidationIssue,
 } from "./types";
 import { propertyRuneDamage, shieldRuneBonus, summarizeRunes } from "./runes";
+import { conditionModifiers } from "./conditions";
 import {
   FEAT_CHOICES,
   FEAT_GRANTS,
@@ -1687,6 +1688,7 @@ export function computeCharacter(
     );
   const spellAbility = caster.spellAbility ?? key;
   const spellMod = spellAbility ? abilityMods[spellAbility] : 0;
+  const conditionEffects = conditionModifiers(draft.play.conditions, { level: draft.level });
   const validation: ValidationIssue[] = [];
   const issue = (severity: Severity, message: string, step?: string) =>
     validation.push({ severity, message, step });
@@ -1927,7 +1929,8 @@ export function computeCharacter(
       proficiency +
       abilityMods[skill.ability] +
       (skill.armorPenalty ? armorCheckPenalty : 0) +
-      (itemMods.skillItemBonus?.[skill.id] ?? 0);
+      (itemMods.skillItemBonus?.[skill.id] ?? 0) +
+      conditionEffects.checks[skill.ability];
     return {
       id: skill.id,
       name: skill.name,
@@ -1940,14 +1943,18 @@ export function computeCharacter(
 
   const lore: DerivedCharacter["lore"] = [];
   for (const name of background?.lore ?? []) {
-    lore.push({ name, mod: proficiencyBonus(1, draft.level) + abilityMods.int, rank: 1 });
+    lore.push({
+      name,
+      mod: proficiencyBonus(1, draft.level) + abilityMods.int + conditionEffects.checks.int,
+      rank: 1,
+    });
   }
   for (const raw of draft.skills.backgroundLore) {
     const clean = String(raw || "").trim();
     if (!clean) continue;
     lore.push({
       name: clean.toLowerCase().includes("lore") ? clean : `${clean} Lore`,
-      mod: proficiencyBonus(1, draft.level) + abilityMods.int,
+      mod: proficiencyBonus(1, draft.level) + abilityMods.int + conditionEffects.checks.int,
       rank: 1,
     });
   }
@@ -1956,7 +1963,7 @@ export function computeCharacter(
     if (!clean) continue;
     lore.push({
       name: clean.toLowerCase().includes("lore") ? clean : `${clean} Lore`,
-      mod: proficiencyBonus(1, draft.level) + abilityMods.int,
+      mod: proficiencyBonus(1, draft.level) + abilityMods.int + conditionEffects.checks.int,
       rank: 1,
     });
   }
@@ -1972,7 +1979,10 @@ export function computeCharacter(
       const rank = draft.level >= 15 ? 4 : draft.level >= 7 ? 3 : draft.level >= 3 ? 2 : 1;
       lore.push({
         name: entry.name,
-        mod: proficiencyBonus(rank, draft.level) + abilityMods[entry.ability],
+        mod:
+          proficiencyBonus(rank, draft.level) +
+          abilityMods[entry.ability] +
+          conditionEffects.checks[entry.ability],
         rank,
       });
     }
@@ -1980,7 +1990,8 @@ export function computeCharacter(
   for (const entry of featMods.lore ?? []) {
     lore.push({
       name: entry.name,
-      mod: proficiencyBonus(entry.rank, draft.level) + abilityMods.int,
+      mod:
+        proficiencyBonus(entry.rank, draft.level) + abilityMods.int + conditionEffects.checks.int,
       rank: entry.rank,
     });
   }
@@ -1999,9 +2010,12 @@ export function computeCharacter(
   const ancestryHp = ancestry?.hp ?? 0;
   const classHp = classData?.hp ?? 0;
   const perLevel = Math.max(1, classHp + conMod);
-  const maxHp =
+  const maxHp = Math.max(
+    1,
     Math.max(1, ancestryHp + perLevel + Math.max(0, draft.level - 1) * perLevel) +
-    (featMods.hpPerLevel ?? 0) * draft.level;
+      (featMods.hpPerLevel ?? 0) * draft.level +
+      conditionEffects.maxHp
+  );
   const currentHp =
     draft.play.hp === null ? maxHp : Math.max(0, Math.min(maxHp, Math.round(draft.play.hp)));
 
@@ -2062,41 +2076,54 @@ export function computeCharacter(
       (itemMods.acItemBonus ?? 0);
   }
   if (shield?.shield?.speedPenalty) speed += shield.shield.speedPenalty;
-  speed = Math.max(5, speed);
+  speed = Math.max(5, speed + conditionEffects.speed);
+  ac += conditionEffects.ac;
 
   const saves: Record<SaveKey, number> = {
     fortitude:
       proficiencyBonus(prof.fortitude, draft.level) +
       abilityMods.con +
       armorRunes.resilient +
-      (itemMods.saveItemBonus?.fortitude ?? 0),
+      (itemMods.saveItemBonus?.fortitude ?? 0) +
+      conditionEffects.saves.fortitude,
     reflex:
       proficiencyBonus(prof.reflex, draft.level) +
       abilityMods.dex +
       armorRunes.resilient +
-      (itemMods.saveItemBonus?.reflex ?? 0),
+      (itemMods.saveItemBonus?.reflex ?? 0) +
+      conditionEffects.saves.reflex,
     will:
       proficiencyBonus(prof.will, draft.level) +
       abilityMods.wis +
       armorRunes.resilient +
-      (itemMods.saveItemBonus?.will ?? 0),
+      (itemMods.saveItemBonus?.will ?? 0) +
+      conditionEffects.saves.will,
   };
   const perception =
     proficiencyBonus(prof.perception, draft.level) +
     abilityMods.wis +
-    (itemMods.perceptionItemBonus ?? 0);
+    (itemMods.perceptionItemBonus ?? 0) +
+    conditionEffects.perception;
   const initiative = perception + (featMods.initiativeBonus ?? 0);
   const classDc = classData
-    ? 10 + proficiencyBonus(prof.classDc, draft.level) + keyMod
+    ? 10 +
+      proficiencyBonus(prof.classDc, draft.level) +
+      keyMod +
+      (key ? conditionEffects.checks[key] : conditionEffects.allChecks)
     : 10 + keyMod;
   const spellDc =
     caster.progression === "none"
       ? null
-      : 10 + proficiencyBonus(prof.spellcasting, draft.level) + spellMod;
+      : 10 +
+        proficiencyBonus(prof.spellcasting, draft.level) +
+        spellMod +
+        (spellAbility ? conditionEffects.checks[spellAbility] : conditionEffects.allChecks);
   const spellAttack =
     caster.progression === "none"
       ? null
-      : proficiencyBonus(prof.spellcasting, draft.level) + spellMod;
+      : proficiencyBonus(prof.spellcasting, draft.level) +
+        spellMod +
+        (spellAbility ? conditionEffects.checks[spellAbility] : conditionEffects.allChecks);
 
   // --- Equipment -----------------------------------------------------------
   const ownedEquipment = draft.equipment
@@ -2162,9 +2189,11 @@ export function computeCharacter(
       item.traits.includes("thrown") || item.traits.some((t) => t.startsWith("thrown-"));
     const finesse = item.traits.includes("finesse");
     let attackAbility = abilityMods.str;
+    let attackAbilityKey: AbilityKey = "str";
     let damageAbility = abilityMods.str;
     if (ranged) {
       attackAbility = abilityMods.dex;
+      attackAbilityKey = "dex";
       damageAbility = isThrown ? abilityMods.str : 0;
       if (!isThrown && item.traits.includes("propulsive")) {
         // Propulsive adds half a positive Strength modifier, or the full
@@ -2173,13 +2202,16 @@ export function computeCharacter(
       }
     } else if (finesse) {
       attackAbility = Math.max(abilityMods.str, abilityMods.dex);
+      attackAbilityKey = abilityMods.dex > abilityMods.str ? "dex" : "str";
       damageAbility = thief ? Math.max(abilityMods.str, abilityMods.dex) : abilityMods.str;
     }
     const attackBonus =
       proficiencyBonus(rank, draft.level) +
       attackAbility +
       (weapon.bonus || 0) +
-      runes.weaponPotency;
+      runes.weaponPotency +
+      conditionEffects.checks[attackAbilityKey] +
+      conditionEffects.attackCircumstance;
     const damageDice = Math.max(weapon.damage.dice, runes.strikingDice);
     const damageBase = `${damageDice}${weapon.damage.die}`;
     // Alchemical bombs have an item bonus to attack rolls but not to damage.
@@ -2219,8 +2251,12 @@ export function computeCharacter(
     prof.attacks.unarmed ?? 0,
     deityFist ? (prof.attacks.favoredWeapon ?? 0) : 0
   );
+  const fistAbilityKey: AbilityKey = abilityMods.dex > abilityMods.str ? "dex" : "str";
   const fistAttack =
-    proficiencyBonus(fistRank, draft.level) + Math.max(abilityMods.str, abilityMods.dex);
+    proficiencyBonus(fistRank, draft.level) +
+    Math.max(abilityMods.str, abilityMods.dex) +
+    conditionEffects.checks[fistAbilityKey] +
+    conditionEffects.attackCircumstance;
   const fistDamage = abilityMods.str + weaponSpecializationBonus(activeFeatures, fistRank);
   attacks.push({
     id: "unarmed:fist",
@@ -2540,6 +2576,7 @@ export function computeCharacter(
     casterProgression: caster.progression,
     maxSpellRank,
     validation,
+    conditionEffects,
     xp: draft.play.xp,
   } satisfies DerivedCharacter;
 

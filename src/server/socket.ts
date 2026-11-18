@@ -6,7 +6,12 @@ import { userFromCookieHeader } from "./auth";
 import { now, newId, safeInt, safeString, parseJson, clamp, sanitizeUserText } from "./util";
 import { characterSummary, computeCharacter, normalizeCharacterDraft } from "../shared/rules";
 import { rollFormula, validateFormula } from "../shared/dice";
-import { normalizeTokenConditions, tickTokenConditions } from "../shared/tokens";
+import {
+  normalizeTokenConditions,
+  syncLifeConditions,
+  tickTokenConditions,
+} from "../shared/tokens";
+import { applyDamageToDraft, reconcileLifeConditions } from "../shared/damage";
 import { filterInitiativeForPlayers, sortInitiativeEntries } from "../shared/initiative";
 import { applyGridPath } from "../shared/movement";
 import { blockingPropForMove } from "../shared/collision";
@@ -28,6 +33,7 @@ import {
   serializeInitiative,
   serializeMessage,
   serializeScene,
+  serializeSceneForPlayers,
   serializeToken,
   touchCampaign,
 } from "./serialize";
@@ -753,10 +759,37 @@ export function registerSocketServer(io: TypedServer): void {
               updated.hp_current === null
                 ? null
                 : Math.max(0, Math.min(1_000_000, Number(updated.hp_current)));
+            const maxHp = computeCharacter(draft, contextForDraft(draft)).maxHp;
+            draft.play.conditions = reconcileLifeConditions(
+              draft.play.conditions,
+              draft.play.hp ?? maxHp,
+              maxHp
+            );
             const summary = characterSummary(draft, contextForDraft(draft));
             db.prepare(
               "UPDATE characters SET data = ?, summary = ?, updated_at = ?, revision = revision + 1 WHERE id = ?"
             ).run(JSON.stringify(draft), JSON.stringify(summary), now(), character.id);
+            const currentTokenConditions = normalizeTokenConditions(
+              parseJson(updated.conditions, [])
+            );
+            const mergedConditions = syncLifeConditions(
+              currentTokenConditions,
+              draft.play.conditions
+            );
+            if (JSON.stringify(mergedConditions) !== JSON.stringify(currentTokenConditions)) {
+              db.prepare("UPDATE tokens SET conditions = ?, updated_at = ? WHERE id = ?").run(
+                JSON.stringify(mergedConditions),
+                now(),
+                token.id
+              );
+              const refreshed = tokenRow(token.id);
+              if (refreshed) {
+                socketTokenEvents(io, campaignId).updated(
+                  tokenWithOwner(refreshed),
+                  Boolean(refreshed.hidden)
+                );
+              }
+            }
             io.to(room(campaignId)).emit("character:updated", {
               characterId: character.id,
               summary,
@@ -766,6 +799,97 @@ export function registerSocketServer(io: TypedServer): void {
             // A malformed draft shouldn't block the token update.
           }
         }
+      }
+      touchCampaign(campaignId);
+    });
+
+    on("token:damage", ({ campaignId, tokenId, amount, critical }) => {
+      const row = tokenRow(tokenId);
+      if (!row) return;
+      const role = getCampaignRole(campaignId, socket.data.user.id);
+      if (!role) return;
+      const scene = sceneBelongs(row.scene_id, campaignId);
+      if (!scene) return;
+      const isOwner = row.owner_id === socket.data.user.id;
+      if (role !== "gm" && !isOwner) {
+        sendError(socket, "You can't damage that token.");
+        return;
+      }
+      const damage = clamp(safeInt(amount, 0, 0, 1_000_000), 0, 1_000_000);
+      if (!damage) return;
+      const ts = now();
+      if (row.character_id) {
+        const character = getCharacter(row.character_id);
+        if (!character) return;
+        if (character.campaign_id && character.campaign_id !== campaignId) {
+          sendError(socket, "That character is not part of this campaign.");
+          return;
+        }
+        try {
+          const draft = normalizeCharacterDraft(JSON.parse(character.data), character.name);
+          const derived = computeCharacter(draft, contextForDraft(draft));
+          const result = applyDamageToDraft(draft, derived.maxHp, damage, {
+            critical: Boolean(critical),
+          });
+          const summary = characterSummary(result.draft, contextForDraft(result.draft));
+          db.prepare(
+            "UPDATE characters SET data = ?, summary = ?, updated_at = ?, revision = revision + 1 WHERE id = ?"
+          ).run(JSON.stringify(result.draft), JSON.stringify(summary), ts, character.id);
+          const tokenConditions = syncLifeConditions(
+            normalizeTokenConditions(parseJson(row.conditions, [])),
+            result.draft.play.conditions
+          );
+          db.prepare(
+            "UPDATE tokens SET hp_max = ?, hp_current = ?, ac = ?, conditions = ?, updated_at = ? WHERE id = ?"
+          ).run(
+            summary.hp,
+            result.draft.play.hp ?? 0,
+            summary.ac,
+            JSON.stringify(tokenConditions),
+            ts,
+            row.id
+          );
+          const updated = tokenRow(row.id);
+          if (updated) {
+            socketTokenEvents(io, campaignId).updated(
+              tokenWithOwner(updated),
+              Boolean(updated.hidden)
+            );
+          }
+          io.to(room(campaignId)).emit("character:updated", {
+            characterId: character.id,
+            summary,
+            name: draft.name,
+          });
+          touchCampaign(campaignId);
+        } catch {
+          sendError(socket, "That character's sheet could not be updated.");
+        }
+        return;
+      }
+
+      const current = row.hp_current ?? row.hp_max ?? 0;
+      const next = Math.max(0, current - damage);
+      let conditions = normalizeTokenConditions(parseJson(row.conditions, []));
+      if (next === 0) {
+        const existingDying = conditions.find((entry) => entry.name.toLowerCase() === "dying");
+        const wounded = conditions.find((entry) => entry.name.toLowerCase() === "wounded");
+        const dying = existingDying
+          ? (existingDying.value ?? 1) + 1 + (critical ? 1 : 0)
+          : 1 + (wounded?.value ?? 0) + (critical ? 1 : 0);
+        conditions = conditions.filter(
+          (entry) => !["dying", "unconscious", "dead"].includes(entry.name.toLowerCase())
+        );
+        conditions.push({ name: "Dying", value: dying, duration: null });
+        conditions.push({ name: "Unconscious", value: null, duration: null });
+        if (dying >= 4) conditions.push({ name: "Dead", value: null, duration: null });
+      }
+      db.prepare(
+        "UPDATE tokens SET hp_current = ?, conditions = ?, updated_at = ? WHERE id = ?"
+      ).run(next, JSON.stringify(conditions), ts, row.id);
+      const updated = tokenRow(row.id);
+      if (updated) {
+        socketTokenEvents(io, campaignId).updated(tokenWithOwner(updated), Boolean(updated.hidden));
       }
       touchCampaign(campaignId);
     });
@@ -834,7 +958,10 @@ export function registerSocketServer(io: TypedServer): void {
         "UPDATE scenes SET name = ?, fog_enabled = ?, grid_size = ?, updated_at = ? WHERE id = ?"
       ).run(name, fogEnabled, gridSize, now(), scene.id);
       const updated = db.prepare("SELECT * FROM scenes WHERE id = ?").get(scene.id) as SceneRow;
-      io.to(room(campaignId)).emit("scene:updated", serializeScene(updated));
+      io.to(room(campaignId))
+        .except(gmRoom(campaignId))
+        .emit("scene:updated", serializeSceneForPlayers(updated));
+      io.to(gmRoom(campaignId)).emit("scene:updated", serializeScene(updated));
       touchCampaign(campaignId);
     });
 
@@ -870,7 +997,10 @@ export function registerSocketServer(io: TypedServer): void {
       );
       const row = db.prepare("SELECT * FROM scenes WHERE id = ?").get(id) as SceneRow;
       const serialized = serializeScene(row);
-      io.to(room(campaignId)).emit("scene:created", serialized);
+      io.to(room(campaignId))
+        .except(gmRoom(campaignId))
+        .emit("scene:created", serializeSceneForPlayers(row));
+      io.to(gmRoom(campaignId)).emit("scene:created", serialized);
       ack?.(serialized);
       touchCampaign(campaignId);
     });
@@ -986,7 +1116,13 @@ export function registerSocketServer(io: TypedServer): void {
         now(),
         sceneId
       );
-      io.to(room(campaignId)).emit("scene:props", { sceneId, props: normalized });
+      io.to(room(campaignId))
+        .except(gmRoom(campaignId))
+        .emit("scene:props", {
+          sceneId,
+          props: normalized.filter((prop) => prop.visible),
+        });
+      io.to(gmRoom(campaignId)).emit("scene:props", { sceneId, props: normalized });
       touchCampaign(campaignId);
     });
 

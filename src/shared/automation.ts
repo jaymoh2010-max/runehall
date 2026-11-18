@@ -21,7 +21,7 @@ export const AUTOMATION_HINTS: Record<AutomationLevel, string> = {
 };
 
 const MECHANICAL_TEXT =
-  /\b(bonus|penalty|resistance|weakness|condition|damage|speed|strike|check|save|dc|hp|hit points|proficiency|trained|expert|master|legendary|grant|gain|increase|reduce|immunity|sense|darkvision|low-light|circumstance|status|item bonus)\b/i;
+  /\b(bonus|penalty|resistance|weakness|condition|damage|speed|strike|check|save|dc|hp|hit points|proficiency|trained|expert|master|legendary|grant|gain|increase|reduce|immunity|sense|darkvision|low-light|circumstance|status|item bonus|action|reaction|attack|move|spell|focus|hero point|fortune|reroll|recall knowledge|exploration|downtime|craft|earn income|identify|maneuver|grapple|trip|shove|disarm|ally|enemy)\b/i;
 
 /**
  * Curated overrides can be added here as specific feats are verified. The

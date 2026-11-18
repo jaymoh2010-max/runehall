@@ -53,6 +53,7 @@ import {
 import { characterSummary, computeCharacter, normalizeCharacterDraft } from "../../shared/rules";
 import { applyLongRest, type LongRestResult } from "../../shared/rest";
 import { consumeLevelXp } from "../../shared/xp";
+import { normalizeTokenConditions, syncLifeConditions } from "../../shared/tokens";
 import {
   isJournalKind,
   normalizeJournalAttachments,
@@ -906,8 +907,12 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
         .prepare("SELECT * FROM tokens WHERE character_id = ?")
         .all(character.id) as TokenRow[];
       for (const token of linkedTokens) {
+        const tokenConditions = syncLifeConditions(
+          normalizeTokenConditions(parseJson(token.conditions, [])),
+          result.draft.play.conditions
+        );
         db.prepare(
-          "UPDATE tokens SET name = ?, hp_max = ?, hp_current = ?, ac = ?, updated_at = ? WHERE id = ?"
+          "UPDATE tokens SET name = ?, hp_max = ?, hp_current = ?, ac = ?, conditions = ?, updated_at = ? WHERE id = ?"
         ).run(
           result.draft.name,
           summary.hp,
@@ -915,6 +920,7 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
             ? summary.hp
             : Math.max(0, Math.min(summary.hp, result.draft.play.hp)),
           summary.ac,
+          JSON.stringify(tokenConditions),
           now(),
           token.id
         );

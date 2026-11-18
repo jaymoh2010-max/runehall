@@ -190,6 +190,12 @@ export function serializeScene(row: SceneRow): Scene {
   };
 }
 
+/** Scene payload for players: GM-only props are removed, walls remain for LOS. */
+export function serializeSceneForPlayers(row: SceneRow): Scene {
+  const scene = serializeScene(row);
+  return { ...scene, props: scene.props.filter((prop) => prop.visible) };
+}
+
 export function serializeToken(row: TokenRow, ownerName?: string): Token {
   return {
     id: row.id,
