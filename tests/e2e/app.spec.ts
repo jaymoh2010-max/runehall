@@ -272,6 +272,7 @@ test("GM places a token, chats, rolls, and opens the scenes manager", async ({ p
   await expect(tokenEditor.getByLabel(/Vision radius/)).toHaveValue("60");
   await expect(tokenEditor.getByLabel(/Senses/)).toHaveValue("normal");
   await expect(tokenEditor.getByLabel(/Light radius/)).toHaveValue("0");
+  await expect(tokenEditor.getByLabel(/Light color/)).toHaveValue("#ffd27d");
   await page.keyboard.press("Escape");
   await expect(tokenEditor).toBeHidden();
 

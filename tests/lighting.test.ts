@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  DEFAULT_LIGHT_COLOR,
+  lightColorRgba,
   lightLevelAt,
   normalizeAmbientLight,
+  normalizeLightColor,
   normalizeTokenVisionMode,
   visionLevelFor,
 } from "../src/shared/lighting";
@@ -34,5 +37,13 @@ describe("lighting", () => {
     expect(visionLevelFor("low-light", "dim")).toBe("bright");
     expect(visionLevelFor("low-light", "darkness")).toBeNull();
     expect(visionLevelFor("darkvision", "darkness")).toBe("dim");
+  });
+
+  it("normalizes light colors and converts them to rgba", () => {
+    expect(normalizeLightColor("#7FB8FF")).toBe("#7fb8ff");
+    expect(normalizeLightColor("blue")).toBe(DEFAULT_LIGHT_COLOR);
+    expect(normalizeLightColor(undefined)).toBe(DEFAULT_LIGHT_COLOR);
+    expect(lightColorRgba("#7fb8ff", 0.5)).toBe("rgba(127, 184, 255, 0.5)");
+    expect(lightColorRgba("nonsense", 2)).toBe(`rgba(255, 210, 125, 1)`);
   });
 });

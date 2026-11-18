@@ -29,6 +29,26 @@ export function normalizePartyVisionScope(value: unknown): PartyVisionScope {
   return value === "per-player" ? "per-player" : "shared";
 }
 
+export const DEFAULT_LIGHT_COLOR = "#ffd27d";
+
+/** Accepts six-digit hex colors; anything else falls back to warm gold. */
+export function normalizeLightColor(value: unknown): string {
+  return typeof value === "string" && /^#[0-9a-f]{6}$/i.test(value)
+    ? value.toLowerCase()
+    : DEFAULT_LIGHT_COLOR;
+}
+
+/** Converts a hex light color to an rgba() string for canvas gradients. */
+export function lightColorRgba(color: string, alpha: number): string {
+  const hex = normalizeLightColor(color).slice(1);
+  const value = Number.parseInt(hex, 16);
+  const red = (value >> 16) & 255;
+  const green = (value >> 8) & 255;
+  const blue = value & 255;
+  const safeAlpha = Math.max(0, Math.min(1, Number.isFinite(alpha) ? alpha : 0));
+  return `rgba(${red}, ${green}, ${blue}, ${safeAlpha})`;
+}
+
 export type LightLevel = "bright" | "dim" | "darkness";
 
 export interface LightSource {

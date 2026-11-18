@@ -14,7 +14,7 @@ import { findPathAroundProps } from "../shared/pathfinding";
 import { normalizeAoeTemplate, normalizeAoeTemplates } from "../shared/templates";
 import { blockingWallForMove, normalizeWalls } from "../shared/walls";
 import { normalizeSceneProps } from "../shared/props";
-import { normalizeTokenVisionMode } from "../shared/lighting";
+import { normalizeLightColor, normalizeTokenVisionMode } from "../shared/lighting";
 import type {
   ClientToServerEvents,
   InitiativeEntry,
@@ -345,12 +345,13 @@ function createToken(
       : safeInt(incoming.initiativeBonus, 0, -100, 1000);
   const visionRadius = clamp(safeInt(incoming.visionRadius, 60, 0, 240), 0, 240);
   const lightRadius = clamp(safeInt(incoming.lightRadius, 0, 0, 240), 0, 240);
+  const lightColor = normalizeLightColor(incoming.lightColor);
   const visionMode = normalizeTokenVisionMode(incoming.visionMode);
   const groupId = incoming.groupId ? safeString(incoming.groupId, "", 80) || null : null;
   const groupName = groupId ? safeString(incoming.groupName, name, 80) : null;
   db.prepare(
-    `INSERT INTO tokens (id, scene_id, name, image_url, character_id, owner_id, x, y, size, vision_radius, light_radius, vision_mode, color, hp_current, hp_max, ac, initiative_bonus, group_id, group_name, conditions, hidden, locked, sort_order, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO tokens (id, scene_id, name, image_url, character_id, owner_id, x, y, size, vision_radius, light_radius, light_color, vision_mode, color, hp_current, hp_max, ac, initiative_bonus, group_id, group_name, conditions, hidden, locked, sort_order, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     id,
     sceneId,
@@ -363,6 +364,7 @@ function createToken(
     size,
     visionRadius,
     lightRadius,
+    lightColor,
     visionMode,
     safeString(incoming.color, "#c8a96b", 30),
     hpCurrent,
@@ -603,6 +605,9 @@ export function registerSocketServer(io: TypedServer): void {
             "light_radius",
             clamp(safeInt(token.lightRadius, row.light_radius ?? 0, 0, 240), 0, 240)
           );
+        }
+        if (token.lightColor !== undefined) {
+          add("light_color", normalizeLightColor(token.lightColor));
         }
         if (token.visionMode !== undefined) {
           add("vision_mode", normalizeTokenVisionMode(token.visionMode));

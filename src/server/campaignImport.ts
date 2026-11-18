@@ -11,6 +11,7 @@ import {
 import { normalizeCampaignThreads } from "../shared/dashboard";
 import {
   normalizeAmbientLight,
+  normalizeLightColor,
   normalizePartyVisionScope,
   normalizeTokenVisionMode,
 } from "../shared/lighting";
@@ -259,8 +260,8 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
       const tokenId = newId("tok");
       db.prepare(
         `INSERT INTO tokens
-          (id, scene_id, name, image_url, character_id, owner_id, x, y, size, vision_radius, light_radius, vision_mode, color, hp_current, hp_max, ac, initiative_bonus, group_id, group_name, conditions, hidden, locked, sort_order, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          (id, scene_id, name, image_url, character_id, owner_id, x, y, size, vision_radius, light_radius, light_color, vision_mode, color, hp_current, hp_max, ac, initiative_bonus, group_id, group_name, conditions, hidden, locked, sort_order, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).run(
         tokenId,
         sceneId,
@@ -273,6 +274,7 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
         clamp(numberValue(token.size, 1, 1, 6), 1, 6),
         clamp(numberValue(token.visionRadius, 60, 0, 240), 0, 240),
         clamp(numberValue(token.lightRadius, 0, 0, 240), 0, 240),
+        normalizeLightColor(token.lightColor),
         normalizeTokenVisionMode(token.visionMode),
         text(token.color, "#c8a96b", 30),
         token.hpCurrent === null || token.hpCurrent === undefined

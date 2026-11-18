@@ -19,6 +19,7 @@ import type {
 import { normalizeCampaignRuleset, normalizeXpMode } from "../shared/content";
 import {
   normalizeAmbientLight,
+  normalizeLightColor,
   normalizePartyVisionScope,
   normalizeTokenVisionMode,
 } from "../shared/lighting";
@@ -166,6 +167,7 @@ export function serializeToken(row: TokenRow, ownerName?: string): Token {
     size: row.size,
     visionRadius: Number(row.vision_radius ?? 60),
     lightRadius: Number(row.light_radius ?? 0),
+    lightColor: normalizeLightColor(row.light_color),
     visionMode: normalizeTokenVisionMode(row.vision_mode),
     color: row.color,
     hpCurrent: row.hp_current,

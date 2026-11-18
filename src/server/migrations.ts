@@ -467,4 +467,11 @@ export const migrations: Migration[] = [
       ALTER TABLE scenes ADD COLUMN wall_collision INTEGER NOT NULL DEFAULT 0;
     `,
   },
+  {
+    version: 24,
+    name: "token_light_color",
+    sql: `
+      ALTER TABLE tokens ADD COLUMN light_color TEXT NOT NULL DEFAULT '#ffd27d';
+    `,
+  },
 ];

@@ -46,6 +46,7 @@ export function TokenEditModal({
   const [size, setSize] = useState("1");
   const [visionRadius, setVisionRadius] = useState("60");
   const [lightRadius, setLightRadius] = useState("0");
+  const [lightColor, setLightColor] = useState("#ffd27d");
   const [visionMode, setVisionMode] = useState<TokenVisionMode>("normal");
   const [color, setColor] = useState("#c8a96b");
   const [ownerId, setOwnerId] = useState("");
@@ -68,6 +69,7 @@ export function TokenEditModal({
     setSize(String(token.size));
     setVisionRadius(String(token.visionRadius ?? 60));
     setLightRadius(String(token.lightRadius ?? 0));
+    setLightColor(token.lightColor ?? "#ffd27d");
     setVisionMode(token.visionMode ?? "normal");
     setColor(token.color);
     setOwnerId(token.ownerId ?? "");
@@ -139,6 +141,7 @@ export function TokenEditModal({
       size: Number(size) || 1,
       visionRadius: Math.max(0, Math.min(240, Math.round(Number(visionRadius) || 0))),
       lightRadius: Math.max(0, Math.min(240, Math.round(Number(lightRadius) || 0))),
+      lightColor,
       visionMode,
       color,
       ownerId: ownerId || null,
@@ -322,6 +325,15 @@ export function TokenEditModal({
                 step={5}
                 value={lightRadius}
                 onChange={(event) => setLightRadius(event.target.value)}
+              />
+            </Field>
+            <Field label="Light color" hint="Tints the light emitted by this token.">
+              <input
+                className="token-color-input"
+                type="color"
+                value={lightColor}
+                aria-label="Light color"
+                onChange={(event) => setLightColor(event.target.value)}
               />
             </Field>
           </div>

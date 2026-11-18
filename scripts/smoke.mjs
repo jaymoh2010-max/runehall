@@ -1170,12 +1170,18 @@ async function main() {
       size: 1,
       visionRadius: 30,
       lightRadius: 20,
+      lightColor: "#7fb8ff",
       visionMode: "darkvision",
       color: "#c8a96b",
     },
   });
   if (!token) throw new Error("GM could not create a character token");
-  if (token.visionRadius !== 30 || token.lightRadius !== 20 || token.visionMode !== "darkvision") {
+  if (
+    token.visionRadius !== 30 ||
+    token.lightRadius !== 20 ||
+    token.lightColor !== "#7fb8ff" ||
+    token.visionMode !== "darkvision"
+  ) {
     throw new Error("Token vision/light settings were not saved");
   }
 

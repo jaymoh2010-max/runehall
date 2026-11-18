@@ -238,8 +238,8 @@ export async function registerTableRoutes(app: FastifyInstance): Promise<void> {
       .all(id) as TokenRow[];
     for (const token of sourceTokens) {
       db.prepare(
-        `INSERT INTO tokens (id, scene_id, name, image_url, character_id, owner_id, x, y, size, vision_radius, light_radius, vision_mode, color, hp_current, hp_max, ac, initiative_bonus, group_id, group_name, conditions, hidden, locked, sort_order, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        `INSERT INTO tokens (id, scene_id, name, image_url, character_id, owner_id, x, y, size, vision_radius, light_radius, light_color, vision_mode, color, hp_current, hp_max, ac, initiative_bonus, group_id, group_name, conditions, hidden, locked, sort_order, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).run(
         `tok_${Math.random().toString(16).slice(2, 14)}${Date.now().toString(16)}`,
         sceneId,
@@ -252,6 +252,7 @@ export async function registerTableRoutes(app: FastifyInstance): Promise<void> {
         token.size,
         token.vision_radius,
         token.light_radius,
+        token.light_color,
         token.vision_mode,
         token.color,
         token.hp_current,

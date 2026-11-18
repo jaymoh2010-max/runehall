@@ -25,6 +25,7 @@ import { blockingPropForMove } from "../../../shared/collision";
 import { findPathAroundProps } from "../../../shared/pathfinding";
 import { blockingWallForMove, nearestWall } from "../../../shared/walls";
 import { computeVision } from "../../../shared/vision";
+import { lightColorRgba } from "../../../shared/lighting";
 import { loadExplored, saveExplored } from "./explored";
 import { Tag } from "../ui";
 import { HoverCard } from "../HoverCard";
@@ -135,6 +136,7 @@ export function SceneCanvas({
   const viewportRef = useRef<HTMLDivElement>(null);
   const surfaceRef = useRef<HTMLDivElement>(null);
   const fogCanvasRef = useRef<HTMLCanvasElement>(null);
+  const lightCanvasRef = useRef<HTMLCanvasElement>(null);
   const [zoom, setZoom] = useState(0.5);
   const [pan, setPan] = useState<Pan>({ x: 40, y: 40 });
   const [dragging, setDragging] = useState<{
@@ -386,6 +388,37 @@ export function SceneCanvas({
     scene.fogEnabled,
     scene.losEnabled,
   ]);
+
+  useEffect(() => {
+    const canvas = lightCanvasRef.current;
+    if (!canvas) return;
+    const scale = Math.min(1, 2048 / Math.max(scene.width, scene.height));
+    const width = Math.max(1, Math.ceil(scene.width * scale));
+    const height = Math.max(1, Math.ceil(scene.height * scale));
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext("2d");
+    if (!context) return;
+    context.clearRect(0, 0, width, height);
+    const lights = tokens.filter((token) => !token.hidden && (token.lightRadius ?? 0) > 0);
+    if (!lights.length) return;
+    context.globalCompositeOperation = "lighter";
+    for (const token of lights) {
+      const radius = ((token.lightRadius ?? 0) / 5) * scene.gridSize * scale;
+      if (radius <= 0) continue;
+      const x = token.x * scale;
+      const y = token.y * scale;
+      const gradient = context.createRadialGradient(x, y, 0, x, y, radius * 2);
+      gradient.addColorStop(0, lightColorRgba(token.lightColor, 0.32));
+      gradient.addColorStop(0.5, lightColorRgba(token.lightColor, 0.14));
+      gradient.addColorStop(1, lightColorRgba(token.lightColor, 0));
+      context.fillStyle = gradient;
+      context.beginPath();
+      context.arc(x, y, radius * 2, 0, Math.PI * 2);
+      context.fill();
+    }
+    context.globalCompositeOperation = "source-over";
+  }, [tokens, scene.width, scene.height, scene.gridSize]);
 
   const scenePoint = (clientX: number, clientY: number) => {
     const rect = surfaceRef.current?.getBoundingClientRect();
@@ -1032,6 +1065,12 @@ export function SceneCanvas({
             backgroundSize: `${scene.gridSize}px ${scene.gridSize}px`,
             backgroundPosition: `${scene.gridOffsetX}px ${scene.gridOffsetY}px`,
           }}
+        />
+        <canvas
+          ref={lightCanvasRef}
+          className="light-canvas"
+          aria-hidden="true"
+          style={{ width: scene.width, height: scene.height }}
         />
         {dragging && Object.keys(dragging.paths).length ? (
           <svg className="path-layer" width={scene.width} height={scene.height} aria-hidden="true">

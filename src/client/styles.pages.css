@@ -6429,6 +6429,13 @@
   pointer-events: none;
   overflow: visible;
 }
+.light-canvas {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 2;
+  pointer-events: none;
+}
 .path-layer {
   position: absolute;
   inset: 0;

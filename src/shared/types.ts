@@ -1097,6 +1097,8 @@ export interface Token {
   visionRadius: number;
   /** Light emitted by this token in feet of bright light. 0 emits no light. */
   lightRadius: number;
+  /** Hex color used to tint this token's light. */
+  lightColor: string;
   /** Senses used when calculating what this token can see. */
   visionMode: TokenVisionMode;
   color: string;

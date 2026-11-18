@@ -429,12 +429,13 @@ Acceptance: a GM can prepare a full session in Runehall and start it with one �
   - Optional line-of-sight fog makes players see cells visible from their tokens using each token's vision radius, light radius, and normal/low-light/darkvision senses. Earlier explored cells stay dimly visible per player in local storage.
   - Scenes can use shared party vision or per-player vision; per-player scenes use each player's owned tokens. GM preview falls back to shared vision.
   - Ambient light is configurable as bright, dim, or darkness. Token light sources create bright light and a dim ring outside it.
-  - Dim light is rendered as a lighter fog rather than full black. Concealment and light-color rendering are not automated.
+  - Dim light is rendered as a lighter fog rather than full black. Concealment remains a manual table call.
+  - Each token light has a hex color; a blended overlay renders warm gold by default or any chosen color as a tinted glow.
   - Wall data is persisted per scene, copied on duplication, exported/imported with campaigns, and broadcast to connected clients.
   - A scene-level **Wall collision** switch makes walls and closed doors block token movement; open doors pass freely.
   - Blocked moves follow the shortest path around walls using the same A* route preview and remaining-Speed truncation as prop collision.
   - Wall collision is off by default so scenes that only use walls for sight keep their current movement behavior.
-  - Covered by shared vision, wall-collision, and pathfinding tests, a two-socket smoke check of a wall detour, and a browser wall-drawing flow.
+  - Covered by shared vision, lighting, wall-collision, and pathfinding tests, a two-socket smoke check of token light colors and a wall detour, and a browser wall-drawing flow.
 - [x] **Built-in map library**
   - Ten categorized vector battle maps ship with the app: tavern, cavern, forest, mountain, battlefield, crypt, village, ship, desert, and swamp.
   - Every built-in map is 1536×1024 with an exact 24×16 grid at 64 px per square, so the overlay aligns without manual calibration.
