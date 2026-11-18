@@ -253,6 +253,20 @@ test("player registers, joins with the invite code, and sees a player-safe table
   await adminPage.goto(`${campaignPath}?tab=settings`);
   await expect(adminPage.getByRole("heading", { name: "Members" })).toBeVisible();
   await expect(adminPage.getByText(player.displayName)).toBeVisible();
+
+  // The in-world date must reach a player who is already looking at Overview.
+  await page.goto(`${campaignPath}?tab=overview`);
+  const playerDate = page.locator(".dashboard-calendar h3");
+  await expect(playerDate).toBeVisible({ timeout: 15_000 });
+  const beforeDate = (await playerDate.textContent())?.trim();
+  await adminPage.goto(`${campaignPath}?tab=overview`);
+  const adminDate = adminPage.locator(".dashboard-calendar h3");
+  await expect(adminDate).toBeVisible({ timeout: 15_000 });
+  await adminPage.getByRole("button", { name: "+1 day" }).click();
+  await expect(adminDate).not.toHaveText(beforeDate ?? "", { timeout: 15_000 });
+  const afterDate = (await adminDate.textContent())?.trim();
+  await expect(playerDate).toHaveText(afterDate ?? "", { timeout: 15_000 });
+
   await adminContext.close();
 });
 

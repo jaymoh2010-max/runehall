@@ -11,7 +11,7 @@ import type {
   Token,
 } from "../../../shared/types";
 import { api } from "../../api";
-import { connectSocket } from "../../socket";
+import { connectSocket, joinCampaign } from "../../socket";
 import { revisionAction } from "../../../shared/revisions";
 import {
   applyCharacterCreated,
@@ -53,7 +53,13 @@ export function useCampaignTable({ initial, campaignId, toast }: UseCampaignTabl
   const [turnIndex, setTurnIndex] = useState(initial.turnIndex);
   const [audioTracks, setAudioTracks] = useState<CampaignAudioTrack[]>(initial.audioTracks ?? []);
   const [audioState, setAudioState] = useState<CampaignAudioState>(
-    initial.audioState ?? { trackId: null, playing: false, position: 0, updatedAt: 0 }
+    initial.audioState ?? {
+      trackId: null,
+      playing: false,
+      position: 0,
+      updatedAt: 0,
+      serverTime: 0,
+    }
   );
   const [presence, setPresence] = useState<PresenceUser[]>([]);
   const [selectedTokenId, setSelectedTokenIdState] = useState<string | null>(null);
@@ -70,7 +76,6 @@ export function useCampaignTable({ initial, campaignId, toast }: UseCampaignTabl
 
   const revisionRef = useRef(initial.revision);
   const refreshingRef = useRef(false);
-  const joined = useRef(false);
   const wasConnectedOnce = useRef(false);
   const pointerTimer = useRef<number | null>(null);
   const scenesRef = useRef(scenes);
@@ -123,7 +128,13 @@ export function useCampaignTable({ initial, campaignId, toast }: UseCampaignTabl
       setTurnIndex(snapshot.turnIndex);
       setAudioTracks(snapshot.audioTracks ?? []);
       setAudioState(
-        snapshot.audioState ?? { trackId: null, playing: false, position: 0, updatedAt: 0 }
+        snapshot.audioState ?? {
+          trackId: null,
+          playing: false,
+          position: 0,
+          updatedAt: 0,
+          serverTime: 0,
+        }
       );
       revisionRef.current = snapshot.revision;
       setMessages((current) => mergeSnapshotMessages(current, snapshot.messages));
@@ -143,31 +154,26 @@ export function useCampaignTable({ initial, campaignId, toast }: UseCampaignTabl
 
   useEffect(() => {
     const socket = connectSocket();
-    const join = () => {
-      setConnectionStatus("connecting");
-      socket.emit("campaign:join", { campaignId }, (ack) => {
-        const result = ack as { ok?: boolean; role?: string } | undefined;
-        if (!result?.ok) {
-          setConnectionStatus("offline");
-          toast("Could not join the live table.", "error");
-          return;
-        }
-        joined.current = true;
-        setConnectionStatus("online");
-        if (wasConnectedOnce.current) {
-          void refreshTable();
-        } else {
-          wasConnectedOnce.current = true;
-        }
-      });
-    };
+    setConnectionStatus("connecting");
+    const leaveCampaignRoom = joinCampaign(campaignId, (ack) => {
+      const result = ack as { ok?: boolean; role?: string } | undefined;
+      if (!result?.ok) {
+        setConnectionStatus("offline");
+        toast("Could not join the live table.", "error");
+        return;
+      }
+      setConnectionStatus("online");
+      if (wasConnectedOnce.current) {
+        void refreshTable();
+      } else {
+        wasConnectedOnce.current = true;
+      }
+    });
     const onDisconnect = () => setConnectionStatus("offline");
     const onConnectError = () => setConnectionStatus("offline");
     const onVisibility = () => {
       if (document.visibilityState === "visible" && socket.connected) void refreshTable();
     };
-    if (socket.connected) join();
-    socket.on("connect", join);
     socket.on("disconnect", onDisconnect);
     socket.on("connect_error", onConnectError);
     document.addEventListener("visibilitychange", onVisibility);
@@ -314,7 +320,6 @@ export function useCampaignTable({ initial, campaignId, toast }: UseCampaignTabl
     socket.on("error:toast", onError);
 
     return () => {
-      socket.off("connect", join);
       socket.off("disconnect", onDisconnect);
       socket.off("connect_error", onConnectError);
       document.removeEventListener("visibilitychange", onVisibility);
@@ -341,7 +346,7 @@ export function useCampaignTable({ initial, campaignId, toast }: UseCampaignTabl
       socket.off("character:created", onCharacterCreated);
       socket.off("campaign:revision", onRevision);
       socket.off("error:toast", onError);
-      if (joined.current) socket.emit("campaign:leave", { campaignId });
+      leaveCampaignRoom();
       if (pointerTimer.current) window.clearTimeout(pointerTimer.current);
     };
   }, [campaignId, toast, refreshTable]);

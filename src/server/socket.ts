@@ -31,6 +31,7 @@ import {
   serializeToken,
   touchCampaign,
 } from "./serialize";
+import { tokenBroadcaster } from "./tokenEvents";
 
 interface SocketData {
   user: PublicUser;
@@ -57,6 +58,27 @@ function room(campaignId: string): string {
 }
 function gmRoom(campaignId: string): string {
   return `gm:${campaignId}`;
+}
+
+function socketTokenEvents(io: TypedServer, campaignId: string) {
+  const emitTo = (roomName: string, event: string, payload: unknown) => {
+    (io.to(roomName) as unknown as { emit: (name: string, value: unknown) => void }).emit(
+      event,
+      payload
+    );
+  };
+  const emitToPlayers = (event: string, payload: unknown) => {
+    (
+      io.to(room(campaignId)).except(gmRoom(campaignId)) as unknown as {
+        emit: (name: string, value: unknown) => void;
+      }
+    ).emit(event, payload);
+  };
+  return tokenBroadcaster((event, payload, target = "all") => {
+    if (target === "gm") emitTo(gmRoom(campaignId), event, payload);
+    else if (target === "players") emitToPlayers(event, payload);
+    else emitTo(room(campaignId), event, payload);
+  });
 }
 
 function presenceList(campaignId: string): PresenceUser[] {
@@ -260,7 +282,9 @@ function tickConditionsForEntry(
       row.id
     );
     const updated = tokenRow(row.id);
-    if (updated) io.to(room(campaignId)).emit("token:updated", tokenWithOwner(updated));
+    if (updated) {
+      socketTokenEvents(io, campaignId).updated(tokenWithOwner(updated), Boolean(row.hidden));
+    }
     changed = true;
   }
   const characterIds = new Set(
@@ -404,7 +428,7 @@ function createToken(
   );
   const row = tokenRow(id)!;
   const token = tokenWithOwner(row);
-  io.to(room(campaignId)).emit("token:created", token);
+  socketTokenEvents(io, campaignId).created(token);
   touchCampaign(campaignId);
   return token;
 }
@@ -538,12 +562,15 @@ export function registerSocketServer(io: TypedServer): void {
               ? `There is no path around ${blocker}.`
               : `Not enough movement left to get around ${blocker}.`
           );
-          io.to(room(campaignId)).emit("token:moved", {
-            tokenId,
-            sceneId,
-            x: row.x,
-            y: row.y,
-          });
+          socketTokenEvents(io, campaignId).moved(
+            {
+              tokenId,
+              sceneId,
+              x: row.x,
+              y: row.y,
+            },
+            Boolean(row.hidden)
+          );
           return;
         }
         const last = path.points[path.points.length - 1];
@@ -568,12 +595,15 @@ export function registerSocketServer(io: TypedServer): void {
         now(),
         tokenId
       );
-      io.to(room(campaignId)).emit("token:moved", {
-        tokenId,
-        sceneId,
-        x: targetX,
-        y: targetY,
-      });
+      socketTokenEvents(io, campaignId).moved(
+        {
+          tokenId,
+          sceneId,
+          x: targetX,
+          y: targetY,
+        },
+        Boolean(row.hidden)
+      );
       if (active && movement && movement.feet > 0) {
         entries[state.turn_index] = {
           ...active,
@@ -682,7 +712,9 @@ export function registerSocketServer(io: TypedServer): void {
         ...values
       );
       const updated = tokenRow(token.id);
-      if (updated) io.to(room(campaignId)).emit("token:updated", tokenWithOwner(updated));
+      if (updated) {
+        socketTokenEvents(io, campaignId).updated(tokenWithOwner(updated), Boolean(row.hidden));
+      }
       // A GM changing a linked token's HP is a table action; mirror it into
       // the character sheet so the player's next view is consistent.
       if (updated?.character_id && token.hpCurrent !== undefined) {
@@ -718,7 +750,10 @@ export function registerSocketServer(io: TypedServer): void {
       const scene = sceneBelongs(row.scene_id, campaignId);
       if (!scene) return;
       db.prepare("DELETE FROM tokens WHERE id = ?").run(tokenId);
-      io.to(room(campaignId)).emit("token:deleted", { tokenId, sceneId: row.scene_id });
+      socketTokenEvents(io, campaignId).deleted(
+        { tokenId, sceneId: row.scene_id },
+        Boolean(row.hidden)
+      );
       touchCampaign(campaignId);
     });
 

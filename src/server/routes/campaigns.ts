@@ -13,6 +13,7 @@ import {
 import {
   db,
   createDefaultScene,
+  type AudioTrackRow,
   type CampaignDashboardRow,
   type CampaignNpcRow,
   type CampaignRow,
@@ -25,6 +26,7 @@ import {
   type TokenRow,
 } from "../db";
 import {
+  serializeAudioTrack,
   serializeCampaignDashboard,
   serializeCampaignNpc,
   serializeCampaignSummary,
@@ -39,6 +41,7 @@ import {
   serializeToken,
   touchCampaign,
 } from "../serialize";
+import { tokenEventsFor } from "../tokenEvents";
 import {
   isCampaignRuleset,
   isXpMode,
@@ -74,6 +77,24 @@ function campaignCounts(row: CampaignRow) {
 function roleFor(row: CampaignRow, userId: string): "gm" | "player" | null {
   if (row.gm_id === userId) return "gm";
   return getMembership(row.id, userId)?.role ?? null;
+}
+
+/** Push role-appropriate campaign metadata to anyone in the room. */
+function broadcastCampaignSummary(app: FastifyInstance, row: CampaignRow): void {
+  const counts = campaignCounts(row);
+  const gmName = getUser(row.gm_id)?.display_name ?? "";
+  app.broadcastCampaign(
+    row.id,
+    "campaign:updated",
+    serializeCampaignSummary(row, "gm", counts, gmName),
+    "gm"
+  );
+  app.broadcastCampaign(
+    row.id,
+    "campaign:updated",
+    serializeCampaignSummary(row, "player", counts, gmName),
+    "players"
+  );
 }
 
 export async function registerCampaignRoutes(app: FastifyInstance): Promise<void> {
@@ -348,6 +369,13 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
         .all(id) as CampaignNpcRow[]
     ).map(serializeCampaignNpc);
     const sessions = campaignSessionsFor(id, "gm", request.user.id);
+    const audioTracks = (
+      db
+        .prepare(
+          "SELECT * FROM campaign_audio_tracks WHERE campaign_id = ? ORDER BY sort_order ASC, created_at ASC"
+        )
+        .all(id) as AudioTrackRow[]
+    ).map(serializeAudioTrack);
     const state = db.prepare("SELECT * FROM campaign_state WHERE campaign_id = ?").get(id) as
       | { active_scene_id: string | null; initiative: string; round: number; turn_index: number }
       | undefined;
@@ -356,6 +384,7 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
     for (const token of tokens) if (token.imageUrl) assets.add(token.imageUrl);
     for (const character of characters)
       if (character.summary?.portraitUrl) assets.add(character.summary.portraitUrl);
+    for (const track of audioTracks) assets.add(track.url);
 
     const payload = {
       format: "runehall-campaign",
@@ -378,6 +407,7 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
       sessions,
       messages,
       journal,
+      audioTracks,
       state: {
         activeSceneId: state?.active_scene_id ?? null,
         initiative: serializeInitiative(parseJson(state?.initiative, [])),
@@ -385,7 +415,7 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
         turnIndex: state?.turn_index ?? 0,
       },
       assets: [...assets],
-      note: "Image files are referenced by URL. Use `npm run backup` to archive the database and data/uploads together.",
+      note: "Image and audio files are referenced by URL. Use `npm run backup` to archive the database and data/uploads together.",
     };
     const safeName = row.name.replace(/[^a-z0-9-_]+/gi, "-").replace(/^-+|-+$/g, "") || "campaign";
     return reply
@@ -437,6 +467,7 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
       }
     }
     const updated = getCampaign(id)!;
+    broadcastCampaignSummary(app, updated);
     return reply.send({
       campaign: serializeCampaignSummary(updated, "gm", campaignCounts(updated)),
     });
@@ -480,6 +511,7 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
       request,
     });
     const updated = getCampaign(id)!;
+    broadcastCampaignSummary(app, updated);
     return reply.send({
       worldDate,
       campaign: serializeCampaignSummary(updated, "gm", campaignCounts(updated)),
@@ -516,6 +548,7 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
       request,
     });
     const updated = getCampaign(id)!;
+    broadcastCampaignSummary(app, updated);
     return reply.send({
       worldDate,
       campaign: serializeCampaignSummary(updated, "gm", campaignCounts(updated)),
@@ -668,7 +701,7 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
         const updatedToken = db
           .prepare("SELECT * FROM tokens WHERE id = ?")
           .get(token.id) as TokenRow;
-        app.broadcastCampaign(id, "token:updated", serializeToken(updatedToken));
+        tokenEventsFor(app, id).updated(serializeToken(updatedToken), Boolean(token.hidden));
       }
 
       app.broadcastCampaign(id, "character:updated", {
@@ -888,7 +921,7 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
         const updatedToken = db
           .prepare("SELECT * FROM tokens WHERE id = ?")
           .get(token.id) as TokenRow;
-        app.broadcastCampaign(id, "token:updated", serializeToken(updatedToken));
+        tokenEventsFor(app, id).updated(serializeToken(updatedToken), Boolean(token.hidden));
       }
 
       app.broadcastCampaign(id, "character:updated", {

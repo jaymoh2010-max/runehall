@@ -22,6 +22,7 @@ export function SoundPanel({
   const audioRef = useRef<HTMLAudioElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const pendingSeek = useRef<number | null>(null);
+  const receivedRef = useRef<{ key: string; at: number } | null>(null);
   const [open, setOpen] = useState(true);
   const [joined, setJoined] = useState(false);
   const [volume, setVolume] = useState(0.7);
@@ -51,8 +52,17 @@ export function SoundPanel({
       audio.src = currentTrackUrl;
       audio.load();
     }
+    const stateKey = `${state.serverTime}:${state.updatedAt}:${state.position}:${state.playing}`;
+    if (!receivedRef.current || receivedRef.current.key !== stateKey) {
+      receivedRef.current = { key: stateKey, at: Date.now() };
+    }
+    // Measure elapsed time from the server's clock so a skewed local clock
+    // cannot seek players to the wrong point in the track.
+    const serverNow = state.serverTime
+      ? state.serverTime + (Date.now() - receivedRef.current.at)
+      : Date.now();
     const elapsed =
-      state.playing && state.updatedAt ? Math.max(0, (Date.now() - state.updatedAt) / 1000) : 0;
+      state.playing && state.updatedAt ? Math.max(0, (serverNow - state.updatedAt) / 1000) : 0;
     const target = Math.max(0, state.position + elapsed);
     if (Number.isFinite(target)) {
       // Newly loaded media has no seekable range yet. Remember the target and
@@ -74,7 +84,15 @@ export function SoundPanel({
     } else if (!state.playing) {
       audio.pause();
     }
-  }, [currentTrackId, currentTrackUrl, state.playing, state.position, state.updatedAt, joined]);
+  }, [
+    currentTrackId,
+    currentTrackUrl,
+    state.playing,
+    state.position,
+    state.updatedAt,
+    state.serverTime,
+    joined,
+  ]);
 
   const sendState = (trackId: string | null, playing: boolean, position: number) => {
     if (!isGm) return;

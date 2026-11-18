@@ -25,6 +25,7 @@ import { contextForDraft } from "../compendium";
 import { importPathbuilder } from "../pathbuilder";
 import { db, type CharacterRow, type TokenRow } from "../db";
 import { serializeCharacter, serializeToken, touchCampaign } from "../serialize";
+import { tokenEventsFor } from "../tokenEvents";
 import {
   addCurrency,
   addItemToDraft,
@@ -70,7 +71,10 @@ function syncCharacterDraft(
       token.id
     );
     const updatedToken = db.prepare("SELECT * FROM tokens WHERE id = ?").get(token.id) as TokenRow;
-    app.broadcastCampaign(row.campaign_id, "token:updated", serializeToken(updatedToken));
+    tokenEventsFor(app, row.campaign_id).updated(
+      serializeToken(updatedToken),
+      Boolean(token.hidden)
+    );
   }
   app.broadcastCampaign(row.campaign_id, "character:updated", {
     characterId: row.id,

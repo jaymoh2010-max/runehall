@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { getCampaign, getCampaignRole } from "../access";
 import { db, type CampaignNpcRow, type SceneRow, type TokenRow } from "../db";
 import { serializeCampaignNpc, serializeToken, touchCampaign } from "../serialize";
+import { tokenEventsFor } from "../tokenEvents";
 import { clamp, newId, now, safeInt, safeString, sanitizeUserText } from "../util";
 
 function gmCampaign(
@@ -212,7 +213,7 @@ export async function registerNpcRoutes(app: FastifyInstance): Promise<void> {
       ts
     );
     const token = db.prepare("SELECT * FROM tokens WHERE id = ?").get(tokenId) as TokenRow;
-    app.broadcastCampaign(id, "token:created", serializeToken(token));
+    tokenEventsFor(app, id).created(serializeToken(token));
     touchCampaign(id);
     return reply.code(201).send({ token: serializeToken(token), sceneId: scene.id });
   });

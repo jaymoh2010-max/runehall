@@ -1,4 +1,6 @@
 import { getUserByUsername } from "./access";
+import fs from "node:fs";
+import path from "node:path";
 import { contextForDraft } from "./compendium";
 import { db, transaction } from "./db";
 import { characterSummary, normalizeCharacterDraft } from "../shared/rules";
@@ -33,7 +35,16 @@ import {
   normalizeSessionAgenda,
   normalizeSessionStatus,
 } from "../shared/sessions";
-import { clamp, inviteCode, newId, now, safeInt, safeString, sanitizeUserText } from "./util";
+import {
+  clamp,
+  inviteCode,
+  newId,
+  now,
+  safeInt,
+  safeString,
+  sanitizeUserText,
+  uploadsDir,
+} from "./util";
 
 type RecordValue = Record<string, unknown>;
 
@@ -49,6 +60,7 @@ export interface CampaignImportStats {
   loot: number;
   npcs: number;
   sessions: number;
+  audioTracks: number;
 }
 
 export interface CampaignImportResult {
@@ -127,6 +139,7 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
     loot: 0,
     npcs: 0,
     sessions: 0,
+    audioTracks: 0,
   };
 
   return transaction(() => {
@@ -169,6 +182,40 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
         stats.members += 1;
       }
       if (exportId) memberUserByExportId.set(exportId, local.id);
+    }
+
+    // Soundtrack files are not embedded in the JSON export. Restore metadata
+    // only when the referenced upload already exists on this machine.
+    for (const track of records(payload.audioTracks, 100, "audioTracks")) {
+      const rawUrl = text(track.url, "", 500);
+      const match = /^\/uploads\/([A-Za-z0-9._-]+)$/.exec(rawUrl);
+      if (!match) continue;
+      const filename = match[1];
+      if (filename === "." || filename === "..") continue;
+      const mimeType = text(track.mimeType, "audio/mpeg", 80);
+      if (!["audio/mpeg", "audio/ogg", "audio/wav", "audio/webm"].includes(mimeType)) continue;
+      try {
+        const filePath = path.join(uploadsDir(), filename);
+        const stat = fs.statSync(filePath);
+        if (!stat.isFile() || stat.size === 0) continue;
+        db.prepare(
+          `INSERT INTO campaign_audio_tracks
+            (id, campaign_id, name, url, mime_type, size, sort_order, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+        ).run(
+          newId("audio"),
+          campaignId,
+          text(track.name, "Imported track", 140),
+          rawUrl,
+          mimeType,
+          stat.size,
+          stats.audioTracks,
+          timestamp(track.createdAt, ts)
+        );
+        stats.audioTracks += 1;
+      } catch {
+        // Skip a track whose file is missing or unreadable.
+      }
     }
 
     const characterMap = new Map<string, string>();

@@ -1211,6 +1211,8 @@ export interface CampaignAudioState {
   position: number;
   /** Server timestamp for extending the position while playing. */
   updatedAt: number;
+  /** Server timestamp when this snapshot was serialized, for clock-skew-safe sync. */
+  serverTime: number;
 }
 
 export interface CampaignTable {
@@ -1422,6 +1424,7 @@ export interface ServerToClientEvents {
   }) => void;
   "character:created": (payload: { character: CharacterRecord }) => void;
   "campaign:revision": (payload: { revision: number }) => void;
+  "campaign:updated": (campaign: CampaignSummary) => void;
   "error:toast": (payload: { message: string }) => void;
 }
 

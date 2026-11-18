@@ -50,6 +50,7 @@ import { CAMPAIGN_RULESET_OPTIONS, XP_MODE_OPTIONS, rulesetLabel } from "../../s
 import { QUEST_STATUS_OPTIONS, normalizeQuestXp } from "../../shared/journal";
 import { xpProgress } from "../../shared/xp";
 import { api, copyText, formatDate, uploadImage } from "../api";
+import { connectSocket, joinCampaign } from "../socket";
 import { errorMessage } from "../stores";
 import { useSession, useToasts } from "../stores";
 import {
@@ -278,6 +279,26 @@ export function CampaignPage() {
       .catch(() => undefined);
     return () => {
       cancelled = true;
+    };
+  }, [id, tab]);
+
+  // Keep shared campaign metadata (the in-world date, name, ruleset, counts)
+  // live while the table itself is not mounted on this tab.
+  useEffect(() => {
+    if (!id || tab === "table") return;
+    const socket = connectSocket();
+    const applySummary = (summary: CampaignSummary) => {
+      if (summary.id !== id) return;
+      setCampaign(summary);
+      setTableData((current) =>
+        current ? { ...current, campaign: { ...current.campaign, ...summary } } : current
+      );
+    };
+    socket.on("campaign:updated", applySummary);
+    const leaveCampaignRoom = joinCampaign(id);
+    return () => {
+      socket.off("campaign:updated", applySummary);
+      leaveCampaignRoom();
     };
   }, [id, tab]);
 

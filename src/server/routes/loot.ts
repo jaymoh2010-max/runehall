@@ -15,6 +15,7 @@ import {
   serializeToken,
   touchCampaign,
 } from "../serialize";
+import { tokenEventsFor } from "../tokenEvents";
 import { normalizeLootItems, lootIsEmpty, applyLootToDraft } from "../../shared/loot";
 import { characterSummary, normalizeCharacterDraft } from "../../shared/rules";
 import { newId, now, parseJson, safeInt, safeString, sanitizeUserText } from "../util";
@@ -273,7 +274,7 @@ export async function registerLootRoutes(app: FastifyInstance): Promise<void> {
     });
 
     for (const token of updatedTokens) {
-      app.broadcastCampaign(id, "token:updated", serializeToken(token));
+      tokenEventsFor(app, id).updated(serializeToken(token), Boolean(token.hidden));
     }
     app.broadcastCampaign(id, "character:updated", {
       characterId: character.id,

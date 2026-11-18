@@ -114,6 +114,7 @@ export function serializeAudioState(campaign: CampaignRow): CampaignAudioState {
     playing: Boolean(campaign.audio_playing),
     position: Number(campaign.audio_position ?? 0),
     updatedAt: Number(campaign.audio_updated_at ?? 0),
+    serverTime: Date.now(),
   };
 }
 

@@ -1199,6 +1199,69 @@ async function main() {
     throw new Error("Token vision/light settings were not saved");
   }
 
+  const hiddenToken = await emitAck(gmSocket, "token:create", {
+    campaignId: campaign.id,
+    sceneId: scene.id,
+    token: { name: "Smoke Lurker", x: 500, y: 500, size: 1, hidden: true },
+  });
+  if (!hiddenToken?.hidden) throw new Error("Hidden token was not created hidden");
+  let playerSawHiddenCreate = false;
+  let playerSawHiddenMove = false;
+  const onHiddenCreated = (created) => {
+    if (created.id === hiddenToken.id) playerSawHiddenCreate = true;
+  };
+  const onHiddenMoved = (moved) => {
+    if (moved.tokenId === hiddenToken.id) playerSawHiddenMove = true;
+  };
+  playerSocket.on("token:created", onHiddenCreated);
+  playerSocket.on("token:moved", onHiddenMoved);
+  await delay(250);
+  if (playerSawHiddenCreate) throw new Error("Hidden token creation leaked to the player");
+  gmSocket.emit("token:move", {
+    campaignId: campaign.id,
+    sceneId: scene.id,
+    tokenId: hiddenToken.id,
+    x: 570,
+    y: 500,
+  });
+  await delay(250);
+  if (playerSawHiddenMove) throw new Error("Hidden token movement leaked to the player");
+  playerSocket.off("token:created", onHiddenCreated);
+  playerSocket.off("token:moved", onHiddenMoved);
+  const hiddenPlayerTable = await api(`/api/campaigns/${campaign.id}/table`, {
+    cookie: playerCookie,
+  });
+  if (hiddenPlayerTable.payload.tokens.some((entry) => entry.id === hiddenToken.id)) {
+    throw new Error("Hidden token appeared in the player snapshot");
+  }
+  const hiddenGmTable = await api(`/api/campaigns/${campaign.id}/table`, { cookie: gmCookie });
+  if (!hiddenGmTable.payload.tokens.some((entry) => entry.id === hiddenToken.id)) {
+    throw new Error("Hidden token disappeared from the GM snapshot");
+  }
+  const revealPromise = waitForEvent(
+    playerSocket,
+    "token:created",
+    (created) => created.id === hiddenToken.id
+  );
+  gmSocket.emit("token:update", {
+    campaignId: campaign.id,
+    token: { id: hiddenToken.id, hidden: false },
+  });
+  await revealPromise;
+  const hidePromise = waitForEvent(
+    playerSocket,
+    "token:deleted",
+    (payload) => payload.tokenId === hiddenToken.id
+  );
+  gmSocket.emit("token:update", {
+    campaignId: campaign.id,
+    token: { id: hiddenToken.id, hidden: true },
+  });
+  await hidePromise;
+  gmSocket.emit("token:delete", { campaignId: campaign.id, tokenId: hiddenToken.id });
+  await delay(150);
+  log("hidden tokens and hidden moves stay GM-only");
+
   const hpTable = await api(`/api/campaigns/${campaign.id}/table`, { cookie: gmCookie });
   const linkedToken = hpTable.payload.tokens.find((entry) => entry.id === token.id);
   const linkedCharacter = hpTable.payload.characters.find((entry) => entry.id === character.id);
@@ -1514,17 +1577,26 @@ async function main() {
   ) {
     throw new Error("The in-world calendar did not advance across the month boundary");
   }
+  const playerCampaignUpdate = waitForEvent(
+    playerSocket,
+    "campaign:updated",
+    (summary) => summary.worldDate?.month === 2 && summary.worldDate?.day === 9
+  );
   const calendarPartial = await api(`/api/campaigns/${campaign.id}/calendar`, {
     method: "PUT",
     cookie: gmCookie,
     body: { day: 9 },
   });
+  await playerCampaignUpdate;
   if (
     calendarPartial.payload.worldDate?.year !== 4726 ||
     calendarPartial.payload.worldDate?.month !== 2 ||
     calendarPartial.payload.worldDate?.day !== 9
   ) {
     throw new Error("A partial calendar update reset the year or month");
+  }
+  if (playerCampaignUpdate.inviteCode) {
+    throw new Error("Player campaign updates leaked the invite code");
   }
   const playerCalendar = await fetch(`${base}/api/campaigns/${campaign.id}/calendar/advance`, {
     method: "POST",
@@ -1620,6 +1692,33 @@ async function main() {
   ) {
     throw new Error("Audio track or playback state was not persisted");
   }
+  const audioExport = await api(`/api/campaigns/${campaign.id}/export`, { cookie: gmCookie });
+  if (!audioExport.payload.audioTracks?.some((track) => track.id === audioTrack.id)) {
+    throw new Error("Campaign export did not include the soundtrack");
+  }
+  const importedAudio = await api("/api/campaigns/import", {
+    method: "POST",
+    cookie: gmCookie,
+    body: audioExport.payload,
+  });
+  if (importedAudio.payload.stats?.audioTracks !== 1) {
+    throw new Error("Campaign import did not report the soundtrack");
+  }
+  const importedAudioTable = await api(
+    `/api/campaigns/${importedAudio.payload.campaign.id}/table`,
+    { cookie: gmCookie }
+  );
+  if (
+    importedAudioTable.payload.audioTracks?.length !== 1 ||
+    importedAudioTable.payload.audioTracks[0]?.url !== audioTrack.url
+  ) {
+    throw new Error("Campaign import did not carry the soundtrack metadata");
+  }
+  await api(`/api/campaigns/${importedAudio.payload.campaign.id}`, {
+    method: "DELETE",
+    cookie: gmCookie,
+  });
+  log("soundtrack survives campaign export and import");
   playerSocket.emit("audio:update", {
     campaignId: campaign.id,
     trackId: audioTrack.id,
@@ -1644,6 +1743,10 @@ async function main() {
   });
   await audioTracksCleared;
   if (!audioDelete.payload.ok) throw new Error("GM could not delete the audio track");
+  const deletedAudioFile = await fetch(`${base}${audioTrack.url}`);
+  if (deletedAudioFile.status !== 404) {
+    throw new Error("Deleting a soundtrack left its backing file behind");
+  }
   const audioTableAfter = await api(`/api/campaigns/${campaign.id}/table`, {
     cookie: gmCookie,
   });

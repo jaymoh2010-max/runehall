@@ -16,6 +16,7 @@ import {
   serializeToken,
   touchCampaign,
 } from "../serialize";
+import { tokenEventsFor } from "../tokenEvents";
 import type { EncounterLaunchMode, InitiativeEntry } from "../../shared/types";
 import { rollFormula } from "../../shared/dice";
 import { sortInitiativeEntries } from "../../shared/initiative";
@@ -606,7 +607,7 @@ export async function registerEncounterRoutes(app: FastifyInstance): Promise<voi
     ).run(scene.id, JSON.stringify(entries), round, turnIndex, now(), id);
 
     for (const token of createdTokens) {
-      app.broadcastCampaign(id, "token:created", serializeToken(token));
+      tokenEventsFor(app, id).created(serializeToken(token));
     }
     app.broadcastCampaign(id, "scene:activated", { sceneId: scene.id });
     app.broadcastCampaign(id, "initiative:updated", { entries, round, turnIndex });

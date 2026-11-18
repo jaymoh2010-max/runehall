@@ -486,10 +486,12 @@ Acceptance: a GM can prepare a full session in Runehall and start it with one �
   - Duplicates preserve content, kind, visibility, and attachments.
 - [x] **Campaign soundtrack**
   - The GM can upload MP3, OGG, WAV, or WebM tracks (up to 25 MB), list them, play or pause, and remove them.
-  - Playback state is campaign-wide and broadcast to connected clients; the position is synced on play, pause, and track changes.
+  - Playback state is campaign-wide and broadcast to connected clients; the position is synced on play, pause, and track changes using server time so client clock skew cannot mis-seek.
+  - New tracks and deletions are broadcast live, so players do not need to reload to play a track the GM just added.
   - Players receive a **Join audio** control to satisfy browser autoplay rules, plus a local volume slider.
-  - Uploaded tracks use the campaign upload store, are protected from orphan cleanup, and stay separate from the image asset library.
-  - Covered by audio-signature unit tests, a two-socket smoke check of upload and playback control, and a browser upload/play/remove flow.
+  - Uploaded tracks use the campaign upload store, are protected from orphan cleanup, and stay separate from the image asset library. Deleting a track removes its backing file once nothing else references it.
+  - Campaign export includes track metadata; import restores tracks whose audio files already exist in `data/uploads`.
+  - Covered by audio-signature unit tests, a two-socket smoke check of upload, playback, export/import, and deletion, and a browser upload/play/remove flow.
 - [x] **Quest handouts and one-time XP rewards**
   - A handout can be marked Active, Completed, or Failed and carry an XP reward.
   - The Journal has a Quests filter and shows the status and reward on the handout.
@@ -505,6 +507,8 @@ Acceptance: a GM can prepare a full session in Runehall and start it with one �
 - [x] **In-world calendar and downtime**
   - Campaigns track a Golarion date in Absalom Reckoning with the standard month lengths and a leap day in Calistril every four years.
   - The Overview shows the current in-world date; the GM can set it or advance it by 1 or 7 days.
+  - Calendar changes broadcast a role-safe campaign summary, so players viewing the campaign see the new date without switching tabs.
+  - Partial calendar updates preserve omitted fields, and blank or non-numeric values are rejected.
   - The GM grants per-character downtime days from the Party tab, and players spend them from the character sheet.
   - Downtime is stored in character play data, so it is preserved by saves, duplication, export, and import; the date is preserved by campaign export/import.
   - Downtime activities such as Earn Income and crafting remain manual table calls.
@@ -644,9 +648,7 @@ That is more trustworthy than silently showing a number that may be missing a +1
 
 These need a product decision before implementation:
 
-- [ ] **Campaign soundtrack portability** — campaign export/import currently omits `campaign_audio_tracks`; include track metadata and import only files that already exist in `data/uploads`.
-- [ ] **Live campaign metadata** — calendar changes only bump the revision counter, so players sitting on Overview keep the old in-world date until they switch tabs or reload; broadcast a small campaign-summary event if live dates matter.
-- [ ] **Incremental refactors** — split `rules.ts`, `CharacterSheetPage`, and `CampaignPage` where it reduces risk without changing behavior.
+- [ ] **Incremental refactors** — split `rules.ts`, `CharacterSheetPage`, and `CampaignPage` where it reduces risk without changing behavior, and clear the remaining `react-hooks/exhaustive-deps` warnings while doing so.
 
 ## Recommended next session
 

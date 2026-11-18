@@ -5,6 +5,7 @@ import { pipeline } from "node:stream/promises";
 import type { FastifyInstance } from "fastify";
 import { getCampaign, getCampaignRole } from "../access";
 import { db, type AudioTrackRow, type CampaignRow } from "../db";
+import { globalAssetReferences } from "../assets";
 import { newId, now, safeString, uploadsDir } from "../util";
 import { inspectImage } from "../imageMeta";
 import { inspectAudio } from "../audioMeta";
@@ -241,6 +242,23 @@ export async function registerUploadRoutes(app: FastifyInstance): Promise<void> 
       db.prepare(
         "UPDATE campaigns SET audio_track_id = NULL, audio_playing = 0, audio_position = 0, audio_updated_at = ?, updated_at = ? WHERE id = ?"
       ).run(now(), now(), id);
+    }
+    // Remove the backing file when nothing else references it. If a player is
+    // still streaming it, keep the file and let `cleanup-assets` retry later.
+    const filename = track.url.startsWith("/uploads/") ? track.url.slice("/uploads/".length) : "";
+    if (
+      filename &&
+      /^[A-Za-z0-9._-]+$/.test(filename) &&
+      filename !== "." &&
+      filename !== ".." &&
+      !globalAssetReferences().has(filename)
+    ) {
+      try {
+        fs.rmSync(path.join(uploadsDir(), filename), { force: true });
+        db.prepare("DELETE FROM uploaded_assets WHERE filename = ?").run(filename);
+      } catch {
+        // The operating system may still have the audio file open.
+      }
     }
     const updated = db.prepare("SELECT * FROM campaigns WHERE id = ?").get(id) as CampaignRow;
     app.broadcastCampaign(id, "audio:tracks", {
