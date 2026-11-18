@@ -4,7 +4,7 @@ Campaign data is more valuable than any single feature. Runehall has two complem
 
 ## 1. Full local backup (recommended)
 
-This snapshots the SQLite database and every uploaded map/portrait/token image.
+This snapshots the SQLite database and every uploaded map, portrait, token image, and soundtrack file.
 
 ```bash
 npm run backup
@@ -15,7 +15,7 @@ Output goes to `backups/runehall-<timestamp>/` by default:
 ```
 runehall-2026-11-03T19-42-05-738Z/
   runehall.db              consistent SQLite snapshot
-  uploads/                 uploaded maps, portraits, token art
+  uploads/                 uploaded maps, portraits, token art, and audio
   compendium-manifest.json data version
   backup.json              manifest, per-file SHA-256 hashes, and archive digest
 ```
@@ -57,7 +57,7 @@ docker compose exec -T runehall npm run ship-backup -- --to /app/shipped --keep 
 
 ### Restore
 
-Stop Runehall first. The restore command refuses to run if the API port is accepting connections.
+Stop Runehall first. Native installs refuse to restore while the local API port is accepting connections; for Docker, stop the `runehall` service first (the `docker compose run --rm` helper has its own loopback, so the port check cannot see the running service).
 
 ```bash
 npm run restore -- --from "backups/runehall-2026-11-03T19-42-05-738Z" --yes
@@ -138,7 +138,7 @@ Docker:
 
 ```bash
 docker compose stop
-docker compose run --rm runehall npm run restore -- --from /app/backups/<archive> --yes
+docker compose run --rm runehall npm run restore -- --from /app/backups/<backup-directory> --yes
 docker compose start
 ```
 
@@ -146,7 +146,7 @@ Native install:
 
 1. Stop the server.
 2. Move the current `data/` directory aside.
-3. Restore the newest archive with `npm run restore -- --from <archive> --yes`.
+3. Restore the newest backup directory with `npm run restore -- --from <backup-directory> --yes`.
 4. Start the server and open `/api/health`.
 
 After either flow:

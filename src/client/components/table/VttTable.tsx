@@ -72,9 +72,10 @@ interface VttTableProps {
   campaignId: string;
   user: PublicUser;
   isGm: boolean;
+  active: boolean;
 }
 
-export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
+export function VttTable({ initial, campaignId, user, isGm, active }: VttTableProps) {
   const toast = useToasts((state) => state.push);
   const {
     scenes,
@@ -607,10 +608,17 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
 
   const rollInitiative = () => {
     if (!activeSceneId) return;
+    if (
+      initiative.length &&
+      !window.confirm("Reroll initiative? This resets the current order and round.")
+    ) {
+      return;
+    }
     getSocket().emit("initiative:roll", { campaignId, sceneId: activeSceneId });
   };
 
   const clearInitiative = () => {
+    if (!window.confirm("Clear the entire initiative order?")) return;
     getSocket().emit("initiative:update", { campaignId, entries: [], round: 1, turnIndex: 0 });
   };
 
@@ -698,6 +706,7 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
 
   // Keyboard shortcuts stay out of the way whenever a form control has focus.
   useEffect(() => {
+    if (!active) return;
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) return;
       const target = event.target as HTMLElement | null;
@@ -794,7 +803,7 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
       }
       if (key === "i" && activeSceneId) {
         event.preventDefault();
-        getSocket().emit("initiative:roll", { campaignId, sceneId: activeSceneId });
+        rollInitiative();
         return;
       }
       if (event.key === "ArrowRight" && initiative.length) {
@@ -810,6 +819,7 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [
+    active,
     activeScene?.fogEnabled,
     activeSceneId,
     campaignId,

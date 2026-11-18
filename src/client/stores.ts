@@ -13,7 +13,8 @@ interface SessionState {
     username: string,
     displayName: string,
     password: string,
-    inviteCode?: string
+    inviteCode?: string,
+    bootstrapToken?: string
   ) => Promise<void>;
   logout: () => Promise<void>;
   setUser: (user: PublicUser | null) => void;
@@ -43,12 +44,12 @@ export const useSession = create<SessionState>((set) => ({
       set({ busy: false });
     }
   },
-  register: async (username, displayName, password, inviteCode) => {
+  register: async (username, displayName, password, inviteCode, bootstrapToken) => {
     set({ busy: true });
     try {
       const result = await api<{ user: PublicUser }>("/api/auth/register", {
         method: "POST",
-        body: { username, displayName, password, inviteCode },
+        body: { username, displayName, password, inviteCode, bootstrapToken },
       });
       set({ user: result.user, ready: true });
     } finally {

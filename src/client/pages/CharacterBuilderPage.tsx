@@ -427,8 +427,16 @@ export function CharacterBuilderPage() {
   const importJson = async (file: File) => {
     try {
       const parsed = JSON.parse(await file.text());
-      const raw = parsed?.data ?? parsed;
-      const normalized = normalizeCharacterDraft(raw, file.name.replace(/\.json$/i, ""));
+      if (
+        !parsed ||
+        parsed.format !== "runehall-character" ||
+        parsed.version !== 1 ||
+        !parsed.data
+      ) {
+        throw new Error("Choose a Runehall character export (.runehall.json).");
+      }
+      if (!window.confirm("Replace this character with the imported file?")) return;
+      const normalized = normalizeCharacterDraft(parsed.data, file.name.replace(/\.json$/i, ""));
       update((current) => ({
         ...normalized,
         portraitUrl: current.portraitUrl ?? normalized.portraitUrl,

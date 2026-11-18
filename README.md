@@ -106,12 +106,16 @@ Open **http://localhost:3001**. The Fastify server serves the built client, API,
 ### 4. Run with Docker
 ```bash
 docker build -t runehall .
-docker run -d --name runehall \
-  -p 3001:3001 \
+docker run -d --name runehall --restart unless-stopped \
+  -p 127.0.0.1:3001:3001 \
+  -e REGISTRATION_MODE=invite \
+  -e BOOTSTRAP_TOKEN=replace-with-a-long-random-value \
   -v runehall-data:/app/data \
   -v runehall-backups:/app/backups \
   runehall
 ```
+
+Set `COOKIE_SECURE=1` behind HTTPS and remove `BOOTSTRAP_TOKEN` after creating the administrator.
 Or use Compose from the repository root:
 ```bash
 docker compose up -d --build
@@ -170,13 +174,14 @@ Players join with the GM's invite link or code from their own accounts. They can
 | `npm run reset-password -- --username <name>` | Issue a temporary password and sign out that account everywhere |
 | `npm run cleanup-assets` | Dry-run scan for unused uploaded files; add `-- --delete` to remove them |
 
-Environment variables: `PORT` (default 3001), `HOST` (default 0.0.0.0), `COOKIE_SECURE` (set to `1` behind HTTPS), `NODE_ENV`, `ENABLE_CSP`, `REGISTRATION_MODE` (`open`, `invite`, or `closed`), `AUDIT_RETENTION_DAYS` (default `0`, keep forever), `AUTH_RATE_LIMIT_MAX`, `UPLOAD_RATE_LIMIT_MAX`, `TRUSTED_ORIGINS`, `DATA_DIR`, `DATABASE_PATH`, `COMPENDIUM_DIR`, `BACKUP_DIR`, `BACKUP_SHIP_DIR`, `LOG_LEVEL`.
+Environment variables: `PORT` (default 3001), `HOST` (default 0.0.0.0), `RUNEHALL_PORT` / `RUNEHALL_BIND` (Compose published port and bind address), `COOKIE_SECURE` (set to `1` behind HTTPS), `NODE_ENV`, `ENABLE_CSP`, `ENFORCE_ORIGIN`, `TRUST_PROXY_HOPS` (default `1`), `REGISTRATION_MODE` (`open`, `invite`, or `closed`), `BOOTSTRAP_TOKEN` (optional one-time first-admin token), `AUDIT_RETENTION_DAYS` (default `0`, keep forever), `AUTH_RATE_LIMIT_MAX`, `AUTH_RATE_LIMIT_WINDOW_MS`, `UPLOAD_RATE_LIMIT_MAX`, `UPLOAD_RATE_LIMIT_WINDOW_MS`, `TRUSTED_ORIGINS`, `DATA_DIR`, `DATABASE_PATH`, `COMPENDIUM_DIR`, `BACKUP_DIR`, `BACKUP_SHIP_DIR`, `LOG_LEVEL`.
 
 ### Production and Docker
 
 ```bash
 npm ci
 npm run build
+# Local HTTP test only; set COOKIE_SECURE=1 behind HTTPS.
 NODE_ENV=production COOKIE_SECURE=0 npm start
 ```
 
@@ -188,7 +193,15 @@ docker compose up -d --build
 
 The compose path keeps SQLite, the compendium, uploads, and backups in `./data` and `./backups`. Put Caddy or Nginx in front for HTTPS, then set `COOKIE_SECURE=1`. Security headers, CSP, origin checks, and auth/upload rate limits are built in. The production image is built and health-checked in CI, and has been verified locally with persistence, backups, and restore. It also prepares `/app/shipped` for an optional off-machine backup mount.
 
-See [docs/DEPLOY.md](docs/DEPLOY.md) for the full deployment checklist, reverse-proxy examples, updates, and current hosting gaps.
+**Hosting for friends:** clone <https://github.com/jaymoh2010-max/runehall.git>, copy
+`.env.example` to `.env`, set `BOOTSTRAP_TOKEN`, `COOKIE_SECURE=1`, and
+`REGISTRATION_MODE=invite` (or `closed`), then run `docker compose up -d --build` behind
+Caddy/Nginx. The compose file binds port 3001 to loopback. Create the first administrator from the
+server or an SSH tunnel before exposing the proxy; it becomes the instance administrator. See
+[docs/DEPLOY.md](docs/DEPLOY.md) for the full
+clone-to-HTTPS checklist, reverse-proxy examples, updates, backups, and current hosting gaps.
+For the table-facing setup, character creation, and session-1 checklist, see
+[docs/FIRST-CAMPAIGN.md](docs/FIRST-CAMPAIGN.md).
 
 ---
 

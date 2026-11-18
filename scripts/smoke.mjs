@@ -1061,6 +1061,24 @@ async function main() {
   await emitAck(playerSocket, "campaign:join", { campaignId: campaign.id });
   log("both realtime sockets joined the campaign");
 
+  const liveHandout = waitForEvent(
+    playerSocket,
+    "journal:created",
+    (entry) => entry.title === "Live Handout"
+  );
+  await api(`/api/campaigns/${campaign.id}/journal`, {
+    method: "POST",
+    cookie: gmCookie,
+    body: {
+      title: "Live Handout",
+      content: "A live clue.",
+      visible: true,
+      kind: "handout",
+    },
+  });
+  await liveHandout;
+  log("journal changes reached a connected player without a reload");
+
   // A malformed payload must be rejected without taking down the server for
   // everyone else at the table.
   playerSocket.emit("campaign:join", null);
@@ -1751,6 +1769,10 @@ async function main() {
   if (!audioTrack?.id || audioTrack.url.startsWith("/uploads/") === false) {
     throw new Error("Audio upload did not return a stored track");
   }
+  const anonymousAudioFile = await fetch(`${base}${audioTrack.url}`);
+  if (anonymousAudioFile.status !== 401) {
+    throw new Error("Uploaded audio was readable without a session");
+  }
   const audioStatePromise = waitForEvent(
     playerSocket,
     "audio:state",
@@ -1823,7 +1845,9 @@ async function main() {
   });
   await audioTracksCleared;
   if (!audioDelete.payload.ok) throw new Error("GM could not delete the audio track");
-  const deletedAudioFile = await fetch(`${base}${audioTrack.url}`);
+  const deletedAudioFile = await fetch(`${base}${audioTrack.url}`, {
+    headers: { cookie: gmCookie },
+  });
   if (deletedAudioFile.status !== 404) {
     throw new Error("Deleting a soundtrack left its backing file behind");
   }

@@ -2,6 +2,57 @@
 
 Runehall is designed to run on one trusted machine first. This is the shortest supported production path.
 
+## Fresh internet-facing server (recommended)
+
+This is the handoff path for a friend hosting the game on a small Linux server.
+
+```bash
+# 1. Clone the public repository
+git clone https://github.com/jaymoh2010-max/runehall.git
+cd runehall
+
+# 2. Configure the host
+cp .env.example .env
+# Edit .env before continuing:
+#   BOOTSTRAP_TOKEN=<long random one-time setup token>
+#   COOKIE_SECURE=1
+#   REGISTRATION_MODE=invite    (or closed after all accounts exist)
+#   TRUSTED_ORIGINS=https://your-domain.example
+# Keep RUNEHALL_BIND=127.0.0.1 and RUNEHALL_PORT=3001 unless you know why not to change them.
+
+# 3. Prepare persistent bind mounts (Linux)
+mkdir -p data/uploads backups
+sudo chown -R 1000:1000 data backups
+
+# 4. Build and start bound to loopback only
+docker compose up -d --build
+curl http://127.0.0.1:3001/api/health
+
+# 5. Create the first administrator from the server (or an SSH tunnel) BEFORE exposing the proxy
+#    Open http://127.0.0.1:3001/register on the server/SSH tunnel and enter BOOTSTRAP_TOKEN.
+# 6. Put Caddy or Nginx in front for HTTPS, then remove BOOTSTRAP_TOKEN from .env and recreate:
+docker compose up -d
+```
+
+The first account becomes the instance administrator. Create it **before** exposing the site through
+the proxy, because the first account is always allowed even when registration is closed. After the
+administrator exists, use **Admin → Hall controls** to create single-use registration invite codes
+for your friends. Do not expose port 3001 directly; bind it to loopback and close it at the firewall
+or cloud security group. See the reverse-proxy examples below.
+
+After the first session, take a backup and verify the restore drill:
+
+```bash
+docker compose exec runehall npm run backup -- --keep 14
+docker compose exec runehall npm run restore-drill
+```
+
+The repository ships the compendium data and the CC0 music library. The only state that must be
+backed up is `./data` (SQLite, uploads) and, if you want off-machine copies, `./backups`.
+
+For the table-facing handoff — campaign creation, player onboarding, and the session-1 checklist —
+see [FIRST-CAMPAIGN.md](FIRST-CAMPAIGN.md).
+
 ## Option 1 — local production process
 
 ```bash
@@ -18,10 +69,11 @@ Open `http://localhost:3001`. This serves the built client and the API from the 
 docker compose up -d --build
 ```
 
-Open `http://localhost:3001`. The compose file uses `./data` for the SQLite database, compendium, and uploads, and `./backups` for backup archives. On Linux, make sure those directories are writable by the container user (UID 1000):
+Open `http://localhost:3001`. The compose file uses `./data` for the SQLite database, compendium, and uploads, and `./backups` for backup archives. Compose defaults to secure cookies; for plain-HTTP localhost testing, run `COOKIE_SECURE=0 docker compose up -d --build`. On Linux, make sure those directories are writable by the container user (UID 1000):
 
 ```bash
 mkdir -p data/uploads backups
+sudo chown -R 1000:1000 data backups
 ```
 
 The production image is built and health-checked in CI. It uses Node 26 Alpine, runs as the non-root `node` user, writes only to `/app/data`, `/app/backups`, and an optional `/app/shipped` mount, and serves the compiled client and API from one process.
@@ -36,6 +88,19 @@ docker compose down
 ```
 
 To use a different host port, set `RUNEHALL_PORT=8080` before `docker compose up`.
+
+### Trusted LAN only (no proxy)
+
+For a home LAN where everyone is on the same trusted network, set these in `.env` and restart:
+
+```ini
+RUNEHALL_BIND=0.0.0.0
+COOKIE_SECURE=0
+TRUST_PROXY_HOPS=0
+```
+
+Allow port 3001 only on the LAN interface in the host firewall. Do not use this configuration on a
+public server.
 
 ## HTTPS reverse proxy
 
@@ -62,14 +127,19 @@ server {
   ssl_certificate     /etc/letsencrypt/live/runehall.example.com/fullchain.pem;
   ssl_certificate_key /etc/letsencrypt/live/runehall.example.com/privkey.pem;
 
+  # Maps are 15 MB, soundtrack audio is 25 MB, and campaign JSON is 3 MB.
+  client_max_body_size 30m;
+
   location / {
     proxy_pass http://127.0.0.1:3001;
     proxy_http_version 1.1;
     proxy_set_header Host $host;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    # Overwrite the client-supplied header so clients cannot spoof their IP.
+    proxy_set_header X-Forwarded-For $remote_addr;
     proxy_set_header X-Forwarded-Proto $scheme;
     proxy_set_header Upgrade $http_upgrade;
     proxy_set_header Connection "upgrade";
+    proxy_read_timeout 3600s;
   }
 }
 ```
@@ -85,10 +155,11 @@ Runehall already enables `trustProxy`, so keep `Host`, `X-Forwarded-For`, and `X
 | `ENABLE_CSP` | `1` | Enables the Content Security Policy. It is on by default in production. |
 | `REGISTRATION_MODE` | `invite` or `closed` on the internet | Controls who can create an account. Runtime changes in Hall controls override it. |
 | `TRUSTED_ORIGINS` | Your public origin | Extra allowed origins for state-changing requests when using a split frontend. |
+| `TRUST_PROXY_HOPS` | `1` for one Caddy/Nginx | How many proxy hops may set the client IP. Use `0` when exposing directly. |
 | `AUTH_RATE_LIMIT_MAX` | `30` | Login/register attempts per IP per window. |
 | `UPLOAD_RATE_LIMIT_MAX` | `60` | Uploads per IP per window. |
 
-Security headers are always sent: `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy`, and cross-origin isolation headers. Production also sends CSP; `COOKIE_SECURE=1` adds HSTS.
+Security headers are always sent: `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy`, and cross-origin isolation headers. Production also sends CSP; `COOKIE_SECURE=1` adds HSTS. Uploaded campaign files under `/uploads/` require a signed-in session and, when the file belongs to a campaign, that campaign's membership.
 
 State-changing API requests from a foreign `Origin` are rejected in production. Same-origin requests and requests without an `Origin` header (CLI, health checks) are allowed.
 
@@ -231,7 +302,7 @@ Docker flow:
 
 ```bash
 docker compose stop
-docker compose run --rm runehall npm run restore -- --from /app/backups/<archive> --yes
+docker compose run --rm runehall npm run restore -- --from /app/backups/<backup-directory> --yes
 docker compose start
 ```
 

@@ -220,7 +220,7 @@ export function AddTokenModal({
                     y: defaultPosition.y,
                     size: 1,
                     color: "#c8a96b",
-                    hpCurrent: character.summary?.hp ?? null,
+                    hpCurrent: character.summary?.currentHp ?? character.summary?.hp ?? null,
                     hpMax: character.summary?.hp ?? null,
                     ac: character.summary?.ac ?? null,
                     conditions: [],

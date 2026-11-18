@@ -830,7 +830,7 @@ export function CampaignDashboard({
           ) : null}
         </Card>
 
-        {setupDone < setupTasks.length ? (
+        {isGm && setupDone < setupTasks.length ? (
           <Card className="dashboard-first-run">
             <div className="row-between">
               <div>

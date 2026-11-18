@@ -44,6 +44,7 @@ export function registrationStatus(): RegistrationStatus {
     mode,
     bootstrap,
     inviteRequired: !bootstrap && mode === "invite",
+    bootstrapTokenRequired: bootstrap && Boolean((process.env.BOOTSTRAP_TOKEN ?? "").trim()),
     canRegister: bootstrap || mode === "open" || mode === "invite",
     userCount: count,
   };

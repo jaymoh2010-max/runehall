@@ -289,6 +289,21 @@ export function CampaignPage() {
     };
   }, [id, tab]);
 
+  // Encounter and NPC prep read scene/token state from the table snapshot.
+  // Refresh it when those tabs open so scenes created this session appear.
+  useEffect(() => {
+    if (!id || (tab !== "encounters" && tab !== "npcs")) return;
+    let cancelled = false;
+    api<CampaignTable>(`/api/campaigns/${id}/table`)
+      .then((table) => {
+        if (!cancelled) setTableData(table);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [id, tab]);
+
   // Keep shared campaign metadata (the in-world date, name, ruleset, counts)
   // live for the whole campaign view. The table hook references the same room,
   // so the shared subscription keeps one socket joined until the page closes.
@@ -312,12 +327,40 @@ export function CampaignPage() {
         })
         .catch(() => undefined);
     };
+    const onCharacterRemoved = ({ characterId }: { characterId: string }) => {
+      setCharacters((current) => current.filter((character) => character.id !== characterId));
+    };
+    const upsertJournal = (entry: JournalEntry) => {
+      setTableData((current) => {
+        if (!current) return current;
+        const journal = [
+          entry,
+          ...current.journal.filter((existing) => existing.id !== entry.id),
+        ].sort((a, b) => b.updatedAt - a.updatedAt);
+        return { ...current, journal };
+      });
+    };
+    const onJournalDeleted = ({ entryId }: { entryId: string }) => {
+      setTableData((current) =>
+        current
+          ? { ...current, journal: current.journal.filter((entry) => entry.id !== entryId) }
+          : current
+      );
+    };
     socket.on("campaign:updated", applySummary);
+    socket.on("character:removed", onCharacterRemoved);
+    socket.on("journal:created", upsertJournal);
+    socket.on("journal:updated", upsertJournal);
+    socket.on("journal:deleted", onJournalDeleted);
     socket.on("join-request:created", refreshDetails);
     socket.on("join-request:updated", refreshDetails);
     const leaveCampaignRoom = joinCampaign(id);
     return () => {
       socket.off("campaign:updated", applySummary);
+      socket.off("character:removed", onCharacterRemoved);
+      socket.off("journal:created", upsertJournal);
+      socket.off("journal:updated", upsertJournal);
+      socket.off("journal:deleted", onJournalDeleted);
       socket.off("join-request:created", refreshDetails);
       socket.off("join-request:updated", refreshDetails);
       leaveCampaignRoom();
@@ -624,9 +667,17 @@ export function CampaignPage() {
   const removeMember = async (member: CampaignMember) => {
     if (!id || !window.confirm(`Remove ${member.displayName} from the campaign?`)) return;
     try {
-      await api(`/api/campaigns/${id}/members/${member.id}`, { method: "DELETE" });
+      const result = await api<{ inviteCode?: string }>(
+        `/api/campaigns/${id}/members/${member.id}`,
+        { method: "DELETE" }
+      );
       setMembers((current) => current.filter((item) => item.id !== member.id));
-      toast("Member removed.", "success");
+      if (result.inviteCode) {
+        setCampaign((current) =>
+          current ? { ...current, inviteCode: result.inviteCode! } : current
+        );
+      }
+      toast("Member removed. Invite code regenerated.", "success");
     } catch (err) {
       toast(errorMessage(err), "error");
     }
@@ -1033,7 +1084,13 @@ export function CampaignPage() {
 
       <div className="campaign-table" style={{ display: tab === "table" ? undefined : "none" }}>
         {tableMounted ? (
-          <VttTable initial={tableData} campaignId={campaign.id} user={user!} isGm={isGm} />
+          <VttTable
+            initial={tableData}
+            campaignId={campaign.id}
+            user={user!}
+            isGm={isGm}
+            active={tab === "table"}
+          />
         ) : (
           <Spinner label="Lighting the table…" />
         )}
@@ -1046,7 +1103,7 @@ export function CampaignPage() {
             isGm={isGm}
             currentUserId={user?.id ?? ""}
             memberCount={members.length}
-            journalCount={tableData.journal.length}
+            journalCount={tableData.journal.filter((entry) => entry.kind === "handout").length}
             characters={characters}
             worldDate={campaign.worldDate}
             onWorldDateChange={(worldDate) => {
@@ -1640,11 +1697,35 @@ export function CampaignPage() {
                                 ? ` · ${request.summary.className || "No class"} · ${request.summary.ancestry || "No ancestry"}`
                                 : " · Unfinished character"}
                             </p>
-                            {errors ? (
-                              <p className="tiny" style={{ color: "#e7b1b1" }}>
-                                {errors} build {errors === 1 ? "error needs" : "errors need"}{" "}
-                                review.
-                              </p>
+                            {request.validation.length ? (
+                              <details className="join-request-details" open={errors > 0}>
+                                <summary className="tiny" style={{ color: "#e7b1b1" }}>
+                                  {errors
+                                    ? `${errors} build ${errors === 1 ? "error" : "errors"}`
+                                    : `${request.validation.length} review ${request.validation.length === 1 ? "item" : "items"}`}
+                                </summary>
+                                <ul className="join-request-issues tiny">
+                                  {[...request.validation]
+                                    .sort((a, b) =>
+                                      a.severity === b.severity
+                                        ? 0
+                                        : a.severity === "error"
+                                          ? -1
+                                          : 1
+                                    )
+                                    .slice(0, 10)
+                                    .map((issue, index) => (
+                                      <li
+                                        key={`${issue.message}-${index}`}
+                                        className={
+                                          issue.severity === "error" ? "is-error" : "is-warning"
+                                        }
+                                      >
+                                        {issue.message}
+                                      </li>
+                                    ))}
+                                </ul>
+                              </details>
                             ) : null}
                             {request.report ? (
                               <details className="join-request-details">

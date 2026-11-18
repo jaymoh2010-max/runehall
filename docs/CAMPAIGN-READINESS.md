@@ -4,7 +4,7 @@
 **Scope:** PF2e Remastered campaign play from session zero through level 20, compared with GM Core/Player Core and common GM/player tooling expectations.  
 **Artifacts:** `scripts/simulate-campaign.ts` (new), `scripts/lib/simHeroes.ts` (new), `npm run simulate:campaign`.
 
-> **Sprint A update:** condition math, temp HP/dying/unconscious, healing reconciliation, Hero Point reroll, Refocus, hidden-prop filtering, and stricter automation labels are implemented in the `sprint-a` worktree. Spell heightening/cast spending, recovery-check automation, encounter cleanup, and movement enforcement remain in Sprint A.
+> **Current status (release pass, November 2026):** Many items from the original P0 audit are now implemented: condition modifiers, temp HP absorption, dying/unconscious life state, healing reconciliation, Hero Point reroll, Refocus, hidden-token initiative filtering, hidden-prop filtering, and linked-token HP preservation. Still open for a first campaign: afflictions, full spell heightening/cast-time spending, recovery checks/doomed automation, encounter cleanup/relaunch, hidden walls/templates review, and enforced movement. The tables below preserve the original audit baseline; read the status labels alongside the README and ROADMAP for the current implementation.
 
 ---
 
@@ -44,12 +44,12 @@ Two simulated campaigns were run against an isolated server with real accounts a
   - Mid-campaign replacement character advanced to party level.
   - Sessions/recap/handout in milestone play.
 
-**Result:** 66 passing checks, 0 failing checks, 7 recorded gaps. Two linked-token bugs were found and fixed:
+**Result (current release pass):** 68 passing checks, 0 failing checks, 7 recorded gaps. Two linked-token bugs were found and fixed:
 
 - Hiding a token after initiative was rolled still exposed its name in the player's initiative order. The server now filters hidden combatants from player snapshots and live initiative broadcasts, with a shared helper and unit coverage (`src/shared/initiative.ts`, `src/server/routes/table.ts`, `src/server/socket.ts`, `tests/initiative.test.ts`).
 - Creating a token for a wounded character reset its current HP to full. New tokens now start at the sheet's current HP unless the GM explicitly supplies one (`src/server/socket.ts`).
 
-The weekly character simulation was also run: 1,000 random characters plus the class/level matrix, all 288 subclass options, 296 ancestry/background combinations, and 6,366 feat prerequisite checks produced **0 math problems**. Automation coverage remains the trust issue: across those builds, 4,861 feat selections were fully automated, 535 partly automated, and 17,460 manual. The character simulation now exits non-zero when it finds a problem, so the weekly job can no longer stay green while reporting failures.
+The weekly character simulation was also run: 1,000 random characters plus the class/level matrix, all 288 subclass options, 296 ancestry/background combinations, and 6,366 feat prerequisite checks produced **0 math problems**. Automation coverage remains the trust issue: across those builds, 2,912 feat selections were fully automated, 535 partly automated, and 19,409 manual. The character simulation exits non-zero when it finds a problem, so the weekly job cannot stay green while reporting failures.
 
 Run it with:
 
@@ -89,19 +89,19 @@ npm run simulate:campaign -- --report campaign-simulation-report.json
 
 These are the items most likely to make a sheet or combat state look right while being wrong.
 
-| Gap | Why it matters | Effort |
+| Gap | Why it matters | Status / effort |
 | --- | --- | --- |
-| Dying/wounded/unconscious/doomed state machine | HP 0 currently has no automatic death/recovery flow; players can keep acting. | M |
-| Condition modifiers (frightened, off-guard, enfeebled, clumsy, drained, etc.) | Conditions are labels/durations but do not change AC, saves, attacks, skills, or DCs. | M |
-| Afflictions (poison/disease/curse) with onset, stages, interval, cure | Common in APs and hazards; currently entirely manual. | L |
-| Spell heightening and cast-time resource spending | Cantrips/spells show base rank; casting does not spend slots/focus; font heal/harm is merged. | M |
-| Hero Point reroll, GM award/reset, session reset | Hero points are pips only; no reroll or death-avoidance workflow. | S–M |
-| Focus/Refocus and daily preparations | Focus max is heuristic; no structured rest/prepare workflow beyond the long-rest reset. | M |
-| Temp HP absorption | Temp HP is editable but token damage bypasses it. | S |
-| Feat/item automation coverage and truthful badges | Only a small curated subset of 6,366 feats/5,956 items is automated; some manual effects can still look automated. | XL, ongoing |
-| Encounter cleanup/relaunch | Fresh launches accumulate monster tokens (16→64 on the simulated scene) and there is no “clear encounter” action. | S–M |
-| Hidden data on the table | Hidden-token initiative entries are fixed; hidden props/walls/templates are still serialized to players. | S–M |
-| Movement enforcement | Straight-line moves and off-turn movement are warned about but not enforced; speed is advisory. | M |
+| Dying/wounded/unconscious/doomed state machine | HP 0 applies dying/unconscious and healing clears the life state; full recovery-check/doomed automation is still manual. | Partial — M |
+| Condition modifiers (frightened, off-guard, enfeebled, clumsy, drained, etc.) | Implemented in sheet and token math with duration ticking. | Done |
+| Afflictions (poison/disease/curse) with onset, stages, interval, cure | Common in APs and hazards; currently entirely manual. | Open — L |
+| Spell heightening and cast-time resource spending | Rank-by-rank slots and preparation caps exist; casting does not yet spend slots/focus or heighten automatically. | Partial — M |
+| Hero Point reroll, GM award/reset, session reset | Reroll, Refocus, and manual pips exist; GM award/session reset workflow is missing. | Partial — S–M |
+| Focus/Refocus and daily preparations | Focus and Refocus exist; structured daily preparation is still manual. | Partial — M |
+| Temp HP absorption | Implemented for token and sheet damage. | Done |
+| Feat/item automation coverage and truthful badges | Only a curated subset of feats/items is automated; manual effects remain common. | Open — XL, ongoing |
+| Encounter cleanup/relaunch | Fresh launches accumulate monster tokens and there is no “clear encounter” action. | Open — S–M |
+| Hidden data on the table | Hidden-token initiative and hidden props are filtered; review hidden walls/templates before relying on them. | Partial — S–M |
+| Movement enforcement | Straight-line moves and off-turn movement are warned about but not enforced; speed is advisory. | Open — M |
 
 ### P1 — campaign economy and continuity
 
@@ -153,10 +153,13 @@ The VTT is the strongest differentiator, but several PF2e combat expectations ar
 ## Recommended sequence
 
 ### Sprint A — make the sheet and table trustworthy
-1. Condition modifier engine + dying/wounded/unconscious + temp HP absorption.
-2. Hero Point reroll/session reset; focus/refocus; structured daily preparations.
+Already completed: condition modifiers, temp HP/dying/unconscious, healing reconciliation, Hero Point reroll, Refocus, hidden-token/prop filtering, and PC token HP preservation.
+
+Remaining:
+1. Full recovery-check/doomed and affliction automation.
+2. GM Hero Point award/session reset; structured daily preparations.
 3. Spell heightening and cast-time resource spending.
-4. Encounter cleanup, hidden-data filtering, PC token HP preservation, movement enforcement.
+4. Encounter cleanup, hidden-wall/template review, and movement enforcement.
 5. Tighten automation badges so “Automated” can never hide a manual bonus.
 
 **Exit criteria:** a player can be dropped to 0 HP, stabilized, wounded, treated, and rested without a GM spreadsheet; frightened/off-guard/clumsy actually change rolls; a caster can cast at the correct heightened rank and spend the slot.

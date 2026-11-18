@@ -19,6 +19,7 @@ export function AuthPage({ mode }: { mode: "login" | "register" }) {
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [inviteCode, setInviteCode] = useState("");
+  const [bootstrapToken, setBootstrapToken] = useState("");
   const [registration, setRegistration] = useState<RegistrationStatus | null>(null);
   const [error, setError] = useState("");
   const isRegister = mode === "register";
@@ -56,7 +57,13 @@ export function AuthPage({ mode }: { mode: "login" | "register" }) {
     }
     try {
       if (isRegister)
-        await register(username.trim(), displayName.trim(), password, inviteCode.trim());
+        await register(
+          username.trim(),
+          displayName.trim(),
+          password,
+          inviteCode.trim(),
+          bootstrapToken.trim()
+        );
       else await login(username.trim(), password);
       navigate(from, { replace: true });
     } catch (err) {
@@ -144,6 +151,20 @@ export function AuthPage({ mode }: { mode: "login" | "register" }) {
                     value={displayName}
                     onChange={(event) => setDisplayName(event.target.value)}
                     placeholder="e.g. Mara"
+                    required
+                  />
+                </Field>
+              ) : null}
+              {isRegister && registration?.bootstrap && registration.bootstrapTokenRequired ? (
+                <Field
+                  label="Bootstrap token"
+                  hint="The one-time setup token from the host's server configuration."
+                >
+                  <Input
+                    value={bootstrapToken}
+                    onChange={(event) => setBootstrapToken(event.target.value)}
+                    placeholder="One-time setup token"
+                    autoComplete="off"
                     required
                   />
                 </Field>

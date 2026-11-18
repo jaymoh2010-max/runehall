@@ -53,6 +53,8 @@ function buildCleric() {
   )!;
   const doctrine = cleric.choiceGroups.find((group) => group.tag === "cleric-doctrine")!;
   const warpriest = doctrine.options.find((option) => option.name === "Warpriest")!;
+  const guidance = spells.find((entry) => entry.name === "Guidance")!;
+  const bless = spells.find((entry) => entry.name === "Bless")!;
 
   const draft = emptyCharacterDraft("Test Cleric");
   draft.ancestryId = dwarf.id;
@@ -67,6 +69,10 @@ function buildCleric() {
   draft.skills.trained = ["arcana", "medicine"];
   draft.feats.ancestry["1"] = dwarvenWeaponFamiliarity.id;
   draft.classChoices[doctrine.key] = [warpriest.id];
+  draft.spells.tradition = "divine";
+  draft.spells.cantrips = [guidance.id];
+  draft.spells.known = [bless.id];
+  draft.spells.prepared = [bless.id];
 
   const context: CharacterContext = {
     ancestry: dwarf,
@@ -75,7 +81,7 @@ function buildCleric() {
     classData: cleric,
     deity: abadar,
     feats: { [dwarvenWeaponFamiliarity.id]: dwarvenWeaponFamiliarity },
-    spells: {},
+    spells: { [guidance.id]: guidance, [bless.id]: bless },
     equipment: {},
   };
   return { draft, context };

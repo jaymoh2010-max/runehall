@@ -17,7 +17,7 @@ import { manifestDigest, sha256File } from "./backup-lib.mjs";
 const args = process.argv.slice(2);
 const dirArg = args.indexOf("--dir");
 const keepArg = args.indexOf("--keep");
-const keep = keepArg >= 0 ? Math.max(1, Math.round(Number(args[keepArg + 1]) || 0)) : 0;
+const keep = keepArg >= 0 ? Math.max(0, Math.round(Number(args[keepArg + 1]) || 0)) : 0;
 const backupRoot = path.resolve(
   dirArg >= 0 ? args[dirArg + 1] : process.env.BACKUP_DIR || "backups"
 );

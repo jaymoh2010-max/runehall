@@ -279,6 +279,8 @@ export function useCampaignTable({ initial, campaignId, toast }: UseCampaignTabl
     }) => setCharacters((current) => applyCharacterUpdated(current, payload));
     const onCharacterCreated = (payload: { character: CharacterRecord }) =>
       setCharacters((current) => applyCharacterCreated(current, payload.character));
+    const onCharacterRemoved = ({ characterId }: { characterId: string }) =>
+      setCharacters((current) => current.filter((character) => character.id !== characterId));
     const onRevision = ({ revision }: { revision: number }) => {
       const action = revisionAction(revisionRef.current, revision);
       if (action === "ignore") return;
@@ -316,6 +318,7 @@ export function useCampaignTable({ initial, campaignId, toast }: UseCampaignTabl
     socket.on("pointer:show", onPointer);
     socket.on("character:updated", onCharacterUpdated);
     socket.on("character:created", onCharacterCreated);
+    socket.on("character:removed", onCharacterRemoved);
     socket.on("campaign:revision", onRevision);
     socket.on("error:toast", onError);
 
@@ -344,6 +347,7 @@ export function useCampaignTable({ initial, campaignId, toast }: UseCampaignTabl
       socket.off("pointer:show", onPointer);
       socket.off("character:updated", onCharacterUpdated);
       socket.off("character:created", onCharacterCreated);
+      socket.off("character:removed", onCharacterRemoved);
       socket.off("campaign:revision", onRevision);
       socket.off("error:toast", onError);
       leaveCampaignRoom();

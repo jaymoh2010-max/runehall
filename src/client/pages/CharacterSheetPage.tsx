@@ -662,6 +662,11 @@ export function CharacterSheetPage() {
           <span>
             {reviewIssues.length} required choice{reviewIssues.length === 1 ? "" : "s"} still need
             review.
+            <ul className="sheet-review-issues tiny">
+              {reviewIssues.slice(0, 6).map((issue, index) => (
+                <li key={`${issue.message}-${index}`}>{issue.message}</li>
+              ))}
+            </ul>
           </span>
           {canEdit ? (
             <Link to={`/characters/${character.id}/edit`} className="btn btn-secondary btn-sm">

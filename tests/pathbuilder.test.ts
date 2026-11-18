@@ -26,6 +26,8 @@ const human = byName(read<Ancestry>("ancestries.json"), "Human");
 const versatileHuman = byName(read<Heritage>("heritages.json"), "Versatile Human");
 const warrior = byName(read<Background>("backgrounds.json"), "Warrior");
 const fighter = byName(read<ClassData>("classes.json"), "Fighter");
+const cleric = byName(read<ClassData>("classes.json"), "Cleric");
+const scholar = byName(read<Background>("backgrounds.json"), "Scholar");
 const feats = read<Feat>("feats.json");
 const equipment = read<Equipment>("equipment.json");
 const spells = read<Spell>("spells.json");
@@ -132,6 +134,26 @@ describe("Pathbuilder import", () => {
     expect(report.unmatched).toEqual([]);
     expect(report.matched.feat).toBeGreaterThanOrEqual(4);
     expect(report.warnings.join(" ")).toContain("awarded feat");
+  });
+
+  it("reconstructs class choices and background skill picks", () => {
+    const { draft } = importPathbuilder({
+      ...build,
+      class: "Cleric",
+      background: "Scholar",
+      specials: ["Cloistered Cleric"],
+      proficiencies: { ...build.proficiencies, arcana: 2 },
+      feats: [],
+      lores: [["Academia Lore", 2]],
+    });
+    const doctrine = cleric.choiceGroups.find((group) => group.tag === "cleric-doctrine");
+    const cloistered = doctrine?.options.find((option) => option.name === "Cloistered Cleric");
+    expect(doctrine).toBeDefined();
+    expect(cloistered).toBeDefined();
+    expect(draft.classChoices[doctrine!.key]).toEqual([cloistered!.id]);
+    expect(draft.skills.background).toContain("arcana");
+    expect(draft.skills.lore).toContain("Academia Lore");
+    expect(draft.backgroundId).toBe(scholar.id);
   });
 
   it("reports names that cannot be matched instead of guessing", () => {

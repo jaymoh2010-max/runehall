@@ -6,6 +6,7 @@ import multipart from "@fastify/multipart";
 import fastifyStatic from "@fastify/static";
 import { Server } from "socket.io";
 import { attachUser } from "./auth";
+import { getMembership } from "./access";
 import { getAuditRetentionDays, pruneAuditLog } from "./audit";
 import { registerAuthRoutes } from "./routes/auth";
 import { registerAdminRoutes } from "./routes/admin";
@@ -22,7 +23,7 @@ import { registerSessionRoutes } from "./routes/sessions";
 import { registerSystemRoutes } from "./routes/system";
 import { registerTableRoutes } from "./routes/table";
 import { registerUploadRoutes } from "./routes/uploads";
-import { registerSecurity } from "./security";
+import { isTrustedOrigin, registerSecurity } from "./security";
 import { setRevisionBroadcaster } from "./revisions";
 import { compendiumCounts } from "./compendium";
 import { db } from "./db";
@@ -44,7 +45,12 @@ const app = Fastify({
             options: { colorize: true, translateTime: "HH:MM:ss", ignore: "pid,hostname" },
           },
   },
-  trustProxy: true,
+  // Trust exactly one reverse proxy by default; set TRUST_PROXY_HOPS=0 if the
+  // app is exposed directly, or 2 for a CDN + reverse proxy chain.
+  trustProxy: (_address, hop) => {
+    const hops = Number(process.env.TRUST_PROXY_HOPS ?? 1);
+    return Number.isFinite(hops) && hop < hops;
+  },
   bodyLimit: 3 * 1024 * 1024,
 });
 
@@ -89,6 +95,29 @@ registerSecurity(app);
 
 app.addHook("preHandler", async (request) => {
   attachUser(request);
+});
+
+// Uploaded campaign files are private. The public URL is only a capability;
+// require a session, and require campaign membership for campaign assets.
+app.addHook("preHandler", async (request, reply) => {
+  if (!request.url.startsWith("/uploads/")) return;
+  if (!request.user) return reply.code(401).send({ error: "Sign in to continue." });
+  let filename: string;
+  try {
+    filename = decodeURIComponent(request.url.slice("/uploads/".length).split("?")[0]);
+  } catch {
+    return reply.code(404).send({ error: "Not found." });
+  }
+  if (!/^[A-Za-z0-9._-]+$/.test(filename)) {
+    return reply.code(404).send({ error: "Not found." });
+  }
+  const asset = db
+    .prepare("SELECT campaign_id FROM uploaded_assets WHERE filename = ?")
+    .get(filename) as { campaign_id: string | null } | undefined;
+  if (asset?.campaign_id && !getMembership(asset.campaign_id, request.user.id)) {
+    return reply.code(403).send({ error: "You can't view that asset." });
+  }
+  reply.header("Cache-Control", "private, no-store");
 });
 
 app.get("/api/health", async (_request, reply) => {
@@ -141,8 +170,7 @@ await app.register(fastifyStatic, {
   root: uploadsDir(),
   prefix: "/uploads/",
   decorateReply: false,
-  cacheControl: true,
-  maxAge: 1000 * 60 * 60 * 24 * 7,
+  cacheControl: false,
 });
 
 const clientDir = path.resolve("dist", "client");
@@ -158,9 +186,10 @@ if (hasClient) {
 
 const io = new Server(app.server, {
   path: "/socket.io",
-  cors: {
-    origin: true,
-    credentials: true,
+  // The client is same-origin. Do not reflect arbitrary browser origins.
+  cors: { origin: false },
+  allowRequest: (request, callback) => {
+    callback(null, isTrustedOrigin(request.headers.origin, request.headers.host));
   },
   maxHttpBufferSize: 1_000_000,
 });

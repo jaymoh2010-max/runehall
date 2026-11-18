@@ -78,6 +78,16 @@ function campaignSummaryFor(row: CampaignRow, userId: string) {
   );
 }
 
+function broadcastScene(
+  app: FastifyInstance,
+  campaignId: string,
+  event: string,
+  row: SceneRow
+): void {
+  app.broadcastCampaign(campaignId, event, serializeSceneForPlayers(row), "players");
+  app.broadcastCampaign(campaignId, event, serializeScene(row), "gm");
+}
+
 export async function registerTableRoutes(app: FastifyInstance): Promise<void> {
   app.get("/api/campaigns/:id/table", async (request, reply) => {
     if (!request.user) return reply.code(401).send({ error: "Sign in to continue." });
@@ -222,7 +232,7 @@ export async function registerTableRoutes(app: FastifyInstance): Promise<void> {
     );
     const row = db.prepare("SELECT * FROM scenes WHERE id = ?").get(sceneId) as SceneRow;
     const scene = serializeScene(row);
-    app.broadcastCampaign(id, "scene:created", scene);
+    broadcastScene(app, id, "scene:created", row);
     if (body.activate === true) {
       ensureState(id);
       db.prepare(
@@ -314,7 +324,7 @@ export async function registerTableRoutes(app: FastifyInstance): Promise<void> {
     }
     const row = db.prepare("SELECT * FROM scenes WHERE id = ?").get(sceneId) as SceneRow;
     const scene = serializeScene(row);
-    app.broadcastCampaign(source.campaign_id, "scene:created", scene);
+    broadcastScene(app, source.campaign_id, "scene:created", row);
     touchCampaign(source.campaign_id);
     return reply.code(201).send({ scene });
   });
@@ -397,7 +407,7 @@ export async function registerTableRoutes(app: FastifyInstance): Promise<void> {
     );
     const updated = db.prepare("SELECT * FROM scenes WHERE id = ?").get(id) as SceneRow;
     const scene = serializeScene(updated);
-    app.broadcastCampaign(row.campaign_id, "scene:updated", scene);
+    broadcastScene(app, row.campaign_id, "scene:updated", updated);
     touchCampaign(row.campaign_id);
     return reply.send({ scene });
   });

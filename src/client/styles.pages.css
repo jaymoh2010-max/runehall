@@ -2004,6 +2004,11 @@
   margin-left: auto;
   flex: none;
 }
+.sheet-review-issues {
+  margin: 4px 0 0;
+  padding-left: 16px;
+  color: #e7b1b1;
+}
 .sheet-hero-copy {
   flex: 1;
   min-width: 0;
@@ -4055,6 +4060,16 @@
 }
 .join-request-details summary {
   cursor: pointer;
+}
+.join-request-issues {
+  margin: 6px 0 0;
+  padding-left: 18px;
+}
+.join-request-issues li.is-error {
+  color: #e7b1b1;
+}
+.join-request-issues li.is-warning {
+  color: var(--gold-bright);
 }
 .danger-zone {
   display: flex;

@@ -32,6 +32,12 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      - name: Lint
+        run: npm run lint
+
+      - name: Format check
+        run: npm run format:check
+
       - name: Unit tests
         run: npm test
 
@@ -40,6 +46,9 @@ jobs:
 
       - name: Production build
         run: npm run build
+
+      - name: Bundle budget
+        run: npm run check:bundle
 
       - name: Smoke test
         run: npm run smoke
@@ -85,6 +94,9 @@ jobs:
     steps:
       - name: Check out
         uses: actions/checkout@v7
+
+      - name: Validate Compose file
+        run: docker compose config
 
       - name: Build production image
         run: docker build -t runehall:ci .

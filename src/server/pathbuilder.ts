@@ -180,6 +180,42 @@ export function importPathbuilder(
   if (background) {
     draft.backgroundId = background.id;
     match("background");
+    const backgroundProficiencies = obj(build.proficiencies);
+    const backgroundSkillPicks = background.skillChoices.flatMap((group) =>
+      group.options
+        .filter((option) => num(backgroundProficiencies[option], 0) > 0)
+        .slice(0, group.count)
+    );
+    if (backgroundSkillPicks.length) {
+      draft.skills.background = backgroundSkillPicks;
+      match("background skill");
+    }
+    const backgroundLoreNames = arr<unknown[]>(build.lores)
+      .map((entry) => text(Array.isArray(entry) ? entry[0] : entry, 80))
+      .filter(Boolean);
+    for (const group of background.loreChoices) {
+      const candidates = group.options.length ? group.options : backgroundLoreNames;
+      const picks = candidates
+        .filter((name) => backgroundLoreNames.some((lore) => nameKey(lore) === nameKey(name)))
+        .slice(0, group.count);
+      if (picks.length) {
+        draft.skills.backgroundLore = [...new Set([...draft.skills.backgroundLore, ...picks])];
+        match("background lore");
+      }
+    }
+    const backgroundFeatNames = arr<unknown[]>(build.feats)
+      .map((entry) => (Array.isArray(entry) ? text(entry[0], 120) : ""))
+      .filter(Boolean);
+    for (const group of background.featChoices) {
+      const picked = group.options.find((option) =>
+        backgroundFeatNames.some((name) => nameKey(name) === nameKey(option.name))
+      );
+      if (picked) {
+        draft.backgroundFeat = picked.id;
+        match("background feat");
+        break;
+      }
+    }
   } else if (text(build.background)) {
     unmatched.push(`Background: ${text(build.background)}`);
   }
@@ -196,6 +232,38 @@ export function importPathbuilder(
     warnings.push(
       `Dual-class (${dualClass}) is not supported; only ${classData?.name ?? "the primary class"} was imported.`
     );
+  }
+  if (classData?.choiceGroups.length) {
+    const chosenNames = new Set(
+      [
+        ...arr<string>(build.specials).map((value) => text(value, 120)),
+        ...arr<unknown[]>(build.feats).map((entry) =>
+          Array.isArray(entry) ? text(entry[0], 120) : ""
+        ),
+      ]
+        .filter(Boolean)
+        .map(nameKey)
+    );
+    const missing: string[] = [];
+    for (const group of classData.choiceGroups) {
+      const matches = group.options.filter((option) => {
+        const key = nameKey(option.name);
+        return [...chosenNames].some(
+          (chosen) => chosen === key || chosen.includes(key) || key.includes(chosen)
+        );
+      });
+      if (matches.length >= group.count) {
+        draft.classChoices[group.key] = matches.slice(0, group.count).map((option) => option.id);
+        match("class choice");
+      } else {
+        missing.push(group.prompt);
+      }
+    }
+    if (missing.length) {
+      warnings.push(
+        `Pathbuilder did not identify these class choices: ${missing.join("; ")}. Review the Class and Feats steps.`
+      );
+    }
   }
 
   const deity = lookup(nameMap(deities), build.deity);
@@ -274,6 +342,11 @@ export function importPathbuilder(
     const feat = lookup(featMap, name);
     if (!feat) {
       unmatched.push(`Feat: ${name}`);
+      continue;
+    }
+    if (feat.id === draft.backgroundFeat) {
+      match("background feat");
+      lastParent = feat;
       continue;
     }
     const level = Math.max(1, Math.min(20, Math.round(num(entry[3], feat.level || 1))));

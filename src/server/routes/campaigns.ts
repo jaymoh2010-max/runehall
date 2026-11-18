@@ -101,6 +101,76 @@ function broadcastCampaignSummary(app: FastifyInstance, row: CampaignRow): void 
   );
 }
 
+function unassignCampaignCharacters(
+  app: FastifyInstance,
+  campaignId: string,
+  userId: string
+): void {
+  const rows = db
+    .prepare("SELECT id FROM characters WHERE campaign_id = ? AND user_id = ?")
+    .all(campaignId, userId) as { id: string }[];
+  if (!rows.length) return;
+  const ids = rows.map((row) => row.id);
+  const placeholders = ids.map(() => "?").join(",");
+  db.prepare(
+    `UPDATE tokens SET character_id = NULL, owner_id = NULL, updated_at = ?
+     WHERE character_id IN (${placeholders})`
+  ).run(now(), ...ids);
+  db.prepare(
+    `UPDATE characters SET campaign_id = NULL, updated_at = ? WHERE id IN (${placeholders})`
+  ).run(now(), ...ids);
+  for (const row of rows) {
+    app.broadcastCampaign(campaignId, "character:removed", { characterId: row.id });
+  }
+}
+
+function ejectUserSockets(
+  app: FastifyInstance,
+  campaignId: string,
+  userId: string,
+  disconnect = false
+): void {
+  for (const socket of app.io.sockets.sockets.values()) {
+    if ((socket.data as { user?: { id?: string } }).user?.id !== userId) continue;
+    socket.leave(`campaign:${campaignId}`);
+    socket.leave(`gm:${campaignId}`);
+    if (disconnect) socket.disconnect(true);
+  }
+}
+
+function broadcastJournalCreated(
+  app: FastifyInstance,
+  campaignId: string,
+  entry: ReturnType<typeof serializeJournal>
+): void {
+  app.broadcastCampaign(campaignId, "journal:created", entry, entry.visible ? "all" : "gm");
+}
+
+function broadcastJournalUpdated(
+  app: FastifyInstance,
+  campaignId: string,
+  entry: ReturnType<typeof serializeJournal>,
+  wasVisible: boolean
+): void {
+  if (entry.visible) {
+    app.broadcastCampaign(campaignId, "journal:updated", entry);
+    return;
+  }
+  app.broadcastCampaign(campaignId, "journal:updated", entry, "gm");
+  if (wasVisible) {
+    app.broadcastCampaign(campaignId, "journal:deleted", { entryId: entry.id }, "players");
+  }
+}
+
+function broadcastJournalDeleted(
+  app: FastifyInstance,
+  campaignId: string,
+  entryId: string,
+  wasVisible: boolean
+): void {
+  app.broadcastCampaign(campaignId, "journal:deleted", { entryId }, wasVisible ? "all" : "gm");
+}
+
 function joinRequestValidation(character: CharacterRow | null) {
   if (!character) return [];
   try {
@@ -183,7 +253,7 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
     });
   });
 
-  app.post("/api/campaigns/import", async (request, reply) => {
+  app.post("/api/campaigns/import", { bodyLimit: 25 * 1024 * 1024 }, async (request, reply) => {
     if (!request.user) return reply.code(401).send({ error: "Sign in to continue." });
     try {
       const result = importCampaign(request.user.id, request.body);
@@ -770,6 +840,10 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
       id,
       request.user.id
     );
+    unassignCampaignCharacters(app, id, request.user.id);
+    ejectUserSockets(app, id, request.user.id);
+    broadcastCampaignSummary(app, row);
+    touchCampaign(id);
     return reply.send({ ok: true });
   });
 
@@ -786,6 +860,21 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
       id,
       userId
     );
+    unassignCampaignCharacters(app, id, userId);
+    ejectUserSockets(app, id, userId, true);
+    // The removed player should not be able to reuse the old invite code.
+    let code = inviteCode();
+    for (let attempt = 0; attempt < 10; attempt++) {
+      if (!db.prepare("SELECT id FROM campaigns WHERE invite_code = ?").get(code)) break;
+      code = inviteCode();
+    }
+    db.prepare("UPDATE campaigns SET invite_code = ?, updated_at = ? WHERE id = ?").run(
+      code,
+      now(),
+      id
+    );
+    broadcastCampaignSummary(app, getCampaign(id)!);
+    touchCampaign(id);
     logAudit({
       action: "campaign.member_remove",
       actor: request.user,
@@ -794,7 +883,7 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
       detail: `${row.name} / ${userId}`,
       request,
     });
-    return reply.send({ ok: true });
+    return reply.send({ ok: true, inviteCode: code });
   });
 
   app.post("/api/campaigns/:id/regenerate-code", async (request, reply) => {
@@ -1211,6 +1300,8 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
          LEFT JOIN users u ON u.id = j.created_by WHERE j.id = ?`
       )
       .get(entryId) as import("../db").JournalRow & { author_name: string | null };
+    touchCampaign(id);
+    broadcastJournalCreated(app, id, serializeJournal(row));
     return reply.code(201).send({ entry: serializeJournal(row) });
   });
 
@@ -1280,6 +1371,8 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
          LEFT JOIN users u ON u.id = j.created_by WHERE j.id = ?`
       )
       .get(entryId) as import("../db").JournalRow & { author_name: string | null };
+    touchCampaign(id);
+    broadcastJournalUpdated(app, id, serializeJournal(row), Boolean(existing.visible));
     return reply.send({ entry: serializeJournal(row) });
   });
 
@@ -1322,6 +1415,7 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
       )
       .get(duplicateId) as JournalRow & { author_name: string | null };
     touchCampaign(id);
+    broadcastJournalCreated(app, id, serializeJournal(row));
     return reply.code(201).send({ entry: serializeJournal(row) });
   });
 
@@ -1403,6 +1497,7 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
          LEFT JOIN users u ON u.id = j.created_by WHERE j.id = ?`
       )
       .get(entryId) as JournalRow & { author_name: string | null };
+    broadcastJournalUpdated(app, id, serializeJournal(row), Boolean(existing.visible));
     const characters = campaignCharacters(id).map((character) =>
       serializeCharacter(character, character.owner_name, {
         canEdit: true,
@@ -1424,7 +1519,12 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
     const role = getMembership(id, request.user.id)?.role;
     if (role !== "gm")
       return reply.code(403).send({ error: "Only the GM can delete journal entries." });
+    const existing = db
+      .prepare("SELECT * FROM journal_entries WHERE id = ? AND campaign_id = ?")
+      .get(entryId, id) as JournalRow | undefined;
     db.prepare("DELETE FROM journal_entries WHERE id = ? AND campaign_id = ?").run(entryId, id);
+    touchCampaign(id);
+    broadcastJournalDeleted(app, id, entryId, Boolean(existing?.visible));
     return reply.send({ ok: true });
   });
 }

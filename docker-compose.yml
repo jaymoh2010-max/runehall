@@ -6,19 +6,32 @@ services:
     init: true
     restart: unless-stopped
     ports:
-      - "${RUNEHALL_PORT:-3001}:3001"
+      # Bind to loopback by default; expose only through Caddy/Nginx.
+      - "${RUNEHALL_BIND:-127.0.0.1}:${RUNEHALL_PORT:-3001}:3001"
     environment:
       NODE_ENV: production
       PORT: 3001
       HOST: 0.0.0.0
       DATA_DIR: /app/data
-      COOKIE_SECURE: "${COOKIE_SECURE:-0}"
+      # Secure by default. Set to 0 only for plain-HTTP local testing.
+      COOKIE_SECURE: "${COOKIE_SECURE:-1}"
       ENABLE_CSP: "${ENABLE_CSP:-1}"
-      REGISTRATION_MODE: "${REGISTRATION_MODE:-open}"
+      REGISTRATION_MODE: "${REGISTRATION_MODE:-invite}"
+      BOOTSTRAP_TOKEN: "${BOOTSTRAP_TOKEN:-}"
       LOG_LEVEL: "${LOG_LEVEL:-info}"
       AUTH_RATE_LIMIT_MAX: "${AUTH_RATE_LIMIT_MAX:-30}"
+      AUTH_RATE_LIMIT_WINDOW_MS: "${AUTH_RATE_LIMIT_WINDOW_MS:-300000}"
       UPLOAD_RATE_LIMIT_MAX: "${UPLOAD_RATE_LIMIT_MAX:-60}"
+      UPLOAD_RATE_LIMIT_WINDOW_MS: "${UPLOAD_RATE_LIMIT_WINDOW_MS:-600000}"
+      AUDIT_RETENTION_DAYS: "${AUDIT_RETENTION_DAYS:-0}"
+      ENFORCE_ORIGIN: "${ENFORCE_ORIGIN:-1}"
       TRUSTED_ORIGINS: "${TRUSTED_ORIGINS:-}"
+      TRUST_PROXY_HOPS: "${TRUST_PROXY_HOPS:-1}"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     volumes:
       - ./data:/app/data
       - ./backups:/app/backups

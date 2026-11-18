@@ -748,6 +748,11 @@ export function registerSocketServer(io: TypedServer): void {
       if (updated) {
         socketTokenEvents(io, campaignId).updated(tokenWithOwner(updated), Boolean(row.hidden));
       }
+      if (token.hidden !== undefined && Boolean(token.hidden) !== Boolean(row.hidden)) {
+        // Hiding a rolled combatant must remove it from the live player
+        // initiative order immediately, not only after the next snapshot.
+        broadcastInitiative(io, campaignId, ensureState(campaignId));
+      }
       // A GM changing a linked token's HP is a table action; mirror it into
       // the character sheet so the player's next view is consistent.
       if (updated?.character_id && token.hpCurrent !== undefined) {
@@ -900,7 +905,31 @@ export function registerSocketServer(io: TypedServer): void {
       if (!row) return;
       const scene = sceneBelongs(row.scene_id, campaignId);
       if (!scene) return;
+      const remainingGroupMember = row.group_id
+        ? db
+            .prepare("SELECT id FROM tokens WHERE group_id = ? AND id != ? LIMIT 1")
+            .get(row.group_id, tokenId)
+        : null;
       db.prepare("DELETE FROM tokens WHERE id = ?").run(tokenId);
+      const state = ensureState(campaignId);
+      const allEntries = serializeInitiative(JSON.parse(state.initiative || "[]"));
+      const activeId = allEntries[state.turn_index]?.id ?? null;
+      const entries = allEntries.filter((entry) => {
+        if (entry.tokenId !== tokenId) return true;
+        return Boolean(entry.groupId && remainingGroupMember);
+      });
+      if (entries.length !== allEntries.length) {
+        const nextTurn = activeId
+          ? Math.max(
+              0,
+              entries.findIndex((entry) => entry.id === activeId)
+            )
+          : 0;
+        db.prepare(
+          "UPDATE campaign_state SET initiative = ?, turn_index = ?, updated_at = ? WHERE campaign_id = ?"
+        ).run(JSON.stringify(entries), nextTurn, now(), campaignId);
+        broadcastInitiative(io, campaignId, ensureState(campaignId));
+      }
       socketTokenEvents(io, campaignId).deleted(
         { tokenId, sceneId: row.scene_id },
         Boolean(row.hidden)
@@ -1047,7 +1076,10 @@ export function registerSocketServer(io: TypedServer): void {
           "SELECT * FROM scenes WHERE campaign_id = ? ORDER BY sort_order ASC, created_at ASC"
         )
         .all(campaignId) as SceneRow[];
-      io.to(room(campaignId)).emit("scenes:reordered", scenes.map(serializeScene));
+      io.to(gmRoom(campaignId)).emit("scenes:reordered", scenes.map(serializeScene));
+      io.to(room(campaignId))
+        .except(gmRoom(campaignId))
+        .emit("scenes:reordered", scenes.map(serializeSceneForPlayers));
       touchCampaign(campaignId);
     });
 
@@ -1342,8 +1374,9 @@ export function registerSocketServer(io: TypedServer): void {
       const state = ensureState(campaignId);
       const entries = serializeInitiative(JSON.parse(state.initiative || "[]"));
       if (!entries.length) return;
-      tickConditionsForEntry(io, campaignId, entries[state.turn_index]);
       const dir = direction === -1 ? -1 : 1;
+      // Conditions tick at the end of a combatant's turn, not when stepping back.
+      if (dir === 1) tickConditionsForEntry(io, campaignId, entries[state.turn_index]);
       let turn = state.turn_index + dir;
       let round = state.round;
       if (turn >= entries.length) {
@@ -1381,6 +1414,7 @@ export function registerSocketServer(io: TypedServer): void {
       if (!row) return;
       const state = ensureState(campaignId);
       const entries = serializeInitiative(JSON.parse(state.initiative || "[]"));
+      const activeId = entries[state.turn_index]?.id ?? null;
       if (row.group_id) {
         if (entries.some((entry) => entry.groupId === row.group_id)) return;
         const members = groupTokens(row.scene_id, row.group_id);
@@ -1394,9 +1428,15 @@ export function registerSocketServer(io: TypedServer): void {
         entries.push(initiativeEntryForToken(row, typeof value === "number" ? value : undefined));
       }
       entries.sort((a, b) => b.initiative - a.initiative || a.name.localeCompare(b.name));
+      const nextTurn = activeId
+        ? Math.max(
+            0,
+            entries.findIndex((entry) => entry.id === activeId)
+          )
+        : 0;
       db.prepare(
-        "UPDATE campaign_state SET initiative = ?, updated_at = ? WHERE campaign_id = ?"
-      ).run(JSON.stringify(entries), now(), campaignId);
+        "UPDATE campaign_state SET initiative = ?, turn_index = ?, updated_at = ? WHERE campaign_id = ?"
+      ).run(JSON.stringify(entries), nextTurn, now(), campaignId);
       broadcastInitiative(io, campaignId, ensureState(campaignId));
       touchCampaign(campaignId);
     });
@@ -1440,12 +1480,21 @@ export function registerSocketServer(io: TypedServer): void {
     on("initiative:remove", ({ campaignId, entryId }) => {
       if (!requireGm(socket, campaignId)) return;
       const state = ensureState(campaignId);
-      const entries = serializeInitiative(JSON.parse(state.initiative || "[]"))
+      const allEntries = serializeInitiative(JSON.parse(state.initiative || "[]"));
+      const activeId = allEntries[state.turn_index]?.id ?? null;
+      const entries = allEntries
         .filter((entry) => entry.id !== entryId)
         .map((entry) => ({ ...entry, movementUsed: 0, diagonalSteps: 0 }));
+      const nextTurn =
+        activeId && activeId !== entryId
+          ? Math.max(
+              0,
+              entries.findIndex((entry) => entry.id === activeId)
+            )
+          : Math.min(state.turn_index, Math.max(0, entries.length - 1));
       db.prepare(
-        "UPDATE campaign_state SET initiative = ?, turn_index = 0, updated_at = ? WHERE campaign_id = ?"
-      ).run(JSON.stringify(entries), now(), campaignId);
+        "UPDATE campaign_state SET initiative = ?, turn_index = ?, updated_at = ? WHERE campaign_id = ?"
+      ).run(JSON.stringify(entries), nextTurn, now(), campaignId);
       broadcastInitiative(io, campaignId, ensureState(campaignId));
       touchCampaign(campaignId);
     });

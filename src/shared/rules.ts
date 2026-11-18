@@ -2283,6 +2283,28 @@ export function computeCharacter(
   if (caster.traditionOptions && !tradition) {
     issue("error", "Choose your magical tradition.", "spells");
   }
+  if (caster.progression !== "none" && caster.progression !== "focus") {
+    const cantripIds = new Set([
+      ...draft.spells.cantrips,
+      ...draft.spells.prepared.filter((id) => context.spells[id]?.rank === 0),
+    ]);
+    if (!cantripIds.size) {
+      issue("error", "Choose at least one cantrip.", "spells");
+    }
+    const hasRankedSpell = [...draft.spells.known, ...draft.spells.prepared].some(
+      (id) => (context.spells[id]?.rank ?? 0) > 0
+    );
+    if (maxSpellRank >= 1 && !hasRankedSpell) {
+      issue("error", "Choose at least one rank 1 spell.", "spells");
+    }
+    if (
+      maxSpellRank >= 1 &&
+      isPreparedCasterClass(classData?.name) &&
+      !draft.spells.prepared.length
+    ) {
+      issue("error", "Prepare at least one spell for the day.", "spells");
+    }
+  }
   for (const spellId of [...draft.spells.cantrips, ...draft.spells.known]) {
     const spell = context.spells[spellId];
     if (!spell) continue;
@@ -2382,6 +2404,17 @@ export function computeCharacter(
       );
     }
   }
+  for (const category of ["ancestry", "class", "skill", "general"] as const) {
+    for (const key of Object.keys(draft.feats[category])) {
+      if (!slotsForFeats.some((slot) => slot.category === category && String(slot.level) === key)) {
+        issue(
+          "warning",
+          `A ${category} feat is stored at level ${key}, which is not a legal ${category} slot. Review the Feats step.`,
+          "feats"
+        );
+      }
+    }
+  }
   for (const id of draft.feats.extras) selectedFeatIds.push(id);
   const selectedFeats = [...new Set(selectedFeatIds)]
     .map((id) => context.feats[id])
@@ -2465,12 +2498,13 @@ export function computeCharacter(
   }
 
   let focusPointsMax =
-    caster.progression !== "none" ||
     features.some((feature) =>
       /focus|devotion spells|conflux spells|link spells|hexes|revelation spells|grave spells|composition spells|psi cantrips/i.test(
         feature.name
       )
-    )
+    ) ||
+    grantedFeats.some((feat) => /focus/i.test(feat.name)) ||
+    draft.spells.focus.length > 0
       ? 1
       : 0;
   if (

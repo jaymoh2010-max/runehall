@@ -1503,6 +1503,10 @@ export interface ServerToClientEvents {
     name: string;
   }) => void;
   "character:created": (payload: { character: CharacterRecord }) => void;
+  "character:removed": (payload: { characterId: string }) => void;
+  "journal:created": (entry: JournalEntry) => void;
+  "journal:updated": (entry: JournalEntry) => void;
+  "journal:deleted": (payload: { entryId: string }) => void;
   "join-request:created": (payload: {
     requestId: string;
     characterName: string;
@@ -1525,6 +1529,8 @@ export interface RegistrationStatus {
   mode: RegistrationMode;
   bootstrap: boolean;
   inviteRequired: boolean;
+  /** Set when the host configured BOOTSTRAP_TOKEN for the first account. */
+  bootstrapTokenRequired: boolean;
   canRegister: boolean;
   userCount: number;
 }

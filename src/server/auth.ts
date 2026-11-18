@@ -36,6 +36,13 @@ export function verifyPassword(password: string, stored: string): boolean {
   }
 }
 
+/** Constant-time comparison for short setup/bootstrap secrets. */
+export function safeEqualText(candidate: string, expected: string): boolean {
+  const a = Buffer.from(candidate);
+  const b = Buffer.from(expected);
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
+
 export function createSession(userId: string): string {
   const token = randomToken(32);
   const expires = now() + SESSION_DAYS * 24 * 60 * 60 * 1000;

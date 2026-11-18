@@ -5,6 +5,7 @@ import {
   destroySession,
   getSessionToken,
   hashPassword,
+  safeEqualText,
   setSessionCookie,
   toPublicUser,
   validateDisplayName,
@@ -46,6 +47,15 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
         return reply.code(403).send({
           error: "Registration is closed. Ask the host for an account.",
         });
+      }
+      const bootstrapToken = (process.env.BOOTSTRAP_TOKEN ?? "").trim();
+      if (status.bootstrap && bootstrapToken) {
+        const provided = safeString(body.bootstrapToken, "", 200);
+        if (!safeEqualText(provided, bootstrapToken)) {
+          return reply
+            .code(403)
+            .send({ error: "Enter the one-time bootstrap token from the host." });
+        }
       }
       let invite = null;
       try {
