@@ -627,13 +627,21 @@ That is more trustworthy than silently showing a number that may be missing a +1
 
 ---
 
+## Backlog beyond the current roadmap
+
+These need a product decision before implementation:
+
+- [ ] **In-world calendar and downtime** — choose the calendar model (Golarion months versus a custom/free-text date), how the GM advances days, and whether downtime is tracked per character or per party.
+- [ ] **Audio playlists** — local audio uploads and synced playlists need format/size limits, autoplay behavior, and a decision on whether playback state is campaign-wide or per client.
+- [ ] **Incremental refactors** — split `rules.ts`, `CharacterSheetPage`, and `CampaignPage` where it reduces risk without changing behavior.
+
 ## Recommended next session
 
-Sprint 12 is complete. Next improvements:
+The current feature queue is complete. Next improvements:
 
 1. keep the Docker, browser E2E, and weekly simulation jobs green,
 2. merge Dependabot updates and keep dependencies current,
-3. refactor the largest modules (`rules.ts`, `CharacterSheetPage`, `CampaignPage`) incrementally,
+3. pick one backlog item above and scope it before implementation,
 4. defer Postgres/S3 adapters and OAuth until the local deployment is proven.
 
 Keep the two-user smoke test and browser E2E suite green as new socket events are added.
