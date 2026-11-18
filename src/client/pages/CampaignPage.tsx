@@ -283,9 +283,10 @@ export function CampaignPage() {
   }, [id, tab]);
 
   // Keep shared campaign metadata (the in-world date, name, ruleset, counts)
-  // live while the table itself is not mounted on this tab.
+  // live for the whole campaign view. The table hook references the same room,
+  // so the shared subscription keeps one socket joined until the page closes.
   useEffect(() => {
-    if (!id || tab === "table") return;
+    if (!id) return;
     const socket = connectSocket();
     const applySummary = (summary: CampaignSummary) => {
       if (summary.id !== id) return;
@@ -300,7 +301,7 @@ export function CampaignPage() {
       socket.off("campaign:updated", applySummary);
       leaveCampaignRoom();
     };
-  }, [id, tab]);
+  }, [id]);
 
   useEffect(() => {
     if (!journalEditor || journalEditor === "new") {
