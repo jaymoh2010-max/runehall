@@ -150,6 +150,19 @@ export interface CharacterRow {
   updated_at: number;
 }
 
+export interface CampaignJoinRequestRow {
+  id: string;
+  campaign_id: string;
+  user_id: string;
+  character_id: string | null;
+  status: "pending" | "approved" | "declined";
+  source: "pathbuilder" | "existing";
+  report: string | null;
+  created_at: number;
+  resolved_at: number | null;
+  resolved_by: string | null;
+}
+
 export interface SceneRow {
   id: string;
   campaign_id: string;

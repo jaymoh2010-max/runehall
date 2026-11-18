@@ -1,10 +1,23 @@
-import { db, type CampaignRow, type CharacterRow, type UserRow } from "./db";
+import {
+  db,
+  type CampaignJoinRequestRow,
+  type CampaignRow,
+  type CharacterRow,
+  type UserRow,
+} from "./db";
 
 export interface MembershipRow {
   campaign_id: string;
   user_id: string;
   role: "gm" | "player";
   joined_at: number;
+}
+
+export interface JoinRequestViewRow extends CampaignJoinRequestRow {
+  player_name: string;
+  player_username: string;
+  character_name: string | null;
+  character_summary: string | null;
 }
 
 export function getCampaign(campaignId: string): CampaignRow | null {
@@ -52,7 +65,7 @@ export function getCharacter(characterId: string): CharacterRow | null {
 
 export function canViewCharacter(character: CharacterRow, userId: string): boolean {
   if (character.user_id === userId) return true;
-  if (!character.campaign_id) return false;
+  if (!character.campaign_id) return canGmReviewJoinCharacter(character.id, userId);
   return Boolean(getMembership(character.campaign_id, userId));
 }
 
@@ -69,6 +82,67 @@ export function canEditCharacter(character: CharacterRow, userId: string): boole
 export function canAdvanceCharacter(character: CharacterRow, userId: string): boolean {
   if (!character.campaign_id) return character.user_id === userId;
   return isCampaignGm(character.campaign_id, userId);
+}
+
+/** A GM may inspect an unassigned character while reviewing its pending request. */
+export function canGmReviewJoinCharacter(characterId: string, userId: string): boolean {
+  return Boolean(
+    db
+      .prepare(
+        `SELECT 1 AS allowed
+         FROM campaign_join_requests r
+         JOIN campaigns c ON c.id = r.campaign_id
+         WHERE r.character_id = ? AND r.status = 'pending' AND c.gm_id = ?
+         LIMIT 1`
+      )
+      .get(characterId, userId)
+  );
+}
+
+export function getJoinRequest(requestId: string): CampaignJoinRequestRow | null {
+  return (
+    (db.prepare("SELECT * FROM campaign_join_requests WHERE id = ?").get(requestId) as
+      CampaignJoinRequestRow | undefined) ?? null
+  );
+}
+
+export function pendingJoinRequest(campaignId: string, userId: string): JoinRequestViewRow | null {
+  return (
+    (db
+      .prepare(
+        `SELECT r.*, u.display_name AS player_name, u.username AS player_username,
+                c.name AS character_name, c.summary AS character_summary
+         FROM campaign_join_requests r
+         JOIN users u ON u.id = r.user_id
+         LEFT JOIN characters c ON c.id = r.character_id
+         WHERE r.campaign_id = ? AND r.user_id = ? AND r.status = 'pending'
+         LIMIT 1`
+      )
+      .get(campaignId, userId) as JoinRequestViewRow | undefined) ?? null
+  );
+}
+
+export function campaignJoinRequests(campaignId: string): JoinRequestViewRow[] {
+  return db
+    .prepare(
+      `SELECT r.*, u.display_name AS player_name, u.username AS player_username,
+              c.name AS character_name, c.summary AS character_summary
+       FROM campaign_join_requests r
+       JOIN users u ON u.id = r.user_id
+       LEFT JOIN characters c ON c.id = r.character_id
+       WHERE r.campaign_id = ? AND r.status = 'pending'
+       ORDER BY r.created_at ASC`
+    )
+    .all(campaignId) as JoinRequestViewRow[];
+}
+
+export function pendingJoinRequestCount(campaignId: string): number {
+  const row = db
+    .prepare(
+      "SELECT COUNT(*) AS count FROM campaign_join_requests WHERE campaign_id = ? AND status = 'pending'"
+    )
+    .get(campaignId) as { count: number };
+  return Number(row?.count ?? 0);
 }
 
 export function campaignMemberCount(campaignId: string): number {

@@ -112,7 +112,12 @@ describe("migrations", () => {
     }[];
     const names = tables.map((table) => table.name);
     expect(names).toEqual(
-      expect.arrayContaining(["app_settings", "registration_invites", "audit_log"])
+      expect.arrayContaining([
+        "app_settings",
+        "registration_invites",
+        "audit_log",
+        "campaign_join_requests",
+      ])
     );
 
     db.close();

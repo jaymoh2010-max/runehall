@@ -5,18 +5,26 @@ import {
   ArrowRight,
   CheckCircle2,
   ChevronRight,
+  Clock,
   Crown,
   LogIn,
   Plus,
   ScrollText,
   Sparkles,
+  Upload,
   UserPlus,
   Users,
 } from "lucide-react";
-import type { CampaignRuleset, CharacterRecord } from "../../shared/types";
+import type {
+  CampaignRuleset,
+  CharacterRecord,
+  PathbuilderImportReport,
+  PendingJoinRequest,
+} from "../../shared/types";
 import { rulesetLabel } from "../../shared/content";
 import { api } from "../api";
 import { errorMessage, useSession, useToasts } from "../stores";
+import { ImportReport } from "../components/ImportReport";
 import {
   Avatar,
   Badge,
@@ -26,6 +34,7 @@ import {
   Input,
   LoadingScreen,
   PageEyebrow,
+  Textarea,
 } from "../components/ui";
 
 interface InviteCampaign {
@@ -44,6 +53,13 @@ interface InviteResponse {
   campaign: InviteCampaign;
   alreadyMember: boolean;
   role: "gm" | "player" | null;
+  pendingRequest: PendingJoinRequest | null;
+}
+
+interface PathbuilderImportResponse {
+  character: CharacterRecord;
+  report: PathbuilderImportReport;
+  joinRequest: PendingJoinRequest | null;
 }
 
 export function JoinCampaignPage() {
@@ -58,8 +74,14 @@ export function JoinCampaignPage() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [mode, setMode] = useState<"new" | "existing" | "solo">("new");
+  const [mode, setMode] = useState<"new" | "existing" | "import">("new");
   const [newName, setNewName] = useState("");
+  const [pendingRequest, setPendingRequest] = useState<PendingJoinRequest | null>(null);
+  const [pathbuilderJson, setPathbuilderJson] = useState("");
+  const [pathbuilderBusy, setPathbuilderBusy] = useState(false);
+  const [pathbuilderError, setPathbuilderError] = useState("");
+  const [withdrawBusy, setWithdrawBusy] = useState(false);
+  const [statusBusy, setStatusBusy] = useState(false);
 
   const returnPath = useMemo(() => `/join/${encodeURIComponent(code)}`, [code]);
   const authState = { from: returnPath };
@@ -74,7 +96,10 @@ export function JoinCampaignPage() {
     setError("");
     api<InviteResponse>(`/api/invites/${encodeURIComponent(code)}`)
       .then((result) => {
-        if (!cancelled) setInvite(result);
+        if (!cancelled) {
+          setInvite(result);
+          setPendingRequest(result.pendingRequest ?? null);
+        }
       })
       .catch((err) => {
         if (!cancelled) setError(errorMessage(err));
@@ -141,6 +166,77 @@ export function JoinCampaignPage() {
       setError(errorMessage(err));
     } finally {
       setBusy(false);
+    }
+  };
+
+  const choosePathbuilderFile = async (file: File | null) => {
+    setPathbuilderError("");
+    if (!file) return;
+    try {
+      setPathbuilderJson(await file.text());
+    } catch {
+      setPathbuilderError("That file could not be read.");
+    }
+  };
+
+  const importAndRequest = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!invite || !pathbuilderJson.trim()) return;
+    setPathbuilderBusy(true);
+    setPathbuilderError("");
+    try {
+      const result = await api<PathbuilderImportResponse>("/api/characters/import/pathbuilder", {
+        method: "POST",
+        body: { json: pathbuilderJson, campaignCode: code },
+      });
+      if (result.joinRequest) {
+        setPendingRequest(result.joinRequest);
+        toast(`${result.character.name} is waiting for GM approval.`, "success");
+      } else {
+        toast(`${result.character.name} joined ${invite.campaign.name}.`, "success");
+        navigate(`/campaigns/${invite.campaign.id}?tab=party`);
+      }
+    } catch (err) {
+      setPathbuilderError(errorMessage(err));
+    } finally {
+      setPathbuilderBusy(false);
+    }
+  };
+
+  const withdrawRequest = async () => {
+    if (!invite || !pendingRequest) return;
+    setWithdrawBusy(true);
+    try {
+      await api(`/api/campaigns/${invite.campaign.id}/join-requests/mine`, {
+        method: "DELETE",
+      });
+      setPendingRequest(null);
+      setPathbuilderJson("");
+      setPathbuilderError("");
+      setMode("import");
+      toast("Join request withdrawn.", "success");
+    } catch (err) {
+      toast(errorMessage(err), "error");
+    } finally {
+      setWithdrawBusy(false);
+    }
+  };
+
+  const checkStatus = async () => {
+    setStatusBusy(true);
+    try {
+      const result = await api<InviteResponse>(`/api/invites/${encodeURIComponent(code)}`);
+      setInvite(result);
+      setPendingRequest(result.pendingRequest ?? null);
+      if (result.alreadyMember) {
+        toast(`You're in ${result.campaign.name}.`, "success");
+      } else if (!result.pendingRequest) {
+        toast("Your request is no longer pending. You can import again.", "info");
+      }
+    } catch (err) {
+      toast(errorMessage(err), "error");
+    } finally {
+      setStatusBusy(false);
     }
   };
 
@@ -214,6 +310,49 @@ export function JoinCampaignPage() {
               My Campaigns
             </Link>
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (pendingRequest) {
+    return (
+      <div className="join-page">
+        <div className="join-invalid card">
+          <div className="join-already-icon">
+            <Clock size={30} />
+          </div>
+          <PageEyebrow>Waiting for the GM</PageEyebrow>
+          <h1>{pendingRequest.characterName} is waiting for approval.</h1>
+          <p className="muted">
+            Your Pathbuilder import for <strong>{campaign.name}</strong> was sent to{" "}
+            <strong>{campaign.gmName}</strong>. You can enter the campaign once the GM approves it.
+          </p>
+          {pendingRequest.report ? (
+            <div style={{ marginTop: 18, textAlign: "left" }}>
+              <ImportReport report={pendingRequest.report} />
+            </div>
+          ) : null}
+          <div className="row wrap" style={{ justifyContent: "center", marginTop: 20 }}>
+            {pendingRequest.characterId ? (
+              <Link
+                to={`/characters/${pendingRequest.characterId}/edit`}
+                className="btn btn-primary btn-lg"
+              >
+                Review your character
+              </Link>
+            ) : null}
+            <Button variant="secondary" loading={statusBusy} onClick={() => void checkStatus()}>
+              Check status
+            </Button>
+            <Button variant="ghost" loading={withdrawBusy} onClick={() => void withdrawRequest()}>
+              Withdraw request
+            </Button>
+          </div>
+          <p className="tiny muted" style={{ marginTop: 16 }}>
+            You can keep editing the imported character while you wait. Nothing joins the party
+            until the GM approves it.
+          </p>
         </div>
       </div>
     );
@@ -338,6 +477,25 @@ export function JoinCampaignPage() {
                   </span>
                   {mode === "existing" ? <CheckCircle2 size={17} /> : null}
                 </button>
+                <button
+                  type="button"
+                  className={`join-choice ${mode === "import" ? "is-selected" : ""}`}
+                  onClick={() => {
+                    setPathbuilderError("");
+                    setMode("import");
+                  }}
+                >
+                  <span className="join-choice-icon">
+                    <Upload size={18} />
+                  </span>
+                  <span>
+                    <strong>Import from Pathbuilder</strong>
+                    <small>
+                      Upload a pathbuilder2e.com JSON export. Your GM reviews it before it joins.
+                    </small>
+                  </span>
+                  {mode === "import" ? <CheckCircle2 size={17} /> : null}
+                </button>
               </div>
 
               {mode === "new" ? (
@@ -354,7 +512,7 @@ export function JoinCampaignPage() {
                     Join and build my character <ArrowRight size={16} />
                   </Button>
                 </form>
-              ) : (
+              ) : mode === "existing" ? (
                 <div className="join-character-list">
                   {characters.map((character) => (
                     <button
@@ -391,6 +549,44 @@ export function JoinCampaignPage() {
                     </p>
                   ) : null}
                 </div>
+              ) : (
+                <form className="join-new-form" onSubmit={importAndRequest}>
+                  {pathbuilderError ? <div className="auth-error">{pathbuilderError}</div> : null}
+                  <Field
+                    label="Pathbuilder JSON file"
+                    hint="In Pathbuilder 2e, open the character and use Export → JSON."
+                  >
+                    <Input
+                      type="file"
+                      accept=".json,application/json"
+                      onChange={(event) =>
+                        void choosePathbuilderFile(event.target.files?.[0] ?? null)
+                      }
+                    />
+                  </Field>
+                  <Field label="Or paste the JSON">
+                    <Textarea
+                      value={pathbuilderJson}
+                      onChange={(event) => setPathbuilderJson(event.target.value)}
+                      placeholder='{"success":true,"build":{...}}'
+                      rows={7}
+                    />
+                  </Field>
+                  <Button
+                    type="submit"
+                    variant="primary"
+                    size="lg"
+                    block
+                    loading={pathbuilderBusy}
+                    disabled={!pathbuilderJson.trim()}
+                  >
+                    Request GM approval <ArrowRight size={16} />
+                  </Button>
+                  <p className="tiny muted">
+                    Runehall imports the file locally, then sends the resulting character to your GM
+                    for review. Nothing joins the party until it is approved.
+                  </p>
+                </form>
               )}
 
               <div className="join-solo-row">

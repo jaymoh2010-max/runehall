@@ -33,6 +33,7 @@ import {
   Users,
 } from "lucide-react";
 import type {
+  CampaignJoinRequest,
   CampaignMember,
   CampaignAsset,
   CampaignRuleset,
@@ -88,6 +89,7 @@ import { NpcLibrary } from "../components/campaign/NpcLibrary";
 import { SessionsPage } from "../components/campaign/SessionsPage";
 import { GmScreen } from "../components/campaign/GmScreen";
 import { JournalBody } from "../components/JournalBody";
+import { ImportReport } from "../components/ImportReport";
 
 function questStatusLabel(status: QuestStatus): string {
   return QUEST_STATUS_OPTIONS.find((option) => option.value === status)?.label ?? "Quest";
@@ -109,6 +111,13 @@ type Tab =
   | "journal"
   | "gm-screen"
   | "settings";
+
+interface CampaignDetails {
+  campaign: CampaignSummary;
+  members: CampaignMember[];
+  characters: CharacterRecord[];
+  joinRequests?: CampaignJoinRequest[];
+}
 
 const TABS: { id: Tab; label: string; icon: React.ReactNode; gmOnly?: boolean }[] = [
   { id: "table", label: "Table", icon: <LayoutGrid size={15} /> },
@@ -148,6 +157,8 @@ export function CampaignPage() {
   const [campaign, setCampaign] = useState<CampaignSummary | null>(null);
   const [members, setMembers] = useState<CampaignMember[]>([]);
   const [characters, setCharacters] = useState<CharacterRecord[]>([]);
+  const [joinRequests, setJoinRequests] = useState<CampaignJoinRequest[]>([]);
+  const [joinRequestBusy, setJoinRequestBusy] = useState<string | null>(null);
   const [tableData, setTableData] = useState<CampaignTable | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -210,16 +221,13 @@ export function CampaignPage() {
     setError("");
     try {
       const [details, table] = await Promise.all([
-        api<{
-          campaign: CampaignSummary;
-          members: CampaignMember[];
-          characters: CharacterRecord[];
-        }>(`/api/campaigns/${id}`),
+        api<CampaignDetails>(`/api/campaigns/${id}`),
         api<CampaignTable>(`/api/campaigns/${id}/table`),
       ]);
       setCampaign(details.campaign);
       setMembers(details.members);
       setCharacters(details.characters);
+      setJoinRequests(details.joinRequests ?? []);
       setTableData(table);
       setSettingsName(details.campaign.name);
       setSettingsDescription(details.campaign.description);
@@ -267,14 +275,13 @@ export function CampaignPage() {
     if (!id || (tab !== "overview" && tab !== "party" && tab !== "loot" && tab !== "settings"))
       return;
     let cancelled = false;
-    api<{ campaign: CampaignSummary; members: CampaignMember[]; characters: CharacterRecord[] }>(
-      `/api/campaigns/${id}`
-    )
+    api<CampaignDetails>(`/api/campaigns/${id}`)
       .then((details) => {
         if (cancelled) return;
         setCampaign(details.campaign);
         setMembers(details.members);
         setCharacters(details.characters);
+        setJoinRequests(details.joinRequests ?? []);
       })
       .catch(() => undefined);
     return () => {
@@ -295,10 +302,24 @@ export function CampaignPage() {
         current ? { ...current, campaign: { ...current.campaign, ...summary } } : current
       );
     };
+    const refreshDetails = () => {
+      api<CampaignDetails>(`/api/campaigns/${id}`)
+        .then((details) => {
+          setCampaign(details.campaign);
+          setMembers(details.members);
+          setCharacters(details.characters);
+          setJoinRequests(details.joinRequests ?? []);
+        })
+        .catch(() => undefined);
+    };
     socket.on("campaign:updated", applySummary);
+    socket.on("join-request:created", refreshDetails);
+    socket.on("join-request:updated", refreshDetails);
     const leaveCampaignRoom = joinCampaign(id);
     return () => {
       socket.off("campaign:updated", applySummary);
+      socket.off("join-request:created", refreshDetails);
+      socket.off("join-request:updated", refreshDetails);
       leaveCampaignRoom();
     };
   }, [id]);
@@ -608,6 +629,34 @@ export function CampaignPage() {
       toast("Member removed.", "success");
     } catch (err) {
       toast(errorMessage(err), "error");
+    }
+  };
+
+  const decideJoinRequest = async (
+    request: CampaignJoinRequest,
+    decision: "approve" | "decline"
+  ) => {
+    if (!id) return;
+    setJoinRequestBusy(request.id);
+    try {
+      await api(`/api/campaigns/${id}/join-requests/${request.id}/${decision}`, {
+        method: "POST",
+      });
+      const details = await api<CampaignDetails>(`/api/campaigns/${id}`);
+      setCampaign(details.campaign);
+      setMembers(details.members);
+      setCharacters(details.characters);
+      setJoinRequests(details.joinRequests ?? []);
+      toast(
+        decision === "approve"
+          ? `${request.characterName} joined the party.`
+          : `Declined ${request.characterName}.`,
+        "success"
+      );
+    } catch (err) {
+      toast(errorMessage(err), "error");
+    } finally {
+      setJoinRequestBusy(null);
     }
   };
 
@@ -974,6 +1023,9 @@ export function CampaignPage() {
             {entry.id === "party" ? <span className="tab-count">{characters.length}</span> : null}
             {entry.id === "journal" ? (
               <span className="tab-count">{tableData.journal.length}</span>
+            ) : null}
+            {entry.id === "settings" && isGm && joinRequests.length ? (
+              <span className="tab-count">{joinRequests.length}</span>
             ) : null}
           </button>
         ))}
@@ -1545,6 +1597,100 @@ export function CampaignPage() {
                 </>
               ) : null}
             </Card>
+
+            {isGm ? (
+              <Card className="settings-card">
+                <div className="row-between">
+                  <div>
+                    <PageEyebrow>Approval queue</PageEyebrow>
+                    <h2 style={{ marginTop: 6 }}>Join requests</h2>
+                    <p className="muted small">
+                      Pathbuilder imports waiting for your review before they join the party.
+                    </p>
+                  </div>
+                  <Badge tone={joinRequests.length ? "gold" : "neutral"}>
+                    {joinRequests.length} pending
+                  </Badge>
+                </div>
+                {joinRequests.length ? (
+                  <div className="join-request-list">
+                    {joinRequests.map((request) => {
+                      const errors = request.validation.filter(
+                        (issue) => issue.severity === "error"
+                      ).length;
+                      return (
+                        <div key={request.id} className="join-request-row">
+                          <Avatar
+                            name={request.characterName}
+                            src={request.summary?.portraitUrl}
+                            size={40}
+                          />
+                          <div className="grow">
+                            <div className="row wrap" style={{ gap: 7 }}>
+                              <strong>{request.characterName}</strong>
+                              {request.summary ? (
+                                <Badge tone="blue">Level {request.summary.level}</Badge>
+                              ) : (
+                                <Badge tone="gold">Draft</Badge>
+                              )}
+                            </div>
+                            <p className="tiny muted">
+                              Imported by {request.playerName}
+                              {request.summary
+                                ? ` · ${request.summary.className || "No class"} · ${request.summary.ancestry || "No ancestry"}`
+                                : " · Unfinished character"}
+                            </p>
+                            {errors ? (
+                              <p className="tiny" style={{ color: "#e7b1b1" }}>
+                                {errors} build {errors === 1 ? "error needs" : "errors need"}{" "}
+                                review.
+                              </p>
+                            ) : null}
+                            {request.report ? (
+                              <details className="join-request-details">
+                                <summary className="tiny muted">View import report</summary>
+                                <ImportReport report={request.report} limit={12} />
+                              </details>
+                            ) : null}
+                          </div>
+                          <div className="join-request-actions">
+                            {request.characterId ? (
+                              <Link
+                                to={`/characters/${request.characterId}`}
+                                className="btn btn-ghost btn-sm"
+                              >
+                                Review sheet
+                              </Link>
+                            ) : null}
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              disabled={joinRequestBusy === request.id}
+                              onClick={() => void decideJoinRequest(request, "decline")}
+                            >
+                              Decline
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="primary"
+                              loading={joinRequestBusy === request.id}
+                              onClick={() => void decideJoinRequest(request, "approve")}
+                            >
+                              Approve
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="muted small" style={{ marginTop: 12 }}>
+                    No pending requests. When a player imports a Pathbuilder character from the
+                    invite page, it appears here for review.
+                  </p>
+                )}
+              </Card>
+            ) : null}
 
             <Card className="settings-card">
               <div className="row-between">

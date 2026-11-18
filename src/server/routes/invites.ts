@@ -1,7 +1,14 @@
 import type { FastifyInstance } from "fastify";
-import { campaignCharacterCount, campaignMemberCount, getCampaignRole, getUser } from "../access";
+import {
+  campaignCharacterCount,
+  campaignMemberCount,
+  getCampaignRole,
+  getUser,
+  pendingJoinRequest,
+} from "../access";
 import { db, type CampaignRow } from "../db";
 import { serializeCampaignSummary } from "../serialize";
+import { parseJson } from "../util";
 
 export async function registerInviteRoutes(app: FastifyInstance): Promise<void> {
   app.get("/api/invites/:code", async (request, reply) => {
@@ -20,6 +27,7 @@ export async function registerInviteRoutes(app: FastifyInstance): Promise<void> 
     if (!row) return reply.code(404).send({ error: "That invite code is not valid." });
 
     const role = request.user ? getCampaignRole(row.id, request.user.id) : null;
+    const pending = request.user ? pendingJoinRequest(row.id, request.user.id) : null;
     const gm = getUser(row.gm_id);
     const summary = serializeCampaignSummary(
       row,
@@ -45,6 +53,15 @@ export async function registerInviteRoutes(app: FastifyInstance): Promise<void> 
       },
       alreadyMember: Boolean(role),
       role,
+      pendingRequest: pending
+        ? {
+            id: pending.id,
+            characterId: pending.character_id,
+            characterName: pending.character_name ?? "Character",
+            createdAt: pending.created_at,
+            report: parseJson(pending.report, null),
+          }
+        : null,
     });
   });
 }

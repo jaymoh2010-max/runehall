@@ -259,10 +259,12 @@ Then immediately add **guided level-up**: a dedicated “Level up” flow that e
   - Uploaded image files are not copied; use a full backup archive to move assets between machines.
 - [x] **Pathbuilder 2e character import**
   - The dashboard's Characters section accepts a pathbuilder2e.com JSON export.
+  - The public invite page also offers **Import from Pathbuilder** for players joining a campaign.
   - Matches ancestry, heritage, background, class, deity, feats, skills, gear, spells, lores, and money by name against the local compendium.
   - Returns a report of unmatched names and warnings instead of guessing.
   - Weapon/armor/shield runes (potency, striking, resilient, reinforcing, and property runes), prepared-slot duplicates, and pets/familiars (as companions) are imported.
   - Dual-class and play state remain manual; pet statblocks need review, and imported characters open in the builder for review.
+  - Imported join requests stay outside the campaign until the GM approves them from **Campaign → Settings → Join requests**; declining leaves the character in the player's library.
 - [x] **Asset cleanup**
   - `npm run cleanup-assets` scans every database table for `/uploads/` references and reports unused files.
   - Dry-run by default; `--delete` removes only unreferenced files, and `--verbose` lists them all.

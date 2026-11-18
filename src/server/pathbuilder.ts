@@ -14,6 +14,7 @@ import {
   type CharacterCompanion,
   type CharacterDraft,
   type ContentMode,
+  type PathbuilderImportReport,
   type SpellTradition,
 } from "../shared/types";
 import {
@@ -126,11 +127,7 @@ function tradition(value: unknown): SpellTradition | null {
   return raw === "arcane" || raw === "divine" || raw === "occult" || raw === "primal" ? raw : null;
 }
 
-export interface PathbuilderReport {
-  matched: Record<string, number>;
-  unmatched: string[];
-  warnings: string[];
-}
+export type PathbuilderReport = PathbuilderImportReport;
 
 export interface PathbuilderImportOptions {
   contentMode?: ContentMode;

@@ -386,6 +386,12 @@ export function DashboardPage() {
                       {campaign.role === "gm" ? <Crown size={10} /> : <Users size={10} />}
                       {campaign.role === "gm" ? "Game Master" : "Player"}
                     </Badge>
+                    {campaign.pendingJoinRequests ? (
+                      <Badge tone="gold">
+                        <UserPlus size={10} /> {campaign.pendingJoinRequests} join{" "}
+                        {campaign.pendingJoinRequests === 1 ? "request" : "requests"}
+                      </Badge>
+                    ) : null}
                     <Badge tone="violet">{rulesetLabel(campaign.ruleset)}</Badge>
                     <Badge tone={campaign.xpMode === "xp" ? "green" : "neutral"}>
                       {campaign.xpMode === "xp" ? "XP tracking" : "GM decides"}

@@ -14,6 +14,11 @@ const player = {
   displayName: "E2E Player",
   password: "e2e-password-123",
 };
+const importer = {
+  username: `e2e_import_${runId}`,
+  displayName: "E2E Importer",
+  password: "e2e-password-123",
+};
 const campaignName = `E2E Campaign ${runId}`;
 
 let campaignPath = "";
@@ -267,6 +272,48 @@ test("player registers, joins with the invite code, and sees a player-safe table
   const afterDate = (await adminDate.textContent())?.trim();
   await expect(playerDate).toHaveText(afterDate ?? "", { timeout: 15_000 });
 
+  await adminContext.close();
+});
+
+test("player imports a Pathbuilder character and joins after GM approval", async ({
+  page,
+  browser,
+}) => {
+  await register(page, importer);
+  await page.goto(`/join/${inviteCode}`);
+  await expect(page.getByRole("heading", { name: "How are you joining?" })).toBeVisible();
+
+  await page.getByRole("button", { name: /Import from Pathbuilder/ }).click();
+  await page
+    .getByLabel("Pathbuilder JSON file")
+    .setInputFiles("tests/e2e/fixtures/pathbuilder.json");
+  const requestButton = page.getByRole("button", { name: "Request GM approval" });
+  await expect(requestButton).toBeEnabled();
+  await requestButton.click();
+  await expect(
+    page.getByRole("heading", { name: "Pathbuilder E2E Hero is waiting for approval." })
+  ).toBeVisible({ timeout: 15_000 });
+
+  const adminContext = await browser.newContext();
+  const adminPage = await adminContext.newPage();
+  await signIn(adminPage, admin);
+  await adminPage.goto(`${campaignPath}?tab=settings`);
+  await expect(adminPage.getByRole("heading", { name: "Join requests" })).toBeVisible();
+  await expect(adminPage.getByText("Pathbuilder E2E Hero")).toBeVisible();
+  await expect(adminPage.getByText(/Imported by E2E Importer/)).toBeVisible();
+
+  await adminPage.getByRole("button", { name: "Approve" }).click();
+  await expect(adminPage.getByText(/Imported by E2E Importer/)).toHaveCount(0, {
+    timeout: 15_000,
+  });
+
+  await adminPage.goto(`${campaignPath}?tab=party`);
+  await expect(adminPage.getByRole("heading", { name: "Pathbuilder E2E Hero" })).toBeVisible({
+    timeout: 15_000,
+  });
+
+  await page.reload();
+  await expect(page.getByText(/You're already in/)).toBeVisible({ timeout: 15_000 });
   await adminContext.close();
 });
 

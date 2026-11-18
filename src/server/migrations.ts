@@ -513,4 +513,28 @@ export const migrations: Migration[] = [
       ALTER TABLE campaigns ADD COLUMN audio_updated_at INTEGER;
     `,
   },
+  {
+    version: 28,
+    name: "campaign_join_requests",
+    sql: `
+      CREATE TABLE IF NOT EXISTS campaign_join_requests (
+        id TEXT PRIMARY KEY,
+        campaign_id TEXT NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        character_id TEXT REFERENCES characters(id) ON DELETE CASCADE,
+        status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'declined')),
+        source TEXT NOT NULL DEFAULT 'pathbuilder' CHECK (source IN ('pathbuilder', 'existing')),
+        report TEXT,
+        created_at INTEGER NOT NULL,
+        resolved_at INTEGER,
+        resolved_by TEXT REFERENCES users(id) ON DELETE SET NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_join_requests_campaign
+        ON campaign_join_requests(campaign_id, status, created_at);
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_join_requests_pending
+        ON campaign_join_requests(campaign_id, user_id)
+        WHERE status = 'pending';
+    `,
+  },
 ];

@@ -2,11 +2,13 @@ import type { FastifyInstance } from "fastify";
 import {
   campaignCharacterCount,
   campaignCharacters,
+  campaignJoinRequests,
   campaignMemberCount,
   campaignMembers,
   canEditCharacter,
   getCampaign,
   getCharacter,
+  getJoinRequest,
   getMembership,
   getUser,
 } from "../access";
@@ -33,6 +35,7 @@ import {
   serializeCharacter,
   serializeEncounter,
   serializeInitiative,
+  serializeJoinRequest,
   serializeJournal,
   serializeLootParcel,
   serializeMember,
@@ -96,6 +99,23 @@ function broadcastCampaignSummary(app: FastifyInstance, row: CampaignRow): void 
     serializeCampaignSummary(row, "player", counts, gmName),
     "players"
   );
+}
+
+function joinRequestValidation(character: CharacterRow | null) {
+  if (!character) return [];
+  try {
+    const draft = normalizeCharacterDraft(JSON.parse(character.data), character.name);
+    return computeCharacter(draft, contextForDraft(draft)).validation;
+  } catch {
+    return [];
+  }
+}
+
+function joinRequestViews(campaignId: string) {
+  return campaignJoinRequests(campaignId).map((request) => {
+    const character = request.character_id ? getCharacter(request.character_id) : null;
+    return serializeJoinRequest(request, joinRequestValidation(character));
+  });
 }
 
 export async function registerCampaignRoutes(app: FastifyInstance): Promise<void> {
@@ -276,6 +296,165 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
     });
   });
 
+  app.get("/api/campaigns/:id/join-requests", async (request, reply) => {
+    if (!request.user) return reply.code(401).send({ error: "Sign in to continue." });
+    const { id } = request.params as { id: string };
+    const campaign = getCampaign(id);
+    if (!campaign) return reply.code(404).send({ error: "Campaign not found." });
+    if (roleFor(campaign, request.user.id) !== "gm") {
+      return reply.code(403).send({ error: "Only the GM can review join requests." });
+    }
+    return reply.send({ requests: joinRequestViews(id) });
+  });
+
+  app.post("/api/campaigns/:id/join-requests/:requestId/approve", async (request, reply) => {
+    if (!request.user) return reply.code(401).send({ error: "Sign in to continue." });
+    const { id, requestId } = request.params as { id: string; requestId: string };
+    const campaign = getCampaign(id);
+    if (!campaign) return reply.code(404).send({ error: "Campaign not found." });
+    if (roleFor(campaign, request.user.id) !== "gm") {
+      return reply.code(403).send({ error: "Only the GM can approve join requests." });
+    }
+    const joinRequest = getJoinRequest(requestId);
+    if (!joinRequest || joinRequest.campaign_id !== id) {
+      return reply.code(404).send({ error: "Join request not found." });
+    }
+    if (joinRequest.status !== "pending") {
+      return reply.code(409).send({ error: "That join request has already been resolved." });
+    }
+    const character = joinRequest.character_id ? getCharacter(joinRequest.character_id) : null;
+    if (!character || character.user_id !== joinRequest.user_id) {
+      return reply.code(409).send({
+        error: "That character is no longer available. Decline the request instead.",
+      });
+    }
+    if (character.campaign_id && character.campaign_id !== id) {
+      return reply.code(409).send({ error: "That character already belongs to another campaign." });
+    }
+
+    const ts = now();
+    if (!getMembership(id, joinRequest.user_id)) {
+      db.prepare(
+        "INSERT OR IGNORE INTO campaign_members (campaign_id, user_id, role, joined_at) VALUES (?, ?, 'player', ?)"
+      ).run(id, joinRequest.user_id, ts);
+    }
+
+    let data = character.data;
+    let summary = parseJson(character.summary, null) as ReturnType<typeof characterSummary> | null;
+    try {
+      const draft = normalizeCharacterDraft(JSON.parse(character.data), character.name);
+      const ruleset = normalizeCampaignRuleset(campaign.ruleset);
+      draft.contentMode = rulesetContentMode(ruleset);
+      draft.includeLegacy = rulesetIncludesLegacy(ruleset);
+      data = JSON.stringify(draft);
+      summary = characterSummary(draft, contextForDraft(draft));
+    } catch {
+      // Keep the imported draft and summary if normalization fails.
+    }
+    db.prepare(
+      "UPDATE characters SET campaign_id = ?, data = ?, summary = ?, updated_at = ?, revision = revision + 1 WHERE id = ?"
+    ).run(id, data, summary === null ? null : JSON.stringify(summary), ts, character.id);
+    db.prepare(
+      "UPDATE campaign_join_requests SET status = 'approved', resolved_at = ?, resolved_by = ? WHERE id = ?"
+    ).run(ts, request.user.id, joinRequest.id);
+
+    touchCampaign(id);
+    const updated = getCharacter(character.id);
+    const player = getUser(joinRequest.user_id);
+    const serialized = updated
+      ? serializeCharacter(updated, player?.display_name ?? "", {
+          canEdit: true,
+          canView: true,
+          canAdvance: false,
+        })
+      : null;
+    if (serialized) {
+      app.broadcastCampaign(id, "character:created", { character: serialized });
+    }
+    app.broadcastCampaign(
+      id,
+      "join-request:updated",
+      { requestId: joinRequest.id, status: "approved" },
+      "gm"
+    );
+    broadcastCampaignSummary(app, campaign);
+    logAudit({
+      action: "campaign.join_request.approve",
+      actor: request.user,
+      targetType: "campaign",
+      targetId: id,
+      detail: `${character.name} (${player?.display_name ?? "player"})`,
+      request,
+    });
+    return reply.send({
+      requestId: joinRequest.id,
+      status: "approved",
+      character: serialized,
+    });
+  });
+
+  app.post("/api/campaigns/:id/join-requests/:requestId/decline", async (request, reply) => {
+    if (!request.user) return reply.code(401).send({ error: "Sign in to continue." });
+    const { id, requestId } = request.params as { id: string; requestId: string };
+    const campaign = getCampaign(id);
+    if (!campaign) return reply.code(404).send({ error: "Campaign not found." });
+    if (roleFor(campaign, request.user.id) !== "gm") {
+      return reply.code(403).send({ error: "Only the GM can decline join requests." });
+    }
+    const joinRequest = getJoinRequest(requestId);
+    if (!joinRequest || joinRequest.campaign_id !== id) {
+      return reply.code(404).send({ error: "Join request not found." });
+    }
+    if (joinRequest.status !== "pending") {
+      return reply.code(409).send({ error: "That join request has already been resolved." });
+    }
+    const character = joinRequest.character_id ? getCharacter(joinRequest.character_id) : null;
+    db.prepare(
+      "UPDATE campaign_join_requests SET status = 'declined', resolved_at = ?, resolved_by = ? WHERE id = ?"
+    ).run(now(), request.user.id, joinRequest.id);
+    app.broadcastCampaign(
+      id,
+      "join-request:updated",
+      { requestId: joinRequest.id, status: "declined" },
+      "gm"
+    );
+    broadcastCampaignSummary(app, campaign);
+    logAudit({
+      action: "campaign.join_request.decline",
+      actor: request.user,
+      targetType: "campaign",
+      targetId: id,
+      detail: character?.name ?? "Character",
+      request,
+    });
+    return reply.send({ requestId: joinRequest.id, status: "declined" });
+  });
+
+  app.delete("/api/campaigns/:id/join-requests/mine", async (request, reply) => {
+    if (!request.user) return reply.code(401).send({ error: "Sign in to continue." });
+    const { id } = request.params as { id: string };
+    if (!getCampaign(id)) return reply.code(404).send({ error: "Campaign not found." });
+    const existing = getMembership(id, request.user.id);
+    if (existing) {
+      return reply.code(409).send({ error: "You are already a member of this campaign." });
+    }
+    const deleted = db
+      .prepare(
+        "DELETE FROM campaign_join_requests WHERE campaign_id = ? AND user_id = ? AND status = 'pending'"
+      )
+      .run(id, request.user.id);
+    if (!deleted.changes) {
+      return reply.code(404).send({ error: "You do not have a pending request." });
+    }
+    app.broadcastCampaign(
+      id,
+      "join-request:updated",
+      { requestId: null, status: "withdrawn" },
+      "gm"
+    );
+    return reply.send({ ok: true });
+  });
+
   app.get("/api/campaigns/:id", async (request, reply) => {
     if (!request.user) return reply.code(401).send({ error: "Sign in to continue." });
     const { id } = request.params as { id: string };
@@ -297,6 +476,7 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
       campaign: serializeCampaignSummary(row, role, campaignCounts(row), gm?.display_name ?? ""),
       members,
       characters,
+      joinRequests: role === "gm" ? joinRequestViews(id) : [],
     });
   });
 

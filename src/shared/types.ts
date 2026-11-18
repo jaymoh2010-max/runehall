@@ -657,6 +657,13 @@ export interface CharacterDraft {
   play: CharacterPlay;
 }
 
+/** Best-effort Pathbuilder import diagnostics shown to players and GMs. */
+export interface PathbuilderImportReport {
+  matched: Record<string, number>;
+  unmatched: string[];
+  warnings: string[];
+}
+
 export interface CharacterSummary {
   level: number;
   ancestry: string;
@@ -835,6 +842,27 @@ export interface CampaignMember extends PublicUser {
   online?: boolean;
 }
 
+/** A Pathbuilder import waiting for the campaign GM to approve it. */
+export interface PendingJoinRequest {
+  id: string;
+  characterId: string | null;
+  characterName: string;
+  createdAt: number;
+  report: PathbuilderImportReport | null;
+}
+
+/** GM-facing view of a pending join request, including review details. */
+export interface CampaignJoinRequest extends PendingJoinRequest {
+  campaignId: string;
+  userId: string;
+  status: "pending" | "approved" | "declined";
+  source: "pathbuilder" | "existing";
+  playerName: string;
+  playerUsername: string;
+  summary: CharacterSummary | null;
+  validation: ValidationIssue[];
+}
+
 export interface CampaignSummary {
   id: string;
   name: string;
@@ -849,6 +877,8 @@ export interface CampaignSummary {
   worldDate: GolarionDate;
   memberCount: number;
   characterCount: number;
+  /** Pending join requests, shown to the GM only. */
+  pendingJoinRequests?: number;
   createdAt: number;
   updatedAt: number;
   lastPlayedAt: number | null;
@@ -1455,6 +1485,15 @@ export interface ServerToClientEvents {
     name: string;
   }) => void;
   "character:created": (payload: { character: CharacterRecord }) => void;
+  "join-request:created": (payload: {
+    requestId: string;
+    characterName: string;
+    playerName: string;
+  }) => void;
+  "join-request:updated": (payload: {
+    requestId: string | null;
+    status: "approved" | "declined" | "withdrawn";
+  }) => void;
   "campaign:revision": (payload: { revision: number }) => void;
   "campaign:updated": (campaign: CampaignSummary) => void;
   "error:toast": (payload: { message: string }) => void;

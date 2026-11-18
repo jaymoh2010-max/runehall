@@ -15,6 +15,7 @@ import {
   getCharacter,
   getMembership,
   getUser,
+  pendingJoinRequest,
 } from "../access";
 import {
   normalizeCampaignRuleset,
@@ -23,7 +24,7 @@ import {
 } from "../../shared/content";
 import { contextForDraft } from "../compendium";
 import { importPathbuilder } from "../pathbuilder";
-import { db, type CharacterRow, type TokenRow } from "../db";
+import { db, type CampaignRow, type CharacterRow, type TokenRow } from "../db";
 import { serializeCharacter, serializeToken, touchCampaign } from "../serialize";
 import { tokenEventsFor } from "../tokenEvents";
 import {
@@ -184,19 +185,39 @@ export async function registerCharacterRoutes(app: FastifyInstance): Promise<voi
         .code(400)
         .send({ error: "That JSON does not look like a Pathbuilder character export." });
     }
-    const campaignId = typeof body.campaignId === "string" ? body.campaignId : null;
-    if (campaignId && !getMembership(campaignId, request.user.id)) {
-      return reply.code(403).send({ error: "You are not a member of that campaign." });
+
+    const requestedCampaignId = typeof body.campaignId === "string" ? body.campaignId : null;
+    const rawCode = safeString(body.campaignCode, "", 200).trim().toUpperCase();
+    const campaignCode = rawCode.includes("/JOIN/")
+      ? rawCode.split("/JOIN/").pop()!.split(/[/?#]/)[0]
+      : rawCode;
+
+    let campaign: CampaignRow | null = null;
+    let attachCampaignId: string | null = null;
+    if (requestedCampaignId) {
+      campaign = getCampaign(requestedCampaignId);
+      if (!campaign) return reply.code(404).send({ error: "Campaign not found." });
+      if (!getMembership(campaign.id, request.user.id)) {
+        return reply.code(403).send({ error: "You are not a member of that campaign." });
+      }
+      attachCampaignId = campaign.id;
+    } else if (campaignCode) {
+      campaign =
+        (db.prepare("SELECT * FROM campaigns WHERE UPPER(invite_code) = ?").get(campaignCode) as
+          CampaignRow | undefined) ?? null;
+      if (!campaign) {
+        return reply.code(404).send({ error: "No campaign has that invite code." });
+      }
+      // Existing members skip the queue; new players import into a pending request.
+      if (getMembership(campaign.id, request.user.id)) attachCampaignId = campaign.id;
     }
+
     let contentMode: "core" | "expanded" = "expanded";
     let includeLegacy = false;
-    if (campaignId) {
-      const campaign = getCampaign(campaignId);
-      if (campaign) {
-        const ruleset = normalizeCampaignRuleset(campaign.ruleset);
-        contentMode = rulesetContentMode(ruleset);
-        includeLegacy = rulesetIncludesLegacy(ruleset);
-      }
+    if (campaign) {
+      const ruleset = normalizeCampaignRuleset(campaign.ruleset);
+      contentMode = rulesetContentMode(ruleset);
+      includeLegacy = rulesetIncludesLegacy(ruleset);
     }
     let result;
     try {
@@ -206,6 +227,11 @@ export async function registerCharacterRoutes(app: FastifyInstance): Promise<voi
     }
     const draft = normalizeCharacterDraft(result.draft, result.draft.name);
     const summary = summarize(draft);
+    const report = {
+      matched: result.report.matched,
+      unmatched: result.report.unmatched.slice(0, 200),
+      warnings: result.report.warnings.slice(0, 100),
+    };
     const id = newId("char");
     const ts = now();
     db.prepare(
@@ -213,7 +239,7 @@ export async function registerCharacterRoutes(app: FastifyInstance): Promise<voi
     ).run(
       id,
       request.user.id,
-      campaignId,
+      attachCampaignId,
       draft.name,
       JSON.stringify(draft),
       JSON.stringify(summary),
@@ -227,10 +253,42 @@ export async function registerCharacterRoutes(app: FastifyInstance): Promise<voi
       canView: true,
       canAdvance: canAdvanceCharacter(row, request.user.id),
     });
-    if (campaignId) {
-      app.broadcastCampaign(campaignId, "character:created", { character: created });
+
+    let joinRequest = null;
+    if (campaign && !attachCampaignId) {
+      const existing = pendingJoinRequest(campaign.id, request.user.id);
+      joinRequest = {
+        id: existing?.id ?? newId("join"),
+        characterId: id,
+        characterName: draft.name,
+        createdAt: ts,
+        report,
+      };
+      if (existing) {
+        db.prepare(
+          "UPDATE campaign_join_requests SET character_id = ?, report = ?, created_at = ? WHERE id = ?"
+        ).run(id, JSON.stringify(report), ts, existing.id);
+      } else {
+        db.prepare(
+          `INSERT INTO campaign_join_requests
+             (id, campaign_id, user_id, character_id, status, source, report, created_at)
+           VALUES (?, ?, ?, ?, 'pending', 'pathbuilder', ?, ?)`
+        ).run(joinRequest.id, campaign.id, request.user.id, id, JSON.stringify(report), ts);
+      }
+      app.broadcastCampaign(
+        campaign.id,
+        "join-request:created",
+        {
+          requestId: joinRequest.id,
+          characterName: draft.name,
+          playerName: request.user.displayName,
+        },
+        "gm"
+      );
+    } else if (campaign) {
+      app.broadcastCampaign(campaign.id, "character:created", { character: created });
     }
-    return reply.code(201).send({ character: created, report: result.report });
+    return reply.code(201).send({ character: created, report, joinRequest });
   });
 
   app.get("/api/characters/:id", async (request, reply) => {

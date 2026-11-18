@@ -2,6 +2,7 @@ import type {
   CampaignAudioState,
   CampaignAudioTrack,
   CampaignDashboard,
+  CampaignJoinRequest,
   CampaignMember,
   CampaignNpc,
   CampaignSession,
@@ -13,10 +14,12 @@ import type {
   InitiativeEntry,
   JournalEntry,
   LootParcel,
+  PathbuilderImportReport,
   RollRequest,
   RollResult,
   Scene,
   Token,
+  ValidationIssue,
 } from "../shared/types";
 import { normalizeCampaignRuleset, normalizeXpMode } from "../shared/content";
 import {
@@ -61,6 +64,7 @@ import {
   type UserRow,
 } from "./db";
 import { parseJson } from "./util";
+import { pendingJoinRequestCount, type JoinRequestViewRow } from "./access";
 import { bumpCampaign } from "./revisions";
 import { normalizeTokenConditions } from "../shared/tokens";
 import { normalizeAoeTemplates } from "../shared/templates";
@@ -89,6 +93,7 @@ export function serializeCampaignSummary(
     }),
     memberCount: counts.memberCount,
     characterCount: counts.characterCount,
+    pendingJoinRequests: role === "gm" ? pendingJoinRequestCount(campaign.id) : undefined,
     createdAt: campaign.created_at,
     updatedAt: campaign.updated_at,
     lastPlayedAt: campaign.last_played_at,
@@ -131,6 +136,27 @@ export function serializeMember(
     isAdmin: Boolean(user.is_admin),
     role,
     joinedAt,
+  };
+}
+
+export function serializeJoinRequest(
+  row: JoinRequestViewRow,
+  validation: ValidationIssue[] = []
+): CampaignJoinRequest {
+  return {
+    id: row.id,
+    campaignId: row.campaign_id,
+    userId: row.user_id,
+    characterId: row.character_id,
+    status: row.status,
+    source: row.source,
+    playerName: row.player_name,
+    playerUsername: row.player_username,
+    characterName: row.character_name ?? "Character",
+    summary: parseJson(row.character_summary, null) as CampaignJoinRequest["summary"],
+    report: parseJson(row.report, null) as PathbuilderImportReport | null,
+    validation,
+    createdAt: row.created_at,
   };
 }
 
