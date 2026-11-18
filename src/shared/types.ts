@@ -2,6 +2,7 @@
 // Core PF2e vocabulary
 // ---------------------------------------------------------------------------
 import type { AoeTemplate } from "./templates";
+import type { GolarionDate } from "./calendar";
 
 export type AbilityKey = "str" | "dex" | "con" | "int" | "wis" | "cha";
 export type SaveKey = "fortitude" | "reflex" | "will";
@@ -564,6 +565,8 @@ export interface CharacterPlay {
   tempHp: number;
   heroPoints: number;
   focusPoints: number;
+  /** Downtime days granted by the GM and spent between adventures. */
+  downtimeDays: number;
   conditions: CharacterCondition[];
   xp: number;
   shieldRaised: boolean;
@@ -650,6 +653,7 @@ export interface CharacterSummary {
   spellDc: number | null;
   heroPoints: number;
   focusPoints: number;
+  downtimeDays: number;
   xp: number;
   conditions: string[];
   portraitUrl: string | null;
@@ -815,6 +819,8 @@ export interface CampaignSummary {
   role: "gm" | "player";
   ruleset: CampaignRuleset;
   xpMode: XpMode;
+  /** Current in-world date for this campaign. */
+  worldDate: GolarionDate;
   memberCount: number;
   characterCount: number;
   createdAt: number;

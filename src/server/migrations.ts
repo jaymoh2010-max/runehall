@@ -483,4 +483,13 @@ export const migrations: Migration[] = [
       ALTER TABLE journal_entries ADD COLUMN quest_rewarded_at INTEGER;
     `,
   },
+  {
+    version: 26,
+    name: "campaign_world_calendar",
+    sql: `
+      ALTER TABLE campaigns ADD COLUMN world_year INTEGER NOT NULL DEFAULT 4726;
+      ALTER TABLE campaigns ADD COLUMN world_month INTEGER NOT NULL DEFAULT 1;
+      ALTER TABLE campaigns ADD COLUMN world_day INTEGER NOT NULL DEFAULT 1;
+    `,
+  },
 ];

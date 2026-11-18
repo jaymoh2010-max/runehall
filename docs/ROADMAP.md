@@ -496,6 +496,13 @@ Acceptance: a GM can prepare a full session in Runehall and start it with one �
   - A player can give an item stack or coins to another character in the same campaign.
   - Transfers are server-side, revision-checked, and applied to both sheets atomically.
   - Received items arrive unequipped; transferring a whole stack moves its runes.
+- [x] **In-world calendar and downtime**
+  - Campaigns track a Golarion date in Absalom Reckoning with the standard month lengths and a leap day in Calistril every four years.
+  - The Overview shows the current in-world date; the GM can set it or advance it by 1 or 7 days.
+  - The GM grants per-character downtime days from the Party tab, and players spend them from the character sheet.
+  - Downtime is stored in character play data, so it is preserved by saves, duplication, export, and import; the date is preserved by campaign export/import.
+  - Downtime activities such as Earn Income and crafting remain manual table calls.
+  - Covered by calendar unit tests, a two-socket smoke check, and a browser date/downtime flow.
 - [x] **Campaign asset library**
   - Uploaded images are tracked with their campaign, original name, type, and size.
   - The GM-only Assets tab lists scene art, token art, portraits, NPC art, and handout images with usage labels.
@@ -631,7 +638,6 @@ That is more trustworthy than silently showing a number that may be missing a +1
 
 These need a product decision before implementation:
 
-- [ ] **In-world calendar and downtime** — choose the calendar model (Golarion months versus a custom/free-text date), how the GM advances days, and whether downtime is tracked per character or per party.
 - [ ] **Audio playlists** — local audio uploads and synced playlists need format/size limits, autoplay behavior, and a decision on whether playback state is campaign-wide or per client.
 - [ ] **Incremental refactors** — split `rules.ts`, `CharacterSheetPage`, and `CampaignPage` where it reduces risk without changing behavior.
 

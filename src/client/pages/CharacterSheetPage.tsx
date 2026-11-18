@@ -1372,6 +1372,33 @@ export function CharacterSheetPage() {
                   </strong>
                 </div>
               ) : null}
+              <div
+                className="point-row"
+                title="The GM grants downtime days. Spend one when you take a downtime activity."
+              >
+                <span>Downtime</span>
+                <div className="row" style={{ gap: 7, alignItems: "center" }}>
+                  <strong>
+                    {draft.play.downtimeDays} day{draft.play.downtimeDays === 1 ? "" : "s"}
+                  </strong>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    disabled={!canEdit || draft.play.downtimeDays <= 0}
+                    onClick={() =>
+                      update((current) => ({
+                        ...current,
+                        play: {
+                          ...current.play,
+                          downtimeDays: Math.max(0, current.play.downtimeDays - 1),
+                        },
+                      }))
+                    }
+                  >
+                    Spend
+                  </Button>
+                </div>
+              </div>
               {derived.focusPointsMax > 0 ? (
                 <div className="point-row">
                   <span>Focus points</span>

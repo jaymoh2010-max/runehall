@@ -61,6 +61,7 @@ import { parseJson } from "./util";
 import { bumpCampaign } from "./revisions";
 import { normalizeTokenConditions } from "../shared/tokens";
 import { normalizeAoeTemplates } from "../shared/templates";
+import { normalizeGolarionDate } from "../shared/calendar";
 
 export function serializeCampaignSummary(
   campaign: CampaignRow,
@@ -78,6 +79,11 @@ export function serializeCampaignSummary(
     role,
     ruleset: normalizeCampaignRuleset(campaign.ruleset),
     xpMode: normalizeXpMode(campaign.xp_mode),
+    worldDate: normalizeGolarionDate({
+      year: campaign.world_year,
+      month: campaign.world_month,
+      day: campaign.world_day,
+    }),
     memberCount: counts.memberCount,
     characterCount: counts.characterCount,
     createdAt: campaign.created_at,

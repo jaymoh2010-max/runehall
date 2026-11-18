@@ -9,6 +9,7 @@ import {
   rulesetIncludesLegacy,
 } from "../shared/content";
 import { normalizeCampaignThreads } from "../shared/dashboard";
+import { normalizeGolarionDate } from "../shared/calendar";
 import {
   normalizeAmbientLight,
   normalizeLightColor,
@@ -112,6 +113,7 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
   const description = longText(campaignData.description, "", 2000);
   const ruleset = normalizeCampaignRuleset(campaignData.ruleset);
   const xpMode = normalizeXpMode(campaignData.xpMode);
+  const worldDate = normalizeGolarionDate(campaignData.worldDate);
 
   const stats: CampaignImportStats = {
     characters: 0,
@@ -131,8 +133,22 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
     const campaignId = newId("camp");
     const ts = now();
     db.prepare(
-      "INSERT INTO campaigns (id, name, description, gm_id, invite_code, ruleset, xp_mode, created_at, updated_at, last_played_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-    ).run(campaignId, name, description, userId, uniqueInviteCode(), ruleset, xpMode, ts, ts, ts);
+      "INSERT INTO campaigns (id, name, description, gm_id, invite_code, ruleset, xp_mode, world_year, world_month, world_day, created_at, updated_at, last_played_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    ).run(
+      campaignId,
+      name,
+      description,
+      userId,
+      uniqueInviteCode(),
+      ruleset,
+      xpMode,
+      worldDate.year,
+      worldDate.month,
+      worldDate.day,
+      ts,
+      ts,
+      ts
+    );
     db.prepare(
       "INSERT INTO campaign_members (campaign_id, user_id, role, joined_at) VALUES (?, ?, 'gm', ?)"
     ).run(campaignId, userId, ts);

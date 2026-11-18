@@ -57,6 +57,7 @@ import {
   normalizeQuestStatus,
   normalizeQuestXp,
 } from "../../shared/journal";
+import { normalizeGolarionDate, shiftGolarionDate } from "../../shared/calendar";
 import { contextForDraft } from "../compendium";
 import { campaignSessionsFor } from "../sessionData";
 import { importCampaign } from "../campaignImport";
@@ -441,6 +442,74 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
     });
   });
 
+  app.put("/api/campaigns/:id/calendar", async (request, reply) => {
+    if (!request.user) return reply.code(401).send({ error: "Sign in to continue." });
+    const { id } = request.params as { id: string };
+    const row = getCampaign(id);
+    if (!row) return reply.code(404).send({ error: "Campaign not found." });
+    if (roleFor(row, request.user.id) !== "gm") {
+      return reply.code(403).send({ error: "Only the GM can change the in-world date." });
+    }
+    const body = (request.body ?? {}) as Record<string, unknown>;
+    if (body.year === undefined && body.month === undefined && body.day === undefined) {
+      return reply.code(400).send({ error: "Choose a year, month, and day." });
+    }
+    const worldDate = normalizeGolarionDate(body);
+    db.prepare(
+      "UPDATE campaigns SET world_year = ?, world_month = ?, world_day = ?, updated_at = ? WHERE id = ?"
+    ).run(worldDate.year, worldDate.month, worldDate.day, now(), id);
+    touchCampaign(id);
+    logAudit({
+      action: "campaign.calendar_set",
+      actor: request.user,
+      targetType: "campaign",
+      targetId: id,
+      detail: `${worldDate.day}/${worldDate.month}/${worldDate.year} AR`,
+      request,
+    });
+    const updated = getCampaign(id)!;
+    return reply.send({
+      worldDate,
+      campaign: serializeCampaignSummary(updated, "gm", campaignCounts(updated)),
+    });
+  });
+
+  app.post("/api/campaigns/:id/calendar/advance", async (request, reply) => {
+    if (!request.user) return reply.code(401).send({ error: "Sign in to continue." });
+    const { id } = request.params as { id: string };
+    const row = getCampaign(id);
+    if (!row) return reply.code(404).send({ error: "Campaign not found." });
+    if (roleFor(row, request.user.id) !== "gm") {
+      return reply.code(403).send({ error: "Only the GM can advance the in-world date." });
+    }
+    const body = (request.body ?? {}) as Record<string, unknown>;
+    const days = safeInt(body.days, 0, -3650, 3650);
+    if (!days) return reply.code(400).send({ error: "Advance by at least one day." });
+    const current = {
+      year: row.world_year,
+      month: row.world_month,
+      day: row.world_day,
+    };
+    const worldDate = shiftGolarionDate(current, days);
+    db.prepare(
+      "UPDATE campaigns SET world_year = ?, world_month = ?, world_day = ?, updated_at = ? WHERE id = ?"
+    ).run(worldDate.year, worldDate.month, worldDate.day, now(), id);
+    touchCampaign(id);
+    logAudit({
+      action: "campaign.calendar_advance",
+      actor: request.user,
+      targetType: "campaign",
+      targetId: id,
+      detail: `${days} day${days === 1 ? "" : "s"} to ${worldDate.day}/${worldDate.month}/${worldDate.year} AR`,
+      request,
+    });
+    const updated = getCampaign(id)!;
+    return reply.send({
+      worldDate,
+      campaign: serializeCampaignSummary(updated, "gm", campaignCounts(updated)),
+    });
+  });
+
   app.delete("/api/campaigns/:id", async (request, reply) => {
     if (!request.user) return reply.code(401).send({ error: "Sign in to continue." });
     const { id } = request.params as { id: string };
@@ -687,6 +756,69 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
       request,
     });
     return reply.send({ amount, recipients, skipped, characters });
+  });
+
+  app.post("/api/campaigns/:id/downtime", async (request, reply) => {
+    if (!request.user) return reply.code(401).send({ error: "Sign in to continue." });
+    const { id } = request.params as { id: string };
+    const row = getCampaign(id);
+    if (!row) return reply.code(404).send({ error: "Campaign not found." });
+    if (roleFor(row, request.user.id) !== "gm") {
+      return reply.code(403).send({ error: "Only the GM can grant downtime." });
+    }
+    const body = (request.body ?? {}) as Record<string, unknown>;
+    const days = safeInt(body.days, 0, 1, 3650);
+    if (days < 1) return reply.code(400).send({ error: "Grant at least one downtime day." });
+    const requested = Array.isArray(body.characterIds)
+      ? body.characterIds.filter((value): value is string => typeof value === "string")
+      : [];
+    const rows = db
+      .prepare("SELECT * FROM characters WHERE campaign_id = ?")
+      .all(id) as CharacterRow[];
+    const selected = requested.length
+      ? rows.filter((character) => requested.includes(character.id))
+      : rows;
+    if (!selected.length) {
+      return reply.code(400).send({ error: "Choose at least one character in this campaign." });
+    }
+    let recipients = 0;
+    let skipped = 0;
+    for (const character of selected) {
+      let draft;
+      try {
+        draft = normalizeCharacterDraft(JSON.parse(character.data), character.name);
+      } catch {
+        skipped += 1;
+        continue;
+      }
+      draft.play.downtimeDays = Math.min(9_999, draft.play.downtimeDays + days);
+      const summary = characterSummary(draft, contextForDraft(draft));
+      db.prepare(
+        "UPDATE characters SET data = ?, summary = ?, updated_at = ?, revision = revision + 1 WHERE id = ?"
+      ).run(JSON.stringify(draft), JSON.stringify(summary), now(), character.id);
+      app.broadcastCampaign(id, "character:updated", {
+        characterId: character.id,
+        summary,
+        name: draft.name,
+      });
+      recipients += 1;
+    }
+    touchCampaign(id);
+    logAudit({
+      action: "campaign.downtime_grant",
+      actor: request.user,
+      targetType: "campaign",
+      targetId: id,
+      detail: `${days} downtime day${days === 1 ? "" : "s"} to ${recipients} characters`,
+      request,
+    });
+    const characters = campaignCharacters(id).map((character) =>
+      serializeCharacter(character, character.owner_name, {
+        canEdit: true,
+        canView: true,
+      })
+    );
+    return reply.send({ days, recipients, skipped, characters });
   });
 
   app.post("/api/campaigns/:id/long-rest", async (request, reply) => {

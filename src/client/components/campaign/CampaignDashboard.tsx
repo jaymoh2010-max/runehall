@@ -24,6 +24,7 @@ import type {
   JournalEntry,
   SessionRecap,
 } from "../../../shared/types";
+import { formatGolarionDate, GOLARION_MONTHS, type GolarionDate } from "../../../shared/calendar";
 import { openThreadCount } from "../../../shared/dashboard";
 import { sessionCheckinSummary } from "../../../shared/sessions";
 import { api, formatDate } from "../../api";
@@ -41,6 +42,7 @@ import {
   Modal,
   PageEyebrow,
   ProgressBar,
+  Select,
   Spinner,
   Tag,
   Textarea,
@@ -78,6 +80,8 @@ export function CampaignDashboard({
   memberCount,
   journalCount,
   characters,
+  worldDate,
+  onWorldDateChange,
   onNavigate,
   onJournalCreated,
   onInvite,
@@ -89,6 +93,8 @@ export function CampaignDashboard({
   memberCount: number;
   journalCount: number;
   characters: CharacterRecord[];
+  worldDate: GolarionDate;
+  onWorldDateChange: (date: GolarionDate) => void;
   onNavigate: (tab: DashboardTab) => void;
   onJournalCreated: (entry: JournalEntry) => void;
   onInvite: () => void;
@@ -115,6 +121,20 @@ export function CampaignDashboard({
   const [recapError, setRecapError] = useState("");
   const [recapHandoutSaved, setRecapHandoutSaved] = useState(false);
   const [recapSummarySaved, setRecapSummarySaved] = useState(false);
+  const [calendarBusy, setCalendarBusy] = useState(false);
+  const [calendarDraft, setCalendarDraft] = useState({
+    year: String(worldDate.year),
+    month: String(worldDate.month),
+    day: String(worldDate.day),
+  });
+
+  useEffect(() => {
+    setCalendarDraft({
+      year: String(worldDate.year),
+      month: String(worldDate.month),
+      day: String(worldDate.day),
+    });
+  }, [worldDate.year, worldDate.month, worldDate.day]);
 
   useEffect(() => {
     let cancelled = false;
@@ -228,6 +248,48 @@ export function CampaignDashboard({
       toast(errorMessage(err), "error");
     } finally {
       setBusy(false);
+    }
+  };
+
+  const advanceCalendar = async (days: number) => {
+    setCalendarBusy(true);
+    try {
+      const result = await api<{ worldDate: GolarionDate }>(
+        `/api/campaigns/${campaignId}/calendar/advance`,
+        { method: "POST", body: { days } }
+      );
+      onWorldDateChange(result.worldDate);
+      toast(
+        `Advanced ${days} day${days === 1 ? "" : "s"} to ${formatGolarionDate(result.worldDate)}.`,
+        "success"
+      );
+    } catch (err) {
+      toast(errorMessage(err), "error");
+    } finally {
+      setCalendarBusy(false);
+    }
+  };
+
+  const setCalendar = async () => {
+    setCalendarBusy(true);
+    try {
+      const result = await api<{ worldDate: GolarionDate }>(
+        `/api/campaigns/${campaignId}/calendar`,
+        {
+          method: "PUT",
+          body: {
+            year: Number(calendarDraft.year),
+            month: Number(calendarDraft.month),
+            day: Number(calendarDraft.day),
+          },
+        }
+      );
+      onWorldDateChange(result.worldDate);
+      toast(`In-world date set to ${formatGolarionDate(result.worldDate)}.`, "success");
+    } catch (err) {
+      toast(errorMessage(err), "error");
+    } finally {
+      setCalendarBusy(false);
     }
   };
 
@@ -534,6 +596,86 @@ export function CampaignDashboard({
               </>
             ) : null}
           </div>
+        </Card>
+
+        <Card className="dashboard-calendar">
+          <div className="row-between">
+            <div>
+              <PageEyebrow>In-world date</PageEyebrow>
+              <h3>{formatGolarionDate(worldDate)}</h3>
+            </div>
+            <CalendarDays size={20} />
+          </div>
+          {isGm ? (
+            <>
+              <div className="row wrap" style={{ gap: 6 }}>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  loading={calendarBusy}
+                  onClick={() => void advanceCalendar(1)}
+                >
+                  +1 day
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  loading={calendarBusy}
+                  onClick={() => void advanceCalendar(7)}
+                >
+                  +7 days
+                </Button>
+              </div>
+              <div className="calendar-editor">
+                <Input
+                  type="number"
+                  aria-label="In-world year"
+                  min={1}
+                  max={9999}
+                  value={calendarDraft.year}
+                  onChange={(event) =>
+                    setCalendarDraft((current) => ({ ...current, year: event.target.value }))
+                  }
+                />
+                <Select
+                  aria-label="In-world month"
+                  value={calendarDraft.month}
+                  onChange={(event) =>
+                    setCalendarDraft((current) => ({ ...current, month: event.target.value }))
+                  }
+                >
+                  {GOLARION_MONTHS.map((name, index) => (
+                    <option key={name} value={index + 1}>
+                      {name}
+                    </option>
+                  ))}
+                </Select>
+                <Input
+                  type="number"
+                  aria-label="In-world day"
+                  min={1}
+                  max={31}
+                  value={calendarDraft.day}
+                  onChange={(event) =>
+                    setCalendarDraft((current) => ({ ...current, day: event.target.value }))
+                  }
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  loading={calendarBusy}
+                  onClick={() => void setCalendar()}
+                >
+                  Set
+                </Button>
+              </div>
+            </>
+          ) : (
+            <p className="tiny muted">The GM advances the date between sessions.</p>
+          )}
         </Card>
 
         <Card className="dashboard-party">

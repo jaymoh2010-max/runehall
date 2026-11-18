@@ -125,6 +125,9 @@ export interface CampaignRow {
   invite_code: string;
   ruleset: string;
   xp_mode: string;
+  world_year: number;
+  world_month: number;
+  world_day: number;
   revision: number;
   created_at: number;
   updated_at: number;

@@ -1481,6 +1481,72 @@ async function main() {
   if (playerQuest.status !== 403) throw new Error("Player could award quest XP");
   log("quest handouts award XP once and record the reward");
 
+  const calendarSet = await api(`/api/campaigns/${campaign.id}/calendar`, {
+    method: "PUT",
+    cookie: gmCookie,
+    body: { year: 4726, month: 1, day: 30 },
+  });
+  if (calendarSet.payload.worldDate?.month !== 1 || calendarSet.payload.worldDate?.day !== 30) {
+    throw new Error("The GM could not set the in-world date");
+  }
+  const calendarAdvance = await api(`/api/campaigns/${campaign.id}/calendar/advance`, {
+    method: "POST",
+    cookie: gmCookie,
+    body: { days: 3 },
+  });
+  if (
+    calendarAdvance.payload.worldDate?.month !== 2 ||
+    calendarAdvance.payload.worldDate?.day !== 2
+  ) {
+    throw new Error("The in-world calendar did not advance across the month boundary");
+  }
+  const playerCalendar = await fetch(`${base}/api/campaigns/${campaign.id}/calendar/advance`, {
+    method: "POST",
+    headers: { cookie: playerCookie, "content-type": "application/json" },
+    body: JSON.stringify({ days: 1 }),
+  });
+  if (playerCalendar.status !== 403) throw new Error("Player advanced the in-world calendar");
+  log("the GM controls the in-world calendar");
+
+  const downtimeGrant = await api(`/api/campaigns/${campaign.id}/downtime`, {
+    method: "POST",
+    cookie: gmCookie,
+    body: { days: 3, characterIds: [character.id] },
+  });
+  const downtimeSummary = downtimeGrant.payload.characters?.find(
+    (entry) => entry.id === character.id
+  )?.summary?.downtimeDays;
+  if (downtimeGrant.payload.recipients !== 1 || downtimeSummary !== 3) {
+    throw new Error("Downtime grant did not reach the character summary");
+  }
+  const downtimeCharacter = await api(`/api/characters/${character.id}`, {
+    cookie: playerCookie,
+  });
+  if (downtimeCharacter.payload.character.data.play.downtimeDays !== 3) {
+    throw new Error("Downtime grant did not reach the character data");
+  }
+  const spentDraft = JSON.parse(JSON.stringify(downtimeCharacter.payload.character.data));
+  spentDraft.play.downtimeDays = 2;
+  await api(`/api/characters/${character.id}`, {
+    method: "PUT",
+    cookie: playerCookie,
+    body: { data: spentDraft, force: true },
+  });
+  const spentTable = await api(`/api/campaigns/${campaign.id}/table`, { cookie: gmCookie });
+  if (
+    spentTable.payload.characters.find((entry) => entry.id === character.id)?.summary
+      ?.downtimeDays !== 2
+  ) {
+    throw new Error("Spending downtime did not update the character summary");
+  }
+  const playerDowntime = await fetch(`${base}/api/campaigns/${campaign.id}/downtime`, {
+    method: "POST",
+    headers: { cookie: playerCookie, "content-type": "application/json" },
+    body: JSON.stringify({ days: 1 }),
+  });
+  if (playerDowntime.status !== 403) throw new Error("Player granted downtime");
+  log("the GM grants downtime and the player spends it on the sheet");
+
   const initiativePromise = waitForEvent(playerSocket, "initiative:updated", (payload) =>
     payload.entries.some((entry) => entry.tokenId === token.id)
   );

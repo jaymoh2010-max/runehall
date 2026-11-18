@@ -3636,12 +3636,25 @@
 }
 .dashboard-session,
 .dashboard-next,
+.dashboard-calendar,
 .dashboard-party,
 .dashboard-threads {
   display: flex;
   flex-direction: column;
   gap: 12px;
   padding: 18px;
+}
+.calendar-editor {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.calendar-editor .input[type="number"] {
+  width: 76px;
+}
+.calendar-editor select {
+  flex: 1;
+  min-width: 0;
 }
 .dashboard-grid h3 {
   font-size: 1.05rem;

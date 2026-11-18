@@ -146,7 +146,10 @@ test("GM creates a campaign and builds a character through the lazy routes", asy
 test("GM controls advancement and milestone mode hides XP awards", async ({ page }) => {
   await signIn(page, admin);
   await page.goto(campaignPath);
-  await page.getByRole("button", { name: /^Party/ }).click();
+  await page
+    .locator(".campaign-tabs")
+    .getByRole("button", { name: /^Party/ })
+    .click();
   await expect(page.getByRole("heading", { name: "Who's at the table?" })).toBeVisible();
   await expect(page.getByText(/The GM controls advancement/)).toBeVisible();
   await expect(page.getByRole("button", { name: "Award XP" })).toHaveCount(0);
@@ -154,6 +157,30 @@ test("GM controls advancement and milestone mode hides XP awards", async ({ page
   page.once("dialog", (dialog) => dialog.accept());
   await page.getByRole("button", { name: "Level up", exact: true }).first().click();
   await expect(page.getByText(/Advanced E2E Hero to level 2/)).toBeVisible({ timeout: 15_000 });
+
+  await page
+    .locator(".campaign-tabs")
+    .getByRole("button", { name: /^Overview/ })
+    .click();
+  await expect(page.getByText("1 Abadius, 4726 AR", { exact: true })).toBeVisible({
+    timeout: 15_000,
+  });
+  await page.getByRole("button", { name: "+1 day" }).click();
+  await expect(page.getByText("2 Abadius, 4726 AR", { exact: true })).toBeVisible({
+    timeout: 15_000,
+  });
+
+  await page
+    .locator(".campaign-tabs")
+    .getByRole("button", { name: /^Party/ })
+    .click();
+  await page.getByRole("button", { name: "Grant downtime" }).click();
+  const downtimeDialog = page.getByRole("dialog", { name: "Grant downtime" });
+  await expect(downtimeDialog).toBeVisible();
+  await downtimeDialog.getByLabel("Downtime days").fill("3");
+  await downtimeDialog.getByRole("button", { name: "Grant downtime" }).click();
+  await expect(page.getByText(/Granted 3 downtime days/)).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator(".party-stats").getByText("3 d")).toBeVisible();
 });
 
 test("GM awards XP in XP tracking mode without automatic level-up", async ({ page }) => {
@@ -163,7 +190,10 @@ test("GM awards XP in XP tracking mode without automatic level-up", async ({ pag
   await page.getByRole("button", { name: "Save changes" }).click();
   await expect(page.getByText("Campaign settings saved.")).toBeVisible();
 
-  await page.getByRole("button", { name: /^Party/ }).click();
+  await page
+    .locator(".campaign-tabs")
+    .getByRole("button", { name: /^Party/ })
+    .click();
   await page.getByRole("button", { name: "Award XP", exact: true }).click();
   const xpDialog = page.getByRole("dialog", { name: "Award XP" });
   await expect(xpDialog).toBeVisible();
@@ -420,7 +450,10 @@ test("GM places a token, chats, rolls, and opens the scenes manager", async ({ p
 test("GM turns a handout into a completed quest and awards its XP", async ({ page }) => {
   await signIn(page, admin);
   await page.goto(campaignPath);
-  await page.getByRole("button", { name: /^Journal/ }).click();
+  await page
+    .locator(".campaign-tabs")
+    .getByRole("button", { name: /^Journal/ })
+    .click();
   await page.getByRole("button", { name: "New entry" }).click();
   const journalDialog = page.getByRole("dialog");
   await expect(journalDialog).toBeVisible();

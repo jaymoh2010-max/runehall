@@ -184,6 +184,11 @@ export function CampaignPage() {
   const [xpRecipientIds, setXpRecipientIds] = useState<string[]>([]);
   const [xpBusy, setXpBusy] = useState(false);
   const [xpError, setXpError] = useState("");
+  const [downtimeOpen, setDowntimeOpen] = useState(false);
+  const [downtimeDays, setDowntimeDays] = useState("1");
+  const [downtimeTargetIds, setDowntimeTargetIds] = useState<string[]>([]);
+  const [downtimeBusy, setDowntimeBusy] = useState(false);
+  const [downtimeError, setDowntimeError] = useState("");
 
   const isGm = campaign?.role === "gm";
   const tab: Tab =
@@ -725,6 +730,57 @@ export function CampaignPage() {
     }
   };
 
+  const openDowntime = () => {
+    setDowntimeDays("1");
+    setDowntimeTargetIds(characters.map((character) => character.id));
+    setDowntimeError("");
+    setDowntimeOpen(true);
+  };
+
+  const toggleDowntimeTarget = (characterId: string, checked: boolean) => {
+    setDowntimeTargetIds((current) =>
+      checked
+        ? [...new Set([...current, characterId])]
+        : current.filter((entry) => entry !== characterId)
+    );
+  };
+
+  const grantDowntime = async () => {
+    if (!id) return;
+    const days = Math.max(1, Math.floor(Number(downtimeDays) || 0));
+    if (!downtimeTargetIds.length) {
+      setDowntimeError("Choose at least one character.");
+      return;
+    }
+    setDowntimeBusy(true);
+    setDowntimeError("");
+    try {
+      const result = await api<{
+        days: number;
+        recipients: number;
+        characters: CharacterRecord[];
+      }>(`/api/campaigns/${id}/downtime`, {
+        method: "POST",
+        body: { days, characterIds: downtimeTargetIds },
+      });
+      setCharacters(result.characters);
+      setTableData((current) =>
+        current ? { ...current, characters: result.characters } : current
+      );
+      setDowntimeOpen(false);
+      toast(
+        `Granted ${result.days} downtime day${result.days === 1 ? "" : "s"} to ${
+          result.recipients
+        } character${result.recipients === 1 ? "" : "s"}.`,
+        "success"
+      );
+    } catch (err) {
+      setDowntimeError(errorMessage(err));
+    } finally {
+      setDowntimeBusy(false);
+    }
+  };
+
   const longRestParty = async () => {
     if (!id || !campaign) return;
     if (
@@ -918,6 +974,13 @@ export function CampaignPage() {
             memberCount={members.length}
             journalCount={tableData.journal.length}
             characters={characters}
+            worldDate={campaign.worldDate}
+            onWorldDateChange={(worldDate) => {
+              setCampaign((current) => (current ? { ...current, worldDate } : current));
+              setTableData((current) =>
+                current ? { ...current, campaign: { ...current.campaign, worldDate } } : current
+              );
+            }}
             onNavigate={(next) => setTab(next)}
             onJournalCreated={(entry) => {
               setTableData((current) =>
@@ -965,6 +1028,13 @@ export function CampaignPage() {
                     >
                       Level up party
                     </Button>
+                    <Button
+                      variant="secondary"
+                      icon={<CalendarClock size={15} />}
+                      onClick={openDowntime}
+                    >
+                      Grant downtime
+                    </Button>
                   </>
                 ) : null}
                 <Button variant="primary" icon={<Plus size={15} />} onClick={createCharacter}>
@@ -1007,6 +1077,7 @@ export function CampaignPage() {
                         <Stat label="HP" value={character.summary.hp} tone="red" />
                         <Stat label="AC" value={character.summary.ac} tone="gold" />
                         <Stat label="Speed" value={`${character.summary.speed} ft.`} />
+                        <Stat label="Downtime" value={`${character.summary.downtimeDays ?? 0} d`} />
                       </div>
                     ) : null}
                     {campaign.xpMode === "xp" && progress ? (
@@ -1785,6 +1856,75 @@ export function CampaignPage() {
             ))}
           </div>
         )}
+      </Modal>
+
+      <Modal
+        open={downtimeOpen}
+        onClose={() => setDowntimeOpen(false)}
+        title="Grant downtime"
+        subtitle="Give the party time between adventures. Players spend the days from their character sheet."
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setDowntimeOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              icon={<CalendarClock size={15} />}
+              loading={downtimeBusy}
+              onClick={() => void grantDowntime()}
+            >
+              Grant downtime
+            </Button>
+          </>
+        }
+      >
+        <div className="stack">
+          {downtimeError ? <div className="auth-error">{downtimeError}</div> : null}
+          <Field
+            label="Downtime days"
+            hint="Each character receives this many days to spend on earn income, crafting, retraining, or other downtime activities."
+          >
+            <Input
+              type="number"
+              min={1}
+              max={365}
+              value={downtimeDays}
+              onChange={(event) => setDowntimeDays(event.target.value)}
+            />
+          </Field>
+          <div className="row-between">
+            <strong>Recipients</strong>
+            <div className="row" style={{ gap: 6 }}>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                onClick={() => setDowntimeTargetIds(characters.map((entry) => entry.id))}
+              >
+                All
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                onClick={() => setDowntimeTargetIds([])}
+              >
+                None
+              </Button>
+            </div>
+          </div>
+          <div className="stack" style={{ gap: 4 }}>
+            {characters.map((entry) => (
+              <Checkbox
+                key={entry.id}
+                label={`${entry.name} (${entry.summary?.downtimeDays ?? 0} days)`}
+                checked={downtimeTargetIds.includes(entry.id)}
+                onChange={(checked) => toggleDowntimeTarget(entry.id, checked)}
+              />
+            ))}
+          </div>
+        </div>
       </Modal>
 
       <Modal
