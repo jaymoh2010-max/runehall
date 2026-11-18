@@ -19,6 +19,7 @@ const GLOBAL_TABLES = [
   "campaign_dashboard",
   "campaign_sessions",
   "session_attendance",
+  "campaign_audio_tracks",
 ];
 const IMAGE_MIME: Record<string, string> = {
   ".png": "image/png",
@@ -113,6 +114,14 @@ export function campaignAssetUsages(campaignId: string): Map<string, string[]> {
       addUsage(usages, filename, "Chat");
     }
   }
+  const audioTracks = db
+    .prepare("SELECT id, name, url FROM campaign_audio_tracks WHERE campaign_id = ?")
+    .all(campaignId) as { id: string; name: string; url: string }[];
+  for (const track of audioTracks) {
+    for (const filename of uploadFilenames(track.url)) {
+      addUsage(usages, filename, `Soundtrack: ${track.name}`);
+    }
+  }
   return usages;
 }
 
@@ -157,11 +166,13 @@ export function listCampaignAssets(campaignId: string, userId: string): Campaign
     const globalCount = references.get(filename) ?? 0;
     const belongsToCampaign = record?.campaign_id === campaignId;
     const ownedByUser = record?.campaign_id === null && record?.uploaded_by === userId;
+    const mimeType = record?.mime_type || mimeForFilename(filename);
+    if (!mimeType.startsWith("image/")) continue;
     assets.push({
       filename,
       url: `/uploads/${filename}`,
       name: record?.original_name || filename,
-      mimeType: record?.mime_type || mimeForFilename(filename),
+      mimeType,
       size: record?.size || stat.size,
       createdAt: record?.created_at || Math.round(stat.mtimeMs),
       usage,

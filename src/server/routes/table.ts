@@ -9,8 +9,17 @@ import {
   getUser,
 } from "../access";
 import { campaignMemberCount, campaignCharacterCount } from "../access";
-import { db, type CampaignRow, type MessageRow, type SceneRow, type TokenRow } from "../db";
 import {
+  db,
+  type AudioTrackRow,
+  type CampaignRow,
+  type MessageRow,
+  type SceneRow,
+  type TokenRow,
+} from "../db";
+import {
+  serializeAudioState,
+  serializeAudioTrack,
   serializeCampaignSummary,
   serializeCharacter,
   serializeInitiative,
@@ -107,6 +116,11 @@ export async function registerTableRoutes(app: FastifyInstance): Promise<void> {
          ORDER BY j.updated_at DESC`
       )
       .all(id) as (import("../db").JournalRow & { author_name: string | null })[];
+    const audioRows = db
+      .prepare(
+        "SELECT * FROM campaign_audio_tracks WHERE campaign_id = ? ORDER BY sort_order ASC, created_at ASC"
+      )
+      .all(id) as AudioTrackRow[];
 
     const memberCharacters = campaignCharacters(id).map((character) =>
       serializeCharacter(character, character.owner_name, {
@@ -135,6 +149,8 @@ export async function registerTableRoutes(app: FastifyInstance): Promise<void> {
       turnIndex: state.turn_index,
       messages: messageRows.reverse().map(serializeMessage),
       journal: journalRows.map(serializeJournal),
+      audioTracks: audioRows.map(serializeAudioTrack),
+      audioState: serializeAudioState(campaign),
       revision: Number(campaign.revision ?? 0),
     });
   });

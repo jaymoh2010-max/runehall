@@ -1547,6 +1547,75 @@ async function main() {
   if (playerDowntime.status !== 403) throw new Error("Player granted downtime");
   log("the GM grants downtime and the player spends it on the sheet");
 
+  const wav = Buffer.from([
+    0x52, 0x49, 0x46, 0x46, 0x24, 0x00, 0x00, 0x00, 0x57, 0x41, 0x56, 0x45, 0x66, 0x6d, 0x74, 0x20,
+    0x10, 0x00, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x40, 0x1f, 0x00, 0x00, 0x80, 0x3e, 0x00, 0x00,
+    0x02, 0x00, 0x10, 0x00, 0x64, 0x61, 0x74, 0x61, 0x00, 0x00, 0x00, 0x00,
+  ]);
+  const audioForm = new FormData();
+  audioForm.append("file", new Blob([wav], { type: "audio/wav" }), "smoke-theme.wav");
+  const audioUpload = await fetch(`${base}/api/uploads/audio`, {
+    method: "POST",
+    headers: { cookie: gmCookie, "x-campaign-id": campaign.id },
+    body: audioForm,
+  });
+  if (audioUpload.status !== 201) {
+    throw new Error(`Audio upload failed (${audioUpload.status})`);
+  }
+  const audioTrack = (await audioUpload.json()).track;
+  if (!audioTrack?.id || audioTrack.url.startsWith("/uploads/") === false) {
+    throw new Error("Audio upload did not return a stored track");
+  }
+  const audioStatePromise = waitForEvent(
+    playerSocket,
+    "audio:state",
+    (payload) => payload.state?.trackId === audioTrack.id && payload.state?.playing === true
+  );
+  gmSocket.emit("audio:update", {
+    campaignId: campaign.id,
+    trackId: audioTrack.id,
+    playing: true,
+    position: 12.5,
+  });
+  await audioStatePromise;
+  const audioTable = await api(`/api/campaigns/${campaign.id}/table`, { cookie: gmCookie });
+  if (
+    audioTable.payload.audioTracks?.length !== 1 ||
+    audioTable.payload.audioState?.trackId !== audioTrack.id ||
+    audioTable.payload.audioState?.playing !== true ||
+    audioTable.payload.audioState?.position !== 12.5
+  ) {
+    throw new Error("Audio track or playback state was not persisted");
+  }
+  playerSocket.emit("audio:update", {
+    campaignId: campaign.id,
+    trackId: audioTrack.id,
+    playing: false,
+    position: 0,
+  });
+  await delay(200);
+  const audioAfterPlayer = await api(`/api/campaigns/${campaign.id}/table`, {
+    cookie: gmCookie,
+  });
+  if (audioAfterPlayer.payload.audioState?.playing !== true) {
+    throw new Error("Player changed the shared audio state");
+  }
+  const audioDelete = await api(`/api/campaigns/${campaign.id}/audio/${audioTrack.id}`, {
+    method: "DELETE",
+    cookie: gmCookie,
+  });
+  if (!audioDelete.payload.ok) throw new Error("GM could not delete the audio track");
+  const audioTableAfter = await api(`/api/campaigns/${campaign.id}/table`, {
+    cookie: gmCookie,
+  });
+  if (
+    audioTableAfter.payload.audioTracks?.length !== 0 ||
+    audioTableAfter.payload.audioState?.trackId !== null
+  ) {
+    throw new Error("Deleted audio track or state was not cleared");
+  }
+  log("GM uploads and controls the shared soundtrack; players cannot change it");
+
   const initiativePromise = waitForEvent(playerSocket, "initiative:updated", (payload) =>
     payload.entries.some((entry) => entry.tokenId === token.id)
   );

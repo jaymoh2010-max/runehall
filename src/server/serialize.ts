@@ -1,4 +1,6 @@
 import type {
+  CampaignAudioState,
+  CampaignAudioTrack,
   CampaignDashboard,
   CampaignMember,
   CampaignNpc,
@@ -42,6 +44,7 @@ import {
 import {
   db,
   type CampaignDashboardRow,
+  type AudioTrackRow,
   type CampaignNpcRow,
   type CampaignRow,
   type CampaignSessionRow,
@@ -89,6 +92,28 @@ export function serializeCampaignSummary(
     createdAt: campaign.created_at,
     updatedAt: campaign.updated_at,
     lastPlayedAt: campaign.last_played_at,
+  };
+}
+
+export function serializeAudioTrack(row: AudioTrackRow): CampaignAudioTrack {
+  return {
+    id: row.id,
+    campaignId: row.campaign_id,
+    name: row.name,
+    url: row.url,
+    mimeType: row.mime_type,
+    size: row.size,
+    sortOrder: row.sort_order,
+    createdAt: row.created_at,
+  };
+}
+
+export function serializeAudioState(campaign: CampaignRow): CampaignAudioState {
+  return {
+    trackId: campaign.audio_track_id ?? null,
+    playing: Boolean(campaign.audio_playing),
+    position: Number(campaign.audio_position ?? 0),
+    updatedAt: Number(campaign.audio_updated_at ?? 0),
   };
 }
 

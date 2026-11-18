@@ -3,10 +3,12 @@ import fs from "node:fs";
 import path from "node:path";
 import { pipeline } from "node:stream/promises";
 import type { FastifyInstance } from "fastify";
-import { getCampaignRole } from "../access";
-import { db } from "../db";
+import { getCampaign, getCampaignRole } from "../access";
+import { db, type AudioTrackRow, type CampaignRow } from "../db";
 import { newId, now, safeString, uploadsDir } from "../util";
 import { inspectImage } from "../imageMeta";
+import { inspectAudio } from "../audioMeta";
+import { serializeAudioState, serializeAudioTrack, touchCampaign } from "../serialize";
 import crypto from "node:crypto";
 
 const MIME_EXT: Record<string, string> = {
@@ -15,6 +17,12 @@ const MIME_EXT: Record<string, string> = {
   "image/webp": ".webp",
   "image/gif": ".gif",
   "image/avif": ".avif",
+};
+const AUDIO_MIME_EXT: Record<string, string> = {
+  "audio/mpeg": ".mp3",
+  "audio/ogg": ".ogg",
+  "audio/wav": ".wav",
+  "audio/webm": ".webm",
 };
 const MAX_DIMENSION = 12_000;
 const MAX_PIXELS = 100_000_000;
@@ -114,5 +122,118 @@ export async function registerUploadRoutes(app: FastifyInstance): Promise<void> 
       mimeType: metadata.mime,
       campaignId,
     });
+  });
+
+  app.post("/api/uploads/audio", async (request, reply) => {
+    if (!request.user) return reply.code(401).send({ error: "Sign in to continue." });
+    const campaignHeader = request.headers["x-campaign-id"];
+    const campaignId =
+      typeof campaignHeader === "string" && campaignHeader.trim() ? campaignHeader.trim() : null;
+    if (!campaignId) return reply.code(400).send({ error: "Choose a campaign first." });
+    if (getCampaignRole(campaignId, request.user.id) !== "gm") {
+      return reply.code(403).send({ error: "Only the GM can upload soundtracks." });
+    }
+    if (!request.isMultipart()) return reply.code(400).send({ error: "Upload an audio file." });
+    let file;
+    try {
+      file = await request.file({ limits: { fileSize: 25 * 1024 * 1024, files: 1 } });
+    } catch {
+      return reply.code(400).send({ error: "Upload an audio file smaller than 25 MB." });
+    }
+    if (!file) return reply.code(400).send({ error: "No file received." });
+    const ext = AUDIO_MIME_EXT[file.mimetype];
+    if (!ext) {
+      return reply.code(415).send({ error: "Use an MP3, OGG, WAV, or WebM audio file." });
+    }
+    const filename = `${Date.now().toString(36)}-${crypto.randomBytes(8).toString("hex")}${ext}`;
+    const destination = path.join(uploadsDir(), filename);
+    const reject = (code: number, error: string) => {
+      try {
+        if (fs.existsSync(destination)) fs.unlinkSync(destination);
+      } catch {}
+      return reply.code(code).send({ error });
+    };
+    try {
+      await pipeline(file.file, createWriteStream(destination));
+      if (file.file.truncated) return reject(413, "Audio is too large (max 25 MB).");
+    } catch {
+      return reject(500, "Could not save the audio file.");
+    }
+    const size = fs.statSync(destination).size;
+    if (size === 0) return reject(400, "The audio file was empty.");
+    const header = Buffer.alloc(Math.min(512, size));
+    try {
+      const fd = fs.openSync(destination, "r");
+      fs.readSync(fd, header, 0, header.length, 0);
+      fs.closeSync(fd);
+    } catch {
+      return reject(500, "Could not inspect the audio file.");
+    }
+    if (!inspectAudio(header, file.mimetype)) {
+      return reject(415, "The audio contents do not match the declared file type.");
+    }
+    const ts = now();
+    const trackId = newId("audio");
+    const name = safeString(file.filename.replace(/\.[^.]+$/, ""), "Soundtrack", 140);
+    try {
+      db.prepare(
+        `INSERT INTO uploaded_assets
+          (id, filename, original_name, mime_type, size, campaign_id, uploaded_by, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+      ).run(
+        newId("asset"),
+        filename,
+        safeString(file.filename, "Soundtrack", 200),
+        file.mimetype,
+        size,
+        campaignId,
+        request.user.id,
+        ts
+      );
+      const order = db
+        .prepare(
+          "SELECT COALESCE(MAX(sort_order), 0) + 1 AS next FROM campaign_audio_tracks WHERE campaign_id = ?"
+        )
+        .get(campaignId) as { next: number };
+      db.prepare(
+        `INSERT INTO campaign_audio_tracks
+          (id, campaign_id, name, url, mime_type, size, sort_order, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+      ).run(trackId, campaignId, name, `/uploads/${filename}`, file.mimetype, size, order.next, ts);
+    } catch {
+      return reject(500, "Could not record the audio file.");
+    }
+    const row = db
+      .prepare("SELECT * FROM campaign_audio_tracks WHERE id = ?")
+      .get(trackId) as AudioTrackRow;
+    touchCampaign(campaignId);
+    return reply.code(201).send({ track: serializeAudioTrack(row) });
+  });
+
+  app.delete("/api/campaigns/:id/audio/:trackId", async (request, reply) => {
+    if (!request.user) return reply.code(401).send({ error: "Sign in to continue." });
+    const { id, trackId } = request.params as { id: string; trackId: string };
+    const campaign = getCampaign(id);
+    if (!campaign) return reply.code(404).send({ error: "Campaign not found." });
+    if (getCampaignRole(id, request.user.id) !== "gm") {
+      return reply.code(403).send({ error: "Only the GM can remove soundtracks." });
+    }
+    const track = db
+      .prepare("SELECT * FROM campaign_audio_tracks WHERE id = ? AND campaign_id = ?")
+      .get(trackId, id) as AudioTrackRow | undefined;
+    if (!track) return reply.code(404).send({ error: "Soundtrack not found." });
+    db.prepare("DELETE FROM campaign_audio_tracks WHERE id = ?").run(trackId);
+    if (campaign.audio_track_id === trackId) {
+      db.prepare(
+        "UPDATE campaigns SET audio_track_id = NULL, audio_playing = 0, audio_position = 0, audio_updated_at = ?, updated_at = ? WHERE id = ?"
+      ).run(now(), now(), id);
+    }
+    const updated = db.prepare("SELECT * FROM campaigns WHERE id = ?").get(id) as CampaignRow;
+    app.broadcastCampaign(id, "audio:state", {
+      campaignId: id,
+      state: serializeAudioState(updated),
+    });
+    touchCampaign(id);
+    return reply.send({ ok: true });
   });
 }

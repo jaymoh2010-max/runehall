@@ -66,6 +66,19 @@ export async function uploadImage(
   });
 }
 
+export async function uploadAudio(
+  file: File,
+  campaignId: string
+): Promise<{ track: import("../shared/types").CampaignAudioTrack }> {
+  const form = new FormData();
+  form.append("file", file);
+  return api("/api/uploads/audio", {
+    method: "POST",
+    body: form,
+    headers: { "x-campaign-id": campaignId },
+  });
+}
+
 export function formatDate(timestamp: number | null | undefined): string {
   if (!timestamp) return "Never";
   const date = new Date(timestamp);

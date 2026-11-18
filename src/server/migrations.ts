@@ -492,4 +492,25 @@ export const migrations: Migration[] = [
       ALTER TABLE campaigns ADD COLUMN world_day INTEGER NOT NULL DEFAULT 1;
     `,
   },
+  {
+    version: 27,
+    name: "campaign_audio",
+    sql: `
+      CREATE TABLE IF NOT EXISTS campaign_audio_tracks (
+        id TEXT PRIMARY KEY,
+        campaign_id TEXT NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        url TEXT NOT NULL,
+        mime_type TEXT NOT NULL,
+        size INTEGER NOT NULL DEFAULT 0,
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        created_at INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_campaign_audio_campaign ON campaign_audio_tracks(campaign_id);
+      ALTER TABLE campaigns ADD COLUMN audio_track_id TEXT;
+      ALTER TABLE campaigns ADD COLUMN audio_playing INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE campaigns ADD COLUMN audio_position REAL NOT NULL DEFAULT 0;
+      ALTER TABLE campaigns ADD COLUMN audio_updated_at INTEGER;
+    `,
+  },
 ];

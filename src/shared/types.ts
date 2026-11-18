@@ -1193,6 +1193,26 @@ export interface JournalEntry {
   updatedAt: number;
 }
 
+export interface CampaignAudioTrack {
+  id: string;
+  campaignId: string;
+  name: string;
+  url: string;
+  mimeType: string;
+  size: number;
+  sortOrder: number;
+  createdAt: number;
+}
+
+export interface CampaignAudioState {
+  trackId: string | null;
+  playing: boolean;
+  /** Playback position in seconds when the state was last changed. */
+  position: number;
+  /** Server timestamp for extending the position while playing. */
+  updatedAt: number;
+}
+
 export interface CampaignTable {
   campaign: {
     id: string;
@@ -1214,6 +1234,8 @@ export interface CampaignTable {
   turnIndex: number;
   messages: ChatMessage[];
   journal: JournalEntry[];
+  audioTracks: CampaignAudioTrack[];
+  audioState: CampaignAudioState;
   /** Monotonic campaign revision for detecting missed socket events. */
   revision: number;
 }
@@ -1309,6 +1331,12 @@ export interface ClientToServerEvents {
   "template:clear": (payload: { campaignId: string; sceneId: string }) => void;
   "scene:walls": (payload: { campaignId: string; sceneId: string; walls: Wall[] }) => void;
   "scene:props": (payload: { campaignId: string; sceneId: string; props: SceneProp[] }) => void;
+  "audio:update": (payload: {
+    campaignId: string;
+    trackId: string | null;
+    playing: boolean;
+    position: number;
+  }) => void;
   "chat:send": (
     payload: { campaignId: string; content: string; visibility?: "all" | "gm" },
     ack?: (message: ChatMessage | null) => void
@@ -1372,6 +1400,7 @@ export interface ServerToClientEvents {
   "scene:templates": (payload: { sceneId: string; templates: AoeTemplate[] }) => void;
   "scene:walls": (payload: { sceneId: string; walls: Wall[] }) => void;
   "scene:props": (payload: { sceneId: string; props: SceneProp[] }) => void;
+  "audio:state": (payload: { campaignId: string; state: CampaignAudioState }) => void;
   "chat:message": (message: ChatMessage) => void;
   "initiative:updated": (payload: {
     entries: InitiativeEntry[];

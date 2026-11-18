@@ -374,6 +374,23 @@ test("GM places a token, chats, rolls, and opens the scenes manager", async ({ p
   await expect(page.getByText("Prop collision disabled.")).toBeVisible();
   await page.getByRole("button", { name: "Props", exact: true }).click();
 
+  const wav = Buffer.from([
+    0x52, 0x49, 0x46, 0x46, 0x24, 0x00, 0x00, 0x00, 0x57, 0x41, 0x56, 0x45, 0x66, 0x6d, 0x74, 0x20,
+    0x10, 0x00, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x40, 0x1f, 0x00, 0x00, 0x80, 0x3e, 0x00, 0x00,
+    0x02, 0x00, 0x10, 0x00, 0x64, 0x61, 0x74, 0x61, 0x00, 0x00, 0x00, 0x00,
+  ]);
+  await page.getByLabel("Upload soundtrack").setInputFiles({
+    name: "E2E Theme.wav",
+    mimeType: "audio/wav",
+    buffer: wav,
+  });
+  await expect(page.getByText("E2E Theme", { exact: true })).toBeVisible({ timeout: 15_000 });
+  await page.getByTitle("Play E2E Theme").click();
+  await expect(page.getByText(/E2E Theme · playing/)).toBeVisible({ timeout: 15_000 });
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.getByTitle("Remove E2E Theme").click();
+  await expect(page.getByText("E2E Theme", { exact: true })).toHaveCount(0);
+
   await page.getByPlaceholder(/Message the table/).fill("E2E table hello");
   await page.getByRole("button", { name: "Send" }).click();
   await expect(page.getByText("E2E table hello")).toBeVisible();

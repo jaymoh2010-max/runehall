@@ -96,7 +96,7 @@ export function registerSecurity(app: FastifyInstance): void {
       }
     }
 
-    if (method === "POST" && path === "/api/uploads") {
+    if (method === "POST" && (path === "/api/uploads" || path === "/api/uploads/audio")) {
       const result = uploadLimiter.check(`${request.ip}:upload`);
       if (!result.allowed) {
         reply.header("Retry-After", String(result.retryAfterSec));

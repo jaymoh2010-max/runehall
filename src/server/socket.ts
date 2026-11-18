@@ -1,7 +1,7 @@
 import type { Server, Socket } from "socket.io";
 import { getCampaignRole, getCharacter, getMembership, getUser } from "./access";
 import { contextForDraft } from "./compendium";
-import { db, type MessageRow, type SceneRow, type TokenRow } from "./db";
+import { db, type CampaignRow, type MessageRow, type SceneRow, type TokenRow } from "./db";
 import { userFromCookieHeader } from "./auth";
 import { now, newId, safeInt, safeString, parseJson, clamp, sanitizeUserText } from "./util";
 import { characterSummary, computeCharacter, normalizeCharacterDraft } from "../shared/rules";
@@ -24,6 +24,7 @@ import type {
   Token,
 } from "../shared/types";
 import {
+  serializeAudioState,
   serializeInitiative,
   serializeMessage,
   serializeScene,
@@ -898,6 +899,32 @@ export function registerSocketServer(io: TypedServer): void {
         sceneId
       );
       io.to(room(campaignId)).emit("scene:props", { sceneId, props: normalized });
+      touchCampaign(campaignId);
+    });
+
+    socket.on("audio:update", ({ campaignId, trackId, playing, position }) => {
+      if (!requireGm(socket, campaignId)) return;
+      const campaign = db.prepare("SELECT * FROM campaigns WHERE id = ?").get(campaignId) as
+        CampaignRow | undefined;
+      if (!campaign) return;
+      if (trackId) {
+        const track = db
+          .prepare("SELECT id FROM campaign_audio_tracks WHERE id = ? AND campaign_id = ?")
+          .get(trackId, campaignId);
+        if (!track) return;
+      }
+      const safePosition = clamp(Number(position) || 0, 0, 86_400);
+      const ts = now();
+      db.prepare(
+        "UPDATE campaigns SET audio_track_id = ?, audio_playing = ?, audio_position = ?, audio_updated_at = ?, updated_at = ? WHERE id = ?"
+      ).run(trackId ?? null, playing ? 1 : 0, safePosition, ts, ts, campaignId);
+      const updated = db
+        .prepare("SELECT * FROM campaigns WHERE id = ?")
+        .get(campaignId) as CampaignRow;
+      io.to(room(campaignId)).emit("audio:state", {
+        campaignId,
+        state: serializeAudioState(updated),
+      });
       touchCampaign(campaignId);
     });
 

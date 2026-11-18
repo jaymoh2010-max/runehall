@@ -484,6 +484,12 @@ Acceptance: a GM can prepare a full session in Runehall and start it with one �
 - [x] **Reusable handouts**
   - The GM can duplicate any journal entry or handout in one click.
   - Duplicates preserve content, kind, visibility, and attachments.
+- [x] **Campaign soundtrack**
+  - The GM can upload MP3, OGG, WAV, or WebM tracks (up to 25 MB), list them, play or pause, and remove them.
+  - Playback state is campaign-wide and broadcast to connected clients; the position is synced on play, pause, and track changes.
+  - Players receive a **Join audio** control to satisfy browser autoplay rules, plus a local volume slider.
+  - Uploaded tracks use the campaign upload store, are protected from orphan cleanup, and stay separate from the image asset library.
+  - Covered by audio-signature unit tests, a two-socket smoke check of upload and playback control, and a browser upload/play/remove flow.
 - [x] **Quest handouts and one-time XP rewards**
   - A handout can be marked Active, Completed, or Failed and carry an XP reward.
   - The Journal has a Quests filter and shows the status and reward on the handout.
@@ -638,7 +644,6 @@ That is more trustworthy than silently showing a number that may be missing a +1
 
 These need a product decision before implementation:
 
-- [ ] **Audio playlists** — local audio uploads and synced playlists need format/size limits, autoplay behavior, and a decision on whether playback state is campaign-wide or per client.
 - [ ] **Incremental refactors** — split `rules.ts`, `CharacterSheetPage`, and `CampaignPage` where it reduces risk without changing behavior.
 
 ## Recommended next session

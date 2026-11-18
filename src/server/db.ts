@@ -128,6 +128,10 @@ export interface CampaignRow {
   world_year: number;
   world_month: number;
   world_day: number;
+  audio_track_id: string | null;
+  audio_playing: number;
+  audio_position: number;
+  audio_updated_at: number | null;
   revision: number;
   created_at: number;
   updated_at: number;
@@ -211,6 +215,17 @@ export interface MessageRow {
   content: string;
   data: string | null;
   visibility: string;
+  created_at: number;
+}
+
+export interface AudioTrackRow {
+  id: string;
+  campaign_id: string;
+  name: string;
+  url: string;
+  mime_type: string;
+  size: number;
+  sort_order: number;
   created_at: number;
 }
 

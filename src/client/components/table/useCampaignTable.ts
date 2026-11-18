@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type {
+  CampaignAudioState,
+  CampaignAudioTrack,
   CampaignTable,
   CharacterRecord,
   ChatMessage,
@@ -49,6 +51,10 @@ export function useCampaignTable({ initial, campaignId, toast }: UseCampaignTabl
   const [initiative, setInitiative] = useState<InitiativeEntry[]>(initial.initiative);
   const [round, setRound] = useState(initial.round);
   const [turnIndex, setTurnIndex] = useState(initial.turnIndex);
+  const [audioTracks, setAudioTracks] = useState<CampaignAudioTrack[]>(initial.audioTracks ?? []);
+  const [audioState, setAudioState] = useState<CampaignAudioState>(
+    initial.audioState ?? { trackId: null, playing: false, position: 0, updatedAt: 0 }
+  );
   const [presence, setPresence] = useState<PresenceUser[]>([]);
   const [selectedTokenId, setSelectedTokenIdState] = useState<string | null>(null);
   const [selectedTokenIds, setSelectedTokenIds] = useState<string[]>([]);
@@ -115,6 +121,10 @@ export function useCampaignTable({ initial, campaignId, toast }: UseCampaignTabl
       setInitiative(snapshot.initiative);
       setRound(snapshot.round);
       setTurnIndex(snapshot.turnIndex);
+      setAudioTracks(snapshot.audioTracks ?? []);
+      setAudioState(
+        snapshot.audioState ?? { trackId: null, playing: false, position: 0, updatedAt: 0 }
+      );
       revisionRef.current = snapshot.revision;
       setMessages((current) => mergeSnapshotMessages(current, snapshot.messages));
       setSelectedTokenIds((current) =>
@@ -245,6 +255,9 @@ export function useCampaignTable({ initial, campaignId, toast }: UseCampaignTabl
       setRound(payload.round);
       setTurnIndex(payload.turnIndex);
     };
+    const onAudioState = (payload: { campaignId: string; state: CampaignAudioState }) => {
+      if (payload.campaignId === campaignId) setAudioState(payload.state);
+    };
     const onPointer = (payload: { displayName: string; x: number; y: number }) => {
       setRemotePointer({ x: payload.x, y: payload.y, name: payload.displayName, ts: Date.now() });
       if (pointerTimer.current) window.clearTimeout(pointerTimer.current);
@@ -289,6 +302,7 @@ export function useCampaignTable({ initial, campaignId, toast }: UseCampaignTabl
     socket.on("scenes:reordered", onScenesReordered);
     socket.on("chat:message", onChatMessage);
     socket.on("initiative:updated", onInitiativeUpdated);
+    socket.on("audio:state", onAudioState);
     socket.on("pointer:show", onPointer);
     socket.on("character:updated", onCharacterUpdated);
     socket.on("character:created", onCharacterCreated);
@@ -316,6 +330,7 @@ export function useCampaignTable({ initial, campaignId, toast }: UseCampaignTabl
       socket.off("scenes:reordered", onScenesReordered);
       socket.off("chat:message", onChatMessage);
       socket.off("initiative:updated", onInitiativeUpdated);
+      socket.off("audio:state", onAudioState);
       socket.off("pointer:show", onPointer);
       socket.off("character:updated", onCharacterUpdated);
       socket.off("character:created", onCharacterCreated);
@@ -339,6 +354,9 @@ export function useCampaignTable({ initial, campaignId, toast }: UseCampaignTabl
     initiative,
     round,
     turnIndex,
+    audioTracks,
+    setAudioTracks,
+    audioState,
     presence,
     selectedTokenId,
     setSelectedTokenId,

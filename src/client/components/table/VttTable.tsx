@@ -63,6 +63,7 @@ import { VttToolbar } from "./VttToolbar";
 import { VttTokenPanel } from "./VttTokenPanel";
 import { BestiaryPalette } from "./BestiaryPalette";
 import { PropPalette } from "./PropPalette";
+import { SoundPanel } from "./SoundPanel";
 import { useCampaignTable } from "./useCampaignTable";
 import type { AoeTemplate, TemplateKind } from "../../../shared/templates";
 
@@ -87,6 +88,9 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
     initiative,
     round,
     turnIndex,
+    audioTracks,
+    setAudioTracks,
+    audioState,
     presence,
     selectedTokenId,
     setSelectedTokenId,
@@ -1085,6 +1089,13 @@ export function VttTable({ initial, campaignId, user, isGm }: VttTableProps) {
 
         {rightOpen ? (
           <aside className="vtt-right">
+            <SoundPanel
+              campaignId={campaignId}
+              isGm={isGm}
+              tracks={audioTracks}
+              state={audioState}
+              onTracksChange={setAudioTracks}
+            />
             <ChatPanel
               messages={messages}
               presence={presence}
