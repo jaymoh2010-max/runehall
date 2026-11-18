@@ -24,7 +24,6 @@ import {
   Dna,
   FileUp,
   FlaskConical,
-  Heart,
   Loader2,
   Minus,
   Plus,
@@ -145,12 +144,10 @@ import {
   rulesetIncludesLegacy,
   rulesetLabel,
 } from "../../shared/content";
+import { buildLevelUpWizardSteps, type LevelUpChoice } from "../../shared/levelup";
 import { summarizeRunes } from "../../shared/runes";
 
-type LevelUpTask = {
-  id: string;
-  label: string;
-  detail: string;
+type LevelUpTask = Omit<LevelUpChoice, "step"> & {
   step: StepId;
   kind: "abilities" | "skills" | "feat" | "spells" | "class";
   category?: "ancestry" | "class" | "skill" | "general";
@@ -173,6 +170,7 @@ export function CharacterBuilderPage() {
   const [step, setStep] = useState<StepId>("ancestry");
   const [picker, setPicker] = useState<Picker>(null);
   const [levelUpOpen, setLevelUpOpen] = useState(false);
+  const [levelUpStep, setLevelUpStep] = useState(0);
   const [levelUpPlan, setLevelUpPlan] = useState<{ level: number; tasks: LevelUpTask[] } | null>(
     null
   );
@@ -483,6 +481,9 @@ export function CharacterBuilderPage() {
   const legacyLocked = Boolean(campaignRuleset);
   const nextLevel = Math.min(20, draft.level + 1);
   const canAdvance = character?.permissions?.canAdvance !== false;
+  const levelUpBlocked = derived.validation.some((issue) => issue.severity === "error");
+  const nextHp =
+    derived.maxHp + Math.max(1, (context.classData?.hp ?? 0) + derived.abilityMods.con);
   const levelUpItems: LevelUpTask[] = [];
   if (nextLevel !== draft.level) {
     for (const milestone of [5, 10, 15, 20]) {
@@ -547,6 +548,15 @@ export function CharacterBuilderPage() {
       }
     }
   }
+  const levelUpWizard = buildLevelUpWizardSteps({
+    fromLevel: draft.level,
+    toLevel: nextLevel,
+    hpBefore: derived.maxHp,
+    hpAfter: nextHp,
+    choices: levelUpItems,
+  });
+  const currentLevelUpStep =
+    levelUpWizard[Math.max(0, Math.min(levelUpStep, levelUpWizard.length - 1))];
   const issues = derived.validation;
   const stepErrors = (stepId: StepId) =>
     issues.filter((issue) => issue.step === stepId && issue.severity === "error");
@@ -711,9 +721,18 @@ export function CharacterBuilderPage() {
             variant="secondary"
             size="sm"
             icon={<TrendingUp size={15} />}
-            onClick={() => setLevelUpOpen(true)}
-            disabled={!canAdvance || draft.level >= 20}
-            title={canAdvance ? undefined : "The campaign GM controls level-ups."}
+            onClick={() => {
+              setLevelUpStep(0);
+              setLevelUpOpen(true);
+            }}
+            disabled={!canAdvance || draft.level >= 20 || levelUpBlocked}
+            title={
+              !canAdvance
+                ? "The campaign GM controls level-ups."
+                : levelUpBlocked
+                  ? "Resolve the remaining required choices before leveling up."
+                  : undefined
+            }
           >
             Level up
           </Button>
@@ -1051,53 +1070,128 @@ export function CharacterBuilderPage() {
         open={levelUpOpen}
         onClose={() => setLevelUpOpen(false)}
         title={`Level ${draft.level} → ${nextLevel}`}
-        subtitle="Review what changes, then jump straight into each new choice."
+        subtitle={`Step ${Math.min(levelUpStep + 1, levelUpWizard.length)} of ${levelUpWizard.length} · ${currentLevelUpStep.title}`}
         footer={
           <>
             <Button variant="ghost" onClick={() => setLevelUpOpen(false)}>
               Cancel
             </Button>
             <Button
-              variant="primary"
-              icon={<TrendingUp size={15} />}
-              onClick={() => completeLevelUp()}
-              disabled={!canAdvance}
+              variant="secondary"
+              onClick={() => setLevelUpStep((current) => Math.max(0, current - 1))}
+              disabled={levelUpStep === 0}
             >
-              Level up
+              Back
             </Button>
+            {levelUpStep >= levelUpWizard.length - 1 ? (
+              <Button
+                variant="primary"
+                icon={<TrendingUp size={15} />}
+                onClick={() => completeLevelUp()}
+                disabled={!canAdvance || levelUpBlocked}
+              >
+                Level up
+              </Button>
+            ) : (
+              <Button
+                variant="primary"
+                onClick={() =>
+                  setLevelUpStep((current) => Math.min(levelUpWizard.length - 1, current + 1))
+                }
+              >
+                Next
+              </Button>
+            )}
           </>
         }
       >
-        <div className="levelup-summary">
-          <div className="levelup-hp">
-            <Heart size={15} />
-            <span>
-              Hit points increase by{" "}
-              <strong>{Math.max(1, (context.classData?.hp ?? 0) + derived.abilityMods.con)}</strong>
-              .
+        <div className="levelup-progress" aria-label="Level-up progress">
+          {levelUpWizard.map((wizardStep, index) => (
+            <span
+              key={wizardStep.id}
+              className={
+                index === levelUpStep ? "is-current" : index < levelUpStep ? "is-done" : ""
+              }
+            >
+              {index + 1}
             </span>
-          </div>
-          {levelUpItems.length ? (
-            levelUpItems.map((item, index) => (
-              <button
-                key={`${item.label}-${index}`}
-                type="button"
-                className="levelup-item"
-                onClick={() => completeLevelUp(item.step)}
-              >
-                <span>
-                  <strong>{item.label}</strong>
-                  <span className="tiny muted">{item.detail}</span>
-                </span>
-                <ArrowRight size={15} />
-              </button>
-            ))
-          ) : (
+          ))}
+        </div>
+        <div className="levelup-step">
+          <span className="page-eyebrow">
+            {currentLevelUpStep.kind === "choice"
+              ? "NEW CHOICE"
+              : currentLevelUpStep.kind === "confirm"
+                ? "CONFIRM"
+                : "SUMMARY"}
+          </span>
+          <h3>{currentLevelUpStep.title}</h3>
+          <p className="muted small">{currentLevelUpStep.detail}</p>
+
+          {currentLevelUpStep.kind === "overview" ? (
+            <>
+              <div className="levelup-compare">
+                <div>
+                  <span className="tiny muted">Hit points</span>
+                  <strong>{currentLevelUpStep.hpBefore}</strong>
+                </div>
+                <ArrowRight size={16} />
+                <div>
+                  <span className="tiny muted">After leveling</span>
+                  <strong>{currentLevelUpStep.hpAfter}</strong>
+                </div>
+              </div>
+              {levelUpItems.length ? (
+                <ul className="levelup-choice-list">
+                  {levelUpItems.map((item) => (
+                    <li key={item.id}>
+                      <strong>{item.label}</strong>
+                      <span className="tiny muted">{item.detail}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="muted small">
+                  No new feat, skill, spell, or ability choices at this level. Review the sheet
+                  after leveling.
+                </p>
+              )}
+            </>
+          ) : null}
+
+          {currentLevelUpStep.kind === "choice" && currentLevelUpStep.choice ? (
+            <>
+              <div className="levelup-compare">
+                <div>
+                  <span className="tiny muted">Current sheet</span>
+                  <strong>Before level {nextLevel}</strong>
+                </div>
+                <ArrowRight size={16} />
+                <div>
+                  <span className="tiny muted">After leveling</span>
+                  <strong>{currentLevelUpStep.choice.label}</strong>
+                </div>
+              </div>
+              <p className="tiny muted">
+                You’ll make this choice in the{" "}
+                <strong>
+                  {STEPS.find((entry) => entry.id === currentLevelUpStep.choice?.step)?.label ??
+                    currentLevelUpStep.choice.step}
+                </strong>{" "}
+                section. The checklist keeps it open until it is done.
+              </p>
+            </>
+          ) : null}
+
+          {currentLevelUpStep.kind === "confirm" ? (
             <p className="muted small">
-              No new feat, skill, spell, or ability choices at this level. Review the sheet after
-              leveling.
+              {levelUpItems.length
+                ? `The builder switches to level ${nextLevel} and opens the ${
+                    STEPS.find((entry) => entry.id === levelUpItems[0]?.step)?.label ?? "review"
+                  } section.`
+                : "The builder switches to the new level. Review the sheet when you are ready."}
             </p>
-          )}
+          ) : null}
         </div>
       </Modal>
       <Modal

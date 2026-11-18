@@ -347,9 +347,11 @@ Acceptance: a GM can prepare a full session in Runehall and start it with one â€
   - After leveling, a persistent checklist lists required choices and links to each chapter.
   - Feat tasks check the actual slot; ability, skill, and spell tasks use validation.
   - Completed tasks are marked and the header reports the remaining count.
-- [ ] **Full guided level-up wizard**
-  - Gate level-up when the current level still has unresolved required choices.
-  - Add a step-by-step next/back flow with before/after explanations.
+- [x] **Full guided level-up wizard**
+  - The Level up button is gated while the current sheet still has validation errors; the tooltip explains which permission or choice is blocking it.
+  - A step-by-step wizard shows an overview with before/after HP, one page for each new feat, skill, spell, ability, or class feature, and a confirmation step with Back/Next controls.
+  - Confirming applies the level and opens the first new choice; the persistent checklist keeps every remaining choice visible.
+  - The wizard step builder is covered by unit tests, and the existing builder browser flow remains green.
 - [x] **Casting presentation**
   - Cleric divine font slots are tracked with their own pips, separate from ordinary rank slots.
   - Prepared casters label their spell lists as **spellbook** and show prepared counts; spontaneous casters use **repertoire**.

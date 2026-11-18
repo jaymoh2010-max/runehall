@@ -5132,47 +5132,78 @@
 /* ==========================================================================
    Guided level-up
    ========================================================================== */
-.levelup-summary {
+.levelup-progress {
   display: flex;
-  flex-direction: column;
-  gap: 8px;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
 }
-.levelup-hp {
-  display: flex;
+.levelup-progress span {
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
   border: 1px solid var(--line);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.015);
-  padding: 10px 12px;
+  border-radius: 50%;
   color: var(--muted);
-  font-size: 0.84rem;
+  font-size: 0.72rem;
 }
-.levelup-hp strong {
+.levelup-progress span.is-done {
+  border-color: rgba(127, 190, 149, 0.45);
   color: var(--green);
 }
-.levelup-item {
+.levelup-progress span.is-current {
+  border-color: var(--gold-deep);
+  background: rgba(200, 169, 107, 0.14);
+  color: var(--gold-bright);
+}
+.levelup-step {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.levelup-step h3 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+.levelup-step p {
+  margin: 0;
+  line-height: 1.55;
+}
+.levelup-compare {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 12px;
-  width: 100%;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.015);
   padding: 10px 12px;
-  color: var(--text-2);
-  text-align: left;
-  cursor: pointer;
 }
-.levelup-item:hover {
-  border-color: var(--gold-deep);
-  background: rgba(200, 169, 107, 0.05);
-}
-.levelup-item > span {
+.levelup-compare > div {
+  flex: 1;
   display: flex;
   flex-direction: column;
   gap: 2px;
+}
+.levelup-compare strong {
+  color: var(--gold-bright);
+  font-size: 1.05rem;
+}
+.levelup-choice-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.levelup-choice-list li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border-left: 2px solid rgba(200, 169, 107, 0.35);
+  padding-left: 9px;
 }
 
 .levelup-checklist {
