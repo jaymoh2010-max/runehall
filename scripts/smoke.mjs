@@ -437,6 +437,9 @@ async function main() {
   restDraft.play.hp = 0;
   restDraft.play.tempHp = 4;
   restDraft.play.heroPoints = 2;
+  restDraft.play.focusPoints = 0;
+  restDraft.spells.slotsUsed = { 1: 2 };
+  restDraft.spells.divineFontUsed = 2;
   restDraft.play.conditions = [
     { name: "Fatigued", value: null, duration: null },
     { name: "Drained", value: 2, duration: null },
@@ -467,6 +470,15 @@ async function main() {
   }
   if (restedCharacter.summary.currentHp !== restedCharacter.summary.hp) {
     throw new Error("Party long rest did not heal the character to maximum HP");
+  }
+  if (Object.keys(restedCharacter.data.spells.slotsUsed ?? {}).length !== 0) {
+    throw new Error("Party long rest did not clear spent spell slots");
+  }
+  if ((restedCharacter.data.spells.divineFontUsed ?? 0) !== 0) {
+    throw new Error("Party long rest did not restore divine font slots");
+  }
+  if (restedCharacter.data.play.focusPoints !== restedCharacter.summary.focusPoints) {
+    throw new Error("Party long rest did not restore focus points");
   }
   if (partyRest.payload.rested < 1)
     throw new Error("Party long rest reported no characters rested");
