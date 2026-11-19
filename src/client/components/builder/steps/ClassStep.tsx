@@ -114,6 +114,7 @@ import {
   rulesetLabel,
 } from "../../../../shared/content";
 import { summarizeRunes } from "../../../../shared/runes";
+import { CLASS_GRANTS } from "../../../../shared/classGrants";
 import type { BuilderProps } from "../shared";
 import { StepHeading, ValidationNote, SearchInput, MiniFeatureList } from "../shared";
 
@@ -361,6 +362,7 @@ export function ClassStep({
                   <div className="choice-options">
                     {optionList.map((option) => {
                       const selectedOption = picks.includes(option.id);
+                      const grant = CLASS_GRANTS[option.id];
                       return (
                         <button
                           type="button"
@@ -391,6 +393,19 @@ export function ClassStep({
                             {selectedOption ? <CheckCircle2 size={15} /> : null}
                           </span>
                           <span className="tiny muted">{option.source}</span>
+                          {grant?.feats?.length || grant?.spells?.length ? (
+                            <span className="tiny gold-text">
+                              {[
+                                ...(grant.feats ?? []).map((feat) => feat.name),
+                                ...(grant.spells ?? []).map(
+                                  (spell) => `${spell.name} (${spell.kind})`
+                                ),
+                              ].join(" · ")}
+                            </span>
+                          ) : null}
+                          {grant?.notes?.[0] ? (
+                            <span className="tiny muted">{grant.notes[0]}</span>
+                          ) : null}
                           <span className="choice-option-desc">
                             {option.description
                               .replace(/<[^>]+>/g, " ")

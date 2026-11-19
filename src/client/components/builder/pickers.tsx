@@ -41,6 +41,7 @@ import {
 } from "../ui";
 import { formatCp } from "../../api";
 import { computeCharacter, featPrerequisiteStatus, weaponDamageLabel } from "../../../shared/rules";
+import { selectedClassGrantFeatIds } from "../../../shared/classGrants";
 import { HoverCard } from "../HoverCard";
 
 interface PickerBase {
@@ -220,7 +221,10 @@ export function FeatPicker({
       ),
     [items, selectionDraft, context, selectionDerived]
   );
-  const eligible = items.filter((feat) => statusById[feat.id]?.status !== "unmet");
+  const grantedFeatIds = selectedClassGrantFeatIds(draft, context.classData);
+  const eligible = items.filter(
+    (feat) => statusById[feat.id]?.status !== "unmet" && !grantedFeatIds.has(feat.id)
+  );
   const hiddenCount = items.length - eligible.length;
   const selectedStatus = selected ? statusById[selected.id] : undefined;
 
@@ -299,7 +303,7 @@ export function FeatPicker({
             {hiddenCount ? (
               <p className="tiny muted picker-prereq-note">
                 {hiddenCount} feat{hiddenCount === 1 ? "" : "s"} hidden because prerequisites or
-                class access are not met.
+                class access are not met, or the feat is already granted by a class choice.
               </p>
             ) : null}
             {eligible.map((feat) => (

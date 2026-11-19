@@ -163,6 +163,29 @@ test("GM creates a campaign and builds a character through the lazy routes", asy
 
   await page
     .locator(".builder-steps")
+    .getByRole("button", { name: /^Class/ })
+    .click();
+  await page.locator(".class-grid").getByRole("button", { name: /Druid/ }).click();
+  await page
+    .locator(".choice-options")
+    .getByRole("button", { name: /Animal Order/ })
+    .click();
+  await expect(page.getByText("Animal Companion").first()).toBeVisible();
+  await page
+    .locator(".builder-steps")
+    .getByRole("button", { name: /^Feats/ })
+    .click();
+  await expect(page.locator(".granted-feats").getByText("Animal Companion")).toBeVisible();
+  await page
+    .locator(".builder-steps")
+    .getByRole("button", { name: /^Spells/ })
+    .click();
+  await expect(
+    page.locator(".spell-section").filter({ hasText: "Granted spells" }).getByText("Heal Animal")
+  ).toBeVisible();
+
+  await page
+    .locator(".builder-steps")
     .getByRole("button", { name: /^Equipment/ })
     .click();
   await expect(page.getByText("Starting wealth", { exact: true })).toBeVisible();

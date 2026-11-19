@@ -24,6 +24,7 @@ import {
   heritageChosenFeatId,
   heritageFeatGrant,
 } from "../shared/heritage";
+import { selectedClassGrants } from "../shared/classGrants";
 import {
   COMPENDIUM_KIND_ORDER,
   compendiumKindFromId,
@@ -481,6 +482,11 @@ export function contextForDraft(draft: CharacterDraft): CharacterContext {
   ) {
     featMap[heritageFeat.id] = heritageFeat;
   }
+  const classGrants = selectedClassGrants(draft, classData);
+  for (const granted of classGrants.feats) {
+    const feat = maps.feat.get(granted.id);
+    if (feat) featMap[feat.id] = feat;
+  }
 
   const spellMap: Record<string, Spell> = {};
   for (const id of [
@@ -491,6 +497,10 @@ export function contextForDraft(draft: CharacterDraft): CharacterContext {
   ]) {
     const spell = maps.spell.get(id);
     if (spell) spellMap[id] = spell;
+  }
+  for (const granted of classGrants.spells) {
+    const spell = maps.spell.get(granted.id);
+    if (spell) spellMap[spell.id] = spell;
   }
 
   const equipmentMap: Record<string, Equipment> = {};

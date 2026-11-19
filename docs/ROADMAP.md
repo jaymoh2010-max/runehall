@@ -182,9 +182,12 @@ The character builder is already good enough for a core campaign at low levels. 
    - Prepared casters now stop preparing once a rank’s slots are full.
    - Duplicate prepared castings are supported with a per-spell counter.
    - Spell slot pips can be reset in one click; cleric divine font and wizard curriculum slots are shown in the slot totals.
+   - Sorcerer and Oracle now use the correct level-1 three-slot spontaneous table.
+   - A bloodline/patron/eidolon-derived tradition is required before ordinary spells can be added, class cantrip caps are shown, and Cleric non-font preparation produces an advisory warning.
+   - Fixed class-choice grants apply Druid order feats/focus spells, Bard muse feats/repertoire spells, Wizard school focus spells and thesis feats, Sorcerer bloodline focus spells, and Cleric doctrine feats.
    - Spontaneous repertoire limits and prepared-slot validation are covered by shared tests.
    - Verified in-browser: a wizard with four rank-1 slots showed 4/4 prepared and disabled a fifth preparation.
-   - Remaining: separate divine-font slot tracking and full spellbook-vs-known presentation for all prepared classes.
+   - Remaining: free-choice grants (domains, devotion spells, variable bloodline gifts, curriculum variants), separate divine-font preparation controls, and full spellbook-vs-known presentation for all prepared classes.
 
 7. **Companions and print (manual roster complete)**
    - Animal companions, familiars, eidolons, and summons can be recorded with name, kind, level, HP, AC, and attack notes.
