@@ -73,7 +73,9 @@ This is the short checklist for the friend hosting Runehall and for the GM runni
    - **Import from Pathbuilder** and submit it for GM approval, or
    - **Bring an existing character** if one is already in the library.
 2. Review the character in the builder. The Review step lists missing choices and warnings.
-3. If the character was imported, wait for the GM to approve it before play.
+3. In **Equipment**, spend the 15 gp starting budget on gear, then use **Take remaining as coins** to
+   carry unspent wealth. Imported characters keep their own purse and are not held to that budget.
+4. If the character was imported, wait for the GM to approve it before play.
 
 ## GM: session 1 checklist
 

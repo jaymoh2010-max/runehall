@@ -17,6 +17,12 @@ export interface EffectModifiers {
   senses?: string[];
   /** Languages granted. Merged into the sheet languages. */
   languages?: string[];
+  /** Extra traits used by prerequisites, e.g. Aiuvarin counting as an elf. */
+  traits?: string[];
+  /** Skills trained by an always-on effect or heritage choice. */
+  trainedSkills?: string[];
+  /** Proficiency-rank floors for skills, e.g. Skilled Human at level 5. */
+  skillRanks?: Record<string, number>;
   /** Always-on bonuses the sheet cannot fully model; surfaced as notes. */
   notes?: string[];
   /** Circumstance bonus to initiative (highest wins). */
@@ -249,6 +255,15 @@ export function mergeEffects(effects: (EffectModifiers | undefined)[]): EffectMo
     if (effect.senses?.length) merged.senses = [...(merged.senses ?? []), ...effect.senses];
     if (effect.languages?.length)
       merged.languages = [...(merged.languages ?? []), ...effect.languages];
+    if (effect.traits?.length) merged.traits = [...(merged.traits ?? []), ...effect.traits];
+    if (effect.trainedSkills?.length)
+      merged.trainedSkills = [...(merged.trainedSkills ?? []), ...effect.trainedSkills];
+    if (effect.skillRanks) {
+      merged.skillRanks ??= {};
+      for (const [skill, rank] of Object.entries(effect.skillRanks)) {
+        merged.skillRanks[skill] = Math.max(merged.skillRanks[skill] ?? 0, rank ?? 0);
+      }
+    }
     if (effect.notes?.length) merged.notes = [...(merged.notes ?? []), ...effect.notes];
     if (effect.initiativeBonus)
       merged.initiativeBonus = Math.max(merged.initiativeBonus ?? 0, effect.initiativeBonus);

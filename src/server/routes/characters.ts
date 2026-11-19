@@ -487,6 +487,9 @@ export async function registerCharacterRoutes(app: FastifyInstance): Promise<voi
       return reply.code(400).send({ error: "Choose an item or an amount of coins to transfer." });
     }
 
+    // A transfer is play history, not character creation.
+    sourceDraft.wealthBudgetCp = null;
+    targetDraft.wealthBudgetCp = null;
     const sourceSummary = summarize(sourceDraft);
     const targetSummary = summarize(targetDraft);
     const updatedAt = now();

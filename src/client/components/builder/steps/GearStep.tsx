@@ -76,11 +76,11 @@ import {
   skillRankCap,
   spellRepertoireLimits,
   spellSlotsFor,
-  startingWealthCp,
   titleCase,
   traitLabel,
   weaponDamageLabel,
 } from "../../../../shared/rules";
+import { addCurrency } from "../../../../shared/inventory";
 import { api, formatCp, uploadImage } from "../../../api";
 import { errorMessage } from "../../../stores";
 import { useToasts } from "../../../stores";
@@ -130,9 +130,8 @@ export function GearStep({
   legacyLocked,
 }: BuilderProps) {
   const [runeEntryId, setRuneEntryId] = useState<string | null>(null);
-  const budget = startingWealthCp(draft.level);
-  const spent = derived.wealth.spent;
-  const remaining = budget - spent;
+  const { budget, spent, currencyCp, committed, remaining } = derived.wealth;
+  const budgeted = budget !== null;
   const runeEntry = runeEntryId
     ? (draft.equipment.find((entry) => entry.itemId === runeEntryId) ?? null)
     : null;
@@ -146,35 +145,64 @@ export function GearStep({
       />
       <Card className="wealth-card">
         <div className="wealth-numbers">
-          <Stat label="Starting wealth" value={formatCp(budget)} />
-          <Stat label="Spent" value={formatCp(spent)} tone="red" />
-          <Stat
-            label="Remaining"
-            value={formatCp(remaining)}
-            tone={remaining < 0 ? "red" : "green"}
-          />
+          {budgeted ? <Stat label="Starting wealth" value={formatCp(budget)} /> : null}
+          <Stat label="Gear value" value={formatCp(spent)} tone="red" />
+          <Stat label="Coins" value={formatCp(currencyCp)} />
+          {budgeted && remaining !== null ? (
+            <Stat
+              label="Remaining"
+              value={formatCp(remaining)}
+              tone={remaining < 0 ? "red" : "green"}
+            />
+          ) : null}
           <Stat
             label="Bulk"
             value={`${derived.bulk.total}`}
             hint={`${derived.bulk.capacity} before encumbered`}
           />
         </div>
-        <ProgressBar
-          value={Math.min(spent, budget)}
-          max={budget}
-          label={
-            <>
-              <span>Gear budget</span>
-              <span>{Math.round((Math.min(spent, budget) / Math.max(1, budget)) * 100)}%</span>
-            </>
-          }
-        />
-        {remaining < 0 ? (
+        {budgeted && budget !== null ? (
+          <>
+            <ProgressBar
+              value={Math.min(committed, budget)}
+              max={budget}
+              label={
+                <>
+                  <span>Starting wealth used</span>
+                  <span>
+                    {Math.round((Math.min(committed, budget) / Math.max(1, budget)) * 100)}%
+                  </span>
+                </>
+              }
+            />
+            {(remaining ?? 0) > 0 ? (
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() =>
+                  update((current) => ({
+                    ...current,
+                    currency: addCurrency(current.currency, remaining ?? 0),
+                  }))
+                }
+              >
+                Take {formatCp(remaining ?? 0)} as coins
+              </Button>
+            ) : null}
+          </>
+        ) : (
+          <p className="muted small">
+            Wealth comes from this character’s import or play history, so no starting budget is
+            applied.
+          </p>
+        )}
+        {budgeted && (remaining ?? 0) < 0 ? (
           <div className="validation-note">
             <div className="validation-line warning">
               <CircleAlert size={14} />
               <span>
-                You are over the standard starting wealth for this level. The GM can approve it.
+                Your gear and coins exceed the standard starting wealth for this level. The GM can
+                approve it.
               </span>
             </div>
           </div>
@@ -341,7 +369,8 @@ export function GearStep({
       <Card className="currency-card">
         <h3>Purse</h3>
         <p className="muted small">
-          Carried coins. Treasure can be recorded here for easy bookkeeping.
+          Carried coins. Coins count against the starting wealth during creation; use “Take
+          remaining as coins” to carry the unspent budget.
         </p>
         <div className="currency-grid">
           {(["gp", "sp", "cp"] as const).map((coin) => (

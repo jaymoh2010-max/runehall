@@ -245,6 +245,8 @@ export async function registerLootRoutes(app: FastifyInstance): Promise<void> {
         .map((item) => item.id)
     );
     draft = applyLootToDraft(draft, serializedParcel, equippable);
+    // Receiving loot moves the character from creation into play.
+    draft.wealthBudgetCp = null;
     const summary = characterSummary(draft, contextForDraft(draft));
     const ts = now();
 

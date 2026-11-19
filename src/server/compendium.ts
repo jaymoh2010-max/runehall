@@ -20,6 +20,11 @@ import type {
 import { isCoreSource } from "../shared/content";
 import { FEAT_GRANTS } from "../shared/effects";
 import {
+  featAllowedByHeritageGrant,
+  heritageChosenFeatId,
+  heritageFeatGrant,
+} from "../shared/heritage";
+import {
   COMPENDIUM_KIND_ORDER,
   compendiumKindFromId,
   stripHtml,
@@ -465,6 +470,16 @@ export function contextForDraft(draft: CharacterDraft): CharacterContext {
     ) {
       featMap[feat.id] = feat;
     }
+  }
+  const heritageGrant = heritageFeatGrant(heritage);
+  const heritageFeatId = heritageChosenFeatId(draft, heritage);
+  const heritageFeat = heritageFeatId ? maps.feat.get(heritageFeatId) : null;
+  if (
+    heritageFeat &&
+    heritageGrant &&
+    featAllowedByHeritageGrant(heritageFeat, heritageGrant, classData?.name)
+  ) {
+    featMap[heritageFeat.id] = heritageFeat;
   }
 
   const spellMap: Record<string, Spell> = {};

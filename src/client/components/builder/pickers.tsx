@@ -781,7 +781,7 @@ export function EquipmentPicker({
   return (
     <PickerShell
       title="Add equipment"
-      subtitle={`${total} items · prices count against starting wealth`}
+      subtitle={`${total} items · prices count toward gear value`}
       onClose={onClose}
     >
       <div className="picker-layout">

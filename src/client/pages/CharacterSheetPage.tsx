@@ -31,6 +31,7 @@ import {
   SAVE_LABELS,
   SIZES,
   SKILLS,
+  VISION_LABELS,
   type CharacterContext,
   type CharacterDraft,
   type CharacterRecord,
@@ -51,7 +52,7 @@ import {
 import { DEGREE_LABELS, applyAttackPenalty, mod, rollFormula } from "../../shared/dice";
 import { currencyToCp } from "../../shared/inventory";
 import { applyLongRest } from "../../shared/rest";
-import { applyDamageToDraft, applyHealingToDraft } from "../../shared/damage";
+import { applyHpEditToDraft } from "../../shared/damage";
 import { xpProgress } from "../../shared/xp";
 import { spellTraditionLabel, stripHtml } from "../../shared/compendium";
 import { conditionBaseName, conditionLabel, parseConditionEntry } from "../../shared/tokens";
@@ -383,35 +384,21 @@ export function CharacterSheetPage() {
 
   const applyDamage = (amount: number) => {
     if (!derived) return;
-    update((current) => applyDamageToDraft(current, derived.maxHp, amount).draft);
+    update(
+      (current) => applyHpEditToDraft(current, derived.maxHp, { type: "damage", amount }).draft
+    );
   };
 
   const applyHealing = (amount: number) => {
     if (!derived) return;
-    update((current) => applyHealingToDraft(current, derived.maxHp, amount).draft);
+    update((current) => applyHpEditToDraft(current, derived.maxHp, { type: "heal", amount }).draft);
   };
 
   const setHp = (nextHp: number) => {
     if (!derived) return;
-    const clamped = Math.max(0, Math.min(derived.maxHp, Math.round(nextHp)));
-    update((current) => {
-      const currentHp = current.play.hp ?? derived.maxHp;
-      if (clamped === currentHp) return current;
-      if (clamped < currentHp) {
-        // The numeric field is a correction, not an attack: keep temporary HP
-        // out of it while still applying dying/unconscious at 0.
-        const withoutTemp = {
-          ...current,
-          play: { ...current.play, tempHp: 0 },
-        };
-        const result = applyDamageToDraft(withoutTemp, derived.maxHp, currentHp - clamped);
-        return {
-          ...result.draft,
-          play: { ...result.draft.play, tempHp: current.play.tempHp },
-        };
-      }
-      return applyHealingToDraft(current, derived.maxHp, clamped - currentHp).draft;
-    });
+    update(
+      (current) => applyHpEditToDraft(current, derived.maxHp, { type: "set", hp: nextHp }).draft
+    );
   };
 
   const commitHpInput = () => {
@@ -1178,7 +1165,7 @@ export function CharacterSheetPage() {
               <h2>Inventory &amp; purse</h2>
               <span className="tiny muted">
                 {draft.equipment.length} {draft.equipment.length === 1 ? "stack" : "stacks"} ·{" "}
-                {derived.bulk.total} bulk · {formatCp(inventoryValue)} value
+                {derived.bulk.total} bulk · {formatCp(inventoryValue)} gear value
               </span>
             </div>
             <div className="sheet-purse">
@@ -1845,7 +1832,10 @@ export function CharacterSheetPage() {
               </div>
               <div>
                 <dt>Senses</dt>
-                <dd>{derived.senses.join(", ") || "Normal"}</dd>
+                <dd>
+                  {derived.senses.map((sense) => VISION_LABELS[sense] ?? sense).join(", ") ||
+                    "Normal"}
+                </dd>
               </div>
               <div>
                 <dt>Bulk</dt>

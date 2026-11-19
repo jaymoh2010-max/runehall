@@ -491,6 +491,10 @@ export function VttTable({ initial, campaignId, user, isGm, active }: VttTablePr
         token.sceneId === activeSceneId && token.groupId === groupId && token.hpMax !== null
     );
     for (const member of members) {
+      if (delta < 0) {
+        damageToken(member.id, Math.abs(delta));
+        continue;
+      }
       const current = member.hpCurrent ?? member.hpMax ?? 0;
       const next = Math.max(0, Math.min(member.hpMax ?? 0, current + delta));
       updateToken(member.id, { hpCurrent: next });

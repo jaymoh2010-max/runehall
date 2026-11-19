@@ -147,7 +147,14 @@ The character builder is already good enough for a core campaign at low levels. 
    - Verified default core backgrounds: 63 shown vs. 262 remastered options when expanded.
    - Remaining: granular per-option automation levels beyond Core/Expanded.
 
-2. **Feat prerequisite validation (complete for the current rules engine)**
+2. **Common heritage mechanics (first pass complete)**
+   - A curated mechanics table covers Skilled Human, Versatile Human, Ancient Elf, Aiuvarin, Dromaar, Nephilim, Changeling, Dhampir, Dragonblood, and Duskwalker.
+   - Heritage skill/feat choices are stored in `featChoices`, so they do not consume normal feat slots.
+   - Versatile and Ancient Elf feats enter the character context, prerequisite checks, and curated effect engine; class feats granted by Ancient Elf bypass only the class-access restriction.
+   - Senses, granted traits, language options, and manual notes flow into the builder and sheet.
+   - Remaining: normalize the upstream Foundry `Sense`/`GrantItem` rules at ingest so the curated table can shrink.
+
+3. **Feat prerequisite validation (complete for the current rules engine)**
    - Level, ability modifier, proficiency, skill/Lore, feat, class feature/option, ancestry/heritage/deity, casting, focus pool, and common trait prerequisites are parsed.
    - Feats with definitively unmet prerequisites are hidden from future choices and cannot be selected.
    - Class feats with recognizable class traits are blocked when they belong to another class, even with the class filter off. Background starting feats enter the context, prerequisite, and effect pipeline.
@@ -157,12 +164,12 @@ The character builder is already good enough for a core campaign at low levels. 
    - Feat category and slot-level mismatches are hard validation errors.
    - Remaining: expand parser coverage for unusual narrative requirements as they are reported. GM overrides are intentionally deferred.
 
-3. **Curated rule overrides for known gaps (deferred)**
+4. **Curated rule overrides for known gaps (deferred)**
    - The current Foundry import already carries subclass proficiencies; Warpriest/Battle Creed armor and save ranks are covered by data tests.
    - Keep a small explicit override layer ready for concrete reported gaps rather than guessing at one now.
    - Acceptance remains: any reported common subclass must affect AC/saves/proficiencies correctly.
 
-4. **Gear and runes (core complete)**
+5. **Gear and runes (core complete)**
    - Weapon and armor potency, striking, resilient, and property runes can be attached per item.
    - Attached runes count toward wealth, replace the previous fundamental rune in their category, and enforce property-rune slots from potency.
    - Weapon potency and striking change attack/damage; armor potency and resilient change AC/all saves; common energy property runes add separate typed damage rolls.
@@ -171,7 +178,7 @@ The character builder is already good enough for a core campaign at low levels. 
    - The builder charges the current rune’s full price, which equals its base price plus any upgrade cost; purchase history is not tracked.
    - Remaining: full property-rune effect coverage.
 
-5. **Spellcasting depth (core complete)**
+6. **Spellcasting depth (core complete)**
    - Prepared casters now stop preparing once a rank’s slots are full.
    - Duplicate prepared castings are supported with a per-spell counter.
    - Spell slot pips can be reset in one click; cleric divine font and wizard curriculum slots are shown in the slot totals.
@@ -179,13 +186,13 @@ The character builder is already good enough for a core campaign at low levels. 
    - Verified in-browser: a wizard with four rank-1 slots showed 4/4 prepared and disabled a fifth preparation.
    - Remaining: separate divine-font slot tracking and full spellbook-vs-known presentation for all prepared classes.
 
-6. **Companions and print (manual roster complete)**
+7. **Companions and print (manual roster complete)**
    - Animal companions, familiars, eidolons, and summons can be recorded with name, kind, level, HP, AC, and attack notes.
    - Companion roster appears on the character sheet and in print output.
    - Added a Print/PDF action with a print stylesheet that removes app chrome.
    - Remaining: bestiary-linked companion stat blocks and automated companion advancement.
 
-7. **Guided level-up (first pass complete)**
+8. **Guided level-up (first pass complete)**
    - The Level up action previews HP, new feat slots, skill increases, spell ranks, ability boosts, and class features.
    - Choosing a preview item advances the character and jumps into that chapter.
    - Remaining: full step-by-step level-up wizard with prerequisite explanations.
@@ -386,6 +393,10 @@ Acceptance: a GM can prepare a full session in Runehall and start it with one �
   - A target DC/AC field resolves PF2e degrees of success; a secret toggle keeps the roll GM-only.
   - Attacks expose second/third-attack MAP buttons (agile-adjusted) and a critical-damage shortcut.
   - Direct HP corrections apply dying/unconscious and wounded-on-recovery without silently consuming temporary HP.
+  - Sheet, token editor, token panel, group actions, and unlinked monsters share one HP edit helper (damage, heal, or direct correction).
+- [x] **Starting wealth budget**
+  - A fresh level-1 character’s 15 gp budget covers both equipment value and carried coins, with a one-click **Take remaining as coins** action.
+  - Pathbuilder, loot, and transfer characters are explicitly unbudgeted so play-history wealth does not trigger false creation warnings.
 - [x] **Area templates**
   - Burst, emanation, cone, and line templates with size in feet.
   - Click-drag placement on the map, with a live preview and a size label.

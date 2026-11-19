@@ -115,6 +115,13 @@ import {
   rulesetLabel,
 } from "../../../../shared/content";
 import { summarizeRunes } from "../../../../shared/runes";
+import {
+  featAllowedByHeritageGrant,
+  heritageChosenFeatId,
+  heritageFeatGrant,
+  heritageFeatTraits,
+  heritageNotes,
+} from "../../../../shared/heritage";
 import type { BuilderProps } from "../shared";
 import { StepHeading, ValidationNote, SearchInput, MiniFeatureList } from "../shared";
 
@@ -130,7 +137,7 @@ export function FeatsStep({
   const classData = context.classData;
   const ancestry = context.ancestry;
   const slots = featSlotsFor(classData, draft.level);
-  const ancestryTrait = ancestry?.name.toLowerCase().replace(/\s+/g, "-");
+  const ancestryTrait = heritageFeatTraits(context.heritage, ancestry).join(",");
   const classTrait = classData?.name.toLowerCase();
   const issues = derived.validation.filter((issue) => issue.step === "feats");
   const selectedFeatList = [
@@ -147,6 +154,58 @@ export function FeatsStep({
     .find((entry) => entry.grant);
   const grantFeatId = grantEntry?.feat.id ?? null;
   const [grantOptions, setGrantOptions] = useState<Feat[]>([]);
+  const heritage = context.heritage;
+  const heritageGrant = heritageFeatGrant(heritage);
+  const heritageChoiceId = heritageChosenFeatId(draft, heritage) ?? "";
+  const heritageChosenFeat = heritageChoiceId ? (context.feats[heritageChoiceId] ?? null) : null;
+  const heritageChosenChoice = heritageChosenFeat ? featChoice(heritageChosenFeat.id) : undefined;
+  const heritageNeedsWeaponChoice =
+    heritageChosenFeat?.id === WEAPON_PROFICIENCY_ID &&
+    Number(classData?.attacks.martial ?? 0) >= 1;
+  const [heritageOptions, setHeritageOptions] = useState<Feat[]>([]);
+  const heritageSelectOptions =
+    heritageChosenFeat && !heritageOptions.some((feat) => feat.id === heritageChosenFeat.id)
+      ? [heritageChosenFeat, ...heritageOptions]
+      : heritageOptions;
+
+  useEffect(() => {
+    if (!heritageGrant) {
+      setHeritageOptions([]);
+      return;
+    }
+    let cancelled = false;
+    const params = new URLSearchParams();
+    params.set("category", heritageGrant.category);
+    params.set("levelMin", "1");
+    params.set("levelMax", String(heritageGrant.level));
+    params.set("limit", "200");
+    if (heritageGrant.filterTraits?.length) {
+      params.set("trait", heritageGrant.filterTraits.join(","));
+    }
+    if (!draft.includeLegacy) params.set("legacy", "0");
+    if (draft.contentMode === "core") params.set("core", "1");
+    api<{ items: Feat[] }>(`/api/compendium/feats?${params.toString()}`)
+      .then((result) => {
+        if (cancelled) return;
+        setHeritageOptions(
+          result.items.filter((feat) =>
+            featAllowedByHeritageGrant(feat, heritageGrant, context.classData?.name)
+          )
+        );
+      })
+      .catch(() => {
+        if (!cancelled) setHeritageOptions([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    heritageGrant,
+    heritage?.id,
+    context.classData?.name,
+    draft.includeLegacy,
+    draft.contentMode,
+  ]);
 
   useEffect(() => {
     if (!grantFeatId) {
@@ -184,6 +243,129 @@ export function FeatsStep({
         title="How do you sharpen your edge?"
         lede="Feats are the techniques, talents, and tricks that make your character yours. Class, skill, general, and ancestry feats unlock on different schedules."
       />
+      {heritageGrant ? (
+        <Card className={`feat-slot ${heritageChoiceId ? "is-filled" : ""}`}>
+          <div className="feat-slot-head">
+            <div className="feat-slot-level">Gift</div>
+            <div className="grow">
+              <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
+                <strong>{heritage?.name} heritage feat</strong>
+                <Badge tone={heritageChoiceId ? "green" : "gold"}>
+                  {heritageChoiceId ? "Chosen" : "Required"}
+                </Badge>
+              </div>
+              <p className="tiny muted">
+                {heritageGrant.prompt}. This feat does not consume a feat slot.
+              </p>
+            </div>
+          </div>
+          <Select
+            value={heritageChoiceId}
+            onChange={(event) => {
+              const value = event.target.value;
+              update((current) => ({
+                ...current,
+                featChoices: {
+                  ...current.featChoices,
+                  [heritage!.id]: value ? [value] : [],
+                },
+              }));
+            }}
+          >
+            <option value="">Choose…</option>
+            {heritageSelectOptions.map((feat) => (
+              <option key={feat.id} value={feat.id}>
+                {feat.name} · level {feat.level}
+              </option>
+            ))}
+          </Select>
+          {heritageChosenFeat ? (
+            <div className="stack" style={{ gap: 8, marginTop: 10 }}>
+              <div className="chip-row">
+                <Tag>{heritageChosenFeat.source}</Tag>
+                {heritageChosenFeat.traits.slice(0, 5).map((trait) => (
+                  <Tag key={trait}>{traitLabel(trait)}</Tag>
+                ))}
+              </div>
+              {heritageChosenChoice ? (
+                <Field
+                  label={heritageChosenChoice.prompt}
+                  hint="Runehall applies your choice to the sheet."
+                >
+                  {heritageChosenChoice.kind === "text" ? (
+                    <Input
+                      value={draft.featChoices[heritageChosenFeat.id]?.[0] ?? ""}
+                      placeholder={heritageChosenChoice.placeholder}
+                      onChange={(event) => {
+                        const value = event.target.value;
+                        update((current) => ({
+                          ...current,
+                          featChoices: {
+                            ...current.featChoices,
+                            [heritageChosenFeat.id]: value ? [value] : [],
+                          },
+                        }));
+                      }}
+                    />
+                  ) : (
+                    <Select
+                      value={draft.featChoices[heritageChosenFeat.id]?.[0] ?? ""}
+                      onChange={(event) => {
+                        const value = event.target.value;
+                        update((current) => ({
+                          ...current,
+                          featChoices: {
+                            ...current.featChoices,
+                            [heritageChosenFeat.id]: value ? [value] : [],
+                          },
+                        }));
+                      }}
+                    >
+                      <option value="">Choose…</option>
+                      {heritageChosenChoice.options.map((option) => (
+                        <option key={option.id} value={option.id}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </Select>
+                  )}
+                </Field>
+              ) : null}
+              {heritageNeedsWeaponChoice ? (
+                <Field
+                  label="Advanced weapon"
+                  hint="You're already trained in martial weapons, so name the advanced weapon to train."
+                >
+                  <Input
+                    value={draft.featChoices[heritageChosenFeat.id]?.[0] ?? ""}
+                    placeholder="e.g. Aldori Dueling Sword"
+                    onChange={(event) => {
+                      const value = event.target.value;
+                      update((current) => ({
+                        ...current,
+                        featChoices: {
+                          ...current.featChoices,
+                          [heritageChosenFeat.id]: value ? [value] : [],
+                        },
+                      }));
+                    }}
+                  />
+                </Field>
+              ) : null}
+              {heritageChosenFeat.prerequisites.length ? (
+                <p className="tiny muted">
+                  <strong>Requires:</strong> {heritageChosenFeat.prerequisites.join("; ")}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+          {heritageNotes(heritage).map((note) => (
+            <p key={note} className="tiny muted">
+              {note}
+            </p>
+          ))}
+        </Card>
+      ) : null}
       <div className="feat-slots">
         {slots.map((slot) => {
           const featId = draft.feats[slot.category]?.[String(slot.level)];

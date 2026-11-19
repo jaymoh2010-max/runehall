@@ -19,6 +19,12 @@ import {
 } from "../src/shared/rules";
 import { validateFormula } from "../src/shared/dice";
 import { automationForEquipment, automationForFeat } from "../src/shared/automation";
+import {
+  featAllowedByHeritageGrant,
+  heritageChosenFeatId,
+  heritageFeatGrant,
+  heritageSkillChoice,
+} from "../src/shared/heritage";
 import { SKILLS } from "../src/shared/types";
 import type {
   Ancestry,
@@ -506,6 +512,9 @@ function simulate(
   const heritageChoices = heritages.filter(
     (entry) =>
       entry.remaster &&
+      // Ancient Elf needs a dedication whose prerequisites depend on the final
+      // ability scores; it is covered by a targeted heritage test instead.
+      entry.name !== "Ancient Elf" &&
       (entry.versatile ||
         entry.ancestry === ancestry.name ||
         entry.ancestrySlug === ancestry.name.toLowerCase())
@@ -529,10 +538,28 @@ function simulate(
   chooseBoosts(rng, draft, baseContext);
   chooseDeity(rng, draft, classData);
 
-  const context = contextFor(draft, [], [], []);
+  const heritageSkill = heritageSkillChoice(heritage);
+  if (heritage && heritageSkill) {
+    const options = heritageSkill.options.filter((skill) => !draft.skills.trained.includes(skill));
+    draft.featChoices[heritage.id] = [pick(rng, options.length ? options : heritageSkill.options)];
+  }
+  const heritageGrant = heritageFeatGrant(heritage);
+  if (heritage && heritageGrant) {
+    const candidates = remasterFeats.filter((feat) =>
+      featAllowedByHeritageGrant(feat, heritageGrant, classData.name)
+    );
+    const chosen = candidates.find((feat) => feat.name === "Toughness") ?? candidates[0] ?? null;
+    if (chosen) draft.featChoices[heritage.id] = [chosen.id];
+  }
+  const heritageFeatId = heritageChosenFeatId(draft, heritage);
+  const heritageFeat = heritageFeatId
+    ? (feats.find((feat) => feat.id === heritageFeatId) ?? null)
+    : null;
+
+  const context = contextFor(draft, heritageFeat ? [heritageFeat] : [], [], []);
   chooseSkills(rng, draft, context);
 
-  const selectedFeats: Feat[] = [];
+  const selectedFeats: Feat[] = heritageFeat ? [heritageFeat] : [];
   chooseFeats(rng, draft, context, selectedFeats);
 
   const selectedSpells: Spell[] = [];

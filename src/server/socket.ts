@@ -12,7 +12,7 @@ import {
   syncLifeConditions,
   tickTokenConditions,
 } from "../shared/tokens";
-import { applyDamageToDraft, reconcileLifeConditions } from "../shared/damage";
+import { applyHpEditToDraft, applyHpEditToState } from "../shared/damage";
 import {
   filterInitiativeForPlayers,
   renameInitiativeEntries,
@@ -809,48 +809,75 @@ export function registerSocketServer(io: TypedServer): void {
         if (character) {
           try {
             const draft = normalizeCharacterDraft(JSON.parse(character.data), character.name);
-            draft.play.hp =
-              updated.hp_current === null
-                ? null
-                : Math.max(0, Math.min(1_000_000, Number(updated.hp_current)));
             const maxHp = computeCharacter(draft, contextForDraft(draft)).maxHp;
-            draft.play.conditions = reconcileLifeConditions(
-              draft.play.conditions,
-              draft.play.hp ?? maxHp,
-              maxHp
-            );
-            const summary = characterSummary(draft, contextForDraft(draft));
+            const result = applyHpEditToDraft(draft, maxHp, {
+              type: "set",
+              hp:
+                updated.hp_current === null
+                  ? null
+                  : Math.max(0, Math.min(maxHp, Number(updated.hp_current))),
+            });
+            const nextDraft = result.draft;
+            const summary = characterSummary(nextDraft, contextForDraft(nextDraft));
             db.prepare(
               "UPDATE characters SET data = ?, summary = ?, updated_at = ?, revision = revision + 1 WHERE id = ?"
-            ).run(JSON.stringify(draft), JSON.stringify(summary), now(), character.id);
-            const currentTokenConditions = normalizeTokenConditions(
-              parseJson(updated.conditions, [])
+            ).run(JSON.stringify(nextDraft), JSON.stringify(summary), now(), character.id);
+            const freshToken = tokenRow(token.id);
+            const tokenConditions = syncLifeConditions(
+              normalizeTokenConditions(parseJson(freshToken?.conditions, [])),
+              nextDraft.play.conditions
             );
-            const mergedConditions = syncLifeConditions(
-              currentTokenConditions,
-              draft.play.conditions
+            db.prepare(
+              "UPDATE tokens SET hp_max = ?, hp_current = ?, ac = ?, conditions = ?, updated_at = ? WHERE id = ?"
+            ).run(
+              summary.hp,
+              nextDraft.play.hp ?? summary.hp,
+              summary.ac,
+              JSON.stringify(tokenConditions),
+              now(),
+              token.id
             );
-            if (JSON.stringify(mergedConditions) !== JSON.stringify(currentTokenConditions)) {
-              db.prepare("UPDATE tokens SET conditions = ?, updated_at = ? WHERE id = ?").run(
-                JSON.stringify(mergedConditions),
-                now(),
-                token.id
+            const refreshed = tokenRow(token.id);
+            if (refreshed) {
+              socketTokenEvents(io, campaignId).updated(
+                tokenWithOwner(refreshed),
+                Boolean(refreshed.hidden)
               );
-              const refreshed = tokenRow(token.id);
-              if (refreshed) {
-                socketTokenEvents(io, campaignId).updated(
-                  tokenWithOwner(refreshed),
-                  Boolean(refreshed.hidden)
-                );
-              }
             }
             io.to(room(campaignId)).emit("character:updated", {
               characterId: character.id,
               summary,
-              name: draft.name,
+              name: nextDraft.name,
             });
           } catch {
             // A malformed draft shouldn't block the token update.
+          }
+        }
+      } else if (!updated?.character_id && token.hpCurrent !== undefined) {
+        const maxHp = updated?.hp_max ?? row.hp_max ?? null;
+        if (maxHp !== null) {
+          const state = applyHpEditToState(
+            {
+              hp: row.hp_current ?? maxHp,
+              conditions: normalizeTokenConditions(parseJson(row.conditions, [])),
+            },
+            maxHp,
+            { type: "set", hp: token.hpCurrent === null ? null : Number(token.hpCurrent) }
+          );
+          db.prepare(
+            "UPDATE tokens SET hp_current = ?, conditions = ?, updated_at = ? WHERE id = ?"
+          ).run(
+            state.draft.play.hp ?? maxHp,
+            JSON.stringify(state.draft.play.conditions),
+            now(),
+            token.id
+          );
+          const refreshed = tokenRow(token.id);
+          if (refreshed) {
+            socketTokenEvents(io, campaignId).updated(
+              tokenWithOwner(refreshed),
+              Boolean(refreshed.hidden)
+            );
           }
         }
       }
@@ -882,7 +909,9 @@ export function registerSocketServer(io: TypedServer): void {
         try {
           const draft = normalizeCharacterDraft(JSON.parse(character.data), character.name);
           const derived = computeCharacter(draft, contextForDraft(draft));
-          const result = applyDamageToDraft(draft, derived.maxHp, damage, {
+          const result = applyHpEditToDraft(draft, derived.maxHp, {
+            type: "damage",
+            amount: damage,
             critical: Boolean(critical),
           });
           const summary = characterSummary(result.draft, contextForDraft(result.draft));
@@ -922,25 +951,19 @@ export function registerSocketServer(io: TypedServer): void {
         return;
       }
 
-      const current = row.hp_current ?? row.hp_max ?? 0;
-      const next = Math.max(0, current - damage);
-      let conditions = normalizeTokenConditions(parseJson(row.conditions, []));
-      if (next === 0) {
-        const existingDying = conditions.find((entry) => entry.name.toLowerCase() === "dying");
-        const wounded = conditions.find((entry) => entry.name.toLowerCase() === "wounded");
-        const dying = existingDying
-          ? (existingDying.value ?? 1) + 1 + (critical ? 1 : 0)
-          : 1 + (wounded?.value ?? 0) + (critical ? 1 : 0);
-        conditions = conditions.filter(
-          (entry) => !["dying", "unconscious", "dead"].includes(entry.name.toLowerCase())
-        );
-        conditions.push({ name: "Dying", value: dying, duration: null });
-        conditions.push({ name: "Unconscious", value: null, duration: null });
-        if (dying >= 4) conditions.push({ name: "Dead", value: null, duration: null });
-      }
+      const maxHp = row.hp_max;
+      if (maxHp === null) return;
+      const result = applyHpEditToState(
+        {
+          hp: row.hp_current ?? maxHp,
+          conditions: normalizeTokenConditions(parseJson(row.conditions, [])),
+        },
+        maxHp,
+        { type: "damage", amount: damage, critical: Boolean(critical) }
+      );
       db.prepare(
         "UPDATE tokens SET hp_current = ?, conditions = ?, updated_at = ? WHERE id = ?"
-      ).run(next, JSON.stringify(conditions), ts, row.id);
+      ).run(result.draft.play.hp ?? 0, JSON.stringify(result.draft.play.conditions), ts, row.id);
       const updated = tokenRow(row.id);
       if (updated) {
         socketTokenEvents(io, campaignId).updated(tokenWithOwner(updated), Boolean(updated.hidden));

@@ -118,7 +118,8 @@ describe("Pathbuilder import", () => {
     expect(draft.boosts.free).toEqual(["str", "dex", "con", "wis"]);
     expect(draft.boosts.levels["5"]).toEqual(["str", "con", "wis", "dex"]);
 
-    expect(draft.feats.general["1"]).toBe(toughness.id);
+    expect(draft.featChoices[versatileHuman.id]).toEqual([toughness.id]);
+    expect(draft.feats.general["1"]).toBeUndefined();
     expect(draft.feats.general["3"]).toBe(fleet.id);
     expect(draft.feats.class["1"]).toBe(doubleSlice.id);
     expect(draft.featChoices[naturalAmbition.id]).toEqual([reachSpell.id]);
@@ -130,6 +131,7 @@ describe("Pathbuilder import", () => {
     expect(draft.equipment.find((entry) => entry.itemId === hideArmor.id)?.equipped).toBe(true);
     expect(draft.equipment.find((entry) => entry.itemId === backpack.id)?.invested).toBe(true);
     expect(draft.currency).toEqual({ gp: 20, sp: 5, cp: 0 });
+    expect(draft.wealthBudgetCp).toBeNull();
 
     expect(report.unmatched).toEqual([]);
     expect(report.matched.feat).toBeGreaterThanOrEqual(4);

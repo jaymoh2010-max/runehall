@@ -16,9 +16,11 @@ Runehall is built for a private group of roughly 4–10 players and a GM. It run
 - Level 1–20 character builder with live PF2e math.
 - Ancestry, heritage, background, class, deity, ability boosts, skills, feats, spells, gear, details, and review chapters.
 - Core sources by default — Player Core, Player Core 2, Core Rulebook, GM Core, and Monster Core — with an **Expanded sources** toggle in every picker.
+- Common level-1 heritage mechanics are applied: Skilled Human's skill choice and level-5 expertise, Versatile Human's bonus general feat, Ancient Elf's other-class dedication, and the senses/feat access of Aiuvarin, Dromaar, Nephilim, Changeling, Dhampir, and Duskwalker. Dragonblood adds Draconic and explicit tracking notes without inventing low-light vision. Less structured heritages stay visible with honest manual notes.
 - Feat prerequisites are enforced: options with unmet prerequisites are hidden and cannot be selected. Complex story requirements stay visible with a **Check prereqs** warning. Class feats are also checked against the selected class, even when the “Only my class” filter is off, and a background’s starting feat enters the same prerequisite and effect pipeline.
 - Core ancestry, heritage, background, and class choices plus picker selections update the summary, step badges, and derived numbers immediately instead of waiting for the next autosave. The **Sheet** link waits for a pending save before navigating, and closing the tab flushes the latest draft.
 - Weapon, armor, and shield runes: weapon/armor potency, striking, resilient, property runes, and shield durability; rune prices count toward wealth and their bonuses flow into attacks, damage, AC, saves, and shield Hardness/HP.
+- Starting wealth is a one-time level-1 creation budget covering both gear and carried coins, with a **Take remaining as coins** action. Imported, looted, and transferred characters use play-history wealth without a starting-budget warning.
 - Prepared casters are capped by their rank-by-rank spell slots; duplicate preparations are supported, spontaneous repertoire limits are checked, and slot pips can be reset between sessions.
 - Manual companion roster for animal companions, familiars, eidolons, and summons, with HP, AC, and attack notes.
 - A step-by-step level-up wizard shows before/after HP and each new feat, skill, spell, ability boost, or class feature with Back/Next controls. Level up stays locked while required choices are unresolved, then opens the first relevant chapter.
@@ -37,7 +39,7 @@ Runehall is built for a private group of roughly 4–10 players and a GM. It run
 - Conditions are shared between a linked character sheet and its table token. A GM applying Frightened or Off-Guard to a token updates the player's AC, saves, attacks, and DCs; a player changing conditions on the sheet updates the token.
 - The open character sheet and party cards receive live `character:updated` events, so token damage, GM rests, loot, conditions, and level-ups do not require a reload.
 - One-click **Long rest**: heals CON modifier (minimum 1) × level, clears temporary HP, resets spell slots, divine font, focus points, and shield, removes fatigued and recovering dying/unconscious, and reduces doomed/drained by 1.
-- **Damage and healing use PF2e life state.** Temporary HP absorbs damage first; reaching 0 HP applies dying and unconscious; healing above 0 clears them and adds or raises wounded; doomed lowers the death threshold. Direct HP corrections apply the same dying/unconscious state without silently consuming temporary HP. Token damage and sheet damage share the same rules.
+- **Damage and healing use PF2e life state.** Temporary HP absorbs damage first; reaching 0 HP applies dying and unconscious; healing above 0 clears them and adds or raises wounded; doomed lowers the death threshold. Direct HP corrections apply the same dying/unconscious state without silently consuming temporary HP. Sheet HP, token editor HP, token panel edits, group damage/healing, and unlinked-monster damage all use the same helper.
 
 ### Shared table
 - Scene maps with automatic dimensions, interactive grid calibration, and map scaling.

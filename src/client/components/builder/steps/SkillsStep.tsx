@@ -114,6 +114,7 @@ import {
   rulesetLabel,
 } from "../../../../shared/content";
 import { summarizeRunes } from "../../../../shared/runes";
+import { heritageSkillChoice } from "../../../../shared/heritage";
 import type { BuilderProps } from "../shared";
 import { StepHeading, ValidationNote, SearchInput, MiniFeatureList } from "../shared";
 
@@ -129,6 +130,9 @@ export function SkillsStep({ draft, update, derived, context, setStep }: Builder
     (level) => level <= draft.level
   );
   const issues = derived.validation.filter((issue) => issue.step === "skills");
+  const heritage = context.heritage;
+  const heritageSkill = heritageSkillChoice(heritage);
+  const heritageSkillId = heritage?.id ? (draft.featChoices[heritage.id]?.[0] ?? "") : "";
 
   const toggleTrained = (skill: SkillId) =>
     update((current) => {
@@ -185,6 +189,48 @@ export function SkillsStep({ draft, update, derived, context, setStep }: Builder
           ) : null}
         </div>
       </Card>
+      {heritageSkill && heritage ? (
+        <Card className="skill-picker">
+          <div className="skill-picker-head">
+            <div>
+              <h3>{heritage.name} training</h3>
+              <p className="muted small">
+                {heritageSkill.prompt}. This training is automatic and does not use a class skill
+                choice.
+              </p>
+            </div>
+            <Badge tone={heritageSkillId ? "green" : "gold"}>
+              {heritageSkillId ? "Chosen" : "Required"}
+            </Badge>
+          </div>
+          <Select
+            value={heritageSkillId}
+            onChange={(event) => {
+              const value = event.target.value;
+              update((current) => ({
+                ...current,
+                featChoices: {
+                  ...current.featChoices,
+                  [heritage.id]: value ? [value] : [],
+                },
+                skills: {
+                  ...current.skills,
+                  trained: current.skills.trained.filter((skill) => skill !== value),
+                },
+              }));
+            }}
+          >
+            <option value="">Choose…</option>
+            {heritageSkill.options
+              .filter((skill) => skill === heritageSkillId || !fixed.has(skill))
+              .map((skill) => (
+                <option key={skill} value={skill}>
+                  {SKILL_BY_ID[skill].name}
+                </option>
+              ))}
+          </Select>
+        </Card>
+      ) : null}
       <Card className="skill-picker">
         <div className="skill-picker-head">
           <div>
