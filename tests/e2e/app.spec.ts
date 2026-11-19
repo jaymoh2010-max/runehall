@@ -565,11 +565,16 @@ test("GM places a token, chats, rolls, and opens the scenes manager", async ({ p
   await expect(page.getByRole("heading", { name: "The First Step" })).toBeVisible({
     timeout: 15_000,
   });
+  await expect(page.locator(".vtt-connection")).toHaveClass(/is-online/, { timeout: 15_000 });
 
   await page.getByRole("button", { name: "Add token", exact: true }).click();
   const addToken = page.getByRole("dialog", { name: "Add a token" });
   await expect(addToken).toBeVisible();
-  await addToken.getByRole("button", { name: "Place" }).first().click();
+  await addToken
+    .locator(".token-add-row")
+    .filter({ has: page.locator("strong", { hasText: /^E2E Hero$/ }) })
+    .getByRole("button", { name: "Place" })
+    .click();
   await expect(page.getByRole("button", { name: /E2E Hero, character token/ })).toBeVisible({
     timeout: 15_000,
   });
