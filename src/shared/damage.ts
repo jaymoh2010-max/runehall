@@ -27,6 +27,148 @@ export interface HealingResult {
   notes: string[];
 }
 
+export type HpEdit =
+  | { type: "damage"; amount: number; critical?: boolean }
+  | { type: "heal"; amount: number }
+  | { type: "set"; hp: number | null };
+
+export interface HpEditResult {
+  draft: CharacterDraft;
+  changed: boolean;
+  notes: string[];
+  tempHpAbsorbed: number;
+  hpDamage: number;
+  healed: number;
+  droppedToZero: boolean;
+  dying: number;
+  wounded: number;
+  dead: boolean;
+}
+
+export interface HpState {
+  hp: number | null;
+  tempHp?: number;
+  conditions: CharacterCondition[];
+}
+
+function stateDraft(state: HpState): CharacterDraft {
+  return {
+    play: {
+      hp: state.hp,
+      tempHp: state.tempHp ?? 0,
+      conditions: state.conditions,
+      heroPoints: 0,
+      focusPoints: 0,
+      downtimeDays: 0,
+      xp: 0,
+      shieldRaised: false,
+    },
+  } as CharacterDraft;
+}
+
+/**
+ * One HP mutation entry point for the sheet, token editor, token panel, group
+ * actions, and unlinked monsters. "set" is a direct correction that preserves
+ * temporary HP; damage and heal use the normal PF2e life-state rules.
+ */
+export function applyHpEditToDraft(
+  draft: CharacterDraft,
+  maxHp: number,
+  edit: HpEdit
+): HpEditResult {
+  if (edit.type === "damage") {
+    const result = applyDamageToDraft(draft, maxHp, edit.amount, {
+      critical: edit.critical,
+    });
+    return {
+      draft: result.draft,
+      changed: result.draft !== draft,
+      notes: result.notes,
+      tempHpAbsorbed: result.tempHpAbsorbed,
+      hpDamage: result.hpDamage,
+      healed: 0,
+      droppedToZero: result.droppedToZero,
+      dying: result.dying,
+      wounded: result.wounded,
+      dead: result.dead,
+    };
+  }
+  if (edit.type === "heal") {
+    const result = applyHealingToDraft(draft, maxHp, edit.amount);
+    return {
+      draft: result.draft,
+      changed: result.draft !== draft,
+      notes: result.notes,
+      tempHpAbsorbed: 0,
+      hpDamage: 0,
+      healed: result.healed,
+      droppedToZero: false,
+      dying: conditionValue(result.draft.play.conditions, "dying"),
+      wounded: conditionValue(result.draft.play.conditions, "wounded"),
+      dead: conditionValue(result.draft.play.conditions, "dead") > 0,
+    };
+  }
+
+  const maximum = Math.max(1, Math.round(maxHp));
+  const currentHp =
+    draft.play.hp === null ? maximum : Math.max(0, Math.min(maximum, Math.round(draft.play.hp)));
+  const target = edit.hp === null ? maximum : Math.max(0, Math.min(maximum, Math.round(edit.hp)));
+  if (target === currentHp) {
+    return {
+      draft,
+      changed: false,
+      notes: [],
+      tempHpAbsorbed: 0,
+      hpDamage: 0,
+      healed: 0,
+      droppedToZero: false,
+      dying: conditionValue(draft.play.conditions, "dying"),
+      wounded: conditionValue(draft.play.conditions, "wounded"),
+      dead: conditionValue(draft.play.conditions, "dead") > 0,
+    };
+  }
+  if (target < currentHp) {
+    // A numeric correction does not consume temporary HP, but it still applies
+    // dying/unconscious when the corrected HP reaches 0.
+    const withoutTemp = { ...draft, play: { ...draft.play, tempHp: 0 } };
+    const result = applyDamageToDraft(withoutTemp, maximum, currentHp - target);
+    const corrected = {
+      ...result.draft,
+      play: { ...result.draft.play, tempHp: draft.play.tempHp },
+    };
+    return {
+      draft: corrected,
+      changed: true,
+      notes: result.notes,
+      tempHpAbsorbed: 0,
+      hpDamage: result.hpDamage,
+      healed: 0,
+      droppedToZero: result.droppedToZero,
+      dying: result.dying,
+      wounded: result.wounded,
+      dead: result.dead,
+    };
+  }
+  const result = applyHealingToDraft(draft, maximum, target - currentHp);
+  return {
+    draft: result.draft,
+    changed: result.draft !== draft,
+    notes: result.notes,
+    tempHpAbsorbed: 0,
+    hpDamage: 0,
+    healed: result.healed,
+    droppedToZero: false,
+    dying: conditionValue(result.draft.play.conditions, "dying"),
+    wounded: conditionValue(result.draft.play.conditions, "wounded"),
+    dead: conditionValue(result.draft.play.conditions, "dead") > 0,
+  };
+}
+
+/** HP edit for a token that has no linked character sheet. */
+export function applyHpEditToState(state: HpState, maxHp: number, edit: HpEdit): HpEditResult {
+  return applyHpEditToDraft(stateDraft(state), maxHp, edit);
+}
+
 /**
  * Keep life-state conditions consistent with current HP after an external
  * edit (a heal, a token HP field, or the Full button). Healing above 0 ends

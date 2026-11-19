@@ -114,6 +114,12 @@ import {
   rulesetLabel,
 } from "../../../../shared/content";
 import { summarizeRunes } from "../../../../shared/runes";
+import {
+  heritageFeatGrant,
+  heritageNotes,
+  heritageSenseList,
+  heritageSkillChoice,
+} from "../../../../shared/heritage";
 import type { BuilderProps } from "../shared";
 import { StepHeading, ValidationNote, SearchInput, MiniFeatureList } from "../shared";
 
@@ -123,6 +129,7 @@ export function HeritageStep({
   staticData,
   setStep,
   derived,
+  context,
   contentMode,
   contentModeLocked,
   legacyDefault,
@@ -244,6 +251,31 @@ export function HeritageStep({
                 </div>
               </div>
               <RichText html={selected.description} />
+              {heritageSenseList(selected, context.ancestry).length ? (
+                <div className="chip-row" style={{ marginTop: 10 }}>
+                  {heritageSenseList(selected, context.ancestry).map((sense) => (
+                    <Tag key={sense} tone="blue">
+                      {VISION_LABELS[sense] ?? titleCase(sense)}
+                    </Tag>
+                  ))}
+                </div>
+              ) : null}
+              {heritageSkillChoice(selected) ? (
+                <p className="tiny muted">
+                  Your heritage skill choice appears on the <strong>Skills</strong> step.
+                </p>
+              ) : null}
+              {heritageFeatGrant(selected) ? (
+                <p className="tiny muted">
+                  Your heritage feat choice appears on the <strong>Feats</strong> step and does not
+                  consume a feat slot.
+                </p>
+              ) : null}
+              {heritageNotes(selected).map((note) => (
+                <p key={note} className="tiny muted">
+                  {note}
+                </p>
+              ))}
               <div className="step-actions">
                 <Button variant="ghost" onClick={() => setStep("ancestry")}>
                   Back

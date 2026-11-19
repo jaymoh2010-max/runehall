@@ -364,6 +364,9 @@ async function main() {
     body: { name: "Smoke Hero" },
   });
   const character = characterResult.payload.character;
+  if (character.data?.wealthBudgetCp !== 1500) {
+    throw new Error("New character did not start with the level-1 wealth budget");
+  }
   const joinResult = await api("/api/campaigns/join", {
     method: "POST",
     cookie: playerCookie,
@@ -578,11 +581,13 @@ async function main() {
     importedHero.name !== "Smoke Pathbuilder Hero" ||
     importedHero.data?.level !== 1 ||
     !importedHero.data?.ancestryId ||
-    !importedHero.data?.feats?.general?.["1"] ||
+    !Object.values(importedHero.data?.featChoices ?? {}).flat().length ||
+    importedHero.data?.feats?.general?.["1"] ||
     !importedHero.data?.equipment?.length ||
     !importedHero.summary ||
     importedHero.summary.level !== 1 ||
-    importedHero.summary.hp <= 0
+    importedHero.summary.hp <= 0 ||
+    importedHero.data?.wealthBudgetCp !== null
   ) {
     throw new Error("Pathbuilder import did not create the expected draft or summary");
   }
@@ -654,6 +659,9 @@ async function main() {
     throw new Error("Loot item missing from the sheet");
   if (lootedSheet.payload.character.data.currency.gp !== 5)
     throw new Error("Loot coins missing from the sheet");
+  if (lootedSheet.payload.character.data.wealthBudgetCp !== null) {
+    throw new Error("Loot did not end the character's creation wealth budget");
+  }
   const playerLoot = await fetch(`${base}/api/campaigns/${campaign.id}/loot`, {
     headers: { cookie: playerCookie },
   });
@@ -708,6 +716,9 @@ async function main() {
     transferredTo.data.currency.gp !== 2
   ) {
     throw new Error("Target character did not receive the item and coins");
+  }
+  if (transferredFrom.data.wealthBudgetCp !== null || transferredTo.data.wealthBudgetCp !== null) {
+    throw new Error("A transfer did not end the creation wealth budget");
   }
   const playerTarget = await api(`/api/characters/${quartermaster.id}`, { cookie: playerCookie });
   if (playerTarget.payload.character.name !== "Smoke Quartermaster") {
@@ -1424,6 +1435,133 @@ async function main() {
     throw new Error("Sheet conditions did not update the linked token");
   }
   log("sheet and token conditions share one source of truth");
+
+  const tempSheet = await api(`/api/characters/${character.id}`, { cookie: playerCookie });
+  const tempDraft = JSON.parse(JSON.stringify(tempSheet.payload.character.data));
+  tempDraft.play.hp = linkedToken.hpMax;
+  tempDraft.play.tempHp = 5;
+  tempDraft.play.conditions = [];
+  await api(`/api/characters/${character.id}`, {
+    method: "PUT",
+    cookie: playerCookie,
+    body: { data: tempDraft, force: true },
+  });
+  const tempDamage = waitForEvent(
+    gmSocket,
+    "character:updated",
+    (payload) => payload.characterId === character.id && payload.summary.tempHp === 2
+  );
+  gmSocket.emit("token:damage", { campaignId: campaign.id, tokenId: token.id, amount: 3 });
+  await tempDamage;
+  const afterTemp = await api(`/api/characters/${character.id}`, { cookie: playerCookie });
+  if (afterTemp.payload.character.data.play.tempHp !== 2) {
+    throw new Error("Token damage did not spend temporary HP before current HP");
+  }
+
+  const downUpdate = waitForEvent(
+    gmSocket,
+    "character:updated",
+    (payload) =>
+      payload.characterId === character.id &&
+      payload.summary.conditions.some((condition) => condition.startsWith("Dying"))
+  );
+  gmSocket.emit("token:update", {
+    campaignId: campaign.id,
+    token: { id: token.id, hpCurrent: 0 },
+  });
+  await downUpdate;
+  const downCharacter = await api(`/api/characters/${character.id}`, { cookie: playerCookie });
+  if (
+    !downCharacter.payload.character.data.play.conditions.some(
+      (condition) => condition.name === "Dying"
+    ) ||
+    !downCharacter.payload.character.data.play.conditions.some(
+      (condition) => condition.name === "Unconscious"
+    )
+  ) {
+    throw new Error("Direct token HP 0 did not apply dying/unconscious to the sheet");
+  }
+  const downTable = await api(`/api/campaigns/${campaign.id}/table`, { cookie: gmCookie });
+  const downToken = downTable.payload.tokens.find((entry) => entry.id === token.id);
+  if (
+    !downToken ||
+    !downToken.conditions.some((condition) => condition.name === "Dying") ||
+    !downToken.conditions.some((condition) => condition.name === "Unconscious")
+  ) {
+    throw new Error("Direct token HP 0 did not apply dying/unconscious to the token");
+  }
+
+  const recoverUpdate = waitForEvent(
+    gmSocket,
+    "character:updated",
+    (payload) =>
+      payload.characterId === character.id &&
+      payload.summary.conditions.some((condition) => condition.startsWith("Wounded"))
+  );
+  gmSocket.emit("token:update", {
+    campaignId: campaign.id,
+    token: { id: token.id, hpCurrent: 1 },
+  });
+  await recoverUpdate;
+  const recoveredCharacter = await api(`/api/characters/${character.id}`, {
+    cookie: playerCookie,
+  });
+  if (
+    recoveredCharacter.payload.character.data.play.conditions.some(
+      (condition) => condition.name === "Dying"
+    ) ||
+    !recoveredCharacter.payload.character.data.play.conditions.some(
+      (condition) => condition.name === "Wounded" && condition.value === 1
+    )
+  ) {
+    throw new Error("Healing a linked token from dying did not add wounded");
+  }
+
+  const unlinkedToken = await emitAck(gmSocket, "token:create", {
+    campaignId: campaign.id,
+    sceneId: scene.id,
+    token: { name: "Smoke Unlinked HP", x: 780, y: 620, size: 1, hpCurrent: 10, hpMax: 10 },
+  });
+  gmSocket.emit("token:update", {
+    campaignId: campaign.id,
+    token: { id: unlinkedToken.id, hpCurrent: 0 },
+  });
+  await delay(200);
+  const unlinkedDownTable = await api(`/api/campaigns/${campaign.id}/table`, {
+    cookie: gmCookie,
+  });
+  const unlinkedDown = unlinkedDownTable.payload.tokens.find(
+    (entry) => entry.id === unlinkedToken.id
+  );
+  if (
+    !unlinkedDown ||
+    unlinkedDown.hpCurrent !== 0 ||
+    !unlinkedDown.conditions.some((condition) => condition.name === "Dying")
+  ) {
+    throw new Error("Direct unlinked token HP 0 did not apply dying");
+  }
+  gmSocket.emit("token:update", {
+    campaignId: campaign.id,
+    token: { id: unlinkedToken.id, hpCurrent: 3 },
+  });
+  await delay(200);
+  const unlinkedRecoveredTable = await api(`/api/campaigns/${campaign.id}/table`, {
+    cookie: gmCookie,
+  });
+  const unlinkedRecovered = unlinkedRecoveredTable.payload.tokens.find(
+    (entry) => entry.id === unlinkedToken.id
+  );
+  if (
+    !unlinkedRecovered ||
+    unlinkedRecovered.conditions.some((condition) => condition.name === "Dying") ||
+    !unlinkedRecovered.conditions.some(
+      (condition) => condition.name === "Wounded" && condition.value === 1
+    )
+  ) {
+    throw new Error("Direct unlinked token healing did not add wounded");
+  }
+  gmSocket.emit("token:delete", { campaignId: campaign.id, tokenId: unlinkedToken.id });
+  log("direct token HP edits share temp HP, dying, and wounded rules");
 
   const detourPromise = waitForEvent(
     gmSocket,

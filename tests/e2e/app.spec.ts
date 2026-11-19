@@ -137,6 +137,40 @@ test("GM creates a campaign and builds a character through the lazy routes", asy
   const builderChecklist = page.locator(".levelup-checklist");
   await expect(builderChecklist.getByText("Choose an ancestry.")).toBeVisible();
   await expect(builderChecklist.getByText(/required choices? remaining/)).toBeVisible();
+
+  await page
+    .locator(".builder-steps")
+    .getByRole("button", { name: /^Ancestry/ })
+    .click();
+  await page.locator(".ancestry-grid .selection-card").filter({ hasText: "Human" }).first().click();
+  await page
+    .locator(".builder-steps")
+    .getByRole("button", { name: /^Heritage/ })
+    .click();
+  await page
+    .locator(".selection-grid .selection-card")
+    .filter({ hasText: "Skilled Human" })
+    .click();
+  await page
+    .locator(".builder-steps")
+    .getByRole("button", { name: /^Skills/ })
+    .click();
+  const heritageTraining = page
+    .locator(".skill-picker")
+    .filter({ hasText: "Skilled Human training" });
+  await heritageTraining.getByRole("combobox").selectOption("stealth");
+  await expect(page.locator(".skill-fixed").getByText("Stealth · Trained")).toBeVisible();
+
+  await page
+    .locator(".builder-steps")
+    .getByRole("button", { name: /^Equipment/ })
+    .click();
+  await expect(page.getByText("Starting wealth", { exact: true })).toBeVisible();
+  const takeCoins = page.getByRole("button", { name: /Take .* as coins/ });
+  await expect(takeCoins).toBeVisible();
+  await takeCoins.click();
+  await expect(page.getByRole("button", { name: /Take .* as coins/ })).toHaveCount(0);
+
   await page.getByRole("link", { name: "Open character sheet" }).click();
   await expect(page).toHaveURL(/\/characters\/[^/]+$/, { timeout: 15_000 });
   await expect(page.getByRole("heading", { name: "E2E Hero" })).toBeVisible();

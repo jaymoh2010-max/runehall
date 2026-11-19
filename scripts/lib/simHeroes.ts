@@ -15,6 +15,7 @@ import {
   flexibleBoosts,
   grantedTrainedSkills,
 } from "../../src/shared/rules";
+import { featAllowedByHeritageGrant, heritageFeatGrant } from "../../src/shared/heritage";
 import { SKILLS } from "../../src/shared/types";
 import type {
   AbilityKey,
@@ -78,6 +79,23 @@ export function buildSimulatedHero(options: SimulatedHeroOptions): CharacterDraf
   draft.heritageId = heritage?.id ?? null;
   draft.backgroundId = background.id;
   draft.classId = classData.id;
+
+  if (heritage?.name === "Skilled Human") {
+    draft.featChoices[heritage.id] = ["stealth"];
+  } else if (heritage?.name === "Versatile Human") {
+    const toughness = feats.find((feat) => feat.name === "Toughness");
+    if (toughness) draft.featChoices[heritage.id] = [toughness.id];
+  } else if (heritage?.name === "Ancient Elf") {
+    const grant = heritageFeatGrant(heritage);
+    const dedication = grant
+      ? feats.find(
+          (feat) =>
+            featAllowedByHeritageGrant(feat, grant, classData.name) &&
+            !feat.traits.some((trait) => trait.toLowerCase() === classData.name.toLowerCase())
+        )
+      : null;
+    if (dedication) draft.featChoices[heritage.id] = [dedication.id];
+  }
 
   // Subclass-style choices that exist at 1st level. The first option is
   // deterministic and keeps the simulation stable from run to run.
@@ -197,6 +215,7 @@ export function contextForDraft(draft: CharacterDraft): CharacterContext {
     ...Object.values(draft.feats.general),
     ...draft.feats.extras,
     ...Object.keys(draft.featChoices),
+    ...Object.values(draft.featChoices).flat(),
   ]);
   const selectedSpellIds = new Set<string>([
     ...draft.spells.cantrips,

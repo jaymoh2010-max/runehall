@@ -145,6 +145,7 @@ import {
 } from "../../shared/content";
 import { buildLevelUpWizardSteps, type LevelUpChoice } from "../../shared/levelup";
 import { summarizeRunes } from "../../shared/runes";
+import { heritageFeatTraits } from "../../shared/heritage";
 
 type LevelUpTask = Omit<LevelUpChoice, "step"> & {
   step: StepId;
@@ -968,14 +969,29 @@ export function CharacterBuilderPage() {
             </Link>
           </Card>
           <Card className="summary-wealth">
-            <div className="row-between">
-              <span className="tiny muted">Gear budget</span>
-              <strong className="tiny">{formatCp(derived.wealth.remaining)} left</strong>
-            </div>
-            <ProgressBar
-              value={Math.min(derived.wealth.spent, derived.wealth.budget)}
-              max={Math.max(1, derived.wealth.budget)}
-            />
+            {derived.wealth.budget !== null ? (
+              <>
+                <div className="row-between">
+                  <span className="tiny muted">Gear budget</span>
+                  <strong className="tiny">{formatCp(derived.wealth.remaining ?? 0)} left</strong>
+                </div>
+                <ProgressBar
+                  value={Math.min(derived.wealth.committed, derived.wealth.budget)}
+                  max={Math.max(1, derived.wealth.budget)}
+                />
+              </>
+            ) : (
+              <>
+                <div className="row-between">
+                  <span className="tiny muted">Gear value</span>
+                  <strong className="tiny">{formatCp(derived.wealth.spent)}</strong>
+                </div>
+                <div className="row-between" style={{ marginTop: 4 }}>
+                  <span className="tiny muted">Purse</span>
+                  <strong className="tiny">{formatCp(derived.wealth.currencyCp)}</strong>
+                </div>
+              </>
+            )}
             <div className="row-between" style={{ marginTop: 8 }}>
               <span className="tiny muted">Bulk</span>
               <strong className="tiny">
@@ -1006,7 +1022,7 @@ export function CharacterBuilderPage() {
           onClose={() => setPicker(null)}
           category={picker.category}
           slotLevel={picker.level}
-          ancestryTrait={context.ancestry?.name.toLowerCase().replace(/\s+/g, "-")}
+          ancestryTrait={heritageFeatTraits(context.heritage, context.ancestry).join(",")}
           classTrait={context.classData?.name.toLowerCase()}
           draft={draft}
           context={context}

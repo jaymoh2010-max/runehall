@@ -7,6 +7,7 @@ import {
 } from "../shared/rules";
 import { newId } from "./util";
 import { featGrant } from "../shared/effects";
+import { featAllowedByHeritageGrant, heritageFeatGrant } from "../shared/heritage";
 import {
   ABILITIES,
   SKILLS,
@@ -330,6 +331,8 @@ export function importPathbuilder(
     Math.max(0, Math.round(num(money.gp))) + Math.max(0, Math.round(num(money.pp))) * 10;
   draft.currency.sp = Math.max(0, Math.round(num(money.sp)));
   draft.currency.cp = Math.max(0, Math.round(num(money.cp)));
+  // Imported wealth is play history, not a fresh level-1 starting budget.
+  draft.wealthBudgetCp = null;
 
   const featMap = nameMap(feats);
   let lastParent: { id: string } | null = null;
@@ -350,6 +353,29 @@ export function importPathbuilder(
       continue;
     }
     const level = Math.max(1, Math.min(20, Math.round(num(entry[3], feat.level || 1))));
+    const heritageGrant = heritageFeatGrant(heritage);
+    const grantCategory =
+      heritageGrant?.category === "general"
+        ? "General Feat"
+        : heritageGrant?.category === "class"
+          ? "Class Feat"
+          : heritageGrant?.category === "ancestry"
+            ? "Ancestry Feat"
+            : heritageGrant?.category === "skill"
+              ? "Skill Feat"
+              : null;
+    const grantedByHeritage =
+      heritage &&
+      heritageGrant &&
+      category === grantCategory &&
+      featAllowedByHeritageGrant(feat, heritageGrant, classData?.name) &&
+      level <= heritageGrant.level;
+    if (grantedByHeritage && heritage) {
+      draft.featChoices[heritage.id] = [feat.id];
+      match("heritage feat");
+      lastParent = feat;
+      continue;
+    }
     if (choiceType === "childChoice" && lastParent && featGrant(lastParent.id)) {
       draft.featChoices[lastParent.id] = [feat.id];
       match("feat");

@@ -39,6 +39,15 @@ import {
   collectItemEffects,
   mergeEffects,
 } from "./effects";
+import {
+  featAllowedByHeritageGrant,
+  heritageChosenFeatId,
+  heritageEffects,
+  heritageFeatGrant,
+  heritageFeatTraits,
+  heritageGrantedTraits,
+  heritageSkillChoice,
+} from "./heritage";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -471,6 +480,7 @@ export function emptyCharacterDraft(name = "New Hero"): CharacterDraft {
     equipment: [],
     companions: [],
     currency: { gp: 0, sp: 0, cp: 0 },
+    wealthBudgetCp: startingWealthCp(1),
     details: {
       age: "",
       gender: "",
@@ -671,6 +681,10 @@ export function normalizeCharacterDraft(input: unknown, fallbackName = "New Hero
       sp: Math.max(0, num(currency.sp, 0)),
       cp: Math.max(0, num(currency.cp, 0)),
     },
+    wealthBudgetCp:
+      typeof raw.wealthBudgetCp === "number" && Number.isFinite(raw.wealthBudgetCp)
+        ? Math.max(0, Math.round(raw.wealthBudgetCp))
+        : null,
     details: {
       age: str(details.age),
       gender: str(details.gender),
@@ -785,6 +799,7 @@ export function automaticSkillRanks(
       if (feature.level <= draft.level) add(feature);
     }
   }
+  add(heritageEffects(draft, context.heritage, context.ancestry));
   return out;
 }
 
@@ -802,6 +817,10 @@ export function grantedTrainedSkills(
   }
 
   for (const skill of Object.keys(automaticSkillRanks(draft, context))) out.add(skill);
+  for (const skill of heritageEffects(draft, context.heritage, context.ancestry).trainedSkills ??
+    []) {
+    out.add(skill);
+  }
 
   for (const group of context.background?.skillChoices ?? []) {
     for (const skill of draft.skills.background) {
@@ -1047,6 +1066,8 @@ function currentTraits(
   };
   add(context.ancestry?.traits);
   add(context.heritage?.traits);
+  add(heritageGrantedTraits(context.heritage));
+  add(heritageFeatTraits(context.heritage, context.ancestry));
   add(context.deity?.traits);
   add(context.classData?.traits);
   for (const option of selectedChoiceOptions(draft, context.classData)) add(option.traits);
@@ -1367,7 +1388,8 @@ export function featPrerequisiteStatus(
   context: CharacterContext,
   derived: DerivedCharacter
 ): { status: PrerequisiteStatus; checks: PrerequisiteCheck[] } {
-  const access = featClassAccess(feat, context);
+  const grantedByHeritage = heritageChosenFeatId(draft, context.heritage) === feat.id;
+  const access = grantedByHeritage ? { allowed: true } : featClassAccess(feat, context);
   const checks: PrerequisiteCheck[] = [
     ...(access.allowed
       ? []
@@ -1708,6 +1730,7 @@ export function computeCharacter(
   const featMods = mergeEffects([
     collectFeatEffects(activeFeatIds),
     collectFeatChoiceEffects(draft.featChoices, activeFeatIds, draft.level),
+    heritageEffects(draft, context.heritage, context.ancestry),
   ]);
   for (const [key, rank] of Object.entries(featMods.proficiencyRanks ?? {})) {
     const value = Math.max(0, Math.min(4, Math.round(rank)));
@@ -1766,6 +1789,35 @@ export function computeCharacter(
     issue("error", "Choose your key ability score.", "abilities");
   if (classData && keyOptions.length === 0 && !key)
     issue("warning", "This class needs a key ability score; select one manually.", "abilities");
+
+  const heritage = context.heritage ?? null;
+  if (ancestry && heritage) {
+    const expected = (heritage.ancestrySlug || heritage.ancestry)
+      .toLowerCase()
+      .replace(/\s+/g, "-");
+    const actual = ancestry.name.toLowerCase().replace(/\s+/g, "-");
+    if (!heritage.versatile && expected && expected !== actual) {
+      issue("error", `${heritage.name} is not available to ${ancestry.name}.`, "heritage");
+    }
+  }
+  const heritageSkill = heritageSkillChoice(heritage);
+  if (heritage && heritageSkill) {
+    const chosen = draft.featChoices[heritage.id]?.[0];
+    if (!chosen || !heritageSkill.options.includes(chosen as SkillId)) {
+      issue("error", `${heritage.name}: ${heritageSkill.prompt}.`, "skills");
+    }
+  }
+  const heritageGrant = heritageFeatGrant(heritage);
+  const heritageFeatId = heritageChosenFeatId(draft, heritage);
+  if (heritage && heritageGrant && !heritageFeatId) {
+    issue("error", `${heritage.name}: ${heritageGrant.prompt}.`, "feats");
+  }
+  if (heritage && heritageGrant && heritageFeatId) {
+    const feat = context.feats[heritageFeatId];
+    if (feat && !featAllowedByHeritageGrant(feat, heritageGrant, classData?.name)) {
+      issue("error", `${feat.name} is not a valid ${heritage.name} choice.`, "feats");
+    }
+  }
 
   for (const featId of activeFeatIds) {
     const definition = FEAT_CHOICES[featId];
@@ -2208,11 +2260,13 @@ export function computeCharacter(
     );
     return sum + item.price.cpTotal * entry.quantity + runeCost;
   }, 0);
-  const budget = startingWealthCp(draft.level);
-  if (spent > budget)
+  const budget = draft.wealthBudgetCp;
+  const currencyCp = draft.currency.gp * 100 + draft.currency.sp * 10 + draft.currency.cp;
+  const committed = spent + currencyCp;
+  if (budget !== null && committed > budget)
     issue(
       "warning",
-      "Your equipment costs more than the standard starting wealth for this level.",
+      "Your equipment and coins exceed the standard starting wealth for this level.",
       "gear"
     );
 
@@ -2562,6 +2616,10 @@ export function computeCharacter(
       grantedFeats.push({ name: feat.name, id: feat.id });
     }
   }
+  const chosenHeritageFeat = heritageFeatId ? context.feats[heritageFeatId] : null;
+  if (chosenHeritageFeat && !grantedFeats.some((feat) => feat.id === chosenHeritageFeat.id)) {
+    grantedFeats.push({ name: chosenHeritageFeat.name, id: chosenHeritageFeat.id });
+  }
 
   let focusPointsMax =
     features.some((feature) =>
@@ -2666,8 +2724,9 @@ export function computeCharacter(
     wealth: {
       budget,
       spent,
-      remaining: budget - spent,
-      currencyCp: draft.currency.gp * 100 + draft.currency.sp * 10 + draft.currency.cp,
+      currencyCp,
+      committed,
+      remaining: budget === null ? null : budget - committed,
     },
     features,
     selectedFeats,
@@ -2680,7 +2739,13 @@ export function computeCharacter(
     xp: draft.play.xp,
   } satisfies DerivedCharacter;
 
-  for (const feat of selectedFeats) {
+  const checkedFeats = [
+    ...selectedFeats,
+    ...(chosenHeritageFeat && !selectedFeats.some((feat) => feat.id === chosenHeritageFeat.id)
+      ? [chosenHeritageFeat]
+      : []),
+  ];
+  for (const feat of checkedFeats) {
     const { status, checks } = featPrerequisiteStatus(feat, draft, context, summary);
     if (status === "unmet") {
       const unmet = checks.filter((check) => check.status === "unmet").map((check) => check.text);

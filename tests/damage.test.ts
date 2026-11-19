@@ -3,6 +3,8 @@ import { emptyCharacterDraft } from "../src/shared/rules";
 import {
   applyDamageToDraft,
   applyHealingToDraft,
+  applyHpEditToDraft,
+  applyHpEditToState,
   reconcileLifeConditions,
 } from "../src/shared/damage";
 import type { CharacterDraft, CharacterCondition } from "../src/shared/types";
@@ -163,6 +165,49 @@ describe("damage and dying", () => {
         20
       )
     ).toEqual([{ name: "Frightened", value: 1, duration: null }]);
+  });
+
+  it("edits HP as a correction without consuming temporary HP", () => {
+    const result = applyHpEditToDraft(draftWith({ hp: 10, tempHp: 5 }), 20, {
+      type: "set",
+      hp: 4,
+    });
+    expect(result.draft.play.hp).toBe(4);
+    expect(result.draft.play.tempHp).toBe(5);
+    expect(result.changed).toBe(true);
+  });
+
+  it("applies dying from a corrected HP target and wounded on recovery", () => {
+    const dropped = applyHpEditToDraft(draftWith({ hp: 10 }), 20, { type: "set", hp: 0 });
+    expect(dropped.dying).toBe(1);
+    expect(dropped.draft.play.conditions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: "Dying", value: 1 }),
+        expect.objectContaining({ name: "Unconscious" }),
+      ])
+    );
+    const recovered = applyHpEditToDraft(dropped.draft, 20, { type: "set", hp: 1 });
+    expect(recovered.draft.play.conditions).toEqual([
+      expect.objectContaining({ name: "Wounded", value: 1 }),
+    ]);
+  });
+
+  it("clamps corrections and treats null as full HP", () => {
+    const above = applyHpEditToDraft(draftWith({ hp: 10 }), 20, { type: "set", hp: 99 });
+    expect(above.draft.play.hp).toBe(20);
+    const full = applyHpEditToDraft(draftWith({ hp: 0 }), 20, { type: "set", hp: null });
+    expect(full.draft.play.hp).toBe(20);
+  });
+
+  it("supports an unlinked token state", () => {
+    const state = applyHpEditToState({ hp: 10, conditions: [] }, 10, {
+      type: "damage",
+      amount: 10,
+    });
+    expect(state.draft.play.hp).toBe(0);
+    expect(state.draft.play.conditions).toEqual(
+      expect.arrayContaining([expect.objectContaining({ name: "Dying", value: 1 })])
+    );
   });
 
   it("does nothing for zero damage or an already dead character", () => {

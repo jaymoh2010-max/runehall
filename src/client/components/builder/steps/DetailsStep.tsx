@@ -115,6 +115,7 @@ import {
   rulesetLabel,
 } from "../../../../shared/content";
 import { summarizeRunes } from "../../../../shared/runes";
+import { heritageLanguageOptions } from "../../../../shared/heritage";
 import type { BuilderProps } from "../shared";
 import { StepHeading, ValidationNote, SearchInput, MiniFeatureList } from "../shared";
 
@@ -125,6 +126,13 @@ export function DetailsStep({ draft, update, context, setStep, onPortrait }: Bui
   const [monsterQuery, setMonsterQuery] = useState("");
   const [monsterResults, setMonsterResults] = useState<Monster[]>([]);
   const [monsterLoading, setMonsterLoading] = useState(false);
+  const languageOptions = [
+    ...new Set([
+      ...(context.ancestry?.languages ?? []),
+      ...(context.ancestry?.additionalLanguages.options ?? []),
+      ...heritageLanguageOptions(context.heritage),
+    ]),
+  ];
 
   useEffect(() => {
     if (!bestiaryFor) return;
@@ -412,7 +420,12 @@ export function DetailsStep({ draft, update, context, setStep, onPortrait }: Bui
               input.value = "";
             }}
           >
-            <Input name="language" placeholder="e.g. Elven" />
+            <Input name="language" placeholder="e.g. Elven" list="builder-language-options" />
+            <datalist id="builder-language-options">
+              {languageOptions.map((language) => (
+                <option key={language} value={language} />
+              ))}
+            </datalist>
             <Button type="submit" icon={<Plus size={14} />}>
               Add language
             </Button>

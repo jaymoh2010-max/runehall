@@ -653,6 +653,11 @@ export interface CharacterDraft {
   equipment: CharacterEquipment[];
   companions: CharacterCompanion[];
   currency: CharacterCurrency;
+  /**
+   * One-time creation budget in copper. Null for imported, looted, or legacy
+   * characters whose wealth provenance is not a fresh level-1 build.
+   */
+  wealthBudgetCp: number | null;
   details: CharacterDetails;
   play: CharacterPlay;
 }
@@ -816,7 +821,13 @@ export interface DerivedCharacter {
   notes: string[];
   equipment: CharacterEquipment[];
   bulk: { total: number; capacity: number; encumbered: boolean; max: number };
-  wealth: { budget: number; spent: number; remaining: number; currencyCp: number };
+  wealth: {
+    budget: number | null;
+    spent: number;
+    currencyCp: number;
+    committed: number;
+    remaining: number | null;
+  };
   features: FeatureSummary[];
   selectedFeats: Feat[];
   grantedFeats: { name: string; id: string | null }[];
