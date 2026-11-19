@@ -1065,6 +1065,16 @@ export function CharacterBuilderPage() {
           legacyDefault={legacyDefault}
           legacyLocked={legacyLocked}
           onLegacyChange={(value) => update((current) => ({ ...current, includeLegacy: value }))}
+          excludeIds={Array.from(
+            new Set([
+              ...derived.grantedSpells.map((spell) => spell.id),
+              ...(picker.target === "cantrips"
+                ? draft.spells.cantrips
+                : picker.target === "focus"
+                  ? draft.spells.focus
+                  : draft.spells.known),
+            ])
+          )}
           onSelect={(spell) => {
             setContext((current) => ({
               ...current,

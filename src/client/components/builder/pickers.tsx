@@ -464,6 +464,7 @@ export function SpellPicker({
   legacyDefault,
   legacyLocked,
   onLegacyChange,
+  excludeIds,
   onSelect,
 }: PickerBase & {
   rank: number | null;
@@ -477,6 +478,7 @@ export function SpellPicker({
   legacyDefault?: boolean;
   legacyLocked?: boolean;
   onLegacyChange?: (value: boolean) => void;
+  excludeIds?: string[];
   onSelect: (spell: Spell) => void;
 }) {
   const [query, setQuery] = useState("");
@@ -517,7 +519,9 @@ export function SpellPicker({
     [query, legacy, expanded, recommended, rank, maxRank, tradition, focus, classTrait]
   );
 
-  const filtered = items;
+  const excluded = new Set(excludeIds ?? []);
+  const filtered = items.filter((spell) => !excluded.has(spell.id));
+  const hiddenCount = items.length - filtered.length;
 
   return (
     <PickerShell
@@ -587,6 +591,12 @@ export function SpellPicker({
               Automation badges are conservative. Manual means Runehall does not apply that effect
               for you.
             </p>
+            {hiddenCount ? (
+              <p className="tiny muted picker-prereq-note">
+                {hiddenCount} spell{hiddenCount === 1 ? "" : "s"} hidden because already granted or
+                selected.
+              </p>
+            ) : null}
             {filtered.map((spell) => (
               <HoverCard
                 key={spell.id}
@@ -618,7 +628,11 @@ export function SpellPicker({
               </HoverCard>
             ))}
             {!loading && !filtered.length && !error ? (
-              <div className="picker-empty">No spells match those filters.</div>
+              <div className="picker-empty">
+                {hiddenCount
+                  ? "Everything matching is already granted or selected."
+                  : "No spells match those filters."}
+              </div>
             ) : null}
             {loading ? <Spinner label="Searching spellbooks…" /> : null}
             {next !== null && !loading ? (

@@ -198,7 +198,11 @@ export function ReviewStep({
             </div>
             <div>
               <dt>Spells chosen</dt>
-              <dd>{draft.spells.cantrips.length + draft.spells.known.length}</dd>
+              <dd>
+                {draft.spells.cantrips.length +
+                  draft.spells.known.length +
+                  derived.grantedSpells.filter((spell) => spell.kind !== "focus").length}
+              </dd>
             </div>
             <div>
               <dt>Equipment</dt>

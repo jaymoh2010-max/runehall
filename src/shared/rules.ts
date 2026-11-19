@@ -462,6 +462,27 @@ export function isFontSpell(spell: Spell, deity: Deity | null | undefined): bool
   return font.length === 0 || font.includes(name);
 }
 
+/** Prepared copies by rank, split into divine-font and ordinary occupancy. */
+export function preparedSlotSplits(
+  prepared: string[],
+  spells: Record<string, Spell>,
+  deity: Deity | null | undefined,
+  fontRank: number | null,
+  fontSlots: number
+): Map<number, { total: number; font: number }> {
+  const splits = new Map<number, { total: number; font: number }>();
+  for (const id of prepared) {
+    const spell = spells[id];
+    if (!spell || spell.rank <= 0) continue;
+    const entry = splits.get(spell.rank) ?? { total: 0, font: 0 };
+    entry.total += 1; // Duplicate preparations each occupy a slot.
+    if (spell.rank === fontRank && isFontSpell(spell, deity)) entry.font += 1;
+    splits.set(spell.rank, entry);
+  }
+  for (const entry of splits.values()) entry.font = Math.min(entry.font, fontSlots);
+  return splits;
+}
+
 export function signed(value: number): string {
   return value >= 0 ? `+${value}` : `${value}`;
 }
@@ -2533,7 +2554,6 @@ export function computeCharacter(
   }
   const preparedCaster = PREPARED_CASTER_CLASSES.has(classData?.name.toLowerCase() ?? "");
   if (preparedCaster && draft.spells.prepared.length) {
-    const preparedByRank = new Map<number, number>();
     for (const spellId of draft.spells.prepared) {
       const spell = context.spells[spellId];
       if (!spell) {
@@ -2551,28 +2571,34 @@ export function computeCharacter(
           "spells"
         );
       }
-      if (spell.rank > 0) preparedByRank.set(spell.rank, (preparedByRank.get(spell.rank) ?? 0) + 1);
     }
     const ordinarySlots = ordinarySpellSlotsFor(draft.level, caster.progression, classData?.name);
-    for (const [rank, count] of preparedByRank) {
-      const limit = slots?.[rank - 1] ?? 0;
-      if (count > limit) {
+    const fontInfo = divineFontInfo(draft.level, classData?.name);
+    const fontLabel = (context.deity?.font?.length ? context.deity.font : ["heal", "harm"])
+      .map(titleCase)
+      .join(" or ");
+    const splits = preparedSlotSplits(
+      draft.spells.prepared,
+      context.spells,
+      context.deity,
+      fontInfo?.rank ?? null,
+      fontInfo?.slots ?? 0
+    );
+    for (const [rank, split] of splits) {
+      const totalLimit = slots?.[rank - 1] ?? 0;
+      if (split.total > totalLimit) {
         issue(
           "error",
-          `${classData?.name ?? "This class"} has ${count} rank ${rank} spells prepared but only ${limit} slot${limit === 1 ? "" : "s"}.`,
+          `${classData?.name ?? "This class"} has ${split.total} rank ${rank} spells prepared but only ${totalLimit} slot${totalLimit === 1 ? "" : "s"}.`,
           "spells"
         );
-      }
-      if (ordinarySlots && classData?.name.toLowerCase() === "cleric") {
-        const fontCount = draft.spells.prepared.filter((spellId) => {
-          const spell = context.spells[spellId];
-          return spell?.rank === rank && isFontSpell(spell, context.deity);
-        }).length;
-        const ordinaryLimit = ordinarySlots[rank - 1] ?? 0;
-        if (count - fontCount > ordinaryLimit) {
+      } else if (fontInfo && rank === fontInfo.rank) {
+        const ordinaryLimit = ordinarySlots?.[rank - 1] ?? Math.max(0, totalLimit - fontInfo.slots);
+        const ordinaryCount = split.total - split.font;
+        if (ordinaryCount > ordinaryLimit) {
           issue(
-            "warning",
-            `Cleric: ${count - fontCount} non-font rank ${rank} spell${count - fontCount === 1 ? "" : "s"} prepared; only ${ordinaryLimit} ordinary slot${ordinaryLimit === 1 ? "" : "s"} available (divine font is heal/harm only).`,
+            "error",
+            `Cleric: ${ordinaryCount} rank ${rank} spell${ordinaryCount === 1 ? "" : "s"} prepared in ordinary slots; only ${ordinaryLimit} ordinary slot${ordinaryLimit === 1 ? "" : "s"} available (divine font is ${fontLabel} only).`,
             "spells"
           );
         }
@@ -2616,7 +2642,11 @@ export function computeCharacter(
   for (const slot of slotsForFeats) {
     const featId = draft.feats[slot.category]?.[String(slot.level)];
     if (!featId) {
-      issue("error", `Choose a ${slot.category} feat for level ${slot.level}.`, "feats");
+      issue(
+        "error",
+        `Choose ${slot.category === "ancestry" ? "an" : "a"} ${slot.category} feat for level ${slot.level}.`,
+        "feats"
+      );
       continue;
     }
     selectedFeatIds.push(featId);
@@ -2809,7 +2839,12 @@ export function computeCharacter(
       : className === "animist"
         ? "Animist slots combine prepared animist spells and spontaneous apparition slots; the tracker shows the total per rank."
         : className === "cleric"
-          ? `Divine font: ${font?.slots ?? 0} rank ${font?.rank ?? 1} heal-or-harm slots, tracked separately from ordinary slots.`
+          ? `Divine font: ${font?.slots ?? 0} rank ${font?.rank ?? 1} ${(context.deity?.font?.length
+              ? context.deity.font
+              : ["heal", "harm"]
+            )
+              .map(titleCase)
+              .join("-or-")} slots, tracked separately from ordinary slots.`
           : className === "wizard"
             ? "Includes one extra curriculum spell slot at each rank."
             : null;

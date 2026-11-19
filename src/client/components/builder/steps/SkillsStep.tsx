@@ -262,7 +262,7 @@ export function SkillsStep({ draft, update, derived, context, setStep }: Builder
                   <span className="tiny muted"> ({ABILITY_SHORT[skill.ability]})</span>
                 </span>
                 {isFixed ? (
-                  <Badge tone="green">Class</Badge>
+                  <Badge tone="green">Granted</Badge>
                 ) : isChosen ? (
                   <CheckCircle2 size={15} />
                 ) : null}

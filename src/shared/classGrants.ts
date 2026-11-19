@@ -27,6 +27,10 @@ function repertoire(id: string, name: string, rank = 1, source?: string): ClassG
   return { id, name, rank, kind: "repertoire", source };
 }
 
+function curriculum(id: string, name: string, rank = 1, source?: string): ClassGrantSpell {
+  return { id, name, rank, kind: "curriculum", source };
+}
+
 /**
  * Curated level-1 class-choice grants for the options whose mechanics are
  * prose-only in the generated compendium. Fixed grants live here; free choices
@@ -94,34 +98,193 @@ export const CLASS_GRANTS: Record<string, ClassGrant> = {
     spells: [repertoire("spell:4YnON9JHYqtLzccu", "Summon Animal")],
   },
 
-  // Wizard arcane schools: initial focus spell. Curriculum remains a manual note.
-  "cf:srcPBNjhq7FBSmi3": { spells: [focus("spell:AzTFMy9E9HQcLNRg", "Debilitating Terror")] },
-  "cf:HYTaibaCGE85rhbZ": {
-    notes: [
-      "Runelord: choose your sin, personal rune, and arcane bond; polearm/spear training remains manual.",
+  // Wizard arcane schools: initial focus spell plus fixed rank-0/rank-1
+  // curriculum spells. Higher-rank curriculum and divisive sub-choices stay
+  // manual notes.
+  "cf:srcPBNjhq7FBSmi3": {
+    spells: [
+      focus("spell:AzTFMy9E9HQcLNRg", "Debilitating Terror"),
+      curriculum("spell:0zU8CPejjQFnhZFI", "Figment", 0),
+      curriculum("spell:MPxbKoR54gkYkqLO", "Gouging Claw", 0),
+      curriculum("spell:aEM2cttJ2eYcLssW", "Fleet Step"),
+      curriculum("spell:i35dpZFI7jZcRoBo", "Illusory Disguise"),
+      curriculum("spell:Gb7SeieEvd0pL2Eh", "Sure Strike"),
     ],
   },
-  "cf:wObrT6PytPdS5aUi": { spells: [focus("spell:lY9fOk1qBDDhBT8s", "Protective Wards")] },
-  "cf:E4GZDMn4DYk6qSEV": { spells: [focus("spell:Hu38hoAUSYeFpkVa", "Force Bolt")] },
-  "cf:YZ2XPmx1WHyWtM0g": { spells: [focus("spell:ffz6wlSMzhaDpjg6", "Earthworks")] },
-  "cf:a7yKDVnAYduaKIrL": { spells: [focus("spell:dweKouFW8OdZ3LXZ", "Control Currents")] },
-  "cf:XXnGHBxNZvRsdkKM": { spells: [focus("spell:cCFDnmFB1EGeQUeA", "Friendly Push")] },
-  "cf:jtAqb5rnhQblZuM8": { spells: [focus("spell:KR8WgdazifDBjDkW", "Unexpected Windfall")] },
-  "cf:bCj5dSlq9VpjWXkU": { spells: [focus("spell:p8HnYqIi6sl8AJT2", "Fact Check")] },
-  "cf:dPAwM9IdabdH68mW": { spells: [focus("spell:pSepsfCrrAKuwA0N", "Augmented Body")] },
-  "cf:L5FiuXsfW6Sa31gO": { spells: [focus("spell:KMFRKzNCq7hVNH7H", "Charming Push")] },
+  "cf:HYTaibaCGE85rhbZ": {
+    focusPoints: 1,
+    spells: [
+      curriculum("spell:gpzpAAAJ1Lza2JVl", "Detect Magic", 0),
+      curriculum("spell:AUctDF2fqPZN2w4W", "Sigil", 0),
+      curriculum("spell:aAbfKn8maGjJjk2W", "Mystic Armor"),
+      curriculum("spell:EE7Q5BHIrfWNCPtT", "Runic Body"),
+      curriculum("spell:TFitdEOpQC4SzKQQ", "Runic Weapon"),
+      curriculum("spell:Gb7SeieEvd0pL2Eh", "Sure Strike"),
+    ],
+    notes: [
+      "Runelord: choose your sin (and its focus spell), personal rune, and arcane bond; sin curriculum and polearm/spear training remain manual.",
+    ],
+  },
+  "cf:wObrT6PytPdS5aUi": {
+    spells: [
+      focus("spell:lY9fOk1qBDDhBT8s", "Protective Wards"),
+      curriculum("spell:vLzFcIaSXs7YTIqJ", "Message", 0),
+      curriculum("spell:AUctDF2fqPZN2w4W", "Sigil", 0),
+      curriculum("spell:aIHY2DArKFweIrpf", "Command"),
+      curriculum("spell:PRrZ7anETWPm90YY", "Disguise Magic"),
+      curriculum("spell:EE7Q5BHIrfWNCPtT", "Runic Body"),
+      curriculum("spell:TFitdEOpQC4SzKQQ", "Runic Weapon"),
+    ],
+  },
+  "cf:E4GZDMn4DYk6qSEV": {
+    spells: [
+      focus("spell:Hu38hoAUSYeFpkVa", "Force Bolt"),
+      curriculum("spell:TVKNbcgTee19PXZR", "Shield", 0),
+      curriculum("spell:60sgbuMWN0268dB7", "Telekinetic Projectile", 0),
+      curriculum("spell:y6rAdMK6EFlV6U0t", "Breathe Fire"),
+      curriculum("spell:gKKqvLohtrSJj3BM", "Force Barrage"),
+      curriculum("spell:aAbfKn8maGjJjk2W", "Mystic Armor"),
+    ],
+  },
+  "cf:YZ2XPmx1WHyWtM0g": {
+    spells: [
+      focus("spell:ffz6wlSMzhaDpjg6", "Earthworks"),
+      curriculum("spell:Qw3fnUlaUbnn7ipC", "Prestidigitation", 0),
+      curriculum("spell:OhD2Z6rIGGD5ocZA", "Read Aura", 0),
+      curriculum("spell:jfVCuOpzC6mUrf6f", "Hydraulic Push"),
+      curriculum("spell:Rn2LkoSq1XhLsODV", "Pummeling Rubble"),
+      curriculum("spell:lKcsmeOrgHtK4xQa", "Summon Construct"),
+    ],
+  },
+  "cf:a7yKDVnAYduaKIrL": {
+    spells: [
+      focus("spell:dweKouFW8OdZ3LXZ", "Control Currents"),
+      curriculum("spell:vLzFcIaSXs7YTIqJ", "Message", 0),
+      curriculum("spell:eSL5hVT9gXrnRLtd", "Spout", 0),
+      curriculum("spell:g8QqHpv2CWDwmIm1", "Gust of Wind"),
+      curriculum("spell:jfVCuOpzC6mUrf6f", "Hydraulic Push"),
+      curriculum("spell:vUEkyqkjDwBDLMZZ", "Rude Awakening"),
+    ],
+    notes: ["Corentyn Armada: the 3rd-rank aquatic arsenal spell is not in the compendium."],
+  },
+  "cf:XXnGHBxNZvRsdkKM": {
+    spells: [
+      focus("spell:cCFDnmFB1EGeQUeA", "Friendly Push"),
+      curriculum("spell:vLzFcIaSXs7YTIqJ", "Message", 0),
+      curriculum("spell:pwzdSlJgYqN7bs2w", "Telekinetic Hand", 0),
+      curriculum("spell:aEM2cttJ2eYcLssW", "Fleet Step"),
+      curriculum("spell:Azoh0BSoCASrA1lr", "Lock"),
+      curriculum("spell:qTr2oCgIXl703Whb", "Thoughtful Gift"),
+    ],
+  },
+  "cf:jtAqb5rnhQblZuM8": {
+    spells: [
+      focus("spell:KR8WgdazifDBjDkW", "Unexpected Windfall"),
+      curriculum("spell:Qw3fnUlaUbnn7ipC", "Prestidigitation", 0),
+      curriculum("spell:OhD2Z6rIGGD5ocZA", "Read Aura", 0),
+      curriculum("spell:4WAib3GichxLjp5p", "Alarm"),
+      curriculum("spell:vLA0q0WOK2YPuJs6", "Charm"),
+      curriculum("spell:4ZGte0i9YbLh4dRi", "Item Facade"),
+    ],
+  },
+  "cf:bCj5dSlq9VpjWXkU": {
+    spells: [
+      focus("spell:p8HnYqIi6sl8AJT2", "Fact Check"),
+      curriculum("spell:gpzpAAAJ1Lza2JVl", "Detect Magic", 0),
+      curriculum("spell:AUctDF2fqPZN2w4W", "Sigil", 0),
+      curriculum("spell:PRrZ7anETWPm90YY", "Disguise Magic"),
+      curriculum("spell:i35dpZFI7jZcRoBo", "Illusory Disguise"),
+      curriculum("spell:D442XMADp01qJ7Cs", "Mindlink"),
+    ],
+  },
+  "cf:dPAwM9IdabdH68mW": {
+    spells: [
+      focus("spell:pSepsfCrrAKuwA0N", "Augmented Body"),
+      curriculum("spell:iYRDFxeVpJ5KIjmr", "Needle Darts", 0),
+      curriculum("spell:TVKNbcgTee19PXZR", "Shield", 0),
+      curriculum("spell:dINQzhqGmIsqGMUY", "Mending"),
+      curriculum("spell:TFitdEOpQC4SzKQQ", "Runic Weapon"),
+      curriculum("spell:lKcsmeOrgHtK4xQa", "Summon Construct"),
+    ],
+  },
+  "cf:L5FiuXsfW6Sa31gO": {
+    spells: [
+      focus("spell:KMFRKzNCq7hVNH7H", "Charming Push"),
+      curriculum("spell:4gBIw4IDrSfFHik4", "Daze", 0),
+      curriculum("spell:0zU8CPejjQFnhZFI", "Figment", 0),
+      curriculum("spell:UKsIOWmMx4hSpafl", "Dizzying Colors"),
+      curriculum("spell:o4lRVTwSxnOOn5vl", "Sleep"),
+      curriculum("spell:Gb7SeieEvd0pL2Eh", "Sure Strike"),
+    ],
+  },
   "cf:Eygg2xIAFtc4xZgQ": {
-    spells: [focus("spell:AfZ1dV4pcxYmaWnH", "Extradimensional Cover")],
+    spells: [
+      focus("spell:AfZ1dV4pcxYmaWnH", "Extradimensional Cover"),
+      curriculum("spell:5gophZ4AOKW4VW27", "Phase Bolt", 0),
+      curriculum("spell:sX2g6WFSQPNW9jzx", "Warp Step", 0),
+      curriculum("spell:4WAib3GichxLjp5p", "Alarm"),
+      curriculum("spell:F1nlmqOIucch3Cmt", "Pet Cache"),
+      curriculum("spell:qTr2oCgIXl703Whb", "Thoughtful Gift"),
+    ],
   },
-  "cf:ZBFICTkzUjE4BDGJ": { spells: [focus("spell:XcMObj2p9nIBp53b", "Scramble Body")] },
-  "cf:X8BINW8OLQpIPpys": { spells: [focus("spell:fwPNYmpOyzRehEY4", "Circle of Weakness")] },
+  "cf:ZBFICTkzUjE4BDGJ": {
+    spells: [
+      focus("spell:XcMObj2p9nIBp53b", "Scramble Body"),
+      curriculum("spell:MPxbKoR54gkYkqLO", "Gouging Claw", 0),
+      curriculum("spell:uZK2BYzPnxUBnDjr", "Tangle Vine", 0),
+      curriculum("spell:Q7QQ91vQtyi1Ux36", "Jump"),
+      curriculum("spell:gfPjmG6Fe6D3MFjl", "Pest Form"),
+      curriculum("spell:DYdvMZ8G2LiSLVWw", "Spider Sting"),
+    ],
+  },
+  "cf:X8BINW8OLQpIPpys": {
+    spells: [
+      focus("spell:fwPNYmpOyzRehEY4", "Circle of Weakness"),
+      curriculum("spell:dDiOnjcsBFbAvP6t", "Gale Blast", 0),
+      curriculum("spell:zA0jNIBRgLsyTpbm", "Scatter Scree", 0),
+      curriculum("spell:nPb8DDs4rZpBLWIb", "Cradle Aloft"),
+      curriculum("spell:TTwOKGqmZeKSyNMH", "Gentle Landing"),
+      curriculum("spell:Rn2LkoSq1XhLsODV", "Pummeling Rubble"),
+    ],
+  },
   "cf:KGkWSv9rARpwWzXW": {
-    spells: [focus("spell:IERHT6v4o5ISvuJG", "Halcyon Mists")],
-    notes: ["Rooted Wisdom: the secondary branch choices remain manual."],
+    spells: [
+      focus("spell:IERHT6v4o5ISvuJG", "Halcyon Mists"),
+      curriculum("spell:gpzpAAAJ1Lza2JVl", "Detect Magic", 0),
+      curriculum("spell:4WAib3GichxLjp5p", "Alarm"),
+    ],
+    notes: ["Rooted Wisdom: choose one secondary branch; its curriculum remains manual."],
   },
-  "cf:0QAFC61tpP63GUQa": { spells: [focus("spell:NIAHICPpNILGzTd0", "The Night is Mine")] },
-  "cf:ZpFCZnVzIfZLfNii": { spells: [focus("spell:tWzxuJdbXqvskdIo", "Fortify Summoning")] },
-  "cf:n2LRzksKVSzOuzqN": { spells: [focus("spell:cQgPIohUja0DUiRL", "Grasping Vine")] },
+  "cf:0QAFC61tpP63GUQa": {
+    spells: [
+      focus("spell:NIAHICPpNILGzTd0", "The Night is Mine"),
+      curriculum("spell:0zU8CPejjQFnhZFI", "Figment", 0),
+      curriculum("spell:IxhGEKl63R4QBvkj", "Frostbite", 0),
+      curriculum("spell:PRrZ7anETWPm90YY", "Disguise Magic"),
+      curriculum("spell:MiDbBU5uupWqjYzm", "Gloom Mantle"),
+      curriculum("spell:2oH5IufzdESuYxat", "Illusory Object"),
+    ],
+  },
+  "cf:ZpFCZnVzIfZLfNii": {
+    spells: [
+      focus("spell:tWzxuJdbXqvskdIo", "Fortify Summoning"),
+      curriculum("spell:pwzdSlJgYqN7bs2w", "Telekinetic Hand", 0),
+      curriculum("spell:mAMEt4FFbdqoRnkN", "Void Warp", 0),
+      curriculum("spell:k34hDOfIIMAxNL4a", "Grim Tendrils"),
+      curriculum("spell:xqmHD8JIjak15lRk", "Phantasmal Minion"),
+      curriculum("spell:9WGeBwIIbbUuWKq0", "Summon Undead"),
+    ],
+  },
+  "cf:n2LRzksKVSzOuzqN": {
+    spells: [
+      focus("spell:cQgPIohUja0DUiRL", "Grasping Vine"),
+      curriculum("spell:pwzdSlJgYqN7bs2w", "Telekinetic Hand", 0),
+      curriculum("spell:60sgbuMWN0268dB7", "Telekinetic Projectile", 0),
+      curriculum("spell:aEM2cttJ2eYcLssW", "Fleet Step"),
+      curriculum("spell:g8QqHpv2CWDwmIm1", "Gust of Wind"),
+      curriculum("spell:dINQzhqGmIsqGMUY", "Mending"),
+    ],
+  },
   "cf:xYYhJtGhFSWNifcO": {
     spells: [focus("spell:bSDTWUIvgXkBaEv8", "Hand of the Apprentice")],
     notes: [
@@ -146,37 +309,140 @@ export const CLASS_GRANTS: Record<string, ClassGrant> = {
     notes: ["Staff Nexus: makeshift staff and its chosen spells remain manual."],
   },
 
-  // Sorcerer bloodlines: initial bloodline focus spell. Gifts stay a manual note.
-  "cf:3qqvnC2U8W26yae7": { spells: [focus("spell:i8PBZsnoCrK7IWph", "Tentacular Limbs")] },
-  "cf:TFihgf3jDhmKd0fa": { spells: [focus("spell:dQ7LrD2HxJoCzi2M", "Barbed Spear")] },
-  "cf:vhW3glAaEfq2DKrw": { spells: [focus("spell:w3uGXDVEdbLFZVO0", "Angelic Halo")] },
-  "cf:w5koctOVrEcpxTIq": { spells: [focus("spell:SdXFiQ4Py8761sNO", "Glutton's Jaws")] },
-  "cf:o39zQMIdERWtmBSB": { spells: [focus("spell:Vctwx1ewa8HUOA94", "Diabolic Edict")] },
+  // Sorcerer bloodlines: initial focus spell plus fixed cantrip and 1st-rank
+  // gift. Variable gifts (Elemental) and higher-rank gifts stay manual notes.
+  "cf:3qqvnC2U8W26yae7": {
+    spells: [
+      focus("spell:i8PBZsnoCrK7IWph", "Tentacular Limbs"),
+      repertoire("spell:4gBIw4IDrSfFHik4", "Daze", 0),
+      repertoire("spell:R8bqnYiThB6MYTxD", "Phantom Pain"),
+    ],
+  },
+  "cf:TFihgf3jDhmKd0fa": {
+    spells: [
+      focus("spell:dQ7LrD2HxJoCzi2M", "Barbed Spear"),
+      repertoire("spell:TVKNbcgTee19PXZR", "Shield", 0),
+      repertoire("spell:aAbfKn8maGjJjk2W", "Mystic Armor"),
+    ],
+  },
+  "cf:vhW3glAaEfq2DKrw": {
+    spells: [
+      focus("spell:w3uGXDVEdbLFZVO0", "Angelic Halo"),
+      repertoire("spell:WBmvzNDfpwka3qT4", "Light", 0),
+      repertoire("spell:rfZpqmj0AIIdkVIs", "Heal"),
+    ],
+  },
+  "cf:w5koctOVrEcpxTIq": {
+    spells: [
+      focus("spell:SdXFiQ4Py8761sNO", "Glutton's Jaws"),
+      repertoire("spell:thAHF1zxNplLCJPO", "Caustic Blast", 0),
+      repertoire("spell:4koZzrnMXhhosn0D", "Fear"),
+    ],
+    notes: ["Demonic: Caustic Blast is off-tradition but still granted by the bloodline."],
+  },
+  "cf:o39zQMIdERWtmBSB": {
+    spells: [
+      focus("spell:Vctwx1ewa8HUOA94", "Diabolic Edict"),
+      repertoire("spell:6DfLZBl8wKIV03Iq", "Ignition", 0),
+      repertoire("spell:vLA0q0WOK2YPuJs6", "Charm"),
+    ],
+    notes: ["Diabolic: Ignition and Charm are off-tradition but still granted by the bloodline."],
+  },
   "cf:ZHabYxSgYK0XbjhM": {
-    spells: [focus("spell:K8vvrOgW4bGakXxm", "Flurry of Claws")],
-    notes: ["Draconic: choose your exemplar, tradition, and second bloodline skill."],
+    spells: [
+      focus("spell:K8vvrOgW4bGakXxm", "Flurry of Claws"),
+      repertoire("spell:TVKNbcgTee19PXZR", "Shield", 0),
+      repertoire("spell:4koZzrnMXhhosn0D", "Fear"),
+    ],
+    notes: [
+      "Draconic: choose your exemplar, tradition, and second bloodline skill; 2nd/5th/8th-level gifts remain manual.",
+    ],
   },
   "cf:RXRnJcG4XSabZ35a": {
     spells: [focus("spell:0JUOgbbFCapp3HlW", "Elemental Toss")],
-    notes: ["Elemental: choose your element and its granted cantrip/1st-rank gift."],
+    notes: [
+      "Elemental: choose your element and add its granted cantrip and 1st-rank gift manually (air, earth, fire, metal, water, or wood).",
+    ],
   },
-  "cf:eW3cfCH7Wpx2vik2": { spells: [focus("spell:IkS3lDGUpIOMug7v", "Faerie Dust")] },
+  "cf:eW3cfCH7Wpx2vik2": {
+    spells: [
+      focus("spell:IkS3lDGUpIOMug7v", "Faerie Dust"),
+      repertoire("spell:0zU8CPejjQFnhZFI", "Figment", 0),
+      repertoire("spell:vLA0q0WOK2YPuJs6", "Charm"),
+    ],
+    notes: ["Fey: Figment is off-tradition but still granted by the bloodline."],
+  },
   "cf:tYOMBiH3HbViNWwn": {
-    spells: [focus("spell:OyiKIbWllLZC6sGz", "Genie's Veil")],
-    notes: ["Genie: choose your genie type and later gift spells."],
+    spells: [
+      focus("spell:OyiKIbWllLZC6sGz", "Genie's Veil"),
+      repertoire("spell:gpzpAAAJ1Lza2JVl", "Detect Magic", 0),
+      repertoire("spell:i35dpZFI7jZcRoBo", "Illusory Disguise"),
+    ],
+    notes: ["Genie: level-1 gifts are fixed; choose your genie type for 2nd/5th/8th-level gifts."],
   },
-  "cf:O0uXZRWMNliDbkxU": { spells: [focus("spell:kvm68hVtmADiIvN4", "Jealous Hex")] },
-  "cf:b6hyZTs1rVGHDexz": { spells: [focus("spell:PaHxcqXihXkkXPsB", "Unraveling Blast")] },
-  "cf:ZEtJJ5UOlV5oTWWp": { spells: [focus("spell:dtOUkMC57izf93z5", "Ancestral Memories")] },
-  "cf:5Wxjghw7lHuCxjZz": { spells: [focus("spell:pHrVvoTKygXeczVG", "Nymph's Token")] },
+  "cf:O0uXZRWMNliDbkxU": {
+    spells: [
+      focus("spell:kvm68hVtmADiIvN4", "Jealous Hex"),
+      repertoire("spell:4gBIw4IDrSfFHik4", "Daze", 0),
+      repertoire("spell:i35dpZFI7jZcRoBo", "Illusory Disguise"),
+    ],
+  },
+  "cf:b6hyZTs1rVGHDexz": {
+    spells: [
+      focus("spell:PaHxcqXihXkkXPsB", "Unraveling Blast"),
+      repertoire("spell:gpzpAAAJ1Lza2JVl", "Detect Magic", 0),
+      repertoire("spell:6ZIKB0151LUR19Rw", "Ill Omen"),
+    ],
+  },
+  "cf:ZEtJJ5UOlV5oTWWp": {
+    spells: [
+      focus("spell:dtOUkMC57izf93z5", "Ancestral Memories"),
+      repertoire("spell:gpzpAAAJ1Lza2JVl", "Detect Magic", 0),
+      repertoire("spell:gKKqvLohtrSJj3BM", "Force Barrage"),
+    ],
+  },
+  "cf:5Wxjghw7lHuCxjZz": {
+    spells: [
+      focus("spell:pHrVvoTKygXeczVG", "Nymph's Token"),
+      repertoire("spell:uZK2BYzPnxUBnDjr", "Tangle Vine", 0),
+      repertoire("spell:vLA0q0WOK2YPuJs6", "Charm"),
+    ],
+  },
   "cf:TWR1wbPJuCLnGdFZ": {
-    spells: [focus("spell:lZx8jZfKrMEtyGY0", "Rejuvenating Flames")],
+    spells: [
+      focus("spell:lZx8jZfKrMEtyGY0", "Rejuvenating Flames"),
+      repertoire("spell:gpzpAAAJ1Lza2JVl", "Detect Magic", 0),
+      repertoire("spell:y6rAdMK6EFlV6U0t", "Breathe Fire"),
+    ],
   },
-  "cf:PpzH9tJULk5ksX9w": { spells: [focus("spell:3mINzPzup2m9qzFU", "Sepulchral Mask")] },
-  "cf:uoQOm41BVdSo6pAS": { spells: [focus("spell:6UafOE1ZUbHamsZJ", "Dim the Light")] },
-  "cf:7WBZ2kkhZ7JorWu2": { spells: [focus("spell:FedTjedva2rYk33r", "Undeath's Blessing")] },
+  "cf:PpzH9tJULk5ksX9w": {
+    spells: [
+      focus("spell:3mINzPzup2m9qzFU", "Sepulchral Mask"),
+      repertoire("spell:kcelf6IHl3L9VXXg", "Vitality Lash", 0),
+      repertoire("spell:rfZpqmj0AIIdkVIs", "Heal"),
+    ],
+  },
+  "cf:uoQOm41BVdSo6pAS": {
+    spells: [
+      focus("spell:6UafOE1ZUbHamsZJ", "Dim the Light"),
+      repertoire("spell:mAMEt4FFbdqoRnkN", "Void Warp", 0),
+      repertoire("spell:k34hDOfIIMAxNL4a", "Grim Tendrils"),
+    ],
+  },
+  "cf:7WBZ2kkhZ7JorWu2": {
+    spells: [
+      focus("spell:FedTjedva2rYk33r", "Undeath's Blessing"),
+      repertoire("spell:mAMEt4FFbdqoRnkN", "Void Warp", 0),
+      repertoire("spell:wdA52JJnsuQWeyqz", "Harm"),
+    ],
+  },
   "cf:dKTb959aCQIzSIXj": {
-    spells: [focus("spell:K8vvrOgW4bGakXxm", "Flurry of Claws")],
+    spells: [
+      focus("spell:K8vvrOgW4bGakXxm", "Flurry of Claws"),
+      repertoire("spell:OhD2Z6rIGGD5ocZA", "Read Aura", 0),
+      repertoire("spell:aAbfKn8maGjJjk2W", "Mystic Armor"),
+    ],
+    notes: ["Wyrmblessed: choose your dragon type; it does not change the level-1 gifts."],
   },
 
   // Cleric doctrines
@@ -203,10 +469,10 @@ const CLASS_NOTES: Record<string, string[]> = {
     "Choose Lay on Hands, Touch of the Void, or Shields of the Spirit as your devotion spell; deity font decides which are legal.",
   ],
   wizard: [
-    "Arcane school curriculum spells are listed in the class description; add the ones your table uses on the Spells step.",
+    "Rank-0 and rank-1 school curriculum spells are granted automatically; higher-rank curriculum, Runelord sin spells, and Rooted Wisdom branch spells remain manual.",
   ],
   sorcerer: [
-    "Bloodline gift spells are listed in the bloodline description; add the fixed cantrip and 1st-rank gift on the Spells step.",
+    "The fixed bloodline cantrip and 1st-rank gift are granted automatically; Elemental's variable gifts and higher-rank bloodline gifts remain manual.",
   ],
   cleric: [
     "Divine font slots are heal-or-harm only and are tracked separately from ordinary slots.",

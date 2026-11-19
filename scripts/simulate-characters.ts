@@ -13,6 +13,7 @@ import {
   flexibleBoosts,
   grantedTrainedSkills,
   normalizeCharacterDraft,
+  ordinarySpellSlotsFor,
   skillRankCap,
   spellRepertoireLimits,
   spellSlotsFor,
@@ -327,8 +328,13 @@ function chooseSpells(
   ]);
   const prepared = preparedClasses.has(classTrait);
   const slots = spellSlotsFor(draft.level, caster.progression, classData.name) ?? [];
+  // Clerics track divine font separately; only ordinary slots may hold
+  // non-font preparations.
+  const ordinarySlots =
+    ordinarySpellSlotsFor(draft.level, caster.progression, classData.name) ?? slots;
   for (let rank = 1; rank <= maxRank; rank++) {
-    const limit = repertoire?.ranks[rank - 1] ?? (prepared ? Math.max(1, slots[rank - 1] ?? 1) : 1);
+    const slotLimit = ordinarySlots[rank - 1] ?? 0;
+    const limit = repertoire?.ranks[rank - 1] ?? (prepared ? Math.max(1, slotLimit) : 1);
     const rankPool = pool.filter((spell) => spell.rank === rank);
     const known = sample(rng, rankPool, Math.max(0, limit));
     for (const spell of known) {
@@ -337,8 +343,7 @@ function chooseSpells(
       context.spells[spell.id] = spell;
     }
     if (prepared) {
-      for (const spell of known.slice(0, slots[rank - 1] ?? 0))
-        draft.spells.prepared.push(spell.id);
+      for (const spell of known.slice(0, slotLimit)) draft.spells.prepared.push(spell.id);
     }
   }
 
