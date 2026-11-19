@@ -24,6 +24,7 @@ import {
   type SaveKey,
   type Severity,
   type SkillId,
+  type Spell,
   type SpellTradition,
   type ValidationIssue,
 } from "./types";
@@ -48,6 +49,7 @@ import {
   heritageGrantedTraits,
   heritageSkillChoice,
 } from "./heritage";
+import { selectedClassGrants } from "./classGrants";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -97,6 +99,28 @@ interface CasterInfo {
 }
 
 const TRADITIONS: SpellTradition[] = ["arcane", "divine", "occult", "primal"];
+
+export function casterTraditionFor(
+  draft: CharacterDraft,
+  classData: ClassData | null | undefined
+): SpellTradition | null {
+  const caster = casterInfo(classData);
+  if (caster.tradition) return caster.tradition;
+  const matches = new Set<SpellTradition>();
+  for (const option of selectedChoiceOptions(draft, classData)) {
+    const description = (option.description ?? "").replace(/<[^>]+>/g, " ");
+    for (const pattern of [
+      /Tradition\s+(arcane|divine|occult|primal)/gi,
+      /Spell List\s+(arcane|divine|occult|primal)/gi,
+    ]) {
+      for (const match of description.matchAll(pattern)) {
+        matches.add(match[1].toLowerCase() as SpellTradition);
+      }
+    }
+  }
+  if (matches.size === 1) return [...matches][0];
+  return draft.spells.tradition ?? null;
+}
 
 export function casterInfo(classData: ClassData | null | undefined): CasterInfo {
   const name = (classData?.name || "").toLowerCase();
@@ -274,6 +298,17 @@ export function skillRankCap(level: number): number {
   return 1;
 }
 
+/** Sorcerer and Oracle use the spontaneous full-caster table (4/rank, 3 at the newest). */
+export function spontaneousFullCasterSlots(level: number): number[] {
+  const maxRank = Math.ceil(level / 2);
+  if (maxRank >= 10) return [4, 4, 4, 4, 4, 4, 4, 4, 4, 1];
+  const slots: number[] = [];
+  for (let rank = 1; rank <= maxRank; rank++) {
+    slots.push(rank < maxRank ? 4 : level % 2 === 1 ? 3 : 4);
+  }
+  return slots;
+}
+
 export function fullCasterSlots(level: number): number[] {
   const maxRank = Math.ceil(level / 2);
   // At 19th and 20th level, full casters have three slots of every rank from
@@ -374,6 +409,9 @@ export function spellSlotsFor(
         return clericSlots(level);
       case "wizard":
         return wizardSlots(level);
+      case "sorcerer":
+      case "oracle":
+        return spontaneousFullCasterSlots(level);
       default:
         return fullCasterSlots(level);
     }
@@ -387,6 +425,41 @@ export function spellSlotsFor(
     return slots;
   }
   return null;
+}
+
+/** Ordinary prepared slots; a cleric's divine font is tracked separately. */
+export function ordinarySpellSlotsFor(
+  level: number,
+  progression: CasterProgression,
+  className?: string
+): number[] | null {
+  if (className?.toLowerCase() === "cleric") return fullCasterSlots(level);
+  return spellSlotsFor(level, progression, className);
+}
+
+const CANTRIP_LIMITS: Record<string, number> = {
+  cleric: 5,
+  druid: 5,
+  bard: 5,
+  oracle: 6,
+  sorcerer: 5,
+  witch: 5,
+  wizard: 6,
+  magus: 5,
+  summoner: 5,
+  psychic: 5,
+};
+
+export function cantripLimitFor(classData: ClassData | null | undefined): number | null {
+  return CANTRIP_LIMITS[classData?.name.toLowerCase() ?? ""] ?? null;
+}
+
+/** Heal/Harm are the only spells a cleric's divine font can prepare. */
+export function isFontSpell(spell: Spell, deity: Deity | null | undefined): boolean {
+  const name = spell.name.trim().toLowerCase();
+  if (name !== "heal" && name !== "harm") return false;
+  const font = (deity?.font ?? []).map((value) => value.toLowerCase());
+  return font.length === 0 || font.includes(name);
 }
 
 export function signed(value: number): string {
@@ -1718,6 +1791,7 @@ export function computeCharacter(
   const ancestry = context.ancestry ?? null;
   const classData = context.classData ?? null;
   const background = context.background ?? null;
+  const classGrants = selectedClassGrants(draft, classData);
   const abilities = baseAbilityScores(draft, context);
   // Validate the 1st-level allocation independently of later milestones.
   const rawAbilities = baseAbilityScores({ ...draft, level: 1 }, context, false);
@@ -2397,21 +2471,27 @@ export function computeCharacter(
     : caster.progression === "none"
       ? 0
       : Math.ceil(draft.level / 2);
-  const tradition = caster.tradition ?? draft.spells.tradition;
+  const tradition = casterTraditionFor(draft, classData);
   if (caster.traditionOptions && !tradition) {
     issue("error", "Choose your magical tradition.", "spells");
   }
+  const grantedSpellIds = new Set(classGrants.spells.map((spell) => spell.id));
+  const grantedKnownSpellIds = new Set(
+    classGrants.spells.filter((spell) => spell.kind !== "focus").map((spell) => spell.id)
+  );
   if (caster.progression !== "none" && caster.progression !== "focus") {
     const cantripIds = new Set([
       ...draft.spells.cantrips,
       ...draft.spells.prepared.filter((id) => context.spells[id]?.rank === 0),
+      ...classGrants.spells.filter((spell) => spell.rank === 0).map((spell) => spell.id),
     ]);
     if (!cantripIds.size) {
       issue("error", "Choose at least one cantrip.", "spells");
     }
-    const hasRankedSpell = [...draft.spells.known, ...draft.spells.prepared].some(
-      (id) => (context.spells[id]?.rank ?? 0) > 0
-    );
+    const hasRankedSpell =
+      [...draft.spells.known, ...draft.spells.prepared].some(
+        (id) => (context.spells[id]?.rank ?? 0) > 0
+      ) || classGrants.spells.some((spell) => spell.rank > 0);
     if (maxSpellRank >= 1 && !hasRankedSpell) {
       issue("error", "Choose at least one rank 1 spell.", "spells");
     }
@@ -2421,6 +2501,17 @@ export function computeCharacter(
       !draft.spells.prepared.length
     ) {
       issue("error", "Prepare at least one spell for the day.", "spells");
+    }
+    const cantripLimit = cantripLimitFor(classData);
+    const baseCantripCount = draft.spells.cantrips.filter(
+      (spellId) => !grantedKnownSpellIds.has(spellId)
+    ).length;
+    if (cantripLimit !== null && baseCantripCount > cantripLimit) {
+      issue(
+        "warning",
+        `${classData?.name ?? "This class"} has ${baseCantripCount} cantrips selected; the level-${draft.level} limit is ${cantripLimit}.`,
+        "spells"
+      );
     }
   }
   for (const spellId of [...draft.spells.cantrips, ...draft.spells.known]) {
@@ -2449,7 +2540,11 @@ export function computeCharacter(
         issue("warning", "A prepared spell is missing from the compendium.", "spells");
         continue;
       }
-      if (!draft.spells.known.includes(spellId) && !draft.spells.cantrips.includes(spellId)) {
+      if (
+        !draft.spells.known.includes(spellId) &&
+        !draft.spells.cantrips.includes(spellId) &&
+        !grantedSpellIds.has(spellId)
+      ) {
         issue(
           "warning",
           `${spell.name} is prepared but is not in this character's spellbook or list.`,
@@ -2458,6 +2553,7 @@ export function computeCharacter(
       }
       if (spell.rank > 0) preparedByRank.set(spell.rank, (preparedByRank.get(spell.rank) ?? 0) + 1);
     }
+    const ordinarySlots = ordinarySpellSlotsFor(draft.level, caster.progression, classData?.name);
     for (const [rank, count] of preparedByRank) {
       const limit = slots?.[rank - 1] ?? 0;
       if (count > limit) {
@@ -2467,19 +2563,37 @@ export function computeCharacter(
           "spells"
         );
       }
+      if (ordinarySlots && classData?.name.toLowerCase() === "cleric") {
+        const fontCount = draft.spells.prepared.filter((spellId) => {
+          const spell = context.spells[spellId];
+          return spell?.rank === rank && isFontSpell(spell, context.deity);
+        }).length;
+        const ordinaryLimit = ordinarySlots[rank - 1] ?? 0;
+        if (count - fontCount > ordinaryLimit) {
+          issue(
+            "warning",
+            `Cleric: ${count - fontCount} non-font rank ${rank} spell${count - fontCount === 1 ? "" : "s"} prepared; only ${ordinaryLimit} ordinary slot${ordinaryLimit === 1 ? "" : "s"} available (divine font is heal/harm only).`,
+            "spells"
+          );
+        }
+      }
     }
   }
   const repertoire = spellRepertoireLimits(classData, draft.level);
   if (repertoire) {
-    if (draft.spells.cantrips.length > repertoire.cantrips) {
+    const baseCantrips = draft.spells.cantrips.filter(
+      (spellId) => !grantedKnownSpellIds.has(spellId)
+    );
+    if (baseCantrips.length > repertoire.cantrips) {
       issue(
         "error",
-        `${classData?.name ?? "This class"} knows ${draft.spells.cantrips.length} cantrips but the repertoire allows ${repertoire.cantrips}.`,
+        `${classData?.name ?? "This class"} knows ${baseCantrips.length} cantrips but the repertoire allows ${repertoire.cantrips}.`,
         "spells"
       );
     }
     const knownByRank = new Map<number, number>();
     for (const spellId of draft.spells.known) {
+      if (grantedKnownSpellIds.has(spellId)) continue;
       const spell = context.spells[spellId];
       if (!spell) continue;
       knownByRank.set(spell.rank, (knownByRank.get(spell.rank) ?? 0) + 1);
@@ -2597,12 +2711,16 @@ export function computeCharacter(
   const selectedBackgroundFeat = (background?.featChoices ?? [])
     .flatMap((group) => group.options)
     .find((option) => option.id === draft.backgroundFeat);
-  const grantedFeats = [
+  const grantedFeats: { name: string; id: string | null; source?: string }[] = [
     ...(background?.grantedFeats ?? []).map((feat) => ({ name: feat.name, id: feat.id })),
     ...(selectedBackgroundFeat
       ? [{ name: selectedBackgroundFeat.name, id: selectedBackgroundFeat.id }]
       : []),
   ];
+  for (const grant of classGrants.feats) {
+    if (grantedFeats.some((feat) => feat.id === grant.id)) continue;
+    grantedFeats.push({ name: grant.name, id: grant.id, source: grant.source ?? "Class choice" });
+  }
   for (const [grantId, grant] of Object.entries(FEAT_GRANTS)) {
     if (!activeFeatIds.includes(grantId)) continue;
     const chosenId = draft.featChoices[grantId]?.[0];
@@ -2637,9 +2755,20 @@ export function computeCharacter(
   ) {
     focusPointsMax = Math.max(focusPointsMax, 2);
   }
-  // A focus pool can hold one point per focus spell, up to 3. This is a
-  // table aid because some focus spells are granted automatically.
-  focusPointsMax = Math.max(focusPointsMax, Math.min(3, draft.spells.focus.length));
+  // A focus pool can hold one point per focus spell, up to 3. Count both
+  // manually chosen and class-granted focus spells without double-counting.
+  const grantedFocusSpells = classGrants.spells.filter(
+    (spell) => spell.kind === "focus" && spell.id
+  );
+  const uniqueFocusSpells = new Set([
+    ...draft.spells.focus,
+    ...grantedFocusSpells.map((spell) => spell.id),
+  ]);
+  focusPointsMax = Math.max(
+    focusPointsMax,
+    Math.min(3, uniqueFocusSpells.size),
+    Math.min(3, classGrants.focusPoints)
+  );
   focusPointsMax = Math.min(3, focusPointsMax);
 
   const featureLanguages = features.flatMap((feature) => {
@@ -2666,7 +2795,9 @@ export function computeCharacter(
   ].filter(
     (value, index, arr) => arr.findIndex((x) => x.toLowerCase() === value.toLowerCase()) === index
   );
-  const notes = [...new Set([...(featMods.notes ?? []), ...(itemMods.notes ?? [])])];
+  const notes = [
+    ...new Set([...(featMods.notes ?? []), ...(itemMods.notes ?? []), ...classGrants.notes]),
+  ];
 
   const className = classData?.name.toLowerCase();
   const font = divineFontInfo(draft.level, classData?.name);
@@ -2731,6 +2862,7 @@ export function computeCharacter(
     features,
     selectedFeats,
     grantedFeats,
+    grantedSpells: classGrants.spells,
     casterTradition: tradition,
     casterProgression: caster.progression,
     maxSpellRank,

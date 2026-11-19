@@ -5,6 +5,7 @@ import {
   animistSlots,
   boundedCasterSlots,
   casterInfo,
+  cantripLimitFor,
   characterSummary,
   checkFeatPrerequisite,
   computeCharacter,
@@ -15,7 +16,9 @@ import {
   featPrerequisiteStatus,
   fullCasterSlots,
   grantedTrainedSkills,
+  isFontSpell,
   normalizeCharacterDraft,
+  ordinarySpellSlotsFor,
   spellRepertoireLimits,
   spellSlotsFor,
 } from "../src/shared/rules";
@@ -431,6 +434,10 @@ describe("PF2e character rules", () => {
     expect(spellSlotsFor(15, "full", "Cleric")).toEqual([3, 3, 3, 3, 3, 3, 3, 8]);
     expect(spellSlotsFor(1, "full", "Wizard")).toEqual([3]);
     expect(spellSlotsFor(5, "full", "Wizard")).toEqual([4, 4, 3]);
+    expect(spellSlotsFor(1, "full", "Sorcerer")).toEqual([3]);
+    expect(spellSlotsFor(1, "full", "Oracle")).toEqual([3]);
+    expect(spellSlotsFor(3, "full", "Sorcerer")).toEqual([4, 3]);
+    expect(spellSlotsFor(5, "full", "Oracle")).toEqual([4, 4, 3]);
     expect(fullCasterSlots(19)).toEqual([3, 3, 3, 3, 3, 3, 3, 3, 3, 1]);
     expect(fullCasterSlots(20)).toEqual([3, 3, 3, 3, 3, 3, 3, 3, 3, 1]);
     expect(boundedCasterSlots(19)).toEqual([2, 2, 2, 2, 2, 2, 2, 2, 2]);
@@ -440,6 +447,14 @@ describe("PF2e character rules", () => {
     expect(spellSlotsFor(19, "bounded", "Psychic")).toEqual([2, 2, 2, 2, 2, 2, 2, 2, 2, 1]);
     expect(spellSlotsFor(19, "bounded", "Necromancer")).toEqual([2, 2, 2, 2, 2, 2, 2, 2, 2, 1]);
     expect(spellSlotsFor(19, "bounded", "Magus")).toEqual([2, 2, 2, 2, 2, 2, 2, 2, 2]);
+    expect(ordinarySpellSlotsFor(1, "full", "Cleric")).toEqual([2]);
+    expect(cantripLimitFor(classes.find((entry) => entry.name === "Wizard"))).toBe(6);
+    expect(cantripLimitFor(classes.find((entry) => entry.name === "Cleric"))).toBe(5);
+    const heal = spells.find((entry) => entry.name === "Heal")!;
+    const fireball = spells.find((entry) => entry.name === "Fireball")!;
+    const abadar = deities.find((entry) => entry.name === "Abadar")!;
+    expect(isFontSpell(heal, abadar)).toBe(true);
+    expect(isFontSpell(fireball, abadar)).toBe(false);
   });
 
   it("tracks cleric divine font separately from ordinary slots", () => {

@@ -156,6 +156,31 @@ export interface ReferenceItem {
   level: number;
 }
 
+export type ClassGrantSpellKind = "focus" | "repertoire" | "curriculum";
+
+export interface ClassGrantFeat {
+  id: string;
+  name: string;
+  level: number;
+  source?: string;
+}
+
+export interface ClassGrantSpell {
+  id: string;
+  name: string;
+  rank: number;
+  kind: ClassGrantSpellKind;
+  source?: string;
+}
+
+export interface ClassGrant {
+  feats?: ClassGrantFeat[];
+  spells?: ClassGrantSpell[];
+  /** Focus-pool floor established even when the spell itself is a later choice. */
+  focusPoints?: number;
+  notes?: string[];
+}
+
 export interface Ancestry extends Publication {
   id: string;
   name: string;
@@ -830,7 +855,9 @@ export interface DerivedCharacter {
   };
   features: FeatureSummary[];
   selectedFeats: Feat[];
-  grantedFeats: { name: string; id: string | null }[];
+  grantedFeats: { name: string; id: string | null; source?: string }[];
+  /** Spells granted by a class choice and not consumed by normal slots. */
+  grantedSpells: ClassGrantSpell[];
   casterTradition: SpellTradition | null;
   casterProgression: CasterProgression;
   maxSpellRank: number;

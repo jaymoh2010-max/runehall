@@ -1080,6 +1080,23 @@ export function CharacterSheetPage() {
               {derived.spellSlotsNote ? (
                 <p className="muted small">{derived.spellSlotsNote}</p>
               ) : null}
+              {derived.grantedSpells.length ? (
+                <div style={{ marginTop: 12 }}>
+                  <h3>Granted spells</h3>
+                  <div className="chip-row" style={{ marginTop: 6 }}>
+                    {derived.grantedSpells.map((spell) => (
+                      <Tag key={`${spell.kind}-${spell.id}`} tone="gold">
+                        {spell.name}
+                        {spell.kind === "focus"
+                          ? " · focus"
+                          : spell.kind === "repertoire"
+                            ? " · repertoire"
+                            : " · curriculum"}
+                      </Tag>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
               <SpellGroups
                 draft={draft}
                 context={context}

@@ -61,6 +61,7 @@ import {
   abilityMod,
   applicableChoiceGroups,
   casterInfo,
+  cantripLimitFor,
   classKeyOptions,
   computeCharacter,
   deitySkillOptions,
@@ -121,7 +122,7 @@ import { StepHeading, ValidationNote, SearchInput, MiniFeatureList } from "../sh
 export function SpellsStep({ draft, update, derived, context, setStep, openPicker }: BuilderProps) {
   const classData = context.classData;
   const caster = casterInfo(classData);
-  const tradition = caster.tradition ?? draft.spells.tradition;
+  const tradition = derived.casterTradition ?? draft.spells.tradition;
   const classTrait = classData?.name.toLowerCase();
   const cantrips = draft.spells.cantrips
     .map((id) => context.spells[id])
@@ -137,7 +138,9 @@ export function SpellsStep({ draft, update, derived, context, setStep, openPicke
   const fontRank = derived.divineFontRank;
   const isFocusCaster = caster.progression === "focus";
   const repertoire = spellRepertoireLimits(classData, draft.level);
+  const cantripCap = cantripLimitFor(classData) ?? repertoire?.cantrips ?? null;
   const isPreparedCaster = isPreparedCasterClass(classData?.name);
+  const traditionMissing = Boolean(caster.traditionOptions) && !tradition;
   const preparedCounts = new Map<string, number>();
   for (const id of draft.spells.prepared) preparedCounts.set(id, (preparedCounts.get(id) ?? 0) + 1);
   const preparedByRank = new Map<number, number>();
@@ -201,40 +204,57 @@ export function SpellsStep({ draft, update, derived, context, setStep, openPicke
         title="What magic answers your call?"
         lede="Choose a tradition, learn cantrips and spells, and track your spell slots at the table. Full, bounded, psychic, and focus casters each use their own progression."
       />
+      {traditionMissing ? (
+        <div className="info-box">
+          <CircleAlert size={16} />
+          <p>
+            Choose a bloodline, patron, or eidolon on the Class step before adding ordinary spells.
+            Class-granted spells still appear below.
+          </p>
+        </div>
+      ) : null}
       {caster.traditionOptions ? (
         <Card className="tradition-card">
           <h3>Magical tradition</h3>
-          <p className="muted small">
-            Your class draws power from one of the four traditions. Choose the one your bloodline,
-            patron, or eidolon grants.
-          </p>
-          <div className="tradition-grid">
-            {caster.traditionOptions.map((option) => (
-              <button
-                type="button"
-                key={option}
-                className={`tradition-option ${tradition === option ? "is-selected" : ""}`}
-                onClick={() =>
-                  update((current) => ({
-                    ...current,
-                    spells: { ...current.spells, tradition: option },
-                  }))
-                }
-              >
-                <Sparkles size={17} />
-                <strong>{titleCase(option)}</strong>
-                <span className="tiny muted">
-                  {option === "arcane"
-                    ? "Wizardry and lore"
-                    : option === "divine"
-                      ? "Gods and faith"
-                      : option === "occult"
-                        ? "Mind and mystery"
-                        : "Nature and primal power"}
-                </span>
-              </button>
-            ))}
-          </div>
+          {tradition ? (
+            <p className="muted small">
+              <strong>{titleCase(tradition)}</strong> · granted by your class choice.
+            </p>
+          ) : (
+            <>
+              <p className="muted small">
+                Your class draws power from one of the four traditions. Choose the one your
+                bloodline, patron, or eidolon grants.
+              </p>
+              <div className="tradition-grid">
+                {caster.traditionOptions.map((option) => (
+                  <button
+                    type="button"
+                    key={option}
+                    className={`tradition-option ${tradition === option ? "is-selected" : ""}`}
+                    onClick={() =>
+                      update((current) => ({
+                        ...current,
+                        spells: { ...current.spells, tradition: option },
+                      }))
+                    }
+                  >
+                    <Sparkles size={17} />
+                    <strong>{titleCase(option)}</strong>
+                    <span className="tiny muted">
+                      {option === "arcane"
+                        ? "Wizardry and lore"
+                        : option === "divine"
+                          ? "Gods and faith"
+                          : option === "occult"
+                            ? "Mind and mystery"
+                            : "Nature and primal power"}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
         </Card>
       ) : (
         <div className="tradition-inline">
@@ -352,6 +372,42 @@ export function SpellsStep({ draft, update, derived, context, setStep, openPicke
         </div>
       )}
 
+      {derived.grantedSpells.length ? (
+        <Card className="spell-section">
+          <div className="sheet-section-head">
+            <h2>Granted spells</h2>
+            <span className="tiny muted">
+              From your class choice; these do not use normal picks.
+            </span>
+          </div>
+          <div className="stack" style={{ gap: 8, marginTop: 10 }}>
+            {(["focus", "repertoire", "curriculum"] as const).map((kind) => {
+              const spells = derived.grantedSpells.filter((spell) => spell.kind === kind);
+              if (!spells.length) return null;
+              return (
+                <div key={kind}>
+                  <span className="field-label">
+                    {kind === "focus"
+                      ? "Focus"
+                      : kind === "repertoire"
+                        ? "Repertoire gift"
+                        : "Curriculum"}
+                  </span>
+                  <div className="chip-row" style={{ marginTop: 5 }}>
+                    {spells.map((spell) => (
+                      <Tag key={`${kind}-${spell.id}`} tone="gold">
+                        {spell.name}
+                        {spell.rank ? ` · rank ${spell.rank}` : ""}
+                      </Tag>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+      ) : null}
+
       {!isFocusCaster ? (
         <>
           <Card className="spell-section">
@@ -360,13 +416,15 @@ export function SpellsStep({ draft, update, derived, context, setStep, openPicke
                 <h3>Cantrips</h3>
                 <p className="muted small">
                   {cantrips.length}
-                  {repertoire ? ` / ${repertoire.cantrips}` : ""} chosen · rank 0
+                  {cantripCap !== null ? ` / ${cantripCap}` : ""} chosen · rank 0
                 </p>
               </div>
               <Button
                 size="sm"
                 icon={<Plus size={14} />}
-                disabled={Boolean(repertoire && cantrips.length >= repertoire.cantrips)}
+                disabled={
+                  traditionMissing || (cantripCap !== null && cantrips.length >= cantripCap)
+                }
                 onClick={() => openPicker({ kind: "spell", rank: 0, target: "cantrips" })}
               >
                 Add cantrip
@@ -417,9 +475,10 @@ export function SpellsStep({ draft, update, derived, context, setStep, openPicke
                   <Button
                     size="sm"
                     icon={<Plus size={14} />}
-                    disabled={Boolean(
-                      repertoire && spells.length >= (repertoire.ranks[rank - 1] ?? 0)
-                    )}
+                    disabled={
+                      traditionMissing ||
+                      Boolean(repertoire && spells.length >= (repertoire.ranks[rank - 1] ?? 0))
+                    }
                     onClick={() => openPicker({ kind: "spell", rank, target: "known" })}
                   >
                     Add spell
