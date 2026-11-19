@@ -189,7 +189,10 @@ export function CampaignDashboard({
   }, [campaignId]);
 
   const completed = useMemo(
-    () => characters.filter((character) => character.summary),
+    () =>
+      characters.filter(
+        (character) => character.summary && (character.summary.validationErrors ?? 0) === 0
+      ),
     [characters]
   );
   const averageLevel = completed.length
@@ -212,9 +215,9 @@ export function CampaignDashboard({
     },
     {
       id: "hero",
-      label: "Create a character",
-      done: characters.length > 0,
-      actionLabel: "Create",
+      label: "Create a playable character",
+      done: completed.length > 0,
+      actionLabel: completed.length ? "Review" : "Create",
       action: () => onNavigate("party"),
     },
     {
@@ -730,6 +733,9 @@ export function CampaignDashboard({
                           <span className="dashboard-condition">
                             {character.summary.conditions.join(", ")}
                           </span>
+                        ) : null}
+                        {(character.summary.validationErrors ?? 0) > 0 ? (
+                          <Badge tone="red">Needs choices</Badge>
                         ) : null}
                       </span>
                     ) : null}

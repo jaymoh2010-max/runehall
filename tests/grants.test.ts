@@ -76,4 +76,16 @@ describe("granted feats", () => {
     expect(featGrant(ancestralParagon.id)?.category).toBe("ancestry");
     expect(featGrant(ancestralParagon.id)?.level).toBe(1);
   });
+
+  it("puts a background starting feat into the character context", () => {
+    const martialDisciple = byName(backgrounds, "Martial Disciple");
+    const catFall = byName(feats, "Cat Fall");
+    const character = draft();
+    character.backgroundId = martialDisciple.id;
+    character.backgroundFeat = catFall.id;
+    const context = contextForDraft(character);
+    expect(context.feats[catFall.id]?.name).toBe("Cat Fall");
+    const derived = computeCharacter(character, context);
+    expect(derived.grantedFeats.some((feat) => feat.id === catFall.id)).toBe(true);
+  });
 });

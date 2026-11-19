@@ -1,3 +1,17 @@
+/**
+ * Current HP after gaining a level. Full characters stay at "full" (null),
+ * while wounded characters gain the same increase as their maximum.
+ */
+export function levelUpCurrentHp(
+  currentHp: number | null,
+  maxHpBefore: number,
+  maxHpAfter: number
+): number | null {
+  if (currentHp === null || currentHp >= maxHpBefore) return null;
+  const gained = Math.max(0, maxHpAfter - maxHpBefore);
+  return Math.min(maxHpAfter, Math.max(0, currentHp) + gained);
+}
+
 export interface LevelUpChoice {
   id: string;
   label: string;

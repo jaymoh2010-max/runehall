@@ -150,6 +150,8 @@ The character builder is already good enough for a core campaign at low levels. 
 2. **Feat prerequisite validation (complete for the current rules engine)**
    - Level, ability modifier, proficiency, skill/Lore, feat, class feature/option, ancestry/heritage/deity, casting, focus pool, and common trait prerequisites are parsed.
    - Feats with definitively unmet prerequisites are hidden from future choices and cannot be selected.
+   - Class feats with recognizable class traits are blocked when they belong to another class, even with the class filter off. Background starting feats enter the context, prerequisite, and effect pipeline.
+   - Core selections and picker choices update the summary and step status before the next autosave; navigating to the sheet flushes the pending save.
    - Complex story/campaign prerequisites remain visible with a **Check prereqs** warning.
    - Replacing a feat evaluates the slot as empty, so the feat being replaced cannot satisfy its own prerequisites.
    - Feat category and slot-level mismatches are hard validation errors.
@@ -220,7 +222,7 @@ Then immediately add **guided level-up**: a dedicated “Level up” flow that e
   - Campaign export includes journal kinds and attachments.
 - [x] **Campaign dashboard (core)**
   - New **Overview** tab with last-session summary, next-session date, shared teaser, and GM-only notes.
-  - Party status cards show level, HP, AC, conditions, and unfinished-character count.
+  - Party status cards show level, HP, AC, conditions, and a **Needs choices** count for unfinished builds.
   - Clue/quest threads can be marked done, shared with players, or kept GM-only.
   - Quick actions jump to the table, party, journal, encounters, or loot.
   - Players receive a filtered read-only view; GM-only notes and threads never leave the server.
@@ -345,15 +347,15 @@ Acceptance: a GM can prepare a full session in Runehall and start it with one �
 - [x] **Golden-sheet regression fixtures**
   - Level-1 fighter, wizard, and rogue fixtures pin abilities, HP, AC, saves, perception, DCs, attacks, and key skills.
   - Build legality remains covered separately by the existing rules tests.
-- [x] **Level-up checklist (first pass)**
-  - After leveling, a persistent checklist lists required choices and links to each chapter.
-  - Feat tasks check the actual slot; ability, skill, and spell tasks use validation.
-  - Completed tasks are marked and the header reports the remaining count.
+- [x] **Persistent character and level-up checklist**
+  - The checklist is derived from the character’s current validation issues, so it survives reloads and appears after GM-driven level-ups.
+  - Each task links to the chapter that resolves it; the header reports the remaining required choices.
+  - Character summaries store validation error/warning counts, and party cards plus the Overview mark unfinished builds as **Needs choices**.
 - [x] **Full guided level-up wizard**
   - The Level up button is gated while the current sheet still has validation errors; the tooltip explains which permission or choice is blocking it.
   - A step-by-step wizard shows an overview with before/after HP, one page for each new feat, skill, spell, ability, or class feature, and a confirmation step with Back/Next controls.
   - Confirming applies the level and opens the first new choice; the persistent checklist keeps every remaining choice visible.
-  - The wizard step builder is covered by unit tests, and the existing builder browser flow remains green.
+  - The wizard step builder is covered by unit tests, and the browser flow verifies the checklist appears on an unfinished draft.
 - [x] **Casting presentation**
   - Cleric divine font slots are tracked with their own pips, separate from ordinary rank slots.
   - Prepared casters label their spell lists as **spellbook** and show prepared counts; spontaneous casters use **repertoire**.
@@ -378,6 +380,12 @@ Acceptance: a GM can prepare a full session in Runehall and start it with one �
 
 **Goal:** run a full combat without another VTT.
 
+- [x] **Live sheet state and table rolls**
+  - The open character sheet joins the campaign room and refreshes on `character:updated` when it has no unsaved edits.
+  - Party cards also consume live character summaries, so token damage, rests, loot, and level-ups do not require a reload.
+  - A target DC/AC field resolves PF2e degrees of success; a secret toggle keeps the roll GM-only.
+  - Attacks expose second/third-attack MAP buttons (agile-adjusted) and a critical-damage shortcut.
+  - Direct HP corrections apply dying/unconscious and wounded-on-recovery without silently consuming temporary HP.
 - [x] **Area templates**
   - Burst, emanation, cone, and line templates with size in feet.
   - Click-drag placement on the map, with a live preview and a size label.
@@ -388,7 +396,9 @@ Acceptance: a GM can prepare a full session in Runehall and start it with one �
   - Legacy string conditions are normalized automatically on load.
   - The token editor, token panel, and initiative tooltip show labels such as “Frightened 2 (3r)”.
   - Advancing initiative ticks the active entry’s timed conditions and removes expired ones.
-  - Character-sheet conditions also track value and round duration, with a one-click −1 duration button.
+  - Character-sheet conditions also track value and round duration, with a one-click −1 duration button that removes a condition when its last round expires.
+  - A linked character sheet and token share one condition list: GM token edits update the sheet’s AC/saves/attacks/DCs, and sheet edits update the token.
+  - Legacy names such as “Drained 2” are normalized during ticking and rest reduction.
   - Character-sheet condition durations tick automatically when that character’s linked token ends its turn in initiative.
   - Remaining: sheet ticking without a linked token.
 - [x] **Multi-select, marquee, and group drag**

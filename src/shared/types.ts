@@ -688,6 +688,10 @@ export interface CharacterSummary {
   xp: number;
   conditions: string[];
   portraitUrl: string | null;
+  /** Required builder choices still unresolved. Older saved summaries may omit this. */
+  validationErrors?: number;
+  /** Non-blocking builder review items. Older saved summaries may omit this. */
+  validationWarnings?: number;
 }
 
 export interface CharacterRecord {

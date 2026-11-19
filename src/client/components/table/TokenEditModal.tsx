@@ -7,7 +7,11 @@ import type {
   TokenCondition,
   TokenVisionMode,
 } from "../../../shared/types";
-import { tokenConditionLabel } from "../../../shared/tokens";
+import {
+  conditionBaseName,
+  parseConditionEntry,
+  tokenConditionLabel,
+} from "../../../shared/tokens";
 import { TOKEN_VISION_OPTIONS } from "../../../shared/lighting";
 import { uploadImage } from "../../api";
 import { errorMessage, useToasts } from "../../stores";
@@ -101,16 +105,22 @@ export function TokenEditModal({
   };
 
   const addCondition = () => {
-    const name = conditionInput.trim();
-    if (!name) return;
-    const value = conditionValue === "" ? null : Math.max(0, Math.round(Number(conditionValue)));
-    const duration =
-      conditionDuration === "" ? null : Math.max(0, Math.round(Number(conditionDuration)));
-    setConditions((current) =>
-      current.some((condition) => condition.name.toLowerCase() === name.toLowerCase())
-        ? current
-        : [...current, { name, value, duration }]
-    );
+    const entry = parseConditionEntry({
+      name: conditionInput,
+      value: conditionValue === "" ? null : Math.max(0, Math.round(Number(conditionValue))),
+      duration:
+        conditionDuration === "" ? null : Math.max(0, Math.round(Number(conditionDuration))),
+    });
+    if (!entry) return;
+    setConditions((current) => {
+      const wanted = conditionBaseName(entry.name);
+      const existing = current.some((condition) => conditionBaseName(condition.name) === wanted);
+      return existing
+        ? current.map((condition) =>
+            conditionBaseName(condition.name) === wanted ? entry : condition
+          )
+        : [...current, entry];
+    });
     setConditionInput("");
     setConditionValue("");
     setConditionDuration("");

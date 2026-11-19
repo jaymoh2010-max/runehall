@@ -6,6 +6,7 @@ import {
   useState,
   type ChangeEvent,
   type FormEvent,
+  type MouseEvent,
 } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
@@ -36,7 +37,6 @@ import {
   Upload,
   UserRound,
   Users,
-  X,
 } from "lucide-react";
 import {
   ABILITIES,
@@ -99,7 +99,6 @@ import {
   Card,
   EmptyState,
   Field,
-  IconButton,
   Input,
   Modal,
   PageEyebrow,
@@ -171,10 +170,8 @@ export function CharacterBuilderPage() {
   const [picker, setPicker] = useState<Picker>(null);
   const [levelUpOpen, setLevelUpOpen] = useState(false);
   const [levelUpStep, setLevelUpStep] = useState(0);
-  const [levelUpPlan, setLevelUpPlan] = useState<{ level: number; tasks: LevelUpTask[] } | null>(
-    null
-  );
   const [saveState, setSaveState] = useState<"saved" | "saving" | "dirty" | "error">("saved");
+  const [pendingSheet, setPendingSheet] = useState(false);
   const [conflict, setConflict] = useState<CharacterRecord | null>(null);
   const initialized = useRef(false);
   const skipInitialSave = useRef(true);
@@ -249,6 +246,29 @@ export function CharacterBuilderPage() {
     };
   }, [id, navigate]);
 
+  // The server context lags the debounced autosave by one request. Resolve the
+  // core choices locally so selecting an ancestry, heritage, background, or
+  // class immediately updates the step status and summary.
+  useEffect(() => {
+    if (!staticData || !draft) return;
+    setContext((current) => {
+      const ancestry = staticData.ancestries.find((entry) => entry.id === draft.ancestryId) ?? null;
+      const heritage = staticData.heritages.find((entry) => entry.id === draft.heritageId) ?? null;
+      const background =
+        staticData.backgrounds.find((entry) => entry.id === draft.backgroundId) ?? null;
+      const classData = staticData.classes.find((entry) => entry.id === draft.classId) ?? null;
+      if (
+        current.ancestry?.id === ancestry?.id &&
+        current.heritage?.id === heritage?.id &&
+        current.background?.id === background?.id &&
+        current.classData?.id === classData?.id
+      ) {
+        return current;
+      }
+      return { ...current, ancestry, heritage, background, classData };
+    });
+  }, [draft?.ancestryId, draft?.heritageId, draft?.backgroundId, draft?.classId, staticData]);
+
   const derived = useMemo(
     () => (draft ? computeCharacter(draft, context) : null),
     [draft, context]
@@ -275,22 +295,27 @@ export function CharacterBuilderPage() {
           if (!currentDraft) break;
           setSaveState("saving");
           try {
-            const [contextResult, saveResult] = await Promise.all([
-              api<{ context: CharacterContext }>(`/api/characters/${id}/context`, {
-                method: "POST",
-                body: { draft: currentDraft },
-              }),
-              api<{ character: CharacterRecord }>(`/api/characters/${id}`, {
-                method: "PUT",
-                body: forceOnce
-                  ? { data: currentDraft, force: true }
-                  : { data: currentDraft, expectedRevision: characterRef.current?.revision },
-              }),
-            ]);
+            // Save the authoritative draft first. A context refresh failure
+            // must not leave the client on an old revision and manufacture a
+            // false 409 on the next save.
+            const saveResult = await api<{ character: CharacterRecord }>(`/api/characters/${id}`, {
+              method: "PUT",
+              body: forceOnce
+                ? { data: currentDraft, force: true }
+                : { data: currentDraft, expectedRevision: characterRef.current?.revision },
+            });
             forceOnce = false;
             characterRef.current = saveResult.character;
             setCharacter(saveResult.character);
-            setContext(contextResult.context);
+            try {
+              const contextResult = await api<{ context: CharacterContext }>(
+                `/api/characters/${id}/context`,
+                { method: "POST", body: { draft: currentDraft } }
+              );
+              setContext(contextResult.context);
+            } catch {
+              // Keep the optimistic/local context; the next save retries it.
+            }
             setConflict(null);
             conflictRef.current = false;
             if (draftRef.current === currentDraft) {
@@ -320,11 +345,10 @@ export function CharacterBuilderPage() {
   );
 
   useEffect(() => {
-    return () => {
+    const flush = () => {
       if (!dirtyRef.current || !id || !draftRef.current) return;
-      // A route change unmounts the builder before the 650ms autosave timer
-      // fires. Send the latest draft with keepalive so a quick "Sheet" click
-      // cannot discard the edit.
+      // A route change or tab close can happen before the 650ms autosave timer
+      // fires. Send the latest draft with keepalive so the edit is not lost.
       void fetch(`/api/characters/${id}`, {
         method: "PUT",
         credentials: "include",
@@ -336,7 +360,29 @@ export function CharacterBuilderPage() {
         }),
       });
     };
+    window.addEventListener("pagehide", flush);
+    return () => {
+      window.removeEventListener("pagehide", flush);
+      flush();
+    };
   }, [id]);
+
+  useEffect(() => {
+    if (!pendingSheet) return;
+    if (saveState === "saved" && !dirtyRef.current && id) {
+      setPendingSheet(false);
+      navigate(`/characters/${id}`);
+    } else if (saveState === "error") {
+      setPendingSheet(false);
+    }
+  }, [pendingSheet, saveState, id, navigate]);
+
+  const openSheet = (event: MouseEvent<HTMLAnchorElement>) => {
+    if (saveState === "saved" && !dirtyRef.current) return;
+    event.preventDefault();
+    setPendingSheet(true);
+    void saveDraft();
+  };
 
   useEffect(() => {
     if (!draft || !initialized.current || !id) return;
@@ -598,6 +644,15 @@ export function CharacterBuilderPage() {
   };
   const errors = issues.filter((issue) => issue.severity === "error");
   const warnings = issues.filter((issue) => issue.severity === "warning");
+  const outstandingChoices = errors.map((issue, index) => {
+    const entry = STEPS.find((candidate) => candidate.id === issue.step) ?? STEPS[STEPS.length - 1];
+    return {
+      id: `${entry.id}-${index}-${issue.message}`,
+      step: entry.id,
+      label: entry.label,
+      detail: issue.message,
+    };
+  });
   const stepIndex = STEPS.findIndex((entry) => entry.id === step);
   const go = (direction: -1 | 1) => {
     const next = STEPS[stepIndex + direction];
@@ -606,21 +661,10 @@ export function CharacterBuilderPage() {
   const completeLevelUp = (targetStep?: StepId) => {
     if (nextLevel === draft.level) return;
     update((current) => ({ ...current, level: nextLevel }));
-    setLevelUpPlan(levelUpItems.length ? { level: nextLevel, tasks: levelUpItems } : null);
     setLevelUpOpen(false);
     setStep(targetStep ?? levelUpItems[0]?.step ?? "review");
     toast(`Level ${nextLevel} reached. Review the new choices.`, "success");
   };
-  const levelUpTaskDone = (task: LevelUpTask): boolean => {
-    if (task.kind === "class") return true;
-    if (task.kind === "feat" && task.category) {
-      return Boolean(draft.feats[task.category]?.[String(levelUpPlan?.level ?? draft.level)]);
-    }
-    return stepErrors(task.step).length === 0;
-  };
-  const levelUpRemaining = levelUpPlan
-    ? levelUpPlan.tasks.filter((task) => !levelUpTaskDone(task)).length
-    : 0;
 
   const renderStep = () => {
     const props: BuilderProps = {
@@ -713,10 +757,9 @@ export function CharacterBuilderPage() {
           <Field label="Level">
             <Select
               value={draft.level}
-              onChange={(event) => {
-                update((current) => ({ ...current, level: Number(event.target.value) }));
-                setLevelUpPlan(null);
-              }}
+              onChange={(event) =>
+                update((current) => ({ ...current, level: Number(event.target.value) }))
+              }
               className="level-select"
               disabled={!canAdvance}
             >
@@ -746,7 +789,7 @@ export function CharacterBuilderPage() {
           >
             Level up
           </Button>
-          <Link to={`/characters/${id}`} className="btn btn-secondary btn-sm">
+          <Link to={`/characters/${id}`} className="btn btn-secondary btn-sm" onClick={openSheet}>
             <ScrollText size={15} /> Sheet
           </Link>
           <Button
@@ -801,42 +844,33 @@ export function CharacterBuilderPage() {
         </aside>
 
         <main className="builder-content">
-          {levelUpPlan && levelUpPlan.level === draft.level ? (
-            <div className={`levelup-checklist ${levelUpRemaining ? "" : "is-complete"}`}>
+          {outstandingChoices.length ? (
+            <div className="levelup-checklist">
               <div className="levelup-checklist-head">
                 <div>
-                  <span className="page-eyebrow">LEVEL {levelUpPlan.level} CHECKLIST</span>
+                  <span className="page-eyebrow">CHARACTER CHECKLIST</span>
                   <strong>
-                    {levelUpRemaining
-                      ? `${levelUpRemaining} choice${levelUpRemaining === 1 ? "" : "s"} remaining`
-                      : "Level complete"}
+                    {outstandingChoices.length} required choice
+                    {outstandingChoices.length === 1 ? "" : "s"} remaining
                   </strong>
                 </div>
-                <IconButton label="Dismiss level-up checklist" onClick={() => setLevelUpPlan(null)}>
-                  <X size={14} />
-                </IconButton>
               </div>
               <div className="levelup-checklist-items">
-                {levelUpPlan.tasks.map((task) => {
-                  const done = levelUpTaskDone(task);
-                  return (
-                    <button
-                      key={task.id}
-                      type="button"
-                      className={`levelup-checklist-item ${done ? "is-done" : ""}`}
-                      onClick={() => setStep(task.step)}
-                    >
-                      <span className="levelup-checklist-check">
-                        {done ? <Check size={12} /> : null}
-                      </span>
-                      <span>
-                        <strong>{task.label}</strong>
-                        <small>{done ? "Done" : task.detail}</small>
-                      </span>
-                      {done ? null : <ArrowRight size={13} />}
-                    </button>
-                  );
-                })}
+                {outstandingChoices.map((task) => (
+                  <button
+                    key={task.id}
+                    type="button"
+                    className="levelup-checklist-item"
+                    onClick={() => setStep(task.step)}
+                  >
+                    <span className="levelup-checklist-check" />
+                    <span>
+                      <strong>{task.label}</strong>
+                      <small>{task.detail}</small>
+                    </span>
+                    <ArrowRight size={13} />
+                  </button>
+                ))}
               </div>
             </div>
           ) : null}
@@ -928,6 +962,7 @@ export function CharacterBuilderPage() {
               to={`/characters/${id}`}
               className="btn btn-gold btn-sm btn-block"
               style={{ marginTop: 11 }}
+              onClick={openSheet}
             >
               <ScrollText size={14} /> Open character sheet
             </Link>
@@ -981,7 +1016,11 @@ export function CharacterBuilderPage() {
           legacyDefault={legacyDefault}
           legacyLocked={legacyLocked}
           onLegacyChange={(value) => update((current) => ({ ...current, includeLegacy: value }))}
-          onSelect={(feat) =>
+          onSelect={(feat) => {
+            setContext((current) => ({
+              ...current,
+              feats: { ...current.feats, [feat.id]: feat },
+            }));
             update((current) => ({
               ...current,
               feats: {
@@ -991,8 +1030,8 @@ export function CharacterBuilderPage() {
                   [String(picker.level)]: feat.id,
                 },
               },
-            }))
-          }
+            }));
+          }}
         />
       ) : null}
       {picker?.kind === "spell" ? (
@@ -1010,7 +1049,11 @@ export function CharacterBuilderPage() {
           legacyDefault={legacyDefault}
           legacyLocked={legacyLocked}
           onLegacyChange={(value) => update((current) => ({ ...current, includeLegacy: value }))}
-          onSelect={(spell) =>
+          onSelect={(spell) => {
+            setContext((current) => ({
+              ...current,
+              spells: { ...current.spells, [spell.id]: spell },
+            }));
             update((current) => {
               if (picker.target === "cantrips" && spell.rank !== 0) return current;
               if (current.spells[picker.target].includes(spell.id)) return current;
@@ -1021,8 +1064,8 @@ export function CharacterBuilderPage() {
                   [picker.target]: [...current.spells[picker.target], spell.id],
                 },
               };
-            })
-          }
+            });
+          }}
         />
       ) : null}
       {picker?.kind === "equipment" ? (
@@ -1036,7 +1079,11 @@ export function CharacterBuilderPage() {
           legacyDefault={legacyDefault}
           legacyLocked={legacyLocked}
           onLegacyChange={(value) => update((current) => ({ ...current, includeLegacy: value }))}
-          onSelect={(item) =>
+          onSelect={(item) => {
+            setContext((current) => ({
+              ...current,
+              equipment: { ...current.equipment, [item.id]: item },
+            }));
             update((current) => {
               const existing = current.equipment.find((entry) => entry.itemId === item.id);
               if (existing) {
@@ -1058,8 +1105,8 @@ export function CharacterBuilderPage() {
                   },
                 ],
               };
-            })
-          }
+            });
+          }}
         />
       ) : null}
       {picker?.kind === "deity" ? (
@@ -1072,9 +1119,10 @@ export function CharacterBuilderPage() {
           legacyDefault={legacyDefault}
           legacyLocked={legacyLocked}
           onLegacyChange={(value) => update((current) => ({ ...current, includeLegacy: value }))}
-          onSelect={(deity) =>
-            update((current) => ({ ...current, deityId: deity.id, deitySkill: null }))
-          }
+          onSelect={(deity) => {
+            setContext((current) => ({ ...current, deity }));
+            update((current) => ({ ...current, deityId: deity.id, deitySkill: null }));
+          }}
         />
       ) : null}
       <Modal

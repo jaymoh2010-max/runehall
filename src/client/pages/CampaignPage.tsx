@@ -330,6 +330,36 @@ export function CampaignPage() {
     const onCharacterRemoved = ({ characterId }: { characterId: string }) => {
       setCharacters((current) => current.filter((character) => character.id !== characterId));
     };
+    const onCharacterUpdated = ({
+      characterId,
+      summary,
+      name,
+    }: {
+      characterId: string;
+      summary: CharacterRecord["summary"];
+      name?: string;
+    }) => {
+      const patch = (character: CharacterRecord): CharacterRecord =>
+        character.id === characterId
+          ? { ...character, summary, name: name ?? character.name }
+          : character;
+      setCharacters((current) => current.map(patch));
+      setTableData((current) =>
+        current ? { ...current, characters: current.characters.map(patch) } : current
+      );
+    };
+    const onCharacterCreated = ({ character }: { character: CharacterRecord }) => {
+      setCharacters((current) =>
+        current.some((entry) => entry.id === character.id)
+          ? current.map((entry) => (entry.id === character.id ? character : entry))
+          : [...current, character]
+      );
+      setTableData((current) =>
+        current && !current.characters.some((entry) => entry.id === character.id)
+          ? { ...current, characters: [...current.characters, character] }
+          : current
+      );
+    };
     const upsertJournal = (entry: JournalEntry) => {
       setTableData((current) => {
         if (!current) return current;
@@ -348,6 +378,8 @@ export function CampaignPage() {
       );
     };
     socket.on("campaign:updated", applySummary);
+    socket.on("character:updated", onCharacterUpdated);
+    socket.on("character:created", onCharacterCreated);
     socket.on("character:removed", onCharacterRemoved);
     socket.on("journal:created", upsertJournal);
     socket.on("journal:updated", upsertJournal);
@@ -357,6 +389,8 @@ export function CampaignPage() {
     const leaveCampaignRoom = joinCampaign(id);
     return () => {
       socket.off("campaign:updated", applySummary);
+      socket.off("character:updated", onCharacterUpdated);
+      socket.off("character:created", onCharacterCreated);
       socket.off("character:removed", onCharacterRemoved);
       socket.off("journal:created", upsertJournal);
       socket.off("journal:updated", upsertJournal);
@@ -1191,6 +1225,9 @@ export function CampaignPage() {
                           <h3>{character.name}</h3>
                           {character.permissions?.canEdit ? (
                             <Badge tone="gold">Editable</Badge>
+                          ) : null}
+                          {(character.summary?.validationErrors ?? 0) > 0 ? (
+                            <Badge tone="red">Needs choices</Badge>
                           ) : null}
                         </div>
                         <p className="tiny muted">

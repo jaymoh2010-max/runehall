@@ -1303,13 +1303,77 @@ export function featPrerequisiteChecks(
   }));
 }
 
+const CLASS_TRAIT_NAMES = new Set([
+  "alchemist",
+  "animist",
+  "barbarian",
+  "bard",
+  "champion",
+  "cleric",
+  "commander",
+  "druid",
+  "exemplar",
+  "fighter",
+  "guardian",
+  "gunslinger",
+  "inventor",
+  "investigator",
+  "kineticist",
+  "magus",
+  "monk",
+  "necromancer",
+  "oracle",
+  "psychic",
+  "ranger",
+  "rogue",
+  "runesmith",
+  "sorcerer",
+  "summoner",
+  "swashbuckler",
+  "thaumaturge",
+  "witch",
+  "wizard",
+]);
+
+/**
+ * Class feats carry one or more class traits. If a feat has a recognizable
+ * class trait and the current class is not among them, the feat is illegal.
+ * Feats without recognizable class metadata stay available rather than risk
+ * hiding a valid option.
+ */
+export function featClassAccess(
+  feat: Feat,
+  context: CharacterContext
+): { allowed: boolean; reason?: string } {
+  if (feat.category !== "class") return { allowed: true };
+  const classData = context.classData;
+  const className = classData?.name.trim().toLowerCase() ?? "";
+  if (!className) {
+    return { allowed: false, reason: "Choose a class before selecting class feats." };
+  }
+  const classTraits = feat.traits
+    .map((trait) => trait.trim().toLowerCase())
+    .filter((trait) => CLASS_TRAIT_NAMES.has(trait));
+  if (!classTraits.length || classTraits.includes(className)) return { allowed: true };
+  return {
+    allowed: false,
+    reason: `${feat.name} is not available to ${classData?.name ?? "this class"}.`,
+  };
+}
+
 export function featPrerequisiteStatus(
   feat: Feat,
   draft: CharacterDraft,
   context: CharacterContext,
   derived: DerivedCharacter
 ): { status: PrerequisiteStatus; checks: PrerequisiteCheck[] } {
-  const checks = featPrerequisiteChecks(feat, draft, context, derived);
+  const access = featClassAccess(feat, context);
+  const checks: PrerequisiteCheck[] = [
+    ...(access.allowed
+      ? []
+      : [{ text: access.reason ?? "Not available to this class.", status: "unmet" as const }]),
+    ...featPrerequisiteChecks(feat, draft, context, derived),
+  ];
   return {
     status: combineStatuses(
       checks.map((check) => check.status),
@@ -2395,6 +2459,8 @@ export function computeCharacter(
     }
     if (feat.level > slot.level)
       issue("error", `${feat.name} is above the level ${slot.level} slot.`, "feats");
+    const access = featClassAccess(feat, context);
+    if (!access.allowed) issue("error", access.reason!, "feats");
     const expected = slot.category === "class" ? ["class", "archetype"] : [slot.category];
     if (!expected.includes(feat.category)) {
       issue(
@@ -2694,5 +2760,7 @@ export function characterSummary(draft: CharacterDraft, context: CharacterContex
         `${condition.name}${condition.value ? ` ${condition.value}` : ""}${condition.duration ? ` (${condition.duration}r)` : ""}`
     ),
     portraitUrl: draft.portraitUrl,
+    validationErrors: derived.validation.filter((issue) => issue.severity === "error").length,
+    validationWarnings: derived.validation.filter((issue) => issue.severity === "warning").length,
   };
 }

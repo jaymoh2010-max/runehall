@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildLevelUpWizardSteps } from "../src/shared/levelup";
+import { buildLevelUpWizardSteps, levelUpCurrentHp } from "../src/shared/levelup";
 
 describe("level-up wizard", () => {
   it("builds an overview, one page per choice, and a confirmation", () => {
@@ -24,6 +24,13 @@ describe("level-up wizard", () => {
     expect(steps[1].id).toBe("choice-feat-class-2");
     expect(steps[2].choice?.step).toBe("skills");
     expect(steps.at(-1)?.id).toBe("confirm");
+  });
+
+  it("keeps a wounded character's deficit while adding the new maximum HP", () => {
+    expect(levelUpCurrentHp(10, 20, 27)).toBe(17);
+    expect(levelUpCurrentHp(null, 20, 27)).toBeNull();
+    expect(levelUpCurrentHp(20, 20, 27)).toBeNull();
+    expect(levelUpCurrentHp(19, 20, 27)).toBe(26);
   });
 
   it("still confirms a level with no new choices", () => {

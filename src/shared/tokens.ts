@@ -35,6 +35,62 @@ export function normalizeTokenConditions(value: unknown): TokenCondition[] {
   return conditions;
 }
 
+/** Character-sheet conditions and table-token conditions share one shape. */
+export function conditionsFromSheet(conditions: CharacterCondition[]): TokenCondition[] {
+  return normalizeTokenConditions(conditions);
+}
+
+/** Mirror a token condition edit back onto the linked character sheet. */
+export function sheetConditionsFromToken(conditions: TokenCondition[]): CharacterCondition[] {
+  return normalizeTokenConditions(conditions);
+}
+
+/** Strip a legacy trailing value such as "Drained 2" while preserving case. */
+export function conditionNameWithoutValue(value: string): string {
+  return value
+    .trim()
+    .replace(/\s+\d+$/, "")
+    .trim();
+}
+
+/** Normalize a condition name for matching, including legacy "Drained 2" names. */
+export function conditionBaseName(value: string): string {
+  return conditionNameWithoutValue(value).toLowerCase();
+}
+
+/** Read a condition value from the explicit field or a legacy trailing number. */
+export function conditionNumericValue(condition: {
+  name: string;
+  value?: number | null;
+}): number | null {
+  if (typeof condition.value === "number" && Number.isFinite(condition.value)) {
+    return Math.max(0, Math.round(condition.value));
+  }
+  const trailing = condition.name.trim().match(/\s+(\d+)$/);
+  return trailing ? Number(trailing[1]) : null;
+}
+
+/** Parse the sheet/token condition inputs, lifting a trailing number into the value. */
+export function parseConditionEntry(input: {
+  name: string;
+  value?: number | null;
+  duration?: number | null;
+}): TokenCondition | null {
+  const raw = input.name.trim();
+  if (!raw) return null;
+  const trailing = raw.match(/^(.*?)\s+(\d+)$/);
+  const name = conditionNameWithoutValue(trailing?.[1] ?? raw).slice(0, 60);
+  if (!name) return null;
+  const explicitValue =
+    typeof input.value === "number" && Number.isFinite(input.value) ? input.value : null;
+  const trailingValue = trailing ? Number(trailing[2]) : null;
+  return normalizeTokenCondition({
+    name,
+    value: explicitValue ?? trailingValue,
+    duration: input.duration ?? null,
+  });
+}
+
 const LIFE_CONDITIONS = new Set(["dying", "unconscious", "dead", "wounded"]);
 
 /**
@@ -46,13 +102,13 @@ export function syncLifeConditions(
   sheetConditions: CharacterCondition[]
 ): TokenCondition[] {
   const kept = tokenConditions.filter(
-    (condition) => !LIFE_CONDITIONS.has(condition.name.trim().toLowerCase())
+    (condition) => !LIFE_CONDITIONS.has(conditionBaseName(condition.name))
   );
   const life = sheetConditions
-    .filter((condition) => LIFE_CONDITIONS.has(condition.name.trim().toLowerCase()))
+    .filter((condition) => LIFE_CONDITIONS.has(conditionBaseName(condition.name)))
     .map((condition) => ({
-      name: condition.name,
-      value: condition.value ?? null,
+      name: conditionNameWithoutValue(condition.name),
+      value: conditionNumericValue(condition),
       duration: null,
     }));
   return [...kept, ...life];
@@ -84,10 +140,11 @@ export function tokenConditionSummary(conditions: TokenCondition[]): string {
 export function tickTokenConditions(conditions: TokenCondition[]): TokenCondition[] {
   const next: TokenCondition[] = [];
   for (const condition of conditions) {
-    const name = condition.name.trim().toLowerCase();
-    const updated = { ...condition };
-    if (name === "frightened" && typeof condition.value === "number" && condition.value > 0) {
-      updated.value = condition.value - 1;
+    const name = conditionBaseName(condition.name);
+    const value = conditionNumericValue(condition);
+    const updated = { ...condition, name: conditionNameWithoutValue(condition.name) };
+    if (name === "frightened" && value !== null && value > 0) {
+      updated.value = value - 1;
     }
     if (typeof condition.duration === "number" && condition.duration > 0) {
       updated.duration = condition.duration - 1;

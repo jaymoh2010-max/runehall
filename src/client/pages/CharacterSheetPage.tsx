@@ -8,6 +8,7 @@ import {
   CircleAlert,
   Coins,
   Dices,
+  EyeOff,
   Heart,
   Minus,
   Moon,
@@ -47,21 +48,17 @@ import {
   signed,
   titleCase,
 } from "../../shared/rules";
-import { DEGREE_LABELS, mod, rollFormula } from "../../shared/dice";
+import { DEGREE_LABELS, applyAttackPenalty, mod, rollFormula } from "../../shared/dice";
 import { currencyToCp } from "../../shared/inventory";
 import { applyLongRest } from "../../shared/rest";
-import {
-  applyDamageToDraft,
-  applyHealingToDraft,
-  reconcileLifeConditions,
-} from "../../shared/damage";
+import { applyDamageToDraft, applyHealingToDraft } from "../../shared/damage";
 import { xpProgress } from "../../shared/xp";
 import { spellTraditionLabel, stripHtml } from "../../shared/compendium";
-import { conditionLabel } from "../../shared/tokens";
+import { conditionBaseName, conditionLabel, parseConditionEntry } from "../../shared/tokens";
 import { api, ApiError, formatCp } from "../api";
 import { errorMessage } from "../stores";
 import { useToasts } from "../stores";
-import { connectSocket } from "../socket";
+import { connectSocket, getSocket, joinCampaign } from "../socket";
 import {
   Avatar,
   Badge,
@@ -126,6 +123,8 @@ export function CharacterSheetPage() {
   const [error, setError] = useState("");
   const [saveState, setSaveState] = useState<"saved" | "saving" | "error">("saved");
   const [rollLog, setRollLog] = useState<RollResult | null>(null);
+  const [targetDc, setTargetDc] = useState("");
+  const [secretRoll, setSecretRoll] = useState(false);
   const [heroPointArmed, setHeroPointArmed] = useState(false);
   const [conditionName, setConditionName] = useState("");
   const [conditionValue, setConditionValue] = useState("");
@@ -143,6 +142,7 @@ export function CharacterSheetPage() {
   const [transferLoading, setTransferLoading] = useState(false);
   const [restOpen, setRestOpen] = useState(false);
   const [restRough, setRestRough] = useState(false);
+  const [hpInput, setHpInput] = useState("");
   const [conflict, setConflict] = useState<CharacterRecord | null>(null);
   const initialized = useRef(false);
   const skipInitialSave = useRef(true);
@@ -151,6 +151,38 @@ export function CharacterSheetPage() {
   const saveInFlight = useRef(false);
   const saveQueued = useRef(false);
   const conflictRef = useRef(false);
+  const dirtyRef = useRef(false);
+  const saveStateRef = useRef(saveState);
+
+  useEffect(() => {
+    saveStateRef.current = saveState;
+  }, [saveState]);
+
+  const refreshFromServer = useCallback(async () => {
+    if (!id || saveInFlight.current || dirtyRef.current || conflictRef.current) return;
+    try {
+      const result = await api<{ character: CharacterRecord }>(`/api/characters/${id}`);
+      if ((result.character.revision ?? 0) <= (characterRef.current?.revision ?? 0)) return;
+      const normalized = normalizeCharacterDraft(result.character.data, result.character.name);
+      const contextResult = await api<{ context: CharacterContext }>(
+        `/api/characters/${id}/context`,
+        { method: "POST", body: { draft: normalized } }
+      );
+      skipInitialSave.current = true;
+      characterRef.current = result.character;
+      draftRef.current = normalized;
+      dirtyRef.current = false;
+      setCharacter(result.character);
+      setDraft(normalized);
+      setContext(contextResult.context);
+      setSaveState("saved");
+      setConflict(null);
+      conflictRef.current = false;
+      document.title = `${normalized.name} · Runehall`;
+    } catch {
+      // Keep the local sheet usable; the next save will surface a conflict.
+    }
+  }, [id]);
 
   useEffect(() => {
     if (!id) return;
@@ -175,6 +207,7 @@ export function CharacterSheetPage() {
         characterRef.current = result.character;
         setDraft(normalized);
         draftRef.current = normalized;
+        dirtyRef.current = false;
         setContext(contextResult.context);
         setConditions(conditionResult.items);
         initialized.current = true;
@@ -190,10 +223,31 @@ export function CharacterSheetPage() {
     };
   }, [id]);
 
+  useEffect(() => {
+    const campaignId = character?.campaignId;
+    if (!campaignId || !id) return;
+    const socket = getSocket();
+    const leaveCampaignRoom = joinCampaign(campaignId);
+    const onCharacterUpdated = (payload: { characterId: string }) => {
+      if (payload.characterId !== id) return;
+      if (saveStateRef.current !== "saved") return;
+      void refreshFromServer();
+    };
+    socket.on("character:updated", onCharacterUpdated);
+    return () => {
+      socket.off("character:updated", onCharacterUpdated);
+      leaveCampaignRoom();
+    };
+  }, [character?.campaignId, id, refreshFromServer]);
+
   const derived = useMemo(
     () => (draft ? computeCharacter(draft, context) : null),
     [draft, context]
   );
+  useEffect(() => {
+    if (!draft || !derived) return;
+    setHpInput(String(draft.play.hp ?? derived.maxHp));
+  }, [draft?.play.hp, derived?.maxHp]);
   const canEdit = Boolean(character?.permissions?.canEdit);
 
   const transferTargets = useMemo(
@@ -251,7 +305,10 @@ export function CharacterSheetPage() {
             setCharacter(result.character);
             setConflict(null);
             conflictRef.current = false;
-            if (draftRef.current === currentDraft) setSaveState("saved");
+            if (draftRef.current === currentDraft) {
+              setSaveState("saved");
+              dirtyRef.current = false;
+            }
           } catch (err) {
             if (err instanceof ApiError && err.status === 409) {
               const payload = err.payload as { character?: CharacterRecord } | null;
@@ -289,6 +346,7 @@ export function CharacterSheetPage() {
     skipInitialSave.current = true;
     setDraft(normalized);
     draftRef.current = normalized;
+    dirtyRef.current = false;
     conflictRef.current = false;
     setConflict(null);
     setSaveState("saved");
@@ -314,6 +372,7 @@ export function CharacterSheetPage() {
   const update = (updater: (current: CharacterDraft) => CharacterDraft) => {
     if (!canEdit) return;
     skipInitialSave.current = false;
+    dirtyRef.current = true;
     setDraft((current) => {
       if (!current) return current;
       const next = updater(current);
@@ -334,14 +393,40 @@ export function CharacterSheetPage() {
 
   const setHp = (nextHp: number) => {
     if (!derived) return;
-    update((current) => ({
-      ...current,
-      play: {
-        ...current.play,
-        hp: nextHp,
-        conditions: reconcileLifeConditions(current.play.conditions, nextHp, derived.maxHp),
-      },
-    }));
+    const clamped = Math.max(0, Math.min(derived.maxHp, Math.round(nextHp)));
+    update((current) => {
+      const currentHp = current.play.hp ?? derived.maxHp;
+      if (clamped === currentHp) return current;
+      if (clamped < currentHp) {
+        // The numeric field is a correction, not an attack: keep temporary HP
+        // out of it while still applying dying/unconscious at 0.
+        const withoutTemp = {
+          ...current,
+          play: { ...current.play, tempHp: 0 },
+        };
+        const result = applyDamageToDraft(withoutTemp, derived.maxHp, currentHp - clamped);
+        return {
+          ...result.draft,
+          play: { ...result.draft.play, tempHp: current.play.tempHp },
+        };
+      }
+      return applyHealingToDraft(current, derived.maxHp, clamped - currentHp).draft;
+    });
+  };
+
+  const commitHpInput = () => {
+    if (!derived) return;
+    const currentHp = draft?.play.hp ?? derived.maxHp;
+    if (!hpInput.trim()) {
+      setHpInput(String(currentHp));
+      return;
+    }
+    const parsed = Number(hpInput);
+    if (!Number.isFinite(parsed)) {
+      setHpInput(String(currentHp));
+      return;
+    }
+    setHp(parsed);
   };
 
   const restPreview = draft && derived ? applyLongRest(draft, derived, { rough: restRough }) : null;
@@ -351,6 +436,7 @@ export function CharacterSheetPage() {
     const result = applyLongRest(draft, derived, { rough: restRough });
     skipInitialSave.current = false;
     draftRef.current = result.draft;
+    dirtyRef.current = true;
     setDraft(result.draft);
     setRestOpen(false);
     setRestRough(false);
@@ -433,6 +519,7 @@ export function CharacterSheetPage() {
       skipInitialSave.current = true;
       setDraft(normalized);
       draftRef.current = normalized;
+      dirtyRef.current = false;
       setSaveState("saved");
       setTransferOpen(false);
       toast(`Sent ${description} to ${result.to.name}.`, "success");
@@ -454,6 +541,10 @@ export function CharacterSheetPage() {
 
   const roll = (formula: string, label: string, dc?: number | null) => {
     if (!draft) return;
+    const parsedDc = targetDc.trim() ? Number(targetDc) : null;
+    const effectiveDc =
+      dc ?? (parsedDc !== null && Number.isFinite(parsedDc) ? Math.round(parsedDc) : null);
+    const visibility = secretRoll ? "gm" : "all";
     let rollLabel = label;
     if (heroPointArmed) {
       if (draft.play.heroPoints < 1) {
@@ -470,11 +561,11 @@ export function CharacterSheetPage() {
     }
     if (!character?.campaignId) {
       try {
-        const result = rollFormula(formula, { dc: dc ?? null, label: rollLabel });
+        const result = rollFormula(formula, { dc: effectiveDc, label: rollLabel });
         setRollLog(result);
         toast(
           `${rollLabel}: ${result.total}${result.degree ? ` · ${DEGREE_LABELS[result.degree]}` : ""}`,
-          "success"
+          result.degree === "critical-failure" || result.degree === "failure" ? "error" : "success"
         );
       } catch (err) {
         toast(errorMessage(err), "error");
@@ -490,7 +581,8 @@ export function CharacterSheetPage() {
             campaignId: character.campaignId!,
             formula,
             label: rollLabel,
-            dc: dc ?? null,
+            dc: effectiveDc,
+            visibility,
             characterId: character.id,
           },
           (message) => {
@@ -516,23 +608,30 @@ export function CharacterSheetPage() {
   };
 
   const addCondition = (name: string) => {
-    const clean = name.trim();
-    if (!clean) return;
-    update((current) => ({
-      ...current,
-      play: {
-        ...current.play,
-        conditions: [
-          ...current.play.conditions,
-          {
-            name: clean,
-            value: conditionValue === "" ? null : Math.max(0, Math.round(Number(conditionValue))),
-            duration:
-              conditionDuration === "" ? null : Math.max(0, Math.round(Number(conditionDuration))),
-          },
-        ],
-      },
-    }));
+    const entry = parseConditionEntry({
+      name,
+      value: conditionValue === "" ? null : Math.max(0, Math.round(Number(conditionValue))),
+      duration:
+        conditionDuration === "" ? null : Math.max(0, Math.round(Number(conditionDuration))),
+    });
+    if (!entry) return;
+    update((current) => {
+      const wanted = conditionBaseName(entry.name);
+      const existing = current.play.conditions.some(
+        (condition) => conditionBaseName(condition.name) === wanted
+      );
+      return {
+        ...current,
+        play: {
+          ...current.play,
+          conditions: existing
+            ? current.play.conditions.map((condition) =>
+                conditionBaseName(condition.name) === wanted ? entry : condition
+              )
+            : [...current.play.conditions, entry],
+        },
+      };
+    });
     setConditionName("");
     setConditionValue("");
     setConditionDuration("");
@@ -841,10 +940,52 @@ export function CharacterSheetPage() {
                     <Button
                       size="sm"
                       variant="ghost"
+                      title="Second attack with the multiple attack penalty"
+                      onClick={() =>
+                        roll(
+                          applyAttackPenalty(
+                            attack.attackFormula,
+                            attack.traits.some((trait) => trait.toLowerCase() === "agile") ? 4 : 5
+                          ),
+                          `${attack.name} attack (2nd)`
+                        )
+                      }
+                    >
+                      2nd
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      title="Third attack with the multiple attack penalty"
+                      onClick={() =>
+                        roll(
+                          applyAttackPenalty(
+                            attack.attackFormula,
+                            attack.traits.some((trait) => trait.toLowerCase() === "agile") ? 8 : 10
+                          ),
+                          `${attack.name} attack (3rd)`
+                        )
+                      }
+                    >
+                      3rd
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
                       icon={<Swords size={13} />}
                       onClick={() => roll(attack.damageFormula, `${attack.name} damage`)}
                     >
                       {attack.damageFormula} {attack.damageType}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      title="Roll doubled weapon damage; deadly, fatal, and critical specialization are manual"
+                      onClick={() =>
+                        roll(`(${attack.damageFormula})*2`, `${attack.name} critical damage`)
+                      }
+                    >
+                      Crit ×2
                     </Button>
                     {attack.extraDamage?.map((extra) => (
                       <Button
@@ -1293,6 +1434,27 @@ export function CharacterSheetPage() {
                 {canEdit ? "Editable" : "Read only"}
               </Badge>
             </div>
+            <div className="row" style={{ gap: 8, alignItems: "flex-end", marginBottom: 10 }}>
+              <Field label="Target DC / AC">
+                <Input
+                  type="number"
+                  min={1}
+                  max={99}
+                  value={targetDc}
+                  onChange={(event) => setTargetDc(event.target.value)}
+                  placeholder="Optional"
+                  style={{ maxWidth: 110 }}
+                />
+              </Field>
+              <label className={`whisper-small ${secretRoll ? "is-on" : ""}`}>
+                <input
+                  type="checkbox"
+                  checked={secretRoll}
+                  onChange={(event) => setSecretRoll(event.target.checked)}
+                />
+                <EyeOff size={12} /> Secret roll
+              </label>
+            </div>
             <div className="hp-editor">
               <div className="hp-editor-head">
                 <span>
@@ -1317,13 +1479,18 @@ export function CharacterSheetPage() {
                 <Input
                   type="number"
                   aria-label="Current hit points"
-                  value={draft.play.hp ?? derived.maxHp}
+                  value={hpInput}
                   min={0}
                   max={derived.maxHp}
                   disabled={!canEdit}
-                  onChange={(event) =>
-                    setHp(Math.max(0, Math.min(derived.maxHp, Number(event.target.value) || 0)))
-                  }
+                  onChange={(event) => setHpInput(event.target.value)}
+                  onBlur={commitHpInput}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      event.currentTarget.blur();
+                    }
+                  }}
                 />
                 <Button
                   size="sm"
@@ -1536,17 +1703,11 @@ export function CharacterSheetPage() {
                             ...current,
                             play: {
                               ...current.play,
-                              conditions: current.play.conditions.map((entry, i) =>
-                                i === index
-                                  ? {
-                                      ...entry,
-                                      duration:
-                                        entry.duration && entry.duration > 1
-                                          ? entry.duration - 1
-                                          : null,
-                                    }
-                                  : entry
-                              ),
+                              conditions: current.play.conditions.flatMap((entry, i) => {
+                                if (i !== index) return [entry];
+                                if (!entry.duration || entry.duration <= 1) return [];
+                                return [{ ...entry, duration: entry.duration - 1 }];
+                              }),
                             },
                           }))
                         }

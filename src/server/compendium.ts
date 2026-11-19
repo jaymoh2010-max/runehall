@@ -430,6 +430,7 @@ function featIdsFromDraft(draft: CharacterDraft): string[] {
     for (const id of Object.values(bucket)) if (id) ids.add(id);
   }
   for (const id of draft.feats.extras) ids.add(id);
+  if (draft.backgroundFeat) ids.add(draft.backgroundFeat);
   return [...ids];
 }
 

@@ -73,6 +73,22 @@ describe("damage and dying", () => {
     expect(result.dying).toBe(3);
   });
 
+  it("lowers the death threshold while doomed", () => {
+    const result = applyDamageToDraft(
+      draftWith({
+        hp: 0,
+        conditions: [
+          { name: "Dying", value: 2, duration: null },
+          { name: "Doomed", value: 1, duration: null },
+        ],
+      }),
+      20,
+      1
+    );
+    expect(result.dying).toBe(3);
+    expect(result.dead).toBe(true);
+  });
+
   it("marks the character dead at dying 4", () => {
     const result = applyDamageToDraft(
       draftWith({ hp: 0, conditions: [{ name: "Dying", value: 3, duration: null }] }),
@@ -86,7 +102,7 @@ describe("damage and dying", () => {
     );
   });
 
-  it("healing above 0 clears dying and unconscious", () => {
+  it("healing above 0 clears dying and unconscious and adds wounded", () => {
     const result = applyHealingToDraft(
       draftWith({
         hp: 0,
@@ -99,7 +115,27 @@ describe("damage and dying", () => {
       5
     );
     expect(result.draft.play.hp).toBe(5);
-    expect(result.draft.play.conditions).toEqual([]);
+    expect(result.draft.play.conditions).toEqual([
+      expect.objectContaining({ name: "Wounded", value: 1 }),
+    ]);
+  });
+
+  it("raises wounded when healed from dying again", () => {
+    const result = applyHealingToDraft(
+      draftWith({
+        hp: 0,
+        conditions: [
+          { name: "Dying", value: 2, duration: null },
+          { name: "Unconscious", value: null, duration: null },
+          { name: "Wounded", value: 1, duration: null },
+        ],
+      }),
+      20,
+      5
+    );
+    expect(result.draft.play.conditions).toEqual([
+      expect.objectContaining({ name: "Wounded", value: 2 }),
+    ]);
   });
 
   it("healing to full clears wounded", () => {
