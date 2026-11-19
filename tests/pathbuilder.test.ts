@@ -240,6 +240,32 @@ describe("Pathbuilder import", () => {
     expect(report.warnings.join(" ")).toContain("prepared list");
   });
 
+  it("maps a Cleric font caster into prepared slots at the font rank", () => {
+    const { draft } = importPathbuilder({
+      ...build,
+      class: "Cleric",
+      keyability: "wis",
+      spellCasters: [
+        {
+          name: "Cleric",
+          magicTradition: "divine",
+          spellcastingType: "prepared",
+          perDay: [0, 3, 3],
+          spells: [{ spellLevel: 1, list: ["Heal"] }],
+        },
+        {
+          name: "Cleric Font",
+          magicTradition: "divine",
+          spellcastingType: "prepared",
+          spells: [{ spellLevel: 3, list: ["Heal", "Heal", "Heal", "Heal", "Heal"] }],
+        },
+      ],
+    });
+    expect(draft.spells.preparedByRank["1"]).toEqual([heal.id]);
+    expect(draft.spells.preparedByRank["3"]).toEqual(Array.from({ length: 5 }, () => heal.id));
+    expect(draft.spells.prepared.filter((id) => id === heal.id)).toHaveLength(6);
+  });
+
   it("routes focus-only casters to the focus list", () => {
     const { draft } = importPathbuilder({
       ...build,

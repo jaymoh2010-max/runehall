@@ -2,8 +2,9 @@ import {
   emptyCharacterDraft,
   baseAbilityScores,
   casterInfo,
+  flattenPreparedByRank,
   flexibleBoosts,
-  spellSlotsFor,
+  ordinarySpellSlotsFor,
 } from "../shared/rules";
 import { newId } from "./util";
 import { featGrant } from "../shared/effects";
@@ -560,14 +561,28 @@ export function importPathbuilder(
     match("spell");
     return spell.id;
   };
-  const prepared: string[] = [];
+  const preparedByRank: Record<string, string[]> = {};
   let preparedCasters = 0;
+  let multiplePreparedCasters = false;
   for (const caster of arr<Obj>(build.spellCasters)) {
     const casterTradition = tradition(caster.magicTradition);
     const isPrepared = text(caster.spellcastingType).toLowerCase() === "prepared";
-    if (isPrepared && casterTradition) preparedCasters += 1;
+    const casterName = text(caster.name);
+    const isFontCaster = /font/i.test(casterName);
+    if (isPrepared && casterTradition) {
+      if (
+        preparedCasters > 0 &&
+        !isFontCaster &&
+        casterName.toLowerCase() !== (classData?.name.toLowerCase() ?? "")
+      ) {
+        multiplePreparedCasters = true;
+      }
+      preparedCasters += 1;
+    }
     if (!draft.spells.tradition && casterTradition) draft.spells.tradition = casterTradition;
-    for (const group of arr<Obj>(caster.spells)) {
+
+    const groups = arr<Obj>(caster.spells);
+    for (const group of groups) {
       const rank = Math.max(0, Math.round(num(group.spellLevel, 0)));
       for (const name of arr(group.list)) {
         if (!casterTradition) {
@@ -575,35 +590,96 @@ export function importPathbuilder(
         } else if (rank === 0) {
           addSpell(name, spellSets.cantrips);
         } else {
-          const id = addSpell(name, spellSets.known);
-          if (isPrepared && id) prepared.push(id);
+          addSpell(name, spellSets.known);
         }
       }
     }
-    if (
-      classData &&
-      casterTradition &&
-      text(caster.name).toLowerCase() === classData.name.toLowerCase()
-    ) {
-      const derivedSlots = spellSlotsFor(
+    if (!isPrepared || !casterTradition) continue;
+
+    const perDay = arr(caster.perDay).map((value) => Math.max(0, Math.round(num(value, 0))));
+    const rawPrepared = arr<unknown>(caster.prepared);
+    const preparedGroups: Obj[] = [];
+    const rankForName = (name: string) => {
+      const group = groups.find((entry) => arr(entry.list).some((item) => text(item) === name));
+      return group ? Math.max(0, Math.round(num(group.spellLevel, 0))) : 0;
+    };
+    if (rawPrepared.length) {
+      for (const entry of rawPrepared) {
+        if (typeof entry === "string") {
+          preparedGroups.push({ spellLevel: rankForName(entry), list: [entry] });
+        } else if (Array.isArray(entry)) {
+          for (const item of entry) {
+            if (typeof item === "string") {
+              preparedGroups.push({ spellLevel: rankForName(item), list: [item] });
+            }
+          }
+        } else if (entry && typeof entry === "object") {
+          const item = entry as Obj;
+          const list = arr(item.list).length ? arr(item.list) : arr(item.spells);
+          if (list.length) {
+            preparedGroups.push({
+              spellLevel: item.spellLevel ?? item.rank ?? 0,
+              list,
+            });
+          } else if (typeof item.name === "string") {
+            preparedGroups.push({
+              spellLevel: item.rank ?? rankForName(item.name),
+              list: [item.name],
+            });
+          }
+        }
+      }
+    }
+    const fallbackToList = preparedGroups.length === 0;
+    const sourceGroups = fallbackToList ? groups : preparedGroups;
+    for (const group of sourceGroups) {
+      const rank = Math.max(0, Math.round(num(group.spellLevel, 0)));
+      if (rank < 1) continue;
+      const key = String(rank);
+      const limit = perDay[rank] ?? Number.POSITIVE_INFINITY;
+      for (const name of arr(group.list)) {
+        const id = addSpell(name, spellSets.known);
+        if (!id) continue;
+        const current = preparedByRank[key] ?? [];
+        if (limit !== Number.POSITIVE_INFINITY && current.length >= limit) {
+          warnings.push(
+            `Pathbuilder lists more rank ${rank} prepared spells for ${casterName} than its per-day slots; extras were kept in the spellbook only.`
+          );
+          continue;
+        }
+        preparedByRank[key] = [...current, id];
+      }
+    }
+    if (fallbackToList) {
+      warnings.push(
+        `Pathbuilder exported ${casterName} as a spell list at each spell level; prepared slots were filled from each rank's list up to its per-day count. Review the Spells step.`
+      );
+    }
+
+    if (classData && casterName.toLowerCase() === classData.name.toLowerCase() && !isFontCaster) {
+      const ordinarySlots = ordinarySpellSlotsFor(
         draft.level,
         casterInfo(classData).progression,
         classData.name
       );
-      const perDay = arr(caster.perDay).map((value) => Math.max(0, Math.round(num(value))));
-      if (derivedSlots) {
-        const length = Math.max(derivedSlots.length, perDay.length);
+      if (ordinarySlots) {
+        const length = Math.max(ordinarySlots.length, perDay.length - 1);
         const differs = Array.from(
           { length },
-          (_, index) => (derivedSlots[index] ?? 0) !== (perDay[index] ?? 0)
+          (_, index) => (ordinarySlots[index] ?? 0) !== (perDay[index + 1] ?? 0)
         ).some(Boolean);
         if (differs) {
           warnings.push(
-            `Pathbuilder lists per-day slots ${JSON.stringify(perDay)} for ${caster.name}, but Runehall derives ${JSON.stringify(derivedSlots)}; bonus or archetype slots may need review.`
+            `Pathbuilder lists per-day slots ${JSON.stringify(perDay)} for ${casterName}, but Runehall derives ${JSON.stringify(ordinarySlots)} ordinary slots (index 0 is cantrips; divine font is separate); bonus or archetype slots may need review.`
           );
         }
       }
     }
+  }
+  if (multiplePreparedCasters) {
+    warnings.push(
+      "Pathbuilder lists more than one prepared caster; only the primary class and Cleric Font entries were mapped to prepared slots."
+    );
   }
   for (const entry of Object.values(obj(build.focus))) {
     for (const caster of Object.values(obj(entry))) {
@@ -613,7 +689,8 @@ export function importPathbuilder(
   }
   draft.spells.cantrips = [...spellSets.cantrips];
   draft.spells.known = [...spellSets.known];
-  draft.spells.prepared = prepared;
+  draft.spells.preparedByRank = preparedByRank;
+  draft.spells.prepared = flattenPreparedByRank(preparedByRank);
   draft.spells.focus = [...spellSets.focus];
   if (preparedCasters) {
     warnings.push(

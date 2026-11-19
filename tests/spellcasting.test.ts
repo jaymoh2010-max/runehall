@@ -115,6 +115,7 @@ describe("spell casting", () => {
       current = result!.draft;
     }
     expect(current.spells.divineFontUsed).toBe(4);
+    expect(current.spells.fontUsed).toEqual({ [heal.id]: 4 });
     expect(current.spells.slotsUsed).toEqual({});
     expect(current.spells.prepared).toEqual(draft.spells.prepared);
 
@@ -133,6 +134,7 @@ describe("spell casting", () => {
     expect(options).toEqual([{ rank: 1, resource: "slot", remaining: 2, label: "Rank 1 slot" }]);
     const result = castSpell(draft, heal, context, { rank: 1, resource: "slot" });
     expect(result?.draft.spells.slotsUsed).toEqual({ "1": 1 });
+    expect(result?.draft.spells.preparedUsed).toEqual({ [`1:${heal.id}`]: 1 });
     expect(result?.draft.spells.divineFontUsed).toBe(4);
   });
 
@@ -150,6 +152,7 @@ describe("spell casting", () => {
       current = result!.draft;
     }
     expect(current.spells.slotsUsed).toEqual({ "1": 2 });
+    expect(current.spells.preparedUsed).toEqual({ [`1:${bless.id}`]: 2 });
     options = spellCastOptions(bless, current, context, { focusPointsMax: 0 });
     expect(spellCastOptionAvailable(options[0])).toBe(false);
     expect(castSpell(current, bless, context, { rank: 1, resource: "slot" })).toBeNull();
@@ -166,9 +169,11 @@ describe("spell casting", () => {
 
     draft.spells.prepared = [fireball.id];
     const options = spellCastOptions(fireball, draft, context);
-    expect(options).toEqual([{ rank: 3, resource: "slot", remaining: 3, label: "Rank 3 slot" }]);
+    expect(options).toEqual([{ rank: 3, resource: "slot", remaining: 1, label: "Rank 3 slot" }]);
     const result = castSpell(draft, fireball, context, { rank: 3, resource: "slot" });
     expect(result?.draft.spells.slotsUsed).toEqual({ "3": 1 });
+    expect(result?.draft.spells.preparedUsed).toEqual({ [`3:${fireball.id}`]: 1 });
+    expect(castSpell(result!.draft, fireball, context, { rank: 3, resource: "slot" })).toBeNull();
   });
 
   it("lets spontaneous casters heighten known spells into higher slots", () => {

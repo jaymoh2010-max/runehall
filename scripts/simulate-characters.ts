@@ -7,6 +7,7 @@ import {
   casterInfo,
   classKeyOptions,
   computeCharacter,
+  divineFontInfo,
   emptyCharacterDraft,
   featPrerequisiteStatus,
   featSlotsFor,
@@ -346,18 +347,46 @@ function chooseSpells(
   // non-font preparations.
   const ordinarySlots =
     ordinarySpellSlotsFor(draft.level, caster.progression, classData.name) ?? slots;
+  const font = divineFontInfo(draft.level, classData.name);
   for (let rank = 1; rank <= maxRank; rank++) {
     const slotLimit = ordinarySlots[rank - 1] ?? 0;
     const limit = repertoire?.ranks[rank - 1] ?? (prepared ? Math.max(1, slotLimit) : 1);
-    const rankPool = pool.filter((spell) => spell.rank === rank);
+    const exact = pool.filter((spell) => spell.rank === rank);
+    const lower = pool.filter((spell) => spell.rank > 0 && spell.rank < rank);
+    const rankPool = exact.length ? exact : lower;
     const known = sample(rng, rankPool, Math.max(0, limit));
     for (const spell of known) {
       draft.spells.known.push(spell.id);
       selectedSpells.push(spell);
       context.spells[spell.id] = spell;
     }
-    if (prepared) {
-      for (const spell of known.slice(0, slotLimit)) draft.spells.prepared.push(spell.id);
+    if (prepared && slotLimit) {
+      const preparedIds = known.slice(0, slotLimit).map((spell) => spell.id);
+      if (preparedIds.length) {
+        draft.spells.preparedByRank[String(rank)] = preparedIds;
+        draft.spells.prepared.push(...preparedIds);
+      }
+    }
+  }
+  if (prepared && font) {
+    const deity = deities.find((entry) => entry.id === draft.deityId) ?? null;
+    const fontNames = (deity?.font?.length ? deity.font : ["heal", "harm"]).map((name) =>
+      name.toLowerCase()
+    );
+    const fontSpell =
+      pool.find((spell) => fontNames.includes(spell.name.toLowerCase())) ??
+      pool.find((spell) => spell.name === "Heal") ??
+      pool.find((spell) => spell.name === "Harm");
+    if (fontSpell) {
+      if (!draft.spells.known.includes(fontSpell.id)) {
+        draft.spells.known.push(fontSpell.id);
+        selectedSpells.push(fontSpell);
+        context.spells[fontSpell.id] = fontSpell;
+      }
+      const key = String(font.rank);
+      const copies = Array.from({ length: font.slots }, () => fontSpell.id);
+      draft.spells.preparedByRank[key] = [...(draft.spells.preparedByRank[key] ?? []), ...copies];
+      draft.spells.prepared.push(...copies);
     }
   }
 
