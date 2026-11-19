@@ -43,6 +43,7 @@ import {
 import {
   casterInfo,
   computeCharacter,
+  effectiveFontChoice,
   isPreparedCasterClass,
   normalizeCharacterDraft,
   preparedEntries,
@@ -270,6 +271,13 @@ export function CharacterSheetPage() {
     setHpInput(String(draft.play.hp ?? derived.maxHp));
   }, [draft?.play.hp, derived?.maxHp]);
   const canEdit = Boolean(character?.permissions?.canEdit);
+  const sheetFontChoice = draft
+    ? effectiveFontChoice(draft, {
+        spells: context.spells,
+        deity: context.deity,
+        classData: context.classData,
+      })
+    : null;
   const castSpellEntry = castState ? (context.spells[castState.spellId] ?? null) : null;
   const castOptions =
     castSpellEntry && draft && derived
@@ -1166,7 +1174,12 @@ export function CharacterSheetPage() {
                         </div>
                         {fontRank === rank && fontSlots ? (
                           <div className="sheet-slot-row slot-row-font">
-                            <span>Divine font · {rank}</span>
+                            <span>
+                              {sheetFontChoice
+                                ? `${titleCase(sheetFontChoice)} font`
+                                : "Divine font"}{" "}
+                              · {rank}
+                            </span>
                             <div className="slot-pips">
                               {Array.from({ length: fontSlots }).map((_, pip) => (
                                 <button
@@ -1189,7 +1202,12 @@ export function CharacterSheetPage() {
                             </div>
                             <span className="tiny muted">
                               {fontSlots - fontUsed} / {fontSlots} ·{" "}
-                              {(context.deity?.font?.length ? context.deity.font : ["heal", "harm"])
+                              {(sheetFontChoice
+                                ? [sheetFontChoice]
+                                : context.deity?.font?.length
+                                  ? context.deity.font
+                                  : ["heal", "harm"]
+                              )
                                 .map(titleCase)
                                 .join(" or ")}
                             </span>

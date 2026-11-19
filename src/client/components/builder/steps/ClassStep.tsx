@@ -242,6 +242,7 @@ export function ClassStep({
                     focus: [],
                     slotsUsed: {},
                     divineFontUsed: 0,
+                    fontChoice: null,
                     preparedUsed: {},
                     fontUsed: {},
                   },

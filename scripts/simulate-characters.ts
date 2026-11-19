@@ -348,13 +348,23 @@ function chooseSpells(
   const ordinarySlots =
     ordinarySpellSlotsFor(draft.level, caster.progression, classData.name) ?? slots;
   const font = divineFontInfo(draft.level, classData.name);
+  const classGrantSpells = selectedClassGrants(draft, classData, context.deity).spells;
   for (let rank = 1; rank <= maxRank; rank++) {
     const slotLimit = ordinarySlots[rank - 1] ?? 0;
     const limit = repertoire?.ranks[rank - 1] ?? (prepared ? Math.max(1, slotLimit) : 1);
     const exact = pool.filter((spell) => spell.rank === rank);
     const lower = pool.filter((spell) => spell.rank > 0 && spell.rank < rank);
     const rankPool = exact.length ? exact : lower;
-    const known = sample(rng, rankPool, Math.max(0, limit));
+    const curriculumAtRank = classGrantSpells
+      .filter((spell) => spell.kind === "curriculum" && spell.rank === rank)
+      .map((spell) => rankPool.find((candidate) => candidate.id === spell.id))
+      .filter((spell): spell is Spell => Boolean(spell));
+    const forced = curriculumAtRank.length ? pick(rng, curriculumAtRank) : null;
+    const samplePool = forced ? rankPool.filter((spell) => spell.id !== forced.id) : rankPool;
+    const known = [
+      ...(forced ? [forced] : []),
+      ...sample(rng, samplePool, Math.max(0, limit - (forced ? 1 : 0))),
+    ];
     for (const spell of known) {
       draft.spells.known.push(spell.id);
       selectedSpells.push(spell);
@@ -378,6 +388,8 @@ function chooseSpells(
       pool.find((spell) => spell.name === "Heal") ??
       pool.find((spell) => spell.name === "Harm");
     if (fontSpell) {
+      const lower = fontSpell.name.trim().toLowerCase();
+      if (lower === "heal" || lower === "harm") draft.spells.fontChoice = lower;
       if (!draft.spells.known.includes(fontSpell.id)) {
         draft.spells.known.push(fontSpell.id);
         selectedSpells.push(fontSpell);

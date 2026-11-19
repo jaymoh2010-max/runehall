@@ -960,6 +960,7 @@ test("builder completes a level-1 Cleric with split divine-font preparation", as
     "2 / 2 ordinary · 4 / 4 font (6 total)"
   );
   await expect(rankOne.getByText(/prepared \(includes font\)/)).toHaveCount(0);
+  await expect(page.getByRole("combobox", { name: "Divine font" })).toHaveValue("heal");
 
   await goToStep(page, "Gear");
   await page.getByRole("button", { name: /Take .* as coins/ }).click();
@@ -971,7 +972,7 @@ test("builder completes a level-1 Cleric with split divine-font preparation", as
   await expect(page.getByRole("heading", { name: "E2E Cleric" })).toBeVisible();
   const slots = page.locator(".sheet-slots");
   await expect(slots.locator(".slot-row-font")).toContainText("4 / 4");
-  await expect(slots.locator(".slot-row-font")).toContainText("Harm or Heal");
+  await expect(slots.locator(".slot-row-font")).toContainText("Heal font");
   await expect(
     page.locator(".sheet-spell-row").filter({ hasText: "Bless" }).getByText("Prepared ×2")
   ).toBeVisible();
@@ -1099,6 +1100,7 @@ test("builder completes a level-1 Wizard using granted curriculum spells", async
   const builderBarrageRow = rankOne.getByRole("group", { name: "Force Barrage spellbook row" });
   await builderBarrageRow.getByRole("button", { name: "Prepare Force Barrage at rank 1" }).click();
   await expect(page.getByTestId("rank-summary-1")).toContainText("1 / 3 prepared");
+  await expect(page.getByTestId("rank-summary-1")).toContainText("1 curriculum slot");
 
   await goToStep(page, "Gear");
   await page.getByRole("button", { name: /Take .* as coins/ }).click();

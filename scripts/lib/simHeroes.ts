@@ -176,6 +176,7 @@ export function buildSimulatedHero(options: SimulatedHeroOptions): CharacterDraf
     const pool = spells.filter(
       (spell) => spell.remaster && (!tradition || spell.traditions.includes(tradition))
     );
+    const classGrantSpells = selectedClassGrants(draft, classData, deity).spells;
     const cantripLimit = cantripLimitFor(classData) ?? 0;
     for (const spell of pool.filter((spell) => spell.rank === 0).slice(0, cantripLimit)) {
       draft.spells.cantrips.push(spell.id);
@@ -186,8 +187,16 @@ export function buildSimulatedHero(options: SimulatedHeroOptions): CharacterDraf
       if (!count) continue;
       const exact = pool.filter((spell) => spell.rank === rank);
       if (!exact.length) continue;
+      const curriculum = classGrantSpells
+        .filter((spell) => spell.kind === "curriculum" && spell.rank === rank)
+        .map((spell) => exact.find((candidate) => candidate.id === spell.id))
+        .filter((spell): spell is Spell => Boolean(spell));
+      const ordered = [
+        ...curriculum.slice(0, 1),
+        ...exact.filter((spell) => spell.id !== curriculum[0]?.id),
+      ];
       for (let index = 0; index < count; index += 1) {
-        const spell = exact[index % exact.length];
+        const spell = ordered[index % ordered.length];
         if (!draft.spells.known.includes(spell.id)) draft.spells.known.push(spell.id);
         draft.spells.prepared.push(spell.id);
         (draft.spells.preparedByRank[String(rank)] ??= []).push(spell.id);
@@ -203,6 +212,8 @@ export function buildSimulatedHero(options: SimulatedHeroOptions): CharacterDraf
         pool.find((spell) => spell.name === "Heal") ??
         pool.find((spell) => spell.name === "Harm");
       if (font && fontSpell) {
+        const lower = fontSpell.name.trim().toLowerCase();
+        if (lower === "heal" || lower === "harm") draft.spells.fontChoice = lower;
         if (!draft.spells.known.includes(fontSpell.id)) {
           draft.spells.known.push(fontSpell.id);
         }
