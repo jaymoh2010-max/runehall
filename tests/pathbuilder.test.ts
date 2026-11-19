@@ -264,6 +264,7 @@ describe("Pathbuilder import", () => {
     expect(draft.spells.preparedByRank["1"]).toEqual([heal.id]);
     expect(draft.spells.preparedByRank["3"]).toEqual(Array.from({ length: 5 }, () => heal.id));
     expect(draft.spells.prepared.filter((id) => id === heal.id)).toHaveLength(6);
+    expect(draft.spells.fontChoice).toBe("heal");
   });
 
   it("routes focus-only casters to the focus list", () => {

@@ -370,7 +370,8 @@ Acceptance: a GM can prepare a full session in Runehall and start it with one â€
   - Cleric divine font slots are tracked with their own pips, separate from ordinary rank slots.
   - Prepared casters label their spell lists as **spellbook** and show prepared counts; spontaneous casters use **repertoire**.
   - The sheet shows the same separation and labels.
-  - Remaining: enforce heal-or-harm on font preparations and fully separate spellbook from known lists for every prepared class.
+  - Dual-font deities now require an explicit Heal or Harm choice, and the rank-1 Wizard extra slot is restricted to curriculum spells.
+  - Remaining: curate higher-rank Wizard curriculum lists and fully separate spellbook from known lists for every prepared class.
 - [x] **Companion support (first pass)**
   - Companions can link to a bestiary entry, which prefills name, level, HP, AC, and attack notes.
   - Linked statblocks show saves, perception, attacks, and abilities in the builder and sheet.

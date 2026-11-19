@@ -640,6 +640,14 @@ export function importPathbuilder(
       for (const name of arr(group.list)) {
         const id = addSpell(name, spellSets.known);
         if (!id) continue;
+        const spellName = text(name).trim().toLowerCase();
+        if (
+          isFontCaster &&
+          !draft.spells.fontChoice &&
+          (spellName === "heal" || spellName === "harm")
+        ) {
+          draft.spells.fontChoice = spellName;
+        }
         const current = preparedByRank[key] ?? [];
         if (limit !== Number.POSITIVE_INFINITY && current.length >= limit) {
           warnings.push(

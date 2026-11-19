@@ -464,6 +464,66 @@ export function isFontSpell(spell: Spell, deity: Deity | null | undefined): bool
   return font.length === 0 || font.includes(name);
 }
 
+export type DivineFontChoice = "heal" | "harm";
+
+/** Font spells this deity allows. A deity without font data is treated as dual. */
+export function deityFontChoices(deity: Deity | null | undefined): DivineFontChoice[] {
+  const font = (deity?.font ?? [])
+    .map((value) => value.trim().toLowerCase())
+    .filter((value): value is DivineFontChoice => value === "heal" || value === "harm");
+  return font.length ? [...new Set(font)] : ["heal", "harm"];
+}
+
+/** True when this spell is the copy that can occupy divine font slots. */
+export function isChosenFontSpell(
+  spell: Spell,
+  deity: Deity | null | undefined,
+  choice: DivineFontChoice | null
+): boolean {
+  const choices = deityFontChoices(deity);
+  const selected =
+    choices.length === 1 ? choices[0]! : choice && choices.includes(choice) ? choice : null;
+  return selected !== null && spell.name.trim().toLowerCase() === selected;
+}
+
+function preparedFontCandidates(
+  draft: CharacterDraft,
+  spells: Record<string, Spell>,
+  fontRank: number,
+  deity: Deity | null | undefined
+): Set<DivineFontChoice> {
+  const explicit = hasExplicitPreparedMap(draft);
+  const ids = explicit ? (explicit[String(fontRank)] ?? []) : draft.spells.prepared;
+  const out = new Set<DivineFontChoice>();
+  for (const id of ids) {
+    const spell = spells[id];
+    if (!spell) continue;
+    if (!explicit && spell.rank !== fontRank) continue;
+    if (!isFontSpell(spell, deity)) continue;
+    const name = spell.name.trim().toLowerCase();
+    if (name === "heal" || name === "harm") out.add(name);
+  }
+  return out;
+}
+
+/**
+ * The font spell locked in by the player, inferred from today's prepared
+ * copies for legacy drafts, or null when a dual-font deity still needs a pick.
+ */
+export function effectiveFontChoice(
+  draft: CharacterDraft,
+  context: Pick<CharacterContext, "spells" | "deity" | "classData">
+): DivineFontChoice | null {
+  const font = divineFontInfo(draft.level, context.classData?.name);
+  if (!font) return null;
+  const choices = deityFontChoices(context.deity);
+  if (choices.length === 1) return choices[0]!;
+  const stored = draft.spells.fontChoice;
+  if (stored && choices.includes(stored)) return stored;
+  const candidates = preparedFontCandidates(draft, context.spells, font.rank, context.deity);
+  return candidates.size === 1 ? [...candidates][0]! : null;
+}
+
 export interface PreparedEntry {
   id: string;
   /** The rank of the slot the copy occupies, not the spell's base rank. */
@@ -489,7 +549,8 @@ function expandExplicitPrepared(
   byRank: PreparedSpellsByRank,
   spells: Record<string, Spell>,
   deity: Deity | null | undefined,
-  font: { slots: number; rank: number } | null
+  font: { slots: number; rank: number } | null,
+  fontChoice: DivineFontChoice | null
 ): PreparedEntry[] {
   const entries: PreparedEntry[] = [];
   const ranks = Object.keys(byRank)
@@ -501,7 +562,11 @@ function expandExplicitPrepared(
     for (const id of byRank[String(rank)] ?? []) {
       const spell = spells[id];
       const isFont = Boolean(
-        font && fontLeft > 0 && rank === font.rank && spell && isFontSpell(spell, deity)
+        font &&
+        fontLeft > 0 &&
+        rank === font.rank &&
+        spell &&
+        isChosenFontSpell(spell, deity, fontChoice)
       );
       if (isFont) fontLeft -= 1;
       entries.push({ id, rank, font: isFont });
@@ -514,7 +579,8 @@ function inferLegacyPrepared(
   prepared: string[],
   spells: Record<string, Spell>,
   deity: Deity | null | undefined,
-  font: { slots: number; rank: number } | null
+  font: { slots: number; rank: number } | null,
+  fontChoice: DivineFontChoice | null
 ): PreparedEntry[] {
   const entries: PreparedEntry[] = [];
   let fontLeft = font?.slots ?? 0;
@@ -524,7 +590,10 @@ function inferLegacyPrepared(
     // A flat legacy list has no slot rank. Only a base rank equal to the font
     // rank is unambiguously a divine font copy.
     const isFont = Boolean(
-      font && fontLeft > 0 && spell.rank === font.rank && isFontSpell(spell, deity)
+      font &&
+      fontLeft > 0 &&
+      spell.rank === font.rank &&
+      isChosenFontSpell(spell, deity, fontChoice)
     );
     if (isFont) fontLeft -= 1;
     entries.push({ id, rank: isFont ? font!.rank : spell.rank, font: isFont });
@@ -538,10 +607,11 @@ export function preparedEntries(
   context: Pick<CharacterContext, "spells" | "deity" | "classData">
 ): PreparedEntry[] {
   const font = divineFontInfo(draft.level, context.classData?.name);
+  const fontChoice = effectiveFontChoice(draft, context);
   const explicit = hasExplicitPreparedMap(draft);
   return explicit
-    ? expandExplicitPrepared(explicit, context.spells, context.deity, font)
-    : inferLegacyPrepared(draft.spells.prepared, context.spells, context.deity, font);
+    ? expandExplicitPrepared(explicit, context.spells, context.deity, font, fontChoice)
+    : inferLegacyPrepared(draft.spells.prepared, context.spells, context.deity, font, fontChoice);
 }
 
 export function preparedUsedKey(rank: number, spellId: string): string {
@@ -575,7 +645,8 @@ export function preparedByRankForDraft(
     draft.spells.prepared,
     context.spells,
     context.deity,
-    divineFontInfo(draft.level, context.classData?.name)
+    divineFontInfo(draft.level, context.classData?.name),
+    effectiveFontChoice(draft, context)
   )) {
     (out[String(entry.rank)] ??= []).push(entry.id);
   }
@@ -776,6 +847,7 @@ export function emptyCharacterDraft(name = "New Hero"): CharacterDraft {
       preparedByRank: {},
       focus: [],
       divineFontUsed: 0,
+      fontChoice: null,
       slotsUsed: {},
       preparedUsed: {},
       fontUsed: {},
@@ -985,6 +1057,11 @@ export function normalizeCharacterDraft(input: unknown, fallbackName = "New Hero
       preparedByRank,
       focus: arr<string>(spells.focus).filter((x) => typeof x === "string"),
       divineFontUsed: Math.max(0, Math.min(10, Math.round(num(spells.divineFontUsed, 0)))),
+      fontChoice:
+        typeof spells.fontChoice === "string" &&
+        ["heal", "harm"].includes(spells.fontChoice.toLowerCase())
+          ? (spells.fontChoice.toLowerCase() as "heal" | "harm")
+          : null,
       slotsUsed: Object.fromEntries(
         Object.entries(obj(spells.slotsUsed)).filter(([, value]) => typeof value === "number")
       ) as Record<string, number>,
@@ -2832,15 +2909,44 @@ export function computeCharacter(
   if (preparedCaster && draft.spells.prepared.length) {
     const ordinarySlots = ordinarySpellSlotsFor(draft.level, caster.progression, classData?.name);
     const fontInfo = divineFontInfo(draft.level, classData?.name);
-    const fontLabel = (context.deity?.font?.length ? context.deity.font : ["heal", "harm"])
-      .map(titleCase)
-      .join(" or ");
+    const fontChoices = deityFontChoices(context.deity);
+    const fontChoice = effectiveFontChoice(draft, {
+      spells: context.spells,
+      deity: context.deity,
+      classData,
+    });
+    const fontLabel = fontChoice
+      ? titleCase(fontChoice)
+      : fontChoices.length === 1
+        ? titleCase(fontChoices[0]!)
+        : "Heal or Harm";
     const entries = preparedEntries(draft, {
       spells: context.spells,
       deity: context.deity,
       classData,
     });
     const summaries = preparedRankSummaries(entries);
+
+    if (fontInfo && fontChoices.length > 1 && !draft.spells.fontChoice && !fontChoice) {
+      issue("warning", "Choose Heal or Harm for your divine font.", "spells");
+    }
+    if (fontInfo && fontChoice) {
+      const otherFont = fontChoice === "heal" ? "harm" : "heal";
+      if (
+        entries.some(
+          (entry) =>
+            entry.rank === fontInfo.rank &&
+            !entry.font &&
+            context.spells[entry.id]?.name.trim().toLowerCase() === otherFont
+        )
+      ) {
+        issue(
+          "warning",
+          `${titleCase(otherFont)} is prepared at rank ${fontInfo.rank}, but your divine font is ${titleCase(fontChoice)}; those copies use ordinary slots.`,
+          "spells"
+        );
+      }
+    }
 
     for (const id of [...new Set(draft.spells.prepared)]) {
       const spell = context.spells[id];
@@ -2906,6 +3012,28 @@ export function computeCharacter(
           `${classData?.name ?? "This class"}: ${summary.ordinary} rank ${rank} spell${summary.ordinary === 1 ? "" : "s"} prepared in ordinary slots; only ${ordinaryLimit} ordinary slot${ordinaryLimit === 1 ? "" : "s"} available${fontLimit ? ` (divine font is ${fontLabel} only)` : ""}.`,
           "spells"
         );
+      }
+    }
+
+    if (classData?.name.toLowerCase() === "wizard") {
+      const curriculumSpells = classGrants.spells.filter((spell) => spell.kind === "curriculum");
+      const curriculumIds = new Set(curriculumSpells.map((spell) => spell.id));
+      const curriculumRanks = new Set(
+        curriculumSpells.filter((spell) => spell.rank > 0).map((spell) => spell.rank)
+      );
+      const baseSlots = fullCasterSlots(draft.level);
+      for (const rank of curriculumRanks) {
+        const baseLimit = Math.max(0, baseSlots[rank - 1] ?? 0);
+        const nonCurriculum = entries.filter(
+          (entry) => entry.rank === rank && !curriculumIds.has(entry.id)
+        ).length;
+        if (nonCurriculum > baseLimit) {
+          issue(
+            "error",
+            `Wizard: ${nonCurriculum} rank ${rank} non-curriculum spell${nonCurriculum === 1 ? "" : "s"} prepared; only ${baseLimit} ordinary slot${baseLimit === 1 ? "" : "s"} available. The extra Wizard slot must hold a curriculum spell.`,
+            "spells"
+          );
+        }
       }
     }
 

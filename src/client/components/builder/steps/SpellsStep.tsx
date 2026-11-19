@@ -65,11 +65,14 @@ import {
   cantripLimitFor,
   classKeyOptions,
   computeCharacter,
+  deityFontChoices,
   deitySkillOptions,
+  effectiveFontChoice,
   emptyCharacterDraft,
   featSlotsFor,
   flexibleBoosts,
   grantedTrainedSkills,
+  isChosenFontSpell,
   isFontSpell,
   isPreparedCasterClass,
   normalizeCharacterDraft,
@@ -89,6 +92,7 @@ import {
   titleCase,
   traitLabel,
   weaponDamageLabel,
+  type DivineFontChoice,
 } from "../../../../shared/rules";
 import { api, formatCp, uploadImage } from "../../../api";
 import { errorMessage } from "../../../stores";
@@ -162,6 +166,24 @@ export function SpellsStep({ draft, update, derived, context, setStep, openPicke
   const slots = derived.spellSlots;
   const fontSlots = derived.divineFontSlots;
   const fontRank = derived.divineFontRank;
+  const fontChoices = deityFontChoices(context.deity);
+  const fontChoice = effectiveFontChoice(draft, {
+    spells: context.spells,
+    deity: context.deity,
+    classData,
+  });
+  const fontNeedsChoice = Boolean(
+    fontSlots && fontChoices.length > 1 && !draft.spells.fontChoice && !fontChoice
+  );
+  const curriculumIds = new Set(
+    derived.grantedSpells.filter((spell) => spell.kind === "curriculum").map((spell) => spell.id)
+  );
+  const curriculumRanks = new Set(
+    derived.grantedSpells
+      .filter((spell) => spell.kind === "curriculum" && spell.rank > 0)
+      .map((spell) => spell.rank)
+  );
+  const wizardCurriculum = classData?.name.toLowerCase() === "wizard";
   const isFocusCaster = caster.progression === "focus";
   const repertoire = spellRepertoireLimits(classData, draft.level);
   const cantripCap = cantripLimitFor(classData) ?? repertoire?.cantrips ?? null;
@@ -192,9 +214,7 @@ export function SpellsStep({ draft, update, derived, context, setStep, openPicke
   for (const list of preparedSummaryBySpell.values()) {
     list.sort((a, b) => a.rank - b.rank);
   }
-  const fontLabel = (context.deity?.font?.length ? context.deity.font : ["heal", "harm"])
-    .map(titleCase)
-    .join(" or ");
+  const fontLabel = fontChoice ? titleCase(fontChoice) : "Heal or Harm";
   const issues = derived.validation.filter((issue) => issue.step === "spells");
   const knownByRank = new Map<number, Spell[]>();
   const addRanked = (spell: Spell) => {
@@ -238,25 +258,50 @@ export function SpellsStep({ draft, update, derived, context, setStep, openPicke
     return chosen && chosen >= spell.rank && chosen <= maxRank ? chosen : Math.max(1, spell.rank);
   };
 
+  const nonCurriculumCountAt = (rank: number) =>
+    preparedRows.filter((row) => row.rank === rank && !curriculumIds.has(row.id)).length;
+
   const rankHasRoom = (spell: Spell, rank: number) => {
     const summary = preparedSplits.get(rank);
+    const totalCount = summary?.total ?? 0;
     const ordinaryCount = summary?.ordinary ?? 0;
     const fontCount = summary?.font ?? 0;
+    if (wizardCurriculum && curriculumRanks.has(rank)) {
+      const totalLimit = ordinaryLimitAt(rank);
+      if (curriculumIds.has(spell.id)) return totalCount < totalLimit;
+      return totalCount < totalLimit && nonCurriculumCountAt(rank) < Math.max(0, totalLimit - 1);
+    }
     const fontRoom =
-      fontRank === rank && isFontSpell(spell, context.deity) && fontCount < (fontSlots ?? 0);
+      fontRank === rank &&
+      isFontSpell(spell, context.deity) &&
+      (fontChoice === null || isChosenFontSpell(spell, context.deity, fontChoice))
+        ? fontCount < (fontSlots ?? 0)
+        : false;
     return fontRoom || ordinaryCount < ordinaryLimitAt(rank);
   };
 
   const prepareSpell = (spell: Spell, rank: number) => {
     if (!rankHasRoom(spell, rank)) return;
-    update((current) =>
-      addPreparedCopy(
+    const chosenFont =
+      fontRank === rank && fontSlots && isFontSpell(spell, context.deity)
+        ? (fontChoice ??
+          (fontChoices.length > 1
+            ? (spell.name.trim().toLowerCase() as DivineFontChoice)
+            : fontChoices[0]!))
+        : null;
+    update((current) => {
+      const next = addPreparedCopy(
         current,
         { spells: context.spells, deity: context.deity, classData },
         spell.id,
         rank
-      )
-    );
+      );
+      if (!chosenFont || current.spells.fontChoice) return next;
+      return {
+        ...next,
+        spells: { ...next.spells, fontChoice: chosenFont },
+      };
+    });
   };
 
   const removePrepared = (spellId: string, rank: number) =>
@@ -414,6 +459,48 @@ export function SpellsStep({ draft, update, derived, context, setStep, openPicke
               </Badge>
             </div>
           </div>
+          {fontSlots && fontChoices.length > 1 ? (
+            <div
+              className="row"
+              style={{ gap: 8, alignItems: "center", marginTop: 8, flexWrap: "wrap" }}
+            >
+              <span className="field-label">Divine font</span>
+              <Select
+                aria-label="Divine font"
+                value={draft.spells.fontChoice ?? fontChoice ?? ""}
+                onChange={(event) => {
+                  const value = event.target.value as DivineFontChoice;
+                  update((current) => {
+                    if (current.spells.fontChoice === value) return current;
+                    return {
+                      ...current,
+                      spells: {
+                        ...current.spells,
+                        fontChoice: value,
+                        divineFontUsed: 0,
+                        fontUsed: {},
+                      },
+                    };
+                  });
+                }}
+              >
+                <option value="" disabled>
+                  Choose Heal or Harm
+                </option>
+                {fontChoices.map((name) => (
+                  <option key={name} value={name}>
+                    {titleCase(name)}
+                  </option>
+                ))}
+              </Select>
+              <span className="tiny muted">Only the chosen spell can fill divine font slots.</span>
+              {fontNeedsChoice && !fontChoice ? <Tag tone="gold">Choose one</Tag> : null}
+            </div>
+          ) : fontSlots && fontChoice ? (
+            <p className="tiny muted" style={{ marginTop: 8 }}>
+              {titleCase(fontChoice)} font chosen by your deity.
+            </p>
+          ) : null}
           {derived.spellSlotsNote ? (
             <p className="muted small" style={{ marginTop: 8 }}>
               {derived.spellSlotsNote}
@@ -461,7 +548,9 @@ export function SpellsStep({ draft, update, derived, context, setStep, openPicke
                   </div>
                   {fontRank === rank && fontSlots ? (
                     <div className="slot-row slot-row-font">
-                      <span className="slot-rank">Divine font · Rank {rank}</span>
+                      <span className="slot-rank">
+                        {fontChoice ? `${titleCase(fontChoice)} font` : "Divine font"} · Rank {rank}
+                      </span>
                       <div className="slot-pips">
                         {Array.from({ length: fontSlots }).map((_, pip) => (
                           <button
@@ -625,7 +714,11 @@ export function SpellsStep({ draft, update, derived, context, setStep, openPicke
                       {isPreparedCaster
                         ? fontSlotsForRank
                           ? ` · ${ordinaryPrepared} / ${ordinaryRankSlots} ordinary · ${fontPrepared} / ${fontSlotsForRank} font (${preparedForRank} total)`
-                          : ` · ${preparedForRank} / ${rankSlots} prepared`
+                          : ` · ${preparedForRank} / ${rankSlots} prepared${
+                              wizardCurriculum && curriculumRanks.has(rank)
+                                ? " · 1 curriculum slot"
+                                : ""
+                            }`
                         : ""}
                     </p>
                   </div>
@@ -763,14 +856,14 @@ export function SpellsStep({ draft, update, derived, context, setStep, openPicke
                               }
                             >
                               {rankChoices.map((option) => {
-                                const optionSplit = preparedSplits.get(option);
-                                const optionOrdinary = optionSplit?.ordinary ?? 0;
-                                const optionFont = optionSplit?.font ?? 0;
+                                const optionFont = preparedSplits.get(option)?.font ?? 0;
                                 const fontRoom =
                                   fontRank === option &&
                                   isFontSpell(spell, context.deity) &&
+                                  (fontChoice === null ||
+                                    isChosenFontSpell(spell, context.deity, fontChoice)) &&
                                   optionFont < (fontSlots ?? 0);
-                                const room = fontRoom || optionOrdinary < ordinaryLimitAt(option);
+                                const room = rankHasRoom(spell, option);
                                 return (
                                   <option key={option} value={option} disabled={!room}>
                                     Rank {option}

@@ -687,6 +687,8 @@ export interface CharacterDraft {
     focus: string[];
     /** Divine font pips spent today (cleric heal/harm slots). */
     divineFontUsed: number;
+    /** Chosen divine font spell when the deity allows both heal and harm. */
+    fontChoice: "heal" | "harm" | null;
     slotsUsed: Record<string, number>;
     /** Ordinary prepared copies spent today, keyed `${rank}:${spellId}`. */
     preparedUsed: Record<string, number>;

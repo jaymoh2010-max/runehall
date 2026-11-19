@@ -45,6 +45,11 @@ const bless = byName(spells, "Bless");
 const guidance = byName(spells, "Guidance");
 const heroism = byName(spells, "Heroism");
 const fireball = byName(spells, "Fireball");
+const fear = byName(spells, "Fear");
+const grease = byName(spells, "Grease");
+const sleep = byName(spells, "Sleep");
+const forceBarrage = byName(spells, "Force Barrage");
+const light = byName(spells, "Light");
 
 function draftFor(classData: ClassData) {
   const draft = emptyCharacterDraft("Prepared Test");
@@ -77,6 +82,21 @@ function repeated(id: string, count: number) {
   return Array.from({ length: count }, () => id);
 }
 
+function wizardAt(level: number, byRank: Record<string, string[]>, known: string[]) {
+  const draft = draftFor(wizard);
+  draft.level = level;
+  const schoolGroup = wizard.choiceGroups.find((group) => group.tag === "wizard-arcane-school")!;
+  draft.classChoices[schoolGroup.key] = ["cf:E4GZDMn4DYk6qSEV"];
+  draft.spells.cantrips = [light.id];
+  draft.spells.known = known;
+  draft.spells.preparedByRank = byRank;
+  draft.spells.prepared = Object.keys(byRank)
+    .map(Number)
+    .sort((a, b) => a - b)
+    .flatMap((rank) => byRank[String(rank)] ?? []);
+  return draft;
+}
+
 describe("rank-aware prepared spells", () => {
   it("normalizes the flat list and rank map without losing duplicates", () => {
     const normalized = normalizeCharacterDraft({
@@ -88,6 +108,19 @@ describe("rank-aware prepared spells", () => {
     });
     expect(normalized.spells.prepared).toEqual([bless.id, bless.id]);
     expect(normalized.spells.preparedByRank).toEqual({ "1": [bless.id, bless.id] });
+  });
+
+  it("normalizes the divine font choice", () => {
+    const chosen = normalizeCharacterDraft({
+      name: "Font",
+      spells: { fontChoice: "Harm" },
+    });
+    expect(chosen.spells.fontChoice).toBe("harm");
+    const invalid = normalizeCharacterDraft({
+      name: "Font",
+      spells: { fontChoice: "both" },
+    });
+    expect(invalid.spells.fontChoice).toBeNull();
   });
 
   it("derives the flat mirror from a rank map and drops stale mismatches", () => {
@@ -261,6 +294,98 @@ describe("rank-aware prepared spells", () => {
       { rank: 1, resource: "slot", remaining: 1, label: "Rank 1 slot" },
       { rank: 3, resource: "font", remaining: 0, label: "Divine font" },
     ]);
+  });
+
+  it("classifies only the chosen divine font spell", () => {
+    const draft = clericAt(1, { "1": [heal.id, harm.id] });
+    const context = contextForDraft(draft);
+    draft.spells.fontChoice = "harm";
+    let entries = preparedEntries(draft, {
+      spells: context.spells,
+      deity: abadar,
+      classData: cleric,
+    });
+    expect(entries).toEqual([
+      { id: heal.id, rank: 1, font: false },
+      { id: harm.id, rank: 1, font: true },
+    ]);
+
+    draft.spells.fontChoice = "heal";
+    entries = preparedEntries(draft, {
+      spells: context.spells,
+      deity: abadar,
+      classData: cleric,
+    });
+    expect(entries).toEqual([
+      { id: heal.id, rank: 1, font: true },
+      { id: harm.id, rank: 1, font: false },
+    ]);
+  });
+
+  it("infers a divine font choice from a single prepared font spell", () => {
+    const draft = clericAt(1, { "1": [harm.id] });
+    const context = contextForDraft(draft);
+    const entries = preparedEntries(draft, {
+      spells: context.spells,
+      deity: abadar,
+      classData: cleric,
+    });
+    expect(entries).toEqual([{ id: harm.id, rank: 1, font: true }]);
+  });
+
+  it("warns a dual-font cleric when no font spell is chosen", () => {
+    const draft = clericAt(1, { "1": [bless.id] });
+    const context = contextForDraft(draft);
+    expect(
+      computeCharacter(draft, context).validation.some(
+        (issue) =>
+          issue.severity === "warning" &&
+          issue.step === "spells" &&
+          issue.message.includes("Choose Heal or Harm")
+      )
+    ).toBe(true);
+  });
+
+  it("offers divine font only for the chosen spell", () => {
+    const draft = clericAt(5, { "3": [heal.id, harm.id] });
+    draft.spells.fontChoice = "harm";
+    const context = contextForDraft(draft);
+    const healOptions = spellCastOptions(heal, draft, context, { focusPointsMax: 0 });
+    expect(healOptions.every((option) => option.resource !== "font")).toBe(true);
+    const harmOptions = spellCastOptions(harm, draft, context, { focusPointsMax: 0 });
+    expect(harmOptions[0]).toMatchObject({ rank: 3, resource: "font", remaining: 1 });
+    expect(harmOptions.some((option) => option.resource === "slot")).toBe(false);
+  });
+
+  it("enforces the rank-1 Wizard curriculum slot", () => {
+    const threeOrdinary = wizardAt(1, { "1": [fear.id, grease.id, sleep.id] }, [
+      fear.id,
+      grease.id,
+      sleep.id,
+    ]);
+    const bad = computeCharacter(threeOrdinary, contextForDraft(threeOrdinary)).validation;
+    expect(
+      bad.some(
+        (issue) =>
+          issue.severity === "error" &&
+          issue.step === "spells" &&
+          issue.message.includes("extra Wizard slot")
+      )
+    ).toBe(true);
+
+    for (const prepared of [
+      [fear.id, grease.id, forceBarrage.id],
+      [fear.id, forceBarrage.id, bless.id],
+      [forceBarrage.id, forceBarrage.id, forceBarrage.id],
+    ]) {
+      const draft = wizardAt(1, { "1": prepared }, [...prepared]);
+      const validation = computeCharacter(draft, contextForDraft(draft)).validation;
+      expect(
+        validation.some(
+          (issue) => issue.severity === "error" && issue.message.includes("extra Wizard slot")
+        )
+      ).toBe(false);
+    }
   });
 
   it("offers only the prepared rank for an upcast Wizard spell", () => {
