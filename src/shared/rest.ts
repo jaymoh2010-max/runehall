@@ -1,3 +1,4 @@
+import { conditionBaseName, conditionNameWithoutValue, conditionNumericValue } from "./tokens";
 import type { CharacterCondition, CharacterDraft, DerivedCharacter } from "./types";
 
 export interface LongRestOptions {
@@ -58,7 +59,7 @@ function restoreConditions(
   const reduced: { name: string; from: number; to: number }[] = [];
 
   for (const condition of conditions) {
-    const name = condition.name.trim().toLowerCase();
+    const name = conditionBaseName(condition.name);
     if (name === "fatigued") {
       removed.push(condition.name);
       continue;
@@ -72,14 +73,15 @@ function restoreConditions(
       continue;
     }
     if (name === "doomed" || name === "drained") {
-      if (typeof condition.value === "number" && Number.isFinite(condition.value)) {
-        const value = Math.max(0, Math.round(condition.value));
+      const value = conditionNumericValue(condition);
+      if (value !== null) {
         if (value <= 1) {
           removed.push(condition.name);
           continue;
         }
-        reduced.push({ name: condition.name, from: value, to: value - 1 });
-        next.push({ ...condition, value: value - 1 });
+        const baseName = conditionNameWithoutValue(condition.name);
+        reduced.push({ name: baseName, from: value, to: value - 1 });
+        next.push({ ...condition, name: baseName, value: value - 1 });
         continue;
       }
     }
@@ -108,6 +110,32 @@ export function applyLongRest(
   const maxHp = Math.max(1, Math.round(derived.maxHp));
   const hpBefore =
     draft.play.hp === null ? maxHp : Math.max(0, Math.min(maxHp, Math.round(draft.play.hp)));
+  const focusMax = Math.max(0, Math.min(3, Math.round(derived.focusPointsMax)));
+  const focusBefore = Math.max(0, Math.min(focusMax, Math.round(draft.play.focusPoints)));
+  const dead = draft.play.conditions.some(
+    (condition) => conditionBaseName(condition.name) === "dead"
+  );
+  if (dead) {
+    return {
+      draft,
+      summary: {
+        healing: 0,
+        healed: 0,
+        hpBefore,
+        hpAfter: hpBefore,
+        maxHp,
+        tempHpCleared: 0,
+        focusBefore,
+        focusAfter: focusBefore,
+        focusMax,
+        slotsRestored: 0,
+        divineFontRestored: 0,
+        removedConditions: [],
+        reducedConditions: [],
+        shieldLowered: false,
+      },
+    };
+  }
   const healing = longRestHealing(draft, derived, options.rough);
   const hpAfter = Math.min(maxHp, hpBefore + healing);
   const healed = hpAfter - hpBefore;
@@ -116,8 +144,6 @@ export function applyLongRest(
     (total, value) => total + Math.max(0, Math.round(Number(value) || 0)),
     0
   );
-  const focusMax = Math.max(0, Math.min(3, Math.round(derived.focusPointsMax)));
-  const focusBefore = Math.max(0, Math.min(focusMax, Math.round(draft.play.focusPoints)));
 
   return {
     draft: {

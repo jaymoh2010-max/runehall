@@ -238,6 +238,18 @@ export function describeRoll(result: RollResult): string {
   return parts.join(" ");
 }
 
+/**
+ * Apply a multiple-attack penalty to a standard d20 attack formula. Any
+ * trailing text after the flat bonus is preserved.
+ */
+export function applyAttackPenalty(formula: string, penalty: number): string {
+  const text = formula.trim();
+  const match = text.match(/^(\d*d20)([+-]\d+)?(.*)$/i);
+  if (!match) return text;
+  const bonus = Number(match[2] ?? 0) - Math.max(0, Math.round(penalty));
+  return `${match[1]}${bonus >= 0 ? "+" : ""}${bonus}${match[3] ?? ""}`;
+}
+
 export function rollFormula(
   formula: string,
   options: { dc?: number | null; label?: string; rng?: Rng } = {}

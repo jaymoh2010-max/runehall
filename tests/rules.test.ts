@@ -5,11 +5,13 @@ import {
   animistSlots,
   boundedCasterSlots,
   casterInfo,
+  characterSummary,
   checkFeatPrerequisite,
   computeCharacter,
   divineFontInfo,
   emptyCharacterDraft,
   featAvailability,
+  featClassAccess,
   featPrerequisiteStatus,
   fullCasterSlots,
   grantedTrainedSkills,
@@ -111,6 +113,39 @@ describe("PF2e character rules", () => {
     expect(derived.divineFontSlots).toBe(4);
     expect(derived.divineFontRank).toBe(1);
     expect(derived.validation.filter((issue) => issue.severity === "error")).toEqual([]);
+  });
+
+  it("records unresolved builder choices in the character summary", () => {
+    const empty = emptyCharacterDraft("Unfinished Hero");
+    const emptySummary = characterSummary(empty, { feats: {}, spells: {}, equipment: {} });
+    expect(emptySummary.validationErrors).toBeGreaterThan(0);
+
+    const { draft, context } = buildCleric();
+    const readySummary = characterSummary(draft, context);
+    expect(readySummary.validationErrors).toBe(0);
+  });
+
+  it("blocks class feats that belong to another class", () => {
+    const reachSpell = read<Feat>("feats.json").find((feat) => feat.name === "Reach Spell")!;
+    const classes = read<ClassData>("classes.json");
+    const fighter = classes.find((entry) => entry.name === "Fighter")!;
+    const wizard = classes.find((entry) => entry.name === "Wizard")!;
+    const context = {
+      feats: { [reachSpell.id]: reachSpell },
+      spells: {},
+      equipment: {},
+      classData: fighter,
+    };
+    expect(featClassAccess(reachSpell, context).allowed).toBe(false);
+    expect(featClassAccess(reachSpell, { ...context, classData: wizard }).allowed).toBe(true);
+
+    const draft = emptyCharacterDraft("Illegal Fighter");
+    draft.classId = fighter.id;
+    draft.feats.class["1"] = reachSpell.id;
+    const derived = computeCharacter(draft, context);
+    expect(
+      derived.validation.some((issue) => issue.message.includes("not available to Fighter"))
+    ).toBe(true);
   });
 
   it("trains background, class, and deity skills", () => {
@@ -678,6 +713,7 @@ describe("PF2e character rules", () => {
 
   it("evaluates common feat prerequisites", () => {
     const rogue = classes.find((entry) => entry.name === "Rogue")!;
+    const ranger = classes.find((entry) => entry.name === "Ranger")!;
     const titan = feats.find((entry) => entry.name === "Titan Wrestler")!;
     const harder = feats.find((entry) => entry.name === "The Harder They Fall (Kingmaker)")!;
     const draft = emptyCharacterDraft("Prereq Rogue");
@@ -704,7 +740,9 @@ describe("PF2e character rules", () => {
     const trained = computeCharacter(draft, context);
     expect(featPrerequisiteStatus(titan, draft, context, trained).status).toBe("met");
     expect(featAvailability(titan, draft, context, trained)).toBe("available");
-    expect(featPrerequisiteStatus(harder, draft, context, trained).status).toBe("met");
+    expect(
+      featPrerequisiteStatus(harder, draft, { ...context, classData: ranger }, trained).status
+    ).toBe("met");
     expect(
       checkFeatPrerequisite("trained in Athletics or Acrobatics", draft, context, trained)
     ).toBe("met");

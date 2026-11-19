@@ -40,7 +40,7 @@ export function reconcileLifeConditions(
 ): CharacterCondition[] {
   if (conditionValue(conditions, "dead") > 0) return conditions;
   return conditions.filter((condition) => {
-    const name = normalizeName(condition.name);
+    const name = normalizeName(condition.name.replace(/\s+\d+$/, ""));
     if (name === "dying" || name === "unconscious") return hp <= 0;
     if (name === "wounded") return hp < Math.max(1, maxHp);
     return true;
@@ -63,15 +63,20 @@ export function applyHealingToDraft(
   const healed = nextHp - currentHp;
   if (!healed) return { draft, healed: 0, notes: [] };
   const notes = [`Healed ${healed} HP.`];
-  if (currentHp === 0 && nextHp > 0) notes.push("Dying and unconscious end above 0 HP.");
-  if (nextHp >= maximum) notes.push("At full HP: wounded ends.");
+  let conditions = reconcileLifeConditions(draft.play.conditions, nextHp, maximum);
+  if (currentHp === 0 && nextHp > 0) {
+    const wounded = conditionValue(conditions, "wounded");
+    conditions = upsertCondition(conditions, "Wounded", wounded + 1);
+    notes.push(`Dying ends: wounded ${wounded + 1}.`);
+  }
+  if (nextHp >= maximum) notes.push("At full HP: wounded ends after a long rest.");
   return {
     draft: {
       ...draft,
       play: {
         ...draft.play,
         hp: nextHp,
-        conditions: reconcileLifeConditions(draft.play.conditions, nextHp, maximum),
+        conditions,
       },
     },
     healed,
@@ -164,10 +169,13 @@ export function applyDamageToDraft(
     conditions = upsertCondition(conditions, "Unconscious", null);
     notes.push(`Dropped to 0 HP: dying ${dying} and unconscious.`);
     notes.push(`Recovery check DC ${10 + dying} at the start of each turn.`);
-    if (dying >= 4) {
+    const deathThreshold = Math.max(1, 4 - conditionValue(conditions, "doomed"));
+    if (dying >= deathThreshold) {
       dead = true;
       conditions = upsertCondition(conditions, "Dead", null);
-      notes.push("Dying 4 reached: the character is dead unless the GM intervenes.");
+      notes.push(
+        `Dying ${deathThreshold} reached: the character is dead unless the GM intervenes.`
+      );
     }
   } else if (hpDamage) {
     notes.push(`${nextHp} HP remaining.`);

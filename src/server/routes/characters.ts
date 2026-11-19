@@ -34,6 +34,7 @@ import {
   removeItemQuantity,
   spendCurrency,
 } from "../../shared/inventory";
+import { conditionsFromSheet } from "../../shared/tokens";
 import { newId, now, parseJson, safeString } from "../util";
 
 function parseDraft(raw: unknown, fallbackName = "New Hero"): CharacterDraft {
@@ -62,12 +63,13 @@ function syncCharacterDraft(
     .all(row.id) as TokenRow[];
   for (const token of linkedTokens) {
     db.prepare(
-      "UPDATE tokens SET name = ?, hp_max = ?, hp_current = ?, ac = ?, updated_at = ? WHERE id = ?"
+      "UPDATE tokens SET name = ?, hp_max = ?, hp_current = ?, ac = ?, conditions = ?, updated_at = ? WHERE id = ?"
     ).run(
       draft.name,
       summary.hp,
       draft.play.hp === null ? summary.hp : Math.max(0, Math.min(summary.hp, draft.play.hp)),
       summary.ac,
+      JSON.stringify(conditionsFromSheet(draft.play.conditions)),
       now(),
       token.id
     );
@@ -438,9 +440,9 @@ export async function registerCharacterRoutes(app: FastifyInstance): Promise<voi
       });
     }
 
-    let sourceDraft = body.data
-      ? parseDraft(body.data, source.name)
-      : parseDraft(parseJson(source.data, {}), source.name);
+    // The stored row is the source of truth. A client-supplied draft could
+    // fabricate items or coins and mint them into another character.
+    let sourceDraft = parseDraft(parseJson(source.data, {}), source.name);
     let targetDraft = parseDraft(parseJson(target.data, {}), target.name);
     let transferred = false;
 

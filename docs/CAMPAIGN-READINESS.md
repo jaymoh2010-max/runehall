@@ -4,7 +4,7 @@
 **Scope:** PF2e Remastered campaign play from session zero through level 20, compared with GM Core/Player Core and common GM/player tooling expectations.  
 **Artifacts:** `scripts/simulate-campaign.ts` (new), `scripts/lib/simHeroes.ts` (new), `npm run simulate:campaign`.
 
-> **Current status (release pass, November 2026):** Many items from the original P0 audit are now implemented: condition modifiers, temp HP absorption, dying/unconscious life state, healing reconciliation, Hero Point reroll, Refocus, hidden-token initiative filtering, hidden-prop filtering, linked-token HP preservation, and encounter cleanup/relaunch. Sessions now stay current until marked played, session changes reach open dashboards live, and the Sessions calendar is the single source for the next-session date. Quest XP is gated to XP tracking mode and a paid reward cannot be reset by editing the handout. Secret chat and secret rolls use independent toggles. Still open for a first campaign: afflictions, full spell heightening/cast-time spending, recovery checks/doomed automation, hidden walls/templates review, and enforced movement. The tables below preserve the original audit baseline; read the status labels alongside the README and ROADMAP for the current implementation.
+> **Current status (release pass, November 2026):** Many items from the original P0 audit are now implemented: condition modifiers, temp HP absorption, dying/unconscious life state, healing reconciliation, wounded-on-recovery, doomed death threshold, Hero Point reroll, Refocus, hidden-token initiative filtering, hidden-prop filtering, linked-token HP preservation, and encounter cleanup/relaunch. Linked sheets and tokens now share one condition list, and open sheets plus party cards consume live character updates. Sheet rolls support target DC/AC, secret visibility, second/third-attack MAP, and critical damage. Sessions now stay current until marked played, session changes reach open dashboards live, and the Sessions calendar is the single source for the next-session date. Quest XP is gated to XP tracking mode and a paid reward cannot be reset by editing the handout. Secret chat and secret rolls use independent toggles. Still open for a first campaign: afflictions, full spell heightening/cast-time spending, recovery-check automation, hidden walls/templates review, and enforced movement. The tables below preserve the original audit baseline; read the status labels alongside the README and ROADMAP for the current implementation.
 
 ---
 
@@ -91,8 +91,8 @@ These are the items most likely to make a sheet or combat state look right while
 
 | Gap | Why it matters | Status / effort |
 | --- | --- | --- |
-| Dying/wounded/unconscious/doomed state machine | HP 0 applies dying/unconscious and healing clears the life state; full recovery-check/doomed automation is still manual. | Partial — M |
-| Condition modifiers (frightened, off-guard, enfeebled, clumsy, drained, etc.) | Implemented in sheet and token math with duration ticking. | Done |
+| Dying/wounded/unconscious/doomed state machine | HP 0 applies dying/unconscious; healing from dying adds or raises wounded; doomed lowers the death threshold; recovery checks and stabilize actions remain manual. | Partial — M |
+| Condition modifiers (frightened, off-guard, enfeebled, clumsy, drained, etc.) | Implemented in sheet and token math, with one shared condition list between a linked sheet and token, duration ticking, and legacy trailing-value normalization. | Done |
 | Afflictions (poison/disease/curse) with onset, stages, interval, cure | Common in APs and hazards; currently entirely manual. | Open — L |
 | Spell heightening and cast-time resource spending | Rank-by-rank slots and preparation caps exist; casting does not yet spend slots/focus or heighten automatically. | Partial — M |
 | Hero Point reroll, GM award/reset, session reset | Reroll, Refocus, and manual pips exist; GM award/session reset workflow is missing. | Partial — S–M |
@@ -138,10 +138,10 @@ These are the items most likely to make a sheet or combat state look right while
 
 The VTT is the strongest differentiator, but several PF2e combat expectations are still manual or advisory:
 
-- **Turn economy:** no 3-action/reaction tracker, no MAP or weapon-trait workflow, no attack-target/cover integration.
+- **Turn economy:** the sheet has target-DC/AC resolution plus second/third-attack MAP and critical-damage shortcuts; there is still no 3-action/reaction tracker or full attack-target/cover integration.
 - **Effects:** AoE templates are visual only; no target resolution, save/damage cards, auras, or persistent spell effects.
-- **Conditions:** token and sheet condition stores are separate; rest updates token HP/name/AC but not token conditions.
-- **Death/afflictions:** no dying/wounded automation, persistent damage, fast healing/regeneration, or poison/disease stages.
+- **Conditions:** linked PC sheets and tokens now share one condition list and update each other live, including condition-driven AC/save/attack math.
+- **Death/afflictions:** dying/unconscious and wounded-on-recovery are automated; recovery checks, persistent damage, fast healing/regeneration, and poison/disease stages remain manual.
 - **Movement/terrain:** no difficult terrain, squeezing, forced movement, elevation/flying, reach, flanking/off-guard, or token-to-token collision.
 - **Hazards:** traps/hazards are custom combatants at best; no hazard XP or simple/complex hazard model.
 - **Monster actions:** bestiary stats are display-only; no attack/ability buttons or recharge tracking.

@@ -94,6 +94,18 @@ describe("PF2e long rest", () => {
     expect(result.summary.reducedConditions).toEqual([{ name: "Drained", from: 2, to: 1 }]);
   });
 
+  it("reduces legacy trailing-value doomed and drained names", () => {
+    const draft = hero(5);
+    draft.play.conditions = [
+      { name: "Doomed 1", value: null, duration: null },
+      { name: "Drained 2", value: null, duration: null },
+    ];
+    const result = applyLongRest(draft, derived);
+    expect(result.draft.play.conditions).toEqual([{ name: "Drained", value: 1, duration: null }]);
+    expect(result.summary.removedConditions).toEqual(["Doomed 1"]);
+    expect(result.summary.reducedConditions).toEqual([{ name: "Drained", from: 2, to: 1 }]);
+  });
+
   it("clears wounded at full HP but keeps it below full HP", () => {
     const full = hero(5);
     full.play.hp = 60;
@@ -106,6 +118,19 @@ describe("PF2e long rest", () => {
     expect(applyLongRest(hurt, derived).draft.play.conditions).toEqual([
       { name: "Wounded", value: 1, duration: null },
     ]);
+  });
+
+  it("does not rest a dead character back to life", () => {
+    const draft = hero(5);
+    draft.play.hp = 0;
+    draft.play.conditions = [
+      { name: "Dead", value: null, duration: null },
+      { name: "Dying", value: 4, duration: null },
+    ];
+    const result = applyLongRest(draft, derived);
+    expect(result.draft).toBe(draft);
+    expect(result.summary.healed).toBe(0);
+    expect(result.summary.slotsRestored).toBe(0);
   });
 
   it("clears dying and unconscious once healing brings the character above zero", () => {

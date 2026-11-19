@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
+  conditionBaseName,
+  conditionNumericValue,
+  conditionsFromSheet,
   groupHp,
   normalizeTokenConditions,
+  parseConditionEntry,
+  sheetConditionsFromToken,
   syncLifeConditions,
   tickTokenConditions,
   tokenConditionLabel,
@@ -93,6 +98,52 @@ describe("token conditions", () => {
       { name: "Frightened", value: 1, duration: null },
     ]);
     expect(tickTokenConditions([{ name: "Frightened", value: 1, duration: null }])).toEqual([]);
+  });
+});
+
+describe("condition input parsing", () => {
+  it("lifts a trailing number into the value and normalizes the name", () => {
+    expect(parseConditionEntry({ name: "Frightened 2" })).toEqual({
+      name: "Frightened",
+      value: 2,
+      duration: null,
+    });
+    expect(parseConditionEntry({ name: " Clumsy ", value: 1, duration: 3 })).toEqual({
+      name: "Clumsy",
+      value: 1,
+      duration: 3,
+    });
+  });
+
+  it("matches legacy trailing-value names during lifecycle updates", () => {
+    expect(conditionBaseName("Drained 2")).toBe("drained");
+    expect(conditionNumericValue({ name: "Drained 2" })).toBe(2);
+    expect(conditionNumericValue({ name: "Drained", value: 3 })).toBe(3);
+    expect(
+      tickTokenConditions([
+        { name: "Frightened 2", value: null, duration: null },
+        { name: "Clumsy 1", value: null, duration: 1 },
+        { name: "Prone", value: null, duration: null },
+      ])
+    ).toEqual([
+      { name: "Frightened", value: 1, duration: null },
+      { name: "Prone", value: null, duration: null },
+    ]);
+  });
+});
+
+describe("sheet and token condition sharing", () => {
+  it("round-trips values, durations, and legacy strings", () => {
+    const sheet = [
+      { name: "Frightened", value: 2, duration: 3 },
+      { name: "Prone", value: null, duration: null },
+    ];
+    const token = conditionsFromSheet(sheet);
+    expect(token).toEqual(sheet);
+    expect(sheetConditionsFromToken(token)).toEqual(sheet);
+    expect(conditionsFromSheet([{ name: " Clumsy ", value: 1 }])).toEqual([
+      { name: "Clumsy", value: 1, duration: null },
+    ]);
   });
 });
 

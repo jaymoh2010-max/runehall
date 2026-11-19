@@ -56,6 +56,7 @@ import {
 import { characterSummary, computeCharacter, normalizeCharacterDraft } from "../../shared/rules";
 import { applyLongRest, type LongRestResult } from "../../shared/rest";
 import { consumeLevelXp } from "../../shared/xp";
+import { levelUpCurrentHp } from "../../shared/levelup";
 import { normalizeTokenConditions, syncLifeConditions } from "../../shared/tokens";
 import {
   isJournalKind,
@@ -946,11 +947,12 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
         continue;
       }
       const before = characterSummary(draft, contextForDraft(draft));
-      const wasFull = draft.play.hp === null || draft.play.hp >= before.hp;
       draft.level += 1;
       draft.play.xp = consumeLevelXp(draft.play.xp);
       const after = characterSummary(draft, contextForDraft(draft));
-      draft.play.hp = wasFull ? null : Math.min(draft.play.hp ?? after.hp, after.hp);
+      // A wounded character gains the new maximum's HP increase, not just a
+      // higher cap that leaves them further below full.
+      draft.play.hp = levelUpCurrentHp(draft.play.hp, before.hp, after.hp);
       const summary = characterSummary(draft, contextForDraft(draft));
       db.prepare(
         "UPDATE characters SET data = ?, summary = ?, updated_at = ?, revision = revision + 1 WHERE id = ?"
@@ -960,11 +962,7 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
         .prepare("SELECT * FROM tokens WHERE character_id = ?")
         .all(character.id) as TokenRow[];
       for (const token of linkedTokens) {
-        const tokenWasFull =
-          token.hp_current === null || token.hp_max === null || token.hp_current >= token.hp_max;
-        const nextHp = tokenWasFull
-          ? summary.hp
-          : Math.min(token.hp_current ?? summary.hp, summary.hp);
+        const nextHp = Math.min(draft.play.hp ?? summary.hp, summary.hp);
         db.prepare(
           "UPDATE tokens SET name = ?, hp_max = ?, hp_current = ?, ac = ?, updated_at = ? WHERE id = ?"
         ).run(draft.name, summary.hp, nextHp, summary.ac, now(), token.id);

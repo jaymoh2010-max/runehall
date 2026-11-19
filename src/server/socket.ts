@@ -8,6 +8,7 @@ import { characterSummary, computeCharacter, normalizeCharacterDraft } from "../
 import { rollFormula, validateFormula } from "../shared/dice";
 import {
   normalizeTokenConditions,
+  sheetConditionsFromToken,
   syncLifeConditions,
   tickTokenConditions,
 } from "../shared/tokens";
@@ -775,6 +776,30 @@ export function registerSocketServer(io: TypedServer): void {
             "UPDATE campaign_state SET initiative = ?, updated_at = ? WHERE campaign_id = ?"
           ).run(JSON.stringify(renamed), now(), campaignId);
           broadcastInitiative(io, campaignId, ensureState(campaignId));
+        }
+      }
+      // Conditions live on both the token and the sheet. Mirror table edits
+      // back so a GM-applied Frightened or Prone changes the player's math.
+      if (updated?.character_id && token.conditions !== undefined) {
+        const character = getCharacter(updated.character_id);
+        if (character) {
+          try {
+            const draft = normalizeCharacterDraft(JSON.parse(character.data), character.name);
+            draft.play.conditions = sheetConditionsFromToken(
+              normalizeTokenConditions(parseJson(updated.conditions, []))
+            );
+            const summary = characterSummary(draft, contextForDraft(draft));
+            db.prepare(
+              "UPDATE characters SET data = ?, summary = ?, updated_at = ?, revision = revision + 1 WHERE id = ?"
+            ).run(JSON.stringify(draft), JSON.stringify(summary), now(), character.id);
+            io.to(room(campaignId)).emit("character:updated", {
+              characterId: character.id,
+              summary,
+              name: draft.name,
+            });
+          } catch {
+            // A malformed draft shouldn't block the token update.
+          }
         }
       }
       // A GM changing a linked token's HP is a table action; mirror it into

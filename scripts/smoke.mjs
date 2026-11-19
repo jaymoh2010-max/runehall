@@ -405,6 +405,9 @@ async function main() {
   if (savedSheet.payload.character.revision !== saveBase.revision + 1) {
     throw new Error("Character revision did not increment after a save");
   }
+  if (!(savedSheet.payload.character.summary?.validationErrors > 0)) {
+    throw new Error("Saved character summary did not report its required choices");
+  }
   const staleSave = await fetch(`${base}/api/characters/${character.id}`, {
     method: "PUT",
     headers: { "content-type": "application/json", cookie: playerCookie },
@@ -664,6 +667,24 @@ async function main() {
       body: { name: "Smoke Quartermaster", campaignId: campaign.id },
     })
   ).payload.character;
+  const forgedTransfer = await fetch(`${base}/api/characters/${character.id}/transfer`, {
+    method: "POST",
+    headers: { "content-type": "application/json", cookie: playerCookie },
+    body: JSON.stringify({
+      toCharacterId: quartermaster.id,
+      itemId: sword.id,
+      quantity: 1,
+      currency: { gp: 999, sp: 0, cp: 0 },
+      data: {
+        ...lootedSheet.payload.character.data,
+        equipment: [{ itemId: sword.id, quantity: 99, equipped: false }],
+        currency: { gp: 999, sp: 0, cp: 0 },
+      },
+    }),
+  });
+  if (forgedTransfer.status !== 400) {
+    throw new Error("A fabricated source draft was accepted by the transfer route");
+  }
   const transferResult = await api(`/api/characters/${character.id}/transfer`, {
     method: "POST",
     cookie: playerCookie,
@@ -1366,6 +1387,43 @@ async function main() {
     throw new Error("Sheet save did not update the linked token HP");
   }
   log("token HP writes back to the sheet, sheet saves update tokens, and max HP is sheet-owned");
+
+  const conditionUpdate = waitForEvent(
+    gmSocket,
+    "character:updated",
+    (payload) =>
+      payload.characterId === character.id &&
+      payload.summary.conditions.some((condition) => condition.startsWith("Frightened 2"))
+  );
+  gmSocket.emit("token:update", {
+    campaignId: campaign.id,
+    token: { id: token.id, conditions: [{ name: "Frightened", value: 2, duration: 3 }] },
+  });
+  await conditionUpdate;
+  const conditionCharacter = await api(`/api/characters/${character.id}`, { cookie: playerCookie });
+  if (
+    conditionCharacter.payload.character.data.play.conditions[0]?.name !== "Frightened" ||
+    conditionCharacter.payload.character.data.play.conditions[0]?.value !== 2
+  ) {
+    throw new Error("Token conditions did not write back to the linked character sheet");
+  }
+  const sheetConditionDraft = JSON.parse(JSON.stringify(conditionCharacter.payload.character.data));
+  sheetConditionDraft.play.conditions = [{ name: "Prone", value: null, duration: null }];
+  await api(`/api/characters/${character.id}`, {
+    method: "PUT",
+    cookie: playerCookie,
+    body: { data: sheetConditionDraft, force: true },
+  });
+  const conditionTable = await api(`/api/campaigns/${campaign.id}/table`, { cookie: gmCookie });
+  const conditionToken = conditionTable.payload.tokens.find((entry) => entry.id === token.id);
+  if (
+    !conditionToken ||
+    conditionToken.conditions.length !== 1 ||
+    conditionToken.conditions[0]?.name !== "Prone"
+  ) {
+    throw new Error("Sheet conditions did not update the linked token");
+  }
+  log("sheet and token conditions share one source of truth");
 
   const detourPromise = waitForEvent(
     gmSocket,

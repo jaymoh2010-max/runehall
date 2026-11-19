@@ -1,10 +1,24 @@
 import { describe, expect, it } from "vitest";
-import { getDegreeOfSuccess, rollFormula, validateFormula } from "../src/shared/dice";
+import {
+  applyAttackPenalty,
+  getDegreeOfSuccess,
+  rollFormula,
+  validateFormula,
+} from "../src/shared/dice";
 
 function sequence(values: number[]) {
   let index = 0;
   return () => values[index++ % values.length];
 }
+
+describe("attack penalties", () => {
+  it("shifts a d20 attack bonus by the multiple attack penalty", () => {
+    expect(applyAttackPenalty("1d20+7", 5)).toBe("1d20+2");
+    expect(applyAttackPenalty("1d20+3", 5)).toBe("1d20-2");
+    expect(applyAttackPenalty("1d20+7", 10)).toBe("1d20-3");
+    expect(applyAttackPenalty("1d20+7", 4)).toBe("1d20+3");
+  });
+});
 
 describe("dice engine", () => {
   it("rolls dice and adds constants", () => {

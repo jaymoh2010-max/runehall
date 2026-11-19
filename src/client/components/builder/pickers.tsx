@@ -298,8 +298,8 @@ export function FeatPicker({
             </p>
             {hiddenCount ? (
               <p className="tiny muted picker-prereq-note">
-                {hiddenCount} feat{hiddenCount === 1 ? "" : "s"} hidden because prerequisites are
-                not met.
+                {hiddenCount} feat{hiddenCount === 1 ? "" : "s"} hidden because prerequisites or
+                class access are not met.
               </p>
             ) : null}
             {eligible.map((feat) => (
@@ -338,7 +338,8 @@ export function FeatPicker({
             ))}
             {!loading && !eligible.length && !error ? (
               <div className="picker-empty">
-                No available feats match those filters. Feats with unmet prerequisites stay hidden.
+                No available feats match those filters. Feats with unmet prerequisites or class
+                access stay hidden.
               </div>
             ) : null}
             {loading ? <Spinner label="Searching the archives…" /> : null}

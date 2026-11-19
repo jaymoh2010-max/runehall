@@ -134,6 +134,9 @@ test("GM creates a campaign and builds a character through the lazy routes", asy
   await expect(page.getByRole("heading", { name: "E2E Hero" })).toBeVisible({
     timeout: 15_000,
   });
+  const builderChecklist = page.locator(".levelup-checklist");
+  await expect(builderChecklist.getByText("Choose an ancestry.")).toBeVisible();
+  await expect(builderChecklist.getByText(/required choices? remaining/)).toBeVisible();
   await page.getByRole("link", { name: "Open character sheet" }).click();
   await expect(page).toHaveURL(/\/characters\/[^/]+$/, { timeout: 15_000 });
   await expect(page.getByRole("heading", { name: "E2E Hero" })).toBeVisible();
@@ -157,6 +160,7 @@ test("GM controls advancement and milestone mode hides XP awards", async ({ page
     .click();
   await expect(page.getByRole("heading", { name: "Who's at the table?" })).toBeVisible();
   await expect(page.getByText(/The GM controls advancement/)).toBeVisible();
+  await expect(page.getByText("Needs choices").first()).toBeVisible();
   await expect(page.getByRole("button", { name: "Award XP" })).toHaveCount(0);
 
   page.once("dialog", (dialog) => dialog.accept());
@@ -354,6 +358,62 @@ test("player imports a Pathbuilder character and joins after GM approval", async
 
   await page.reload();
   await expect(page.getByText(/You're already in/)).toBeVisible({ timeout: 15_000 });
+  await adminContext.close();
+});
+
+test("sheet HP corrections and GM conditions stay live", async ({ page, browser }) => {
+  await signIn(page, importer);
+  await page.goto(`${campaignPath}?tab=party`);
+  const heroCard = page.locator(".party-card").filter({ hasText: "Pathbuilder E2E Hero" });
+  await expect(heroCard).toBeVisible();
+  await heroCard.getByRole("link", { name: "Sheet" }).click();
+  await expect(page.getByRole("heading", { name: "Pathbuilder E2E Hero" })).toBeVisible();
+  const characterId = page.url().split("/characters/")[1]?.split(/[/?#]/)[0];
+  expect(characterId).toBeTruthy();
+
+  const hpInput = page.getByLabel("Current hit points");
+  await hpInput.fill("0");
+  await hpInput.press("Enter");
+  const conditionList = page.locator(".conditions-list");
+  await expect(conditionList.getByText("Dying", { exact: false })).toBeVisible();
+  await expect(conditionList.getByText("Unconscious", { exact: false })).toBeVisible();
+
+  await hpInput.fill("1");
+  await hpInput.press("Enter");
+  await expect(conditionList.getByText("Wounded 1", { exact: false })).toBeVisible();
+  await expect(page.locator(".save-indicator")).toHaveText("Saved");
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Pathbuilder E2E Hero" })).toBeVisible();
+  await expect(
+    page.locator(".conditions-list").getByText("Wounded 1", { exact: false })
+  ).toBeVisible();
+
+  const adminContext = await browser.newContext();
+  const adminPage = await adminContext.newPage();
+  await signIn(adminPage, admin);
+  const sheetResponse = await adminPage.request.get(`/api/characters/${characterId}`);
+  const sheet = (await sheetResponse.json()) as { character: { data: unknown } };
+  const originalData = sheet.character.data;
+  const withCondition = structuredClone(originalData) as {
+    play: { conditions: { name: string; value: number | null; duration: number | null }[] };
+  };
+  withCondition.play.conditions.push({ name: "Off-Guard", value: null, duration: null });
+  const addResponse = await adminPage.request.put(`/api/characters/${characterId}`, {
+    data: { data: withCondition, force: true },
+  });
+  expect(addResponse.ok()).toBe(true);
+  await expect(conditionList.getByText("Off-Guard", { exact: false })).toBeVisible({
+    timeout: 15_000,
+  });
+
+  const removeResponse = await adminPage.request.put(`/api/characters/${characterId}`, {
+    data: { data: originalData, force: true },
+  });
+  expect(removeResponse.ok()).toBe(true);
+  await expect(conditionList.getByText("Off-Guard", { exact: false })).toHaveCount(0, {
+    timeout: 15_000,
+  });
+
   await adminContext.close();
 });
 

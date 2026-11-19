@@ -16,12 +16,14 @@ Runehall is built for a private group of roughly 4–10 players and a GM. It run
 - Level 1–20 character builder with live PF2e math.
 - Ancestry, heritage, background, class, deity, ability boosts, skills, feats, spells, gear, details, and review chapters.
 - Core sources by default — Player Core, Player Core 2, Core Rulebook, GM Core, and Monster Core — with an **Expanded sources** toggle in every picker.
-- Feat prerequisites are enforced: options with unmet prerequisites are hidden and cannot be selected. Complex story requirements stay visible with a **Check prereqs** warning.
+- Feat prerequisites are enforced: options with unmet prerequisites are hidden and cannot be selected. Complex story requirements stay visible with a **Check prereqs** warning. Class feats are also checked against the selected class, even when the “Only my class” filter is off, and a background’s starting feat enters the same prerequisite and effect pipeline.
+- Core ancestry, heritage, background, and class choices plus picker selections update the summary, step badges, and derived numbers immediately instead of waiting for the next autosave. The **Sheet** link waits for a pending save before navigating, and closing the tab flushes the latest draft.
 - Weapon, armor, and shield runes: weapon/armor potency, striking, resilient, property runes, and shield durability; rune prices count toward wealth and their bonuses flow into attacks, damage, AC, saves, and shield Hardness/HP.
 - Prepared casters are capped by their rank-by-rank spell slots; duplicate preparations are supported, spontaneous repertoire limits are checked, and slot pips can be reset between sessions.
 - Manual companion roster for animal companions, familiars, eidolons, and summons, with HP, AC, and attack notes.
 - A step-by-step level-up wizard shows before/after HP and each new feat, skill, spell, ability boost, or class feature with Back/Next controls. Level up stays locked while required choices are unresolved, then opens the first relevant chapter.
-- A persistent level-up checklist tracks required boosts, skill increases, feat slots, and spell ranks, with links back to each chapter.
+- A persistent character checklist tracks every unresolved required choice — boosts, skill increases, feat slots, spell ranks, and base selections — with links back to each chapter. It survives reloads and appears after GM-driven level-ups too.
+- Party cards and the Overview mark characters with unresolved required choices as **Needs choices** instead of treating a saved but unfinished draft as ready.
 - Printable character sheet with a clean Print/PDF layout.
 - Real compendium content: 51 ancestries, 334 heritages, 540 backgrounds, 29 classes, 3,000+ class features/feats, 2,000+ spells, 5,900+ items, 480+ deities, 1,200+ creatures.
 - Feat, spell, and equipment pickers default to a **Recommended only** view (common, non-playtest options) and rank exact/prefix name matches first; toggle the filter off to browse everything.
@@ -31,9 +33,11 @@ Runehall is built for a private group of roughly 4–10 players and a GM. It run
 - Derived HP, AC, saves, perception, class DC, spell DC/attack, skills, lore, attacks, bulk, and wealth.
 - Autosaves every change; portable JSON export/import.
 - Route-level code splitting keeps the initial client small, with a gzip bundle budget in CI checks. Dialogs trap and restore focus, the app has a skip link, and reduced-motion preferences are honored.
-- At-the-table sheet with clickable skill/save/attack/spell rolls, HP, temp HP, hero points, focus points, conditions, and notes. Conditions change the derived math, the sheet explains what was applied, **Arm next roll** spends a Hero Point on a reroll, and **Refocus** restores a Focus Point.
+- At-the-table sheet with clickable skill/save/attack/spell rolls, HP, temp HP, hero points, focus points, conditions, and notes. A target DC/AC field resolves degree of success, secret rolls stay GM-only, attacks have second/third-attack MAP buttons and a critical-damage shortcut, conditions change the derived math, the sheet explains what was applied, **Arm next roll** spends a Hero Point on a reroll, and **Refocus** restores a Focus Point.
+- Conditions are shared between a linked character sheet and its table token. A GM applying Frightened or Off-Guard to a token updates the player's AC, saves, attacks, and DCs; a player changing conditions on the sheet updates the token.
+- The open character sheet and party cards receive live `character:updated` events, so token damage, GM rests, loot, conditions, and level-ups do not require a reload.
 - One-click **Long rest**: heals CON modifier (minimum 1) × level, clears temporary HP, resets spell slots, divine font, focus points, and shield, removes fatigued and recovering dying/unconscious, and reduces doomed/drained by 1.
-- **Damage and healing use PF2e life state.** Temporary HP absorbs damage first; reaching 0 HP applies dying and unconscious; healing above 0 clears them and reaching full HP clears wounded. Token damage and sheet damage share the same rules.
+- **Damage and healing use PF2e life state.** Temporary HP absorbs damage first; reaching 0 HP applies dying and unconscious; healing above 0 clears them and adds or raises wounded; doomed lowers the death threshold. Direct HP corrections apply the same dying/unconscious state without silently consuming temporary HP. Token damage and sheet damage share the same rules.
 
 ### Shared table
 - Scene maps with automatic dimensions, interactive grid calibration, and map scaling.
