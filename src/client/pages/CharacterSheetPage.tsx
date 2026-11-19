@@ -49,6 +49,17 @@ import {
   signed,
   titleCase,
 } from "../../shared/rules";
+import {
+  castSpell,
+  isHealingSpell,
+  spellCastOptionAvailable,
+  spellCastOptions,
+  spellDamageAtRank,
+  spellHeighteningHint,
+  spellHeighteningNotes,
+  type SpellCastOption,
+  type SpellCastResource,
+} from "../../shared/spellcasting";
 import { DEGREE_LABELS, applyAttackPenalty, mod, rollFormula } from "../../shared/dice";
 import { currencyToCp } from "../../shared/inventory";
 import { applyLongRest } from "../../shared/rest";
@@ -143,6 +154,13 @@ export function CharacterSheetPage() {
   const [transferLoading, setTransferLoading] = useState(false);
   const [restOpen, setRestOpen] = useState(false);
   const [restRough, setRestRough] = useState(false);
+  const [castState, setCastState] = useState<{
+    spellId: string;
+    kind: "known" | "cantrip" | "focus";
+    rank: number;
+    resource: SpellCastResource;
+  } | null>(null);
+  const [castRanks, setCastRanks] = useState<Record<string, number>>({});
   const [hpInput, setHpInput] = useState("");
   const [conflict, setConflict] = useState<CharacterRecord | null>(null);
   const initialized = useRef(false);
@@ -153,6 +171,7 @@ export function CharacterSheetPage() {
   const saveQueued = useRef(false);
   const conflictRef = useRef(false);
   const dirtyRef = useRef(false);
+  const castLock = useRef(false);
   const saveStateRef = useRef(saveState);
 
   useEffect(() => {
@@ -250,6 +269,25 @@ export function CharacterSheetPage() {
     setHpInput(String(draft.play.hp ?? derived.maxHp));
   }, [draft?.play.hp, derived?.maxHp]);
   const canEdit = Boolean(character?.permissions?.canEdit);
+  const castSpellEntry = castState ? (context.spells[castState.spellId] ?? null) : null;
+  const castOptions =
+    castSpellEntry && draft && derived
+      ? spellCastOptions(castSpellEntry, draft, context, {
+          focus: castState?.kind === "focus",
+          focusPointsMax: derived.focusPointsMax,
+        })
+      : [];
+  const selectedCastOption =
+    castOptions.find(
+      (option) => option.rank === castState?.rank && option.resource === castState?.resource
+    ) ??
+    castOptions.find(spellCastOptionAvailable) ??
+    castOptions[0] ??
+    null;
+  const castDamage =
+    castSpellEntry && selectedCastOption
+      ? spellDamageAtRank(castSpellEntry, selectedCastOption.rank)
+      : null;
 
   const transferTargets = useMemo(
     () => party.filter((entry) => entry.id !== character?.id),
@@ -418,6 +456,65 @@ export function CharacterSheetPage() {
 
   const restPreview = draft && derived ? applyLongRest(draft, derived, { rough: restRough }) : null;
 
+  const openCast = (
+    spell: NonNullable<CharacterContext["spells"][string]>,
+    kind: "known" | "cantrip" | "focus"
+  ) => {
+    if (!draft || !derived || !canEdit) return;
+    const options = spellCastOptions(spell, draft, context, {
+      focus: kind === "focus",
+      focusPointsMax: derived.focusPointsMax,
+    });
+    if (!options.length) return;
+    const option = options.find(spellCastOptionAvailable) ?? options[0];
+    setCastState({ spellId: spell.id, kind, rank: option.rank, resource: option.resource });
+  };
+
+  const confirmCast = () => {
+    if (!castSpellEntry || !selectedCastOption || !draft || !derived || castLock.current) return;
+    if (!spellCastOptionAvailable(selectedCastOption)) return;
+    castLock.current = true;
+    try {
+      const result = castSpell(
+        draftRef.current ?? draft,
+        castSpellEntry,
+        context,
+        { rank: selectedCastOption.rank, resource: selectedCastOption.resource },
+        { focus: castState?.kind === "focus", focusPointsMax: derived.focusPointsMax }
+      );
+      if (!result) {
+        toast("That spell cannot be cast right now.", "error");
+        return;
+      }
+      if (result.draft !== (draftRef.current ?? draft)) {
+        skipInitialSave.current = false;
+        draftRef.current = result.draft;
+        dirtyRef.current = true;
+        setDraft(result.draft);
+        void saveDraft();
+      }
+      setCastRanks((current) => ({
+        ...current,
+        [castSpellEntry.id]: selectedCastOption.rank,
+      }));
+      const cost =
+        selectedCastOption.resource === "font"
+          ? "divine font"
+          : selectedCastOption.resource === "focus"
+            ? "focus point"
+            : selectedCastOption.resource === "slot"
+              ? `rank ${selectedCastOption.rank} slot`
+              : null;
+      toast(
+        `Cast ${castSpellEntry.name} at rank ${selectedCastOption.rank}${cost ? ` using a ${cost}` : ""}.`,
+        "success"
+      );
+      setCastState(null);
+    } finally {
+      castLock.current = false;
+    }
+  };
+
   const takeLongRest = () => {
     if (!draft || !derived) return;
     const result = applyLongRest(draft, derived, { rough: restRough });
@@ -425,6 +522,7 @@ export function CharacterSheetPage() {
     draftRef.current = result.draft;
     dirtyRef.current = true;
     setDraft(result.draft);
+    setCastRanks({});
     setRestOpen(false);
     setRestRough(false);
     void saveDraft();
@@ -1106,6 +1204,10 @@ export function CharacterSheetPage() {
                 onRoll={roll}
                 spellAttack={derived.spellAttack}
                 grantedSpells={derived.grantedSpells}
+                canEdit={canEdit}
+                focusPointsMax={derived.focusPointsMax}
+                onCast={openCast}
+                castRanks={castRanks}
               />
             </Card>
           ) : null}
@@ -2135,6 +2237,117 @@ export function CharacterSheetPage() {
       </Modal>
 
       <Modal
+        open={Boolean(castState && castSpellEntry)}
+        onClose={() => setCastState(null)}
+        title={castSpellEntry ? `Cast ${castSpellEntry.name}` : "Cast spell"}
+        subtitle="Choose the rank and resource, then roll from the spell row."
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setCastState(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              icon={<Sparkles size={15} />}
+              disabled={!selectedCastOption || !spellCastOptionAvailable(selectedCastOption)}
+              onClick={confirmCast}
+            >
+              Cast spell
+            </Button>
+          </>
+        }
+      >
+        {castSpellEntry ? (
+          <div className="stack">
+            <p className="tiny muted">
+              {castSpellEntry.actions || "cast"} · {castSpellEntry.range || "range —"}
+              {castSpellEntry.defense?.save ? ` · ${castSpellEntry.defense.save} save` : ""}
+            </p>
+            {castOptions.length > 1 ? (
+              <Field label="Cast at rank">
+                <Select
+                  aria-label="Cast at rank"
+                  value={`${selectedCastOption?.rank}:${selectedCastOption?.resource}`}
+                  onChange={(event) => {
+                    const [rank, resource] = event.target.value.split(":");
+                    setCastState((current) =>
+                      current
+                        ? {
+                            ...current,
+                            rank: Number(rank),
+                            resource: resource as SpellCastResource,
+                          }
+                        : current
+                    );
+                  }}
+                >
+                  {castOptions.map((option) => (
+                    <option
+                      key={`${option.rank}:${option.resource}`}
+                      value={`${option.rank}:${option.resource}`}
+                      disabled={!spellCastOptionAvailable(option)}
+                    >
+                      Rank {option.rank} · {option.label} · {castRemainingLabel(option)}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+            ) : (
+              <p className="cast-cost">
+                Rank {selectedCastOption?.rank} · {selectedCastOption?.label} ·{" "}
+                {selectedCastOption ? castRemainingLabel(selectedCastOption) : "unavailable"}
+              </p>
+            )}
+            <p className="cast-cost">
+              Cost: <strong>{castCostLabel(selectedCastOption)}</strong>.
+            </p>
+            <ul className="rest-preview">
+              <li>
+                <span>Spell attack</span>
+                <strong>
+                  {derived?.spellAttack === null || derived?.spellAttack === undefined
+                    ? "—"
+                    : signed(derived.spellAttack)}
+                </strong>
+              </li>
+              <li>
+                <span>Spell DC</span>
+                <strong>{derived?.spellDc ?? "—"}</strong>
+              </li>
+              {castDamage?.parts.length ? (
+                <li>
+                  <span>{isHealingSpell(castSpellEntry) ? "Healing" : "Damage"}</span>
+                  <strong>
+                    {castDamage.parts
+                      .map((part) => `${part.formula} ${part.type}`.trim())
+                      .join(", ")}
+                  </strong>
+                </li>
+              ) : null}
+              {castDamage?.areaDelta ? (
+                <li>
+                  <span>Area</span>
+                  <strong>+{castDamage.areaDelta} ft.</strong>
+                </li>
+              ) : null}
+            </ul>
+            {selectedCastOption
+              ? (() => {
+                  const hint = spellHeighteningHint(castSpellEntry, selectedCastOption.rank);
+                  if (hint) return <p className="tiny muted">{hint}</p>;
+                  const printed = spellHeighteningNotes(castSpellEntry)[0];
+                  return printed ? <p className="tiny muted">{printed}</p> : null;
+                })()
+              : null}
+            <p className="tiny muted">
+              Save spells use your spell DC; targets roll the save. Action-count variants, area
+              changes, and unsupported heightening remain manual.
+            </p>
+          </div>
+        ) : null}
+      </Modal>
+
+      <Modal
         open={Boolean(conflict)}
         onClose={() => void applyServerVersion()}
         closeOnBackdrop={false}
@@ -2169,18 +2382,67 @@ export function CharacterSheetPage() {
 // ---------------------------------------------------------------------------
 // Spell display helper
 // ---------------------------------------------------------------------------
+function castRemainingLabel(option: SpellCastOption): string {
+  return option.remaining === null ? "unlimited" : `${option.remaining} left`;
+}
+
+function castCostLabel(option: SpellCastOption | null): string {
+  if (!option) return "nothing";
+  if (option.resource === "cantrip") return "no slot";
+  if (option.resource === "focus") return "1 focus point";
+  if (option.resource === "font") return "1 divine font slot";
+  return `1 rank ${option.rank} slot`;
+}
+
+function castHint(
+  options: SpellCastOption[],
+  kind: "known" | "cantrip" | "focus",
+  preparedCaster: boolean
+): string {
+  const available = options.find(spellCastOptionAvailable);
+  if (available) {
+    if (available.resource === "cantrip") return `rank ${available.rank} · no slot`;
+    if (available.resource === "focus") {
+      return `${available.remaining ?? 0} focus point${available.remaining === 1 ? "" : "s"}`;
+    }
+    if (available.resource === "font") return `divine font · ${available.remaining} left`;
+    return `rank ${available.rank} slot · ${available.remaining} left`;
+  }
+  if (!options.length) {
+    return preparedCaster && kind === "known" ? "not prepared" : "no slots";
+  }
+  const font = options.find((option) => option.resource === "font");
+  if (font) return "no font slots";
+  const focus = options.find((option) => option.resource === "focus");
+  if (focus) return "no focus points";
+  const slot = options.find((option) => option.resource === "slot");
+  if (slot) return `no rank ${slot.rank} slots`;
+  return "unavailable";
+}
+
 function SpellGroups({
   draft,
   context,
   onRoll,
   spellAttack,
   grantedSpells,
+  canEdit,
+  focusPointsMax,
+  onCast,
+  castRanks,
 }: {
   draft: CharacterDraft;
   context: CharacterContext;
   onRoll: (formula: string, label: string, dc?: number | null) => void;
   spellAttack: number | null;
   grantedSpells: DerivedCharacter["grantedSpells"];
+  canEdit: boolean;
+  focusPointsMax: number;
+  onCast: (
+    spell: NonNullable<CharacterContext["spells"][string]>,
+    kind: "known" | "cantrip" | "focus"
+  ) => void;
+  castRanks: Record<string, number>;
 }) {
   const unique = (spells: NonNullable<CharacterContext["spells"][string]>[]) => {
     const seen = new Set<string>();
@@ -2194,10 +2456,14 @@ function SpellGroups({
   const granted = grantedSpells
     .map((spell) => context.spells[spell.id])
     .filter((spell): spell is NonNullable<typeof spell> => Boolean(spell));
+  const preparedSpells = draft.spells.prepared
+    .map((id) => context.spells[id])
+    .filter((spell): spell is NonNullable<typeof spell> => Boolean(spell) && spell.rank > 0);
   const known = unique([
     ...draft.spells.known
       .map((id) => context.spells[id])
       .filter((spell): spell is NonNullable<typeof spell> => Boolean(spell)),
+    ...preparedSpells,
     ...granted.filter((spell) => spell.rank > 0 && grantedKind.get(spell.id) !== "focus"),
   ]);
   const cantrips = unique([
@@ -2221,14 +2487,38 @@ function SpellGroups({
     list.push(spell);
     grouped.set(spell.rank, list);
   }
+  const renderRow = (
+    spell: NonNullable<CharacterContext["spells"][string]>,
+    castKind: "known" | "cantrip" | "focus",
+    preparedCount?: number
+  ) => {
+    const options = spellCastOptions(spell, draft, context, {
+      focus: castKind === "focus",
+      focusPointsMax,
+    });
+    return (
+      <SpellRow
+        key={spell.id}
+        spell={spell}
+        onRoll={onRoll}
+        spellAttack={spellAttack}
+        prepared={preparedCount}
+        castOptions={options}
+        castable={options.some(spellCastOptionAvailable)}
+        castHint={castHint(options, castKind, preparedCaster)}
+        castKind={castKind}
+        onCast={onCast}
+        castRank={castRanks[spell.id]}
+        canEdit={canEdit}
+      />
+    );
+  };
   return (
     <div className="sheet-spells">
       {cantrips.length ? (
         <div className="spell-group">
           <h4>Cantrips</h4>
-          {cantrips.map((spell) => (
-            <SpellRow key={spell.id} spell={spell} onRoll={onRoll} spellAttack={spellAttack} />
-          ))}
+          {cantrips.map((spell) => renderRow(spell, "cantrip"))}
         </div>
       ) : null}
       {[...grouped.entries()]
@@ -2238,23 +2528,13 @@ function SpellGroups({
             <h4>
               Rank {rank} {preparedCaster ? "spellbook" : "repertoire"}
             </h4>
-            {spells.map((spell) => (
-              <SpellRow
-                key={spell.id}
-                spell={spell}
-                onRoll={onRoll}
-                spellAttack={spellAttack}
-                prepared={prepared.get(spell.id) ?? 0}
-              />
-            ))}
+            {spells.map((spell) => renderRow(spell, "known", prepared.get(spell.id) ?? 0))}
           </div>
         ))}
       {focus.length ? (
         <div className="spell-group">
           <h4>Focus spells</h4>
-          {focus.map((spell) => (
-            <SpellRow key={spell.id} spell={spell} onRoll={onRoll} spellAttack={spellAttack} />
-          ))}
+          {focus.map((spell) => renderRow(spell, "focus"))}
         </div>
       ) : null}
       {!cantrips.length && !known.length && !focus.length ? (
@@ -2269,13 +2549,43 @@ function SpellRow({
   onRoll,
   spellAttack,
   prepared,
+  castOptions,
+  castable,
+  castHint: hint,
+  castKind,
+  onCast,
+  castRank,
+  canEdit,
 }: {
   spell: NonNullable<CharacterContext["spells"][string]>;
   onRoll: (formula: string, label: string, dc?: number | null) => void;
   spellAttack: number | null;
   prepared?: number;
+  castOptions: SpellCastOption[];
+  castable: boolean;
+  castHint: string;
+  castKind: "known" | "cantrip" | "focus";
+  onCast: (
+    spell: NonNullable<CharacterContext["spells"][string]>,
+    kind: "known" | "cantrip" | "focus"
+  ) => void;
+  castRank?: number;
+  canEdit: boolean;
 }) {
-  const damageFormula = spell.damage?.[0]?.formula;
+  const damageRank = castRank ?? castOptions[0]?.rank ?? Math.max(1, spell.rank);
+  const damage = spellDamageAtRank(spell, damageRank);
+  const healing = isHealingSpell(spell);
+  const computedDamage = damage.parts
+    .map((part) => `${part.formula} ${part.type}`.trim())
+    .join(", ");
+  const showBaseDamage = Boolean(
+    spell.damageText && damageRank > Math.max(1, spell.rank) && spell.damageText !== computedDamage
+  );
+  const damageLabel = (part: { type: string }) => {
+    const kind = healing ? "healing" : `${part.type || "untyped"} damage`;
+    const rankSuffix = damageRank > Math.max(1, spell.rank) ? ` (rank ${damageRank})` : "";
+    return `${spell.name} ${kind}${rankSuffix}`;
+  };
   return (
     <HoverCard
       title={spell.name}
@@ -2294,7 +2604,13 @@ function SpellRow({
             · {spell.actions || "—"} · {spell.range || "range —"}
             {spell.defense?.save ? ` · ${spell.defense.save}` : ""}
           </span>
-          {spell.damageText ? <span className="tiny gold-text"> · {spell.damageText}</span> : null}
+          {spell.damageText ? (
+            <span className="tiny muted">
+              {" "}
+              · {showBaseDamage ? `Base ${spell.damageText}` : spell.damageText}
+            </span>
+          ) : null}
+          <span className={`tiny ${castable ? "gold-text" : "muted"}`}> · {hint}</span>
         </div>
         <div className="row" style={{ gap: 5 }}>
           {spellAttack !== null && spell.traits.includes("attack") ? (
@@ -2306,15 +2622,28 @@ function SpellRow({
               <Dices size={13} /> Attack
             </Button>
           ) : null}
-          {damageFormula ? (
+          {damage.parts.map((part, index) => (
             <Button
+              key={`${part.type}-${index}`}
               size="sm"
               variant="ghost"
-              onClick={() => onRoll(damageFormula, `${spell.name} damage`)}
+              title={damage.supported ? undefined : "Heightening is manual for this spell."}
+              onClick={() => onRoll(part.formula, damageLabel(part))}
             >
-              <Swords size={13} /> {damageFormula}
+              <Swords size={13} /> {part.formula}
+              {part.type && !healing ? ` ${part.type}` : ""}
             </Button>
-          ) : null}
+          ))}
+          <Button
+            size="sm"
+            variant="primary"
+            aria-label={`Cast ${spell.name}`}
+            disabled={!canEdit || !castable}
+            title={castable ? `Cast ${spell.name}` : hint}
+            onClick={() => onCast(spell, castKind)}
+          >
+            <Sparkles size={13} /> Cast
+          </Button>
         </div>
       </div>
     </HoverCard>

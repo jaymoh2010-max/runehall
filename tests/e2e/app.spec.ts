@@ -263,6 +263,17 @@ test("GM creates a campaign and builds a character through the lazy routes", asy
   await expect(page.getByRole("heading", { name: "E2E Hero" })).toBeVisible();
   await expect(page.getByText("Initiative").first()).toBeVisible();
 
+  const focusPip = page.locator(".point-pip.focus").first();
+  await expect(focusPip).toHaveAttribute("aria-pressed", "true");
+  const healAnimalRow = page.locator(".sheet-spell-row").filter({ hasText: "Heal Animal" });
+  await healAnimalRow.getByRole("button", { name: "Cast Heal Animal" }).click();
+  const healAnimalDialog = page.getByRole("dialog", { name: "Cast Heal Animal" });
+  await expect(healAnimalDialog.getByText(/1 focus point/)).toBeVisible();
+  await healAnimalDialog.getByRole("button", { name: "Cast spell" }).click();
+  await expect(focusPip).toHaveAttribute("aria-pressed", "false");
+  await page.getByRole("button", { name: "Refocus" }).click();
+  await expect(focusPip).toHaveAttribute("aria-pressed", "true");
+
   await page.getByRole("button", { name: "Long rest" }).click();
   const restDialog = page.getByRole("dialog", { name: "Take a long rest" });
   await expect(restDialog).toBeVisible();
@@ -964,6 +975,41 @@ test("builder completes a level-1 Cleric with split divine-font preparation", as
   await expect(
     page.locator(".sheet-spell-row").filter({ hasText: "Heal" }).getByText("Prepared ×4")
   ).toBeVisible();
+
+  const ordinaryRankOne = slots
+    .locator(".sheet-slot-row:not(.slot-row-font)")
+    .filter({ hasText: "Rank 1" });
+  await expect(ordinaryRankOne).toContainText("2 / 2");
+  const sheetHealRow = page.locator(".sheet-spell-row").filter({ hasText: "Heal" });
+  await sheetHealRow.getByRole("button", { name: "Cast Heal" }).click();
+  const healDialog = page.getByRole("dialog", { name: "Cast Heal" });
+  await expect(healDialog.getByText(/1 divine font slot/)).toBeVisible();
+  await healDialog.getByRole("button", { name: "Cast spell" }).click();
+  await expect(slots.locator(".slot-row-font")).toContainText("3 / 4");
+  await expect(ordinaryRankOne).toContainText("2 / 2");
+  await expect(page.locator(".save-indicator")).toHaveText("Saved");
+
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "E2E Cleric" })).toBeVisible();
+  await expect(page.locator(".sheet-slots .slot-row-font")).toContainText("3 / 4");
+
+  const sheetBlessRow = page.locator(".sheet-spell-row").filter({ hasText: "Bless" });
+  await sheetBlessRow.getByRole("button", { name: "Cast Bless" }).click();
+  const blessDialog = page.getByRole("dialog", { name: "Cast Bless" });
+  await expect(blessDialog.getByText(/1 rank 1 slot/)).toBeVisible();
+  await blessDialog.getByRole("button", { name: "Cast spell" }).click();
+  await expect(
+    page.locator(".sheet-slots .sheet-slot-row:not(.slot-row-font)").filter({ hasText: "Rank 1" })
+  ).toContainText("1 / 2");
+
+  await page.getByRole("button", { name: "Long rest" }).click();
+  const castRestDialog = page.getByRole("dialog", { name: "Take a long rest" });
+  await expect(castRestDialog).toBeVisible();
+  await castRestDialog.getByRole("button", { name: "Take long rest" }).click();
+  await expect(page.locator(".sheet-slots .slot-row-font")).toContainText("4 / 4");
+  await expect(
+    page.locator(".sheet-slots .sheet-slot-row:not(.slot-row-font)").filter({ hasText: "Rank 1" })
+  ).toContainText("2 / 2");
 });
 
 test("builder completes a level-1 Wizard using granted curriculum spells", async ({ page }) => {
@@ -1064,4 +1110,42 @@ test("builder completes a level-1 Wizard using granted curriculum spells", async
   await expect(
     page.locator(".sheet-spells").getByText("Force Bolt", { exact: true })
   ).toBeVisible();
+
+  const wizardRankOne = page.locator(".sheet-slots .sheet-slot-row").filter({ hasText: "Rank 1" });
+  await expect(wizardRankOne).toContainText("3 / 3");
+  const barrageRow = page.locator(".sheet-spell-row").filter({ hasText: "Force Barrage" });
+  await barrageRow.getByRole("button", { name: "Cast Force Barrage" }).click();
+  const barrageDialog = page.getByRole("dialog", { name: "Cast Force Barrage" });
+  await expect(barrageDialog.getByText(/1 rank 1 slot/)).toBeVisible();
+  await barrageDialog.getByRole("button", { name: "Cast spell" }).click();
+  await expect(wizardRankOne).toContainText("2 / 3");
+  await expect(page.locator(".save-indicator")).toHaveText("Saved");
+
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "E2E Wizard" })).toBeVisible();
+  await expect(
+    page.locator(".sheet-slots .sheet-slot-row").filter({ hasText: "Rank 1" })
+  ).toContainText("2 / 3");
+
+  const focusPip = page.locator(".point-pip.focus").first();
+  await expect(focusPip).toHaveAttribute("aria-pressed", "true");
+  const boltRow = page.locator(".sheet-spell-row").filter({ hasText: "Force Bolt" });
+  await boltRow.getByRole("button", { name: "Cast Force Bolt" }).click();
+  const boltDialog = page.getByRole("dialog", { name: "Cast Force Bolt" });
+  await expect(boltDialog.getByText(/1 focus point/)).toBeVisible();
+  await boltDialog.getByRole("button", { name: "Cast spell" }).click();
+  await expect(focusPip).toHaveAttribute("aria-pressed", "false");
+  await page.getByRole("button", { name: "Refocus" }).click();
+  await expect(focusPip).toHaveAttribute("aria-pressed", "true");
+
+  const projectileRow = page
+    .locator(".sheet-spell-row")
+    .filter({ hasText: "Telekinetic Projectile" });
+  await projectileRow.getByRole("button", { name: "Cast Telekinetic Projectile" }).click();
+  const projectileDialog = page.getByRole("dialog", { name: "Cast Telekinetic Projectile" });
+  await expect(projectileDialog.getByText(/no slot/)).toBeVisible();
+  await projectileDialog.getByRole("button", { name: "Cast spell" }).click();
+  await expect(
+    page.locator(".sheet-slots .sheet-slot-row").filter({ hasText: "Rank 1" })
+  ).toContainText("2 / 3");
 });
