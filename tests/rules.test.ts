@@ -19,6 +19,7 @@ import {
   isFontSpell,
   normalizeCharacterDraft,
   ordinarySpellSlotsFor,
+  preparedSlotSplits,
   spellRepertoireLimits,
   spellSlotsFor,
 } from "../src/shared/rules";
@@ -448,6 +449,8 @@ describe("PF2e character rules", () => {
     expect(spellSlotsFor(19, "bounded", "Necromancer")).toEqual([2, 2, 2, 2, 2, 2, 2, 2, 2, 1]);
     expect(spellSlotsFor(19, "bounded", "Magus")).toEqual([2, 2, 2, 2, 2, 2, 2, 2, 2]);
     expect(ordinarySpellSlotsFor(1, "full", "Cleric")).toEqual([2]);
+    expect(ordinarySpellSlotsFor(5, "full", "Cleric")).toEqual([3, 3, 2]);
+    expect(ordinarySpellSlotsFor(19, "full", "Cleric")).toEqual([3, 3, 3, 3, 3, 3, 3, 3, 3, 1]);
     expect(cantripLimitFor(classes.find((entry) => entry.name === "Wizard"))).toBe(6);
     expect(cantripLimitFor(classes.find((entry) => entry.name === "Cleric"))).toBe(5);
     const heal = spells.find((entry) => entry.name === "Heal")!;
@@ -463,6 +466,85 @@ describe("PF2e character rules", () => {
     expect(divineFontInfo(15, "Cleric")).toEqual({ slots: 6, rank: 8 });
     expect(divineFontInfo(19, "Cleric")).toEqual({ slots: 6, rank: 9 });
     expect(divineFontInfo(10, "Wizard")).toBeNull();
+  });
+
+  it("splits prepared font copies from ordinary slots and validates the split", () => {
+    const { draft, context } = buildCleric();
+    const abadar = context.deity!;
+    const bless = spells.find((entry) => entry.name === "Bless")!;
+    const heal = spells.find((entry) => entry.name === "Heal")!;
+    const harm = spells.find((entry) => entry.name === "Harm")!;
+    const spellMap = { [bless.id]: bless, [heal.id]: heal, [harm.id]: harm };
+    context.spells[heal.id] = heal;
+    context.spells[harm.id] = harm;
+
+    const splitAt = (
+      prepared: string[],
+      fontRank: number | null = 1,
+      fontSlots = 4,
+      rank = 1,
+      deity = abadar
+    ) =>
+      preparedSlotSplits(prepared, spellMap, deity, fontRank, fontSlots).get(rank) ?? {
+        total: 0,
+        font: 0,
+      };
+
+    expect(splitAt([bless.id, bless.id, bless.id])).toEqual({ total: 3, font: 0 });
+    expect(splitAt([bless.id, bless.id, heal.id, heal.id, heal.id, heal.id])).toEqual({
+      total: 6,
+      font: 4,
+    });
+    // A fifth Heal spills into an ordinary slot.
+    expect(splitAt([bless.id, heal.id, heal.id, heal.id, heal.id, heal.id])).toEqual({
+      total: 6,
+      font: 4,
+    });
+    expect(splitAt([bless.id, bless.id, ...Array(5).fill(heal.id)])).toEqual({
+      total: 7,
+      font: 4,
+    });
+    expect(splitAt([harm.id, harm.id, harm.id, heal.id, heal.id, heal.id])).toEqual({
+      total: 6,
+      font: 4,
+    });
+    // A heal-only deity does not let Harm fill font slots.
+    expect(
+      splitAt([harm.id, harm.id, harm.id, heal.id, heal.id, heal.id], 1, 4, 1, {
+        ...abadar,
+        font: ["heal"],
+      })
+    ).toEqual({ total: 6, font: 3 });
+    // Font rank moves with level; rank-1 Heals no longer fill font slots.
+    expect(splitAt([bless.id, bless.id, bless.id, heal.id, heal.id, heal.id], 3, 5, 1)).toEqual({
+      total: 6,
+      font: 0,
+    });
+
+    const spellErrors = (prepared: string[]) => {
+      draft.spells.prepared = prepared;
+      return computeCharacter(draft, context).validation.filter(
+        (issue) => issue.step === "spells" && issue.severity === "error"
+      );
+    };
+
+    expect(spellErrors([bless.id, bless.id])).toEqual([]);
+    expect(
+      spellErrors([bless.id, bless.id, bless.id]).some((issue) =>
+        issue.message.includes("3 rank 1 spells prepared in ordinary slots")
+      )
+    ).toBe(true);
+    expect(spellErrors([bless.id, bless.id, heal.id, heal.id, heal.id, heal.id])).toEqual([]);
+    expect(
+      spellErrors([bless.id, bless.id, bless.id, heal.id, heal.id, heal.id]).some((issue) =>
+        issue.message.includes("3 rank 1 spells prepared in ordinary slots")
+      )
+    ).toBe(true);
+    expect(
+      spellErrors([bless.id, bless.id, bless.id, heal.id, heal.id, heal.id, heal.id]).some(
+        (issue) => issue.message.includes("7 rank 1 spells prepared but only 6 slots")
+      )
+    ).toBe(true);
   });
 
   it("treats a deity's favored weapon as proficient", () => {

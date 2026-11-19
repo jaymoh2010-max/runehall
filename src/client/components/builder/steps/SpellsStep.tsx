@@ -69,8 +69,11 @@ import {
   featSlotsFor,
   flexibleBoosts,
   grantedTrainedSkills,
+  isFontSpell,
   isPreparedCasterClass,
   normalizeCharacterDraft,
+  ordinarySpellSlotsFor,
+  preparedSlotSplits,
   requiredExtraSkills,
   selectedChoiceOptions,
   selectedDeitySkill,
@@ -133,6 +136,17 @@ export function SpellsStep({ draft, update, derived, context, setStep, openPicke
   const focus = draft.spells.focus
     .map((id) => context.spells[id])
     .filter((spell): spell is Spell => Boolean(spell));
+  const grantedSpellIds = new Set(derived.grantedSpells.map((spell) => spell.id));
+  const grantedFocus = derived.grantedSpells.filter((spell) => spell.kind === "focus");
+  const grantedFocusIds = new Set(grantedFocus.map((spell) => spell.id));
+  const manualFocus = focus.filter((spell) => !grantedFocusIds.has(spell.id));
+  const grantedNonFocus = derived.grantedSpells.filter((spell) => spell.kind !== "focus");
+  const grantedNonFocusIds = new Set(grantedNonFocus.map((spell) => spell.id));
+  const grantedCantrips = grantedNonFocus
+    .filter((spell) => spell.rank === 0)
+    .map((spell) => context.spells[spell.id])
+    .filter((spell): spell is Spell => Boolean(spell));
+  const baseCantripCount = cantrips.filter((spell) => !grantedSpellIds.has(spell.id)).length;
   const slots = derived.spellSlots;
   const fontSlots = derived.divineFontSlots;
   const fontRank = derived.divineFontRank;
@@ -143,18 +157,28 @@ export function SpellsStep({ draft, update, derived, context, setStep, openPicke
   const traditionMissing = Boolean(caster.traditionOptions) && !tradition;
   const preparedCounts = new Map<string, number>();
   for (const id of draft.spells.prepared) preparedCounts.set(id, (preparedCounts.get(id) ?? 0) + 1);
-  const preparedByRank = new Map<number, number>();
-  for (const id of draft.spells.prepared) {
-    const spell = context.spells[id];
-    if (!spell) continue;
-    preparedByRank.set(spell.rank, (preparedByRank.get(spell.rank) ?? 0) + 1);
-  }
+  const ordinarySlots = ordinarySpellSlotsFor(draft.level, caster.progression, classData?.name);
+  const preparedSplits = preparedSlotSplits(
+    draft.spells.prepared,
+    context.spells,
+    context.deity,
+    fontRank,
+    fontSlots ?? 0
+  );
+  const fontLabel = (context.deity?.font?.length ? context.deity.font : ["heal", "harm"])
+    .map(titleCase)
+    .join(" or ");
   const issues = derived.validation.filter((issue) => issue.step === "spells");
   const knownByRank = new Map<number, Spell[]>();
-  for (const spell of known) {
+  const addRanked = (spell: Spell) => {
     const list = knownByRank.get(spell.rank) ?? [];
-    list.push(spell);
+    if (!list.some((entry) => entry.id === spell.id)) list.push(spell);
     knownByRank.set(spell.rank, list);
+  };
+  for (const spell of known) addRanked(spell);
+  for (const spell of grantedNonFocus) {
+    const resolved = context.spells[spell.id];
+    if (resolved) addRanked(resolved);
   }
   const addSpell = (spell: Spell, target: "cantrips" | "known" | "focus") =>
     update((current) => {
@@ -356,7 +380,7 @@ export function SpellsStep({ draft, update, derived, context, setStep, openPicke
                         ))}
                       </div>
                       <span className="tiny muted">
-                        {fontSlots - fontUsed} of {fontSlots} left · heal or harm
+                        {fontSlots - fontUsed} of {fontSlots} left · {fontLabel}
                       </span>
                     </div>
                   ) : null}
@@ -415,7 +439,7 @@ export function SpellsStep({ draft, update, derived, context, setStep, openPicke
               <div>
                 <h3>Cantrips</h3>
                 <p className="muted small">
-                  {cantrips.length}
+                  {baseCantripCount}
                   {cantripCap !== null ? ` / ${cantripCap}` : ""} chosen · rank 0
                 </p>
               </div>
@@ -423,7 +447,7 @@ export function SpellsStep({ draft, update, derived, context, setStep, openPicke
                 size="sm"
                 icon={<Plus size={14} />}
                 disabled={
-                  traditionMissing || (cantripCap !== null && cantrips.length >= cantripCap)
+                  traditionMissing || (cantripCap !== null && baseCantripCount >= cantripCap)
                 }
                 onClick={() => openPicker({ kind: "spell", rank: 0, target: "cantrips" })}
               >
@@ -447,15 +471,36 @@ export function SpellsStep({ draft, update, derived, context, setStep, openPicke
                   </button>
                 </div>
               ))}
-              {!cantrips.length ? <p className="muted small">No cantrips selected yet.</p> : null}
+              {grantedCantrips
+                .filter((spell) => !draft.spells.cantrips.includes(spell.id))
+                .map((spell) => (
+                  <div key={`granted-${spell.id}`} className="spell-chip">
+                    <span>
+                      <strong>{spell.name}</strong>
+                      <span className="tiny muted"> · granted cantrip</span>
+                    </span>
+                    <Tag tone="gold">Granted</Tag>
+                  </div>
+                ))}
+              {!cantrips.length && !grantedCantrips.length ? (
+                <p className="muted small">No cantrips selected yet.</p>
+              ) : null}
             </div>
           </Card>
 
           {Array.from({ length: derived.maxSpellRank }).map((_, index) => {
             const rank = index + 1;
             const spells = knownByRank.get(rank) ?? [];
+            const chosenSpells = spells.filter((spell) => !grantedNonFocusIds.has(spell.id));
+            const grantedForRank = spells.length - chosenSpells.length;
             const rankSlots = slots?.[rank - 1] ?? 0;
-            const preparedForRank = preparedByRank.get(rank) ?? 0;
+            const split = preparedSplits.get(rank) ?? { total: 0, font: 0 };
+            const preparedForRank = split.total;
+            const fontPrepared = split.font;
+            const ordinaryPrepared = preparedForRank - fontPrepared;
+            const fontSlotsForRank = fontRank === rank ? (fontSlots ?? 0) : 0;
+            const ordinaryRankSlots =
+              ordinarySlots?.[rank - 1] ?? Math.max(0, rankSlots - fontSlotsForRank);
             return (
               <Card key={rank} className="spell-section">
                 <div className="row-between">
@@ -464,11 +509,14 @@ export function SpellsStep({ draft, update, derived, context, setStep, openPicke
                       Rank {rank} {isPreparedCaster ? "spellbook" : "repertoire"}
                     </h3>
                     <p className="muted small">
-                      {spells.length}
+                      {chosenSpells.length}
                       {repertoire ? ` / ${repertoire.ranks[rank - 1] ?? 0}` : ""}{" "}
                       {isPreparedCaster ? "in spellbook" : "known"}
+                      {grantedForRank ? ` + ${grantedForRank} granted` : ""}
                       {isPreparedCaster
-                        ? ` · ${preparedForRank} / ${rankSlots} prepared${fontRank === rank ? " (includes font)" : ""}`
+                        ? fontSlotsForRank
+                          ? ` · ${ordinaryPrepared} / ${ordinaryRankSlots} ordinary · ${fontPrepared} / ${fontSlotsForRank} font (${preparedForRank} total)`
+                          : ` · ${preparedForRank} / ${rankSlots} prepared`
                         : ""}
                     </p>
                   </div>
@@ -477,7 +525,9 @@ export function SpellsStep({ draft, update, derived, context, setStep, openPicke
                     icon={<Plus size={14} />}
                     disabled={
                       traditionMissing ||
-                      Boolean(repertoire && spells.length >= (repertoire.ranks[rank - 1] ?? 0))
+                      Boolean(
+                        repertoire && chosenSpells.length >= (repertoire.ranks[rank - 1] ?? 0)
+                      )
                     }
                     onClick={() => openPicker({ kind: "spell", rank, target: "known" })}
                   >
@@ -485,68 +535,80 @@ export function SpellsStep({ draft, update, derived, context, setStep, openPicke
                   </Button>
                 </div>
                 <div className="spell-list-compact">
-                  {spells.map((spell) => (
-                    <div key={spell.id} className="spell-row">
-                      <div className="grow">
-                        <strong>{spell.name}</strong>
-                        <span className="tiny muted">
-                          {" "}
-                          · {spell.actions || "—"} · {spell.range || "range —"}
-                          {spell.defense?.save ? ` · ${spell.defense.save}` : ""}
-                        </span>
-                        {spell.damageText ? (
-                          <span className="tiny gold-text"> · {spell.damageText}</span>
-                        ) : null}
-                      </div>
-                      {isPreparedCaster ? (
-                        <div
-                          className="prepared-stepper"
-                          title={`${preparedCounts.get(spell.id) ?? 0} of ${rankSlots} rank ${rank} slots prepared`}
-                        >
-                          <button
-                            type="button"
-                            onClick={() =>
-                              update((current) => {
-                                const prepared = [...current.spells.prepared];
-                                const index = prepared.lastIndexOf(spell.id);
-                                if (index >= 0) prepared.splice(index, 1);
-                                return { ...current, spells: { ...current.spells, prepared } };
-                              })
-                            }
-                            disabled={(preparedCounts.get(spell.id) ?? 0) === 0}
-                            aria-label={`Remove one prepared ${spell.name}`}
-                          >
-                            <Minus size={12} />
-                          </button>
-                          <span>{preparedCounts.get(spell.id) || 0}</span>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              update((current) => ({
-                                ...current,
-                                spells: {
-                                  ...current.spells,
-                                  prepared: [...current.spells.prepared, spell.id],
-                                },
-                              }))
-                            }
-                            disabled={preparedForRank >= rankSlots}
-                            aria-label={`Prepare another ${spell.name}`}
-                          >
-                            <Plus size={12} />
-                          </button>
+                  {spells.map((spell) => {
+                    const spellCount = preparedCounts.get(spell.id) ?? 0;
+                    const grantedSpell = grantedNonFocusIds.has(spell.id);
+                    const spellIsFont = fontRank === rank && isFontSpell(spell, context.deity);
+                    const canPrepare = spellIsFont
+                      ? fontPrepared < fontSlotsForRank || ordinaryPrepared < ordinaryRankSlots
+                      : ordinaryPrepared < ordinaryRankSlots;
+                    return (
+                      <div key={spell.id} className="spell-row">
+                        <div className="grow">
+                          <strong>{spell.name}</strong>
+                          {grantedSpell ? <Tag tone="gold">Granted</Tag> : null}
+                          {spellIsFont ? <Tag tone="gold">Font</Tag> : null}
+                          <span className="tiny muted">
+                            {" "}
+                            · {spell.actions || "—"} · {spell.range || "range —"}
+                            {spell.defense?.save ? ` · ${spell.defense.save}` : ""}
+                          </span>
+                          {spell.damageText ? (
+                            <span className="tiny gold-text"> · {spell.damageText}</span>
+                          ) : null}
                         </div>
-                      ) : null}
-                      <button
-                        type="button"
-                        className="icon-btn"
-                        aria-label={`Remove ${spell.name}`}
-                        onClick={() => removeSpell(spell.id, "known")}
-                      >
-                        <Minus size={13} />
-                      </button>
-                    </div>
-                  ))}
+                        {isPreparedCaster ? (
+                          <div
+                            className="prepared-stepper"
+                            title={`${spellCount} prepared · rank ${rank}: ${ordinaryPrepared}/${ordinaryRankSlots} ordinary${fontSlotsForRank ? `, ${fontPrepared}/${fontSlotsForRank} font` : ""}`}
+                          >
+                            <button
+                              type="button"
+                              onClick={() =>
+                                update((current) => {
+                                  const prepared = [...current.spells.prepared];
+                                  const index = prepared.lastIndexOf(spell.id);
+                                  if (index >= 0) prepared.splice(index, 1);
+                                  return { ...current, spells: { ...current.spells, prepared } };
+                                })
+                              }
+                              disabled={spellCount === 0}
+                              aria-label={`Remove one prepared ${spell.name}`}
+                            >
+                              <Minus size={12} />
+                            </button>
+                            <span>{spellCount}</span>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                update((current) => ({
+                                  ...current,
+                                  spells: {
+                                    ...current.spells,
+                                    prepared: [...current.spells.prepared, spell.id],
+                                  },
+                                }))
+                              }
+                              disabled={!canPrepare}
+                              aria-label={`Prepare another ${spell.name}`}
+                            >
+                              <Plus size={12} />
+                            </button>
+                          </div>
+                        ) : null}
+                        {grantedSpell ? null : (
+                          <button
+                            type="button"
+                            className="icon-btn"
+                            aria-label={`Remove ${spell.name} from spellbook`}
+                            onClick={() => removeSpell(spell.id, "known")}
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
                   {!spells.length ? (
                     <p className="muted small">No rank {rank} spells selected.</p>
                   ) : null}
@@ -575,7 +637,7 @@ export function SpellsStep({ draft, update, derived, context, setStep, openPicke
           </Button>
         </div>
         <div className="spell-chip-grid">
-          {focus.map((spell) => (
+          {manualFocus.map((spell) => (
             <div key={spell.id} className="spell-chip">
               <span>
                 <strong>{spell.name}</strong>
@@ -590,16 +652,31 @@ export function SpellsStep({ draft, update, derived, context, setStep, openPicke
               </button>
             </div>
           ))}
-          {!focus.length ? <p className="muted small">No focus spells selected.</p> : null}
+          {grantedFocus.map((spell) => (
+            <div key={`granted-${spell.id}`} className="spell-chip">
+              <span>
+                <strong>{spell.name}</strong>
+                <span className="tiny muted">
+                  {" "}
+                  · granted{spell.rank ? ` · rank ${spell.rank}` : ""}
+                </span>
+              </span>
+              <Tag tone="gold">Granted</Tag>
+            </div>
+          ))}
+          {!manualFocus.length && !grantedFocus.length ? (
+            <p className="muted small">No focus spells selected.</p>
+          ) : null}
         </div>
       </Card>
       <div className="info-box">
         <BookOpen size={16} />
         <p>
-          Prepared casters can prepare up to their available slots for each rank; the Prepare button
-          stops when that rank is full. Spontaneous repertoire limits are checked for bards,
-          oracles, sorcerers, and summoners. Divine font pips are tracked separately, but the
-          prepared counter includes them. Slot pips are a table aid and reset between sessions.
+          Prepared casters can prepare up to their ordinary slots for each rank; the Prepare button
+          stops when that pool is full. Cleric divine font is counted separately, and Heal/Harm
+          copies fill font slots first before spilling into ordinary slots. Each duplicate uses a
+          slot. Spontaneous repertoire limits are checked for bards, oracles, sorcerers, and
+          summoners. Slot pips are a table aid and reset between sessions.
         </p>
       </div>
       <ValidationNote issues={issues} />

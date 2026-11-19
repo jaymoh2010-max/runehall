@@ -1068,7 +1068,10 @@ export function CharacterSheetPage() {
                               ))}
                             </div>
                             <span className="tiny muted">
-                              {fontSlots - fontUsed} / {fontSlots} · heal or harm
+                              {fontSlots - fontUsed} / {fontSlots} ·{" "}
+                              {(context.deity?.font?.length ? context.deity.font : ["heal", "harm"])
+                                .map(titleCase)
+                                .join(" or ")}
                             </span>
                           </div>
                         ) : null}
@@ -1102,6 +1105,7 @@ export function CharacterSheetPage() {
                 context={context}
                 onRoll={roll}
                 spellAttack={derived.spellAttack}
+                grantedSpells={derived.grantedSpells}
               />
             </Card>
           ) : null}
@@ -2170,15 +2174,44 @@ function SpellGroups({
   context,
   onRoll,
   spellAttack,
+  grantedSpells,
 }: {
   draft: CharacterDraft;
   context: CharacterContext;
   onRoll: (formula: string, label: string, dc?: number | null) => void;
   spellAttack: number | null;
+  grantedSpells: DerivedCharacter["grantedSpells"];
 }) {
-  const known = draft.spells.known.map((id) => context.spells[id]).filter(Boolean);
-  const cantrips = draft.spells.cantrips.map((id) => context.spells[id]).filter(Boolean);
-  const focus = draft.spells.focus.map((id) => context.spells[id]).filter(Boolean);
+  const unique = (spells: NonNullable<CharacterContext["spells"][string]>[]) => {
+    const seen = new Set<string>();
+    return spells.filter((spell) => {
+      if (seen.has(spell.id)) return false;
+      seen.add(spell.id);
+      return true;
+    });
+  };
+  const grantedKind = new Map(grantedSpells.map((spell) => [spell.id, spell.kind]));
+  const granted = grantedSpells
+    .map((spell) => context.spells[spell.id])
+    .filter((spell): spell is NonNullable<typeof spell> => Boolean(spell));
+  const known = unique([
+    ...draft.spells.known
+      .map((id) => context.spells[id])
+      .filter((spell): spell is NonNullable<typeof spell> => Boolean(spell)),
+    ...granted.filter((spell) => spell.rank > 0 && grantedKind.get(spell.id) !== "focus"),
+  ]);
+  const cantrips = unique([
+    ...draft.spells.cantrips
+      .map((id) => context.spells[id])
+      .filter((spell): spell is NonNullable<typeof spell> => Boolean(spell)),
+    ...granted.filter((spell) => spell.rank === 0 && grantedKind.get(spell.id) !== "focus"),
+  ]);
+  const focus = unique([
+    ...draft.spells.focus
+      .map((id) => context.spells[id])
+      .filter((spell): spell is NonNullable<typeof spell> => Boolean(spell)),
+    ...granted.filter((spell) => grantedKind.get(spell.id) === "focus"),
+  ]);
   const prepared = new Map<string, number>();
   for (const id of draft.spells.prepared) prepared.set(id, (prepared.get(id) ?? 0) + 1);
   const preparedCaster = isPreparedCasterClass(context.classData?.name);

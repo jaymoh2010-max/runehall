@@ -118,6 +118,35 @@ import { CLASS_GRANTS } from "../../../../shared/classGrants";
 import type { BuilderProps } from "../shared";
 import { StepHeading, ValidationNote, SearchInput, MiniFeatureList } from "../shared";
 
+function grantSummary(
+  grant:
+    | {
+        feats?: { name: string }[];
+        spells?: { name: string; kind: string }[];
+      }
+    | undefined
+): string {
+  if (!grant) return "";
+  const parts = (grant.feats ?? []).map((feat) => feat.name);
+  const byKind = new Map<string, string[]>();
+  for (const spell of grant.spells ?? []) {
+    const list = byKind.get(spell.kind) ?? [];
+    list.push(spell.name);
+    byKind.set(spell.kind, list);
+  }
+  const labels: Record<string, string> = {
+    focus: "focus",
+    repertoire: "gift",
+    curriculum: "curriculum",
+  };
+  for (const [kind, names] of byKind) {
+    parts.push(
+      names.length <= 2 ? names.join(" / ") : `${names.length} ${labels[kind] ?? kind} spells`
+    );
+  }
+  return parts.join(" · ");
+}
+
 export function ClassStep({
   draft,
   update,
@@ -344,7 +373,12 @@ export function ClassStep({
             ) : null}
             {groups.map((group) => {
               const picks = draft.classChoices[group.key] ?? [];
-              const optionList = group.options.filter((option) => option.level <= draft.level);
+              const optionList = group.options.filter((option) => {
+                if (option.level > draft.level) return false;
+                if (expanded || picks.includes(option.id)) return true;
+                if (!legacy && !option.remaster) return false;
+                return isCoreSource(option.source);
+              });
               return (
                 <Card key={group.key} className="choice-group">
                   <div className="choice-group-head">
@@ -394,14 +428,7 @@ export function ClassStep({
                           </span>
                           <span className="tiny muted">{option.source}</span>
                           {grant?.feats?.length || grant?.spells?.length ? (
-                            <span className="tiny gold-text">
-                              {[
-                                ...(grant.feats ?? []).map((feat) => feat.name),
-                                ...(grant.spells ?? []).map(
-                                  (spell) => `${spell.name} (${spell.kind})`
-                                ),
-                              ].join(" · ")}
-                            </span>
+                            <span className="tiny gold-text">{grantSummary(grant)}</span>
                           ) : null}
                           {grant?.notes?.[0] ? (
                             <span className="tiny muted">{grant.notes[0]}</span>
