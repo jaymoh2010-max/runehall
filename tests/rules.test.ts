@@ -199,6 +199,16 @@ describe("PF2e character rules", () => {
     expect(draft.details.notes).toBe("Hello");
   });
 
+  it("normalizes free class grant choices safely", () => {
+    expect(emptyCharacterDraft("Defaults").grantChoices).toEqual({});
+    const draft = normalizeCharacterDraft({
+      name: "Chooser",
+      grantChoices: { "grant:sorcerer-element": ["fire", 7], "grant:cleric-domain": "bad" },
+    });
+    expect(draft.grantChoices["grant:sorcerer-element"]).toEqual(["fire"]);
+    expect(draft.grantChoices["grant:cleric-domain"]).toEqual([]);
+  });
+
   it("normalizes character condition values and durations", () => {
     const draft = normalizeCharacterDraft(
       {

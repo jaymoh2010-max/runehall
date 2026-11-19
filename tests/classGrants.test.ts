@@ -195,11 +195,14 @@ describe("class-choice grants", () => {
     }
   });
 
-  it("leaves Elemental's level-1 gifts manual", () => {
+  it("keeps Elemental's fixed focus spell while the element remains unchosen", () => {
     const draft = draftFor(sorcerer);
     chooseOption(draft, sorcerer, "cf:RXRnJcG4XSabZ35a");
     const grants = selectedClassGrants(draft, sorcerer);
     expect(grants.spells.filter((spell) => spell.kind === "repertoire")).toEqual([]);
+    expect(grants.spells).toEqual(
+      expect.arrayContaining([expect.objectContaining({ name: "Elemental Toss", kind: "focus" })])
+    );
     expect(grants.notes.join(" ")).toMatch(/Elemental.*element/i);
   });
 
@@ -348,7 +351,7 @@ describe("class-choice grants", () => {
     }
   });
 
-  it("keeps Runelord sins and Unified Magical Theory choices manual", () => {
+  it("keeps Runelord's common curriculum until a sin is chosen", () => {
     const runelord = draftFor(wizard);
     chooseOption(runelord, wizard, "cf:HYTaibaCGE85rhbZ");
     const runelordGrants = selectedClassGrants(runelord, wizard);

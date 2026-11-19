@@ -50,6 +50,7 @@ import {
   heritageSkillChoice,
 } from "./heritage";
 import { selectedClassGrants } from "./classGrants";
+import { activeGrantChoiceGroups } from "./classGrantChoices";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -561,6 +562,7 @@ export function emptyCharacterDraft(name = "New Hero"): CharacterDraft {
       extras: [],
     },
     classChoices: {},
+    grantChoices: {},
     featChoices: {},
     spells: {
       tradition: null,
@@ -643,6 +645,10 @@ export function normalizeCharacterDraft(input: unknown, fallbackName = "New Hero
   const classChoices: Record<string, string[]> = {};
   for (const [key, value] of Object.entries(choicesRaw))
     classChoices[key] = arr<string>(value).filter((x) => typeof x === "string");
+  const grantChoicesRaw = obj(raw.grantChoices);
+  const grantChoices: Record<string, string[]> = {};
+  for (const [key, value] of Object.entries(grantChoicesRaw))
+    grantChoices[key] = arr<string>(value).filter((x) => typeof x === "string");
   const featChoicesRaw = obj(raw.featChoices);
   const featChoices: Record<string, string[]> = {};
   for (const [key, value] of Object.entries(featChoicesRaw))
@@ -722,6 +728,7 @@ export function normalizeCharacterDraft(input: unknown, fallbackName = "New Hero
       extras: arr<string>(feats.extras).filter((x) => typeof x === "string"),
     },
     classChoices,
+    grantChoices,
     featChoices,
     spells: {
       tradition: TRADITIONS.includes(spells.tradition as SpellTradition)
@@ -853,7 +860,20 @@ export function applicableChoiceGroups(
   classData: ClassData | null | undefined
 ): ClassChoiceGroup[] {
   if (!classData) return [];
-  return classData.choiceGroups.filter((group) => (group.sourceFeature?.level ?? 0) <= draft.level);
+  const suppressed = new Set<string>();
+  for (const group of classData.choiceGroups) {
+    for (const id of draft.classChoices[group.key] ?? []) {
+      const option = group.options.find((entry) => entry.id === id);
+      for (const uuid of option?.suppressedFeatures ?? []) {
+        suppressed.add(parseClassFeatureUuidName(uuid).toLowerCase());
+      }
+    }
+  }
+  return classData.choiceGroups.filter(
+    (group) =>
+      (group.sourceFeature?.level ?? 0) <= draft.level &&
+      !(group.sourceFeature?.name && suppressed.has(group.sourceFeature.name.toLowerCase()))
+  );
 }
 
 export function deitySkillOptions(deity: Deity | null | undefined): SkillId[] {
@@ -1812,7 +1832,7 @@ export function computeCharacter(
   const ancestry = context.ancestry ?? null;
   const classData = context.classData ?? null;
   const background = context.background ?? null;
-  const classGrants = selectedClassGrants(draft, classData);
+  const classGrants = selectedClassGrants(draft, classData, context.deity);
   const abilities = baseAbilityScores(draft, context);
   // Validate the 1st-level allocation independently of later milestones.
   const rawAbilities = baseAbilityScores({ ...draft, level: 1 }, context, false);
@@ -2699,6 +2719,27 @@ export function computeCharacter(
       }
       if (new Set(selected).size !== selected.length) {
         issue("error", `${group.prompt} Choose different options.`, "class");
+      }
+    }
+    for (const group of activeGrantChoiceGroups(
+      draft,
+      classData,
+      context.deity,
+      classGrants.feats.map((feat) => feat.id)
+    )) {
+      const picks = [...new Set(draft.grantChoices[group.key] ?? [])];
+      if (picks.length !== group.count) {
+        issue(
+          "error",
+          `${group.prompt} Choose ${group.count} option${group.count === 1 ? "" : "s"}.`,
+          "class"
+        );
+      } else if (!picks.every((id) => group.options.some((option) => option.id === id))) {
+        issue(
+          "error",
+          `${group.prompt} That saved choice is no longer available; choose again.`,
+          "class"
+        );
       }
     }
   }

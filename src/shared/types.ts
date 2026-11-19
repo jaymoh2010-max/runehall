@@ -662,6 +662,12 @@ export interface CharacterDraft {
     extras: string[];
   };
   classChoices: Record<string, string[]>;
+  /**
+   * Free sub-choices attached to a class option or class-granted feat, keyed
+   * by the registry group key (for example a Cleric domain, Champion devotion
+   * spell, Elemental Sorcerer element, or Runelord sin).
+   */
+  grantChoices: Record<string, string[]>;
   /** Per-feat option picks for choice-driven feats, keyed by feat id. */
   featChoices: Record<string, string[]>;
   spells: {

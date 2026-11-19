@@ -27,6 +27,7 @@ const versatileHuman = byName(read<Heritage>("heritages.json"), "Versatile Human
 const warrior = byName(read<Background>("backgrounds.json"), "Warrior");
 const fighter = byName(read<ClassData>("classes.json"), "Fighter");
 const cleric = byName(read<ClassData>("classes.json"), "Cleric");
+const champion = byName(read<ClassData>("classes.json"), "Champion");
 const scholar = byName(read<Background>("backgrounds.json"), "Scholar");
 const feats = read<Feat>("feats.json");
 const equipment = read<Equipment>("equipment.json");
@@ -156,6 +157,21 @@ describe("Pathbuilder import", () => {
     expect(draft.skills.background).toContain("arcana");
     expect(draft.skills.lore).toContain("Academia Lore");
     expect(draft.backgroundId).toBe(scholar.id);
+  });
+
+  it("prefers an exact Champion cause over feat-name substrings", () => {
+    const { draft } = importPathbuilder({
+      ...build,
+      class: "Champion",
+      level: 1,
+      deity: "Iomedae",
+      keyability: "cha",
+      specials: ["Justice"],
+      feats: [["Yamaraj's Grandeur", null, "Ancestry Feat", 17]],
+    });
+    const cause = champion.choiceGroups.find((group) => group.tag === "champion-cause");
+    expect(cause).toBeDefined();
+    expect(draft.classChoices[cause!.key]).toEqual(["cf:peEXunfbSD8WcMFk"]);
   });
 
   it("reports names that cannot be matched instead of guessing", () => {

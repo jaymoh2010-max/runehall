@@ -4,7 +4,9 @@ import type {
   ClassGrant,
   ClassGrantFeat,
   ClassGrantSpell,
+  Deity,
 } from "./types";
+import { activeGrantChoiceGroups } from "./classGrantChoices";
 
 export type { ClassGrant, ClassGrantFeat, ClassGrantSpell, ClassGrantSpellKind } from "./types";
 
@@ -122,7 +124,7 @@ export const CLASS_GRANTS: Record<string, ClassGrant> = {
       curriculum("spell:Gb7SeieEvd0pL2Eh", "Sure Strike"),
     ],
     notes: [
-      "Runelord: choose your sin (and its focus spell), personal rune, and arcane bond; sin curriculum and polearm/spear training remain manual.",
+      "Runelord: the chosen sin grants its focus spell and rank-0/rank-1 sin curriculum. Personal rune, arcane bond, polearm/spear training, higher-rank sin curriculum, and Runelord Dedication remain manual.",
     ],
   },
   "cf:wObrT6PytPdS5aUi": {
@@ -361,7 +363,7 @@ export const CLASS_GRANTS: Record<string, ClassGrant> = {
   "cf:RXRnJcG4XSabZ35a": {
     spells: [focus("spell:0JUOgbbFCapp3HlW", "Elemental Toss")],
     notes: [
-      "Elemental: choose your element and add its granted cantrip and 1st-rank gift manually (air, earth, fire, metal, water, or wood).",
+      "Elemental: choose air, earth, fire, metal, water, or wood. The chosen element grants its cantrip and 1st-rank gift; blood magic damage and higher-rank gifts remain manual.",
     ],
   },
   "cf:eW3cfCH7Wpx2vik2": {
@@ -449,7 +451,7 @@ export const CLASS_GRANTS: Record<string, ClassGrant> = {
   "cf:ZZzLMOUAtBVgV1DF": {
     feats: [feat("feat:hT4INKGtly4QY8KN", "Domain Initiate")],
     focusPoints: 1,
-    notes: ["Choose a deity domain and its initial domain spell on the Spells step."],
+    notes: ["Choose one of your deity's domains on the Class step; its initial spell is granted."],
   },
   "cf:0Aocw3igLwna9cjp": {
     feats: [feat("feat:jM72TjJ965jocBV8", "Shield Block")],
@@ -466,13 +468,13 @@ export const CLASS_GRANTS: Record<string, ClassGrant> = {
 
 const CLASS_NOTES: Record<string, string[]> = {
   champion: [
-    "Choose Lay on Hands, Touch of the Void, or Shields of the Spirit as your devotion spell; deity font decides which are legal.",
+    "The devotion spell choice is filtered by your deity's divine font; Lay on Hands requires heal, Touch of the Void requires harm, and Shields of the Spirit is always legal. Cause sanctification, blessings, and higher-level focus spells remain manual.",
   ],
   wizard: [
-    "Rank-0 and rank-1 school curriculum spells are granted automatically; higher-rank curriculum, Runelord sin spells, and Rooted Wisdom branch spells remain manual.",
+    "Rank-0 and rank-1 school curriculum spells are granted automatically, including the chosen Runelord sin's focus spell and rank-0/rank-1 sin curriculum. Higher-rank curriculum, Rooted Wisdom branch spells, personal runes, and arcane bonds remain manual.",
   ],
   sorcerer: [
-    "The fixed bloodline cantrip and 1st-rank gift are granted automatically; Elemental's variable gifts and higher-rank bloodline gifts remain manual.",
+    "The fixed bloodline cantrip and 1st-rank gift are granted automatically; Elemental's chosen element grants its cantrip and 1st-rank gift. Higher-rank and advanced bloodline gifts remain manual.",
   ],
   cleric: [
     "Divine font slots are heal-or-harm only and are tracked separately from ordinary slots.",
@@ -485,7 +487,8 @@ function spellKey(spell: ClassGrantSpell): string {
 
 export function selectedClassGrants(
   draft: CharacterDraft,
-  classData: ClassData | null | undefined
+  classData: ClassData | null | undefined,
+  deity?: Deity | null
 ): SelectedClassGrants {
   const result: SelectedClassGrants = { feats: [], spells: [], focusPoints: 0, notes: [] };
   if (!classData) return result;
@@ -499,13 +502,21 @@ export function selectedClassGrants(
       result.feats.push(item);
     }
     for (const item of grant.spells ?? []) {
-      const key = spellKey(item);
-      if (item.rank > Math.ceil(draft.level / 2) || spellKeys.has(key)) continue;
-      // A spell granted as focus stays focus even if another table entry lists
-      // it as a repertoire/curriculum option.
-      if (result.spells.some((spell) => spell.id === item.id && spell.kind === "focus")) {
+      if (item.rank > Math.ceil(draft.level / 2)) continue;
+      if (item.kind === "focus") {
+        // Focus wins over an earlier repertoire/curriculum grant of the same spell.
+        const duplicate = result.spells.findIndex(
+          (spell) => spell.id === item.id && spell.kind !== "focus"
+        );
+        if (duplicate >= 0) {
+          const [removed] = result.spells.splice(duplicate, 1);
+          spellKeys.delete(spellKey(removed));
+        }
+      } else if (result.spells.some((spell) => spell.id === item.id && spell.kind === "focus")) {
         continue;
       }
+      const key = spellKey(item);
+      if (spellKeys.has(key)) continue;
       spellKeys.add(key);
       result.spells.push(item);
     }
@@ -522,6 +533,21 @@ export function selectedClassGrants(
       if (option && option.level <= draft.level) addGrant(CLASS_GRANTS[option.id]);
     }
   }
+
+  for (const group of activeGrantChoiceGroups(
+    draft,
+    classData,
+    deity,
+    result.feats.map((feat) => feat.id)
+  )) {
+    addGrant(group.baseGrant);
+    const picks = [...new Set(draft.grantChoices[group.key] ?? [])].slice(0, group.count);
+    for (const pick of picks) {
+      const option = group.options.find((entry) => entry.id === pick);
+      if (option) addGrant(option.grant);
+    }
+  }
+
   for (const note of CLASS_NOTES[classData.name.toLowerCase()] ?? []) {
     if (!result.notes.includes(note)) result.notes.push(note);
   }
@@ -530,14 +556,16 @@ export function selectedClassGrants(
 
 export function selectedClassGrantFeatIds(
   draft: CharacterDraft,
-  classData: ClassData | null | undefined
+  classData: ClassData | null | undefined,
+  deity?: Deity | null
 ): Set<string> {
-  return new Set(selectedClassGrants(draft, classData).feats.map((feat) => feat.id));
+  return new Set(selectedClassGrants(draft, classData, deity).feats.map((feat) => feat.id));
 }
 
 export function selectedClassGrantSpells(
   draft: CharacterDraft,
-  classData: ClassData | null | undefined
+  classData: ClassData | null | undefined,
+  deity?: Deity | null
 ): ClassGrantSpell[] {
-  return selectedClassGrants(draft, classData).spells;
+  return selectedClassGrants(draft, classData, deity).spells;
 }

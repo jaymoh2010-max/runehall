@@ -482,7 +482,7 @@ export function contextForDraft(draft: CharacterDraft): CharacterContext {
   ) {
     featMap[heritageFeat.id] = heritageFeat;
   }
-  const classGrants = selectedClassGrants(draft, classData);
+  const classGrants = selectedClassGrants(draft, classData, deity);
   for (const granted of classGrants.feats) {
     const feat = maps.feat.get(granted.id);
     if (feat) featMap[feat.id] = feat;
