@@ -9,11 +9,15 @@
 import fs from "node:fs";
 import path from "node:path";
 import {
+  cantripLimitFor,
+  casterInfo,
   classKeyOptions,
   computeCharacter,
+  divineFontInfo,
   emptyCharacterDraft,
   flexibleBoosts,
   grantedTrainedSkills,
+  ordinarySpellSlotsFor,
 } from "../../src/shared/rules";
 import { featAllowedByHeritageGrant, heritageFeatGrant } from "../../src/shared/heritage";
 import { activeGrantChoiceGroups } from "../../src/shared/classGrantChoices";
@@ -165,6 +169,52 @@ export function buildSimulatedHero(options: SimulatedHeroOptions): CharacterDraf
     draft.grantChoices[group.key] = group.options.slice(0, group.count).map((option) => option.id);
   }
 
+  const caster = casterInfo(classData);
+  if (caster.progression !== "none" && caster.progression !== "focus") {
+    const tradition = caster.tradition ?? caster.traditionOptions?.[0] ?? null;
+    draft.spells.tradition = tradition;
+    const pool = spells.filter(
+      (spell) => spell.remaster && (!tradition || spell.traditions.includes(tradition))
+    );
+    const cantripLimit = cantripLimitFor(classData) ?? 0;
+    for (const spell of pool.filter((spell) => spell.rank === 0).slice(0, cantripLimit)) {
+      draft.spells.cantrips.push(spell.id);
+    }
+    const ordinary = ordinarySpellSlotsFor(1, caster.progression, classData.name) ?? [];
+    for (let rank = 1; rank <= ordinary.length; rank += 1) {
+      const count = ordinary[rank - 1] ?? 0;
+      if (!count) continue;
+      const exact = pool.filter((spell) => spell.rank === rank);
+      if (!exact.length) continue;
+      for (let index = 0; index < count; index += 1) {
+        const spell = exact[index % exact.length];
+        if (!draft.spells.known.includes(spell.id)) draft.spells.known.push(spell.id);
+        draft.spells.prepared.push(spell.id);
+        (draft.spells.preparedByRank[String(rank)] ??= []).push(spell.id);
+      }
+    }
+    if (classData.name.toLowerCase() === "cleric") {
+      const font = divineFontInfo(1, classData.name);
+      const fontNames = (deity?.font?.length ? deity.font : ["heal", "harm"]).map((name) =>
+        name.toLowerCase()
+      );
+      const fontSpell =
+        pool.find((spell) => fontNames.includes(spell.name.toLowerCase())) ??
+        pool.find((spell) => spell.name === "Heal") ??
+        pool.find((spell) => spell.name === "Harm");
+      if (font && fontSpell) {
+        if (!draft.spells.known.includes(fontSpell.id)) {
+          draft.spells.known.push(fontSpell.id);
+        }
+        const key = String(font.rank);
+        for (let index = 0; index < font.slots; index += 1) {
+          draft.spells.prepared.push(fontSpell.id);
+          (draft.spells.preparedByRank[key] ??= []).push(fontSpell.id);
+        }
+      }
+    }
+  }
+
   const granted = grantedTrainedSkills(draft, context);
   const additional = Math.max(
     0,
@@ -229,6 +279,8 @@ export function contextForDraft(draft: CharacterDraft): CharacterContext {
   const selectedSpellIds = new Set<string>([
     ...draft.spells.cantrips,
     ...draft.spells.known,
+    ...draft.spells.prepared,
+    ...Object.values(draft.spells.preparedByRank ?? {}).flat(),
     ...draft.spells.focus,
   ]);
   const selectedEquipmentIds = new Set(draft.equipment.map((entry) => entry.itemId));

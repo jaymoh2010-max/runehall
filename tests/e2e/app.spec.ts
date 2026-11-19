@@ -939,23 +939,26 @@ test("builder completes a level-1 Cleric with split divine-font preparation", as
   const rankOne = page
     .locator(".spell-section")
     .filter({ has: page.getByRole("heading", { name: "Rank 1 spellbook" }) });
-  await rankOne.getByRole("button", { name: "Add spell" }).click();
+  await rankOne.getByRole("button", { name: "Add rank 1 spell to spellbook" }).click();
   await pickSpell(page, "Bless");
-  await rankOne.getByRole("button", { name: "Add spell" }).click();
+  await rankOne.getByRole("button", { name: "Add rank 1 spell to spellbook" }).click();
   await pickSpell(page, "Heal");
 
-  const blessRow = rankOne.locator(".spell-row").filter({ hasText: "Bless" });
-  await blessRow.getByRole("button", { name: "Prepare another Bless" }).click();
-  await blessRow.getByRole("button", { name: "Prepare another Bless" }).click();
-  await expect(blessRow.getByRole("button", { name: "Prepare another Bless" })).toBeDisabled();
+  const blessRow = rankOne.getByRole("group", { name: "Bless spellbook row" });
+  await blessRow.getByRole("button", { name: "Prepare Bless at rank 1" }).click();
+  await blessRow.getByRole("button", { name: "Prepare Bless at rank 1" }).click();
+  await expect(blessRow.getByRole("button", { name: "Prepare Bless at rank 1" })).toBeDisabled();
 
-  const healRow = rankOne.locator(".spell-row").filter({ hasText: "Heal" });
-  await expect(healRow.getByText("Font", { exact: true })).toBeVisible();
+  const healRow = rankOne.getByRole("group", { name: "Heal spellbook row" });
   for (let index = 0; index < 4; index += 1) {
-    await healRow.getByRole("button", { name: "Prepare another Heal" }).click();
+    await healRow.getByRole("button", { name: "Prepare Heal at rank 1" }).click();
   }
-  await expect(healRow.getByRole("button", { name: "Prepare another Heal" })).toBeDisabled();
-  await expect(rankOne.getByText("2 / 2 ordinary · 4 / 4 font (6 total)")).toBeVisible();
+  const preparedRankOne = page.getByTestId("prepared-rank-1");
+  await expect(preparedRankOne.getByTestId("prepared-1-heal")).toContainText("Font");
+  await expect(preparedRankOne.getByTestId("prepared-1-heal")).toContainText("4");
+  await expect(page.getByTestId("rank-summary-1")).toContainText(
+    "2 / 2 ordinary · 4 / 4 font (6 total)"
+  );
   await expect(rankOne.getByText(/prepared \(includes font\)/)).toHaveCount(0);
 
   await goToStep(page, "Gear");
@@ -1087,14 +1090,15 @@ test("builder completes a level-1 Wizard using granted curriculum spells", async
   await expect(rankOne.getByText("Breathe Fire", { exact: true })).toBeVisible();
 
   // A granted curriculum spell cannot be added again from the picker.
-  await rankOne.getByRole("button", { name: "Add spell" }).click();
+  await rankOne.getByRole("button", { name: "Add rank 1 spell to spellbook" }).click();
   await page.getByPlaceholder(/Search spells/).fill("Force Barrage");
   await expect(page.locator(".picker-item-name", { hasText: /^Force Barrage$/ })).toHaveCount(0);
   await expect(page.getByText(/hidden because already granted or selected/)).toBeVisible();
   await page.keyboard.press("Escape");
 
-  await rankOne.getByRole("button", { name: "Prepare another Force Barrage" }).click();
-  await expect(rankOne.getByText(/1 \/ 3 prepared/)).toBeVisible();
+  const builderBarrageRow = rankOne.getByRole("group", { name: "Force Barrage spellbook row" });
+  await builderBarrageRow.getByRole("button", { name: "Prepare Force Barrage at rank 1" }).click();
+  await expect(page.getByTestId("rank-summary-1")).toContainText("1 / 3 prepared");
 
   await goToStep(page, "Gear");
   await page.getByRole("button", { name: /Take .* as coins/ }).click();
@@ -1268,4 +1272,179 @@ test("builder grants the chosen Elemental Sorcerer element", async ({ page }) =>
     .locator(".spell-section")
     .filter({ has: page.getByRole("heading", { name: "Rank 1 repertoire" }) });
   await expect(rankOne.getByText("Breathe Fire")).toBeVisible();
+});
+
+test("level-5 prepared upcasting moves Heal into the rank-3 font pool", async ({ page }) => {
+  test.setTimeout(60_000);
+  await signIn(page, admin);
+  await openNewCharacter(page, "E2E Prepared 5");
+
+  await goToStep(page, "Ancestry");
+  await page.locator(".ancestry-grid .selection-card").filter({ hasText: "Human" }).first().click();
+  await goToStep(page, "Heritage");
+  await page
+    .locator(".selection-grid .selection-card")
+    .filter({ hasText: "Skilled Human" })
+    .click();
+  await goToStep(page, "Background");
+  await page
+    .locator(".selection-grid .selection-card")
+    .filter({ hasText: "Acolyte" })
+    .first()
+    .click();
+  await goToStep(page, "Class");
+  await page
+    .locator(".class-grid")
+    .getByRole("button", { name: /Cleric/ })
+    .click();
+  await page.getByRole("button", { name: "Choose deity" }).click();
+  await page.getByPlaceholder(/Search deities/).fill("Abadar");
+  await page
+    .locator(".picker-item-name", { hasText: /^Abadar$/ })
+    .first()
+    .click();
+  await page.getByRole("button", { name: "Follow Abadar" }).click();
+  const classSave = page.waitForResponse(
+    (response) =>
+      response.request().method() === "PUT" && response.url().includes("/api/characters/")
+  );
+  await page
+    .locator(".choice-options")
+    .getByRole("button", { name: /Warpriest/ })
+    .click();
+  await classSave;
+
+  const characterId = page.url().split("/characters/")[1]?.split("/")[0];
+  expect(characterId).toBeTruthy();
+  const response = await page.request.get(`/api/characters/${characterId}`);
+  const payload = (await response.json()) as {
+    character: { revision: number; data: Record<string, unknown> };
+  };
+  const data = structuredClone(payload.character.data) as {
+    level: number;
+    spells: Record<string, unknown>;
+  };
+  const heal = "spell:rfZpqmj0AIIdkVIs";
+  const bless = "spell:XSujb7EsSwKl19Uu";
+  const heroism = "spell:KqvqNAfGIE5a9wSv";
+  const guidance = "spell:izcxFQFwf3woCnFs";
+  data.level = 5;
+  data.spells.known = [bless, heal, heroism];
+  data.spells.cantrips = [guidance];
+  data.spells.preparedByRank = {
+    "1": [bless, bless, heal],
+    "3": [heal, heal, heal, heal, heal, heroism, heroism],
+  };
+  data.spells.prepared = [bless, bless, heal, heal, heal, heal, heal, heal, heroism, heroism];
+  const save = await page.request.put(`/api/characters/${characterId}`, {
+    data: { data, expectedRevision: payload.character.revision },
+  });
+  expect(save.ok()).toBe(true);
+
+  await page.goto(`/characters/${characterId}/edit`);
+  await goToStep(page, "Spells");
+  const preparedRankThree = page.getByTestId("prepared-rank-3");
+  await expect(preparedRankThree.getByTestId("prepared-3-heal")).toContainText("Font");
+  await expect(preparedRankThree.getByTestId("prepared-3-heal")).toContainText("5");
+  await expect(page.getByTestId("rank-summary-3")).toContainText(
+    "2 / 2 ordinary · 5 / 5 font (7 total)"
+  );
+
+  await page.getByRole("link", { name: "Open character sheet" }).click();
+  await expect(page).toHaveURL(/\/characters\/[^/]+$/, { timeout: 15_000 });
+  const healRow = page.getByTestId("sheet-spell-heal");
+  await expect(healRow.getByTestId("sheet-prepared-heal")).toContainText("Prepared ×6");
+  const healRanks = healRow.getByTestId("sheet-prepared-ranks-heal");
+  await expect(healRanks).toContainText("rank 3 font ×5");
+  await expect(healRanks).toContainText("rank 1 ordinary ×1");
+  await healRow.getByRole("button", { name: "Cast Heal" }).click();
+  const healDialog = page.getByRole("dialog", { name: "Cast Heal" });
+  await expect(healDialog.getByLabel("Cast at rank")).toHaveValue("3:font");
+  await expect(healDialog.getByLabel("Cast at rank").locator("option")).toHaveText([
+    "Rank 3 · Divine font · 5 left",
+    "Rank 1 · Rank 1 slot · 1 left",
+  ]);
+  await expect(healDialog.getByTestId("cast-prepared-summary")).toContainText("rank 3 font ×5");
+  await healDialog.getByRole("button", { name: "Cast spell" }).click();
+  await expect(page.locator(".sheet-slots .slot-row-font")).toContainText("4 / 5");
+
+  await healRow.getByRole("button", { name: "Cast Heal" }).click();
+  const secondDialog = page.getByRole("dialog", { name: "Cast Heal" });
+  await secondDialog.getByLabel("Cast at rank").selectOption("1:slot");
+  await secondDialog.getByRole("button", { name: "Cast spell" }).click();
+  const rankOneRow = page
+    .locator(".sheet-slots .sheet-slot-row:not(.slot-row-font)")
+    .filter({ hasText: "Rank 1" });
+  await expect(rankOneRow).toContainText("2 / 3");
+});
+
+test("level-9 Wizard upcasts Fireball into a rank-5 prepared slot", async ({ page }) => {
+  test.setTimeout(60_000);
+  await signIn(page, admin);
+  const campaignId = campaignPath.split("/").filter(Boolean).pop();
+  expect(campaignId).toBeTruthy();
+  const created = await page.request.post("/api/characters", {
+    data: { name: "E2E Wizard 9", campaignId },
+  });
+  expect(created.status()).toBe(201);
+  const { character } = (await created.json()) as { character: { id: string } };
+  const fireball = "spell:sxQZ6yqTn0czJxVd";
+  const light = "spell:WBmvzNDfpwka3qT4";
+  const data = {
+    name: "E2E Wizard 9",
+    ancestryId: "anc:IiG7DgeLWYrSNXuX",
+    heritageId: "her:zVf0Hlp5xG0Q7kmc",
+    backgroundId: "bg:CAjQrHZZbALE7Qjy",
+    classId: "cls:RwjIZzIxzPpUglnK",
+    keyAbility: "int",
+    level: 9,
+    spells: {
+      tradition: "arcane",
+      cantrips: [light],
+      known: [fireball],
+      prepared: [],
+      preparedByRank: {},
+      focus: [],
+      divineFontUsed: 0,
+      slotsUsed: {},
+      preparedUsed: {},
+      fontUsed: {},
+    },
+  };
+  const save = await page.request.put(`/api/characters/${character.id}`, { data: { data } });
+  expect(save.ok()).toBe(true);
+
+  await page.goto(`/characters/${character.id}/edit`);
+  await expect(page.getByRole("heading", { name: "E2E Wizard 9" })).toBeVisible({
+    timeout: 15_000,
+  });
+  await goToStep(page, "Spells");
+
+  const fireballRow = page.getByRole("group", { name: "Fireball spellbook row" });
+  const rankSelect = fireballRow.getByRole("combobox", { name: "Preparation rank for Fireball" });
+  await expect(rankSelect.locator("option")).toHaveText(["Rank 3 (base)", "Rank 4", "Rank 5"]);
+  await rankSelect.selectOption("5");
+  await fireballRow.getByRole("button", { name: "Prepare Fireball at rank 5" }).click();
+  await expect(page.getByTestId("rank-summary-5")).toContainText("1 / 3 prepared");
+  const preparedRankFive = page.getByTestId("prepared-rank-5");
+  await expect(preparedRankFive.getByTestId("prepared-5-fireball")).toContainText("base rank 3");
+
+  await page.getByRole("link", { name: "Open character sheet" }).click();
+  await expect(page.getByRole("heading", { name: "E2E Wizard 9" })).toBeVisible({
+    timeout: 15_000,
+  });
+  const fireballSheetRow = page.getByTestId("sheet-spell-fireball");
+  await expect(fireballSheetRow.getByTestId("sheet-prepared-fireball")).toContainText("Prepared");
+  await expect(fireballSheetRow.getByTestId("sheet-prepared-ranks-fireball")).toContainText(
+    "rank 5 ordinary ×1"
+  );
+
+  await fireballSheetRow.getByRole("button", { name: "Cast Fireball" }).click();
+  const dialog = page.getByRole("dialog", { name: "Cast Fireball" });
+  await expect(dialog.getByText("Rank 5 · Rank 5 slot · 1 left")).toBeVisible();
+  await expect(dialog.getByText(/1 rank 5 slot/)).toBeVisible();
+  await dialog.getByRole("button", { name: "Cast spell" }).click();
+  await expect(
+    page.locator(".sheet-slots .sheet-slot-row").filter({ hasText: "Rank 5" })
+  ).toContainText("2 / 3");
 });

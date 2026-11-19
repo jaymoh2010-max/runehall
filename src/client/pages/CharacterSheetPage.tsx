@@ -45,6 +45,7 @@ import {
   computeCharacter,
   isPreparedCasterClass,
   normalizeCharacterDraft,
+  preparedEntries,
   selectedChoiceOptions,
   signed,
   titleCase,
@@ -288,6 +289,27 @@ export function CharacterSheetPage() {
     castSpellEntry && selectedCastOption
       ? spellDamageAtRank(castSpellEntry, selectedCastOption.rank)
       : null;
+  const castPreparedRows =
+    castSpellEntry && draft
+      ? preparedEntries(draft, {
+          spells: context.spells,
+          deity: context.deity,
+          classData: context.classData,
+        }).filter((entry) => entry.id === castSpellEntry.id)
+      : [];
+  const castPreparedSummary = (() => {
+    const groups = new Map<string, { rank: number; font: boolean; count: number }>();
+    for (const row of castPreparedRows) {
+      const key = `${row.rank}:${row.font ? "font" : "slot"}`;
+      const group = groups.get(key) ?? { rank: row.rank, font: row.font, count: 0 };
+      group.count += 1;
+      groups.set(key, group);
+    }
+    return [...groups.values()]
+      .sort((a, b) => a.rank - b.rank || Number(b.font) - Number(a.font))
+      .map((group) => `rank ${group.rank}${group.font ? " font" : " ordinary"} ×${group.count}`)
+      .join(", ");
+  })();
 
   const transferTargets = useMemo(
     () => party.filter((entry) => entry.id !== character?.id),
@@ -2263,6 +2285,11 @@ export function CharacterSheetPage() {
               {castSpellEntry.actions || "cast"} · {castSpellEntry.range || "range —"}
               {castSpellEntry.defense?.save ? ` · ${castSpellEntry.defense.save} save` : ""}
             </p>
+            {castPreparedRows.length ? (
+              <p className="tiny muted" data-testid="cast-prepared-summary">
+                Prepared: {castPreparedSummary}
+              </p>
+            ) : null}
             {castOptions.length > 1 ? (
               <Field label="Cast at rank">
                 <Select
@@ -2386,6 +2413,13 @@ function castRemainingLabel(option: SpellCastOption): string {
   return option.remaining === null ? "unlimited" : `${option.remaining} left`;
 }
 
+function spellTestId(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
 function castCostLabel(option: SpellCastOption | null): string {
   if (!option) return "nothing";
   if (option.resource === "cantrip") return "no slot";
@@ -2412,11 +2446,15 @@ function castHint(
     return preparedCaster && kind === "known" ? "not prepared" : "no slots";
   }
   const font = options.find((option) => option.resource === "font");
-  if (font) return "no font slots";
+  if (font) return "no font casts left";
   const focus = options.find((option) => option.resource === "focus");
   if (focus) return "no focus points";
   const slot = options.find((option) => option.resource === "slot");
-  if (slot) return `no rank ${slot.rank} slots`;
+  if (slot) {
+    return preparedCaster
+      ? `no rank ${slot.rank} prepared casts left`
+      : `no rank ${slot.rank} slots left`;
+  }
   return "unavailable";
 }
 
@@ -2456,9 +2494,16 @@ function SpellGroups({
   const granted = grantedSpells
     .map((spell) => context.spells[spell.id])
     .filter((spell): spell is NonNullable<typeof spell> => Boolean(spell));
-  const preparedSpells = draft.spells.prepared
-    .map((id) => context.spells[id])
-    .filter((spell): spell is NonNullable<typeof spell> => Boolean(spell) && spell.rank > 0);
+  const preparedRows = preparedEntries(draft, {
+    spells: context.spells,
+    deity: context.deity,
+    classData: context.classData,
+  });
+  const preparedSpells = unique(
+    preparedRows
+      .map((entry) => context.spells[entry.id])
+      .filter((spell): spell is NonNullable<typeof spell> => Boolean(spell) && spell.rank > 0)
+  );
   const known = unique([
     ...draft.spells.known
       .map((id) => context.spells[id])
@@ -2478,8 +2523,27 @@ function SpellGroups({
       .filter((spell): spell is NonNullable<typeof spell> => Boolean(spell)),
     ...granted.filter((spell) => grantedKind.get(spell.id) === "focus"),
   ]);
-  const prepared = new Map<string, number>();
-  for (const id of draft.spells.prepared) prepared.set(id, (prepared.get(id) ?? 0) + 1);
+  const prepared = new Map<
+    string,
+    { count: number; ranks: { rank: number; font: number; ordinary: number }[] }
+  >();
+  for (const row of preparedRows) {
+    const entry = prepared.get(row.id) ?? { count: 0, ranks: [] };
+    entry.count += 1;
+    const rank = entry.ranks.find((item) => item.rank === row.rank);
+    if (rank) {
+      if (row.font) rank.font += 1;
+      else rank.ordinary += 1;
+    } else {
+      entry.ranks.push({
+        rank: row.rank,
+        font: row.font ? 1 : 0,
+        ordinary: row.font ? 0 : 1,
+      });
+    }
+    prepared.set(row.id, entry);
+  }
+  for (const entry of prepared.values()) entry.ranks.sort((a, b) => a.rank - b.rank);
   const preparedCaster = isPreparedCasterClass(context.classData?.name);
   const grouped = new Map<number, typeof known>();
   for (const spell of known) {
@@ -2489,8 +2553,7 @@ function SpellGroups({
   }
   const renderRow = (
     spell: NonNullable<CharacterContext["spells"][string]>,
-    castKind: "known" | "cantrip" | "focus",
-    preparedCount?: number
+    castKind: "known" | "cantrip" | "focus"
   ) => {
     const options = spellCastOptions(spell, draft, context, {
       focus: castKind === "focus",
@@ -2502,7 +2565,7 @@ function SpellGroups({
         spell={spell}
         onRoll={onRoll}
         spellAttack={spellAttack}
-        prepared={preparedCount}
+        prepared={prepared.get(spell.id)}
         castOptions={options}
         castable={options.some(spellCastOptionAvailable)}
         castHint={castHint(options, castKind, preparedCaster)}
@@ -2528,7 +2591,7 @@ function SpellGroups({
             <h4>
               Rank {rank} {preparedCaster ? "spellbook" : "repertoire"}
             </h4>
-            {spells.map((spell) => renderRow(spell, "known", prepared.get(spell.id) ?? 0))}
+            {spells.map((spell) => renderRow(spell, "known"))}
           </div>
         ))}
       {focus.length ? (
@@ -2560,7 +2623,7 @@ function SpellRow({
   spell: NonNullable<CharacterContext["spells"][string]>;
   onRoll: (formula: string, label: string, dc?: number | null) => void;
   spellAttack: number | null;
-  prepared?: number;
+  prepared?: { count: number; ranks: { rank: number; font: number; ordinary: number }[] };
   castOptions: SpellCastOption[];
   castable: boolean;
   castHint: string;
@@ -2586,6 +2649,22 @@ function SpellRow({
     const rankSuffix = damageRank > Math.max(1, spell.rank) ? ` (rank ${damageRank})` : "";
     return `${spell.name} ${kind}${rankSuffix}`;
   };
+  const preparedRankDetail = prepared
+    ? prepared.ranks
+        .flatMap((entry) => {
+          const parts: string[] = [];
+          if (entry.font) parts.push(`rank ${entry.rank} font ×${entry.font}`);
+          if (entry.ordinary) parts.push(`rank ${entry.rank} ordinary ×${entry.ordinary}`);
+          return parts;
+        })
+        .join(", ")
+    : "";
+  const showPreparedRanks = Boolean(
+    prepared &&
+    (prepared.ranks.length > 1 ||
+      prepared.ranks.some((entry) => entry.font > 0) ||
+      prepared.ranks.some((entry) => entry.rank !== spell.rank))
+  );
   return (
     <HoverCard
       title={spell.name}
@@ -2593,11 +2672,26 @@ function SpellRow({
       body={stripHtml(spell.description, 220) || undefined}
       meta={spell.damageText ? <span>{spell.damageText}</span> : undefined}
     >
-      <div className="sheet-spell-row">
+      <div className="sheet-spell-row" data-testid={`sheet-spell-${spellTestId(spell.name)}`}>
         <div className="grow">
           <strong>{spell.name}</strong>
           {prepared ? (
-            <span className="tiny gold-text"> · Prepared{prepared > 1 ? ` ×${prepared}` : ""}</span>
+            <span
+              className="tiny gold-text"
+              data-testid={`sheet-prepared-${spellTestId(spell.name)}`}
+            >
+              {" "}
+              · Prepared{prepared.count > 1 ? ` ×${prepared.count}` : ""}
+            </span>
+          ) : null}
+          {showPreparedRanks ? (
+            <span
+              className="tiny muted"
+              data-testid={`sheet-prepared-ranks-${spellTestId(spell.name)}`}
+            >
+              {" "}
+              ({preparedRankDetail})
+            </span>
           ) : null}
           <span className="tiny muted">
             {" "}

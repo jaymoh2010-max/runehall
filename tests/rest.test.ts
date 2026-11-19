@@ -8,6 +8,8 @@ function hero(level = 5): CharacterDraft {
   draft.level = level;
   draft.spells.slotsUsed = { "1": 2, "2": 1 };
   draft.spells.divineFontUsed = 2;
+  draft.spells.preparedUsed = { "1:spell:magic-missile": 1 };
+  draft.spells.fontUsed = { "spell:heal": 1 };
   draft.spells.prepared = ["spell:magic-missile"];
   draft.play.hp = 10;
   draft.play.tempHp = 6;
@@ -70,6 +72,8 @@ describe("PF2e long rest", () => {
     const result = applyLongRest(hero(5), derived);
     expect(result.draft.spells.slotsUsed).toEqual({});
     expect(result.draft.spells.divineFontUsed).toBe(0);
+    expect(result.draft.spells.preparedUsed).toEqual({});
+    expect(result.draft.spells.fontUsed).toEqual({});
     expect(result.draft.play.tempHp).toBe(0);
     expect(result.draft.play.focusPoints).toBe(3);
     expect(result.draft.play.shieldRaised).toBe(false);

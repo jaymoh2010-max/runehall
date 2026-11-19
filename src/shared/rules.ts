@@ -26,6 +26,7 @@ import {
   type SkillId,
   type Spell,
   type SpellTradition,
+  type PreparedSpellsByRank,
   type ValidationIssue,
 } from "./types";
 import { propertyRuneDamage, shieldRuneBonus, summarizeRunes } from "./runes";
@@ -463,7 +464,210 @@ export function isFontSpell(spell: Spell, deity: Deity | null | undefined): bool
   return font.length === 0 || font.includes(name);
 }
 
-/** Prepared copies by rank, split into divine-font and ordinary occupancy. */
+export interface PreparedEntry {
+  id: string;
+  /** The rank of the slot the copy occupies, not the spell's base rank. */
+  rank: number;
+  font: boolean;
+}
+
+export interface PreparedRankSummary {
+  total: number;
+  font: number;
+  ordinary: number;
+  ids: string[];
+}
+
+function hasExplicitPreparedMap(draft: CharacterDraft): PreparedSpellsByRank | null {
+  const byRank = draft.spells.preparedByRank ?? {};
+  if (!Object.keys(byRank).length) return null;
+  if (!draft.spells.prepared.length) return byRank;
+  return samePreparedMultiset(flattenPreparedByRank(byRank), draft.spells.prepared) ? byRank : null;
+}
+
+function expandExplicitPrepared(
+  byRank: PreparedSpellsByRank,
+  spells: Record<string, Spell>,
+  deity: Deity | null | undefined,
+  font: { slots: number; rank: number } | null
+): PreparedEntry[] {
+  const entries: PreparedEntry[] = [];
+  const ranks = Object.keys(byRank)
+    .map(Number)
+    .filter((rank) => Number.isInteger(rank) && rank >= 1 && rank <= 10)
+    .sort((a, b) => a - b);
+  for (const rank of ranks) {
+    let fontLeft = font && rank === font.rank ? font.slots : 0;
+    for (const id of byRank[String(rank)] ?? []) {
+      const spell = spells[id];
+      const isFont = Boolean(
+        font && fontLeft > 0 && rank === font.rank && spell && isFontSpell(spell, deity)
+      );
+      if (isFont) fontLeft -= 1;
+      entries.push({ id, rank, font: isFont });
+    }
+  }
+  return entries;
+}
+
+function inferLegacyPrepared(
+  prepared: string[],
+  spells: Record<string, Spell>,
+  deity: Deity | null | undefined,
+  font: { slots: number; rank: number } | null
+): PreparedEntry[] {
+  const entries: PreparedEntry[] = [];
+  let fontLeft = font?.slots ?? 0;
+  for (const id of prepared) {
+    const spell = spells[id];
+    if (!spell || spell.rank <= 0) continue;
+    // A flat legacy list has no slot rank. Only a base rank equal to the font
+    // rank is unambiguously a divine font copy.
+    const isFont = Boolean(
+      font && fontLeft > 0 && spell.rank === font.rank && isFontSpell(spell, deity)
+    );
+    if (isFont) fontLeft -= 1;
+    entries.push({ id, rank: isFont ? font!.rank : spell.rank, font: isFont });
+  }
+  return entries;
+}
+
+/** Effective prepared copies, using explicit ranks when available. */
+export function preparedEntries(
+  draft: CharacterDraft,
+  context: Pick<CharacterContext, "spells" | "deity" | "classData">
+): PreparedEntry[] {
+  const font = divineFontInfo(draft.level, context.classData?.name);
+  const explicit = hasExplicitPreparedMap(draft);
+  return explicit
+    ? expandExplicitPrepared(explicit, context.spells, context.deity, font)
+    : inferLegacyPrepared(draft.spells.prepared, context.spells, context.deity, font);
+}
+
+export function preparedUsedKey(rank: number, spellId: string): string {
+  return `${rank}:${spellId}`;
+}
+
+export function preparedRankSummaries(entries: PreparedEntry[]): Map<number, PreparedRankSummary> {
+  const out = new Map<number, PreparedRankSummary>();
+  for (const entry of entries) {
+    const row = out.get(entry.rank) ?? { total: 0, font: 0, ordinary: 0, ids: [] };
+    row.total += 1;
+    row.ids.push(entry.id);
+    if (entry.font) row.font += 1;
+    else row.ordinary += 1;
+    out.set(entry.rank, row);
+  }
+  return out;
+}
+
+/** Materialize inferred ranks into the explicit map (used on first builder edit). */
+export function preparedByRankForDraft(
+  draft: CharacterDraft,
+  context: Pick<CharacterContext, "spells" | "deity" | "classData">
+): PreparedSpellsByRank {
+  const explicit = hasExplicitPreparedMap(draft);
+  if (explicit) {
+    return Object.fromEntries(Object.entries(explicit).map(([rank, ids]) => [rank, [...ids]]));
+  }
+  const out: PreparedSpellsByRank = {};
+  for (const entry of inferLegacyPrepared(
+    draft.spells.prepared,
+    context.spells,
+    context.deity,
+    divineFontInfo(draft.level, context.classData?.name)
+  )) {
+    (out[String(entry.rank)] ??= []).push(entry.id);
+  }
+  return out;
+}
+
+export function addPreparedCopy(
+  draft: CharacterDraft,
+  context: Pick<CharacterContext, "spells" | "deity" | "classData">,
+  spellId: string,
+  rank: number
+): CharacterDraft {
+  const nextRank = Math.max(1, Math.min(10, Math.floor(rank)));
+  const byRank = preparedByRankForDraft(draft, context);
+  byRank[String(nextRank)] = [...(byRank[String(nextRank)] ?? []), spellId];
+  return {
+    ...draft,
+    spells: {
+      ...draft.spells,
+      preparedByRank: byRank,
+      prepared: flattenPreparedByRank(byRank),
+    },
+  };
+}
+
+export function removePreparedCopy(
+  draft: CharacterDraft,
+  context: Pick<CharacterContext, "spells" | "deity" | "classData">,
+  spellId: string,
+  rank: number
+): CharacterDraft {
+  const key = String(Math.max(1, Math.min(10, Math.floor(rank))));
+  const byRank = preparedByRankForDraft(draft, context);
+  const list = [...(byRank[key] ?? [])];
+  const index = list.lastIndexOf(spellId);
+  if (index < 0) return draft;
+  list.splice(index, 1);
+  if (list.length) byRank[key] = list;
+  else delete byRank[key];
+  const preparedUsed = { ...draft.spells.preparedUsed };
+  if (!list.length) delete preparedUsed[preparedUsedKey(Number(key), spellId)];
+  return {
+    ...draft,
+    spells: {
+      ...draft.spells,
+      preparedByRank: byRank,
+      prepared: flattenPreparedByRank(byRank),
+      preparedUsed,
+    },
+  };
+}
+
+/** Remove every prepared copy of a spell, across ranks and the legacy mirror. */
+export function removePreparedSpellEverywhere(
+  draft: CharacterDraft,
+  spellId: string
+): CharacterDraft {
+  const existing = draft.spells.preparedByRank ?? {};
+  const preparedUsed = Object.fromEntries(
+    Object.entries(draft.spells.preparedUsed).filter(([key]) => !key.endsWith(`:${spellId}`))
+  );
+  const fontUsed = { ...draft.spells.fontUsed };
+  delete fontUsed[spellId];
+  if (!Object.keys(existing).length) {
+    return {
+      ...draft,
+      spells: {
+        ...draft.spells,
+        prepared: draft.spells.prepared.filter((id) => id !== spellId),
+        preparedByRank: {},
+        preparedUsed,
+        fontUsed,
+      },
+    };
+  }
+  const byRank: PreparedSpellsByRank = {};
+  for (const [rank, ids] of Object.entries(existing)) {
+    const next = ids.filter((id) => id !== spellId);
+    if (next.length) byRank[rank] = next;
+  }
+  return {
+    ...draft,
+    spells: {
+      ...draft.spells,
+      preparedByRank: byRank,
+      prepared: flattenPreparedByRank(byRank),
+      preparedUsed,
+      fontUsed,
+    },
+  };
+}
+
 export function preparedSlotSplits(
   prepared: string[],
   spells: Record<string, Spell>,
@@ -569,9 +773,12 @@ export function emptyCharacterDraft(name = "New Hero"): CharacterDraft {
       cantrips: [],
       known: [],
       prepared: [],
+      preparedByRank: {},
       focus: [],
       divineFontUsed: 0,
       slotsUsed: {},
+      preparedUsed: {},
+      fontUsed: {},
     },
     equipment: [],
     companions: [],
@@ -602,6 +809,38 @@ export function emptyCharacterDraft(name = "New Hero"): CharacterDraft {
   };
 }
 
+export function flattenPreparedByRank(byRank: PreparedSpellsByRank): string[] {
+  return Object.keys(byRank)
+    .map(Number)
+    .filter((rank) => Number.isInteger(rank) && rank >= 1 && rank <= 10)
+    .sort((a, b) => a - b)
+    .flatMap((rank) => byRank[String(rank)] ?? []);
+}
+
+export function samePreparedMultiset(a: string[], b: string[]): boolean {
+  if (a.length !== b.length) return false;
+  const counts = new Map<string, number>();
+  for (const id of a) counts.set(id, (counts.get(id) ?? 0) + 1);
+  for (const id of b) {
+    const next = (counts.get(id) ?? 0) - 1;
+    if (next < 0) return false;
+    counts.set(id, next);
+  }
+  return true;
+}
+
+function normalizePreparedByRankValue(value: unknown): PreparedSpellsByRank | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const out: PreparedSpellsByRank = {};
+  for (const [key, raw] of Object.entries(value as Record<string, unknown>)) {
+    const rank = Number(key);
+    if (!Number.isInteger(rank) || rank < 1 || rank > 10) continue;
+    const ids = Array.isArray(raw) ? raw.filter((id): id is string => typeof id === "string") : [];
+    if (ids.length) out[String(rank)] = ids;
+  }
+  return Object.keys(out).length ? out : null;
+}
+
 export function normalizeCharacterDraft(input: unknown, fallbackName = "New Hero"): CharacterDraft {
   const base = emptyCharacterDraft(fallbackName);
   if (!input || typeof input !== "object") return base;
@@ -628,6 +867,12 @@ export function normalizeCharacterDraft(input: unknown, fallbackName = "New Hero
   const skills = obj(raw.skills);
   const feats = obj(raw.feats);
   const spells = obj(raw.spells);
+  const prepared = arr<string>(spells.prepared).filter((x) => typeof x === "string");
+  const rankMap = normalizePreparedByRankValue(spells.preparedByRank);
+  const rankedFlat = rankMap ? flattenPreparedByRank(rankMap) : [];
+  const finalPrepared = prepared.length ? prepared : rankedFlat;
+  const preparedByRank =
+    rankMap && (prepared.length === 0 || samePreparedMultiset(prepared, rankedFlat)) ? rankMap : {};
   const details = obj(raw.details);
   const play = obj(raw.play);
   const currency = obj(raw.currency);
@@ -736,11 +981,22 @@ export function normalizeCharacterDraft(input: unknown, fallbackName = "New Hero
         : null,
       cantrips: arr<string>(spells.cantrips).filter((x) => typeof x === "string"),
       known: arr<string>(spells.known).filter((x) => typeof x === "string"),
-      prepared: arr<string>(spells.prepared).filter((x) => typeof x === "string"),
+      prepared: finalPrepared,
+      preparedByRank,
       focus: arr<string>(spells.focus).filter((x) => typeof x === "string"),
       divineFontUsed: Math.max(0, Math.min(10, Math.round(num(spells.divineFontUsed, 0)))),
       slotsUsed: Object.fromEntries(
         Object.entries(obj(spells.slotsUsed)).filter(([, value]) => typeof value === "number")
+      ) as Record<string, number>,
+      preparedUsed: Object.fromEntries(
+        Object.entries(obj(spells.preparedUsed))
+          .filter(([, value]) => typeof value === "number" && Number.isFinite(value))
+          .map(([key, value]) => [key, Math.max(0, Math.floor(value as number))])
+      ) as Record<string, number>,
+      fontUsed: Object.fromEntries(
+        Object.entries(obj(spells.fontUsed))
+          .filter(([, value]) => typeof value === "number" && Number.isFinite(value))
+          .map(([key, value]) => [key, Math.max(0, Math.floor(value as number))])
       ) as Record<string, number>,
     },
     equipment: equipmentEntries,
@@ -2574,16 +2830,57 @@ export function computeCharacter(
   }
   const preparedCaster = PREPARED_CASTER_CLASSES.has(classData?.name.toLowerCase() ?? "");
   if (preparedCaster && draft.spells.prepared.length) {
-    for (const spellId of draft.spells.prepared) {
-      const spell = context.spells[spellId];
+    const ordinarySlots = ordinarySpellSlotsFor(draft.level, caster.progression, classData?.name);
+    const fontInfo = divineFontInfo(draft.level, classData?.name);
+    const fontLabel = (context.deity?.font?.length ? context.deity.font : ["heal", "harm"])
+      .map(titleCase)
+      .join(" or ");
+    const entries = preparedEntries(draft, {
+      spells: context.spells,
+      deity: context.deity,
+      classData,
+    });
+    const summaries = preparedRankSummaries(entries);
+
+    for (const id of [...new Set(draft.spells.prepared)]) {
+      const spell = context.spells[id];
       if (!spell) {
         issue("warning", "A prepared spell is missing from the compendium.", "spells");
         continue;
       }
+      if (spell.rank === 0 || spell.traits.includes("focus")) {
+        issue(
+          "warning",
+          `${spell.name} is a cantrip or focus spell and does not occupy a prepared slot.`,
+          "spells"
+        );
+      }
+    }
+
+    for (const entry of entries) {
+      const spell = context.spells[entry.id];
+      if (!spell) continue;
+      if (entry.rank > maxSpellRank) {
+        issue(
+          "error",
+          `Rank ${entry.rank} spell slots aren't available at level ${draft.level}.`,
+          "spells"
+        );
+        continue;
+      }
+      if (spell.rank > entry.rank) {
+        issue(
+          "error",
+          `${spell.name} is a rank ${spell.rank} spell and can't be prepared in a rank ${entry.rank} slot.`,
+          "spells"
+        );
+        continue;
+      }
       if (
-        !draft.spells.known.includes(spellId) &&
-        !draft.spells.cantrips.includes(spellId) &&
-        !grantedSpellIds.has(spellId)
+        !entry.font &&
+        !draft.spells.known.includes(entry.id) &&
+        !draft.spells.cantrips.includes(entry.id) &&
+        !grantedSpellIds.has(entry.id)
       ) {
         issue(
           "warning",
@@ -2592,37 +2889,32 @@ export function computeCharacter(
         );
       }
     }
-    const ordinarySlots = ordinarySpellSlotsFor(draft.level, caster.progression, classData?.name);
-    const fontInfo = divineFontInfo(draft.level, classData?.name);
-    const fontLabel = (context.deity?.font?.length ? context.deity.font : ["heal", "harm"])
-      .map(titleCase)
-      .join(" or ");
-    const splits = preparedSlotSplits(
-      draft.spells.prepared,
-      context.spells,
-      context.deity,
-      fontInfo?.rank ?? null,
-      fontInfo?.slots ?? 0
-    );
-    for (const [rank, split] of splits) {
-      const totalLimit = slots?.[rank - 1] ?? 0;
-      if (split.total > totalLimit) {
+
+    for (const [rank, summary] of summaries) {
+      const ordinaryLimit = Math.max(0, ordinarySlots?.[rank - 1] ?? 0);
+      const fontLimit = fontInfo && rank === fontInfo.rank ? fontInfo.slots : 0;
+      const totalLimit = ordinaryLimit + fontLimit;
+      if (summary.total > totalLimit) {
         issue(
           "error",
-          `${classData?.name ?? "This class"} has ${split.total} rank ${rank} spells prepared but only ${totalLimit} slot${totalLimit === 1 ? "" : "s"}.`,
+          `${classData?.name ?? "This class"} has ${summary.total} rank ${rank} spells prepared but only ${totalLimit} slot${totalLimit === 1 ? "" : "s"}.`,
           "spells"
         );
-      } else if (fontInfo && rank === fontInfo.rank) {
-        const ordinaryLimit = ordinarySlots?.[rank - 1] ?? Math.max(0, totalLimit - fontInfo.slots);
-        const ordinaryCount = split.total - split.font;
-        if (ordinaryCount > ordinaryLimit) {
-          issue(
-            "error",
-            `Cleric: ${ordinaryCount} rank ${rank} spell${ordinaryCount === 1 ? "" : "s"} prepared in ordinary slots; only ${ordinaryLimit} ordinary slot${ordinaryLimit === 1 ? "" : "s"} available (divine font is ${fontLabel} only).`,
-            "spells"
-          );
-        }
+      } else if (summary.ordinary > ordinaryLimit) {
+        issue(
+          "error",
+          `${classData?.name ?? "This class"}: ${summary.ordinary} rank ${rank} spell${summary.ordinary === 1 ? "" : "s"} prepared in ordinary slots; only ${ordinaryLimit} ordinary slot${ordinaryLimit === 1 ? "" : "s"} available${fontLimit ? ` (divine font is ${fontLabel} only)` : ""}.`,
+          "spells"
+        );
       }
+    }
+
+    if (fontInfo && fontInfo.rank > 1 && !Object.keys(draft.spells.preparedByRank ?? {}).length) {
+      issue(
+        "warning",
+        `This prepared list predates rank-aware slots. Re-prepare ${fontLabel} at rank ${fontInfo.rank} to use divine font slots.`,
+        "spells"
+      );
     }
   }
   const repertoire = spellRepertoireLimits(classData, draft.level);

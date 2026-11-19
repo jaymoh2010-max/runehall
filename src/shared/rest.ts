@@ -152,6 +152,8 @@ export function applyLongRest(
         ...draft.spells,
         divineFontUsed: 0,
         slotsUsed: {},
+        preparedUsed: {},
+        fontUsed: {},
       },
       play: {
         ...draft.play,

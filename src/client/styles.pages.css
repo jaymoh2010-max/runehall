@@ -941,6 +941,87 @@
   font-size: 0.75rem;
   font-weight: 700;
 }
+.prepared-at-rank {
+  margin: 10px 0 2px;
+  padding: 8px 10px;
+  border: 1px dashed rgba(200, 169, 107, 0.22);
+  border-radius: 8px;
+  background: rgba(200, 169, 107, 0.03);
+}
+.prepared-at-rank-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.prepared-at-rank .chip-row {
+  margin-top: 6px;
+  align-items: center;
+}
+.prepared-at-rank .chip-row > p {
+  flex-basis: 100%;
+  margin: 0;
+}
+.prepared-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.025);
+  padding: 4px 6px 4px 10px;
+  font-size: 0.78rem;
+}
+.prepared-chip.is-font {
+  border-color: rgba(200, 169, 107, 0.32);
+  background: rgba(200, 169, 107, 0.07);
+}
+.prepared-chip .prepared-stepper {
+  border: 0;
+  background: transparent;
+  padding: 0;
+}
+.prepared-chip .prepared-stepper button {
+  width: 20px;
+  height: 20px;
+}
+.prepared-adder {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-left: auto;
+}
+.prepared-adder .select {
+  width: auto;
+  min-width: 120px;
+  padding: 6px 26px 6px 8px;
+  font-size: 0.78rem;
+}
+.spell-row {
+  flex-wrap: wrap;
+}
+
+@media (max-width: 760px) {
+  .spell-row {
+    align-items: flex-start;
+  }
+  .prepared-adder {
+    width: 100%;
+    margin-left: 0;
+    justify-content: flex-start;
+  }
+  .prepared-adder .select {
+    flex: 1 1 120px;
+    max-width: none;
+  }
+  .prepared-at-rank-head {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 2px;
+  }
+}
 
 /* Gear */
 .wealth-card {

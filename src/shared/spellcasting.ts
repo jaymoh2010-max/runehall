@@ -1,9 +1,10 @@
 import {
   casterInfo,
   divineFontInfo,
-  isFontSpell,
   isPreparedCasterClass,
   ordinarySpellSlotsFor,
+  preparedEntries,
+  preparedUsedKey,
 } from "./rules";
 import type { CharacterContext, CharacterDraft, Spell } from "./types";
 
@@ -124,40 +125,73 @@ export function spellCastOptions(
   if (spell.rank > maxRank) return [];
 
   const preparedCaster = isPreparedCasterClass(context.classData?.name);
-  const preparedCount = draft.spells.prepared.filter((id) => id === spell.id).length;
-  if (preparedCaster && preparedCount === 0) return [];
-
   const font = divineFontInfo(level, context.classData?.name);
-  const fontEligible = Boolean(
-    font && isFontSpell(spell, context.deity) && spell.rank <= font.rank
-  );
   const fontSlots = font?.slots ?? 0;
   const fontUsed = clampInt(draft.spells.divineFontUsed, 0, fontSlots);
   const fontRemaining = Math.max(0, fontSlots - fontUsed);
-  // Prepared Heal/Harm copies that fit entirely in the font pool are font
-  // preparations. Surplus copies spill into ordinary slots.
-  const claimedByFont = preparedCaster && fontEligible && preparedCount <= fontSlots;
 
-  const ranks = new Set<number>();
   if (preparedCaster) {
-    if (!claimedByFont) ranks.add(spell.rank);
-    if (font && fontEligible) ranks.add(font.rank);
-  } else {
-    for (let rank = spell.rank; rank <= maxRank; rank += 1) ranks.add(rank);
+    const entries = preparedEntries(draft, {
+      spells: context.spells,
+      deity: context.deity,
+      classData: context.classData,
+    }).filter(
+      (entry) => entry.id === spell.id && entry.rank >= spell.rank && entry.rank <= maxRank
+    );
+    if (!entries.length) return [];
+
+    const copiesByRank = new Map<number, { font: number; ordinary: number }>();
+    for (const entry of entries) {
+      const copies = copiesByRank.get(entry.rank) ?? { font: 0, ordinary: 0 };
+      if (entry.font) copies.font += 1;
+      else copies.ordinary += 1;
+      copiesByRank.set(entry.rank, copies);
+    }
+
+    const options: SpellCastOption[] = [];
+    for (const [rank, copies] of [...copiesByRank.entries()].sort((a, b) => a[0] - b[0])) {
+      const slotCount = ordinary[rank - 1] ?? 0;
+      const slotUsed = clampInt(draft.spells.slotsUsed[String(rank)], 0, slotCount);
+      if (copies.font > 0) {
+        const spent = clampInt(draft.spells.fontUsed[spell.id], 0, copies.font);
+        const remaining = Math.max(0, Math.min(fontRemaining, copies.font - spent));
+        if (remaining > 0 || copies.ordinary === 0) {
+          options.push({
+            rank,
+            resource: "font",
+            remaining,
+            label: "Divine font",
+          });
+        }
+      }
+      if (copies.ordinary > 0) {
+        const spent = clampInt(
+          draft.spells.preparedUsed[preparedUsedKey(rank, spell.id)],
+          0,
+          copies.ordinary
+        );
+        options.push({
+          rank,
+          resource: "slot",
+          remaining: Math.max(0, Math.min(slotCount - slotUsed, copies.ordinary - spent)),
+          label: `Rank ${rank} slot`,
+        });
+      }
+    }
+
+    return options.sort(
+      (a, b) =>
+        Number(spellCastOptionAvailable(b)) - Number(spellCastOptionAvailable(a)) ||
+        (a.resource === "font" ? 0 : 1) - (b.resource === "font" ? 0 : 1) ||
+        a.rank - b.rank
+    );
   }
 
+  const ranks: number[] = [];
+  for (let rank = spell.rank; rank <= maxRank; rank += 1) ranks.push(rank);
+
   const options: SpellCastOption[] = [];
-  for (const rank of [...ranks].sort((a, b) => a - b)) {
-    const isFontRank = Boolean(font && fontEligible && rank === font.rank);
-    if (isFontRank && (fontRemaining > 0 || claimedByFont)) {
-      options.push({
-        rank,
-        resource: "font",
-        remaining: fontRemaining,
-        label: "Divine font",
-      });
-      continue;
-    }
+  for (const rank of ranks) {
     const slotCount = ordinary[rank - 1] ?? 0;
     const used = clampInt(draft.spells.slotsUsed[String(rank)], 0, slotCount);
     options.push({
@@ -168,10 +202,7 @@ export function spellCastOptions(
     });
   }
 
-  // Prefer divine font at the font rank so the default choice follows the rule.
-  return options.sort(
-    (a, b) => (a.resource === "font" ? 0 : 1) - (b.resource === "font" ? 0 : 1) || a.rank - b.rank
-  );
+  return options;
 }
 
 export function castSpell(
@@ -203,29 +234,51 @@ export function castSpell(
     if (!font) return null;
     const used = clampInt(draft.spells.divineFontUsed, 0, font.slots);
     if (used >= font.slots) return null;
+    const copies = preparedEntries(draft, {
+      spells: context.spells,
+      deity: context.deity,
+      classData: context.classData,
+    }).filter((entry) => entry.id === spell.id && entry.font && entry.rank === option.rank).length;
+    const spent = clampInt(draft.spells.fontUsed[spell.id], 0, copies);
+    if (spent >= copies) return null;
     return {
       draft: {
         ...draft,
         spells: {
           ...draft.spells,
           divineFontUsed: used + 1,
+          fontUsed: { ...draft.spells.fontUsed, [spell.id]: spent + 1 },
         },
       },
-      option: { ...option, remaining: font.slots - used - 1 },
+      option: {
+        ...option,
+        remaining: Math.max(0, Math.min(font.slots - used - 1, copies - spent - 1)),
+      },
     };
   }
 
   const key = String(option.rank);
   const used = Math.max(0, Math.round(Number(draft.spells.slotsUsed[key]) || 0));
   if (option.remaining !== null && option.remaining <= 0) return null;
+  const spells: CharacterDraft["spells"] = {
+    ...draft.spells,
+    slotsUsed: { ...draft.spells.slotsUsed, [key]: used + 1 },
+  };
+  if (isPreparedCasterClass(context.classData?.name)) {
+    const copies = preparedEntries(draft, {
+      spells: context.spells,
+      deity: context.deity,
+      classData: context.classData,
+    }).filter((entry) => entry.id === spell.id && !entry.font && entry.rank === option.rank).length;
+    if (copies > 0) {
+      const copyKey = preparedUsedKey(option.rank, spell.id);
+      const spent = clampInt(draft.spells.preparedUsed[copyKey], 0, copies);
+      if (spent >= copies) return null;
+      spells.preparedUsed = { ...draft.spells.preparedUsed, [copyKey]: spent + 1 };
+    }
+  }
   return {
-    draft: {
-      ...draft,
-      spells: {
-        ...draft.spells,
-        slotsUsed: { ...draft.spells.slotsUsed, [key]: used + 1 },
-      },
-    },
+    draft: { ...draft, spells },
     option: { ...option, remaining: Math.max(0, (option.remaining ?? 0) - 1) },
   };
 }

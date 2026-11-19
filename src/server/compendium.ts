@@ -493,6 +493,7 @@ export function contextForDraft(draft: CharacterDraft): CharacterContext {
     ...draft.spells.cantrips,
     ...draft.spells.known,
     ...draft.spells.prepared,
+    ...Object.values(draft.spells.preparedByRank ?? {}).flat(),
     ...draft.spells.focus,
   ]) {
     const spell = maps.spell.get(id);

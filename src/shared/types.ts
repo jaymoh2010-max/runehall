@@ -621,6 +621,8 @@ export interface CharacterPlay {
   shieldRaised: boolean;
 }
 
+export type PreparedSpellsByRank = Record<string, string[]>;
+
 export interface CharacterDraft {
   version: 1;
   name: string;
@@ -676,10 +678,20 @@ export interface CharacterDraft {
     known: string[];
     /** Spell IDs prepared for the day by prepared casters. */
     prepared: string[];
+    /**
+     * Prepared spells grouped by the rank of the slot they occupy. Keys are
+     * decimal strings ("1".."10"); duplicates are separate prepared copies.
+     * Empty/absent means legacy: infer ranks from each spell's base rank.
+     */
+    preparedByRank: PreparedSpellsByRank;
     focus: string[];
     /** Divine font pips spent today (cleric heal/harm slots). */
     divineFontUsed: number;
     slotsUsed: Record<string, number>;
+    /** Ordinary prepared copies spent today, keyed `${rank}:${spellId}`. */
+    preparedUsed: Record<string, number>;
+    /** Divine font copies spent today, keyed by spell id. */
+    fontUsed: Record<string, number>;
   };
   equipment: CharacterEquipment[];
   companions: CharacterCompanion[];

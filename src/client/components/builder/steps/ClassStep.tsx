@@ -238,8 +238,12 @@ export function ClassStep({
                     cantrips: [],
                     known: [],
                     prepared: [],
+                    preparedByRank: {},
                     focus: [],
                     slotsUsed: {},
+                    divineFontUsed: 0,
+                    preparedUsed: {},
+                    fontUsed: {},
                   },
                   feats: { ...current.feats, class: {} },
                 };
