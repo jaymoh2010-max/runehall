@@ -1149,3 +1149,123 @@ test("builder completes a level-1 Wizard using granted curriculum spells", async
     page.locator(".sheet-slots .sheet-slot-row").filter({ hasText: "Rank 1" })
   ).toContainText("2 / 3");
 });
+
+test("builder grants a Cloistered Cleric domain focus spell", async ({ page }) => {
+  test.setTimeout(60_000);
+  await signIn(page, admin);
+  await openNewCharacter(page, "E2E Domain Cleric");
+
+  await goToStep(page, "Class");
+  await page
+    .locator(".class-grid")
+    .getByRole("button", { name: /Cleric/ })
+    .click();
+  await page.getByRole("button", { name: "Choose deity" }).click();
+  await page.getByPlaceholder(/Search deities/).fill("Abadar");
+  await page
+    .locator(".picker-item-name", { hasText: /^Abadar$/ })
+    .first()
+    .click();
+  await page.getByRole("button", { name: "Follow Abadar" }).click();
+  await page
+    .locator(".choice-options")
+    .getByRole("button", { name: /Cloistered Cleric/ })
+    .click();
+
+  const domainGroup = page
+    .locator(".choice-group")
+    .filter({ hasText: "Domain Initiate: choose a domain." });
+  await expect(domainGroup).toBeVisible();
+  await expect(domainGroup.getByRole("button", { name: /Cities Domain/ })).toBeVisible();
+  await expect(domainGroup.getByRole("button", { name: /Fire Domain/ })).toHaveCount(0);
+  await domainGroup.getByRole("button", { name: /Cities Domain/ }).click();
+
+  await goToStep(page, "Spells");
+  await expect(
+    page
+      .locator(".spell-section")
+      .filter({ hasText: "Granted spells" })
+      .getByText("Face in the Crowd")
+  ).toBeVisible();
+  const focusCard = page
+    .locator(".spell-section")
+    .filter({ has: page.getByRole("heading", { name: "Focus spells" }) });
+  await expect(focusCard.getByText("Face in the Crowd")).toBeVisible();
+  await expect(focusCard.getByText("Granted", { exact: true })).toBeVisible();
+});
+
+test("builder filters Champion devotion spells by deity font", async ({ page }) => {
+  test.setTimeout(60_000);
+  await signIn(page, admin);
+  await openNewCharacter(page, "E2E Champion");
+
+  await goToStep(page, "Class");
+  await page
+    .locator(".class-grid")
+    .getByRole("button", { name: /Champion/ })
+    .click();
+  await page
+    .locator(".choice-options")
+    .getByRole("button", { name: /^Justice/ })
+    .click();
+  await page.getByRole("button", { name: "Choose deity" }).click();
+  await page.getByPlaceholder(/Search deities/).fill("Iomedae");
+  await page
+    .locator(".picker-item-name", { hasText: /^Iomedae$/ })
+    .first()
+    .click();
+  await page.getByRole("button", { name: "Follow Iomedae" }).click();
+
+  const devotionGroup = page
+    .locator(".choice-group")
+    .filter({ hasText: "Choose your devotion spell." });
+  await expect(devotionGroup).toBeVisible();
+  await expect(devotionGroup.getByRole("button", { name: /Lay on Hands/ })).toBeVisible();
+  await expect(devotionGroup.getByRole("button", { name: /Touch of the Void/ })).toHaveCount(0);
+  await devotionGroup.getByRole("button", { name: /Lay on Hands/ }).click();
+
+  await goToStep(page, "Spells");
+  const focusCard = page
+    .locator(".spell-section")
+    .filter({ has: page.getByRole("heading", { name: "Focus spells" }) });
+  await expect(focusCard.getByText("Lay on Hands")).toBeVisible();
+  await expect(focusCard.getByText("Granted", { exact: true })).toBeVisible();
+});
+
+test("builder grants the chosen Elemental Sorcerer element", async ({ page }) => {
+  test.setTimeout(60_000);
+  await signIn(page, admin);
+  await openNewCharacter(page, "E2E Elemental Sorcerer");
+
+  await goToStep(page, "Class");
+  await page
+    .locator(".class-grid")
+    .getByRole("button", { name: /Sorcerer/ })
+    .click();
+  await page
+    .locator(".choice-options")
+    .getByRole("button", { name: /Bloodline: Elemental/ })
+    .click();
+
+  const elementGroup = page
+    .locator(".choice-group")
+    .filter({ hasText: "Elemental bloodline: choose an element." });
+  await expect(elementGroup).toBeVisible();
+  await elementGroup
+    .locator(".choice-option")
+    .filter({ has: page.locator(".choice-option-head strong", { hasText: /^Fire$/ }) })
+    .click();
+
+  await goToStep(page, "Spells");
+  const granted = page.locator(".spell-section").filter({ hasText: "Granted spells" });
+  await expect(granted.getByText("Ignition")).toBeVisible();
+  await expect(granted.getByText("Breathe Fire")).toBeVisible();
+  const cantrips = page
+    .locator(".spell-section")
+    .filter({ has: page.getByRole("heading", { name: "Cantrips", exact: true }) });
+  await expect(cantrips.getByText("Ignition")).toBeVisible();
+  const rankOne = page
+    .locator(".spell-section")
+    .filter({ has: page.getByRole("heading", { name: "Rank 1 repertoire" }) });
+  await expect(rankOne.getByText("Breathe Fire")).toBeVisible();
+});

@@ -27,6 +27,8 @@ import {
   heritageSkillChoice,
 } from "../src/shared/heritage";
 import { SKILLS } from "../src/shared/types";
+import { activeGrantChoiceGroups } from "../src/shared/classGrantChoices";
+import { selectedClassGrants } from "../src/shared/classGrants";
 import type {
   Ancestry,
   Background,
@@ -144,6 +146,18 @@ function chooseClassChoices(
       else ids.push(forcedChoice.optionId);
     }
     draft.classChoices[group.key] = ids;
+  }
+}
+
+function chooseGrantChoices(rng: () => number, draft: CharacterDraft, classData: ClassData) {
+  draft.grantChoices = {};
+  const deity = deities.find((entry) => entry.id === draft.deityId) ?? null;
+  const featIds = selectedClassGrants(draft, classData, deity).feats.map((feat) => feat.id);
+  for (const group of activeGrantChoiceGroups(draft, classData, deity, featIds)) {
+    if (!group.options.length) continue;
+    draft.grantChoices[group.key] = sample(rng, group.options, group.count).map(
+      (option) => option.id
+    );
   }
 }
 
@@ -542,6 +556,7 @@ function simulate(
   chooseClassChoices(rng, draft, classData, forcedChoice);
   chooseBoosts(rng, draft, baseContext);
   chooseDeity(rng, draft, classData);
+  chooseGrantChoices(rng, draft, classData);
 
   const heritageSkill = heritageSkillChoice(heritage);
   if (heritage && heritageSkill) {

@@ -235,24 +235,27 @@ export function importPathbuilder(
     );
   }
   if (classData?.choiceGroups.length) {
-    const chosenNames = new Set(
-      [
-        ...arr<string>(build.specials).map((value) => text(value, 120)),
-        ...arr<unknown[]>(build.feats).map((entry) =>
-          Array.isArray(entry) ? text(entry[0], 120) : ""
-        ),
-      ]
+    const specialNames = new Set(
+      arr<string>(build.specials)
+        .map((value) => nameKey(text(value, 120)))
         .filter(Boolean)
-        .map(nameKey)
+    );
+    const featNames = new Set(
+      arr<unknown[]>(build.feats)
+        .map((entry) => (Array.isArray(entry) ? nameKey(text(entry[0], 120)) : ""))
+        .filter(Boolean)
     );
     const missing: string[] = [];
     for (const group of classData.choiceGroups) {
-      const matches = group.options.filter((option) => {
-        const key = nameKey(option.name);
-        return [...chosenNames].some(
-          (chosen) => chosen === key || chosen.includes(key) || key.includes(chosen)
-        );
-      });
+      const names =
+        group.tag === "champion-cause" ? specialNames : new Set([...specialNames, ...featNames]);
+      let matches = group.options.filter((option) => names.has(nameKey(option.name)));
+      if (!matches.length) {
+        matches = group.options.filter((option) => {
+          const key = nameKey(option.name);
+          return [...names].some((chosen) => chosen.includes(key) || key.includes(chosen));
+        });
+      }
       if (matches.length >= group.count) {
         draft.classChoices[group.key] = matches.slice(0, group.count).map((option) => option.id);
         match("class choice");

@@ -16,6 +16,8 @@ import {
   grantedTrainedSkills,
 } from "../../src/shared/rules";
 import { featAllowedByHeritageGrant, heritageFeatGrant } from "../../src/shared/heritage";
+import { activeGrantChoiceGroups } from "../../src/shared/classGrantChoices";
+import { selectedClassGrants } from "../../src/shared/classGrants";
 import { SKILLS } from "../../src/shared/types";
 import type {
   AbilityKey,
@@ -154,6 +156,13 @@ export function buildSimulatedHero(options: SimulatedHeroOptions): CharacterDraf
     const deity =
       deities.find((entry) => entry.skill?.length || entry.weapons?.length) ?? deities[0] ?? null;
     draft.deityId = deity?.id ?? null;
+  }
+
+  const deity = deities.find((entry) => entry.id === draft.deityId) ?? null;
+  const grantFeatIds = selectedClassGrants(draft, classData, deity).feats.map((feat) => feat.id);
+  for (const group of activeGrantChoiceGroups(draft, classData, deity, grantFeatIds)) {
+    if (!group.options.length) continue;
+    draft.grantChoices[group.key] = group.options.slice(0, group.count).map((option) => option.id);
   }
 
   const granted = grantedTrainedSkills(draft, context);

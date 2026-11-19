@@ -114,7 +114,8 @@ import {
   rulesetLabel,
 } from "../../../../shared/content";
 import { summarizeRunes } from "../../../../shared/runes";
-import { CLASS_GRANTS } from "../../../../shared/classGrants";
+import { CLASS_GRANTS, selectedClassGrantFeatIds } from "../../../../shared/classGrants";
+import { activeGrantChoiceGroups } from "../../../../shared/classGrantChoices";
 import type { BuilderProps } from "../shared";
 import { StepHeading, ValidationNote, SearchInput, MiniFeatureList } from "../shared";
 
@@ -175,6 +176,14 @@ export function ClassStep({
   const selected = staticData.classes.find((cls) => cls.id === draft.classId) ?? null;
   const keyOptions = selected ? classKeyOptions(draft, selected) : [];
   const groups = selected ? applicableChoiceGroups(draft, selected) : [];
+  const virtualGroups = selected
+    ? activeGrantChoiceGroups(
+        draft,
+        selected,
+        context.deity,
+        selectedClassGrantFeatIds(draft, selected, context.deity)
+      )
+    : [];
   const chosen = selected ? selectedChoiceOptions(draft, selected) : [];
   const needsDeity = Boolean(
     selected?.features.some((feature) => feature.name.toLowerCase().startsWith("deity (")) ||
@@ -220,6 +229,7 @@ export function ClassStep({
                   classId: cls.id,
                   keyAbility: null,
                   classChoices: {},
+                  grantChoices: {},
                   deityId: null,
                   deitySkill: null,
                   spells: {
@@ -448,7 +458,73 @@ export function ClassStep({
                 </Card>
               );
             })}
-            {!groups.length ? (
+            {virtualGroups.map((group) => {
+              const picks = (draft.grantChoices[group.key] ?? []).filter((id) =>
+                group.options.some((option) => option.id === id)
+              );
+              return (
+                <Card key={group.key} className="choice-group">
+                  <div className="choice-group-head">
+                    <div>
+                      <h3>{group.prompt}</h3>
+                      <p className="muted small">
+                        {group.chooseLabel} ·{" "}
+                        {group.count === 1 ? "Choose one" : `Choose ${group.count}`}
+                      </p>
+                    </div>
+                    <Badge tone={picks.length === group.count ? "green" : "gold"}>
+                      {picks.length}/{group.count}
+                    </Badge>
+                  </div>
+                  <div className="choice-options">
+                    {group.options.length ? (
+                      group.options.map((option) => {
+                        const selectedOption = picks.includes(option.id);
+                        return (
+                          <button
+                            type="button"
+                            key={option.id}
+                            className={`choice-option ${selectedOption ? "is-selected" : ""}`}
+                            onClick={() =>
+                              update((current) => {
+                                const currentPicks = current.grantChoices[group.key] ?? [];
+                                let nextPicks: string[];
+                                if (selectedOption)
+                                  nextPicks = currentPicks.filter((id) => id !== option.id);
+                                else if (group.count === 1) nextPicks = [option.id];
+                                else if (currentPicks.length < group.count)
+                                  nextPicks = [...currentPicks, option.id];
+                                else nextPicks = [...currentPicks.slice(1), option.id];
+                                return {
+                                  ...current,
+                                  grantChoices: {
+                                    ...current.grantChoices,
+                                    [group.key]: nextPicks,
+                                  },
+                                };
+                              })
+                            }
+                          >
+                            <span className="choice-option-head">
+                              <strong>{option.name}</strong>
+                              {selectedOption ? <CheckCircle2 size={15} /> : null}
+                            </span>
+                            {option.hint ? <span className="tiny muted">{option.hint}</span> : null}
+                            <span className="tiny gold-text">{grantSummary(option.grant)}</span>
+                            {option.grant.notes?.[0] ? (
+                              <span className="tiny muted">{option.grant.notes[0]}</span>
+                            ) : null}
+                          </button>
+                        );
+                      })
+                    ) : (
+                      <p className="muted small">{group.emptyHint}</p>
+                    )}
+                  </div>
+                </Card>
+              );
+            })}
+            {!groups.length && !virtualGroups.length ? (
               <p className="muted small">This class has no choices at your current level.</p>
             ) : null}
           </div>
