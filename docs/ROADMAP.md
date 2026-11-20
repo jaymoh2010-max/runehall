@@ -402,6 +402,11 @@ Acceptance: a GM can prepare a full session in Runehall and start it with one �
 - [x] **Starting wealth budget**
   - A fresh level-1 character’s 15 gp budget covers both equipment value and carried coins, with a one-click **Take remaining as coins** action.
   - Pathbuilder, loot, and transfer characters are explicitly unbudgeted so play-history wealth does not trigger false creation warnings.
+- [x] **Treasure audit and replacement wealth**
+  - Loot parcels show compendium item value plus coins instead of a coin-only total.
+  - The Loot tab shows the GM Core treasure-by-level budget (total and coin portion) for the current party level, the value of open and distributed parcels, and each character’s committed wealth against the table 10-10 lump-sum benchmark.
+  - A GM can top up a replacement or catch-up character to the level benchmark with one action; only the difference is granted, and the result becomes play-history wealth.
+  - The audit is advisory: parcels are not tagged by level and the permanent/consumable item mix is not enforced.
 - [x] **Area templates**
   - Burst, emanation, cone, and line templates with size in feet.
   - Click-drag placement on the map, with a live preview and a size label.
@@ -705,4 +710,4 @@ A campaign-level review compared Runehall against PF2e GM Core/Player Core progr
 
 - Full report: [CAMPAIGN-READINESS.md](CAMPAIGN-READINESS.md)
 - Repeatable simulation: `npm run simulate:campaign`
-- Next priority: automatic token-turn dying/persistent-damage hooks, fast healing/regeneration, and affliction onset timers, then treasure/advancement economy, then exploration/downtime/social continuity.
+- Next priority: automatic token-turn dying/persistent-damage hooks, fast healing/regeneration, and affliction onset timers, then exploration/downtime/social continuity and the remaining treasure item-mix planner.

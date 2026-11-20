@@ -67,7 +67,8 @@ import {
   xpProgress,
   type AccomplishmentTier,
 } from "../../shared/xp";
-import { api, copyText, formatDate, uploadImage } from "../api";
+import { startingWealthCp } from "../../shared/rules";
+import { api, copyText, formatCp, formatDate, uploadImage } from "../api";
 import { connectSocket, joinCampaign } from "../socket";
 import { errorMessage } from "../stores";
 import { useSession, useToasts } from "../stores";
@@ -208,6 +209,7 @@ export function CampaignPage() {
   const [inviteOpen, setInviteOpen] = useState(false);
   const [levelUpBusy, setLevelUpBusy] = useState(false);
   const [levelingId, setLevelingId] = useState<string | null>(null);
+  const [wealthBusyId, setWealthBusyId] = useState<string | null>(null);
   const [restBusy, setRestBusy] = useState(false);
   const [xpOpen, setXpOpen] = useState(false);
   const [xpAwards, setXpAwards] = useState<XpAward[]>([]);
@@ -873,6 +875,48 @@ export function CampaignPage() {
     }
   };
 
+  const topUpWealth = async (character: CharacterRecord) => {
+    if (!id || !isGm || !character.summary) return;
+    const level = character.summary.level;
+    const targetCp = startingWealthCp(level);
+    const confirmed = window.confirm(
+      `Top up ${character.name}'s wealth to the level ${level} lump-sum benchmark (${formatCp(targetCp)} total)? This grants only the difference.`
+    );
+    if (!confirmed) return;
+    setWealthBusyId(character.id);
+    try {
+      const result = await api<{
+        character: CharacterRecord;
+        grantCp: number;
+        targetCp: number;
+        committedCp: number;
+      }>(`/api/campaigns/${id}/characters/${character.id}/wealth`, { method: "POST" });
+      setCharacters((current) =>
+        current.map((entry) => (entry.id === result.character.id ? result.character : entry))
+      );
+      setTableData((current) =>
+        current
+          ? {
+              ...current,
+              characters: current.characters.map((entry) =>
+                entry.id === result.character.id ? result.character : entry
+              ),
+            }
+          : current
+      );
+      toast(
+        result.grantCp > 0
+          ? `Granted ${formatCp(result.grantCp)} to ${result.character.name}. Total wealth is now about ${formatCp(result.committedCp)}.`
+          : `${result.character.name} already meets the level ${level} wealth benchmark.`,
+        "success"
+      );
+    } catch (err) {
+      toast(errorMessage(err), "error");
+    } finally {
+      setWealthBusyId(null);
+    }
+  };
+
   const openXpAward = () => {
     const partyLevel = Math.max(1, ...characters.map((character) => character.summary?.level ?? 1));
     setXpKind("encounter");
@@ -1350,15 +1394,26 @@ export function CampaignPage() {
                         </Link>
                       ) : null}
                       {isGm ? (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          icon={<Sparkles size={14} />}
-                          loading={levelingId === character.id}
-                          onClick={() => void levelUpCharacters(character.id)}
-                        >
-                          Level up
-                        </Button>
+                        <>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            icon={<Coins size={14} />}
+                            loading={wealthBusyId === character.id}
+                            onClick={() => void topUpWealth(character)}
+                          >
+                            Top up wealth
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            icon={<Sparkles size={14} />}
+                            loading={levelingId === character.id}
+                            onClick={() => void levelUpCharacters(character.id)}
+                          >
+                            Level up
+                          </Button>
+                        </>
                       ) : null}
                     </div>
                   </article>

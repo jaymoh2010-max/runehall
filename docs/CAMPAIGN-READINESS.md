@@ -15,7 +15,7 @@ Runehall is already a strong **campaign table**: invite → join → party roste
 It is **not yet a full adventure-path runner or a complete exploration/downtime game**. The largest gaps are:
 
 1. **Rules trust:** conditions, dying/wounded, and hero/focus points are automated; staged afflictions are tracked with stage saves, but onset timing and compendium presets are manual. Spell heightening and most feat/item effects are still partly manual.
-2. **Campaign economy:** advancement speed and hazard/accomplishment XP are now supported, but there is still no treasure-by-level budget, item-level parcels, new-character wealth, shops, or cost of living.
+2. **Campaign economy:** advancement speed, hazard/accomplishment XP, a treasure-by-level audit, and replacement-character wealth are now supported. There is still no permanent/consumable item-mix planner, shops, or cost-of-living workflow.
 3. **The other two-thirds of play:** exploration/travel/weather, downtime activities, social reputation/factions, and player knowledge all need a first-class model.
 4. **Campaign continuity:** no session-zero/safety tools, private player notes, AP chapter/level scaffolding, or self-contained archive.
 
@@ -33,7 +33,8 @@ Two simulated campaigns were run against an isolated server with real accounts a
   - Fast (800 XP per level) advancement, GM-only party level-up, HP/AC growth, token sync, excess-XP carry, level-20 cap.
   - Complex/simple hazard XP, major accomplishment XP, and a GM-visible award ledger.
   - Long rest natural healing, condition reduction, temp HP clearing, token sync.
-  - Treasure parcels (GM Core currency column), loot distribution, purse totals.
+  - Treasure parcels (GM Core currency column), item-plus-coin parcel valuation, loot distribution, purse totals.
+  - Loot audit at level 20 against the GM Core party budget, including each character's committed wealth.
   - Downtime grants/spending; Golarion month, year, and leap-day boundaries.
   - Sessions, attendance, check-ins, recap; shared vs GM-only handouts; one-time quest XP.
   - Player permission boundaries and optimistic revision conflicts.
@@ -42,10 +43,10 @@ Two simulated campaigns were run against an isolated server with real accounts a
   - Story level-ups from 1→20 with no XP requirement.
   - Quest XP one-time award in XP mode; milestone campaigns reject the award and keep the value for reference.
   - Live campaign metadata to a connected player.
-  - Mid-campaign replacement character advanced to party level.
+  - Mid-campaign replacement character advanced to party level, then topped up to the level-10 lump-sum wealth benchmark.
   - Sessions/recap/handout in milestone play.
 
-**Result (current release pass):** 70 passing checks, 0 failing checks, 2 recorded gaps. Encounter cleanup is now exercised after every simulated act, milestone XP awards are verified as blocked, and the fast advancement threshold, hazard XP, accomplishment XP, and award ledger are exercised. Two linked-token bugs were found and fixed:
+**Result (current release pass):** 71 passing checks, 0 failing checks, 1 recorded gap. Encounter cleanup is now exercised after every simulated act, milestone XP awards are verified as blocked, the fast advancement threshold, hazard XP, accomplishment XP, and award ledger are exercised, and the loot audit plus replacement-wealth grant are verified at level 20 and level 10. Two linked-token bugs were found and fixed:
 
 - Hiding a token after initiative was rolled still exposed its name in the player's initiative order. The server now filters hidden combatants from player snapshots and live initiative broadcasts, with a shared helper and unit coverage (`src/shared/initiative.ts`, `src/server/routes/table.ts`, `src/server/socket.ts`, `tests/initiative.test.ts`).
 - Creating a token for a wounded character reset its current HP to full. New tokens now start at the sheet's current HP unless the GM explicitly supplies one (`src/server/socket.ts`).
@@ -76,7 +77,7 @@ npm run simulate:campaign -- --report campaign-simulation-report.json
 | Exploration | Travel pace, terrain, weather, watches, foraging/tracking, hex/pointcrawl, discovery | Scenes, fog, walls, light, measurement; no travel/weather/hex/exploration activities | Missing |
 | Social | NPCs, attitude, factions, reputation, rumors, shops, negotiation | NPC statblock library, dashboard threads, quest handouts; no relationships/reputation/factions/shops | Partial |
 | Downtime | Day accounting, Earn Income, Craft, Retrain, rituals, cost of living, shopping | GM grants days; player spends days; activities remain manual | Partial |
-| Treasure | Party budget by level, item levels, parcels, gems/art, wealth audit, ABP | Loot parcels with compendium items/coins, one recipient, sheet updates; no budget/wealth audit/shops/ABP | Partial |
+| Treasure | Party budget by level, item levels, parcels, gems/art, wealth audit, ABP | Loot parcels with compendium items/coins, one recipient, sheet updates, item-plus-coin valuation, GM Core party budget, character wealth audit, and replacement top-up; no permanent/consumable item-mix planner, shops, or ABP | Partial |
 | Campaign log | Journal, handouts, quests, clues, recap, player knowledge | Journal/handouts with visibility/attachments, quest status/XP, recap draft, dashboard threads; no per-player knowledge or private notes | Partial |
 | World clock | In-world date, downtime, afflictions, sessions | Golarion calendar with leap day and GM advance | Strong |
 | Table | Maps, fog, walls/doors, lighting, tokens, conditions, chat, dice, music | Deep implementation; see table gaps below | Strong with caveats |
@@ -113,8 +114,8 @@ These are the items most likely to make a sheet or combat state look right while
 | Advancement speed | Fast/medium/slow XP thresholds (800/1,000/1,200) are stored per campaign and used by progress bars and level-up subtraction. | Done |
 | Party XP pool and catch-up | Support a shared party total, per-character catch-up doubling, and absent-player awards. | M |
 | Hazard and accomplishment XP | The Award XP dialog supports simple/complex hazard XP by level difference and minor/moderate/major accomplishments (10/30/80), with a GM-visible ledger. The encounter builder still has no hazard actor or XP budget row. | Done — award workflow |
-| Treasure-by-level engine | Encode GM Core Table 10-9: 2 permanent L+1, 2 permanent L, 2 consumables L+1/L/L−1, currency; show awarded vs. budget. | M |
-| New/replacement character wealth | Level-1 creation now budgets gear plus carried coins. Still missing: the Table 10-10 starting package or a level-appropriate lump sum; the simulation showed a level-10 replacement with 10 gp instead of ~2,300 gp. | Partial — S–M |
+| Treasure-by-level engine | Encodes GM Core table 10-9 total and coin budgets and shows parcel vs. budget value. Still missing: permanent/consumable item-level composition and level-tagged parcels. | Partial — done for audit |
+| New/replacement character wealth | Level-1 creation budgets gear plus coins. A GM can top up a replacement or catch-up character to the GM Core table 10-10 lump-sum benchmark; only the difference is granted. | Done |
 | Shops and settlement levels | Persistent merchants with item level/price/stock, buy/sell, and settlement purchase limits. | M |
 | Downtime activities | Earn Income, Craft, Retrain, rituals, cost of living, per-character queues and approvals. | L |
 | Exploration/travel | Pace/terrain/weather, watches, foraging/tracking, hex/pointcrawl, ETA, encounter checks, discovered/rumored sites. | L |
@@ -169,7 +170,7 @@ Remaining:
 
 ### Sprint B — campaign economy and progression
 1. Party XP pool, catch-up, and absent-player awards. (Advancement speed and hazard/accomplishment awards are done.)
-2. Treasure-by-level budget, item-level parcels, new-character wealth, wealth audit.
+2. Permanent/consumable item-mix planner and level-tagged parcels. (The party budget, wealth audit, and replacement top-up are done.)
 3. Shops/settlement levels, cost of living, downtime activity planner.
 4. Session-zero/safety checklist and private player notes.
 

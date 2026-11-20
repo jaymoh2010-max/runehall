@@ -4913,6 +4913,66 @@
 }
 
 /* Loot parcels */
+.treasure-audit {
+  padding: 18px 20px;
+  margin-bottom: 18px;
+}
+.treasure-audit-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 22px;
+  flex-wrap: wrap;
+}
+.treasure-audit-head h3 {
+  margin: 3px 0 6px;
+  font-size: 1.2rem;
+}
+.treasure-audit-head p {
+  max-width: 620px;
+}
+.treasure-audit-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.treasure-audit-stats > div {
+  min-width: 132px;
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.02);
+}
+.treasure-audit-stats span {
+  display: block;
+  color: var(--muted);
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.treasure-audit-stats strong {
+  display: block;
+  margin-top: 3px;
+  font-size: 1rem;
+}
+.treasure-audit-characters {
+  margin-top: 16px;
+  padding-top: 13px;
+  border-top: 1px solid var(--line);
+}
+.treasure-audit-character-list {
+  display: grid;
+  gap: 4px;
+  margin-top: 8px;
+}
+.treasure-audit-character {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 18px;
+  flex-wrap: wrap;
+  padding: 5px 0;
+}
 .loot-header {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
