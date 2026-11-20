@@ -31,6 +31,7 @@ import {
 } from "./types";
 import { propertyRuneDamage, shieldRuneBonus, summarizeRunes } from "./runes";
 import { conditionModifiers } from "./conditions";
+import { normalizeAfflictions } from "./afflictions";
 import {
   FEAT_CHOICES,
   FEAT_GRANTS,
@@ -875,6 +876,7 @@ export function emptyCharacterDraft(name = "New Hero"): CharacterDraft {
       focusPoints: 1,
       downtimeDays: 0,
       conditions: [],
+      afflictions: [],
       xp: 0,
       shieldRaised: false,
     },
@@ -1144,6 +1146,7 @@ export function normalizeCharacterDraft(input: unknown, fallbackName = "New Hero
           value: typeof c.value === "number" ? c.value : null,
           duration: typeof c.duration === "number" ? c.duration : null,
         })),
+      afflictions: normalizeAfflictions(play.afflictions),
       xp: Math.max(0, num(play.xp, 0)),
       shieldRaised: Boolean(play.shieldRaised),
     },

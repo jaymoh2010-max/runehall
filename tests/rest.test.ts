@@ -17,6 +17,25 @@ function hero(level = 5): CharacterDraft {
   draft.play.focusPoints = 0;
   draft.play.xp = 450;
   draft.play.shieldRaised = true;
+  draft.play.afflictions = [
+    {
+      id: "aff-rest",
+      name: "Grave Curse",
+      type: "curse",
+      dc: 18,
+      save: "will",
+      stage: 2,
+      stageMax: 3,
+      interval: "1 day",
+      duration: "",
+      onset: "1 hour",
+      virulent: false,
+      virulentSuccesses: 0,
+      virulentCrit: "reduce",
+      savesCanEnd: true,
+      notes: "",
+    },
+  ];
   draft.play.conditions = [
     { name: "Fatigued", value: null, duration: null },
     { name: "Drained", value: 2, duration: null },
@@ -74,6 +93,7 @@ describe("PF2e long rest", () => {
     expect(result.draft.spells.divineFontUsed).toBe(0);
     expect(result.draft.spells.preparedUsed).toEqual({});
     expect(result.draft.spells.fontUsed).toEqual({});
+    expect(result.draft.play.afflictions).toEqual(hero(5).play.afflictions);
     expect(result.draft.play.tempHp).toBe(0);
     expect(result.draft.play.focusPoints).toBe(3);
     expect(result.draft.play.shieldRaised).toBe(false);

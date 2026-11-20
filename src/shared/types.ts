@@ -617,8 +617,42 @@ export interface CharacterPlay {
   /** Downtime days granted by the GM and spent between adventures. */
   downtimeDays: number;
   conditions: CharacterCondition[];
+  afflictions: CharacterAffliction[];
   xp: number;
   shieldRaised: boolean;
+}
+
+export type AfflictionType = "poison" | "disease" | "curse";
+
+export interface CharacterAffliction {
+  id: string;
+  name: string;
+  type: AfflictionType;
+  /** Recovery-check DC. */
+  dc: number;
+  /** Save used for exposure and stage saves. */
+  save: SaveKey;
+  /** Current stage, 1..stageMax. */
+  stage: number;
+  stageMax: number;
+  /** Recovery-check interval, e.g. "1 round", "1 day"; blank means no periodic save. */
+  interval: string;
+  /** Maximum duration, e.g. "1 minute" or empty for until cured. */
+  duration: string;
+  /** Onset text, e.g. "1 round" or "1 hour". */
+  onset: string;
+  /** Virulent afflictions need two consecutive successes to reduce a stage. */
+  virulent: boolean;
+  /** Consecutive successful stage saves for a virulent affliction. */
+  virulentSuccesses: number;
+  /**
+   * How a virulent critical success behaves: the common reading reduces one
+   * stage; the strict reading counts as a single success toward the streak.
+   */
+  virulentCrit: "reduce" | "streak";
+  /** False for curses or effects that require a specific removal. */
+  savesCanEnd: boolean;
+  notes: string;
 }
 
 export type PreparedSpellsByRank = Record<string, string[]>;
