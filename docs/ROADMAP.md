@@ -703,4 +703,4 @@ A campaign-level review compared Runehall against PF2e GM Core/Player Core progr
 
 - Full report: [CAMPAIGN-READINESS.md](CAMPAIGN-READINESS.md)
 - Repeatable simulation: `npm run simulate:campaign`
-- Next priority: affliction onset timers and dying/persistent-damage recovery checks, then treasure/advancement economy, then exploration/downtime/social continuity.
+- Next priority: automatic token-turn dying/persistent-damage hooks, fast healing/regeneration, and affliction onset timers, then treasure/advancement economy, then exploration/downtime/social continuity.

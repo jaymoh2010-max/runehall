@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { emptyCharacterDraft } from "../src/shared/rules";
 import {
   applyDamageToDraft,
+  applyDyingRecovery,
   applyHealingToDraft,
   applyHpEditToDraft,
   applyHpEditToState,
@@ -140,6 +141,23 @@ describe("damage and dying", () => {
     ]);
   });
 
+  it("does not raise wounded again when healing a stable character", () => {
+    const result = applyHealingToDraft(
+      draftWith({
+        hp: 0,
+        conditions: [
+          { name: "Unconscious", value: null, duration: null },
+          { name: "Wounded", value: 1, duration: null },
+        ],
+      }),
+      20,
+      5
+    );
+    expect(result.draft.play.conditions).toEqual([
+      expect.objectContaining({ name: "Wounded", value: 1 }),
+    ]);
+  });
+
   it("healing to full clears wounded", () => {
     const result = applyHealingToDraft(
       draftWith({
@@ -220,5 +238,122 @@ describe("damage and dying", () => {
     );
     expect(dead.draft.play.hp).toBe(0);
     expect(dead.dead).toBe(true);
+  });
+
+  it("reduces dying on a successful recovery check and keeps unconscious at 0 HP", () => {
+    const draft = draftWith({
+      hp: 0,
+      conditions: [
+        { name: "Dying", value: 2, duration: null },
+        { name: "Unconscious", value: null, duration: null },
+      ],
+    });
+    const result = applyDyingRecovery(draft, "success");
+    expect(result.dying).toBe(1);
+    expect(result.ended).toBe(false);
+    expect(result.draft.play.conditions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: "Dying", value: 1 }),
+        expect.objectContaining({ name: "Unconscious" }),
+      ])
+    );
+
+    const ended = applyDyingRecovery(result.draft, "success");
+    expect(ended.dying).toBe(0);
+    expect(ended.ended).toBe(true);
+    expect(ended.wounded).toBe(1);
+    expect(ended.draft.play.conditions).toEqual([
+      expect.objectContaining({ name: "Unconscious" }),
+      expect.objectContaining({ name: "Wounded", value: 1 }),
+    ]);
+  });
+
+  it("reduces dying by two on a critical success", () => {
+    const result = applyDyingRecovery(
+      draftWith({
+        hp: 0,
+        conditions: [{ name: "Dying", value: 3, duration: null }],
+      }),
+      "critical-success"
+    );
+    expect(result.dying).toBe(1);
+    expect(result.ended).toBe(false);
+  });
+
+  it("increases dying on failure and critical failure, then applies the death threshold", () => {
+    const failed = applyDyingRecovery(
+      draftWith({
+        hp: 0,
+        conditions: [{ name: "Dying", value: 2, duration: null }],
+      }),
+      "failure"
+    );
+    expect(failed.dying).toBe(3);
+    expect(failed.dead).toBe(false);
+
+    const critical = applyDyingRecovery(
+      draftWith({
+        hp: 0,
+        conditions: [{ name: "Dying", value: 2, duration: null }],
+      }),
+      "critical-failure"
+    );
+    expect(critical.dying).toBe(4);
+    expect(critical.dead).toBe(true);
+    expect(critical.draft.play.conditions).toEqual(
+      expect.arrayContaining([expect.objectContaining({ name: "Dead" })])
+    );
+  });
+
+  it("lowers the recovery death threshold while doomed", () => {
+    const result = applyDyingRecovery(
+      draftWith({
+        hp: 0,
+        conditions: [
+          { name: "Dying", value: 2, duration: null },
+          { name: "Doomed", value: 1, duration: null },
+        ],
+      }),
+      "failure"
+    );
+    expect(result.dying).toBe(3);
+    expect(result.dead).toBe(true);
+  });
+
+  it("dies immediately when doomed lowers the threshold to zero", () => {
+    const recovery = applyDyingRecovery(
+      draftWith({
+        hp: 0,
+        conditions: [
+          { name: "Dying", value: 1, duration: null },
+          { name: "Doomed", value: 4, duration: null },
+        ],
+      }),
+      "critical-success"
+    );
+    expect(recovery.dead).toBe(true);
+    expect(recovery.draft.play.conditions).toEqual(
+      expect.arrayContaining([expect.objectContaining({ name: "Dead" })])
+    );
+
+    const damage = applyDamageToDraft(
+      draftWith({ hp: 5, conditions: [{ name: "Doomed", value: 4, duration: null }] }),
+      20,
+      5
+    );
+    expect(damage.dead).toBe(true);
+  });
+
+  it("does not change an already dead or stable character", () => {
+    const dead = draftWith({
+      hp: 0,
+      conditions: [{ name: "Dead", value: null, duration: null }],
+    });
+    expect(applyDyingRecovery(dead, "success").draft).toBe(dead);
+    const stable = draftWith({
+      hp: 0,
+      conditions: [{ name: "Unconscious", value: null, duration: null }],
+    });
+    expect(applyDyingRecovery(stable, "failure").draft).toBe(stable);
   });
 });

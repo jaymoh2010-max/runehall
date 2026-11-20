@@ -38,6 +38,7 @@ import {
   type CharacterCondition,
   type CharacterAffliction,
   type AfflictionType,
+  type PersistentDamageInstance,
   type ConditionRef,
   type DerivedCharacter,
   type RollResult,
@@ -66,10 +67,16 @@ import {
   type SpellCastOption,
   type SpellCastResource,
 } from "../../shared/spellcasting";
-import { DEGREE_LABELS, applyAttackPenalty, mod, rollFormula } from "../../shared/dice";
+import {
+  DEGREE_LABELS,
+  applyAttackPenalty,
+  mod,
+  rollFormula,
+  validateFormula,
+} from "../../shared/dice";
 import { currencyToCp } from "../../shared/inventory";
 import { applyLongRest } from "../../shared/rest";
-import { applyHpEditToDraft } from "../../shared/damage";
+import { applyHpEditToDraft, applyDyingRecovery } from "../../shared/damage";
 import { xpProgress } from "../../shared/xp";
 import { spellTraditionLabel, stripHtml } from "../../shared/compendium";
 import {
@@ -79,6 +86,11 @@ import {
   newAfflictionId,
   normalizeAffliction,
 } from "../../shared/afflictions";
+import {
+  PERSISTENT_DAMAGE_DC,
+  normalizePersistentDamage,
+  persistentDamageLabel,
+} from "../../shared/persistentDamage";
 import { conditionBaseName, conditionLabel, parseConditionEntry } from "../../shared/tokens";
 import { api, ApiError, formatCp } from "../api";
 import { errorMessage } from "../stores";
@@ -180,6 +192,10 @@ export function CharacterSheetPage() {
   const [afflictionOpen, setAfflictionOpen] = useState(false);
   const [afflictionEditingId, setAfflictionEditingId] = useState<string | null>(null);
   const [afflictionForm, setAfflictionForm] = useState<CharacterAffliction>(emptyAfflictionForm);
+  const [persistentFormula, setPersistentFormula] = useState("1d6");
+  const [persistentType, setPersistentType] = useState("fire");
+  const [persistentDc, setPersistentDc] = useState(String(PERSISTENT_DAMAGE_DC));
+  const [persistentNotes, setPersistentNotes] = useState("");
   const [party, setParty] = useState<CharacterRecord[]>([]);
   const [transferOpen, setTransferOpen] = useState(false);
   const [transferMode, setTransferMode] = useState<"item" | "coins">("item");
@@ -507,6 +523,21 @@ export function CharacterSheetPage() {
     update((current) => applyHpEditToDraft(current, derived.maxHp, { type: "heal", amount }).draft);
   };
 
+  const rollDyingRecovery = () => {
+    if (!draft || !derived) return;
+    const dying = derived.conditionEffects.dying;
+    if (dying <= 0) return;
+    roll("1d20", "Dying recovery check", 10 + dying, (result) => {
+      if (!result.degree) return;
+      const applied = applyDyingRecovery(draftRef.current ?? draft, result.degree);
+      update((current) => applyDyingRecovery(current, result.degree!).draft);
+      toast(
+        applied.notes.join(" ") || `Dying recovery: ${DEGREE_LABELS[result.degree!]}.`,
+        applied.dead ? "error" : "success"
+      );
+    });
+  };
+
   const setHp = (nextHp: number) => {
     if (!derived) return;
     update(
@@ -709,15 +740,21 @@ export function CharacterSheetPage() {
     formula: string,
     label: string,
     dc?: number | null,
-    onResult?: (result: RollResult) => void
+    onResult?: (result: RollResult) => void,
+    options: { heroPoint?: boolean; visibility?: "all" | "gm"; useTargetDc?: boolean } = {}
   ) => {
     if (!draft) return;
     const parsedDc = targetDc.trim() ? Number(targetDc) : null;
     const effectiveDc =
-      dc ?? (parsedDc !== null && Number.isFinite(parsedDc) ? Math.round(parsedDc) : null);
-    const visibility = secretRoll ? "gm" : "all";
+      dc ??
+      (options.useTargetDc === false
+        ? null
+        : parsedDc !== null && Number.isFinite(parsedDc)
+          ? Math.round(parsedDc)
+          : null);
+    const visibility = options.visibility ?? (secretRoll ? "gm" : "all");
     let rollLabel = label;
-    if (heroPointArmed) {
+    if (heroPointArmed && options.heroPoint !== false) {
       if (draft.play.heroPoints < 1) {
         toast("No Hero Points remaining.", "error");
         setHeroPointArmed(false);
@@ -897,6 +934,116 @@ export function CharacterSheetPage() {
       });
       toast(applied.message, applied.outcome === "worsened" ? "error" : "success");
     });
+  };
+
+  const addPersistentDamage = () => {
+    const instance = normalizePersistentDamage({
+      formula: persistentFormula,
+      type: persistentType,
+      dc: persistentDc,
+      notes: persistentNotes,
+    });
+    if (!instance) {
+      toast("Enter a persistent damage formula.", "error");
+      return;
+    }
+    const valid = validateFormula(instance.formula);
+    if (!valid.ok) {
+      toast(valid.error ?? "That damage formula is not valid.", "error");
+      return;
+    }
+    const replaced = Boolean(
+      draft?.play.persistentDamage.some((entry) => entry.type === instance.type)
+    );
+    update((current) => ({
+      ...current,
+      play: {
+        ...current.play,
+        // Same-type persistent damage does not stack; the newest entry
+        // replaces the old one so end-of-turn damage is not double-counted.
+        persistentDamage: [
+          ...current.play.persistentDamage.filter((entry) => entry.type !== instance.type),
+          instance,
+        ],
+      },
+    }));
+    if (replaced) {
+      toast(`Replaced the existing ${instance.type} persistent damage.`, "success");
+    }
+    setPersistentFormula("1d6");
+    setPersistentDc(String(PERSISTENT_DAMAGE_DC));
+    setPersistentNotes("");
+  };
+
+  const removePersistentDamage = (id: string) =>
+    update((current) => ({
+      ...current,
+      play: {
+        ...current.play,
+        persistentDamage: current.play.persistentDamage.filter((entry) => entry.id !== id),
+      },
+    }));
+
+  const endTurnPersistentDamage = () => {
+    if (!draft || !derived) return;
+    if (draft.play.conditions.some((condition) => conditionBaseName(condition.name) === "dead")) {
+      toast("This character is dead.", "error");
+      return;
+    }
+    const instances = draft.play.persistentDamage.filter(
+      (instance) => validateFormula(instance.formula).ok
+    );
+    if (!instances.length) {
+      toast("No valid persistent damage to roll.", "error");
+      return;
+    }
+
+    let total = 0;
+    let remaining = instances.length;
+    let applied = false;
+    const applyTotal = () => {
+      if (applied) return;
+      applied = true;
+      if (total > 0) applyDamage(total);
+      for (const instance of instances) {
+        roll(
+          "1d20",
+          `Persistent ${instance.type} flat check`,
+          instance.dc,
+          (check) => {
+            if (check.degree === "success" || check.degree === "critical-success") {
+              update((current) => ({
+                ...current,
+                play: {
+                  ...current.play,
+                  persistentDamage: current.play.persistentDamage.filter(
+                    (entry) => entry.id !== instance.id
+                  ),
+                },
+              }));
+              toast(`${persistentDamageLabel(instance)} ends.`, "success");
+            } else if (check.degree) {
+              toast(`${persistentDamageLabel(instance)} persists.`, "error");
+            }
+          },
+          { heroPoint: false, visibility: "all" }
+        );
+      }
+    };
+
+    for (const instance of instances) {
+      roll(
+        instance.formula,
+        `Persistent ${instance.type} damage (end of turn)`,
+        null,
+        (damage) => {
+          total += Math.max(0, Math.round(damage.total));
+          remaining -= 1;
+          if (remaining === 0) applyTotal();
+        },
+        { heroPoint: false, visibility: "all", useTargetDc: false }
+      );
+    }
   };
 
   if (loading) return <LoadingScreen label="Opening the character sheet…" />;
@@ -1844,6 +1991,39 @@ export function CharacterSheetPage() {
               </Field>
             </div>
 
+            {derived.conditionEffects.dying > 0 ? (
+              <div className="dying-recovery">
+                <div className="row-between" style={{ gap: 10, alignItems: "flex-start" }}>
+                  <div>
+                    <strong>Dying {derived.conditionEffects.dying}</strong>
+                    {derived.conditionEffects.doomed > 0 ? (
+                      <span className="tiny muted">
+                        {" "}
+                        · doomed {derived.conditionEffects.doomed} (death threshold{" "}
+                        {4 - derived.conditionEffects.doomed})
+                      </span>
+                    ) : null}
+                    <p className="tiny muted">
+                      Recovery check DC {10 + derived.conditionEffects.dying} at the start of each
+                      turn.
+                    </p>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="primary"
+                    disabled={!canEdit}
+                    aria-label="Roll dying recovery check"
+                    onClick={rollDyingRecovery}
+                  >
+                    Recovery check
+                  </Button>
+                </div>
+                <p className="tiny muted">
+                  Success: −1 dying · Critical success: −2 · Failure: +1 · Critical failure: +2.
+                </p>
+              </div>
+            ) : null}
+
             <div className="play-points">
               <div className="point-row">
                 <span>Hero points</span>
@@ -2096,6 +2276,99 @@ export function CharacterSheetPage() {
                   />
                 </div>
               ) : null}
+            </div>
+
+            <div className="persistent-damage-editor">
+              <div className="row-between">
+                <h3>Persistent damage</h3>
+                <div className="row" style={{ gap: 6 }}>
+                  <span className="tiny muted">{draft.play.persistentDamage.length}</span>
+                  {canEdit && draft.play.persistentDamage.length ? (
+                    <Button
+                      size="sm"
+                      variant="primary"
+                      aria-label="End turn for all persistent damage"
+                      onClick={endTurnPersistentDamage}
+                    >
+                      End turn
+                    </Button>
+                  ) : null}
+                </div>
+              </div>
+              <div className="persistent-damage-list">
+                {draft.play.persistentDamage.map((instance) => (
+                  <div className="persistent-damage-row" key={instance.id}>
+                    <div className="grow">
+                      <Tag tone="red">{persistentDamageLabel(instance)}</Tag>
+                      <span className="tiny muted"> · DC {instance.dc}</span>
+                      {instance.notes ? (
+                        <span className="tiny muted"> · {instance.notes}</span>
+                      ) : null}
+                    </div>
+                    {canEdit ? (
+                      <div className="row" style={{ gap: 4 }}>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          aria-label={`Remove ${persistentDamageLabel(instance)}`}
+                          onClick={() => removePersistentDamage(instance.id)}
+                        >
+                          <Trash2 size={13} />
+                        </Button>
+                      </div>
+                    ) : null}
+                  </div>
+                ))}
+                {!draft.play.persistentDamage.length ? (
+                  <span className="muted tiny">No persistent damage.</span>
+                ) : null}
+              </div>
+              {canEdit ? (
+                <div className="persistent-damage-add">
+                  <Input
+                    aria-label="Persistent damage formula"
+                    value={persistentFormula}
+                    onChange={(event) => setPersistentFormula(event.target.value)}
+                    placeholder="1d6"
+                    style={{ maxWidth: 90 }}
+                  />
+                  <Input
+                    aria-label="Persistent damage type"
+                    value={persistentType}
+                    onChange={(event) => setPersistentType(event.target.value)}
+                    placeholder="fire"
+                    style={{ maxWidth: 110 }}
+                  />
+                  <Input
+                    aria-label="Persistent damage DC"
+                    type="number"
+                    min={1}
+                    max={30}
+                    value={persistentDc}
+                    onChange={(event) => setPersistentDc(event.target.value)}
+                    placeholder="15"
+                    style={{ maxWidth: 70 }}
+                  />
+                  <Input
+                    aria-label="Persistent damage notes"
+                    value={persistentNotes}
+                    onChange={(event) => setPersistentNotes(event.target.value)}
+                    placeholder="Source (optional)"
+                  />
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    icon={<Plus size={13} />}
+                    onClick={addPersistentDamage}
+                  >
+                    Add persistent
+                  </Button>
+                </div>
+              ) : null}
+              <p className="tiny muted">
+                At the end of the turn, take all listed damage at once, then attempt each
+                entry&apos;s flat check. Adding the same damage type replaces the existing entry.
+              </p>
             </div>
 
             <div className="afflictions-editor">

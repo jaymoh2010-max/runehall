@@ -112,10 +112,11 @@ This is the short checklist for the friend hosting Runehall and for the GM runni
 - The builder is strong but not every feat, spell, or item effect is automated. Read the effect and
   apply manual bonuses when needed.
 - Spell heightening/cast-time spending and the common Heal/Harm/Force Barrage action variants are
-  automated. Other action variants, affliction onset timers, dying/persistent-damage recovery
-  checks, and forced movement are not fully automated. Staged afflictions can be tracked on the
-  sheet with stage saves, but their presets and timers remain manual. The GM review queue shows
-  validation errors it can detect, but not every missing situational bonus.
+  automated. Other action variants, affliction onset timers, automatic token-turn
+  dying/persistent-damage hooks, fast healing/regeneration, and forced movement are not fully
+  automated. The sheet can roll dying recovery checks and persistent damage end-of-turn checks
+  manually, and staged afflictions have a stage-save tracker. The GM review queue shows validation
+  errors it can detect, but not every missing situational bonus.
 - Only Pathbuilder imports go through the GM approval queue. A player who joins without a character
   can create one directly in the campaign; the GM should check the Party tab before play.
 - Encounter cleanup only knows tokens launched after this update. Tokens created by older launches

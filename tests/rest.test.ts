@@ -36,6 +36,15 @@ function hero(level = 5): CharacterDraft {
       notes: "",
     },
   ];
+  draft.play.persistentDamage = [
+    {
+      id: "pd-rest",
+      formula: "1d6",
+      type: "fire",
+      dc: 15,
+      notes: "",
+    },
+  ];
   draft.play.conditions = [
     { name: "Fatigued", value: null, duration: null },
     { name: "Drained", value: 2, duration: null },
@@ -94,6 +103,7 @@ describe("PF2e long rest", () => {
     expect(result.draft.spells.preparedUsed).toEqual({});
     expect(result.draft.spells.fontUsed).toEqual({});
     expect(result.draft.play.afflictions).toEqual(hero(5).play.afflictions);
+    expect(result.draft.play.persistentDamage).toEqual(hero(5).play.persistentDamage);
     expect(result.draft.play.tempHp).toBe(0);
     expect(result.draft.play.focusPoints).toBe(3);
     expect(result.draft.play.shieldRaised).toBe(false);

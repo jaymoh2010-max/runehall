@@ -32,6 +32,7 @@ import {
 import { propertyRuneDamage, shieldRuneBonus, summarizeRunes } from "./runes";
 import { conditionModifiers } from "./conditions";
 import { normalizeAfflictions } from "./afflictions";
+import { normalizePersistentDamageList } from "./persistentDamage";
 import {
   FEAT_CHOICES,
   FEAT_GRANTS,
@@ -877,6 +878,7 @@ export function emptyCharacterDraft(name = "New Hero"): CharacterDraft {
       downtimeDays: 0,
       conditions: [],
       afflictions: [],
+      persistentDamage: [],
       xp: 0,
       shieldRaised: false,
     },
@@ -1147,6 +1149,7 @@ export function normalizeCharacterDraft(input: unknown, fallbackName = "New Hero
           duration: typeof c.duration === "number" ? c.duration : null,
         })),
       afflictions: normalizeAfflictions(play.afflictions),
+      persistentDamage: normalizePersistentDamageList(play.persistentDamage),
       xp: Math.max(0, num(play.xp, 0)),
       shieldRaised: Boolean(play.shieldRaised),
     },

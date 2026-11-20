@@ -618,8 +618,20 @@ export interface CharacterPlay {
   downtimeDays: number;
   conditions: CharacterCondition[];
   afflictions: CharacterAffliction[];
+  persistentDamage: PersistentDamageInstance[];
   xp: number;
   shieldRaised: boolean;
+}
+
+export interface PersistentDamageInstance {
+  id: string;
+  /** Damage formula rolled at the end of each turn, e.g. "1d6". */
+  formula: string;
+  /** Damage type, e.g. "fire", "bleed", or "acid". */
+  type: string;
+  /** Flat-check DC to end this instance; 15 unless the source overrides it. */
+  dc: number;
+  notes: string;
 }
 
 export type AfflictionType = "poison" | "disease" | "curse";

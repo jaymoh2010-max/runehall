@@ -2585,6 +2585,16 @@
 .hp-quick .btn {
   flex: 1;
 }
+.dying-recovery {
+  margin-top: 10px;
+  padding: 9px 10px;
+  border: 1px solid rgba(190, 82, 82, 0.45);
+  border-radius: 7px;
+  background: rgba(190, 82, 82, 0.08);
+}
+.dying-recovery p {
+  margin: 2px 0 0;
+}
 .play-points {
   display: flex;
   flex-direction: column;
@@ -2646,6 +2656,35 @@
   flex-direction: column;
   gap: 2px;
   line-height: 1.35;
+}
+.persistent-damage-editor {
+  padding-top: 13px;
+  margin-top: 13px;
+  border-top: 1px solid var(--line);
+}
+.persistent-damage-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 7px;
+}
+.persistent-damage-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.015);
+  padding: 6px 9px;
+}
+.persistent-damage-add {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 8px;
 }
 .afflictions-editor {
   padding-top: 13px;
