@@ -1520,3 +1520,59 @@ test("sheet tracks afflictions with stages and stage saves", async ({ page }) =>
   await row.getByRole("button", { name: "End Giant Spider Venom" }).click();
   await expect(page.locator(".affliction-row")).toHaveCount(0);
 });
+
+test("sheet rolls dying recovery and persistent damage end-of-turn checks", async ({ page }) => {
+  test.setTimeout(60_000);
+  await signIn(page, admin);
+  const created = await page.request.post("/api/characters", {
+    data: { name: "E2E Dying" },
+  });
+  expect(created.status()).toBe(201);
+  const { character } = (await created.json()) as { character: { id: string } };
+  const saved = await page.request.put(`/api/characters/${character.id}`, {
+    data: {
+      data: {
+        name: "E2E Dying",
+        level: 1,
+        classId: "cls:8zn3cD6GSmoo1LW4",
+        keyAbility: "str",
+      },
+    },
+  });
+  expect(saved.ok()).toBe(true);
+
+  await page.goto(`/characters/${character.id}`);
+  await expect(page.getByRole("heading", { name: "E2E Dying" })).toBeVisible({
+    timeout: 15_000,
+  });
+
+  const hpInput = page.getByLabel("Current hit points");
+  await hpInput.fill("0");
+  await hpInput.blur();
+  const dyingPanel = page.locator(".dying-recovery");
+  await expect(dyingPanel).toContainText("Dying 1");
+  await expect(dyingPanel).toContainText("Recovery check DC 11");
+
+  await page.evaluate(() => {
+    Math.random = () => 0.5;
+  });
+  await page.getByRole("button", { name: "Roll dying recovery check" }).click();
+  await expect(page.locator(".dying-recovery")).toHaveCount(0);
+  await expect(page.locator(".conditions-list").getByText("Wounded 1")).toBeVisible();
+
+  await hpInput.fill("10");
+  await hpInput.blur();
+  await page.getByLabel("Persistent damage formula").fill("1d6");
+  await page.getByLabel("Persistent damage type").fill("fire");
+  await page.getByRole("button", { name: "Add persistent" }).click();
+  const persistentRow = page.locator(".persistent-damage-row").filter({ hasText: "1d6 fire" });
+  await expect(persistentRow).toBeVisible();
+  await expect(persistentRow).toContainText("DC 15");
+
+  await page.evaluate(() => {
+    Math.random = () => 0.999;
+  });
+  await page.getByRole("button", { name: "End turn for all persistent damage" }).click();
+  await expect(page.locator(".persistent-damage-row")).toHaveCount(0);
+  await expect(hpInput).toHaveValue("4");
+});

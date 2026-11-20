@@ -1,4 +1,4 @@
-import type { CharacterCondition, CharacterDraft } from "./types";
+import type { CharacterCondition, CharacterDraft, DegreeOfSuccess } from "./types";
 
 /**
  * PF2e damage helper. Temporary HP absorbs damage first, and dropping to 0 HP
@@ -60,10 +60,12 @@ function stateDraft(state: HpState): CharacterDraft {
       heroPoints: 0,
       focusPoints: 0,
       downtimeDays: 0,
+      afflictions: [],
+      persistentDamage: [],
       xp: 0,
       shieldRaised: false,
     },
-  } as CharacterDraft;
+  } as unknown as CharacterDraft;
 }
 
 /**
@@ -205,8 +207,9 @@ export function applyHealingToDraft(
   const healed = nextHp - currentHp;
   if (!healed) return { draft, healed: 0, notes: [] };
   const notes = [`Healed ${healed} HP.`];
+  const wasDying = conditionValue(draft.play.conditions, "dying") > 0;
   let conditions = reconcileLifeConditions(draft.play.conditions, nextHp, maximum);
-  if (currentHp === 0 && nextHp > 0) {
+  if (currentHp === 0 && nextHp > 0 && wasDying) {
     const wounded = conditionValue(conditions, "wounded");
     conditions = upsertCondition(conditions, "Wounded", wounded + 1);
     notes.push(`Dying ends: wounded ${wounded + 1}.`);
@@ -222,6 +225,114 @@ export function applyHealingToDraft(
       },
     },
     healed,
+    notes,
+  };
+}
+
+export interface DyingRecoveryResult {
+  draft: CharacterDraft;
+  dying: number;
+  wounded: number;
+  dead: boolean;
+  ended: boolean;
+  notes: string[];
+}
+
+function conditionBaseName(value: string): string {
+  const trailing = String(value ?? "")
+    .trim()
+    .match(/^(.*?)\s+(\d+)$/);
+  return normalizeName(trailing?.[1] ?? String(value ?? ""));
+}
+
+/**
+ * Apply a start-of-turn dying recovery check. A success reduces dying by 1
+ * (critical success by 2) and a failure increases it by 1 (critical failure by
+ * 2). Dropping below dying 1 ends dying, keeps unconscious while HP remains 0,
+ * and increases wounded by 1. Reaching the doomed-adjusted threshold kills.
+ */
+export function applyDyingRecovery(
+  draft: CharacterDraft,
+  degree: DegreeOfSuccess
+): DyingRecoveryResult {
+  const existing = conditionValue(draft.play.conditions, "dying");
+  const wounded = conditionValue(draft.play.conditions, "wounded");
+  const alreadyDead = conditionValue(draft.play.conditions, "dead") > 0;
+  if (alreadyDead || existing <= 0) {
+    return {
+      draft,
+      dying: existing,
+      wounded,
+      dead: alreadyDead,
+      ended: existing <= 0,
+      notes: [],
+    };
+  }
+
+  const immediateThreshold = 4 - conditionValue(draft.play.conditions, "doomed");
+  if (immediateThreshold <= 0) {
+    const conditions = upsertCondition(
+      draft.play.conditions.map((condition) => ({ ...condition })),
+      "Dead",
+      null
+    );
+    return {
+      draft: { ...draft, play: { ...draft.play, conditions } },
+      dying: existing,
+      wounded,
+      dead: true,
+      ended: false,
+      notes: ["Doomed lowered the death threshold to 0: the character is dead."],
+    };
+  }
+
+  const delta =
+    degree === "critical-success"
+      ? -2
+      : degree === "success"
+        ? -1
+        : degree === "critical-failure"
+          ? 2
+          : 1;
+  const dying = Math.max(0, existing + delta);
+  let conditions = draft.play.conditions.map((condition) => ({ ...condition }));
+  const notes: string[] = [];
+  let ended = false;
+
+  if (dying <= 0) {
+    ended = true;
+    const hp = draft.play.hp === null ? 1 : Math.max(0, Math.round(draft.play.hp));
+    conditions = conditions.filter((condition) => {
+      const base = conditionBaseName(condition.name);
+      if (base === "dying") return false;
+      if (base === "unconscious" && hp > 0) return false;
+      return true;
+    });
+    conditions = upsertCondition(conditions, "Wounded", wounded + 1);
+    notes.push(`Dying ends: wounded ${wounded + 1}.`);
+  } else {
+    conditions = upsertCondition(conditions, "Dying", dying);
+    notes.push(`Dying ${existing} → ${dying}.`);
+    const deathThreshold = 4 - conditionValue(conditions, "doomed");
+    if (deathThreshold <= 0 || dying >= deathThreshold) {
+      conditions = upsertCondition(conditions, "Dead", null);
+      notes.push(
+        deathThreshold <= 0
+          ? "Doomed lowered the death threshold to 0: the character is dead."
+          : `Dying ${deathThreshold} reached: the character is dead unless the GM intervenes.`
+      );
+    }
+  }
+
+  return {
+    draft: {
+      ...draft,
+      play: { ...draft.play, conditions },
+    },
+    dying,
+    wounded: conditionValue(conditions, "wounded"),
+    dead: conditionValue(conditions, "dead") > 0,
+    ended,
     notes,
   };
 }
@@ -311,12 +422,14 @@ export function applyDamageToDraft(
     conditions = upsertCondition(conditions, "Unconscious", null);
     notes.push(`Dropped to 0 HP: dying ${dying} and unconscious.`);
     notes.push(`Recovery check DC ${10 + dying} at the start of each turn.`);
-    const deathThreshold = Math.max(1, 4 - conditionValue(conditions, "doomed"));
-    if (dying >= deathThreshold) {
+    const deathThreshold = 4 - conditionValue(conditions, "doomed");
+    if (deathThreshold <= 0 || dying >= deathThreshold) {
       dead = true;
       conditions = upsertCondition(conditions, "Dead", null);
       notes.push(
-        `Dying ${deathThreshold} reached: the character is dead unless the GM intervenes.`
+        deathThreshold <= 0
+          ? "Doomed lowered the death threshold to 0: the character is dead."
+          : `Dying ${deathThreshold} reached: the character is dead unless the GM intervenes.`
       );
     }
   } else if (hpDamage) {
