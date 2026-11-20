@@ -98,6 +98,10 @@ describe("migrations", () => {
       name: string;
     }[];
     expect(tokenColumns.map((column) => column.name)).toContain("encounter_id");
+    const campaignColumns = db.prepare("PRAGMA table_info(campaigns)").all() as {
+      name: string;
+    }[];
+    expect(campaignColumns.map((column) => column.name)).toContain("advancement_speed");
 
     const columns = db.prepare("PRAGMA table_info(users)").all() as { name: string }[];
     expect(columns.map((column) => column.name)).toContain("is_admin");
@@ -122,6 +126,7 @@ describe("migrations", () => {
         "audit_log",
         "campaign_join_requests",
         "audio_library_tracks",
+        "xp_awards",
       ])
     );
 

@@ -630,8 +630,10 @@ Acceptance: a GM can prepare a full session in Runehall and start it with one â€
 - [x] **GM-controlled advancement and XP awards**
   - The default advancement mode is Milestone, where the GM decides when the party or an individual character levels up.
   - Optional XP tracking adds PF2e encounter budgets plus an award flow for one character, several characters, or the whole party.
+  - Campaigns choose fast, medium, or slow advancement (800/1,000/1,200 XP per level); progress bars and level-up subtraction use the chosen threshold.
+  - XP awards support encounters, simple/complex hazards by level difference, minor/moderate/major accomplishments (10/30/80), quests, and other awards. The GM gets a recent-award ledger.
   - XP awards never trigger a level-up; the GM uses **Level up** on a party card or **Level up party**.
-  - Advancing a character consumes up to 1,000 XP and preserves any excess.
+  - Advancing a character consumes up to one level's threshold and preserves any excess.
   - Party cards show XP progress when tracking is enabled, and the character sheet shows awarded XP.
   - Campaign characters can only change level through the GM; the builder disables level changes for players, and the server rejects attempts to bypass it. Uncampaigned characters stay owner-editable.
   - XP awards are GM-only, audited, and covered by unit tests, the two-user smoke test, and the browser suite.

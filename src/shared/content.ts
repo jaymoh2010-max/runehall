@@ -1,4 +1,5 @@
-import type { CampaignRuleset, ContentMode, XpMode } from "./types";
+import type { AdvancementSpeed, CampaignRuleset, ContentMode, XpMode } from "./types";
+import { XP_PER_LEVEL_BY_SPEED } from "./xp";
 
 /**
  * Tier 1 character options. These are the remastered core books most tables
@@ -91,6 +92,30 @@ export const XP_MODE_OPTIONS: { value: XpMode; label: string; description: strin
     label: "XP tracking (GM levels up)",
     description:
       "Track PF2e encounter budgets and award XP. Characters still level up only when the GM chooses.",
+  },
+];
+
+export const ADVANCEMENT_SPEED_OPTIONS: {
+  value: AdvancementSpeed;
+  label: string;
+  description: string;
+}[] = [
+  {
+    value: "fast",
+    label: `Fast (${XP_PER_LEVEL_BY_SPEED.fast.toLocaleString("en-US")} XP per level)`,
+    description:
+      "Quick, heroic pacing. Characters reach level 20 after about 16,000 XP of encounters and accomplishments.",
+  },
+  {
+    value: "medium",
+    label: `Medium (${XP_PER_LEVEL_BY_SPEED.medium.toLocaleString("en-US")} XP per level)`,
+    description: "The standard PF2e pace used by most Adventure Paths. One level per 1,000 XP.",
+  },
+  {
+    value: "slow",
+    label: `Slow (${XP_PER_LEVEL_BY_SPEED.slow.toLocaleString("en-US")} XP per level)`,
+    description:
+      "A longer campaign. Use this when you want more sessions at each level and slower power growth.",
   },
 ];
 

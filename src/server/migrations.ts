@@ -584,4 +584,30 @@ export const migrations: Migration[] = [
       CREATE INDEX IF NOT EXISTS idx_tokens_encounter ON tokens(encounter_id);
     `,
   },
+  {
+    version: 31,
+    name: "campaign_advancement_speed",
+    sql: `
+      ALTER TABLE campaigns ADD COLUMN advancement_speed TEXT NOT NULL DEFAULT 'medium';
+    `,
+  },
+  {
+    version: 32,
+    name: "xp_award_ledger",
+    sql: `
+      CREATE TABLE IF NOT EXISTS xp_awards (
+        id TEXT PRIMARY KEY,
+        campaign_id TEXT NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+        actor_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+        kind TEXT NOT NULL DEFAULT 'other',
+        amount INTEGER NOT NULL,
+        reason TEXT NOT NULL DEFAULT '',
+        recipient_count INTEGER NOT NULL DEFAULT 0,
+        created_at INTEGER NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_xp_awards_campaign
+        ON xp_awards(campaign_id, created_at DESC);
+    `,
+  },
 ];

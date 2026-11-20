@@ -3561,6 +3561,21 @@
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.015);
 }
+.xp-ledger {
+  margin-top: 22px;
+}
+.xp-ledger .section-title {
+  margin-bottom: 10px;
+}
+.xp-ledger-row {
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+  gap: 16px;
+}
+.xp-ledger-row:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
 .party-card-actions {
   display: flex;
   flex-wrap: wrap;

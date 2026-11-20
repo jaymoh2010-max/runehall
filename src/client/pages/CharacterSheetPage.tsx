@@ -1065,7 +1065,11 @@ export function CharacterSheetPage() {
   const selectedOptions = selectedChoiceOptions(draft, classData);
   const hp = derived.currentHp;
   const fortune = draft.play;
-  const xp = xpProgress(draft.play.xp, draft.level);
+  const xp = xpProgress(
+    draft.play.xp,
+    draft.level,
+    character?.campaignAdvancementSpeed ?? "medium"
+  );
   const reviewIssues = derived.validation.filter((issue) => issue.severity === "error");
   const sheetSections = [
     { id: "sheet-abilities", label: "Abilities" },

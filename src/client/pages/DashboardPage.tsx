@@ -15,8 +15,19 @@ import {
   UserPlus,
   Users,
 } from "lucide-react";
-import type { CampaignRuleset, CampaignSummary, CharacterRecord, XpMode } from "../../shared/types";
-import { CAMPAIGN_RULESET_OPTIONS, XP_MODE_OPTIONS, rulesetLabel } from "../../shared/content";
+import type {
+  AdvancementSpeed,
+  CampaignRuleset,
+  CampaignSummary,
+  CharacterRecord,
+  XpMode,
+} from "../../shared/types";
+import {
+  ADVANCEMENT_SPEED_OPTIONS,
+  CAMPAIGN_RULESET_OPTIONS,
+  XP_MODE_OPTIONS,
+  rulesetLabel,
+} from "../../shared/content";
 import { api, copyText, formatDate } from "../api";
 import { errorMessage, useSession, useToasts } from "../stores";
 import {
@@ -72,6 +83,8 @@ export function DashboardPage() {
   const [campaignDescription, setCampaignDescription] = useState("");
   const [campaignRuleset, setCampaignRuleset] = useState<CampaignRuleset>("core");
   const [campaignXpMode, setCampaignXpMode] = useState<XpMode>("milestone");
+  const [campaignAdvancementSpeed, setCampaignAdvancementSpeed] =
+    useState<AdvancementSpeed>("medium");
   const [invite, setInvite] = useState("");
   const [newCharacterName, setNewCharacterName] = useState("");
   const [newCharacterCampaign, setNewCharacterCampaign] = useState("");
@@ -199,6 +212,7 @@ export function DashboardPage() {
           description: campaignDescription,
           ruleset: campaignRuleset,
           xpMode: campaignXpMode,
+          advancementSpeed: campaignAdvancementSpeed,
         },
       });
       setCreateOpen(false);
@@ -206,6 +220,7 @@ export function DashboardPage() {
       setCampaignDescription("");
       setCampaignRuleset("core");
       setCampaignXpMode("milestone");
+      setCampaignAdvancementSpeed("medium");
       toast("Campaign created. Invite your players when you're ready.", "success");
       navigate(`/campaigns/${result.campaign.id}`, { state: { invite: true } });
     } catch (err) {
@@ -394,7 +409,9 @@ export function DashboardPage() {
                     ) : null}
                     <Badge tone="violet">{rulesetLabel(campaign.ruleset)}</Badge>
                     <Badge tone={campaign.xpMode === "xp" ? "green" : "neutral"}>
-                      {campaign.xpMode === "xp" ? "XP tracking" : "GM decides"}
+                      {campaign.xpMode === "xp"
+                        ? `XP tracking · ${campaign.advancementSpeed}`
+                        : "GM decides"}
                     </Badge>
                     {campaign.lastPlayedAt ? (
                       <span className="tiny muted">Played {formatDate(campaign.lastPlayedAt)}</span>
@@ -677,6 +694,26 @@ export function DashboardPage() {
               onChange={(event) => setCampaignXpMode(event.target.value as XpMode)}
             >
               {XP_MODE_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Field
+            label="Advancement speed"
+            hint={
+              ADVANCEMENT_SPEED_OPTIONS.find((option) => option.value === campaignAdvancementSpeed)
+                ?.description
+            }
+          >
+            <Select
+              value={campaignAdvancementSpeed}
+              onChange={(event) =>
+                setCampaignAdvancementSpeed(event.target.value as AdvancementSpeed)
+              }
+            >
+              {ADVANCEMENT_SPEED_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>
                   {option.label}
                 </option>
