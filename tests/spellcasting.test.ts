@@ -5,8 +5,10 @@ import {
   addSpellFormulas,
   cantripCastRank,
   castSpell,
+  defaultSpellActions,
   focusCastRank,
   scaleSpellFormula,
+  spellActionVariants,
   spellCastOptionAvailable,
   spellCastOptions,
   spellDamageAtRank,
@@ -323,5 +325,56 @@ describe("spell casting", () => {
     expect(addSpellFormulas("6d6", "4d6")).toBe("10d6");
     expect(addSpellFormulas("1d4+1", "1d4+1")).toBe("2d4+2");
     expect(addSpellFormulas("4", "1d6+2")).toBe("1d6+6");
+  });
+
+  it("builds Heal and Harm action variants with rank scaling", () => {
+    const rankOne = spellActionVariants(heal, 1);
+    expect(rankOne.map((variant) => [variant.actions, variant.formula, variant.note])).toEqual([
+      [1, "1d8", "Touch"],
+      [2, "1d8+8", "30 feet"],
+      [3, "1d8", "30-ft emanation"],
+    ]);
+    expect(rankOne.every((variant) => variant.healing && variant.type === "vitality")).toBe(true);
+
+    expect(spellActionVariants(heal, 3).map((variant) => variant.formula)).toEqual([
+      "3d8",
+      "3d8+24",
+      "3d8",
+    ]);
+    expect(spellActionVariants(harm, 3).map((variant) => variant.formula)).toEqual([
+      "3d8",
+      "3d8+24",
+      "3d8",
+    ]);
+    expect(spellActionVariants(harm, 3).every((variant) => !variant.healing)).toBe(true);
+    expect(spellActionVariants(harm, 3)[0].type).toBe("void");
+    expect(defaultSpellActions(heal)).toBe(2);
+    expect(defaultSpellActions(harm)).toBe(2);
+  });
+
+  it("builds Force Barrage shard variants on its +2 heightening", () => {
+    expect(
+      spellActionVariants(forceBarrage, 1).map((variant) => [variant.actions, variant.formula])
+    ).toEqual([
+      [1, "1d4+1"],
+      [2, "2d4+2"],
+      [3, "3d4+3"],
+    ]);
+    expect(
+      spellActionVariants(forceBarrage, 3).map((variant) => [variant.actions, variant.formula])
+    ).toEqual([
+      [1, "2d4+2"],
+      [2, "4d4+4"],
+      [3, "6d4+6"],
+    ]);
+    expect(
+      spellActionVariants(forceBarrage, 5).map((variant) => [variant.actions, variant.formula])
+    ).toEqual([
+      [1, "3d4+3"],
+      [2, "6d4+6"],
+      [3, "9d4+9"],
+    ]);
+    expect(defaultSpellActions(forceBarrage)).toBe(1);
+    expect(spellActionVariants(fireball, 5)).toEqual([]);
   });
 });

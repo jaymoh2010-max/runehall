@@ -413,6 +413,97 @@ export function isHealingSpell(spell: Pick<Spell, "traits">): boolean {
   return spell.traits.includes("healing");
 }
 
+export interface SpellActionVariant {
+  actions: 1 | 2 | 3;
+  formula: string;
+  type: string;
+  /** True when the spell restores HP to its primary target. */
+  healing: boolean;
+  /** Range or area for this action count. */
+  note: string;
+  /** Short table-facing explanation of the effect. */
+  detail: string;
+  label: string;
+  rollLabel: string;
+}
+
+const ACTION_COUNTS: Array<1 | 2 | 3> = [1, 2, 3];
+
+/**
+ * Curated 1/2/3-action variants for spells whose printed effect changes with
+ * the number of actions spent. Other variable-action spells stay manual.
+ */
+export function spellActionVariants(
+  spell: Pick<Spell, "name" | "rank">,
+  castRank: number
+): SpellActionVariant[] {
+  const name = spell.name.trim().toLowerCase();
+  const baseRank = Math.max(1, Math.round(spell.rank) || 1);
+  const rank = clampInt(castRank, baseRank, 10);
+
+  if (name === "heal" || name === "harm") {
+    const healing = name === "heal";
+    const type = healing ? "vitality" : "void";
+    const dice = `${rank}d8`;
+    const extra = rank * 8;
+    return ACTION_COUNTS.map((actions) => {
+      const formula = actions === 2 ? `${dice}+${extra}` : dice;
+      const note = actions === 1 ? "Touch" : actions === 2 ? "30 feet" : "30-ft emanation";
+      const effect = healing
+        ? `${formula} healing (or ${formula} vitality damage to undead)`
+        : `${formula} void damage (or ${formula} healing to undead)`;
+      return {
+        actions,
+        formula,
+        type,
+        healing,
+        note,
+        detail: healing
+          ? `Heals living creatures; against undead this deals ${formula} vitality damage with a basic Fortitude save.`
+          : `Deals ${formula} void damage to living creatures with a basic Fortitude save; heals undead for ${formula}.`,
+        label: `${actions} action${actions === 1 ? "" : "s"}`,
+        rollLabel: `${spell.name} · ${actions} action${actions === 1 ? "" : "s"} (${effect})`,
+      };
+    });
+  }
+
+  if (name === "force barrage" || name === "magic missile") {
+    const shardsPerAction = 1 + Math.floor((rank - 1) / 2);
+    return ACTION_COUNTS.map((actions) => {
+      const shards = shardsPerAction * actions;
+      const formula = `${shards}d4+${shards}`;
+      return {
+        actions,
+        formula,
+        type: "force",
+        healing: false,
+        note: "120 feet",
+        detail: `${shards} shard${shards === 1 ? "" : "s"}, each 1d4+1 force; automatically hits.`,
+        label: `${actions} action${actions === 1 ? "" : "s"}`,
+        rollLabel: `${spell.name} · ${actions} action${actions === 1 ? "" : "s"} (${formula} force, ${shards} shard${shards === 1 ? "" : "s"})`,
+      };
+    });
+  }
+
+  return [];
+}
+
+/** The default action count when opening the cast dialog. */
+export function defaultSpellActions(spell: Pick<Spell, "name">): 1 | 2 | 3 {
+  const name = spell.name.trim().toLowerCase();
+  return name === "heal" || name === "harm" ? 2 : 1;
+}
+
+export function spellActionVariant(
+  spell: Pick<Spell, "name" | "rank">,
+  castRank: number,
+  actions: number
+): SpellActionVariant | null {
+  return (
+    spellActionVariants(spell, castRank).find((variant) => variant.actions === actions) ?? null
+  );
+}
+
 export function spellHeighteningNotes(spell: Spell): string[] {
   const text = spell.description
     .replace(/<[^>]+>/g, " ")

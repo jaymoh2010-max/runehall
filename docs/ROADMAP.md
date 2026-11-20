@@ -370,6 +370,7 @@ Acceptance: a GM can prepare a full session in Runehall and start it with one â€
   - Cleric divine font slots are tracked with their own pips, separate from ordinary rank slots.
   - Prepared casters label their spell lists as **spellbook** and show prepared counts; spontaneous casters use **repertoire**.
   - The sheet shows the same separation and labels.
+  - Heal, Harm, and Force Barrage expose 1/2/3-action formulas and rolls, including rank-scaled 2-action healing and Force Barrage's +2 shard heightening.
   - Dual-font deities now require an explicit Heal or Harm choice, and the rank-1 Wizard extra slot is restricted to curriculum spells.
   - Remaining: curate higher-rank Wizard curriculum lists and fully separate spellbook from known lists for every prepared class.
 - [x] **Companion support (first pass)**
