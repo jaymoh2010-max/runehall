@@ -1123,6 +1123,11 @@ test("builder completes a level-1 Wizard using granted curriculum spells", async
   await barrageRow.getByRole("button", { name: "Cast Force Barrage" }).click();
   const barrageDialog = page.getByRole("dialog", { name: "Cast Force Barrage" });
   await expect(barrageDialog.getByText(/1 rank 1 slot/)).toBeVisible();
+  await expect(
+    barrageDialog.getByRole("button", { name: "Use 1 action for Force Barrage" })
+  ).toHaveAttribute("aria-pressed", "true");
+  await barrageDialog.getByRole("button", { name: "Use 2 actions for Force Barrage" }).click();
+  await expect(barrageDialog.getByText("2d4+2 force", { exact: true })).toBeVisible();
   await barrageDialog.getByRole("button", { name: "Cast spell" }).click();
   await expect(wizardRankOne).toContainText("2 / 3");
   await expect(page.locator(".save-indicator")).toHaveText("Saved");
@@ -1367,6 +1372,14 @@ test("level-5 prepared upcasting moves Heal into the rank-3 font pool", async ({
     "Rank 1 · Rank 1 slot · 1 left",
   ]);
   await expect(healDialog.getByTestId("cast-prepared-summary")).toContainText("rank 3 font ×5");
+  await expect(healDialog.getByRole("button", { name: "Use 2 actions for Heal" })).toHaveAttribute(
+    "aria-pressed",
+    "true"
+  );
+  await expect(healDialog.getByText("3d8+24 HP", { exact: true })).toBeVisible();
+  await healDialog.getByRole("button", { name: "Use 1 action for Heal" }).click();
+  await expect(healDialog.getByText("3d8 HP", { exact: true })).toBeVisible();
+  await healDialog.getByRole("button", { name: "Use 2 actions for Heal" }).click();
   await healDialog.getByRole("button", { name: "Cast spell" }).click();
   await expect(page.locator(".sheet-slots .slot-row-font")).toContainText("4 / 5");
 

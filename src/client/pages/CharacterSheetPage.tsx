@@ -53,7 +53,9 @@ import {
 } from "../../shared/rules";
 import {
   castSpell,
+  defaultSpellActions,
   isHealingSpell,
+  spellActionVariants,
   spellCastOptionAvailable,
   spellCastOptions,
   spellDamageAtRank,
@@ -161,6 +163,7 @@ export function CharacterSheetPage() {
     kind: "known" | "cantrip" | "focus";
     rank: number;
     resource: SpellCastResource;
+    actions: 1 | 2 | 3;
   } | null>(null);
   const [castRanks, setCastRanks] = useState<Record<string, number>>({});
   const [hpInput, setHpInput] = useState("");
@@ -297,6 +300,14 @@ export function CharacterSheetPage() {
     castSpellEntry && selectedCastOption
       ? spellDamageAtRank(castSpellEntry, selectedCastOption.rank)
       : null;
+  const castVariants =
+    castSpellEntry && selectedCastOption
+      ? spellActionVariants(castSpellEntry, selectedCastOption.rank)
+      : [];
+  const selectedCastVariant =
+    castVariants.find((variant) => variant.actions === castState?.actions) ??
+    castVariants[0] ??
+    null;
   const castPreparedRows =
     castSpellEntry && draft
       ? preparedEntries(draft, {
@@ -497,7 +508,13 @@ export function CharacterSheetPage() {
     });
     if (!options.length) return;
     const option = options.find(spellCastOptionAvailable) ?? options[0];
-    setCastState({ spellId: spell.id, kind, rank: option.rank, resource: option.resource });
+    setCastState({
+      spellId: spell.id,
+      kind,
+      rank: option.rank,
+      resource: option.resource,
+      actions: defaultSpellActions(spell),
+    });
   };
 
   const confirmCast = () => {
@@ -2303,6 +2320,34 @@ export function CharacterSheetPage() {
               {castSpellEntry.actions || "cast"} · {castSpellEntry.range || "range —"}
               {castSpellEntry.defense?.save ? ` · ${castSpellEntry.defense.save} save` : ""}
             </p>
+            {castVariants.length ? (
+              <div className="row" style={{ gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                <span className="field-label">Actions</span>
+                <div className="chip-row">
+                  {castVariants.map((variant) => {
+                    const selected = selectedCastVariant?.actions === variant.actions;
+                    return (
+                      <Button
+                        key={variant.actions}
+                        size="sm"
+                        variant={selected ? "primary" : "ghost"}
+                        aria-pressed={selected}
+                        aria-label={`Use ${variant.label} for ${castSpellEntry.name}`}
+                        title={variant.note}
+                        onClick={() =>
+                          setCastState((current) =>
+                            current ? { ...current, actions: variant.actions } : current
+                          )
+                        }
+                      >
+                        {variant.label}
+                      </Button>
+                    );
+                  })}
+                </div>
+                <span className="tiny muted">{selectedCastVariant?.note}</span>
+              </div>
+            ) : null}
             {castPreparedRows.length ? (
               <p className="tiny muted" data-testid="cast-prepared-summary">
                 Prepared: {castPreparedSummary}
@@ -2359,7 +2404,15 @@ export function CharacterSheetPage() {
                 <span>Spell DC</span>
                 <strong>{derived?.spellDc ?? "—"}</strong>
               </li>
-              {castDamage?.parts.length ? (
+              {selectedCastVariant ? (
+                <li>
+                  <span>{selectedCastVariant.healing ? "Healing" : "Damage"}</span>
+                  <strong>
+                    {selectedCastVariant.formula}{" "}
+                    {selectedCastVariant.healing ? "HP" : selectedCastVariant.type}
+                  </strong>
+                </li>
+              ) : castDamage?.parts.length ? (
                 <li>
                   <span>{isHealingSpell(castSpellEntry) ? "Healing" : "Damage"}</span>
                   <strong>
@@ -2369,25 +2422,37 @@ export function CharacterSheetPage() {
                   </strong>
                 </li>
               ) : null}
-              {castDamage?.areaDelta ? (
+              {selectedCastVariant ? (
+                <li>
+                  <span>Range / area</span>
+                  <strong>{selectedCastVariant.note}</strong>
+                </li>
+              ) : castDamage?.areaDelta ? (
                 <li>
                   <span>Area</span>
                   <strong>+{castDamage.areaDelta} ft.</strong>
                 </li>
               ) : null}
             </ul>
-            {selectedCastOption
-              ? (() => {
-                  const hint = spellHeighteningHint(castSpellEntry, selectedCastOption.rank);
-                  if (hint) return <p className="tiny muted">{hint}</p>;
-                  const printed = spellHeighteningNotes(castSpellEntry)[0];
-                  return printed ? <p className="tiny muted">{printed}</p> : null;
-                })()
-              : null}
-            <p className="tiny muted">
-              Save spells use your spell DC; targets roll the save. Action-count variants, area
-              changes, and unsupported heightening remain manual.
-            </p>
+            {selectedCastVariant ? (
+              <>
+                <p className="tiny muted">{selectedCastVariant.detail}</p>
+                <p className="tiny muted">Heightened to rank {selectedCastOption?.rank}.</p>
+              </>
+            ) : selectedCastOption ? (
+              (() => {
+                const hint = spellHeighteningHint(castSpellEntry, selectedCastOption.rank);
+                if (hint) return <p className="tiny muted">{hint}</p>;
+                const printed = spellHeighteningNotes(castSpellEntry)[0];
+                return printed ? <p className="tiny muted">{printed}</p> : null;
+              })()
+            ) : null}
+            {castVariants.length ? null : (
+              <p className="tiny muted">
+                Save spells use your spell DC; targets roll the save. Action-count variants, area
+                changes, and unsupported heightening remain manual.
+              </p>
+            )}
           </div>
         ) : null}
       </Modal>
@@ -2655,6 +2720,7 @@ function SpellRow({
 }) {
   const damageRank = castRank ?? castOptions[0]?.rank ?? Math.max(1, spell.rank);
   const damage = spellDamageAtRank(spell, damageRank);
+  const actionVariants = spellActionVariants(spell, damageRank);
   const healing = isHealingSpell(spell);
   const computedDamage = damage.parts
     .map((part) => `${part.formula} ${part.type}`.trim())
@@ -2716,7 +2782,15 @@ function SpellRow({
             · {spell.actions || "—"} · {spell.range || "range —"}
             {spell.defense?.save ? ` · ${spell.defense.save}` : ""}
           </span>
-          {spell.damageText ? (
+          {actionVariants.length ? (
+            <span className="tiny muted">
+              {" "}
+              ·{" "}
+              {actionVariants
+                .map((variant) => `${variant.actions}a ${variant.formula}`)
+                .join(" · ")}
+            </span>
+          ) : spell.damageText ? (
             <span className="tiny muted">
               {" "}
               · {showBaseDamage ? `Base ${spell.damageText}` : spell.damageText}
@@ -2734,18 +2808,31 @@ function SpellRow({
               <Dices size={13} /> Attack
             </Button>
           ) : null}
-          {damage.parts.map((part, index) => (
-            <Button
-              key={`${part.type}-${index}`}
-              size="sm"
-              variant="ghost"
-              title={damage.supported ? undefined : "Heightening is manual for this spell."}
-              onClick={() => onRoll(part.formula, damageLabel(part))}
-            >
-              <Swords size={13} /> {part.formula}
-              {part.type && !healing ? ` ${part.type}` : ""}
-            </Button>
-          ))}
+          {actionVariants.length
+            ? actionVariants.map((variant) => (
+                <Button
+                  key={variant.actions}
+                  size="sm"
+                  variant="ghost"
+                  title={`${variant.label} · ${variant.note} · ${variant.formula}`}
+                  aria-label={`Roll ${spell.name} with ${variant.label}`}
+                  onClick={() => onRoll(variant.formula, variant.rollLabel)}
+                >
+                  <Swords size={13} /> {variant.actions}a {variant.formula}
+                </Button>
+              ))
+            : damage.parts.map((part, index) => (
+                <Button
+                  key={`${part.type}-${index}`}
+                  size="sm"
+                  variant="ghost"
+                  title={damage.supported ? undefined : "Heightening is manual for this spell."}
+                  onClick={() => onRoll(part.formula, damageLabel(part))}
+                >
+                  <Swords size={13} /> {part.formula}
+                  {part.type && !healing ? ` ${part.type}` : ""}
+                </Button>
+              ))}
           <Button
             size="sm"
             variant="primary"
