@@ -2647,6 +2647,41 @@
   gap: 2px;
   line-height: 1.35;
 }
+.afflictions-editor {
+  padding-top: 13px;
+  margin-top: 13px;
+  border-top: 1px solid var(--line);
+}
+.affliction-list {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin-top: 7px;
+}
+.affliction-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.015);
+  padding: 8px 10px;
+}
+.affliction-copy {
+  flex: 1 1 250px;
+  min-width: 0;
+}
+.affliction-notes {
+  margin: 4px 0 0;
+  white-space: pre-wrap;
+}
+@media (max-width: 760px) {
+  .affliction-row {
+    flex-direction: column;
+  }
+}
 .sheet-meta-card {
   padding: 16px 17px;
 }

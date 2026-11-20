@@ -1463,3 +1463,60 @@ test("level-9 Wizard upcasts Fireball into a rank-5 prepared slot", async ({ pag
     page.locator(".sheet-slots .sheet-slot-row").filter({ hasText: "Rank 5" })
   ).toContainText("2 / 3");
 });
+
+test("sheet tracks afflictions with stages and stage saves", async ({ page }) => {
+  test.setTimeout(60_000);
+  await signIn(page, admin);
+  const created = await page.request.post("/api/characters", {
+    data: { name: "E2E Affliction" },
+  });
+  expect(created.status()).toBe(201);
+  const { character } = (await created.json()) as { character: { id: string } };
+
+  await page.goto(`/characters/${character.id}`);
+  await expect(page.getByRole("heading", { name: "E2E Affliction" })).toBeVisible({
+    timeout: 15_000,
+  });
+
+  await page.getByRole("button", { name: "Add affliction" }).click();
+  const addDialog = page.getByRole("dialog", { name: "Add affliction" });
+  await addDialog.getByLabel("Name").fill("Giant Spider Venom");
+  await addDialog.getByLabel("Affliction type").selectOption("poison");
+  await addDialog.getByLabel("DC").fill("18");
+  await addDialog.getByLabel("Current stage").fill("1");
+  await addDialog.getByLabel("Maximum stage").fill("3");
+  await addDialog.getByLabel("Onset").fill("1 round");
+  await addDialog.getByLabel("Stage interval").fill("1 round");
+  await addDialog
+    .getByLabel("Stage effects / notes")
+    .fill("Stage 1: clumsy 1. Stage 2: clumsy 2 and drained 1.");
+  await addDialog.getByRole("button", { name: "Save affliction" }).click();
+
+  const row = page.locator(".affliction-row").filter({ hasText: "Giant Spider Venom" });
+  await expect(row).toContainText("Stage 1 / 3");
+  await expect(row).toContainText("DC 18");
+  await expect(row).toContainText("Fortitude");
+  await expect(row).toContainText("onset 1 round");
+
+  await row.getByRole("button", { name: "Increase stage of Giant Spider Venom" }).click();
+  await expect(row).toContainText("Stage 2 / 3");
+  await row.getByRole("button", { name: "Reduce stage of Giant Spider Venom" }).click();
+  await expect(row).toContainText("Stage 1 / 3");
+
+  // An uncampaigned sheet rolls locally, so a fixed d20 exercises the
+  // stage-save callback without depending on the server's randomness.
+  await page.evaluate(() => {
+    Math.random = () => 0.5;
+  });
+  await row.getByRole("button", { name: "Roll stage save for Giant Spider Venom" }).click();
+  await expect(row).toContainText("Stage 2 / 3");
+
+  await row.getByRole("button", { name: "Edit Giant Spider Venom" }).click();
+  const editDialog = page.getByRole("dialog", { name: "Edit affliction" });
+  await editDialog.getByLabel("DC").fill("20");
+  await editDialog.getByRole("button", { name: "Save affliction" }).click();
+  await expect(row).toContainText("DC 20");
+
+  await row.getByRole("button", { name: "End Giant Spider Venom" }).click();
+  await expect(page.locator(".affliction-row")).toHaveCount(0);
+});

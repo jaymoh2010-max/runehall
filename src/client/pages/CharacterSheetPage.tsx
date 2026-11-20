@@ -36,6 +36,8 @@ import {
   type CharacterDraft,
   type CharacterRecord,
   type CharacterCondition,
+  type CharacterAffliction,
+  type AfflictionType,
   type ConditionRef,
   type DerivedCharacter,
   type RollResult,
@@ -70,6 +72,13 @@ import { applyLongRest } from "../../shared/rest";
 import { applyHpEditToDraft } from "../../shared/damage";
 import { xpProgress } from "../../shared/xp";
 import { spellTraditionLabel, stripHtml } from "../../shared/compendium";
+import {
+  AFFLICTION_TYPES,
+  afflictionTypeLabel,
+  applyAfflictionSave,
+  newAfflictionId,
+  normalizeAffliction,
+} from "../../shared/afflictions";
 import { conditionBaseName, conditionLabel, parseConditionEntry } from "../../shared/tokens";
 import { api, ApiError, formatCp } from "../api";
 import { errorMessage } from "../stores";
@@ -80,6 +89,7 @@ import {
   Badge,
   Button,
   Card,
+  Checkbox,
   EmptyState,
   Field,
   IconButton,
@@ -92,9 +102,30 @@ import {
   Select,
   Stat,
   Tag,
+  Textarea,
   Toggle,
 } from "../components/ui";
 import { HoverCard } from "../components/HoverCard";
+
+function emptyAfflictionForm(): CharacterAffliction {
+  return {
+    id: newAfflictionId(),
+    name: "",
+    type: "poison",
+    dc: 15,
+    save: "fortitude",
+    stage: 1,
+    stageMax: 3,
+    interval: "",
+    duration: "",
+    onset: "",
+    virulent: false,
+    virulentSuccesses: 0,
+    virulentCrit: "reduce",
+    savesCanEnd: true,
+    notes: "",
+  };
+}
 
 const COMMON_CONDITIONS = [
   "Blinded",
@@ -146,6 +177,9 @@ export function CharacterSheetPage() {
   const [conditionValue, setConditionValue] = useState("");
   const [conditionDuration, setConditionDuration] = useState("");
   const [conditions, setConditions] = useState<ConditionRef[]>([]);
+  const [afflictionOpen, setAfflictionOpen] = useState(false);
+  const [afflictionEditingId, setAfflictionEditingId] = useState<string | null>(null);
+  const [afflictionForm, setAfflictionForm] = useState<CharacterAffliction>(emptyAfflictionForm);
   const [party, setParty] = useState<CharacterRecord[]>([]);
   const [transferOpen, setTransferOpen] = useState(false);
   const [transferMode, setTransferMode] = useState<"item" | "coins">("item");
@@ -671,7 +705,12 @@ export function CharacterSheetPage() {
     }
   };
 
-  const roll = (formula: string, label: string, dc?: number | null) => {
+  const roll = (
+    formula: string,
+    label: string,
+    dc?: number | null,
+    onResult?: (result: RollResult) => void
+  ) => {
     if (!draft) return;
     const parsedDc = targetDc.trim() ? Number(targetDc) : null;
     const effectiveDc =
@@ -699,6 +738,7 @@ export function CharacterSheetPage() {
           `${rollLabel}: ${result.total}${result.degree ? ` · ${DEGREE_LABELS[result.degree]}` : ""}`,
           result.degree === "critical-failure" || result.degree === "failure" ? "error" : "success"
         );
+        onResult?.(result);
       } catch (err) {
         toast(errorMessage(err), "error");
       }
@@ -727,6 +767,7 @@ export function CharacterSheetPage() {
                   ? "error"
                   : "success"
               );
+              onResult?.(message.data);
             }
           }
         );
@@ -767,6 +808,95 @@ export function CharacterSheetPage() {
     setConditionName("");
     setConditionValue("");
     setConditionDuration("");
+  };
+
+  const openAfflictionEditor = (existing?: CharacterAffliction) => {
+    if (existing) {
+      setAfflictionForm({ ...existing });
+      setAfflictionEditingId(existing.id);
+    } else {
+      setAfflictionForm(emptyAfflictionForm());
+      setAfflictionEditingId(null);
+    }
+    setAfflictionOpen(true);
+  };
+
+  const saveAffliction = () => {
+    const normalized = normalizeAffliction({
+      ...afflictionForm,
+      id: afflictionEditingId ?? afflictionForm.id,
+    });
+    if (!normalized) {
+      toast("Give the affliction a name.", "error");
+      return;
+    }
+    update((current) => ({
+      ...current,
+      play: {
+        ...current.play,
+        afflictions: afflictionEditingId
+          ? current.play.afflictions.map((entry) =>
+              entry.id === afflictionEditingId
+                ? {
+                    ...normalized,
+                    virulentSuccesses:
+                      entry.stage === normalized.stage ? normalized.virulentSuccesses : 0,
+                  }
+                : entry
+            )
+          : [...current.play.afflictions, normalized],
+      },
+    }));
+    setAfflictionOpen(false);
+  };
+
+  const updateAffliction = (
+    id: string,
+    updater: (affliction: CharacterAffliction) => CharacterAffliction
+  ) =>
+    update((current) => ({
+      ...current,
+      play: {
+        ...current.play,
+        afflictions: current.play.afflictions.map((entry) =>
+          entry.id === id ? updater(entry) : entry
+        ),
+      },
+    }));
+
+  const removeAffliction = (id: string) =>
+    update((current) => ({
+      ...current,
+      play: {
+        ...current.play,
+        afflictions: current.play.afflictions.filter((entry) => entry.id !== id),
+      },
+    }));
+
+  const rollAfflictionSave = (affliction: CharacterAffliction) => {
+    if (!draft || !derived) return;
+    const formula = `1d20${signed(derived.saves[affliction.save])}`;
+    roll(formula, `${affliction.name} stage save`, affliction.dc, (result) => {
+      if (!result.degree) return;
+      const applied = applyAfflictionSave(affliction, result.degree);
+      update((current) => {
+        const active = current.play.afflictions.find((entry) => entry.id === affliction.id);
+        if (!active) return current;
+        const next = applyAfflictionSave(active, result.degree!);
+        return {
+          ...current,
+          play: {
+            ...current.play,
+            afflictions: next.affliction
+              ? current.play.afflictions.map((entry) =>
+                  entry.id === affliction.id ? next.affliction! : entry
+                )
+              : current.play.afflictions.filter((entry) => entry.id !== affliction.id),
+          },
+        };
+      });
+      toast(applied.message, applied.outcome === "worsened" ? "error" : "success");
+    });
   };
 
   if (loading) return <LoadingScreen label="Opening the character sheet…" />;
@@ -1967,6 +2097,133 @@ export function CharacterSheetPage() {
                 </div>
               ) : null}
             </div>
+
+            <div className="afflictions-editor">
+              <div className="row-between">
+                <h3>Afflictions</h3>
+                <div className="row" style={{ gap: 6 }}>
+                  <span className="tiny muted">{draft.play.afflictions.length}</span>
+                  {canEdit ? (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      icon={<Plus size={13} />}
+                      onClick={() => openAfflictionEditor()}
+                    >
+                      Add affliction
+                    </Button>
+                  ) : null}
+                </div>
+              </div>
+              <div className="affliction-list">
+                {draft.play.afflictions.map((affliction) => (
+                  <div
+                    className="affliction-row"
+                    key={affliction.id}
+                    data-testid={`affliction-${affliction.id}`}
+                  >
+                    <div className="affliction-copy">
+                      <div
+                        className="row"
+                        style={{ gap: 6, flexWrap: "wrap", alignItems: "center" }}
+                      >
+                        <strong>{affliction.name}</strong>
+                        <Tag
+                          tone={
+                            affliction.type === "poison"
+                              ? "green"
+                              : affliction.type === "disease"
+                                ? "violet"
+                                : "red"
+                          }
+                        >
+                          {afflictionTypeLabel(affliction.type)}
+                        </Tag>
+                        <Tag tone="gold">
+                          Stage {affliction.stage} / {affliction.stageMax}
+                        </Tag>
+                        {affliction.virulent ? <Tag tone="red">Virulent</Tag> : null}
+                      </div>
+                      <span className="tiny muted">
+                        DC {affliction.dc} · {titleCase(affliction.save)} ·{" "}
+                        {affliction.interval ? `every ${affliction.interval}` : "no interval save"}
+                        {affliction.duration ? ` · max ${affliction.duration}` : ""}
+                        {affliction.onset ? ` · onset ${affliction.onset}` : ""}
+                        {affliction.virulent
+                          ? ` · ${affliction.virulentSuccesses} / 2 consecutive successes`
+                          : ""}
+                      </span>
+                      {affliction.notes ? (
+                        <p className="tiny muted affliction-notes">{affliction.notes}</p>
+                      ) : null}
+                    </div>
+                    {canEdit ? (
+                      <div className="row" style={{ gap: 4, flexWrap: "wrap" }}>
+                        {affliction.interval ? (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            aria-label={`Roll stage save for ${affliction.name}`}
+                            onClick={() => rollAfflictionSave(affliction)}
+                          >
+                            Stage save
+                          </Button>
+                        ) : null}
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          disabled={affliction.stage <= 1}
+                          aria-label={`Reduce stage of ${affliction.name}`}
+                          onClick={() =>
+                            updateAffliction(affliction.id, (current) => ({
+                              ...current,
+                              stage: Math.max(1, current.stage - 1),
+                              virulentSuccesses: 0,
+                            }))
+                          }
+                        >
+                          − Stage
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          disabled={affliction.stage >= affliction.stageMax}
+                          aria-label={`Increase stage of ${affliction.name}`}
+                          onClick={() =>
+                            updateAffliction(affliction.id, (current) => ({
+                              ...current,
+                              stage: Math.min(current.stageMax, current.stage + 1),
+                              virulentSuccesses: 0,
+                            }))
+                          }
+                        >
+                          + Stage
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          aria-label={`Edit ${affliction.name}`}
+                          onClick={() => openAfflictionEditor(affliction)}
+                        >
+                          <Pencil size={13} />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          aria-label={`End ${affliction.name}`}
+                          onClick={() => removeAffliction(affliction.id)}
+                        >
+                          <Trash2 size={13} />
+                        </Button>
+                      </div>
+                    ) : null}
+                  </div>
+                ))}
+                {!draft.play.afflictions.length ? (
+                  <span className="muted tiny">No active afflictions.</span>
+                ) : null}
+              </div>
+            </div>
           </Card>
 
           <Card className="sheet-meta-card">
@@ -2172,6 +2429,12 @@ export function CharacterSheetPage() {
               XP are unchanged, and companion HP is not touched. Other conditions are left for the
               GM to adjudicate.
             </p>
+            {draft.play.afflictions.length ? (
+              <p className="tiny muted">
+                Afflictions remain active and need their own stage saves:{" "}
+                {draft.play.afflictions.map((entry) => entry.name).join(", ")}.
+              </p>
+            ) : null}
             {restPreview.summary.hpBefore === 0 ? (
               <div className="settings-note">
                 <CircleAlert size={16} />
@@ -2455,6 +2718,217 @@ export function CharacterSheetPage() {
             )}
           </div>
         ) : null}
+      </Modal>
+
+      <Modal
+        open={afflictionOpen}
+        onClose={() => setAfflictionOpen(false)}
+        title={afflictionEditingId ? "Edit affliction" : "Add affliction"}
+        subtitle="Set the stage from the exposure save (failure = 1, critical failure = 2). Recovery rolls use the chosen save and update the stage automatically."
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setAfflictionOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="primary" onClick={saveAffliction}>
+              Save affliction
+            </Button>
+          </>
+        }
+      >
+        <div className="stack">
+          <Field label="Name">
+            <Input
+              autoFocus
+              value={afflictionForm.name}
+              onChange={(event) =>
+                setAfflictionForm((current) => ({ ...current, name: event.target.value }))
+              }
+              placeholder="e.g. Giant Spider Venom"
+              maxLength={80}
+            />
+          </Field>
+          <div className="row" style={{ gap: 10, flexWrap: "wrap" }}>
+            <Field label="Type">
+              <Select
+                aria-label="Affliction type"
+                value={afflictionForm.type}
+                onChange={(event) =>
+                  setAfflictionForm((current) => ({
+                    ...current,
+                    type: event.target.value as AfflictionType,
+                  }))
+                }
+              >
+                {AFFLICTION_TYPES.map((type) => (
+                  <option key={type} value={type}>
+                    {afflictionTypeLabel(type)}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <Field label="DC">
+              <Input
+                type="number"
+                min={1}
+                max={60}
+                value={afflictionForm.dc}
+                onChange={(event) =>
+                  setAfflictionForm((current) => ({
+                    ...current,
+                    dc: Math.max(1, Math.min(60, Math.round(Number(event.target.value) || 0))),
+                  }))
+                }
+                style={{ maxWidth: 110 }}
+              />
+            </Field>
+            <Field label="Save">
+              <Select
+                aria-label="Stage save"
+                value={afflictionForm.save}
+                onChange={(event) =>
+                  setAfflictionForm((current) => ({
+                    ...current,
+                    save: event.target.value as "fortitude" | "reflex" | "will",
+                  }))
+                }
+              >
+                {(["fortitude", "reflex", "will"] as const).map((key) => (
+                  <option key={key} value={key}>
+                    {SAVE_LABELS[key]}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          </div>
+          <div className="row" style={{ gap: 10, flexWrap: "wrap" }}>
+            <Field label="Current stage">
+              <Input
+                type="number"
+                min={1}
+                max={afflictionForm.stageMax}
+                value={afflictionForm.stage}
+                onChange={(event) =>
+                  setAfflictionForm((current) => ({
+                    ...current,
+                    stage: Math.max(
+                      1,
+                      Math.min(current.stageMax, Math.round(Number(event.target.value) || 1))
+                    ),
+                  }))
+                }
+                style={{ maxWidth: 120 }}
+              />
+            </Field>
+            <Field label="Maximum stage">
+              <Input
+                type="number"
+                min={1}
+                max={10}
+                value={afflictionForm.stageMax}
+                onChange={(event) => {
+                  const stageMax = Math.max(
+                    1,
+                    Math.min(10, Math.round(Number(event.target.value) || 1))
+                  );
+                  setAfflictionForm((current) => ({
+                    ...current,
+                    stageMax,
+                    stage: Math.min(current.stage, stageMax),
+                  }));
+                }}
+                style={{ maxWidth: 120 }}
+              />
+            </Field>
+          </div>
+          <div className="row" style={{ gap: 10, flexWrap: "wrap" }}>
+            <Field label="Onset">
+              <Input
+                value={afflictionForm.onset}
+                onChange={(event) =>
+                  setAfflictionForm((current) => ({ ...current, onset: event.target.value }))
+                }
+                placeholder="e.g. 1 round or 1 hour"
+                maxLength={40}
+              />
+            </Field>
+            <Field label="Stage interval">
+              <Input
+                value={afflictionForm.interval}
+                onChange={(event) =>
+                  setAfflictionForm((current) => ({ ...current, interval: event.target.value }))
+                }
+                placeholder="blank = no periodic save"
+                maxLength={40}
+              />
+            </Field>
+            <Field label="Maximum duration">
+              <Input
+                value={afflictionForm.duration}
+                onChange={(event) =>
+                  setAfflictionForm((current) => ({ ...current, duration: event.target.value }))
+                }
+                placeholder="e.g. 1 minute; blank = until cured"
+                maxLength={40}
+              />
+            </Field>
+          </div>
+          <p className="tiny muted">
+            One interval drives the Stage save button. Record per-stage interval differences and
+            effects in the notes.
+          </p>
+          <Checkbox
+            label="Virulent (two consecutive successes per stage)"
+            checked={afflictionForm.virulent}
+            onChange={(value) =>
+              setAfflictionForm((current) => ({
+                ...current,
+                virulent: value,
+                virulentSuccesses: value ? current.virulentSuccesses : 0,
+              }))
+            }
+          />
+          {afflictionForm.virulent ? (
+            <Field label="Virulent critical success">
+              <Select
+                aria-label="Virulent critical success"
+                value={afflictionForm.virulentCrit}
+                onChange={(event) =>
+                  setAfflictionForm((current) => ({
+                    ...current,
+                    virulentCrit: event.target.value as "reduce" | "streak",
+                  }))
+                }
+              >
+                <option value="reduce">Reduce 1 stage (common reading)</option>
+                <option value="streak">Count as one success (strict reading)</option>
+              </Select>
+            </Field>
+          ) : null}
+          <Checkbox
+            label="Stage saves can end this affliction"
+            checked={afflictionForm.savesCanEnd}
+            onChange={(value) =>
+              setAfflictionForm((current) => ({ ...current, savesCanEnd: value }))
+            }
+          />
+          {afflictionForm.type === "curse" && afflictionForm.savesCanEnd ? (
+            <p className="tiny muted">
+              Curses usually require a curse-specific removal. Turn this off unless the stat block
+              gives the curse stage saves that can end it.
+            </p>
+          ) : null}
+          <Field label="Stage effects / notes">
+            <Textarea
+              rows={3}
+              value={afflictionForm.notes}
+              onChange={(event) =>
+                setAfflictionForm((current) => ({ ...current, notes: event.target.value }))
+              }
+              placeholder="Stage 1: …  Stage 2: …  Stage 3: …"
+            />
+          </Field>
+        </div>
       </Modal>
 
       <Modal
