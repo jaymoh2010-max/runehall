@@ -125,6 +125,7 @@ export interface CampaignRow {
   invite_code: string;
   ruleset: string;
   xp_mode: string;
+  advancement_speed: string;
   world_year: number;
   world_month: number;
   world_day: number;
@@ -270,6 +271,17 @@ export interface JournalRow {
   created_by: string | null;
   created_at: number;
   updated_at: number;
+}
+
+export interface XpAwardRow {
+  id: string;
+  campaign_id: string;
+  actor_id: string | null;
+  kind: string;
+  amount: number;
+  reason: string;
+  recipient_count: number;
+  created_at: number;
 }
 
 export interface EncounterRow {

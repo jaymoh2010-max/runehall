@@ -37,6 +37,7 @@ import type {
   CampaignMember,
   CampaignAsset,
   CampaignRuleset,
+  AdvancementSpeed,
   CampaignSummary,
   CampaignTable,
   CharacterRecord,
@@ -45,11 +46,27 @@ import type {
   JournalKind,
   QuestStatus,
   Token,
+  XpAward,
+  XpAwardKind,
   XpMode,
 } from "../../shared/types";
-import { CAMPAIGN_RULESET_OPTIONS, XP_MODE_OPTIONS, rulesetLabel } from "../../shared/content";
+import {
+  ADVANCEMENT_SPEED_OPTIONS,
+  CAMPAIGN_RULESET_OPTIONS,
+  XP_MODE_OPTIONS,
+  rulesetLabel,
+} from "../../shared/content";
 import { QUEST_STATUS_OPTIONS, normalizeQuestXp } from "../../shared/journal";
-import { xpProgress } from "../../shared/xp";
+import {
+  ACCOMPLISHMENT_LABELS,
+  ACCOMPLISHMENT_TIERS,
+  ACCOMPLISHMENT_XP,
+  XP_AWARD_KIND_LABELS,
+  XP_AWARD_KINDS,
+  hazardXp,
+  xpProgress,
+  type AccomplishmentTier,
+} from "../../shared/xp";
 import { api, copyText, formatDate, uploadImage } from "../api";
 import { connectSocket, joinCampaign } from "../socket";
 import { errorMessage } from "../stores";
@@ -186,13 +203,21 @@ export function CampaignPage() {
   const [settingsDescription, setSettingsDescription] = useState("");
   const [settingsRuleset, setSettingsRuleset] = useState<CampaignRuleset>("core");
   const [settingsXpMode, setSettingsXpMode] = useState<XpMode>("milestone");
+  const [settingsAdvancementSpeed, setSettingsAdvancementSpeed] =
+    useState<AdvancementSpeed>("medium");
   const [inviteOpen, setInviteOpen] = useState(false);
   const [levelUpBusy, setLevelUpBusy] = useState(false);
   const [levelingId, setLevelingId] = useState<string | null>(null);
   const [restBusy, setRestBusy] = useState(false);
   const [xpOpen, setXpOpen] = useState(false);
+  const [xpAwards, setXpAwards] = useState<XpAward[]>([]);
+  const [xpKind, setXpKind] = useState<XpAwardKind>("encounter");
   const [xpAmount, setXpAmount] = useState("20");
   const [xpReason, setXpReason] = useState("");
+  const [xpHazardLevel, setXpHazardLevel] = useState("1");
+  const [xpPartyLevel, setXpPartyLevel] = useState("1");
+  const [xpHazardComplexity, setXpHazardComplexity] = useState<"simple" | "complex">("complex");
+  const [xpAccomplishmentTier, setXpAccomplishmentTier] = useState<AccomplishmentTier>("moderate");
   const [xpRecipientIds, setXpRecipientIds] = useState<string[]>([]);
   const [xpBusy, setXpBusy] = useState(false);
   const [xpError, setXpError] = useState("");
@@ -203,6 +228,12 @@ export function CampaignPage() {
   const [downtimeError, setDowntimeError] = useState("");
 
   const isGm = campaign?.role === "gm";
+  const xpPreviewAmount =
+    xpKind === "hazard"
+      ? hazardXp(Number(xpHazardLevel) || 0, Number(xpPartyLevel) || 1, xpHazardComplexity)
+      : xpKind === "accomplishment"
+        ? ACCOMPLISHMENT_XP[xpAccomplishmentTier]
+        : Math.max(0, Math.floor(Number(xpAmount) || 0));
   const tab: Tab =
     (requestedTab === "encounters" ||
       requestedTab === "loot" ||
@@ -233,6 +264,15 @@ export function CampaignPage() {
       setSettingsDescription(details.campaign.description);
       setSettingsRuleset(details.campaign.ruleset);
       setSettingsXpMode(details.campaign.xpMode);
+      setSettingsAdvancementSpeed(details.campaign.advancementSpeed);
+      if (details.campaign.role === "gm") {
+        try {
+          const ledger = await api<{ awards: XpAward[] }>(`/api/campaigns/${id}/xp-awards`);
+          setXpAwards(ledger.awards);
+        } catch {
+          setXpAwards([]);
+        }
+      }
       setSelectedJournalId((current) => current ?? table.journal[0]?.id ?? null);
     } catch (err) {
       setError(errorMessage(err));
@@ -623,7 +663,13 @@ export function CampaignPage() {
         amount: number;
         recipients: number;
         characters: CharacterRecord[];
+        award?: XpAward;
       }>(`/api/campaigns/${id}/journal/${entry.id}/award-quest-xp`, { method: "POST" });
+      setCharacters(result.characters);
+      const award = result.award;
+      if (award) {
+        setXpAwards((current) => [award, ...current].slice(0, 20));
+      }
       setTableData((current) =>
         current
           ? {
@@ -660,6 +706,7 @@ export function CampaignPage() {
           description: settingsDescription,
           ruleset: settingsRuleset,
           xpMode: settingsXpMode,
+          advancementSpeed: settingsAdvancementSpeed,
         },
       });
       setCampaign(result.campaign);
@@ -673,6 +720,7 @@ export function CampaignPage() {
                 description: result.campaign.description,
                 ruleset: result.campaign.ruleset,
                 xpMode: result.campaign.xpMode,
+                advancementSpeed: result.campaign.advancementSpeed,
               },
             }
           : current
@@ -826,8 +874,14 @@ export function CampaignPage() {
   };
 
   const openXpAward = () => {
+    const partyLevel = Math.max(1, ...characters.map((character) => character.summary?.level ?? 1));
+    setXpKind("encounter");
     setXpAmount("20");
     setXpReason("");
+    setXpHazardLevel(String(partyLevel));
+    setXpPartyLevel(String(partyLevel));
+    setXpHazardComplexity("complex");
+    setXpAccomplishmentTier("moderate");
     setXpRecipientIds(characters.map((character) => character.id));
     setXpError("");
     setXpOpen(true);
@@ -843,9 +897,8 @@ export function CampaignPage() {
 
   const awardXp = async () => {
     if (!id) return;
-    const amount = Math.max(0, Math.floor(Number(xpAmount) || 0));
-    if (amount < 1) {
-      setXpError("Award at least 1 XP.");
+    if (xpPreviewAmount < 1) {
+      setXpError("This award is worth no XP. Raise the hazard level or award at least 1 XP.");
       return;
     }
     if (!xpRecipientIds.length) {
@@ -860,18 +913,27 @@ export function CampaignPage() {
         recipients: number;
         skipped: number;
         characters: CharacterRecord[];
+        award: XpAward;
       }>(`/api/campaigns/${id}/award-xp`, {
         method: "POST",
         body: {
-          amount,
+          kind: xpKind,
+          amount: xpPreviewAmount,
           characterIds: xpRecipientIds,
           reason: xpReason.trim(),
+          hazardLevel: Number(xpHazardLevel),
+          partyLevel: Number(xpPartyLevel),
+          hazardComplexity: xpHazardComplexity,
+          tier: xpAccomplishmentTier,
         },
       });
       setCharacters(result.characters);
       setTableData((current) =>
         current ? { ...current, characters: result.characters } : current
       );
+      if (result.award) {
+        setXpAwards((current) => [result.award, ...current].slice(0, 20));
+      }
       setXpOpen(false);
       toast(
         `Awarded ${result.amount} XP to ${result.recipients} ${
@@ -1210,7 +1272,11 @@ export function CampaignPage() {
             <div className="party-grid">
               {characters.map((character) => {
                 const progress = character.summary
-                  ? xpProgress(character.summary.xp ?? 0, character.summary.level)
+                  ? xpProgress(
+                      character.summary.xp ?? 0,
+                      character.summary.level,
+                      campaign?.advancementSpeed ?? character.campaignAdvancementSpeed ?? "medium"
+                    )
                   : null;
                 return (
                   <article key={character.id} className="party-card card">
@@ -1311,6 +1377,34 @@ export function CampaignPage() {
                 />
               ) : null}
             </div>
+            {isGm && campaign.xpMode === "xp" && xpAwards.length ? (
+              <Card className="xp-ledger">
+                <div className="section-title">
+                  <div>
+                    <PageEyebrow>XP ledger</PageEyebrow>
+                    <h3>Recent awards</h3>
+                  </div>
+                </div>
+                <div className="stack" style={{ gap: 8 }}>
+                  {xpAwards.slice(0, 6).map((award) => (
+                    <div key={award.id} className="row-between xp-ledger-row">
+                      <div>
+                        <div className="row wrap" style={{ gap: 8 }}>
+                          <strong>{award.amount.toLocaleString()} XP</strong>
+                          <Badge tone="neutral">{XP_AWARD_KIND_LABELS[award.kind]}</Badge>
+                        </div>
+                        <p className="tiny muted">{award.reason || "No reason recorded"}</p>
+                      </div>
+                      <span className="tiny muted">
+                        {award.recipientCount}{" "}
+                        {award.recipientCount === 1 ? "character" : "characters"} ·{" "}
+                        {formatDate(award.createdAt)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            ) : null}
           </div>
         ) : null}
 
@@ -1634,6 +1728,30 @@ export function CampaignPage() {
                     ))}
                   </Select>
                 </Field>
+                <Field
+                  label="Advancement speed"
+                  hint={
+                    isGm
+                      ? ADVANCEMENT_SPEED_OPTIONS.find(
+                          (option) => option.value === settingsAdvancementSpeed
+                        )?.description
+                      : "Set by the campaign GM. It controls how much XP each level requires."
+                  }
+                >
+                  <Select
+                    value={settingsAdvancementSpeed}
+                    onChange={(event) =>
+                      setSettingsAdvancementSpeed(event.target.value as AdvancementSpeed)
+                    }
+                    disabled={!isGm}
+                  >
+                    {ADVANCEMENT_SPEED_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
                 {isGm ? (
                   <Button type="submit" variant="primary" loading={settingsBusy}>
                     Save changes
@@ -1645,9 +1763,10 @@ export function CampaignPage() {
                   <Sparkles size={15} />
                   <p>
                     Switch to <strong>XP tracking</strong> to see PF2e encounter difficulty and
-                    award XP. <strong>Milestone</strong> hides those numbers. Either way, no
-                    character levels up automatically; use <strong>Level up party</strong> or the{" "}
-                    <strong>Level up</strong> button on a party card when you decide.
+                    award XP. <strong>Milestone</strong> hides those numbers. Advancement speed sets
+                    the XP threshold for each level (fast 800, medium 1,000, slow 1,200). Either
+                    way, no character levels up automatically; use <strong>Level up party</strong>{" "}
+                    or the <strong>Level up</strong> button on a party card when you decide.
                   </p>
                 </div>
               ) : null}
@@ -2244,30 +2363,108 @@ export function CampaignPage() {
         <div className="stack">
           {xpError ? <div className="auth-error">{xpError}</div> : null}
           <Field
-            label="XP amount"
-            hint="PF2e encounter awards: trivial 10, low 15, moderate 20, severe 30, extreme 40."
+            label="Award type"
+            hint="Encounters use the PF2e threat XP. Hazards use the level-difference table. Accomplishments cover exploration and story milestones."
           >
-            <Input
-              type="number"
-              min={1}
-              max={100000}
-              value={xpAmount}
-              onChange={(event) => setXpAmount(event.target.value)}
-            />
+            <Select
+              value={xpKind}
+              onChange={(event) => setXpKind(event.target.value as XpAwardKind)}
+            >
+              {XP_AWARD_KINDS.filter((kind) => kind !== "quest").map((kind) => (
+                <option key={kind} value={kind}>
+                  {XP_AWARD_KIND_LABELS[kind]}
+                </option>
+              ))}
+            </Select>
           </Field>
-          <div className="xp-quick">
-            {[10, 15, 20, 30, 40].map((value) => (
-              <Button
-                key={value}
-                type="button"
-                size="sm"
-                variant="ghost"
-                onClick={() => setXpAmount(String(value))}
+          {xpKind === "hazard" ? (
+            <>
+              <div className="form-grid three">
+                <Field label="Hazard level">
+                  <Input
+                    type="number"
+                    min={0}
+                    max={30}
+                    value={xpHazardLevel}
+                    onChange={(event) => setXpHazardLevel(event.target.value)}
+                  />
+                </Field>
+                <Field label="Party level">
+                  <Input
+                    type="number"
+                    min={1}
+                    max={20}
+                    value={xpPartyLevel}
+                    onChange={(event) => setXpPartyLevel(event.target.value)}
+                  />
+                </Field>
+                <Field label="Hazard type">
+                  <Select
+                    value={xpHazardComplexity}
+                    onChange={(event) =>
+                      setXpHazardComplexity(event.target.value as "simple" | "complex")
+                    }
+                  >
+                    <option value="complex">Complex hazard</option>
+                    <option value="simple">Simple hazard</option>
+                  </Select>
+                </Field>
+              </div>
+              <p className="tiny muted">
+                This hazard is worth <strong>{xpPreviewAmount.toLocaleString()} XP</strong>. Award
+                it once, whether the party disables, avoids, or endures the hazard.
+              </p>
+            </>
+          ) : null}
+          {xpKind === "accomplishment" ? (
+            <Field
+              label="Accomplishment"
+              hint="Minor 10 XP, moderate 30 XP, major 80 XP. Moderate and major awards often also grant a Hero Point."
+            >
+              <div className="xp-quick">
+                {ACCOMPLISHMENT_TIERS.map((tier) => (
+                  <Button
+                    key={tier}
+                    type="button"
+                    size="sm"
+                    variant={xpAccomplishmentTier === tier ? "primary" : "ghost"}
+                    onClick={() => setXpAccomplishmentTier(tier)}
+                  >
+                    {ACCOMPLISHMENT_LABELS[tier]} ({ACCOMPLISHMENT_XP[tier]} XP)
+                  </Button>
+                ))}
+              </div>
+            </Field>
+          ) : null}
+          {xpKind === "encounter" || xpKind === "other" ? (
+            <>
+              <Field
+                label="XP amount"
+                hint="PF2e encounter awards: trivial 10, low 15, moderate 20, severe 30, extreme 40."
               >
-                {value} XP
-              </Button>
-            ))}
-          </div>
+                <Input
+                  type="number"
+                  min={1}
+                  max={100000}
+                  value={xpAmount}
+                  onChange={(event) => setXpAmount(event.target.value)}
+                />
+              </Field>
+              <div className="xp-quick">
+                {[10, 15, 20, 30, 40].map((value) => (
+                  <Button
+                    key={value}
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setXpAmount(String(value))}
+                  >
+                    {value} XP
+                  </Button>
+                ))}
+              </div>
+            </>
+          ) : null}
           <Field label="Reason (optional)">
             <Input
               value={xpReason}

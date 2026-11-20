@@ -484,13 +484,26 @@ async function main() {
     throw new Error("Party long rest reported no characters rested");
   log("party long rest heals, clears temporary HP, and reduces rest conditions");
 
+  const milestoneAward = await fetch(`${base}/api/campaigns/${campaign.id}/award-xp`, {
+    method: "POST",
+    headers: { "content-type": "application/json", cookie: gmCookie },
+    body: JSON.stringify({ amount: 100, characterIds: [character.id] }),
+  });
+  if (milestoneAward.status !== 400) {
+    throw new Error("Milestone campaigns could award XP");
+  }
+  await api(`/api/campaigns/${campaign.id}`, {
+    method: "PATCH",
+    cookie: gmCookie,
+    body: { xpMode: "xp", advancementSpeed: "fast" },
+  });
   const awardedXp = await api(`/api/campaigns/${campaign.id}/award-xp`, {
     method: "POST",
     cookie: gmCookie,
-    body: { amount: 1250, characterIds: [character.id], reason: "Smoke XP" },
+    body: { amount: 850, characterIds: [character.id], reason: "Smoke XP" },
   });
   const xpCharacter = awardedXp.payload.characters.find((entry) => entry.id === character.id);
-  if (!xpCharacter || xpCharacter.summary?.xp !== 1250) {
+  if (!xpCharacter || xpCharacter.summary?.xp !== 850) {
     throw new Error("GM XP award did not reach the character summary");
   }
   const playerAward = await fetch(`${base}/api/campaigns/${campaign.id}/award-xp`, {
@@ -509,11 +522,16 @@ async function main() {
     leveledCharacter.payload.leveled !== 1 ||
     !advanced ||
     advanced.summary?.level !== 2 ||
-    advanced.summary?.xp !== 250
+    advanced.summary?.xp !== 50
   ) {
-    throw new Error("Individual level-up did not spend 1,000 XP and advance one level");
+    throw new Error("Individual level-up did not spend 800 XP at fast advancement");
   }
-  log("XP awards are GM-only and individual level-ups spend 1,000 XP");
+  log("XP awards are GM-only and fast individual level-ups spend 800 XP");
+  await api(`/api/campaigns/${campaign.id}`, {
+    method: "PATCH",
+    cookie: gmCookie,
+    body: { xpMode: "milestone", advancementSpeed: "medium" },
+  });
 
   const playerLevelChange = await fetch(`${base}/api/characters/${character.id}`, {
     method: "PUT",

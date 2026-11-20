@@ -327,7 +327,12 @@ test("GM controls advancement and milestone mode hides XP awards", async ({ page
 test("GM awards XP in XP tracking mode without automatic level-up", async ({ page }) => {
   await signIn(page, admin);
   await page.goto(`${campaignPath}?tab=settings`);
-  await page.getByLabel("Advancement").selectOption({ label: "XP tracking (GM levels up)" });
+  await page
+    .getByRole("combobox", { name: /^Advancement Default/ })
+    .selectOption({ label: "XP tracking (GM levels up)" });
+  await page
+    .getByRole("combobox", { name: /^Advancement speed/ })
+    .selectOption({ label: "Fast (800 XP per level)" });
   await page.getByRole("button", { name: "Save changes" }).click();
   await expect(page.getByText("Campaign settings saved.")).toBeVisible();
 
@@ -338,12 +343,14 @@ test("GM awards XP in XP tracking mode without automatic level-up", async ({ pag
   await page.getByRole("button", { name: "Award XP", exact: true }).click();
   const xpDialog = page.getByRole("dialog", { name: "Award XP" });
   await expect(xpDialog).toBeVisible();
-  await xpDialog.getByLabel("XP amount").fill("1000");
+  await xpDialog.getByLabel("XP amount").fill("800");
   await xpDialog.getByRole("button", { name: "Award XP", exact: true }).click();
 
-  await expect(page.getByText(/Awarded 1000 XP/)).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText(/Awarded 800 XP/)).toBeVisible({ timeout: 15_000 });
   await expect(page.getByText("Ready to level")).toBeVisible();
   await expect(page.getByText(/Level 2/).first()).toBeVisible();
+  await expect(page.locator(".xp-ledger").getByText("Recent awards")).toBeVisible();
+  await expect(page.locator(".xp-ledger").getByText("800 XP")).toBeVisible();
 });
 
 test("GM schedules from Sessions and overdue sessions stay current", async ({ page }) => {

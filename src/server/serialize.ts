@@ -21,8 +21,10 @@ import type {
   Scene,
   Token,
   ValidationIssue,
+  XpAward,
 } from "../shared/types";
 import { normalizeCampaignRuleset, normalizeXpMode } from "../shared/content";
+import { normalizeAdvancementSpeed, normalizeXpAwardKind } from "../shared/xp";
 import { isAudioMood } from "../shared/audio";
 import {
   normalizeAmbientLight,
@@ -65,6 +67,7 @@ import {
   type SceneRow,
   type TokenRow,
   type UserRow,
+  type XpAwardRow,
 } from "./db";
 import { parseJson } from "./util";
 import { pendingJoinRequestCount, type JoinRequestViewRow } from "./access";
@@ -89,6 +92,7 @@ export function serializeCampaignSummary(
     role,
     ruleset: normalizeCampaignRuleset(campaign.ruleset),
     xpMode: normalizeXpMode(campaign.xp_mode),
+    advancementSpeed: normalizeAdvancementSpeed(campaign.advancement_speed),
     worldDate: normalizeGolarionDate({
       year: campaign.world_year,
       month: campaign.world_month,
@@ -190,10 +194,14 @@ export function serializeCharacter(
   const data = parseJson(row.data, {});
   const summary = parseJson(row.summary, null);
   const campaignRow = row.campaign_id
-    ? (db.prepare("SELECT ruleset FROM campaigns WHERE id = ?").get(row.campaign_id) as
-        { ruleset: string } | undefined)
+    ? (db
+        .prepare("SELECT ruleset, advancement_speed FROM campaigns WHERE id = ?")
+        .get(row.campaign_id) as { ruleset: string; advancement_speed: string } | undefined)
     : undefined;
   const campaignRuleset = campaignRow ? normalizeCampaignRuleset(campaignRow.ruleset) : null;
+  const campaignAdvancementSpeed = campaignRow
+    ? normalizeAdvancementSpeed(campaignRow.advancement_speed)
+    : null;
   return {
     id: row.id,
     userId: row.user_id,
@@ -202,6 +210,7 @@ export function serializeCharacter(
     data: data as CharacterRecord["data"],
     summary: summary as CharacterRecord["summary"],
     campaignRuleset,
+    campaignAdvancementSpeed,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     revision: Number(row.revision ?? 1),
@@ -444,6 +453,18 @@ export function serializeLootParcel(row: LootParcelRow): LootParcel {
     sortOrder: row.sort_order,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+  };
+}
+
+export function serializeXpAward(row: XpAwardRow): XpAward {
+  return {
+    id: row.id,
+    campaignId: row.campaign_id,
+    kind: normalizeXpAwardKind(row.kind),
+    amount: Math.max(0, Math.round(row.amount)),
+    reason: row.reason,
+    recipientCount: Math.max(0, Math.round(row.recipient_count)),
+    createdAt: row.created_at,
   };
 }
 

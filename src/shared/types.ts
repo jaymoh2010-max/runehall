@@ -350,6 +350,22 @@ export type CampaignRuleset = "core" | "expanded" | "legacy";
  */
 export type XpMode = "milestone" | "xp";
 
+/** GM Core advancement pace; medium is 1,000 XP per level. */
+export type AdvancementSpeed = "fast" | "medium" | "slow";
+
+/** The source of an XP award, used for the GM's award ledger. */
+export type XpAwardKind = "encounter" | "hazard" | "accomplishment" | "quest" | "other";
+
+export interface XpAward {
+  id: string;
+  campaignId: string;
+  kind: XpAwardKind;
+  amount: number;
+  reason: string;
+  recipientCount: number;
+  createdAt: number;
+}
+
 export interface Spell extends Publication {
   id: string;
   name: string;
@@ -799,6 +815,8 @@ export interface CharacterRecord {
   summary: CharacterSummary | null;
   /** Set when the character belongs to a campaign; the GM's ruleset wins. */
   campaignRuleset?: CampaignRuleset | null;
+  /** Set when the character belongs to a campaign; used for XP progress. */
+  campaignAdvancementSpeed?: AdvancementSpeed | null;
   createdAt: number;
   updatedAt: number;
   /** Optimistic-lock version, incremented on every save. */
@@ -981,6 +999,7 @@ export interface CampaignSummary {
   role: "gm" | "player";
   ruleset: CampaignRuleset;
   xpMode: XpMode;
+  advancementSpeed: AdvancementSpeed;
   /** Current in-world date for this campaign. */
   worldDate: GolarionDate;
   memberCount: number;
@@ -1407,6 +1426,7 @@ export interface CampaignTable {
     role: "gm" | "player";
     ruleset: CampaignRuleset;
     xpMode: XpMode;
+    advancementSpeed: AdvancementSpeed;
   };
   members: CampaignMember[];
   characters: CharacterRecord[];

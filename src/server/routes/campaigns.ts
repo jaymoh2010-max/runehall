@@ -26,6 +26,7 @@ import {
   type MessageRow,
   type SceneRow,
   type TokenRow,
+  type XpAwardRow,
 } from "../db";
 import {
   serializeAudioTrack,
@@ -42,6 +43,7 @@ import {
   serializeMessage,
   serializeScene,
   serializeToken,
+  serializeXpAward,
   touchCampaign,
 } from "../serialize";
 import { tokenEventsFor } from "../tokenEvents";
@@ -55,7 +57,6 @@ import {
 } from "../../shared/content";
 import { characterSummary, computeCharacter, normalizeCharacterDraft } from "../../shared/rules";
 import { applyLongRest, type LongRestResult } from "../../shared/rest";
-import { consumeLevelXp } from "../../shared/xp";
 import { levelUpCurrentHp } from "../../shared/levelup";
 import { normalizeTokenConditions, syncLifeConditions } from "../../shared/tokens";
 import {
@@ -65,6 +66,18 @@ import {
   normalizeQuestStatus,
   normalizeQuestXp,
 } from "../../shared/journal";
+import {
+  ACCOMPLISHMENT_LABELS,
+  ACCOMPLISHMENT_XP,
+  consumeLevelXp,
+  hazardXp,
+  isAccomplishmentTier,
+  isAdvancementSpeed,
+  normalizeAdvancementSpeed,
+  normalizeXpAwardKind,
+  type AdvancementSpeed,
+  type AccomplishmentTier,
+} from "../../shared/xp";
 import { normalizeGolarionDate, shiftGolarionDate } from "../../shared/calendar";
 import { contextForDraft } from "../compendium";
 import { campaignSessionsFor } from "../sessionData";
@@ -225,6 +238,10 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
       return reply.code(400).send({ error: "Choose milestone or XP budget advancement." });
     }
     const xpMode = normalizeXpMode(body.xpMode);
+    if (body.advancementSpeed !== undefined && !isAdvancementSpeed(body.advancementSpeed)) {
+      return reply.code(400).send({ error: "Choose fast, medium, or slow advancement." });
+    }
+    const advancementSpeed: AdvancementSpeed = normalizeAdvancementSpeed(body.advancementSpeed);
     let code = inviteCode();
     for (let attempt = 0; attempt < 10; attempt++) {
       const exists = db.prepare("SELECT id FROM campaigns WHERE invite_code = ?").get(code);
@@ -234,8 +251,20 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
     const id = newId("camp");
     const ts = now();
     db.prepare(
-      "INSERT INTO campaigns (id, name, description, gm_id, invite_code, ruleset, xp_mode, created_at, updated_at, last_played_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-    ).run(id, name, description, request.user.id, code, ruleset, xpMode, ts, ts, ts);
+      "INSERT INTO campaigns (id, name, description, gm_id, invite_code, ruleset, xp_mode, advancement_speed, created_at, updated_at, last_played_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    ).run(
+      id,
+      name,
+      description,
+      request.user.id,
+      code,
+      ruleset,
+      xpMode,
+      advancementSpeed,
+      ts,
+      ts,
+      ts
+    );
     db.prepare(
       "INSERT INTO campaign_members (campaign_id, user_id, role, joined_at) VALUES (?, ?, 'gm', ?)"
     ).run(id, request.user.id, ts);
@@ -246,7 +275,7 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
       actor: request.user,
       targetType: "campaign",
       targetId: id,
-      detail: `${name} (${ruleset}/${xpMode})`,
+      detail: `${name} (${ruleset}/${xpMode}/${advancementSpeed})`,
       request,
     });
     return reply.code(201).send({
@@ -693,12 +722,19 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
     if (body.xpMode !== undefined && !isXpMode(body.xpMode)) {
       return reply.code(400).send({ error: "Choose milestone or XP budget advancement." });
     }
+    if (body.advancementSpeed !== undefined && !isAdvancementSpeed(body.advancementSpeed)) {
+      return reply.code(400).send({ error: "Choose fast, medium, or slow advancement." });
+    }
     const ruleset =
       body.ruleset === undefined ? normalizeCampaignRuleset(row.ruleset) : body.ruleset;
     const xpMode = body.xpMode === undefined ? normalizeXpMode(row.xp_mode) : body.xpMode;
+    const advancementSpeed =
+      body.advancementSpeed === undefined
+        ? normalizeAdvancementSpeed(row.advancement_speed)
+        : body.advancementSpeed;
     db.prepare(
-      "UPDATE campaigns SET name = ?, description = ?, ruleset = ?, xp_mode = ?, updated_at = ? WHERE id = ?"
-    ).run(name, description, ruleset, xpMode, now(), id);
+      "UPDATE campaigns SET name = ?, description = ?, ruleset = ?, xp_mode = ?, advancement_speed = ?, updated_at = ? WHERE id = ?"
+    ).run(name, description, ruleset, xpMode, advancementSpeed, now(), id);
     if (ruleset !== normalizeCampaignRuleset(row.ruleset)) {
       const contentMode = rulesetContentMode(ruleset);
       const legacyAllowed = rulesetIncludesLegacy(ruleset);
@@ -948,7 +984,12 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
       }
       const before = characterSummary(draft, contextForDraft(draft));
       draft.level += 1;
-      draft.play.xp = consumeLevelXp(draft.play.xp);
+      if (normalizeXpMode(row.xp_mode) === "xp") {
+        draft.play.xp = consumeLevelXp(
+          draft.play.xp,
+          normalizeAdvancementSpeed(row.advancement_speed)
+        );
+      }
       const after = characterSummary(draft, contextForDraft(draft));
       // A wounded character gains the new maximum's HP increase, not just a
       // higher cap that leaves them further below full.
@@ -1000,6 +1041,26 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
     return reply.send({ leveled, atMaxLevel, skipped, characters });
   });
 
+  app.get("/api/campaigns/:id/xp-awards", async (request, reply) => {
+    if (!request.user) return reply.code(401).send({ error: "Sign in to continue." });
+    const { id } = request.params as { id: string };
+    const row = getCampaign(id);
+    if (!row) return reply.code(404).send({ error: "Campaign not found." });
+    if (roleFor(row, request.user.id) !== "gm") {
+      return reply.code(403).send({ error: "Only the GM can view the XP ledger." });
+    }
+    const query = request.query as { limit?: string };
+    const limit = safeInt(query.limit, 20, 1, 100);
+    const awards = (
+      db
+        .prepare(
+          "SELECT * FROM xp_awards WHERE campaign_id = ? ORDER BY created_at DESC, rowid DESC LIMIT ?"
+        )
+        .all(id, limit) as XpAwardRow[]
+    ).map(serializeXpAward);
+    return reply.send({ awards });
+  });
+
   app.post("/api/campaigns/:id/award-xp", async (request, reply) => {
     if (!request.user) return reply.code(401).send({ error: "Sign in to continue." });
     const { id } = request.params as { id: string };
@@ -1008,9 +1069,39 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
     if (roleFor(row, request.user.id) !== "gm") {
       return reply.code(403).send({ error: "Only the GM can award XP." });
     }
+    if (normalizeXpMode(row.xp_mode) !== "xp") {
+      return reply.code(400).send({ error: "Award XP in XP tracking mode." });
+    }
     const body = (request.body ?? {}) as Record<string, unknown>;
-    const amount = safeInt(body.amount, 0, 1, 100_000);
-    if (amount < 1) return reply.code(400).send({ error: "Award at least 1 XP." });
+    const kind = normalizeXpAwardKind(body.kind);
+    if (kind === "quest") {
+      return reply.code(400).send({ error: "Award quest XP from a completed quest handout." });
+    }
+    let amount = 0;
+    let defaultReason = "";
+    if (kind === "hazard") {
+      const hazardLevel = Number(body.hazardLevel);
+      if (!Number.isInteger(hazardLevel) || hazardLevel < 0 || hazardLevel > 30) {
+        return reply.code(400).send({ error: "Choose a hazard level between 0 and 30." });
+      }
+      const partyLevel = safeInt(body.partyLevel, 1, 1, 20);
+      const complexity = body.hazardComplexity === "simple" ? "simple" : "complex";
+      amount = hazardXp(hazardLevel, partyLevel, complexity);
+      if (amount < 1) {
+        return reply
+          .code(400)
+          .send({ error: "A hazard more than four levels below the party awards no XP." });
+      }
+      const label = complexity === "simple" ? "Simple hazard" : "Complex hazard";
+      defaultReason = `${label} ${hazardLevel} vs party ${partyLevel}`;
+    } else if (kind === "accomplishment") {
+      const tier: AccomplishmentTier = isAccomplishmentTier(body.tier) ? body.tier : "moderate";
+      amount = ACCOMPLISHMENT_XP[tier];
+      defaultReason = `${ACCOMPLISHMENT_LABELS[tier]} accomplishment`;
+    } else {
+      amount = safeInt(body.amount, 0, 1, 100_000);
+      if (amount < 1) return reply.code(400).send({ error: "Award at least 1 XP." });
+    }
     const characterIds = Array.isArray(body.characterIds)
       ? [
           ...new Set(
@@ -1021,7 +1112,7 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
     if (!characterIds.length) {
       return reply.code(400).send({ error: "Choose at least one character." });
     }
-    const reason = sanitizeUserText(body.reason, 200);
+    const reason = sanitizeUserText(body.reason, 200) || defaultReason;
     const rows = db
       .prepare("SELECT * FROM characters WHERE campaign_id = ?")
       .all(id) as CharacterRow[];
@@ -1053,6 +1144,10 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
       recipients += 1;
     }
 
+    const awardId = newId("xpa");
+    db.prepare(
+      "INSERT INTO xp_awards (id, campaign_id, actor_id, kind, amount, reason, recipient_count, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+    ).run(awardId, id, request.user.id, kind, amount, reason, recipients, now());
     touchCampaign(id);
     const characters = campaignCharacters(id).map((character) =>
       serializeCharacter(character, character.owner_name, {
@@ -1068,7 +1163,14 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
       detail: `${amount} XP to ${recipients} characters${reason ? `: ${reason}` : ""}`,
       request,
     });
-    return reply.send({ amount, recipients, skipped, characters });
+    const award = db.prepare("SELECT * FROM xp_awards WHERE id = ?").get(awardId) as XpAwardRow;
+    return reply.send({
+      amount,
+      recipients,
+      skipped,
+      characters,
+      award: serializeXpAward(award),
+    });
   });
 
   app.post("/api/campaigns/:id/downtime", async (request, reply) => {
@@ -1482,6 +1584,18 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
       rewardedAt,
       entryId
     );
+    const questAwardId = newId("xpa");
+    db.prepare(
+      "INSERT INTO xp_awards (id, campaign_id, actor_id, kind, amount, reason, recipient_count, created_at) VALUES (?, ?, ?, 'quest', ?, ?, ?, ?)"
+    ).run(
+      questAwardId,
+      id,
+      request.user.id,
+      amount,
+      `Quest: ${existing.title}`,
+      recipients,
+      rewardedAt
+    );
     touchCampaign(id);
     logAudit({
       action: "campaign.quest_xp",
@@ -1504,12 +1618,16 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
         canView: true,
       })
     );
+    const award = db
+      .prepare("SELECT * FROM xp_awards WHERE id = ?")
+      .get(questAwardId) as XpAwardRow;
     return reply.send({
       entry: serializeJournal(row),
       amount,
       recipients,
       skipped,
       characters,
+      award: serializeXpAward(award),
     });
   });
 

@@ -26,7 +26,7 @@ import { io, type Socket } from "socket.io-client";
 import { characterSummary, computeCharacter } from "../src/shared/rules";
 import { longRestHealing } from "../src/shared/rest";
 import { encounterBudget, encounterAwardXp } from "../src/shared/encounters";
-import { XP_PER_LEVEL } from "../src/shared/xp";
+import { normalizeAdvancementSpeed, xpPerLevel } from "../src/shared/xp";
 import { formatGolarionDate, shiftGolarionDate } from "../src/shared/calendar";
 import { buildSimulatedHero, contextForDraft } from "./lib/simHeroes";
 import type { CharacterDraft, CharacterRecord, Encounter } from "../src/shared/types";
@@ -439,13 +439,14 @@ async function awardXp(
   gmCookie: string,
   amount: number,
   reason: string,
-  characterIds: string[]
+  characterIds: string[],
+  extra: Json = {}
 ): Promise<Json> {
   return (
     await api(`/api/campaigns/${campaignId}/award-xp`, {
       method: "POST",
       cookie: gmCookie,
-      body: { amount, characterIds, reason },
+      body: { amount, characterIds, reason, ...extra },
     })
   ).payload;
 }
@@ -460,12 +461,16 @@ async function runCampaignA(gm: Account, players: Account[]): Promise<void> {
       description: "A 1-20 simulation campaign with XP advancement.",
       ruleset: "expanded",
       xpMode: "xp",
+      advancementSpeed: "fast",
     },
   });
   const campaign = created.payload.campaign;
   const campaignId = campaign.id as string;
   const inviteCode = campaign.inviteCode as string;
+  const levelXp = xpPerLevel(normalizeAdvancementSpeed(campaign.advancementSpeed));
   assertEqual(campaign.xpMode, "xp", "Campaign XP mode");
+  assertEqual(campaign.advancementSpeed, "fast", "Campaign advancement speed");
+  assertEqual(levelXp, 800, "Fast advancement threshold");
   assertEqual(campaign.worldDate?.year, 4726, "Default world year");
   assertEqual(campaign.memberCount, 1, "New campaign member count");
 
@@ -901,7 +906,7 @@ async function runCampaignA(gm: Account, players: Account[]): Promise<void> {
           "Encounter cleanup left launched tokens behind"
         );
       }
-      const remaining = XP_PER_LEVEL - earned;
+      const remaining = levelXp - earned;
       await awardXp(
         campaignId,
         gm.cookie,
@@ -914,11 +919,11 @@ async function runCampaignA(gm: Account, players: Account[]): Promise<void> {
       await awardXp(
         campaignId,
         gm.cookie,
-        XP_PER_LEVEL,
+        levelXp,
         `Simulated adventures at level ${level}`,
         heroes.map((hero) => hero.id)
       );
-      earned = XP_PER_LEVEL;
+      earned = levelXp;
     }
 
     await check(campaignLabel, "XP accumulates without automatic leveling", async () => {
@@ -1341,21 +1346,53 @@ async function runCampaignA(gm: Account, players: Account[]): Promise<void> {
     assertEqual(stale.status, 409, "Stale save status");
   });
 
+  await check(
+    campaignName,
+    "hazard and accomplishment awards use PF2e values and reach the ledger",
+    async () => {
+      const before = await getTable(campaignId, gm.cookie);
+      const ids = heroes.map((hero) => hero.id);
+      const complex = await awardXp(campaignId, gm.cookie, 0, "", ids, {
+        kind: "hazard",
+        hazardLevel: 11,
+        partyLevel: 10,
+        hazardComplexity: "complex",
+      });
+      assertEqual(complex.amount, 60, "Complex hazard XP");
+      const simple = await awardXp(campaignId, gm.cookie, 0, "", ids, {
+        kind: "hazard",
+        hazardLevel: 10,
+        partyLevel: 10,
+        hazardComplexity: "simple",
+      });
+      assertEqual(simple.amount, 8, "Simple hazard XP");
+      const accomplishment = await awardXp(campaignId, gm.cookie, 0, "", ids, {
+        kind: "accomplishment",
+        tier: "major",
+      });
+      assertEqual(accomplishment.amount, 80, "Major accomplishment XP");
+      const after = await getTable(campaignId, gm.cookie);
+      for (const hero of heroes) {
+        const previous = summaryFor(before, hero.id);
+        const current = summaryFor(after, hero.id);
+        assertEqual(current.xp, previous.xp + 148, `${hero.name} XP after hazard and story awards`);
+      }
+      const ledger = await api(`/api/campaigns/${campaignId}/xp-awards`, { cookie: gm.cookie });
+      const kinds = (ledger.payload.awards as Json[]).slice(0, 3).map((award) => award.kind);
+      assertEqual(kinds.join(","), "accomplishment,hazard,hazard", "XP ledger award kinds");
+      assertEqual(
+        (ledger.payload.awards as Json[])[0].reason,
+        "Major accomplishment",
+        "Accomplishment ledger label"
+      );
+    }
+  );
+
   // --- Observations --------------------------------------------------------
   observe(
     campaignName,
     "Treasure system is currency-only",
     `Simulated ${parcelCount} level-budget parcels using GM Core currency values (${TREASURE_CURRENCY_GP[0]} gp at 1 to ${TREASURE_CURRENCY_GP[19]} gp at 20). The app has no permanent-item/consumable item-level budget or wealth-by-level audit.`
-  );
-  observe(
-    campaignName,
-    "Advancement speed is hard-coded",
-    `The campaign used ${XP_PER_LEVEL} XP per level. GM Core supports fast (800), medium (1,000), and slow (1,200) speeds; the campaign schema only stores milestone/XP.`
-  );
-  observe(
-    campaignName,
-    "No hazard or accomplishment ledger",
-    "Hazard XP (simple/complex) and 10/30/80 accomplishment awards were simulated as generic XP. The app's encounter builder has no hazard actor or hazard XP row."
   );
 
   gmSocket.close();
@@ -1547,11 +1584,17 @@ async function runCampaignB(gm: Account, players: Account[]): Promise<void> {
     }
   );
 
-  observe(
-    campaignName,
-    "Milestone mode accepts XP awards by API",
-    "The UI hides XP, but POST /award-xp still succeeds in milestone mode. This is harmless because leveling stays manual, but it means milestone and XP data can drift."
-  );
+  await check(campaignName, "milestone mode rejects XP awards", async () => {
+    const award = await api(`/api/campaigns/${campaignId}/award-xp`, {
+      method: "POST",
+      cookie: gm.cookie,
+      body: { amount: 10, characterIds: [heroes[0].id] },
+      expect: null,
+    });
+    assertEqual(award.status, 400, "Milestone XP award status");
+    const table = await getTable(campaignId, gm.cookie);
+    assertEqual(summaryFor(table, heroes[0].id).xp, 0, "Milestone XP after rejected award");
+  });
 
   metric("campaignB.id", campaignId);
   metric("campaignB.memberCount", 4);
