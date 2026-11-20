@@ -55,7 +55,14 @@ import {
   rulesetContentMode,
   rulesetIncludesLegacy,
 } from "../../shared/content";
-import { characterSummary, computeCharacter, normalizeCharacterDraft } from "../../shared/rules";
+import {
+  characterSummary,
+  computeCharacter,
+  normalizeCharacterDraft,
+  replacementWealthGrantCp,
+  startingWealthCp,
+} from "../../shared/rules";
+import { addCurrency } from "../../shared/inventory";
 import { applyLongRest, type LongRestResult } from "../../shared/rest";
 import { levelUpCurrentHp } from "../../shared/levelup";
 import { normalizeTokenConditions, syncLifeConditions } from "../../shared/tokens";
@@ -1039,6 +1046,65 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
       request,
     });
     return reply.send({ leveled, atMaxLevel, skipped, characters });
+  });
+
+  app.post("/api/campaigns/:id/characters/:characterId/wealth", async (request, reply) => {
+    if (!request.user) return reply.code(401).send({ error: "Sign in to continue." });
+    const { id, characterId } = request.params as { id: string; characterId: string };
+    const row = getCampaign(id);
+    if (!row) return reply.code(404).send({ error: "Campaign not found." });
+    if (roleFor(row, request.user.id) !== "gm") {
+      return reply.code(403).send({ error: "Only the GM can grant replacement wealth." });
+    }
+    const character = getCharacter(characterId);
+    if (!character || character.campaign_id !== id) {
+      return reply.code(404).send({ error: "That character is not part of this campaign." });
+    }
+    let draft;
+    try {
+      draft = normalizeCharacterDraft(JSON.parse(character.data), character.name);
+    } catch {
+      return reply.code(400).send({ error: "That character's draft could not be read." });
+    }
+    const derived = computeCharacter(draft, contextForDraft(draft));
+    const committedCp = derived.wealth.committed;
+    const targetCp = startingWealthCp(draft.level);
+    const grantCp = replacementWealthGrantCp(draft.level, committedCp);
+    let summary = characterSummary(draft, contextForDraft(draft));
+    if (grantCp > 0) {
+      draft.currency = addCurrency(draft.currency, grantCp);
+      // This is play-history wealth, not a fresh creation budget.
+      draft.wealthBudgetCp = null;
+      summary = characterSummary(draft, contextForDraft(draft));
+      db.prepare(
+        "UPDATE characters SET data = ?, summary = ?, updated_at = ?, revision = revision + 1 WHERE id = ?"
+      ).run(JSON.stringify(draft), JSON.stringify(summary), now(), character.id);
+      app.broadcastCampaign(id, "character:updated", {
+        characterId: character.id,
+        summary,
+        name: draft.name,
+      });
+      touchCampaign(id);
+      logAudit({
+        action: "campaign.wealth_grant",
+        actor: request.user,
+        targetType: "campaign",
+        targetId: id,
+        detail: `${draft.name}: ${grantCp} cp to level ${draft.level} wealth`,
+        request,
+      });
+    }
+    const updated = getCharacter(character.id)!;
+    const owner = getUser(updated.user_id);
+    return reply.send({
+      character: serializeCharacter(updated, owner?.display_name ?? "", {
+        canEdit: true,
+        canView: true,
+      }),
+      grantCp,
+      targetCp,
+      committedCp: committedCp + grantCp,
+    });
   });
 
   app.get("/api/campaigns/:id/xp-awards", async (request, reply) => {

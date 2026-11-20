@@ -23,10 +23,11 @@ import fs from "node:fs";
 import net from "node:net";
 import path from "node:path";
 import { io, type Socket } from "socket.io-client";
-import { characterSummary, computeCharacter } from "../src/shared/rules";
+import { characterSummary, computeCharacter, startingWealthCp } from "../src/shared/rules";
 import { longRestHealing } from "../src/shared/rest";
 import { encounterBudget, encounterAwardXp } from "../src/shared/encounters";
 import { normalizeAdvancementSpeed, xpPerLevel } from "../src/shared/xp";
+import { TREASURE_CURRENCY_GP, treasureBudgetGp } from "../src/shared/treasure";
 import { formatGolarionDate, shiftGolarionDate } from "../src/shared/calendar";
 import { buildSimulatedHero, contextForDraft } from "./lib/simHeroes";
 import type { CharacterDraft, CharacterRecord, Encounter } from "../src/shared/types";
@@ -333,17 +334,6 @@ function characterFor(table: Json, characterId: string): Json {
 function localSummary(character: Json): Json {
   return characterSummary(character.data as CharacterDraft, contextForDraft(character.data));
 }
-
-/** Official party treasure by level (GM Core table 10-9), currency column. */
-const TREASURE_CURRENCY_GP = [
-  40, 70, 120, 200, 320, 500, 720, 1_000, 1_400, 2_000, 2_800, 4_000, 6_000, 9_000, 13_000, 20_000,
-  30_000, 48_000, 80_000, 140_000,
-];
-/** Official total treasure value per level, for the observer metric only. */
-const TREASURE_TOTAL_GP = [
-  175, 300, 500, 850, 1_350, 2_000, 2_900, 4_000, 5_700, 8_000, 11_500, 16_500, 25_000, 36_000,
-  54_500, 82_500, 128_000, 208_000, 355_000, 490_000,
-];
 
 /** Encounters that make up one level of play in the simulation. */
 const LEVEL_ENCOUNTERS = [
@@ -1346,6 +1336,22 @@ async function runCampaignA(gm: Account, players: Account[]): Promise<void> {
     assertEqual(stale.status, 409, "Stale save status");
   });
 
+  await check(campaignName, "loot audit values parcels and character wealth", async () => {
+    const response = await api(`/api/campaigns/${campaignId}/loot/audit`, { cookie: gm.cookie });
+    const audit = response.payload.audit;
+    assertEqual(audit.partyLevel, 20, "Audit party level");
+    assertEqual(audit.budget.totalGp, treasureBudgetGp(20).totalGp, "Level 20 treasure budget");
+    assertEqual(audit.parcels.length, parcelCount, "Audited parcel count");
+    assertEqual(audit.preparedCp, 0, "All simulated parcels were distributed");
+    assert(audit.distributedCp > 0, "Distributed treasure was not valued");
+    assertEqual(audit.characters.length, 4, "Audited character count");
+    assert(
+      audit.characters.every((character: Json) => character.expectedCp > 0),
+      "Character wealth benchmark missing"
+    );
+    metric("campaignA.treasureDistributedCp", audit.distributedCp);
+  });
+
   await check(
     campaignName,
     "hazard and accomplishment awards use PF2e values and reach the ledger",
@@ -1391,8 +1397,8 @@ async function runCampaignA(gm: Account, players: Account[]): Promise<void> {
   // --- Observations --------------------------------------------------------
   observe(
     campaignName,
-    "Treasure system is currency-only",
-    `Simulated ${parcelCount} level-budget parcels using GM Core currency values (${TREASURE_CURRENCY_GP[0]} gp at 1 to ${TREASURE_CURRENCY_GP[19]} gp at 20). The app has no permanent-item/consumable item-level budget or wealth-by-level audit.`
+    "Treasure audit is advisory",
+    `Valued ${parcelCount} distributed parcels (${TREASURE_CURRENCY_GP[0]} gp at level 1 to ${TREASURE_CURRENCY_GP[19]} gp at level 20) and each character's gear and coins. Parcels are not tagged by level, and the app does not enforce the permanent-item/consumable item mix from GM Core table 10-9.`
   );
 
   gmSocket.close();
@@ -1527,11 +1533,23 @@ async function runCampaignB(gm: Account, players: Account[]): Promise<void> {
       }
       const table = await getTable(campaignId, gm.cookie);
       assertEqual(summaryFor(table, replacement.id).level, 10, "Replacement character level");
-      observe(
-        campaignName,
-        "Replacement characters start with level-1 wealth",
-        "A new level-10 character keeps its 10 gp purse. GM Core's new-character table expects about 2,300 gp (1 permanent L-1, 2 L-2, 1 L-3, 2 L-4). There is no starting-wealth or catch-up flow."
+      const grant = await api(`/api/campaigns/${campaignId}/characters/${replacement.id}/wealth`, {
+        method: "POST",
+        cookie: gm.cookie,
+      });
+      assert(grant.payload.grantCp > 0, "Replacement wealth grant was empty");
+      assertEqual(grant.payload.targetCp, startingWealthCp(10), "Replacement wealth benchmark");
+      const sheet = await api(`/api/characters/${replacement.id}`, { cookie: gm.cookie });
+      const committed = computeCharacter(
+        sheet.payload.character.data as CharacterDraft,
+        contextForDraft(sheet.payload.character.data)
+      ).wealth.committed;
+      assertEqual(committed, startingWealthCp(10), "Replacement wealth after grant");
+      const secondGrant = await api(
+        `/api/campaigns/${campaignId}/characters/${replacement.id}/wealth`,
+        { method: "POST", cookie: gm.cookie }
       );
+      assertEqual(secondGrant.payload.grantCp, 0, "Repeated replacement wealth grant");
     }
   );
 

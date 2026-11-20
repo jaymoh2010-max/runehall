@@ -1072,6 +1072,39 @@ export interface LootParcel {
   updatedAt: number;
 }
 
+/** Party treasure by level from GM Core table 10-9 (four characters). */
+export interface TreasureBudget {
+  level: number;
+  totalGp: number;
+  currencyGp: number;
+}
+
+export interface TreasureAuditParcel {
+  id: string;
+  name: string;
+  status: LootParcelStatus;
+  valueCp: number;
+}
+
+export interface TreasureAuditCharacter {
+  id: string;
+  name: string;
+  level: number;
+  committedCp: number;
+  expectedCp: number;
+  deltaCp: number;
+}
+
+export interface TreasureAudit {
+  partyLevel: number;
+  partySize: number;
+  budget: TreasureBudget;
+  preparedCp: number;
+  distributedCp: number;
+  parcels: TreasureAuditParcel[];
+  characters: TreasureAuditCharacter[];
+}
+
 export interface CampaignThread {
   id: string;
   text: string;

@@ -353,6 +353,25 @@ test("GM awards XP in XP tracking mode without automatic level-up", async ({ pag
   await expect(page.locator(".xp-ledger").getByText("800 XP")).toBeVisible();
 });
 
+test("loot audit and replacement wealth top-up are available", async ({ page }) => {
+  await signIn(page, admin);
+  await page.goto(`${campaignPath}?tab=loot`);
+  await expect(page.getByRole("heading", { name: /Level \d+ hoard/ })).toBeVisible();
+  await expect(page.getByText("Character wealth")).toBeVisible();
+  await expect(page.getByText("Open parcels")).toBeVisible();
+  await expect(page.getByText("Level budget")).toBeVisible();
+
+  await page
+    .locator(".campaign-tabs")
+    .getByRole("button", { name: /^Party/ })
+    .click();
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.getByRole("button", { name: "Top up wealth" }).first().click();
+  await expect(
+    page.getByText(/Granted .* to E2E Hero|already meets the level \d+ wealth benchmark/)
+  ).toBeVisible({ timeout: 15_000 });
+});
+
 test("GM schedules from Sessions and overdue sessions stay current", async ({ page }) => {
   await signIn(page, admin);
   await page.goto(`${campaignPath}?tab=sessions`);

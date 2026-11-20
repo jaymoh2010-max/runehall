@@ -58,14 +58,21 @@ import { activeGrantChoiceGroups } from "./classGrantChoices";
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
+/** GM Core table 10-10: the lump-sum wealth of a new character at each level. */
 export const STARTING_WEALTH_CP = [
-  0, 1500, 3000, 7500, 14000, 27000, 44000, 72000, 110000, 160000, 230000, 320000, 450000, 600000,
-  800000, 1050000, 1350000, 1800000, 2400000, 3200000, 4500000,
+  0, 1_500, 3_000, 7_500, 14_000, 27_000, 45_000, 72_000, 110_000, 160_000, 230_000, 320_000,
+  450_000, 640_000, 930_000, 1_350_000, 2_000_000, 3_000_000, 4_500_000, 6_900_000, 11_200_000,
 ];
 
 export function startingWealthCp(level: number): number {
   const safe = Math.max(1, Math.min(20, Math.floor(level || 1)));
-  return STARTING_WEALTH_CP[safe] ?? 1500;
+  return STARTING_WEALTH_CP[safe] ?? 1_500;
+}
+
+/** Currency needed to bring an existing character up to the new-character benchmark. */
+export function replacementWealthGrantCp(level: number, committedCp: number): number {
+  const committed = Math.max(0, Math.round(Number.isFinite(committedCp) ? committedCp : 0));
+  return Math.max(0, startingWealthCp(level) - committed);
 }
 
 const FULL_CASTER_CLASSES = new Set([

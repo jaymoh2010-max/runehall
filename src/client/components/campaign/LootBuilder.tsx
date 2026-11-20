@@ -5,6 +5,7 @@ import type {
   CharacterRecord,
   Equipment,
   LootParcel,
+  TreasureAudit,
 } from "../../../shared/types";
 import { lootCopper, lootIsEmpty, lootItemCount } from "../../../shared/loot";
 import { api, formatCp, formatDate } from "../../api";
@@ -40,6 +41,7 @@ export function LootBuilder({
   toast: (message: string, kind?: "info" | "success" | "error") => void;
 }) {
   const [parcels, setParcels] = useState<LootParcel[]>([]);
+  const [audit, setAudit] = useState<TreasureAudit | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -64,15 +66,38 @@ export function LootBuilder({
     Math.max(0, Number(spDraft) || 0) * 10 +
     Math.max(0, Number(cpDraft) || 0);
   const draftEmpty = (selected?.items.length ?? 0) === 0 && draftCopper === 0;
+  const parcelValueById = useMemo(
+    () => new Map((audit?.parcels ?? []).map((parcel) => [parcel.id, parcel.valueCp])),
+    [audit]
+  );
+  const selectedItemValueCp = selected
+    ? Math.max(0, (parcelValueById.get(selected.id) ?? 0) - lootCopper(selected))
+    : 0;
+  const draftValueCp = selectedItemValueCp + draftCopper;
+
+  const refreshAudit = async () => {
+    try {
+      const result = await api<{ audit: TreasureAudit }>(`/api/campaigns/${campaignId}/loot/audit`);
+      setAudit(result.audit);
+    } catch {
+      // The audit is advisory; keep the last known values if it fails.
+    }
+  };
 
   useEffect(() => {
     if (!isGm) return;
     let cancelled = false;
     setLoading(true);
-    api<{ parcels: LootParcel[] }>(`/api/campaigns/${campaignId}/loot`)
-      .then((result) => {
+    Promise.all([
+      api<{ parcels: LootParcel[] }>(`/api/campaigns/${campaignId}/loot`),
+      api<{ audit: TreasureAudit }>(`/api/campaigns/${campaignId}/loot/audit`)
+        .then((result) => result.audit)
+        .catch(() => null),
+    ])
+      .then(([result, auditResult]) => {
         if (cancelled) return;
         setParcels(result.parcels);
+        setAudit(auditResult);
         setSelectedId((current) =>
           current && result.parcels.some((parcel) => parcel.id === current)
             ? current
@@ -136,6 +161,7 @@ export function LootBuilder({
 
   const replaceParcel = (parcel: LootParcel) => {
     setParcels((current) => current.map((entry) => (entry.id === parcel.id ? parcel : entry)));
+    void refreshAudit();
   };
 
   const createParcel = async () => {
@@ -147,6 +173,7 @@ export function LootBuilder({
       });
       setParcels((current) => [...current, result.parcel]);
       setSelectedId(result.parcel.id);
+      void refreshAudit();
       toast("Loot parcel created.", "success");
     } catch (err) {
       toast(errorMessage(err), "error");
@@ -190,6 +217,7 @@ export function LootBuilder({
       const remaining = parcels.filter((parcel) => parcel.id !== selected.id);
       setParcels(remaining);
       setSelectedId(remaining[0]?.id ?? null);
+      void refreshAudit();
       toast("Loot parcel deleted.", "success");
     } catch (err) {
       toast(errorMessage(err), "error");
@@ -314,6 +342,64 @@ export function LootBuilder({
         </div>
       ) : null}
 
+      {audit ? (
+        <Card className="treasure-audit">
+          <div className="treasure-audit-head">
+            <div>
+              <PageEyebrow>Treasure budget</PageEyebrow>
+              <h3>Level {audit.partyLevel} hoard</h3>
+              <p className="tiny muted">
+                GM Core suggests about {formatCp(audit.budget.totalGp * 100)} of treasure for a
+                four-character party at this level, including about{" "}
+                {formatCp(audit.budget.currencyGp * 100)} in coins. This campaign has{" "}
+                {audit.partySize} {audit.partySize === 1 ? "character" : "characters"}. The
+                character benchmark is the table's lump-sum cash option, not the full item
+                allotment.
+              </p>
+            </div>
+            <div className="treasure-audit-stats">
+              <div title="All open parcels, including parcels prepared for future levels.">
+                <span>Open parcels</span>
+                <strong>{formatCp(audit.preparedCp)}</strong>
+              </div>
+              <div title="All parcels already handed to a character.">
+                <span>Distributed</span>
+                <strong>{formatCp(audit.distributedCp)}</strong>
+              </div>
+              <div title="Guideline for a four-character party at the current party level.">
+                <span>Level budget</span>
+                <strong>{formatCp(audit.budget.totalGp * 100)}</strong>
+              </div>
+            </div>
+          </div>
+          <div className="treasure-audit-characters">
+            <div className="row-between">
+              <strong>Character wealth</strong>
+              <span className="tiny muted">New-character lump sum · GM Core table 10-10</span>
+            </div>
+            <div className="treasure-audit-character-list">
+              {audit.characters.map((character) => (
+                <div key={character.id} className="treasure-audit-character">
+                  <span>
+                    <strong>{character.name}</strong>{" "}
+                    <span className="tiny muted">Level {character.level}</span>
+                  </span>
+                  <span className="tiny muted">{formatCp(character.committedCp)} committed</span>
+                  <Tag tone={character.deltaCp >= 0 ? "green" : "gold"}>
+                    {character.deltaCp >= 0
+                      ? `+${formatCp(character.deltaCp)}`
+                      : `${formatCp(-character.deltaCp)} short`}
+                  </Tag>
+                </div>
+              ))}
+              {!audit.characters.length ? (
+                <p className="muted small">No characters in this campaign yet.</p>
+              ) : null}
+            </div>
+          </div>
+        </Card>
+      ) : null}
+
       {loading ? (
         <Spinner label="Opening the treasury…" />
       ) : !parcels.length ? (
@@ -351,7 +437,7 @@ export function LootBuilder({
                     <strong>{parcel.name}</strong>
                     <span className="tiny muted">
                       {lootItemCount(parcel)} {lootItemCount(parcel) === 1 ? "item" : "items"} ·{" "}
-                      {formatCp(lootCopper(parcel))}
+                      {formatCp(parcelValueById.get(parcel.id) ?? lootCopper(parcel))}
                     </span>
                   </span>
                   {parcel.status === "distributed" ? (
@@ -446,7 +532,10 @@ export function LootBuilder({
                         <PageEyebrow>Contents</PageEyebrow>
                         <h3>What is in the parcel?</h3>
                       </div>
-                      <Badge tone="gold">{formatCp(draftCopper)}</Badge>
+                      <div className="row" style={{ gap: 6 }}>
+                        <Badge tone="gold">{formatCp(draftCopper)} coins</Badge>
+                        <Badge tone="violet">{formatCp(draftValueCp)} value</Badge>
+                      </div>
                     </div>
                     {!selected.items.length ? (
                       <p className="muted small">
@@ -506,7 +595,7 @@ export function LootBuilder({
                             <p className="tiny muted">
                               {draftEmpty
                                 ? "Add items or coins first."
-                                : `${lootItemCount(selected)} ${lootItemCount(selected) === 1 ? "item" : "items"} and ${formatCp(draftCopper)} will move to the character.`}
+                                : `${lootItemCount(selected)} ${lootItemCount(selected) === 1 ? "item" : "items"} worth ${formatCp(draftValueCp)} will move to the character.`}
                             </p>
                           </div>
                           <div className="loot-distribute-controls">

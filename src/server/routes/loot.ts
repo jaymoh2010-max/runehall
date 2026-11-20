@@ -17,7 +17,14 @@ import {
 } from "../serialize";
 import { tokenEventsFor } from "../tokenEvents";
 import { normalizeLootItems, lootIsEmpty, applyLootToDraft } from "../../shared/loot";
-import { characterSummary, normalizeCharacterDraft } from "../../shared/rules";
+import {
+  characterSummary,
+  computeCharacter,
+  normalizeCharacterDraft,
+  startingWealthCp,
+} from "../../shared/rules";
+import { lootParcelValueCp, treasureBudgetGp } from "../../shared/treasure";
+import { partyDefaults } from "../../shared/encounters";
 import { newId, now, parseJson, safeInt, safeString, sanitizeUserText } from "../util";
 
 function gmRequires(
@@ -73,6 +80,68 @@ export async function registerLootRoutes(app: FastifyInstance): Promise<void> {
       )
       .all(id) as LootParcelRow[];
     return reply.send({ parcels: rows.map(serializeLootParcel) });
+  });
+
+  app.get("/api/campaigns/:id/loot/audit", async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const access = gmRequires(request, id);
+    if (!access.row) return reply.code(access.code ?? 403).send({ error: access.error });
+    const priceCpById = new Map(equipment.map((item) => [item.id, item.price.cpTotal]));
+    const rows = db
+      .prepare(
+        "SELECT * FROM loot_parcels WHERE campaign_id = ? ORDER BY sort_order ASC, updated_at DESC"
+      )
+      .all(id) as LootParcelRow[];
+    const parcels = rows.map((row) => {
+      const parcel = serializeLootParcel(row);
+      return {
+        id: parcel.id,
+        name: parcel.name,
+        status: parcel.status,
+        valueCp: lootParcelValueCp(parcel, priceCpById),
+      };
+    });
+    const preparedCp = parcels
+      .filter((parcel) => parcel.status === "open")
+      .reduce((sum, parcel) => sum + parcel.valueCp, 0);
+    const distributedCp = parcels
+      .filter((parcel) => parcel.status === "distributed")
+      .reduce((sum, parcel) => sum + parcel.valueCp, 0);
+
+    const characterRows = db
+      .prepare("SELECT * FROM characters WHERE campaign_id = ? ORDER BY name COLLATE NOCASE")
+      .all(id) as CharacterRow[];
+    const characters = characterRows.map((character) => {
+      let level = 1;
+      let committedCp = 0;
+      try {
+        const draft = normalizeCharacterDraft(parseJson(character.data, {}), character.name);
+        level = draft.level;
+        committedCp = computeCharacter(draft, contextForDraft(draft)).wealth.committed;
+      } catch {
+        // An unfinished draft still appears in the audit at its stored name.
+      }
+      return {
+        id: character.id,
+        name: character.name,
+        level,
+        committedCp,
+        expectedCp: startingWealthCp(level),
+        deltaCp: committedCp - startingWealthCp(level),
+      };
+    });
+    const party = partyDefaults(characters.map((character) => character.level));
+    return reply.send({
+      audit: {
+        partyLevel: party.partyLevel,
+        partySize: party.partySize,
+        budget: treasureBudgetGp(party.partyLevel),
+        preparedCp,
+        distributedCp,
+        parcels,
+        characters,
+      },
+    });
   });
 
   app.post("/api/campaigns/:id/loot", async (request, reply) => {
