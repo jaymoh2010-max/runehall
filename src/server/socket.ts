@@ -25,6 +25,7 @@ import { normalizeAoeTemplate, normalizeAoeTemplates } from "../shared/templates
 import { blockingWallForMove, normalizeWalls } from "../shared/walls";
 import { normalizeSceneProps } from "../shared/props";
 import { normalizeLightColor, normalizeTokenVisionMode } from "../shared/lighting";
+import { emptyTokenTurnEffects, normalizeTokenTurnEffects } from "../shared/tokenTurnEffects";
 import type {
   ClientToServerEvents,
   InitiativeEntry,
@@ -438,9 +439,12 @@ function createToken(
   const visionMode = normalizeTokenVisionMode(incoming.visionMode);
   const groupId = incoming.groupId ? safeString(incoming.groupId, "", 80) || null : null;
   const groupName = groupId ? safeString(incoming.groupName, name, 80) : null;
+  const turnEffects = character
+    ? emptyTokenTurnEffects()
+    : normalizeTokenTurnEffects(incoming.turnEffects);
   db.prepare(
-    `INSERT INTO tokens (id, scene_id, name, image_url, character_id, owner_id, x, y, size, vision_radius, light_radius, light_color, vision_mode, color, hp_current, hp_max, ac, initiative_bonus, group_id, group_name, conditions, hidden, locked, sort_order, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO tokens (id, scene_id, name, image_url, character_id, owner_id, x, y, size, vision_radius, light_radius, light_color, vision_mode, color, hp_current, hp_max, ac, initiative_bonus, group_id, group_name, conditions, turn_effects, hidden, locked, sort_order, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     id,
     sceneId,
@@ -463,6 +467,7 @@ function createToken(
     groupId,
     groupName,
     JSON.stringify(normalizeTokenConditions(incoming.conditions)),
+    JSON.stringify(turnEffects),
     incoming.hidden ? 1 : 0,
     incoming.locked ? 1 : 0,
     Date.now(),
@@ -731,6 +736,9 @@ export function registerSocketServer(io: TypedServer): void {
         }
         if (token.groupName !== undefined) {
           add("group_name", token.groupName ? safeString(token.groupName, "", 80) || null : null);
+        }
+        if (token.turnEffects !== undefined && !row.character_id) {
+          add("turn_effects", JSON.stringify(normalizeTokenTurnEffects(token.turnEffects)));
         }
         if (token.hidden !== undefined) add("hidden", token.hidden ? 1 : 0);
         if (token.locked !== undefined) add("locked", token.locked ? 1 : 0);

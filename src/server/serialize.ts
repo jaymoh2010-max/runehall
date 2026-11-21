@@ -26,6 +26,7 @@ import type {
 import { normalizeCampaignRuleset, normalizeXpMode } from "../shared/content";
 import { normalizeAdvancementSpeed, normalizeXpAwardKind } from "../shared/xp";
 import { normalizeSettlementLevel } from "../shared/shop";
+import { normalizeTokenTurnEffects } from "../shared/tokenTurnEffects";
 import { isAudioMood } from "../shared/audio";
 import {
   normalizeAmbientLight,
@@ -284,6 +285,7 @@ export function serializeToken(row: TokenRow, ownerName?: string): Token {
     groupId: row.group_id ?? null,
     groupName: row.group_name ?? null,
     conditions: normalizeTokenConditions(parseJson(row.conditions, [])),
+    turnEffects: normalizeTokenTurnEffects(parseJson(row.turn_effects, {})),
     hidden: Boolean(row.hidden),
     locked: Boolean(row.locked),
     sortOrder: row.sort_order,

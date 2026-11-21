@@ -5,9 +5,21 @@ import { db, type CharacterRow, type TokenRow } from "./db";
 import { serializeMessage, serializeToken, touchCampaign } from "./serialize";
 import { tokenBroadcaster } from "./tokenEvents";
 import { characterSummary, normalizeCharacterDraft } from "../shared/rules";
-import { conditionsFromSheet } from "../shared/tokens";
-import { resolveEndOfTurn, resolveStartOfTurn } from "../shared/turnAutomation";
-import type { CharacterDraft, InitiativeEntry, RollResult } from "../shared/types";
+import { conditionsFromSheet, normalizeTokenConditions } from "../shared/tokens";
+import {
+  resolveEndOfTurn,
+  resolveStartOfTurn,
+  resolveTokenEndOfTurn,
+} from "../shared/turnAutomation";
+import { normalizeTokenTurnEffects, tokenTurnHealing } from "../shared/tokenTurnEffects";
+import type {
+  CharacterDraft,
+  InitiativeEntry,
+  RollResult,
+  TokenCondition,
+  TokenTurnEffects,
+} from "../shared/types";
+import { applyHpEditToState } from "../shared/damage";
 import { newId, now, parseJson } from "./util";
 
 const campaignRoom = (campaignId: string) => `campaign:${campaignId}`;
@@ -73,7 +85,7 @@ function claimTurnMark(campaignId: string, mark: string): boolean {
 function postAutomationRoll(
   io: TypedServer,
   campaignId: string,
-  characterId: string,
+  actor: { characterId?: string; tokenId?: string },
   result: RollResult,
   hidden: boolean
 ): void {
@@ -86,10 +98,33 @@ function postAutomationRoll(
     campaignId,
     "Turn automation",
     result.label || result.formula,
-    JSON.stringify({ ...result, characterId }),
+    JSON.stringify({
+      ...result,
+      characterId: actor.characterId ?? null,
+      tokenId: actor.tokenId ?? null,
+    }),
     visibility,
     now()
   );
+  const row = db.prepare("SELECT * FROM messages WHERE id = ?").get(id) as Parameters<
+    typeof serializeMessage
+  >[0];
+  const message = serializeMessage(row);
+  if (hidden) io.to(gmRoom(campaignId)).emit("chat:message", message);
+  else io.to(campaignRoom(campaignId)).emit("chat:message", message);
+}
+
+function postAutomationNote(
+  io: TypedServer,
+  campaignId: string,
+  text: string,
+  hidden: boolean
+): void {
+  const id = newId("msg");
+  const visibility = hidden ? "gm" : "all";
+  db.prepare(
+    "INSERT INTO messages (id, campaign_id, scene_id, user_id, author_name, type, content, data, visibility, created_at) VALUES (?, ?, NULL, NULL, ?, 'chat', ?, NULL, ?, ?)"
+  ).run(id, campaignId, "Turn automation", text, visibility, now());
   const row = db.prepare("SELECT * FROM messages WHERE id = ?").get(id) as Parameters<
     typeof serializeMessage
   >[0];
@@ -133,6 +168,34 @@ function persistCharacterDraft(
   touchCampaign(campaignId);
 }
 
+function tokenConditions(token: TokenRow): TokenCondition[] {
+  return normalizeTokenConditions(parseJson(token.conditions, []));
+}
+
+function saveUnlinkedToken(
+  io: TypedServer,
+  campaignId: string,
+  token: TokenRow,
+  update: {
+    hp: number | null;
+    conditions: TokenCondition[];
+    turnEffects: TokenTurnEffects;
+  }
+): void {
+  db.prepare(
+    "UPDATE tokens SET hp_current = ?, conditions = ?, turn_effects = ?, updated_at = ? WHERE id = ?"
+  ).run(
+    update.hp,
+    JSON.stringify(update.conditions),
+    JSON.stringify(update.turnEffects),
+    now(),
+    token.id
+  );
+  const updated = tokenRow(token.id);
+  if (updated) broadcastToken(io, campaignId, updated, Boolean(token.hidden));
+  touchCampaign(campaignId);
+}
+
 export function runTurnEnd(
   io: TypedServer,
   campaignId: string,
@@ -141,8 +204,58 @@ export function runTurnEnd(
 ): void {
   const seen = new Set<string>();
   for (const token of entryTokens(entry)) {
+    if (!token.character_id) {
+      const effects = normalizeTokenTurnEffects(parseJson(token.turn_effects, {}));
+      if (!effects.persistentDamage.length) continue;
+      if (!claimTurnMark(campaignId, `tok:${round}:${entry!.id}:${token.id}:end`)) {
+        continue;
+      }
+      try {
+        const conditions = tokenConditions(token);
+        const dead = conditions.some((condition) => condition.name.trim().toLowerCase() === "dead");
+        const result = resolveTokenEndOfTurn(effects, { labelPrefix: token.name }, dead);
+        for (const roll of result.rolls) {
+          postAutomationRoll(
+            io,
+            campaignId,
+            { tokenId: token.id },
+            roll.damage,
+            Boolean(token.hidden)
+          );
+          if (roll.flatCheck) {
+            postAutomationRoll(
+              io,
+              campaignId,
+              { tokenId: token.id },
+              roll.flatCheck,
+              Boolean(token.hidden)
+            );
+          }
+        }
+        if (!result.changed) continue;
+        let hp = token.hp_current;
+        let nextConditions = conditions;
+        if (result.totalDamage > 0 && token.hp_max !== null) {
+          const applied = applyHpEditToState({ hp: token.hp_current, conditions }, token.hp_max, {
+            type: "damage",
+            amount: result.totalDamage,
+          });
+          hp = applied.draft.play.hp;
+          nextConditions = applied.draft.play.conditions as TokenCondition[];
+        }
+        saveUnlinkedToken(io, campaignId, token, {
+          hp,
+          conditions: nextConditions,
+          turnEffects: { ...effects, persistentDamage: result.remaining },
+        });
+      } catch (error) {
+        console.error("[turn-effects] unlinked end-of-turn failed", error);
+      }
+      continue;
+    }
+
     const characterId = token.character_id;
-    if (!characterId || seen.has(characterId)) continue;
+    if (seen.has(characterId)) continue;
     seen.add(characterId);
     if (!claimTurnMark(campaignId, `${round}:${entry!.id}:${characterId}:end`)) continue;
     const character = getCharacter(characterId);
@@ -154,9 +267,21 @@ export function runTurnEnd(
         labelPrefix: character.name,
       });
       for (const roll of result.rolls) {
-        postAutomationRoll(io, campaignId, character.id, roll.damage, Boolean(token.hidden));
+        postAutomationRoll(
+          io,
+          campaignId,
+          { characterId: character.id },
+          roll.damage,
+          Boolean(token.hidden)
+        );
         if (roll.flatCheck) {
-          postAutomationRoll(io, campaignId, character.id, roll.flatCheck, Boolean(token.hidden));
+          postAutomationRoll(
+            io,
+            campaignId,
+            { characterId: character.id },
+            roll.flatCheck,
+            Boolean(token.hidden)
+          );
         }
       }
       if (result.changed) persistCharacterDraft(io, campaignId, character, result.draft);
@@ -175,8 +300,40 @@ export function runTurnStart(
 ): void {
   const seen = new Set<string>();
   for (const token of entryTokens(entry)) {
+    if (!token.character_id) {
+      const effects = normalizeTokenTurnEffects(parseJson(token.turn_effects, {}));
+      const conditions = tokenConditions(token);
+      const healing = tokenTurnHealing(effects, conditions);
+      if (healing <= 0 || token.hp_max === null) continue;
+      if (!claimTurnMark(campaignId, `tok:${round}:${entry!.id}:${token.id}:start`)) {
+        continue;
+      }
+      try {
+        if (token.hp_current !== null && token.hp_current >= token.hp_max) continue;
+        const applied = applyHpEditToState({ hp: token.hp_current, conditions }, token.hp_max, {
+          type: "heal",
+          amount: healing,
+        });
+        if (!applied.changed) continue;
+        saveUnlinkedToken(io, campaignId, token, {
+          hp: applied.draft.play.hp,
+          conditions: applied.draft.play.conditions as TokenCondition[],
+          turnEffects: effects,
+        });
+        postAutomationNote(
+          io,
+          campaignId,
+          `${token.name} heals ${applied.healed} HP from fast healing or regeneration.`,
+          Boolean(token.hidden)
+        );
+      } catch (error) {
+        console.error("[turn-effects] unlinked start-of-turn failed", error);
+      }
+      continue;
+    }
+
     const characterId = token.character_id;
-    if (!characterId || seen.has(characterId)) continue;
+    if (seen.has(characterId)) continue;
     seen.add(characterId);
     if (!claimTurnMark(campaignId, `${round}:${entry!.id}:${characterId}:start`)) continue;
     const character = getCharacter(characterId);
@@ -185,7 +342,13 @@ export function runTurnStart(
       const draft = normalizeCharacterDraft(parseJson(character.data, {}), character.name);
       const result = resolveStartOfTurn(draft, { labelPrefix: character.name });
       if (result.recovery) {
-        postAutomationRoll(io, campaignId, character.id, result.recovery, Boolean(token.hidden));
+        postAutomationRoll(
+          io,
+          campaignId,
+          { characterId: character.id },
+          result.recovery,
+          Boolean(token.hidden)
+        );
       }
       if (result.changed) persistCharacterDraft(io, campaignId, character, result.draft);
     } catch (error) {

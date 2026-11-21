@@ -1,6 +1,11 @@
 import { applyDyingRecovery, applyHpEditToDraft } from "./damage";
 import { rollFormula, validateFormula } from "./dice";
-import type { CharacterDraft, PersistentDamageInstance, RollResult } from "./types";
+import type {
+  CharacterDraft,
+  PersistentDamageInstance,
+  RollResult,
+  TokenTurnEffects,
+} from "./types";
 
 export type TurnAutomationRng = () => number;
 
@@ -33,6 +38,14 @@ export interface EndOfTurnResult {
   rolls: EndOfTurnRoll[];
   notes: string[];
   dead: boolean;
+}
+
+export interface TokenEndOfTurnResult {
+  changed: boolean;
+  totalDamage: number;
+  rolls: EndOfTurnRoll[];
+  remaining: PersistentDamageInstance[];
+  notes: string[];
 }
 
 function normalizedConditionName(value: string): string {
@@ -211,5 +224,71 @@ export function resolveEndOfTurn(
     rolls,
     notes,
     dead,
+  };
+}
+
+/**
+ * End-of-turn persistent damage for an unlinked token. HP and conditions are
+ * applied by the caller so the existing unlinked-token HP helper stays the
+ * single source of truth for dying/unconscious/dead.
+ */
+export function resolveTokenEndOfTurn(
+  effects: TokenTurnEffects,
+  options: TurnAutomationOptions = {},
+  dead = false
+): TokenEndOfTurnResult {
+  if (dead) {
+    return {
+      changed: false,
+      totalDamage: 0,
+      rolls: [],
+      remaining: effects.persistentDamage,
+      notes: [],
+    };
+  }
+  const instances = effects.persistentDamage.filter(
+    (instance) => validateFormula(instance.formula).ok
+  );
+  if (!instances.length) {
+    return {
+      changed: false,
+      totalDamage: 0,
+      rolls: [],
+      remaining: effects.persistentDamage,
+      notes: [],
+    };
+  }
+
+  let totalDamage = 0;
+  const damageRolls = new Map<string, RollResult>();
+  for (const instance of instances) {
+    const damage = rollFormula(instance.formula, {
+      label: label(options.labelPrefix, `Persistent ${instance.type} damage`),
+      rng: options.rng,
+    });
+    damageRolls.set(instance.id, damage);
+    totalDamage += Math.max(0, Math.round(damage.total));
+  }
+
+  const rolls: EndOfTurnRoll[] = [];
+  const endedIds = new Set<string>();
+  for (const instance of instances) {
+    const damage = damageRolls.get(instance.id)!;
+    const flatCheck = rollFormula("1d20", {
+      dc: instance.dc,
+      label: label(options.labelPrefix, `Persistent ${instance.type} flat check`),
+      rng: options.rng,
+    });
+    const ended = flatCheck.degree === "success" || flatCheck.degree === "critical-success";
+    if (ended) endedIds.add(instance.id);
+    rolls.push({ instance, damage, flatCheck, ended });
+  }
+
+  return {
+    changed: totalDamage > 0 || endedIds.size > 0,
+    totalDamage,
+    rolls,
+    remaining: effects.persistentDamage.filter((instance) => !endedIds.has(instance.id)),
+    notes: [],
   };
 }

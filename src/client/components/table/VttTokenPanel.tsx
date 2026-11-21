@@ -535,6 +535,30 @@ export function VttTokenPanel({
               ))}
             </div>
           ) : null}
+          {selectedToken.turnEffects &&
+          (selectedToken.turnEffects.fastHealing > 0 ||
+            selectedToken.turnEffects.regeneration > 0 ||
+            selectedToken.turnEffects.persistentDamage.length) ? (
+            <div className="chip-row" style={{ marginTop: 6 }}>
+              {selectedToken.turnEffects.fastHealing > 0 ? (
+                <Tag tone="green">
+                  Fast healing {selectedToken.turnEffects.fastHealing}
+                  {selectedToken.turnEffects.fastHealingActive ? "" : " (off)"}
+                </Tag>
+              ) : null}
+              {selectedToken.turnEffects.regeneration > 0 ? (
+                <Tag tone="green">
+                  Regen {selectedToken.turnEffects.regeneration}
+                  {selectedToken.turnEffects.regenerationActive ? "" : " (off)"}
+                </Tag>
+              ) : null}
+              {selectedToken.turnEffects.persistentDamage.map((instance) => (
+                <Tag key={instance.id} tone="red">
+                  {instance.formula} {instance.type}
+                </Tag>
+              ))}
+            </div>
+          ) : null}
         </div>
       ) : (
         <div className="vtt-left-tip">

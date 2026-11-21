@@ -7524,6 +7524,7 @@
   background: rgba(255, 255, 255, 0.015);
   padding: 9px 11px;
 }
+.token-turn-effects-editor,
 .token-conditions-editor {
   border: 1px solid var(--line);
   border-radius: 7px;
@@ -7532,6 +7533,22 @@
   display: flex;
   flex-direction: column;
   gap: 7px;
+}
+.token-turn-effects-editor .token-edit-stat-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.token-turn-effects-editor .token-edit-toggles {
+  border: 0;
+  padding: 0;
+  background: transparent;
+}
+.token-persistent-damage {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  border-top: 1px solid var(--line);
+  padding-top: 8px;
+  margin-top: 2px;
 }
 .token-linked-character {
   display: flex;

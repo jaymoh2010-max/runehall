@@ -654,6 +654,12 @@ Acceptance: a GM can prepare a full session in Runehall and start it with one �
   - Hidden-token automation rolls stay in the GM room; visible rolls appear as “Turn automation” cards in chat.
   - Per-round/entry/phase marks prevent duplicate resolution when stepping backward and forward.
   - The sheet's manual recovery and end-turn buttons remain for out-of-combat use. Unlinked monsters, fast healing/regeneration, and affliction timers remain manual.
+- [x] **Monster turn effects**
+  - Unlinked tokens store fast healing, regeneration, persistent damage, and activation/suppression notes.
+  - Encounter launch seeds numeric fast healing/regeneration from monster ability names; conditional fast healing starts inactive.
+  - Bestiary placement seeds the same effects on each grouped token.
+  - Start of turn applies fast healing/regeneration; end of turn rolls persistent damage once and then one flat check per type.
+  - The token editor exposes the fields and a manual “Regeneration suppressed” toggle. Damage-type suppression and linked-PC fast healing remain manual.
 - [x] **Browser E2E**
   - Playwright covers first-user registration, Hall controls (retention, CSV export, filtering), campaign creation, the invite code, the character builder and sheet, lazy library/compendium/rules/account routes, a second player joining with the invite code, and table interactions (token placement, chat, dice rolls, and the scenes manager).
   - Player-safe campaign navigation is checked: GM-only tabs are absent for the player, and the GM sees the new member in Settings.
@@ -722,4 +728,4 @@ A campaign-level review compared Runehall against PF2e GM Core/Player Core progr
 
 - Full report: [CAMPAIGN-READINESS.md](CAMPAIGN-READINESS.md)
 - Repeatable simulation: `npm run simulate:campaign`
-- Next priority: fast healing/regeneration, affliction onset timers, and unlinked-monster turn effects, then exploration/downtime/social continuity and the remaining treasure item-mix planner.
+- Next priority: fast healing/regeneration for linked PCs, damage-type regeneration suppression, and affliction onset timers, then exploration/downtime/social continuity and the remaining treasure item-mix planner.

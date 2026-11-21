@@ -841,6 +841,48 @@ test("GM places a token, chats, rolls, and opens the scenes manager", async ({ p
   await expect(scenes).toBeHidden();
 });
 
+test("GM configures fast healing, regeneration, and persistent damage on a token", async ({
+  page,
+}) => {
+  await signIn(page, admin);
+  await page.goto(campaignPath);
+  await expect(page.locator(".vtt-connection")).toHaveClass(/is-online/, { timeout: 15_000 });
+
+  await page.getByRole("button", { name: "Add token", exact: true }).click();
+  const addToken = page.getByRole("dialog", { name: "Add a token" });
+  await addToken.getByRole("button", { name: /Custom/ }).click();
+  await addToken.getByLabel("Token name").fill("Effect Dummy");
+  await addToken.getByLabel("Hit points").fill("20");
+  await addToken.getByLabel("Armor class").fill("15");
+  await addToken.getByRole("button", { name: "Place token" }).click();
+  await expect(addToken).toBeHidden();
+
+  const tokenButton = page.getByRole("button", {
+    name: /Effect Dummy, 20 of 20 hit points/,
+  });
+  await expect(tokenButton).toBeVisible({ timeout: 15_000 });
+  await tokenButton.click({ force: true });
+  await page.getByRole("button", { name: "Edit token" }).click();
+  const editor = page.getByRole("dialog", { name: /Edit “Effect Dummy”/ });
+  await editor.getByLabel("Fast healing", { exact: true }).fill("5");
+  await editor.getByLabel("Regeneration", { exact: true }).fill("10");
+  await editor.getByLabel("Token persistent damage formula").fill("1d6");
+  await editor.getByLabel("Token persistent damage type").fill("fire");
+  await editor.getByRole("button", { name: "Add persistent damage" }).click();
+  await expect(editor.getByText(/1d6 fire/)).toBeVisible();
+  await editor.getByRole("button", { name: "Save token" }).click();
+  await expect(editor).toBeHidden();
+
+  await tokenButton.click({ force: true });
+  await page.getByRole("button", { name: "Edit token" }).click();
+  await expect(editor.getByLabel("Fast healing", { exact: true })).toHaveValue("5");
+  await expect(editor.getByLabel("Regeneration", { exact: true })).toHaveValue("10");
+  await expect(editor.getByText(/1d6 fire/)).toBeVisible();
+  page.once("dialog", (dialog) => dialog.accept());
+  await editor.getByRole("button", { name: "Delete" }).click();
+  await expect(editor).toBeHidden();
+});
+
 test("GM turns a handout into a completed quest and awards its XP", async ({ page }) => {
   await signIn(page, admin);
   await page.goto(campaignPath);
