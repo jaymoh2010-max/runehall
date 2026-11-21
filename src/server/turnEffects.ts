@@ -12,6 +12,7 @@ import {
   resolveTokenEndOfTurn,
 } from "../shared/turnAutomation";
 import { normalizeTokenTurnEffects, tokenTurnHealing } from "../shared/tokenTurnEffects";
+import { characterTokenTurnEffects } from "../shared/characterTurnEffects";
 import type {
   CharacterDraft,
   InitiativeEntry,
@@ -153,10 +154,11 @@ function persistCharacterDraft(
       ? summary.hp
       : Math.max(0, Math.min(summary.hp, Math.round(draft.play.hp)));
   const conditions = JSON.stringify(conditionsFromSheet(draft.play.conditions));
+  const turnEffects = JSON.stringify(characterTokenTurnEffects(draft.play));
   for (const token of linkedTokens) {
     db.prepare(
-      "UPDATE tokens SET name = ?, hp_max = ?, hp_current = ?, ac = ?, conditions = ?, updated_at = ? WHERE id = ?"
-    ).run(draft.name, summary.hp, nextHp, summary.ac, conditions, ts, token.id);
+      "UPDATE tokens SET name = ?, hp_max = ?, hp_current = ?, ac = ?, conditions = ?, turn_effects = ?, updated_at = ? WHERE id = ?"
+    ).run(draft.name, summary.hp, nextHp, summary.ac, conditions, turnEffects, ts, token.id);
     const updated = tokenRow(token.id);
     if (updated) broadcastToken(io, campaignId, updated, Boolean(token.hidden));
   }
@@ -340,7 +342,16 @@ export function runTurnStart(
     if (!character) continue;
     try {
       const draft = normalizeCharacterDraft(parseJson(character.data, {}), character.name);
-      const result = resolveStartOfTurn(draft, { labelPrefix: character.name });
+      const summary = characterSummary(draft, contextForDraft(draft));
+      const result = resolveStartOfTurn(draft, summary.hp, { labelPrefix: character.name });
+      if (result.healing > 0) {
+        postAutomationNote(
+          io,
+          campaignId,
+          `${character.name} regains ${result.healing} HP from fast healing or regeneration.`,
+          Boolean(token.hidden)
+        );
+      }
       if (result.heroicRecoveryAvailable) {
         postAutomationNote(
           io,

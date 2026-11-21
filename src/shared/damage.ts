@@ -1,4 +1,8 @@
 import type { CharacterCondition, CharacterDraft, DegreeOfSuccess } from "./types";
+import {
+  characterRegenerationActive,
+  suppressRegenerationFromDamage,
+} from "./characterTurnEffects";
 
 /**
  * PF2e damage helper. Temporary HP absorbs damage first, and dropping to 0 HP
@@ -19,6 +23,8 @@ export interface DamageResult {
 export interface DamageOptions {
   /** Critical damage increases the dying value by 1. */
   critical?: boolean;
+  /** Damage types used to deactivate regeneration before the damage lands. */
+  damageTypes?: string[];
 }
 
 export interface HealingResult {
@@ -28,7 +34,7 @@ export interface HealingResult {
 }
 
 export type HpEdit =
-  | { type: "damage"; amount: number; critical?: boolean }
+  | { type: "damage"; amount: number; critical?: boolean; damageTypes?: string[] }
   | { type: "heal"; amount: number }
   | { type: "set"; hp: number | null };
 
@@ -81,6 +87,7 @@ export function applyHpEditToDraft(
   if (edit.type === "damage") {
     const result = applyDamageToDraft(draft, maxHp, edit.amount, {
       critical: edit.critical,
+      damageTypes: edit.damageTypes,
     });
     return {
       draft: result.draft,
@@ -301,9 +308,15 @@ function conditionBaseName(value: string): string {
  * 2). Dropping below dying 1 ends dying, keeps unconscious while HP remains 0,
  * and increases wounded by 1. Reaching the doomed-adjusted threshold kills.
  */
+export interface DyingRecoveryOptions {
+  /** Active regeneration keeps the dying value below the death threshold. */
+  regenerationActive?: boolean;
+}
+
 export function applyDyingRecovery(
   draft: CharacterDraft,
-  degree: DegreeOfSuccess
+  degree: DegreeOfSuccess,
+  options: DyingRecoveryOptions = {}
 ): DyingRecoveryResult {
   const existing = conditionValue(draft.play.conditions, "dying");
   const wounded = conditionValue(draft.play.conditions, "wounded");
@@ -344,7 +357,7 @@ export function applyDyingRecovery(
         : degree === "critical-failure"
           ? 2
           : 1;
-  const dying = Math.max(0, existing + delta);
+  let dying = Math.max(0, existing + delta);
   let conditions = draft.play.conditions.map((condition) => ({ ...condition }));
   const notes: string[] = [];
   let ended = false;
@@ -361,9 +374,13 @@ export function applyDyingRecovery(
     conditions = upsertCondition(conditions, "Wounded", wounded + 1);
     notes.push(`Dying ends: wounded ${wounded + 1}.`);
   } else {
+    const deathThreshold = 4 - conditionValue(conditions, "doomed");
+    if (options.regenerationActive && deathThreshold > 0 && dying >= deathThreshold) {
+      dying = Math.max(0, deathThreshold - 1);
+      notes.push(`Regeneration prevents death: dying capped at ${dying}.`);
+    }
     conditions = upsertCondition(conditions, "Dying", dying);
     notes.push(`Dying ${existing} → ${dying}.`);
-    const deathThreshold = 4 - conditionValue(conditions, "doomed");
     if (deathThreshold <= 0 || dying >= deathThreshold) {
       conditions = upsertCondition(conditions, "Dead", null);
       notes.push(
@@ -430,32 +447,45 @@ export function applyDamageToDraft(
   options: DamageOptions = {}
 ): DamageResult {
   const damage = Math.max(0, Math.round(Number.isFinite(amount) ? amount : 0));
+  const suppression = options.damageTypes?.length
+    ? suppressRegenerationFromDamage(draft.play, options.damageTypes)
+    : null;
+  const working = suppression?.applied
+    ? {
+        ...draft,
+        play: { ...draft.play, conditions: suppression.conditions },
+      }
+    : draft;
+  const regenerationActive = characterRegenerationActive(working.play);
   const currentHp =
-    draft.play.hp === null
+    working.play.hp === null
       ? Math.max(1, Math.round(maxHp))
-      : Math.max(0, Math.min(Math.max(1, Math.round(maxHp)), Math.round(draft.play.hp)));
-  const tempHp = Math.max(0, Math.round(draft.play.tempHp));
-  if (!damage || conditionValue(draft.play.conditions, "dead") > 0) {
+      : Math.max(0, Math.min(Math.max(1, Math.round(maxHp)), Math.round(working.play.hp)));
+  const tempHp = Math.max(0, Math.round(working.play.tempHp));
+  const notes: string[] = [];
+  if (suppression?.applied) {
+    notes.push(`Regeneration suppressed by ${suppression.types.join(", ")}.`);
+  }
+  if (!damage || conditionValue(working.play.conditions, "dead") > 0) {
     return {
-      draft,
+      draft: working,
       tempHpAbsorbed: 0,
       hpDamage: 0,
       droppedToZero: false,
-      dying: conditionValue(draft.play.conditions, "dying"),
-      wounded: conditionValue(draft.play.conditions, "wounded"),
-      dead: conditionValue(draft.play.conditions, "dead") > 0,
-      notes: [],
+      dying: conditionValue(working.play.conditions, "dying"),
+      wounded: conditionValue(working.play.conditions, "wounded"),
+      dead: conditionValue(working.play.conditions, "dead") > 0,
+      notes,
     };
   }
 
   const tempHpAbsorbed = Math.min(tempHp, damage);
   const hpDamage = Math.min(currentHp, damage - tempHpAbsorbed);
   const nextHp = Math.max(0, currentHp - hpDamage);
-  const notes: string[] = [];
   if (tempHpAbsorbed) notes.push(`Absorbed ${tempHpAbsorbed} damage with temporary HP.`);
   if (hpDamage) notes.push(`Took ${hpDamage} damage.`);
 
-  let conditions = draft.play.conditions.map((condition) => ({ ...condition }));
+  let conditions = working.play.conditions.map((condition) => ({ ...condition }));
   let dying = 0;
   let dead = false;
   const droppedToZero = currentHp > 0 && nextHp === 0;
@@ -468,11 +498,15 @@ export function applyDamageToDraft(
     } else {
       dying = 1 + (wounded > 0 ? wounded : 0) + criticalBonus;
     }
+    const deathThreshold = 4 - conditionValue(conditions, "doomed");
+    if (regenerationActive && deathThreshold > 0 && dying >= deathThreshold) {
+      dying = Math.max(0, deathThreshold - 1);
+      notes.push(`Regeneration prevents death: dying capped at ${dying}.`);
+    }
     conditions = upsertCondition(conditions, "Dying", dying);
     conditions = upsertCondition(conditions, "Unconscious", null);
     notes.push(`Dropped to 0 HP: dying ${dying} and unconscious.`);
     notes.push(`Recovery check DC ${10 + dying} at the start of each turn.`);
-    const deathThreshold = 4 - conditionValue(conditions, "doomed");
     if (deathThreshold <= 0 || dying >= deathThreshold) {
       dead = true;
       conditions = upsertCondition(conditions, "Dead", null);
@@ -488,9 +522,9 @@ export function applyDamageToDraft(
 
   return {
     draft: {
-      ...draft,
+      ...working,
       play: {
-        ...draft.play,
+        ...working.play,
         hp: nextHp,
         tempHp: tempHp - tempHpAbsorbed,
         conditions,

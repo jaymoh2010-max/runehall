@@ -357,3 +357,58 @@ describe("damage and dying", () => {
     expect(applyDyingRecovery(stable, "failure").draft).toBe(stable);
   });
 });
+
+describe("linked regeneration", () => {
+  function regenerating(hp: number | null, conditions: CharacterCondition[] = []): CharacterDraft {
+    const draft = draftWith({ hp, conditions });
+    draft.play.regeneration = 5;
+    draft.play.regenerationDeactivatedBy = ["fire", "acid"];
+    return draft;
+  }
+
+  it("suppresses regeneration only for matching typed damage", () => {
+    const fire = applyDamageToDraft(regenerating(15), 20, 5, { damageTypes: ["fire"] });
+    expect(fire.draft.play.hp).toBe(10);
+    expect(fire.notes).toContain("Regeneration suppressed by fire.");
+    expect(fire.draft.play.conditions).toEqual(
+      expect.arrayContaining([expect.objectContaining({ name: "Regeneration Suppressed" })])
+    );
+
+    const cold = applyDamageToDraft(regenerating(15), 20, 5, { damageTypes: ["cold"] });
+    expect(cold.draft.play.conditions).toHaveLength(0);
+  });
+
+  it("deactivates regeneration before triggering lethal damage", () => {
+    const fire = applyDamageToDraft(
+      regenerating(0, [{ name: "Dying", value: 3, duration: null }]),
+      20,
+      1,
+      { damageTypes: ["fire"] }
+    );
+    expect(fire.dead).toBe(true);
+
+    const cold = applyDamageToDraft(
+      regenerating(0, [{ name: "Dying", value: 3, duration: null }]),
+      20,
+      1,
+      { damageTypes: ["cold"] }
+    );
+    expect(cold.dead).toBe(false);
+    expect(cold.dying).toBe(3);
+    expect(cold.notes.some((note) => note.includes("Regeneration prevents death"))).toBe(true);
+  });
+
+  it("caps recovery failures below the death threshold while active", () => {
+    const draft = regenerating(0, [{ name: "Dying", value: 2, duration: null }]);
+    const result = applyDyingRecovery(draft, "critical-failure", { regenerationActive: true });
+    expect(result.dead).toBe(false);
+    expect(result.dying).toBe(3);
+    expect(result.notes.some((note) => note.includes("Regeneration prevents death"))).toBe(true);
+
+    const suppressed = applyDyingRecovery(draft, "critical-failure", {
+      regenerationActive: false,
+    });
+    expect(suppressed.dead).toBe(true);
+    expect(suppressed.dying).toBe(4);
+  });
+});

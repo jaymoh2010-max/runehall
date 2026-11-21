@@ -1,4 +1,9 @@
 import { applyDyingRecovery, applyHpEditToDraft } from "./damage";
+import {
+  characterRegenerationActive,
+  characterTurnHealingParts,
+  clearRegenerationSuppression,
+} from "./characterTurnEffects";
 import { rollFormula, validateFormula } from "./dice";
 import type {
   CharacterDraft,
@@ -20,6 +25,8 @@ export interface StartOfTurnResult {
   dyingBefore: number;
   recovery: RollResult | null;
   heroicRecoveryAvailable: boolean;
+  /** HP regained from fast healing and regeneration at the start of the turn. */
+  healing: number;
   notes: string[];
   ended: boolean;
   dead: boolean;
@@ -83,35 +90,63 @@ function label(prefix: string | undefined, suffix: string): string {
 }
 
 /**
- * Start-of-turn effects. PF2e lets the creature order healing and the recovery
- * check; this sprint resolves the recovery check, which is the only structured
- * start-of-turn effect currently stored on a character.
+ * Start-of-turn effects. Fast healing and regeneration restore HP first, then
+ * a still-dying character chooses between Heroic Recovery and a recovery check.
+ * Regeneration suppression is cleared after the skipped healing so it skips
+ * exactly one start-of-turn regeneration tick.
  */
 export function resolveStartOfTurn(
   draft: CharacterDraft,
+  maxHp: number,
   options: TurnAutomationOptions = {}
 ): StartOfTurnResult {
-  const dyingBefore = dyingValue(draft);
-  if (dyingBefore <= 0 || hasDead(draft)) {
+  const healingParts = characterTurnHealingParts(draft.play);
+  let current = draft;
+  let healing = 0;
+  const notes: string[] = [];
+  if (healingParts.total > 0) {
+    const applied = applyHpEditToDraft(draft, Math.max(1, Math.round(maxHp)), {
+      type: "heal",
+      amount: healingParts.total,
+    });
+    current = applied.draft;
+    healing = applied.healed;
+    notes.push(...applied.notes);
+  }
+  const regenerationActive = characterRegenerationActive(draft.play);
+  if (!hasDead(current) && healingParts.suppressed && draft.play.regeneration > 0) {
+    current = {
+      ...current,
+      play: {
+        ...current.play,
+        conditions: clearRegenerationSuppression(current.play.conditions),
+      },
+    };
+  }
+
+  const dyingBefore = dyingValue(current);
+  if (dyingBefore <= 0 || hasDead(current)) {
     return {
-      draft,
-      changed: false,
+      draft: current,
+      changed: current !== draft,
       dyingBefore,
       recovery: null,
       heroicRecoveryAvailable: false,
-      notes: [],
+      healing,
+      notes,
       ended: dyingBefore <= 0,
-      dead: hasDead(draft),
+      dead: hasDead(current),
     };
   }
-  if (draft.play.heroPoints > 0) {
+  if (current.play.heroPoints > 0) {
     return {
-      draft,
-      changed: false,
+      draft: current,
+      changed: current !== draft,
       dyingBefore,
       recovery: null,
       heroicRecoveryAvailable: true,
-      notes: ["Heroic Recovery is available."],
+      healing,
+      notes: [...notes, "Heroic Recovery is available."],
       ended: false,
       dead: false,
     };
@@ -122,14 +157,17 @@ export function resolveStartOfTurn(
     label: label(options.labelPrefix, "Dying recovery check"),
     rng: options.rng,
   });
-  const applied = applyDyingRecovery(draft, recovery.degree ?? "failure");
+  const applied = applyDyingRecovery(current, recovery.degree ?? "failure", {
+    regenerationActive,
+  });
   return {
     draft: applied.draft,
     changed: applied.draft !== draft,
     dyingBefore,
     recovery,
     heroicRecoveryAvailable: false,
-    notes: applied.notes,
+    healing,
+    notes: [...notes, ...applied.notes],
     ended: applied.ended,
     dead: applied.dead,
   };
@@ -191,6 +229,7 @@ export function resolveEndOfTurn(
     const applied = applyHpEditToDraft(draft, Math.max(1, Math.round(maxHp)), {
       type: "damage",
       amount: totalDamage,
+      damageTypes: [...new Set(instances.map((instance) => instance.type))],
     });
     next = applied.draft;
     dead = applied.dead;

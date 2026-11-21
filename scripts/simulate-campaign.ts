@@ -990,6 +990,145 @@ async function runCampaignA(gm: Account, players: Account[]): Promise<void> {
 
   await check(
     campaignName,
+    "linked fast healing and regeneration resolve at turn start",
+    async () => {
+      const hero = heroes[0];
+      const sheet = await api(`/api/characters/${hero.id}`, { cookie: players[0].cookie });
+      const maxHp = Number(sheet.payload.character.summary.hp);
+      const startHp = Math.max(0, maxHp - 10);
+      const healTarget = Math.min(maxHp, startHp + 10);
+      const draft = JSON.parse(JSON.stringify(sheet.payload.character.data)) as Json;
+      draft.play.hp = startHp;
+      draft.play.tempHp = 0;
+      draft.play.heroPoints = 0;
+      draft.play.conditions = [];
+      draft.play.persistentDamage = [];
+      draft.play.fastHealing = 4;
+      draft.play.fastHealingActive = true;
+      draft.play.regeneration = 6;
+      draft.play.regenerationActive = true;
+      draft.play.regenerationDeactivatedBy = ["fire", "acid"];
+      await api(`/api/characters/${hero.id}`, {
+        method: "PUT",
+        cookie: players[0].cookie,
+        body: { data: draft, force: true },
+      });
+
+      let table = await getTable(campaignId, gm.cookie);
+      let entries = table.initiative as Json[];
+      let heroIndex = entries.findIndex((entry) => entry.tokenId === tokens.get(hero.id)?.id);
+      assert(heroIndex >= 0, "Fast healing hero missing from initiative");
+      let otherIndex = (heroIndex + 1) % entries.length;
+      let round = Number(table.round) + 1;
+      await emitAndWait(
+        gmSocket,
+        "initiative:update",
+        { campaignId, entries, round, turnIndex: otherIndex },
+        "initiative:updated"
+      );
+      const healedUpdate = waitForEvent<Json>(
+        gmSocket,
+        "character:updated",
+        (payload) => payload.characterId === hero.id,
+        5_000
+      );
+      const healedNote = waitForEvent<Json>(
+        gmSocket,
+        "chat:message",
+        (payload) =>
+          payload.type === "chat" &&
+          String(payload.content).includes("from fast healing or regeneration"),
+        5_000
+      );
+      await emitAndWait(
+        gmSocket,
+        "initiative:update",
+        { campaignId, entries, round, turnIndex: heroIndex },
+        "initiative:updated",
+        (payload) => payload.turnIndex === heroIndex
+      );
+      await Promise.all([healedUpdate, healedNote]);
+      const healed = await api(`/api/characters/${hero.id}`, { cookie: players[0].cookie });
+      assertEqual(healed.payload.character.data.play.hp, healTarget, "Linked fast healing HP");
+      const healedToken = ((await getTable(campaignId, gm.cookie)).tokens as Json[]).find(
+        (token) => token.characterId === hero.id
+      );
+      assertEqual(healedToken?.hpCurrent, healTarget, "Linked fast healing token mirror");
+      assertEqual(healedToken?.turnEffects?.regeneration, 6, "Linked turn effects token mirror");
+
+      const suppressedDraft = JSON.parse(JSON.stringify(healed.payload.character.data)) as Json;
+      const suppressedStart = Math.max(0, maxHp - 4);
+      const suppressedTarget = Math.min(maxHp, suppressedStart + 4);
+      suppressedDraft.play.hp = suppressedStart;
+      suppressedDraft.play.conditions = [{ name: "Regeneration Suppressed", value: null }];
+      await api(`/api/characters/${hero.id}`, {
+        method: "PUT",
+        cookie: players[0].cookie,
+        body: { data: suppressedDraft, force: true },
+      });
+      table = await getTable(campaignId, gm.cookie);
+      entries = table.initiative as Json[];
+      heroIndex = entries.findIndex((entry) => entry.tokenId === tokens.get(hero.id)?.id);
+      otherIndex = (heroIndex + 1) % entries.length;
+      round = Number(table.round) + 1;
+      await emitAndWait(
+        gmSocket,
+        "initiative:update",
+        { campaignId, entries, round, turnIndex: otherIndex },
+        "initiative:updated"
+      );
+      const suppressedUpdate = waitForEvent<Json>(
+        gmSocket,
+        "character:updated",
+        (payload) => payload.characterId === hero.id,
+        5_000
+      );
+      await emitAndWait(
+        gmSocket,
+        "initiative:update",
+        { campaignId, entries, round, turnIndex: heroIndex },
+        "initiative:updated",
+        (payload) => payload.turnIndex === heroIndex
+      );
+      await suppressedUpdate;
+      const suppressed = await api(`/api/characters/${hero.id}`, {
+        cookie: players[0].cookie,
+      });
+      assertEqual(
+        suppressed.payload.character.data.play.hp,
+        suppressedTarget,
+        "Suppressed regeneration HP"
+      );
+      assert(
+        !suppressed.payload.character.data.play.conditions.some(
+          (condition: Json) => condition.name === "Regeneration Suppressed"
+        ),
+        "Regeneration suppression was not cleared after its turn"
+      );
+
+      const restore = JSON.parse(JSON.stringify(sheet.payload.character.data)) as Json;
+      restore.play.hp = null;
+      restore.play.tempHp = 0;
+      restore.play.heroPoints = 1;
+      restore.play.conditions = [];
+      restore.play.persistentDamage = [];
+      restore.play.fastHealing = 0;
+      restore.play.fastHealingActive = true;
+      restore.play.fastHealingNote = "";
+      restore.play.regeneration = 0;
+      restore.play.regenerationActive = true;
+      restore.play.regenerationNote = "";
+      restore.play.regenerationDeactivatedBy = [];
+      await api(`/api/characters/${hero.id}`, {
+        method: "PUT",
+        cookie: players[0].cookie,
+        body: { data: restore, force: true },
+      });
+    }
+  );
+
+  await check(
+    campaignName,
     "unlinked token turn effects heal, damage, and resolve once",
     async () => {
       const created = await emitAck<Json>(gmSocket, "token:create", {

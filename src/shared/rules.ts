@@ -34,6 +34,7 @@ import { conditionModifiers } from "./conditions";
 import { normalizeAfflictions } from "./afflictions";
 import { normalizePersistentDamageList } from "./persistentDamage";
 import { clampHeroPoints } from "./heroPoints";
+import { normalizeCharacterTurnEffects } from "./characterTurnEffects";
 import {
   FEAT_CHOICES,
   FEAT_GRANTS,
@@ -887,6 +888,13 @@ export function emptyCharacterDraft(name = "New Hero"): CharacterDraft {
       conditions: [],
       afflictions: [],
       persistentDamage: [],
+      fastHealing: 0,
+      fastHealingActive: true,
+      fastHealingNote: "",
+      regeneration: 0,
+      regenerationActive: true,
+      regenerationNote: "",
+      regenerationDeactivatedBy: [],
       xp: 0,
       shieldRaised: false,
     },
@@ -1158,6 +1166,7 @@ export function normalizeCharacterDraft(input: unknown, fallbackName = "New Hero
         })),
       afflictions: normalizeAfflictions(play.afflictions),
       persistentDamage: normalizePersistentDamageList(play.persistentDamage),
+      ...normalizeCharacterTurnEffects(play),
       xp: Math.max(0, num(play.xp, 0)),
       shieldRaised: Boolean(play.shieldRaised),
     },

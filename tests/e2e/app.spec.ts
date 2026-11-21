@@ -1705,4 +1705,26 @@ test("sheet rolls dying recovery and persistent damage end-of-turn checks", asyn
   await page.getByRole("button", { name: "End turn for all persistent damage" }).click();
   await expect(page.locator(".persistent-damage-row")).toHaveCount(0);
   await expect(hpInput).toHaveValue("4");
+
+  await page.getByLabel("Fast healing", { exact: true }).fill("5");
+  await page.getByLabel("Regeneration", { exact: true }).fill("10");
+  await page.getByLabel("Regeneration suppressed by").fill("fire, acid");
+  await page.getByLabel("Quick damage type").fill("fire");
+  await page.getByRole("button", { name: "Decrease hit points by 1" }).click();
+  await expect(page.locator(".conditions-list").getByText("Regeneration Suppressed")).toBeVisible();
+  await expect(page.locator(".save-indicator")).toContainText("Saved", { timeout: 15_000 });
+
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "E2E Dying" })).toBeVisible({
+    timeout: 15_000,
+  });
+  await expect(page.getByLabel("Fast healing", { exact: true })).toHaveValue("5");
+  await expect(page.getByLabel("Regeneration", { exact: true })).toHaveValue("10");
+  await expect(page.getByLabel("Regeneration suppressed by")).toHaveValue("fire, acid");
+  await expect(page.locator(".conditions-list").getByText("Regeneration Suppressed")).toBeVisible();
+
+  await page.getByRole("switch", { name: "Regeneration suppressed" }).click();
+  await expect(page.locator(".conditions-list").getByText("Regeneration Suppressed")).toHaveCount(
+    0
+  );
 });

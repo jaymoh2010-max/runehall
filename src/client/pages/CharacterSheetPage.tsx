@@ -94,6 +94,10 @@ import {
   persistentDamageLabel,
 } from "../../shared/persistentDamage";
 import { conditionBaseName, conditionLabel, parseConditionEntry } from "../../shared/tokens";
+import {
+  REGENERATION_SUPPRESSED_CONDITION,
+  normalizeDamageTypeList,
+} from "../../shared/characterTurnEffects";
 import { api, ApiError, formatCp } from "../api";
 import { errorMessage } from "../stores";
 import { useToasts } from "../stores";
@@ -222,6 +226,7 @@ export function CharacterSheetPage() {
   } | null>(null);
   const [castRanks, setCastRanks] = useState<Record<string, number>>({});
   const [hpInput, setHpInput] = useState("");
+  const [damageType, setDamageType] = useState("");
   const [conflict, setConflict] = useState<CharacterRecord | null>(null);
   const initialized = useRef(false);
   const skipInitialSave = useRef(true);
@@ -516,16 +521,42 @@ export function CharacterSheetPage() {
     });
   };
 
-  const applyDamage = (amount: number) => {
+  const applyDamage = (amount: number, types?: string[]) => {
     if (!derived) return;
+    const typed = types ?? normalizeDamageTypeList(damageType);
+    const damageTypes = typed.length ? typed : undefined;
     update(
-      (current) => applyHpEditToDraft(current, derived.maxHp, { type: "damage", amount }).draft
+      (current) =>
+        applyHpEditToDraft(current, derived.maxHp, {
+          type: "damage",
+          amount,
+          damageTypes,
+        }).draft
     );
   };
 
   const applyHealing = (amount: number) => {
     if (!derived) return;
     update((current) => applyHpEditToDraft(current, derived.maxHp, { type: "heal", amount }).draft);
+  };
+
+  const setRegenerationSuppressed = (checked: boolean) => {
+    update((current) => {
+      const conditions = current.play.conditions.filter(
+        (condition) => conditionBaseName(condition.name) !== "regeneration suppressed"
+      );
+      if (checked) {
+        conditions.push({
+          name: REGENERATION_SUPPRESSED_CONDITION,
+          value: null,
+          duration: null,
+        });
+      }
+      return {
+        ...current,
+        play: { ...current.play, conditions },
+      };
+    });
   };
 
   const rollDyingRecovery = () => {
@@ -1065,7 +1096,7 @@ export function CharacterSheetPage() {
     const applyTotal = () => {
       if (applied) return;
       applied = true;
-      if (total > 0) applyDamage(total);
+      if (total > 0) applyDamage(total, [...new Set(instances.map((entry) => entry.type))]);
       for (const instance of instances) {
         roll(
           "1d20",
@@ -2047,6 +2078,18 @@ export function CharacterSheetPage() {
                   Full
                 </Button>
               </div>
+              <Field
+                label="Quick damage type"
+                hint="Used by the damage buttons. A type listed in regeneration's suppressed-by field turns regeneration off."
+              >
+                <Input
+                  aria-label="Quick damage type"
+                  value={damageType}
+                  onChange={(event) => setDamageType(event.target.value)}
+                  placeholder="fire, acid, slashing…"
+                  disabled={!canEdit}
+                />
+              </Field>
               <Field label="Temp HP">
                 <Input
                   type="number"
@@ -2064,6 +2107,151 @@ export function CharacterSheetPage() {
                   }
                 />
               </Field>
+            </div>
+
+            <div className="persistent-damage-editor">
+              <div className="row-between">
+                <h3>Fast healing &amp; regeneration</h3>
+                <span className="tiny muted">Applied at the start of your turn</span>
+              </div>
+              <p className="tiny muted">
+                Both restore HP when initiative advances. While active, regeneration also keeps
+                dying below the death threshold.
+              </p>
+              <div className="form-grid two">
+                <Field
+                  label="Fast healing"
+                  hint={draft.play.fastHealingNote || "HP regained at the start of each turn."}
+                >
+                  <Input
+                    aria-label="Fast healing"
+                    type="number"
+                    min={0}
+                    max={1000}
+                    value={draft.play.fastHealing}
+                    disabled={!canEdit}
+                    onChange={(event) =>
+                      update((current) => ({
+                        ...current,
+                        play: {
+                          ...current.play,
+                          fastHealing: Math.max(
+                            0,
+                            Math.min(1000, Math.floor(Number(event.target.value) || 0))
+                          ),
+                        },
+                      }))
+                    }
+                  />
+                </Field>
+                <Field
+                  label="Regeneration"
+                  hint={draft.play.regenerationNote || "Skipped while suppressed."}
+                >
+                  <Input
+                    aria-label="Regeneration"
+                    type="number"
+                    min={0}
+                    max={1000}
+                    value={draft.play.regeneration}
+                    disabled={!canEdit}
+                    onChange={(event) =>
+                      update((current) => ({
+                        ...current,
+                        play: {
+                          ...current.play,
+                          regeneration: Math.max(
+                            0,
+                            Math.min(1000, Math.floor(Number(event.target.value) || 0))
+                          ),
+                        },
+                      }))
+                    }
+                  />
+                </Field>
+              </div>
+              <div className="token-toggles token-edit-toggles">
+                <Toggle
+                  checked={draft.play.fastHealingActive}
+                  onChange={(checked) =>
+                    update((current) => ({
+                      ...current,
+                      play: { ...current.play, fastHealingActive: checked },
+                    }))
+                  }
+                  label="Fast healing active"
+                  disabled={!canEdit}
+                />
+                <Toggle
+                  checked={draft.play.regenerationActive}
+                  onChange={(checked) =>
+                    update((current) => ({
+                      ...current,
+                      play: { ...current.play, regenerationActive: checked },
+                    }))
+                  }
+                  label="Regeneration active"
+                  disabled={!canEdit}
+                />
+                <Toggle
+                  checked={draft.play.conditions.some(
+                    (condition) => conditionBaseName(condition.name) === "regeneration suppressed"
+                  )}
+                  onChange={setRegenerationSuppressed}
+                  label="Regeneration suppressed"
+                  disabled={!canEdit}
+                />
+              </div>
+              <Field
+                label="Suppressed by"
+                hint="Comma-separated damage types, e.g. acid, fire. Matching typed damage suppresses regeneration automatically."
+              >
+                <Input
+                  aria-label="Regeneration suppressed by"
+                  value={draft.play.regenerationDeactivatedBy.join(", ")}
+                  disabled={!canEdit}
+                  onChange={(event) =>
+                    update((current) => ({
+                      ...current,
+                      play: {
+                        ...current.play,
+                        regenerationDeactivatedBy: normalizeDamageTypeList(event.target.value),
+                      },
+                    }))
+                  }
+                  placeholder="acid, fire"
+                />
+              </Field>
+              <div className="form-grid two">
+                <Field label="Fast healing note">
+                  <Input
+                    aria-label="Fast healing note"
+                    value={draft.play.fastHealingNote}
+                    disabled={!canEdit}
+                    onChange={(event) =>
+                      update((current) => ({
+                        ...current,
+                        play: { ...current.play, fastHealingNote: event.target.value },
+                      }))
+                    }
+                    placeholder="e.g. while below half HP"
+                  />
+                </Field>
+                <Field label="Regeneration note">
+                  <Input
+                    aria-label="Regeneration note"
+                    value={draft.play.regenerationNote}
+                    disabled={!canEdit}
+                    onChange={(event) =>
+                      update((current) => ({
+                        ...current,
+                        play: { ...current.play, regenerationNote: event.target.value },
+                      }))
+                    }
+                    placeholder="e.g. from the regenerate spell"
+                  />
+                </Field>
+              </div>
             </div>
 
             {derived.conditionEffects.dying > 0 ? (
