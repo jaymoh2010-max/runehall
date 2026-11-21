@@ -860,10 +860,11 @@ async function runCampaignA(gm: Account, players: Account[]): Promise<void> {
     const heroIndex = entries.findIndex((entry) => entry.tokenId === tokens.get(hero.id)?.id);
     assert(heroIndex >= 0, "Dying hero missing from initiative");
     const otherIndex = (heroIndex + 1) % entries.length;
+    const nextRound = Number(table.round) + 1;
     await emitAndWait(
       gmSocket,
       "initiative:update",
-      { campaignId, entries, round: table.round, turnIndex: otherIndex },
+      { campaignId, entries, round: nextRound, turnIndex: otherIndex },
       "initiative:updated",
       (payload) => payload.turnIndex === otherIndex
     );
@@ -878,7 +879,7 @@ async function runCampaignA(gm: Account, players: Account[]): Promise<void> {
     await emitAndWait(
       gmSocket,
       "initiative:update",
-      { campaignId, entries, round: table.round, turnIndex: heroIndex },
+      { campaignId, entries, round: nextRound, turnIndex: heroIndex },
       "initiative:updated",
       (payload) => payload.turnIndex === heroIndex
     );
