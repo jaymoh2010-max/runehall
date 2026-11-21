@@ -648,6 +648,12 @@ Acceptance: a GM can prepare a full session in Runehall and start it with one �
   - Party cards show XP progress when tracking is enabled, and the character sheet shows awarded XP.
   - Campaign characters can only change level through the GM; the builder disables level changes for players, and the server rejects attempts to bypass it. Uncampaigned characters stay owner-editable.
   - XP awards are GM-only, audited, and covered by unit tests, the two-user smoke test, and the browser suite.
+- [x] **Turn-start and turn-end automation**
+  - Advancing initiative resolves linked characters' start-of-turn dying recovery checks and end-of-turn persistent damage.
+  - Persistent damage rolls all types, applies the total once, updates dying once, then attempts one DC 15 flat check per type.
+  - Hidden-token automation rolls stay in the GM room; visible rolls appear as “Turn automation” cards in chat.
+  - Per-round/entry/phase marks prevent duplicate resolution when stepping backward and forward.
+  - The sheet's manual recovery and end-turn buttons remain for out-of-combat use. Unlinked monsters, fast healing/regeneration, and affliction timers remain manual.
 - [x] **Browser E2E**
   - Playwright covers first-user registration, Hall controls (retention, CSV export, filtering), campaign creation, the invite code, the character builder and sheet, lazy library/compendium/rules/account routes, a second player joining with the invite code, and table interactions (token placement, chat, dice rolls, and the scenes manager).
   - Player-safe campaign navigation is checked: GM-only tabs are absent for the player, and the GM sees the new member in Settings.
@@ -716,4 +722,4 @@ A campaign-level review compared Runehall against PF2e GM Core/Player Core progr
 
 - Full report: [CAMPAIGN-READINESS.md](CAMPAIGN-READINESS.md)
 - Repeatable simulation: `npm run simulate:campaign`
-- Next priority: automatic token-turn dying/persistent-damage hooks, fast healing/regeneration, and affliction onset timers, then exploration/downtime/social continuity and the remaining treasure item-mix planner.
+- Next priority: fast healing/regeneration, affliction onset timers, and unlinked-monster turn effects, then exploration/downtime/social continuity and the remaining treasure item-mix planner.
