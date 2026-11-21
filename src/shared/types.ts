@@ -817,6 +817,8 @@ export interface CharacterRecord {
   campaignRuleset?: CampaignRuleset | null;
   /** Set when the character belongs to a campaign; used for XP progress. */
   campaignAdvancementSpeed?: AdvancementSpeed | null;
+  /** Set when the character belongs to a campaign; controls shop stock. */
+  campaignSettlementLevel?: number | null;
   createdAt: number;
   updatedAt: number;
   /** Optimistic-lock version, incremented on every save. */
@@ -1000,6 +1002,7 @@ export interface CampaignSummary {
   ruleset: CampaignRuleset;
   xpMode: XpMode;
   advancementSpeed: AdvancementSpeed;
+  settlementLevel: number;
   /** Current in-world date for this campaign. */
   worldDate: GolarionDate;
   memberCount: number;
@@ -1460,6 +1463,7 @@ export interface CampaignTable {
     ruleset: CampaignRuleset;
     xpMode: XpMode;
     advancementSpeed: AdvancementSpeed;
+    settlementLevel: number;
   };
   members: CampaignMember[];
   characters: CharacterRecord[];

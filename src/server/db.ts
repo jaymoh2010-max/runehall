@@ -126,6 +126,7 @@ export interface CampaignRow {
   ruleset: string;
   xp_mode: string;
   advancement_speed: string;
+  settlement_level: number;
   world_year: number;
   world_month: number;
   world_day: number;

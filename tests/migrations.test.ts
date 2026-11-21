@@ -102,6 +102,7 @@ describe("migrations", () => {
       name: string;
     }[];
     expect(campaignColumns.map((column) => column.name)).toContain("advancement_speed");
+    expect(campaignColumns.map((column) => column.name)).toContain("settlement_level");
 
     const columns = db.prepare("PRAGMA table_info(users)").all() as { name: string }[];
     expect(columns.map((column) => column.name)).toContain("is_admin");

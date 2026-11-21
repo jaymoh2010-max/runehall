@@ -50,7 +50,7 @@ function summarize(draft: CharacterDraft): CharacterSummary {
   return characterSummary(draft, contextForDraft(draft));
 }
 
-function syncCharacterDraft(
+export function syncCharacterDraft(
   app: FastifyInstance,
   row: CharacterRow,
   draft: CharacterDraft,

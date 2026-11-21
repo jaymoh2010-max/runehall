@@ -764,6 +764,82 @@ async function main() {
   }
   log("inventory stacks and coins transferred between campaign characters");
 
+  const daggerId = "item:rQWaJhI5Bko5x14Z";
+  const currencyCp = (currency) =>
+    (currency.gp ?? 0) * 100 + (currency.sp ?? 0) * 10 + (currency.cp ?? 0);
+  const beforeShopCp = currencyCp(transferredFrom.data.currency);
+  const bought = await api(`/api/campaigns/${campaign.id}/shop/buy`, {
+    method: "POST",
+    cookie: playerCookie,
+    body: {
+      characterId: character.id,
+      itemId: daggerId,
+      quantity: 1,
+      expectedRevision: transferredFrom.revision,
+    },
+  });
+  const boughtCharacter = bought.payload.character;
+  if (
+    !boughtCharacter.data.equipment.some((entry) => entry.itemId === daggerId) ||
+    currencyCp(boughtCharacter.data.currency) !== beforeShopCp - 20
+  ) {
+    throw new Error("Shop purchase did not add the item or spend the correct coins");
+  }
+  const sold = await api(`/api/campaigns/${campaign.id}/shop/sell`, {
+    method: "POST",
+    cookie: playerCookie,
+    body: {
+      characterId: character.id,
+      itemId: daggerId,
+      quantity: 1,
+      expectedRevision: boughtCharacter.revision,
+    },
+  });
+  const soldCharacter = sold.payload.character;
+  if (
+    soldCharacter.data.equipment.some((entry) => entry.itemId === daggerId) ||
+    currencyCp(soldCharacter.data.currency) !== beforeShopCp - 10
+  ) {
+    throw new Error("Shop sale did not remove the item or pay half price");
+  }
+  const aboveLevel = await fetch(`${base}/api/campaigns/${campaign.id}/shop/buy`, {
+    method: "POST",
+    headers: { "content-type": "application/json", cookie: playerCookie },
+    body: JSON.stringify({
+      characterId: character.id,
+      itemId: "item:66yY2SClvqj0lMFX",
+      quantity: 1,
+    }),
+  });
+  if (aboveLevel.status !== 400) {
+    throw new Error("Shop sold an item above the settlement level");
+  }
+  const uncommon = await fetch(`${base}/api/campaigns/${campaign.id}/shop/buy`, {
+    method: "POST",
+    headers: { "content-type": "application/json", cookie: playerCookie },
+    body: JSON.stringify({
+      characterId: character.id,
+      itemId: "item:NELpewmAIxQXaMtv",
+      quantity: 1,
+    }),
+  });
+  if (uncommon.status !== 400) {
+    throw new Error("Shop sold an uncommon item without GM access");
+  }
+  const foreignShop = await fetch(`${base}/api/campaigns/${campaign.id}/shop/buy`, {
+    method: "POST",
+    headers: { "content-type": "application/json", cookie: playerCookie },
+    body: JSON.stringify({
+      characterId: quartermaster.id,
+      itemId: daggerId,
+      quantity: 1,
+    }),
+  });
+  if (foreignShop.status !== 403) {
+    throw new Error("Player could shop for a character they do not control");
+  }
+  log("settlement shop buys and sells at the correct prices without crossing permissions");
+
   await api(`/api/campaigns/${campaign.id}/journal`, {
     method: "POST",
     cookie: gmCookie,
