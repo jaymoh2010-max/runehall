@@ -372,6 +372,28 @@ test("loot audit and replacement wealth top-up are available", async ({ page }) 
   ).toBeVisible({ timeout: 15_000 });
 });
 
+test("character sheet shop buys and sells common gear", async ({ page }) => {
+  await signIn(page, admin);
+  await page.goto(`${campaignPath}?tab=party`);
+  await page.locator(".party-card").first().getByRole("link", { name: "Sheet" }).click();
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("E2E Hero");
+
+  await page.getByRole("button", { name: "Shop", exact: true }).click();
+  const shop = page.getByRole("dialog", { name: "Settlement shop" });
+  await expect(shop).toBeVisible();
+  await shop.getByPlaceholder("Search common items…").fill("Dagger");
+  const daggerRow = shop.locator(".shop-row").filter({ hasText: "Dagger" }).first();
+  await expect(daggerRow).toBeVisible();
+  await daggerRow.getByRole("button", { name: "Buy", exact: true }).click();
+  await expect(page.getByText(/Bought 1× Dagger/)).toBeVisible({ timeout: 15_000 });
+
+  await shop.getByRole("button", { name: "Sell", exact: true }).click();
+  const sellRow = shop.locator(".shop-row").filter({ hasText: "Dagger" }).first();
+  await expect(sellRow).toBeVisible();
+  await sellRow.getByRole("button", { name: "Sell", exact: true }).click();
+  await expect(page.getByText(/Sold 1× Dagger/)).toBeVisible({ timeout: 15_000 });
+});
+
 test("GM schedules from Sessions and overdue sessions stay current", async ({ page }) => {
   await signIn(page, admin);
   await page.goto(`${campaignPath}?tab=sessions`);

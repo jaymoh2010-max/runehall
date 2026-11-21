@@ -19,6 +19,7 @@ import {
   Shield,
   Shuffle,
   Sparkles,
+  Store,
   Swords,
   Trash2,
   UserRound,
@@ -118,6 +119,7 @@ import {
   Toggle,
 } from "../components/ui";
 import { HoverCard } from "../components/HoverCard";
+import { ShopModal } from "../components/campaign/ShopModal";
 
 function emptyAfflictionForm(): CharacterAffliction {
   return {
@@ -206,6 +208,7 @@ export function CharacterSheetPage() {
   const [transferBusy, setTransferBusy] = useState(false);
   const [transferError, setTransferError] = useState("");
   const [transferLoading, setTransferLoading] = useState(false);
+  const [shopOpen, setShopOpen] = useState(false);
   const [restOpen, setRestOpen] = useState(false);
   const [restRough, setRestRough] = useState(false);
   const [castState, setCastState] = useState<{
@@ -646,6 +649,42 @@ export function CharacterSheetPage() {
     );
   };
 
+  const applyUpdatedCharacter = useCallback(
+    (updated: CharacterRecord) => {
+      const normalized = normalizeCharacterDraft(updated.data, updated.name);
+      characterRef.current = updated;
+      setCharacter(updated);
+      skipInitialSave.current = true;
+      setDraft(normalized);
+      draftRef.current = normalized;
+      dirtyRef.current = false;
+      setSaveState("saved");
+      if (!id) return;
+      // Newly bought items need their compendium context on the sheet.
+      void api<{ context: CharacterContext }>(`/api/characters/${id}/context`, {
+        method: "POST",
+        body: { draft: normalized },
+      })
+        .then((result) => setContext(result.context))
+        .catch(() => {
+          // The sheet remains usable; context refreshes on the next reload.
+        });
+    },
+    [id]
+  );
+
+  const openShop = async () => {
+    if (!character || !character.campaignId || !canEdit) return;
+    if (dirtyRef.current) {
+      await saveDraft();
+      if (conflictRef.current) {
+        setShopOpen(false);
+        return;
+      }
+    }
+    setShopOpen(true);
+  };
+
   const openTransfer = (mode: "item" | "coins", itemId: string | null = null) => {
     if (!character || !draft) return;
     setTransferMode(mode);
@@ -710,14 +749,7 @@ export function CharacterSheetPage() {
         `/api/characters/${character.id}/transfer`,
         { method: "POST", body }
       );
-      const normalized = normalizeCharacterDraft(result.from.data, result.from.name);
-      characterRef.current = result.from;
-      setCharacter(result.from);
-      skipInitialSave.current = true;
-      setDraft(normalized);
-      draftRef.current = normalized;
-      dirtyRef.current = false;
-      setSaveState("saved");
+      applyUpdatedCharacter(result.from);
       setTransferOpen(false);
       toast(`Sent ${description} to ${result.to.name}.`, "success");
     } catch (err) {
@@ -1103,6 +1135,16 @@ export function CharacterSheetPage() {
           >
             Print / PDF
           </Button>
+          {canEdit && character.campaignId ? (
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={<Store size={14} />}
+              onClick={() => void openShop()}
+            >
+              Shop
+            </Button>
+          ) : null}
           {canEdit ? (
             <Button
               variant="secondary"
@@ -2724,6 +2766,14 @@ export function CharacterSheetPage() {
           </div>
         ) : null}
       </Modal>
+
+      <ShopModal
+        open={shopOpen}
+        onClose={() => setShopOpen(false)}
+        character={character}
+        onCharacterUpdated={applyUpdatedCharacter}
+        toast={toast}
+      />
 
       <Modal
         open={transferOpen}

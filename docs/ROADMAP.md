@@ -407,6 +407,12 @@ Acceptance: a GM can prepare a full session in Runehall and start it with one �
   - The Loot tab shows the GM Core treasure-by-level budget (total and coin portion) for the current party level, the value of open and distributed parcels, and each character’s committed wealth against the table 10-10 lump-sum benchmark.
   - A GM can top up a replacement or catch-up character to the level benchmark with one action; only the difference is granted, and the result becomes play-history wealth.
   - The audit is advisory: parcels are not tagged by level and the permanent/consumable item mix is not enforced.
+- [x] **Settlement shop**
+  - Campaigns store a settlement level that controls shop stock: common items of that level or lower, at full price.
+  - A Shop action on the character sheet opens buy and sell tabs with compendium search, quantity controls, and the character’s current purse.
+  - Sales pay half price for gear and magic items, full price for treasure, and include attached runes when the whole stack is sold.
+  - The server validates item level, rarity, quantity, price, ownership, and revision; players cannot shop for characters they do not control.
+  - Shopping is abstract rather than downtime-gated, and top-end stock scarcity is not simulated.
 - [x] **Area templates**
   - Burst, emanation, cone, and line templates with size in feet.
   - Click-drag placement on the map, with a live preview and a size label.

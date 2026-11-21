@@ -25,6 +25,7 @@ import type {
 } from "../shared/types";
 import { normalizeCampaignRuleset, normalizeXpMode } from "../shared/content";
 import { normalizeAdvancementSpeed, normalizeXpAwardKind } from "../shared/xp";
+import { normalizeSettlementLevel } from "../shared/shop";
 import { isAudioMood } from "../shared/audio";
 import {
   normalizeAmbientLight,
@@ -93,6 +94,7 @@ export function serializeCampaignSummary(
     ruleset: normalizeCampaignRuleset(campaign.ruleset),
     xpMode: normalizeXpMode(campaign.xp_mode),
     advancementSpeed: normalizeAdvancementSpeed(campaign.advancement_speed),
+    settlementLevel: normalizeSettlementLevel(campaign.settlement_level),
     worldDate: normalizeGolarionDate({
       year: campaign.world_year,
       month: campaign.world_month,
@@ -195,12 +197,16 @@ export function serializeCharacter(
   const summary = parseJson(row.summary, null);
   const campaignRow = row.campaign_id
     ? (db
-        .prepare("SELECT ruleset, advancement_speed FROM campaigns WHERE id = ?")
-        .get(row.campaign_id) as { ruleset: string; advancement_speed: string } | undefined)
+        .prepare("SELECT ruleset, advancement_speed, settlement_level FROM campaigns WHERE id = ?")
+        .get(row.campaign_id) as
+        { ruleset: string; advancement_speed: string; settlement_level: number } | undefined)
     : undefined;
   const campaignRuleset = campaignRow ? normalizeCampaignRuleset(campaignRow.ruleset) : null;
   const campaignAdvancementSpeed = campaignRow
     ? normalizeAdvancementSpeed(campaignRow.advancement_speed)
+    : null;
+  const campaignSettlementLevel = campaignRow
+    ? normalizeSettlementLevel(campaignRow.settlement_level)
     : null;
   return {
     id: row.id,
@@ -211,6 +217,7 @@ export function serializeCharacter(
     summary: summary as CharacterRecord["summary"],
     campaignRuleset,
     campaignAdvancementSpeed,
+    campaignSettlementLevel,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     revision: Number(row.revision ?? 1),

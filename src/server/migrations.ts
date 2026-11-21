@@ -610,4 +610,11 @@ export const migrations: Migration[] = [
         ON xp_awards(campaign_id, created_at DESC);
     `,
   },
+  {
+    version: 33,
+    name: "campaign_settlement_level",
+    sql: `
+      ALTER TABLE campaigns ADD COLUMN settlement_level INTEGER NOT NULL DEFAULT 1;
+    `,
+  },
 ];

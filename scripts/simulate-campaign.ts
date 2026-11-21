@@ -24,6 +24,7 @@ import net from "node:net";
 import path from "node:path";
 import { io, type Socket } from "socket.io-client";
 import { characterSummary, computeCharacter, startingWealthCp } from "../src/shared/rules";
+import { currencyToCp } from "../src/shared/inventory";
 import { longRestHealing } from "../src/shared/rest";
 import { encounterBudget, encounterAwardXp } from "../src/shared/encounters";
 import { normalizeAdvancementSpeed, xpPerLevel } from "../src/shared/xp";
@@ -498,6 +499,70 @@ async function runCampaignA(gm: Account, players: Account[]): Promise<void> {
     }
     assertEqual(table.characters.length, 4, "Table party size");
     metric("campaignA.partySize", 4);
+  });
+
+  await check(campaignName, "settlement shop buys and sells with server-side prices", async () => {
+    const updated = await api(`/api/campaigns/${campaignId}`, {
+      method: "PATCH",
+      cookie: gm.cookie,
+      body: { settlementLevel: 5 },
+    });
+    assertEqual(updated.payload.campaign.settlementLevel, 5, "Campaign settlement level");
+    const before = await getTable(campaignId, gm.cookie);
+    const hero = characterFor(before, heroes[0].id);
+    const beforeCp = currencyToCp(hero.data.currency);
+    const daggerId = "item:rQWaJhI5Bko5x14Z";
+    const bought = await api(`/api/campaigns/${campaignId}/shop/buy`, {
+      method: "POST",
+      cookie: players[0].cookie,
+      body: {
+        characterId: heroes[0].id,
+        itemId: daggerId,
+        quantity: 2,
+        expectedRevision: hero.revision,
+      },
+    });
+    const boughtCharacter = bought.payload.character;
+    assertEqual(currencyToCp(boughtCharacter.data.currency), beforeCp - 40, "Buy price");
+    assertEqual(
+      boughtCharacter.data.equipment.find((entry: Json) => entry.itemId === daggerId)?.quantity,
+      2,
+      "Purchased quantity"
+    );
+    assertEqual(boughtCharacter.campaignSettlementLevel, 5, "Shop level on character");
+    const sold = await api(`/api/campaigns/${campaignId}/shop/sell`, {
+      method: "POST",
+      cookie: players[0].cookie,
+      body: {
+        characterId: heroes[0].id,
+        itemId: daggerId,
+        quantity: 1,
+        expectedRevision: boughtCharacter.revision,
+      },
+    });
+    const soldCharacter = sold.payload.character;
+    assertEqual(currencyToCp(soldCharacter.data.currency), beforeCp - 30, "Sale price");
+    assertEqual(
+      soldCharacter.data.equipment.find((entry: Json) => entry.itemId === daggerId)?.quantity,
+      1,
+      "Remaining quantity after sale"
+    );
+    const aboveLevel = await api(`/api/campaigns/${campaignId}/shop/buy`, {
+      method: "POST",
+      cookie: players[0].cookie,
+      body: {
+        characterId: heroes[0].id,
+        itemId: "item:66yY2SClvqj0lMFX",
+        quantity: 1,
+      },
+      expect: null,
+    });
+    assertEqual(aboveLevel.status, 400, "Above-level shop purchase");
+    await api(`/api/campaigns/${campaignId}`, {
+      method: "PATCH",
+      cookie: gm.cookie,
+      body: { settlementLevel: 1 },
+    });
   });
 
   // --- Table: tokens, ownership, hidden initiative --------------------------

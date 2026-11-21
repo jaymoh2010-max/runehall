@@ -85,6 +85,7 @@ import {
   type AdvancementSpeed,
   type AccomplishmentTier,
 } from "../../shared/xp";
+import { isSettlementLevel, normalizeSettlementLevel } from "../../shared/shop";
 import { normalizeGolarionDate, shiftGolarionDate } from "../../shared/calendar";
 import { contextForDraft } from "../compendium";
 import { campaignSessionsFor } from "../sessionData";
@@ -249,6 +250,10 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
       return reply.code(400).send({ error: "Choose fast, medium, or slow advancement." });
     }
     const advancementSpeed: AdvancementSpeed = normalizeAdvancementSpeed(body.advancementSpeed);
+    if (body.settlementLevel !== undefined && !isSettlementLevel(body.settlementLevel)) {
+      return reply.code(400).send({ error: "Choose a settlement level between 0 and 25." });
+    }
+    const settlementLevel = normalizeSettlementLevel(body.settlementLevel);
     let code = inviteCode();
     for (let attempt = 0; attempt < 10; attempt++) {
       const exists = db.prepare("SELECT id FROM campaigns WHERE invite_code = ?").get(code);
@@ -258,7 +263,7 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
     const id = newId("camp");
     const ts = now();
     db.prepare(
-      "INSERT INTO campaigns (id, name, description, gm_id, invite_code, ruleset, xp_mode, advancement_speed, created_at, updated_at, last_played_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+      "INSERT INTO campaigns (id, name, description, gm_id, invite_code, ruleset, xp_mode, advancement_speed, settlement_level, created_at, updated_at, last_played_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
     ).run(
       id,
       name,
@@ -268,6 +273,7 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
       ruleset,
       xpMode,
       advancementSpeed,
+      settlementLevel,
       ts,
       ts,
       ts
@@ -282,7 +288,7 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
       actor: request.user,
       targetType: "campaign",
       targetId: id,
-      detail: `${name} (${ruleset}/${xpMode}/${advancementSpeed})`,
+      detail: `${name} (${ruleset}/${xpMode}/${advancementSpeed}/settlement ${settlementLevel})`,
       request,
     });
     return reply.code(201).send({
@@ -732,6 +738,9 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
     if (body.advancementSpeed !== undefined && !isAdvancementSpeed(body.advancementSpeed)) {
       return reply.code(400).send({ error: "Choose fast, medium, or slow advancement." });
     }
+    if (body.settlementLevel !== undefined && !isSettlementLevel(body.settlementLevel)) {
+      return reply.code(400).send({ error: "Choose a settlement level between 0 and 25." });
+    }
     const ruleset =
       body.ruleset === undefined ? normalizeCampaignRuleset(row.ruleset) : body.ruleset;
     const xpMode = body.xpMode === undefined ? normalizeXpMode(row.xp_mode) : body.xpMode;
@@ -739,9 +748,13 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
       body.advancementSpeed === undefined
         ? normalizeAdvancementSpeed(row.advancement_speed)
         : body.advancementSpeed;
+    const settlementLevel =
+      body.settlementLevel === undefined
+        ? normalizeSettlementLevel(row.settlement_level)
+        : body.settlementLevel;
     db.prepare(
-      "UPDATE campaigns SET name = ?, description = ?, ruleset = ?, xp_mode = ?, advancement_speed = ?, updated_at = ? WHERE id = ?"
-    ).run(name, description, ruleset, xpMode, advancementSpeed, now(), id);
+      "UPDATE campaigns SET name = ?, description = ?, ruleset = ?, xp_mode = ?, advancement_speed = ?, settlement_level = ?, updated_at = ? WHERE id = ?"
+    ).run(name, description, ruleset, xpMode, advancementSpeed, settlementLevel, now(), id);
     if (ruleset !== normalizeCampaignRuleset(row.ruleset)) {
       const contentMode = rulesetContentMode(ruleset);
       const legacyAllowed = rulesetIncludesLegacy(ruleset);

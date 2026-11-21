@@ -24,6 +24,7 @@ Runehall is built for a private group of roughly 4–10 players and a GM. It run
 - Weapon, armor, and shield runes: weapon/armor potency, striking, resilient, property runes, and shield durability; rune prices count toward wealth and their bonuses flow into attacks, damage, AC, saves, and shield Hardness/HP.
 - Starting wealth is a one-time level-1 creation budget covering both gear and carried coins, with a **Take remaining as coins** action. Imported, looted, and transferred characters use play-history wealth without a starting-budget warning.
 - The GM treasury values parcels from compendium prices plus coins, shows the GM Core treasure-by-level budget, audits each character against the new-character lump-sum benchmark, and can top up a replacement character's wealth by the difference.
+- Each campaign has a settlement level and shop. Characters can buy common items up to that level at full price and sell gear for half price (treasure for full price) directly from the sheet; prices and stock are validated on the server.
 - Prepared casters are capped by their rank-by-rank spell slots; duplicate preparations are supported, spontaneous repertoire limits are checked, and slot pips can be reset between sessions.
 - Manual companion roster for animal companions, familiars, eidolons, and summons, with HP, AC, and attack notes.
 - A step-by-step level-up wizard shows before/after HP and each new feat, skill, spell, ability boost, or class feature with Back/Next controls. Level up stays locked while required choices are unresolved, then opens the first relevant chapter.
@@ -221,7 +222,7 @@ src/
   shared/            Types, PF2e rules engine, dice parser, encounter math, content helpers
   client/components/builder/steps/  Focused builder chapter components
   server/            Fastify API, SQLite, auth, compendium, Socket.IO table server
-    routes/          Auth, campaigns, encounters, loot, characters, compendium, table/scenes, uploads
+    routes/          Auth, campaigns, encounters, loot, shop, characters, compendium, table/scenes, uploads
   client/            React 19 interface
     components/      UI system, builder pickers, table canvas/chat/initiative
     pages/           Landing, auth, dashboard, campaign hub, builder, sheet, library, rules

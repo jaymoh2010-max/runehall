@@ -206,6 +206,7 @@ export function CampaignPage() {
   const [settingsXpMode, setSettingsXpMode] = useState<XpMode>("milestone");
   const [settingsAdvancementSpeed, setSettingsAdvancementSpeed] =
     useState<AdvancementSpeed>("medium");
+  const [settingsSettlementLevel, setSettingsSettlementLevel] = useState("1");
   const [inviteOpen, setInviteOpen] = useState(false);
   const [levelUpBusy, setLevelUpBusy] = useState(false);
   const [levelingId, setLevelingId] = useState<string | null>(null);
@@ -267,6 +268,7 @@ export function CampaignPage() {
       setSettingsRuleset(details.campaign.ruleset);
       setSettingsXpMode(details.campaign.xpMode);
       setSettingsAdvancementSpeed(details.campaign.advancementSpeed);
+      setSettingsSettlementLevel(String(details.campaign.settlementLevel));
       if (details.campaign.role === "gm") {
         try {
           const ledger = await api<{ awards: XpAward[] }>(`/api/campaigns/${id}/xp-awards`);
@@ -709,6 +711,7 @@ export function CampaignPage() {
           ruleset: settingsRuleset,
           xpMode: settingsXpMode,
           advancementSpeed: settingsAdvancementSpeed,
+          settlementLevel: Number(settingsSettlementLevel) || 0,
         },
       });
       setCampaign(result.campaign);
@@ -723,6 +726,7 @@ export function CampaignPage() {
                 ruleset: result.campaign.ruleset,
                 xpMode: result.campaign.xpMode,
                 advancementSpeed: result.campaign.advancementSpeed,
+                settlementLevel: result.campaign.settlementLevel,
               },
             }
           : current
@@ -1806,6 +1810,23 @@ export function CampaignPage() {
                       </option>
                     ))}
                   </Select>
+                </Field>
+                <Field
+                  label="Settlement level"
+                  hint={
+                    isGm
+                      ? "The shop stocks common items of this level or lower. Characters sell gear for half price. Set 0 for a tiny outpost."
+                      : "Set by the campaign GM. It controls which common items the settlement shop stocks."
+                  }
+                >
+                  <Input
+                    type="number"
+                    min={0}
+                    max={25}
+                    value={settingsSettlementLevel}
+                    onChange={(event) => setSettingsSettlementLevel(event.target.value)}
+                    disabled={!isGm}
+                  />
                 </Field>
                 {isGm ? (
                   <Button type="submit" variant="primary" loading={settingsBusy}>
