@@ -902,6 +902,174 @@ async function runCampaignA(gm: Account, players: Account[]): Promise<void> {
 
   await check(
     campaignName,
+    "unlinked token turn effects heal, damage, and resolve once",
+    async () => {
+      const created = await emitAck<Json>(gmSocket, "token:create", {
+        campaignId,
+        sceneId,
+        token: {
+          name: "Regenerating Test Monster",
+          x: 500,
+          y: 300,
+          size: 1,
+          hpCurrent: 10,
+          hpMax: 20,
+          ac: 15,
+          turnEffects: {
+            fastHealing: 5,
+            persistentDamage: [
+              { id: "token-pd-fire", formula: "1d2", type: "fire", dc: 15, notes: "" },
+            ],
+          },
+        },
+      });
+      assertEqual(created.turnEffects?.fastHealing, 5, "Token turn effects were not saved");
+      await emitAndWait(
+        gmSocket,
+        "initiative:roll",
+        {
+          campaignId,
+          sceneId,
+          tokenIds: [...tokens.values()].map((token) => token.id).concat(created.id),
+        },
+        "initiative:updated"
+      );
+      await emitAndWait(
+        gmSocket,
+        "token:update",
+        { campaignId, token: { id: created.id, hpCurrent: 10 } },
+        "token:updated",
+        (payload) => payload.id === created.id && payload.hpCurrent === 10
+      );
+      const table = await getTable(campaignId, gm.cookie);
+      const entries = table.initiative as Json[];
+      const tokenIndex = entries.findIndex((entry) => entry.tokenId === created.id);
+      assert(tokenIndex >= 0, "Test monster missing from initiative");
+      const otherIndex = (tokenIndex + 1) % entries.length;
+      const nextRound = Number(table.round) + 1;
+      await emitAndWait(
+        gmSocket,
+        "initiative:update",
+        { campaignId, entries, round: nextRound, turnIndex: otherIndex },
+        "initiative:updated",
+        (payload) => payload.turnIndex === otherIndex
+      );
+      const healNote = waitForEvent<Json>(
+        gmSocket,
+        "chat:message",
+        (payload) =>
+          payload.type === "chat" && String(payload.content ?? "").includes("heals 5 HP"),
+        5_000
+      );
+      const healedToken = waitForEvent<Json>(
+        gmSocket,
+        "token:updated",
+        (payload) => payload.id === created.id && payload.hpCurrent === 15,
+        5_000
+      );
+      await emitAndWait(
+        gmSocket,
+        "initiative:update",
+        { campaignId, entries, round: nextRound, turnIndex: tokenIndex },
+        "initiative:updated",
+        (payload) => payload.turnIndex === tokenIndex
+      );
+      await Promise.all([healNote, healedToken]);
+
+      const damageRoll = waitForEvent<Json>(
+        gmSocket,
+        "chat:message",
+        (payload) =>
+          payload.type === "roll" &&
+          String((payload.data as Json)?.label ?? "").includes("Persistent fire damage"),
+        5_000
+      );
+      const damagedToken = waitForEvent<Json>(
+        gmSocket,
+        "token:updated",
+        (payload) =>
+          payload.id === created.id &&
+          typeof payload.hpCurrent === "number" &&
+          payload.hpCurrent < 15,
+        5_000
+      );
+      gmSocket.emit("initiative:next", { campaignId, direction: 1 });
+      await Promise.all([damageRoll, damagedToken]);
+      const afterTable = await getTable(campaignId, gm.cookie);
+      const afterToken = (afterTable.tokens as Json[]).find((token) => token.id === created.id);
+      assert(afterToken, "Test monster disappeared");
+      const afterHp = afterToken.hpCurrent as number;
+      assert(afterHp >= 13 && afterHp <= 14, `Persistent damage produced HP ${afterHp}`);
+
+      await emitAndWait(
+        gmSocket,
+        "initiative:next",
+        { campaignId, direction: -1 },
+        "initiative:updated",
+        (payload) => payload.turnIndex === tokenIndex
+      );
+      await emitAndWait(
+        gmSocket,
+        "initiative:next",
+        { campaignId, direction: 1 },
+        "initiative:updated"
+      );
+      const repeatedTable = await getTable(campaignId, gm.cookie);
+      const repeatedToken = (repeatedTable.tokens as Json[]).find(
+        (token) => token.id === created.id
+      );
+      assertEqual(repeatedToken?.hpCurrent, afterHp, "Token persistent damage repeated");
+
+      const deleted = waitForEvent<Json>(
+        gmSocket,
+        "token:deleted",
+        (payload) => payload.tokenId === created.id,
+        5_000
+      );
+      gmSocket.emit("token:delete", { campaignId, tokenId: created.id });
+      await deleted;
+    }
+  );
+
+  await check(
+    campaignName,
+    "encounter launch seeds regeneration from the monster statblock",
+    async () => {
+      const encounter = (
+        await api(`/api/campaigns/${campaignId}/encounters`, {
+          method: "POST",
+          cookie: gm.cookie,
+          body: { name: "Trollhound Seed Test", description: "", sceneId },
+        })
+      ).payload.encounter as Json;
+      await api(`/api/campaigns/${campaignId}/encounters/${encounter.id}/combatants`, {
+        method: "POST",
+        cookie: gm.cookie,
+        body: { monsterId: "mon:gTkvu3RRiDHNONzf", count: 1, wave: 1 },
+      });
+      const launched = await api(`/api/campaigns/${campaignId}/encounters/${encounter.id}/launch`, {
+        method: "POST",
+        cookie: gm.cookie,
+        body: { sceneId, wave: 1, mode: "fresh" },
+      });
+      const token = (launched.payload.tokens as Json[]).find((entry) =>
+        String(entry.name).includes("Trollhound")
+      );
+      assert(token, "Trollhound token missing after launch");
+      assertEqual(token.turnEffects?.regeneration, 15, "Seeded regeneration");
+      assert(
+        (token.turnEffects?.regenerationDeactivatedBy as string[]).includes("electricity"),
+        "Seeded regeneration deactivation types"
+      );
+      await api(`/api/campaigns/${campaignId}/encounters/${encounter.id}/clear`, {
+        method: "POST",
+        cookie: gm.cookie,
+      });
+    }
+  );
+
+  await check(
+    campaignName,
     "hidden scene props are filtered from the player table and live updates",
     async () => {
       const visible = {

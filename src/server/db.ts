@@ -214,6 +214,7 @@ export interface TokenRow {
   group_id: string | null;
   group_name: string | null;
   conditions: string;
+  turn_effects: string;
   hidden: number;
   locked: number;
   sort_order: number;

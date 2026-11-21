@@ -3,6 +3,7 @@ import { ImagePlus, Minus, Plus, Shield, Swords, Trash2, Upload, UserRound } fro
 import type {
   CampaignMember,
   CharacterRecord,
+  PersistentDamageInstance,
   Token,
   TokenCondition,
   TokenVisionMode,
@@ -13,6 +14,9 @@ import {
   tokenConditionLabel,
 } from "../../../shared/tokens";
 import { TOKEN_VISION_OPTIONS } from "../../../shared/lighting";
+import { emptyTokenTurnEffects, normalizeTokenTurnEffects } from "../../../shared/tokenTurnEffects";
+import { normalizePersistentDamage } from "../../../shared/persistentDamage";
+import { validateFormula } from "../../../shared/dice";
 import { uploadImage } from "../../api";
 import { errorMessage, useToasts } from "../../stores";
 import { Avatar, Button, Field, initialsForName, Input, Modal, Select, Tag, Toggle } from "../ui";
@@ -60,6 +64,18 @@ export function TokenEditModal({
   const [conditionInput, setConditionInput] = useState("");
   const [conditionValue, setConditionValue] = useState("");
   const [conditionDuration, setConditionDuration] = useState("");
+  const [fastHealing, setFastHealing] = useState("0");
+  const [fastHealingActive, setFastHealingActive] = useState(true);
+  const [fastHealingNote, setFastHealingNote] = useState("");
+  const [regeneration, setRegeneration] = useState("0");
+  const [regenerationActive, setRegenerationActive] = useState(true);
+  const [regenerationNote, setRegenerationNote] = useState("");
+  const [regenerationDeactivatedBy, setRegenerationDeactivatedBy] = useState<string[]>([]);
+  const [persistentDamage, setPersistentDamage] = useState<PersistentDamageInstance[]>([]);
+  const [persistentFormula, setPersistentFormula] = useState("1d6");
+  const [persistentType, setPersistentType] = useState("fire");
+  const [persistentDc, setPersistentDc] = useState("15");
+  const [persistentNotes, setPersistentNotes] = useState("");
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
 
@@ -83,6 +99,19 @@ export function TokenEditModal({
     setConditionInput("");
     setConditionValue("");
     setConditionDuration("");
+    const effects = normalizeTokenTurnEffects(token.turnEffects ?? emptyTokenTurnEffects());
+    setFastHealing(String(effects.fastHealing));
+    setFastHealingActive(effects.fastHealingActive);
+    setFastHealingNote(effects.fastHealingNote);
+    setRegeneration(String(effects.regeneration));
+    setRegenerationActive(effects.regenerationActive);
+    setRegenerationNote(effects.regenerationNote);
+    setRegenerationDeactivatedBy(effects.regenerationDeactivatedBy);
+    setPersistentDamage(effects.persistentDamage.map((instance) => ({ ...instance })));
+    setPersistentFormula("1d6");
+    setPersistentType("fire");
+    setPersistentDc("15");
+    setPersistentNotes("");
     setError("");
   }, [open, token?.id]);
 
@@ -126,6 +155,47 @@ export function TokenEditModal({
     setConditionDuration("");
   };
 
+  const addPersistentDamage = () => {
+    if (!validateFormula(persistentFormula).ok) {
+      setError("Enter a valid persistent damage formula, e.g. 1d6.");
+      return;
+    }
+    const entry = normalizePersistentDamage({
+      formula: persistentFormula,
+      type: persistentType,
+      dc: Number(persistentDc) || 15,
+      notes: persistentNotes,
+    });
+    if (!entry) {
+      setError("Enter a valid persistent damage formula.");
+      return;
+    }
+    setPersistentDamage((current) => [
+      ...current.filter((instance) => instance.type !== entry.type),
+      entry,
+    ]);
+    setPersistentNotes("");
+    setError("");
+  };
+
+  const removePersistentDamage = (id: string) => {
+    setPersistentDamage((current) => current.filter((instance) => instance.id !== id));
+  };
+
+  const regenerationSuppressed = conditions.some(
+    (condition) => conditionBaseName(condition.name) === "regeneration suppressed"
+  );
+  const setRegenerationSuppressed = (checked: boolean) => {
+    setConditions((current) => {
+      const without = current.filter(
+        (condition) => conditionBaseName(condition.name) !== "regeneration suppressed"
+      );
+      return checked
+        ? [...without, { name: "Regeneration Suppressed", value: null, duration: null }]
+        : without;
+    });
+  };
+
   const save = () => {
     const parsedMax = hpMax === "" ? null : Number(hpMax);
     const parsedCurrent = hpCurrent === "" ? null : Number(hpCurrent);
@@ -158,6 +228,20 @@ export function TokenEditModal({
       hidden,
       locked,
       conditions,
+      ...(token.characterId
+        ? {}
+        : {
+            turnEffects: normalizeTokenTurnEffects({
+              fastHealing,
+              fastHealingActive,
+              fastHealingNote,
+              regeneration,
+              regenerationActive,
+              regenerationNote,
+              regenerationDeactivatedBy,
+              persistentDamage,
+            }),
+          }),
     });
     onClose();
   };
@@ -400,6 +484,139 @@ export function TokenEditModal({
             <Toggle checked={hidden} onChange={setHidden} label="Hidden from players" />
             <Toggle checked={locked} onChange={setLocked} label="Locked in place" />
           </div>
+
+          {!token.characterId ? (
+            <div className="token-turn-effects-editor">
+              <div className="row-between">
+                <span className="field-label">Monster turn effects</span>
+                <span className="tiny muted">Applied when initiative advances</span>
+              </div>
+              <div className="token-edit-stat-grid">
+                <Field
+                  label="Fast healing"
+                  hint={
+                    fastHealingNote
+                      ? `Conditional: ${fastHealingNote}`
+                      : "Heals at the start of the token's turn."
+                  }
+                >
+                  <Input
+                    aria-label="Fast healing"
+                    type="number"
+                    min={0}
+                    max={1000}
+                    value={fastHealing}
+                    onChange={(event) => setFastHealing(event.target.value)}
+                  />
+                </Field>
+                <Field
+                  label="Regeneration"
+                  hint={
+                    regenerationNote ? regenerationNote : "Heals at the start of turn while active."
+                  }
+                >
+                  <Input
+                    aria-label="Regeneration"
+                    type="number"
+                    min={0}
+                    max={1000}
+                    value={regeneration}
+                    onChange={(event) => setRegeneration(event.target.value)}
+                  />
+                </Field>
+              </div>
+              <div className="token-toggles token-edit-toggles">
+                <Toggle
+                  checked={fastHealingActive}
+                  onChange={setFastHealingActive}
+                  label="Fast healing active"
+                />
+                <Toggle
+                  checked={regenerationActive}
+                  onChange={setRegenerationActive}
+                  label="Regeneration active"
+                />
+                <Toggle
+                  checked={regenerationSuppressed}
+                  onChange={setRegenerationSuppressed}
+                  label="Regeneration suppressed"
+                />
+              </div>
+              {regenerationDeactivatedBy.length ? (
+                <p className="tiny muted">
+                  Statblock deactivates regeneration on: {regenerationDeactivatedBy.join(", ")}.
+                  Apply this manually when the monster takes that damage.
+                </p>
+              ) : null}
+              <div className="token-persistent-damage">
+                <div className="row-between">
+                  <span className="field-label">Persistent damage</span>
+                  <span className="tiny muted">Damage then a DC 15 flat check at end of turn</span>
+                </div>
+                <div className="chip-row">
+                  {persistentDamage.map((instance) => (
+                    <Tag key={instance.id} tone="red">
+                      {instance.formula} {instance.type} · DC {instance.dc}
+                      <button
+                        type="button"
+                        className="tag-remove"
+                        onClick={() => removePersistentDamage(instance.id)}
+                      >
+                        ×
+                      </button>
+                    </Tag>
+                  ))}
+                  {!persistentDamage.length ? (
+                    <span className="tiny muted">No persistent damage.</span>
+                  ) : null}
+                </div>
+                <div className="row" style={{ marginTop: 7, gap: 6 }}>
+                  <Input
+                    aria-label="Token persistent damage formula"
+                    value={persistentFormula}
+                    onChange={(event) => setPersistentFormula(event.target.value)}
+                    placeholder="1d6"
+                    style={{ maxWidth: 80 }}
+                  />
+                  <Input
+                    aria-label="Token persistent damage type"
+                    value={persistentType}
+                    onChange={(event) => setPersistentType(event.target.value)}
+                    placeholder="fire"
+                    style={{ maxWidth: 100 }}
+                  />
+                  <Input
+                    aria-label="Token persistent damage DC"
+                    type="number"
+                    min={1}
+                    max={30}
+                    value={persistentDc}
+                    onChange={(event) => setPersistentDc(event.target.value)}
+                    style={{ maxWidth: 74 }}
+                  />
+                  <Input
+                    aria-label="Token persistent damage notes"
+                    value={persistentNotes}
+                    onChange={(event) => setPersistentNotes(event.target.value)}
+                    placeholder="Notes"
+                  />
+                  <Button
+                    size="sm"
+                    icon={<Plus size={13} />}
+                    aria-label="Add persistent damage"
+                    onClick={addPersistentDamage}
+                  >
+                    Add
+                  </Button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <p className="tiny muted">
+              Fast healing, regeneration, and persistent damage for linked characters are tracked on
+              the character sheet.
+            </p>
+          )}
 
           <div className="token-conditions-editor">
             <div className="row-between">

@@ -629,4 +629,11 @@ export const migrations: Migration[] = [
       );
     `,
   },
+  {
+    version: 35,
+    name: "token_turn_effects",
+    sql: `
+      ALTER TABLE tokens ADD COLUMN turn_effects TEXT NOT NULL DEFAULT '{}';
+    `,
+  },
 ];

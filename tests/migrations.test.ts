@@ -98,6 +98,7 @@ describe("migrations", () => {
       name: string;
     }[];
     expect(tokenColumns.map((column) => column.name)).toContain("encounter_id");
+    expect(tokenColumns.map((column) => column.name)).toContain("turn_effects");
     const campaignColumns = db.prepare("PRAGMA table_info(campaigns)").all() as {
       name: string;
     }[];

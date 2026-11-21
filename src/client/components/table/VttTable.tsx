@@ -36,6 +36,7 @@ import type {
   WallKind,
 } from "../../../shared/types";
 import type { PropPreset } from "../../../shared/props";
+import { tokenTurnEffectsFromMonster } from "../../../shared/tokenTurnEffects";
 import { errorMessage, useToasts } from "../../stores";
 import { api } from "../../api";
 import { getSocket } from "../../socket";
@@ -477,6 +478,7 @@ export function VttTable({ initial, campaignId, user, isGm, active }: VttTablePr
         groupId,
         groupName: groupId ? monster.name : null,
         conditions: [],
+        turnEffects: tokenTurnEffectsFromMonster(monster),
         hidden: false,
         locked: false,
       };

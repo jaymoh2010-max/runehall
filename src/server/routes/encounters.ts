@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { getCampaign, getCampaignRole, getCharacter } from "../access";
 import { monsters } from "../compendium";
+import { emptyTokenTurnEffects, tokenTurnEffectsFromMonster } from "../../shared/tokenTurnEffects";
 import {
   db,
   type CampaignRow,
@@ -598,6 +599,10 @@ export async function registerEncounterRoutes(app: FastifyInstance): Promise<voi
     for (const combatant of combatants) {
       const count = Math.max(1, Math.min(50, combatant.count));
       const groupId = newId("grp");
+      const monster = combatant.monster_id
+        ? (monsters.find((entry) => entry.id === combatant.monster_id) ?? null)
+        : null;
+      const turnEffects = monster ? tokenTurnEffectsFromMonster(monster) : emptyTokenTurnEffects();
       for (let copy = 0; copy < count; copy += 1) {
         const column = index % columns;
         const row = Math.floor(index / columns);
@@ -622,8 +627,8 @@ export async function registerEncounterRoutes(app: FastifyInstance): Promise<voi
         }
         db.prepare(
           `INSERT INTO tokens
-            (id, scene_id, encounter_id, name, image_url, character_id, owner_id, x, y, size, color, hp_current, hp_max, ac, initiative_bonus, group_id, group_name, conditions, hidden, locked, sort_order, created_at, updated_at)
-           VALUES (?, ?, ?, ?, NULL, NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '[]', 0, 0, ?, ?, ?)`
+            (id, scene_id, encounter_id, name, image_url, character_id, owner_id, x, y, size, color, hp_current, hp_max, ac, initiative_bonus, group_id, group_name, conditions, turn_effects, hidden, locked, sort_order, created_at, updated_at)
+           VALUES (?, ?, ?, ?, NULL, NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '[]', ?, 0, 0, ?, ?, ?)`
         ).run(
           tokenId,
           scene.id,
@@ -639,6 +644,7 @@ export async function registerEncounterRoutes(app: FastifyInstance): Promise<voi
           combatant.perception,
           groupId,
           combatant.name,
+          JSON.stringify(turnEffects),
           Date.now(),
           ts,
           ts

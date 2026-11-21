@@ -14,6 +14,7 @@ import { normalizeCampaignThreads } from "../shared/dashboard";
 import { normalizeGolarionDate } from "../shared/calendar";
 import { normalizeAdvancementSpeed } from "../shared/xp";
 import { normalizeSettlementLevel } from "../shared/shop";
+import { normalizeTokenTurnEffects } from "../shared/tokenTurnEffects";
 import {
   normalizeAmbientLight,
   normalizeLightColor,
@@ -368,8 +369,8 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
       const tokenId = newId("tok");
       db.prepare(
         `INSERT INTO tokens
-          (id, scene_id, name, image_url, character_id, owner_id, x, y, size, vision_radius, light_radius, light_color, vision_mode, color, hp_current, hp_max, ac, initiative_bonus, group_id, group_name, conditions, hidden, locked, sort_order, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          (id, scene_id, name, image_url, character_id, owner_id, x, y, size, vision_radius, light_radius, light_color, vision_mode, color, hp_current, hp_max, ac, initiative_bonus, group_id, group_name, conditions, turn_effects, hidden, locked, sort_order, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).run(
         tokenId,
         sceneId,
@@ -396,6 +397,7 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
         groupId,
         groupId ? text(token.groupName, "Group", 80) : null,
         JSON.stringify(normalizeTokenConditions(token.conditions)),
+        JSON.stringify(normalizeTokenTurnEffects(token.turnEffects)),
         token.hidden ? 1 : 0,
         token.locked ? 1 : 0,
         numberValue(token.sortOrder, 0),

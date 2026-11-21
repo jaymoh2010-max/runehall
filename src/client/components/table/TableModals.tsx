@@ -38,6 +38,7 @@ import {
   type BuiltinMap,
   type BuiltinMapCategory,
 } from "../../../shared/builtinMaps";
+import { tokenTurnEffectsFromMonster } from "../../../shared/tokenTurnEffects";
 import { AMBIENT_LIGHT_OPTIONS, PARTY_VISION_OPTIONS } from "../../../shared/lighting";
 import { stripHtml } from "../../../shared/compendium";
 import { HoverCard } from "../HoverCard";
@@ -374,6 +375,7 @@ export function AddTokenModal({
                           groupId,
                           groupName: groupId ? selectedMonster.name : null,
                           conditions: [],
+                          turnEffects: tokenTurnEffectsFromMonster(selectedMonster),
                           hidden: false,
                           locked: false,
                         };

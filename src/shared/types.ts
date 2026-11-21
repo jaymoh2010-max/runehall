@@ -650,6 +650,18 @@ export interface PersistentDamageInstance {
   notes: string;
 }
 
+/** Turn-start/end effects stored on an unlinked token. */
+export interface TokenTurnEffects {
+  fastHealing: number;
+  fastHealingActive: boolean;
+  fastHealingNote: string;
+  regeneration: number;
+  regenerationActive: boolean;
+  regenerationNote: string;
+  regenerationDeactivatedBy: string[];
+  persistentDamage: PersistentDamageInstance[];
+}
+
 export type AfflictionType = "poison" | "disease" | "curse";
 
 export interface CharacterAffliction {
@@ -1336,6 +1348,8 @@ export interface Token {
   groupId?: string | null;
   groupName?: string | null;
   conditions: TokenCondition[];
+  /** Fast healing, regeneration, and persistent damage for unlinked tokens. */
+  turnEffects: TokenTurnEffects;
   hidden: boolean;
   locked: boolean;
   sortOrder: number;
