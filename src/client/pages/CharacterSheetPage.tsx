@@ -19,6 +19,7 @@ import {
   Shield,
   Shuffle,
   Sparkles,
+  Star,
   Store,
   Swords,
   Trash2,
@@ -211,6 +212,7 @@ export function CharacterSheetPage() {
   const [shopOpen, setShopOpen] = useState(false);
   const [restOpen, setRestOpen] = useState(false);
   const [restRough, setRestRough] = useState(false);
+  const [heroicRecoveryBusy, setHeroicRecoveryBusy] = useState(false);
   const [castState, setCastState] = useState<{
     spellId: string;
     kind: "known" | "cantrip" | "focus";
@@ -539,6 +541,33 @@ export function CharacterSheetPage() {
         applied.dead ? "error" : "success"
       );
     });
+  };
+
+  const spendHeroicRecovery = async () => {
+    if (!character) return;
+    setHeroicRecoveryBusy(true);
+    try {
+      if (dirtyRef.current) await saveDraft();
+      if (conflictRef.current) {
+        toast("Resolve the sheet conflict before using Heroic Recovery.", "error");
+        return;
+      }
+      const result = await api<{
+        character: CharacterRecord;
+        spent: number;
+        notes: string[];
+      }>(`/api/characters/${character.id}/heroic-recovery`, { method: "POST" });
+      applyUpdatedCharacter(result.character);
+      toast(
+        result.notes.join(" ") ||
+          `Heroic Recovery: spent ${result.spent} Hero Point${result.spent === 1 ? "" : "s"}.`,
+        "success"
+      );
+    } catch (err) {
+      toast(errorMessage(err), "error");
+    } finally {
+      setHeroicRecoveryBusy(false);
+    }
   };
 
   const setHp = (nextHp: number) => {
@@ -2051,21 +2080,39 @@ export function CharacterSheetPage() {
                     ) : null}
                     <p className="tiny muted">
                       Recovery check DC {10 + derived.conditionEffects.dying} at the start of each
-                      turn. In encounter mode, the GM's initiative advance rolls it automatically.
+                      turn. In encounter mode, initiative advance defers while Heroic Recovery is
+                      available.
                     </p>
                   </div>
-                  <Button
-                    size="sm"
-                    variant="primary"
-                    disabled={!canEdit}
-                    aria-label="Roll dying recovery check"
-                    onClick={rollDyingRecovery}
-                  >
-                    Recovery check
-                  </Button>
+                  <div className="row" style={{ gap: 6, flexWrap: "wrap" }}>
+                    <Button
+                      size="sm"
+                      variant="primary"
+                      disabled={!canEdit}
+                      aria-label="Roll dying recovery check"
+                      onClick={rollDyingRecovery}
+                    >
+                      Recovery check
+                    </Button>
+                    {fortune.heroPoints > 0 ? (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        icon={<Star size={14} />}
+                        loading={heroicRecoveryBusy}
+                        disabled={!canEdit}
+                        aria-label="Use Heroic Recovery"
+                        onClick={() => void spendHeroicRecovery()}
+                      >
+                        Heroic Recovery
+                      </Button>
+                    ) : null}
+                  </div>
                 </div>
                 <p className="tiny muted">
                   Success: −1 dying · Critical success: −2 · Failure: +1 · Critical failure: +2.
+                  Heroic Recovery spends all Hero Points to stabilize at 0 HP without adding
+                  wounded.
                 </p>
               </div>
             ) : null}

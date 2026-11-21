@@ -86,6 +86,7 @@ import {
   type AccomplishmentTier,
 } from "../../shared/xp";
 import { isSettlementLevel, normalizeSettlementLevel } from "../../shared/shop";
+import { grantHeroPoints, resetHeroPoints } from "../../shared/heroPoints";
 import { normalizeGolarionDate, shiftGolarionDate } from "../../shared/calendar";
 import { contextForDraft } from "../compendium";
 import { campaignSessionsFor } from "../sessionData";
@@ -1250,6 +1251,139 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
       characters,
       award: serializeXpAward(award),
     });
+  });
+
+  app.post("/api/campaigns/:id/award-hero-points", async (request, reply) => {
+    if (!request.user) return reply.code(401).send({ error: "Sign in to continue." });
+    const { id } = request.params as { id: string };
+    const row = getCampaign(id);
+    if (!row) return reply.code(404).send({ error: "Campaign not found." });
+    if (roleFor(row, request.user.id) !== "gm") {
+      return reply.code(403).send({ error: "Only the GM can award Hero Points." });
+    }
+    const body = (request.body ?? {}) as Record<string, unknown>;
+    const amount = safeInt(body.amount, 1, 1, 3);
+    const characterIds = Array.isArray(body.characterIds)
+      ? [
+          ...new Set(
+            body.characterIds.filter((value): value is string => typeof value === "string")
+          ),
+        ]
+      : [];
+    if (!characterIds.length) {
+      return reply.code(400).send({ error: "Choose at least one character." });
+    }
+    const rows = db
+      .prepare("SELECT * FROM characters WHERE campaign_id = ?")
+      .all(id) as CharacterRow[];
+    const selected = rows.filter((character) => characterIds.includes(character.id));
+    if (!selected.length) {
+      return reply.code(400).send({ error: "Those characters are not in this campaign." });
+    }
+    let recipients = 0;
+    let capped = 0;
+    let skipped = 0;
+    for (const character of selected) {
+      let draft;
+      try {
+        draft = normalizeCharacterDraft(JSON.parse(character.data), character.name);
+      } catch {
+        skipped += 1;
+        continue;
+      }
+      const grant = grantHeroPoints(draft.play.heroPoints, amount);
+      if (grant.capped > 0) capped += 1;
+      if (grant.gained <= 0) continue;
+      draft.play.heroPoints = grant.value;
+      const summary = characterSummary(draft, contextForDraft(draft));
+      db.prepare(
+        "UPDATE characters SET data = ?, summary = ?, updated_at = ?, revision = revision + 1 WHERE id = ?"
+      ).run(JSON.stringify(draft), JSON.stringify(summary), now(), character.id);
+      app.broadcastCampaign(id, "character:updated", {
+        characterId: character.id,
+        summary,
+        name: draft.name,
+      });
+      recipients += 1;
+    }
+    touchCampaign(id);
+    const characters = campaignCharacters(id).map((character) =>
+      serializeCharacter(character, character.owner_name, {
+        canEdit: true,
+        canView: true,
+      })
+    );
+    logAudit({
+      action: "campaign.award_hero_points",
+      actor: request.user,
+      targetType: "campaign",
+      targetId: id,
+      detail: `${amount} Hero Point${amount === 1 ? "" : "s"} to ${recipients} characters${
+        capped ? ` (${capped} at cap)` : ""
+      }`,
+      request,
+    });
+    return reply.send({ amount, recipients, capped, skipped, characters });
+  });
+
+  app.post("/api/campaigns/:id/reset-hero-points", async (request, reply) => {
+    if (!request.user) return reply.code(401).send({ error: "Sign in to continue." });
+    const { id } = request.params as { id: string };
+    const row = getCampaign(id);
+    if (!row) return reply.code(404).send({ error: "Campaign not found." });
+    if (roleFor(row, request.user.id) !== "gm") {
+      return reply.code(403).send({ error: "Only the GM can reset Hero Points." });
+    }
+    const body = (request.body ?? {}) as Record<string, unknown>;
+    const value = resetHeroPoints(body.value === undefined ? 1 : body.value);
+    const requested = Array.isArray(body.characterIds)
+      ? body.characterIds.filter((entry): entry is string => typeof entry === "string")
+      : [];
+    const rows = db
+      .prepare("SELECT * FROM characters WHERE campaign_id = ?")
+      .all(id) as CharacterRow[];
+    const selected = requested.length
+      ? rows.filter((character) => requested.includes(character.id))
+      : rows;
+    let recipients = 0;
+    let skipped = 0;
+    for (const character of selected) {
+      let draft;
+      try {
+        draft = normalizeCharacterDraft(JSON.parse(character.data), character.name);
+      } catch {
+        skipped += 1;
+        continue;
+      }
+      if (draft.play.heroPoints === value) continue;
+      draft.play.heroPoints = value;
+      const summary = characterSummary(draft, contextForDraft(draft));
+      db.prepare(
+        "UPDATE characters SET data = ?, summary = ?, updated_at = ?, revision = revision + 1 WHERE id = ?"
+      ).run(JSON.stringify(draft), JSON.stringify(summary), now(), character.id);
+      app.broadcastCampaign(id, "character:updated", {
+        characterId: character.id,
+        summary,
+        name: draft.name,
+      });
+      recipients += 1;
+    }
+    touchCampaign(id);
+    const characters = campaignCharacters(id).map((character) =>
+      serializeCharacter(character, character.owner_name, {
+        canEdit: true,
+        canView: true,
+      })
+    );
+    logAudit({
+      action: "campaign.reset_hero_points",
+      actor: request.user,
+      targetType: "campaign",
+      targetId: id,
+      detail: `Reset ${recipients} characters to ${value} Hero Point${value === 1 ? "" : "s"}`,
+      request,
+    });
+    return reply.send({ value, recipients, skipped, characters });
   });
 
   app.post("/api/campaigns/:id/downtime", async (request, reply) => {

@@ -33,6 +33,7 @@ import { propertyRuneDamage, shieldRuneBonus, summarizeRunes } from "./runes";
 import { conditionModifiers } from "./conditions";
 import { normalizeAfflictions } from "./afflictions";
 import { normalizePersistentDamageList } from "./persistentDamage";
+import { clampHeroPoints } from "./heroPoints";
 import {
   FEAT_CHOICES,
   FEAT_GRANTS,
@@ -1145,7 +1146,7 @@ export function normalizeCharacterDraft(input: unknown, fallbackName = "New Hero
     play: {
       hp: typeof play.hp === "number" && Number.isFinite(play.hp) ? play.hp : null,
       tempHp: Math.max(0, num(play.tempHp, 0)),
-      heroPoints: Math.max(0, Math.min(3, Math.floor(num(play.heroPoints, 1)))),
+      heroPoints: clampHeroPoints(num(play.heroPoints, 1)),
       focusPoints: Math.max(0, Math.min(3, Math.floor(num(play.focusPoints, 1)))),
       downtimeDays: Math.max(0, Math.min(9_999, Math.floor(num(play.downtimeDays, 0)))),
       conditions: arr<Record<string, unknown>>(play.conditions)

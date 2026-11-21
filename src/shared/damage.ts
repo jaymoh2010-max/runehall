@@ -238,6 +238,56 @@ export interface DyingRecoveryResult {
   notes: string[];
 }
 
+export interface HeroicRecoveryResult {
+  draft: CharacterDraft;
+  applied: boolean;
+  spent: number;
+  reason: "dead" | "not-dying" | "no-hero-points" | null;
+  notes: string[];
+}
+
+/**
+ * PF2e Heroic Recovery: spend all remaining Hero Points at the start of a turn
+ * (or when dying would increase) to stabilize at 0 HP. Unlike ordinary
+ * recovery, this does not add wounded.
+ */
+export function applyHeroicRecovery(draft: CharacterDraft): HeroicRecoveryResult {
+  const dying = conditionValue(draft.play.conditions, "dying");
+  const dead = conditionValue(draft.play.conditions, "dead") > 0;
+  const heroPoints = Math.max(0, Math.floor(Number(draft.play.heroPoints) || 0));
+  if (dead) {
+    return { draft, applied: false, spent: 0, reason: "dead", notes: [] };
+  }
+  if (dying <= 0) {
+    return { draft, applied: false, spent: 0, reason: "not-dying", notes: [] };
+  }
+  if (heroPoints < 1) {
+    return { draft, applied: false, spent: 0, reason: "no-hero-points", notes: [] };
+  }
+
+  let conditions = draft.play.conditions
+    .filter((condition) => conditionBaseName(condition.name) !== "dying")
+    .map((condition) => ({ ...condition }));
+  if (!conditions.some((condition) => conditionBaseName(condition.name) === "unconscious")) {
+    conditions = upsertCondition(conditions, "Unconscious", null);
+  }
+  return {
+    draft: {
+      ...draft,
+      play: {
+        ...draft.play,
+        hp: 0,
+        heroPoints: 0,
+        conditions,
+      },
+    },
+    applied: true,
+    spent: heroPoints,
+    reason: null,
+    notes: ["Heroic Recovery: dying ends; the character remains unconscious at 0 HP."],
+  };
+}
+
 function conditionBaseName(value: string): string {
   const trailing = String(value ?? "")
     .trim()

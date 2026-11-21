@@ -353,6 +353,31 @@ test("GM awards XP in XP tracking mode without automatic level-up", async ({ pag
   await expect(page.locator(".xp-ledger").getByText("800 XP")).toBeVisible();
 });
 
+test("GM awards Hero Points and resets them for a new session", async ({ page }) => {
+  await signIn(page, admin);
+  await page.goto(`${campaignPath}?tab=party`);
+  await expect(page.getByRole("heading", { name: "Who's at the table?" })).toBeVisible();
+  await expect(page.locator(".party-stats").getByText("1 / 3")).toBeVisible();
+
+  await page.getByRole("button", { name: "Hero Points", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Hero Points" });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByText("E2E Hero (1 / 3)")).toBeVisible();
+  await dialog.getByRole("button", { name: "Award Hero Points" }).click();
+  await expect(page.getByText(/Awarded 1 Hero Point to 1 character/)).toBeVisible({
+    timeout: 15_000,
+  });
+  await expect(page.locator(".party-stats").getByText("2 / 3")).toBeVisible();
+
+  await page.getByRole("button", { name: "Hero Points", exact: true }).click();
+  page.once("dialog", (confirm) => confirm.accept());
+  await dialog.getByRole("button", { name: "Start new session (reset to 1)" }).click();
+  await expect(page.getByText(/New session: reset 1 character to 1 Hero Point/)).toBeVisible({
+    timeout: 15_000,
+  });
+  await expect(page.locator(".party-stats").getByText("1 / 3")).toBeVisible();
+});
+
 test("loot audit and replacement wealth top-up are available", async ({ page }) => {
   await signIn(page, admin);
   await page.goto(`${campaignPath}?tab=loot`);
@@ -1642,6 +1667,21 @@ test("sheet rolls dying recovery and persistent damage end-of-turn checks", asyn
   const dyingPanel = page.locator(".dying-recovery");
   await expect(dyingPanel).toContainText("Dying 1");
   await expect(dyingPanel).toContainText("Recovery check DC 11");
+
+  await page.getByRole("button", { name: "Use Heroic Recovery" }).click();
+  await expect(dyingPanel).toHaveCount(0);
+  await expect(page.locator(".conditions-list").getByText("Unconscious")).toBeVisible();
+  await expect(page.locator(".conditions-list").getByText("Wounded 1")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Set hero points to 1" })).toHaveAttribute(
+    "aria-pressed",
+    "false"
+  );
+
+  await hpInput.fill("10");
+  await hpInput.blur();
+  await hpInput.fill("0");
+  await hpInput.blur();
+  await expect(dyingPanel).toContainText("Dying 1");
 
   await page.evaluate(() => {
     Math.random = () => 0.5;
