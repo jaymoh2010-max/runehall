@@ -220,6 +220,34 @@ describe("PF2e character rules", () => {
     expect(draft.play.conditions[0]).toEqual({ name: "Frightened", value: 2, duration: 3 });
   });
 
+  it("normalizes fast healing and regeneration play fields", () => {
+    const defaults = emptyCharacterDraft("Defaults");
+    expect(defaults.play.fastHealing).toBe(0);
+    expect(defaults.play.fastHealingActive).toBe(true);
+    expect(defaults.play.regeneration).toBe(0);
+    expect(defaults.play.regenerationDeactivatedBy).toEqual([]);
+
+    const draft = normalizeCharacterDraft(
+      {
+        name: "Regenerator",
+        play: {
+          fastHealing: "4.8",
+          fastHealingActive: false,
+          fastHealingNote: "  while below half HP ",
+          regeneration: 9999,
+          regenerationDeactivatedBy: ["Fire Damage", "acid", "fire"],
+        },
+      },
+      "Fallback"
+    );
+    expect(draft.play.fastHealing).toBe(5);
+    expect(draft.play.fastHealingActive).toBe(false);
+    expect(draft.play.fastHealingNote).toBe("while below half HP");
+    expect(draft.play.regeneration).toBe(1000);
+    expect(draft.play.regenerationActive).toBe(true);
+    expect(draft.play.regenerationDeactivatedBy).toEqual(["fire", "acid"]);
+  });
+
   it("preserves companion bestiary links when normalizing", () => {
     const draft = normalizeCharacterDraft(
       {

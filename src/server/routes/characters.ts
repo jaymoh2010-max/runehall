@@ -35,6 +35,7 @@ import {
   spendCurrency,
 } from "../../shared/inventory";
 import { conditionsFromSheet } from "../../shared/tokens";
+import { characterTokenTurnEffects } from "../../shared/characterTurnEffects";
 import { applyHeroicRecovery } from "../../shared/damage";
 import { logAudit } from "../audit";
 import { newId, now, parseJson, safeString } from "../util";
@@ -65,13 +66,14 @@ export function syncCharacterDraft(
     .all(row.id) as TokenRow[];
   for (const token of linkedTokens) {
     db.prepare(
-      "UPDATE tokens SET name = ?, hp_max = ?, hp_current = ?, ac = ?, conditions = ?, updated_at = ? WHERE id = ?"
+      "UPDATE tokens SET name = ?, hp_max = ?, hp_current = ?, ac = ?, conditions = ?, turn_effects = ?, updated_at = ? WHERE id = ?"
     ).run(
       draft.name,
       summary.hp,
       draft.play.hp === null ? summary.hp : Math.max(0, Math.min(summary.hp, draft.play.hp)),
       summary.ac,
       JSON.stringify(conditionsFromSheet(draft.play.conditions)),
+      JSON.stringify(characterTokenTurnEffects(draft.play)),
       now(),
       token.id
     );

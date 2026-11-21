@@ -635,6 +635,16 @@ export interface CharacterPlay {
   conditions: CharacterCondition[];
   afflictions: CharacterAffliction[];
   persistentDamage: PersistentDamageInstance[];
+  /** Fixed HP regained at the start of the character's turn. */
+  fastHealing: number;
+  fastHealingActive: boolean;
+  fastHealingNote: string;
+  /** Regeneration heals at the start of turn and prevents dying from reaching the death threshold. */
+  regeneration: number;
+  regenerationActive: boolean;
+  regenerationNote: string;
+  /** Damage types that deactivate regeneration until the end of the next turn. */
+  regenerationDeactivatedBy: string[];
   xp: number;
   shieldRaised: boolean;
 }

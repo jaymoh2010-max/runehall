@@ -25,7 +25,8 @@ import { normalizeAoeTemplate, normalizeAoeTemplates } from "../shared/templates
 import { blockingWallForMove, normalizeWalls } from "../shared/walls";
 import { normalizeSceneProps } from "../shared/props";
 import { normalizeLightColor, normalizeTokenVisionMode } from "../shared/lighting";
-import { emptyTokenTurnEffects, normalizeTokenTurnEffects } from "../shared/tokenTurnEffects";
+import { normalizeTokenTurnEffects } from "../shared/tokenTurnEffects";
+import { characterTokenTurnEffects } from "../shared/characterTurnEffects";
 import type {
   ClientToServerEvents,
   InitiativeEntry,
@@ -440,7 +441,9 @@ function createToken(
   const groupId = incoming.groupId ? safeString(incoming.groupId, "", 80) || null : null;
   const groupName = groupId ? safeString(incoming.groupName, name, 80) : null;
   const turnEffects = character
-    ? emptyTokenTurnEffects()
+    ? characterTokenTurnEffects(
+        normalizeCharacterDraft(parseJson(character.data, {}), character.name).play
+      )
     : normalizeTokenTurnEffects(incoming.turnEffects);
   db.prepare(
     `INSERT INTO tokens (id, scene_id, name, image_url, character_id, owner_id, x, y, size, vision_radius, light_radius, light_color, vision_mode, color, hp_current, hp_max, ac, initiative_bonus, group_id, group_name, conditions, turn_effects, hidden, locked, sort_order, created_at, updated_at)

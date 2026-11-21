@@ -484,6 +484,33 @@ async function main() {
     throw new Error("Party long rest reported no characters rested");
   log("party long rest heals, clears temporary HP, and reduces rest conditions");
 
+  const effectsDraft = JSON.parse(JSON.stringify(restedCharacter.data));
+  effectsDraft.play.fastHealing = 4;
+  effectsDraft.play.fastHealingActive = true;
+  effectsDraft.play.fastHealingNote = "  while below half HP  ";
+  effectsDraft.play.regeneration = 6;
+  effectsDraft.play.regenerationActive = true;
+  effectsDraft.play.regenerationDeactivatedBy = ["Fire Damage", "acid"];
+  const effectsSave = await api(`/api/characters/${character.id}`, {
+    method: "PUT",
+    cookie: playerCookie,
+    body: { data: effectsDraft, force: true },
+  });
+  const savedPlay = effectsSave.payload.character.data.play;
+  if (
+    savedPlay.fastHealing !== 4 ||
+    savedPlay.fastHealingActive !== true ||
+    savedPlay.fastHealingNote !== "while below half HP" ||
+    savedPlay.regeneration !== 6 ||
+    savedPlay.regenerationActive !== true ||
+    savedPlay.regenerationDeactivatedBy.length !== 2 ||
+    savedPlay.regenerationDeactivatedBy[0] !== "fire" ||
+    savedPlay.regenerationDeactivatedBy[1] !== "acid"
+  ) {
+    throw new Error("Character fast healing/regeneration effects did not round-trip");
+  }
+  log("character saves preserve fast healing, regeneration, and suppression types");
+
   const milestoneAward = await fetch(`${base}/api/campaigns/${campaign.id}/award-xp`, {
     method: "POST",
     headers: { "content-type": "application/json", cookie: gmCookie },
