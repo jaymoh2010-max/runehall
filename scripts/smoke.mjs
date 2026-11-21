@@ -533,6 +533,41 @@ async function main() {
     body: { xpMode: "milestone", advancementSpeed: "medium" },
   });
 
+  const heroAward = await api(`/api/campaigns/${campaign.id}/award-hero-points`, {
+    method: "POST",
+    cookie: gmCookie,
+    body: { amount: 1, characterIds: [character.id] },
+  });
+  let heroAwardCharacter = heroAward.payload.characters.find((entry) => entry.id === character.id);
+  if (heroAwardCharacter?.data?.play?.heroPoints !== 3) {
+    throw new Error("Hero Point award did not reach the character");
+  }
+  const heroCapped = await api(`/api/campaigns/${campaign.id}/award-hero-points`, {
+    method: "POST",
+    cookie: gmCookie,
+    body: { amount: 3, characterIds: [character.id] },
+  });
+  heroAwardCharacter = heroCapped.payload.characters.find((entry) => entry.id === character.id);
+  if (heroAwardCharacter?.data?.play?.heroPoints !== 3 || heroCapped.payload.capped !== 1) {
+    throw new Error("Hero Point award did not respect the maximum");
+  }
+  const heroReset = await api(`/api/campaigns/${campaign.id}/reset-hero-points`, {
+    method: "POST",
+    cookie: gmCookie,
+    body: { value: 1 },
+  });
+  heroAwardCharacter = heroReset.payload.characters.find((entry) => entry.id === character.id);
+  if (heroAwardCharacter?.data?.play?.heroPoints !== 1) {
+    throw new Error("Session reset did not set Hero Points to 1");
+  }
+  const playerHeroAward = await fetch(`${base}/api/campaigns/${campaign.id}/award-hero-points`, {
+    method: "POST",
+    headers: { "content-type": "application/json", cookie: playerCookie },
+    body: JSON.stringify({ amount: 1, characterIds: [character.id] }),
+  });
+  if (playerHeroAward.status !== 403) throw new Error("Player was able to award Hero Points");
+  log("Hero Points are GM-awarded, capped at 3, and reset to 1 for a new session");
+
   const playerLevelChange = await fetch(`${base}/api/characters/${character.id}`, {
     method: "PUT",
     headers: { "content-type": "application/json", cookie: playerCookie },

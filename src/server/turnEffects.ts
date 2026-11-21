@@ -341,6 +341,14 @@ export function runTurnStart(
     try {
       const draft = normalizeCharacterDraft(parseJson(character.data, {}), character.name);
       const result = resolveStartOfTurn(draft, { labelPrefix: character.name });
+      if (result.heroicRecoveryAvailable) {
+        postAutomationNote(
+          io,
+          campaignId,
+          `${character.name} is dying with Heroic Recovery available. Roll a recovery check or spend all Hero Points.`,
+          Boolean(token.hidden)
+        );
+      }
       if (result.recovery) {
         postAutomationRoll(
           io,

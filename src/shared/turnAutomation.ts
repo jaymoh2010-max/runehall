@@ -19,6 +19,7 @@ export interface StartOfTurnResult {
   changed: boolean;
   dyingBefore: number;
   recovery: RollResult | null;
+  heroicRecoveryAvailable: boolean;
   notes: string[];
   ended: boolean;
   dead: boolean;
@@ -97,9 +98,22 @@ export function resolveStartOfTurn(
       changed: false,
       dyingBefore,
       recovery: null,
+      heroicRecoveryAvailable: false,
       notes: [],
       ended: dyingBefore <= 0,
       dead: hasDead(draft),
+    };
+  }
+  if (draft.play.heroPoints > 0) {
+    return {
+      draft,
+      changed: false,
+      dyingBefore,
+      recovery: null,
+      heroicRecoveryAvailable: true,
+      notes: ["Heroic Recovery is available."],
+      ended: false,
+      dead: false,
     };
   }
 
@@ -114,6 +128,7 @@ export function resolveStartOfTurn(
     changed: applied.draft !== draft,
     dyingBefore,
     recovery,
+    heroicRecoveryAvailable: false,
     notes: applied.notes,
     ended: applied.ended,
     dead: applied.dead,

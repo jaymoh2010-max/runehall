@@ -565,6 +565,39 @@ async function runCampaignA(gm: Account, players: Account[]): Promise<void> {
     });
   });
 
+  await check(campaignName, "Hero Points award, cap, reset, and permissions", async () => {
+    const award = await api(`/api/campaigns/${campaignId}/award-hero-points`, {
+      method: "POST",
+      cookie: gm.cookie,
+      body: { amount: 1, characterIds: [heroes[0].id] },
+    });
+    let hero = (award.payload.characters as Json[]).find((entry) => entry.id === heroes[0].id);
+    assertEqual(hero?.data?.play?.heroPoints, 2, "Hero Point award");
+    const capped = await api(`/api/campaigns/${campaignId}/award-hero-points`, {
+      method: "POST",
+      cookie: gm.cookie,
+      body: { amount: 3, characterIds: [heroes[0].id] },
+    });
+    hero = (capped.payload.characters as Json[]).find((entry) => entry.id === heroes[0].id);
+    assertEqual(hero?.data?.play?.heroPoints, 3, "Hero Point cap");
+    assertEqual(capped.payload.capped, 1, "Hero Point capped count");
+    const reset = await api(`/api/campaigns/${campaignId}/reset-hero-points`, {
+      method: "POST",
+      cookie: gm.cookie,
+      body: { value: 1 },
+    });
+    for (const entry of reset.payload.characters as Json[]) {
+      assertEqual(entry.data.play.heroPoints, 1, `${entry.name} session reset`);
+    }
+    const forbidden = await api(`/api/campaigns/${campaignId}/award-hero-points`, {
+      method: "POST",
+      cookie: players[0].cookie,
+      body: { amount: 1, characterIds: [heroes[0].id] },
+      expect: null,
+    });
+    assertEqual(forbidden.status, 403, "Player Hero Point award status");
+  });
+
   // --- Table: tokens, ownership, hidden initiative --------------------------
   const gmSocket = await connectSocket(gm.cookie);
   const playerSocket = await connectSocket(players[0].cookie);
@@ -849,6 +882,7 @@ async function runCampaignA(gm: Account, players: Account[]): Promise<void> {
     const draft = JSON.parse(JSON.stringify(sheet.payload.character.data)) as Json;
     draft.play.hp = 0;
     draft.play.tempHp = 0;
+    draft.play.heroPoints = 0;
     draft.play.conditions = [{ name: "Dying", value: 1 }];
     await api(`/api/characters/${hero.id}`, {
       method: "PUT",
@@ -896,6 +930,60 @@ async function runCampaignA(gm: Account, players: Account[]): Promise<void> {
     await api(`/api/characters/${hero.id}`, {
       method: "PUT",
       cookie: players[2].cookie,
+      body: { data: restore, force: true },
+    });
+  });
+
+  await check(campaignName, "Heroic Recovery spends all points and avoids wounded", async () => {
+    const hero = heroes[3];
+    const sheet = await api(`/api/characters/${hero.id}`, { cookie: players[3].cookie });
+    const draft = JSON.parse(JSON.stringify(sheet.payload.character.data)) as Json;
+    draft.play.hp = 0;
+    draft.play.tempHp = 0;
+    draft.play.heroPoints = 2;
+    draft.play.conditions = [
+      { name: "Dying", value: 1 },
+      { name: "Wounded", value: 1 },
+    ];
+    await api(`/api/characters/${hero.id}`, {
+      method: "PUT",
+      cookie: players[3].cookie,
+      body: { data: draft, force: true },
+    });
+    const forbidden = await api(`/api/characters/${hero.id}/heroic-recovery`, {
+      method: "POST",
+      cookie: players[0].cookie,
+      expect: null,
+    });
+    assertEqual(forbidden.status, 403, "Foreign Heroic Recovery status");
+    const recovery = await api(`/api/characters/${hero.id}/heroic-recovery`, {
+      method: "POST",
+      cookie: players[3].cookie,
+    });
+    const recovered = recovery.payload.character.data.play;
+    assertEqual(recovered.heroPoints, 0, "Heroic Recovery Hero Points");
+    assertEqual(recovered.hp, 0, "Heroic Recovery HP");
+    assert(
+      !recovered.conditions.some((condition: Json) => condition.name === "Dying"),
+      "Heroic Recovery left dying"
+    );
+    assert(
+      recovered.conditions.some((condition: Json) => condition.name === "Unconscious"),
+      "Heroic Recovery did not leave unconscious"
+    );
+    assertEqual(
+      recovered.conditions.find((condition: Json) => condition.name === "Wounded")?.value,
+      1,
+      "Heroic Recovery changed wounded"
+    );
+    const restore = JSON.parse(JSON.stringify(sheet.payload.character.data)) as Json;
+    restore.play.hp = null;
+    restore.play.tempHp = 0;
+    restore.play.heroPoints = 1;
+    restore.play.conditions = [];
+    await api(`/api/characters/${hero.id}`, {
+      method: "PUT",
+      cookie: players[3].cookie,
       body: { data: restore, force: true },
     });
   });

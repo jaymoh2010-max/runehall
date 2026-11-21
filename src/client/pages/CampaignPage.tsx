@@ -26,6 +26,7 @@ import {
   Shield,
   Skull,
   Sparkles,
+  Star,
   Swords,
   Trash2,
   UserPlus,
@@ -229,6 +230,11 @@ export function CampaignPage() {
   const [downtimeTargetIds, setDowntimeTargetIds] = useState<string[]>([]);
   const [downtimeBusy, setDowntimeBusy] = useState(false);
   const [downtimeError, setDowntimeError] = useState("");
+  const [heroPointOpen, setHeroPointOpen] = useState(false);
+  const [heroPointAmount, setHeroPointAmount] = useState("1");
+  const [heroPointRecipientIds, setHeroPointRecipientIds] = useState<string[]>([]);
+  const [heroPointBusy, setHeroPointBusy] = useState(false);
+  const [heroPointError, setHeroPointError] = useState("");
 
   const isGm = campaign?.role === "gm";
   const xpPreviewAmount =
@@ -1047,6 +1053,104 @@ export function CampaignPage() {
     }
   };
 
+  const openHeroPoints = () => {
+    setHeroPointAmount("1");
+    setHeroPointRecipientIds(characters.map((character) => character.id));
+    setHeroPointError("");
+    setHeroPointOpen(true);
+  };
+
+  const toggleHeroPointRecipient = (characterId: string, checked: boolean) => {
+    setHeroPointRecipientIds((current) =>
+      checked
+        ? [...new Set([...current, characterId])]
+        : current.filter((entry) => entry !== characterId)
+    );
+  };
+
+  const awardHeroPoints = async () => {
+    if (!id) return;
+    if (!heroPointRecipientIds.length) {
+      setHeroPointError("Choose at least one character.");
+      return;
+    }
+    setHeroPointBusy(true);
+    setHeroPointError("");
+    try {
+      const result = await api<{
+        amount: number;
+        recipients: number;
+        capped: number;
+        skipped: number;
+        characters: CharacterRecord[];
+      }>(`/api/campaigns/${id}/award-hero-points`, {
+        method: "POST",
+        body: {
+          amount: Math.max(1, Math.min(3, Math.floor(Number(heroPointAmount) || 1))),
+          characterIds: heroPointRecipientIds,
+        },
+      });
+      setCharacters(result.characters);
+      setTableData((current) =>
+        current ? { ...current, characters: result.characters } : current
+      );
+      setHeroPointOpen(false);
+      toast(
+        `Awarded ${result.amount} Hero Point${result.amount === 1 ? "" : "s"} to ${
+          result.recipients
+        } character${result.recipients === 1 ? "" : "s"}${
+          result.capped ? `; ${result.capped} already at the maximum` : ""
+        }.`,
+        "success"
+      );
+    } catch (err) {
+      setHeroPointError(errorMessage(err));
+    } finally {
+      setHeroPointBusy(false);
+    }
+  };
+
+  const startNewSession = async () => {
+    if (!id) return;
+    if (
+      !window.confirm(
+        "Start a new session? Every character's Hero Points are set to 1. HP, focus, spells, conditions, and session status are unchanged."
+      )
+    ) {
+      return;
+    }
+    setHeroPointBusy(true);
+    setHeroPointError("");
+    try {
+      const result = await api<{
+        value: number;
+        recipients: number;
+        skipped: number;
+        characters: CharacterRecord[];
+      }>(`/api/campaigns/${id}/reset-hero-points`, {
+        method: "POST",
+        body: { value: 1 },
+      });
+      setCharacters(result.characters);
+      setTableData((current) =>
+        current ? { ...current, characters: result.characters } : current
+      );
+      setHeroPointOpen(false);
+      toast(
+        result.recipients > 0
+          ? `New session: reset ${result.recipients} character${
+              result.recipients === 1 ? "" : "s"
+            } to 1 Hero Point.`
+          : "New session: every character already had 1 Hero Point.",
+        "success"
+      );
+    } catch (err) {
+      setHeroPointError(errorMessage(err));
+    } finally {
+      setHeroPointBusy(false);
+    }
+  };
+
   const longRestParty = async () => {
     if (!id || !campaign) return;
     if (
@@ -1287,6 +1391,9 @@ export function CampaignPage() {
                         Award XP
                       </Button>
                     ) : null}
+                    <Button variant="secondary" icon={<Star size={15} />} onClick={openHeroPoints}>
+                      Hero Points
+                    </Button>
                     <Button
                       variant="secondary"
                       icon={<Moon size={15} />}
@@ -1359,6 +1466,7 @@ export function CampaignPage() {
                         <Stat label="HP" value={character.summary.hp} tone="red" />
                         <Stat label="AC" value={character.summary.ac} tone="gold" />
                         <Stat label="Speed" value={`${character.summary.speed} ft.`} />
+                        <Stat label="Hero" value={`${character.summary.heroPoints ?? 0} / 3`} />
                         <Stat label="Downtime" value={`${character.summary.downtimeDays ?? 0} d`} />
                       </div>
                     ) : null}
@@ -2411,6 +2519,92 @@ export function CampaignPage() {
                 onChange={(checked) => toggleDowntimeTarget(entry.id, checked)}
               />
             ))}
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        open={heroPointOpen}
+        onClose={() => setHeroPointOpen(false)}
+        title="Hero Points"
+        subtitle="Award points for heroic actions, or reset the table for a new session."
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setHeroPointOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              icon={<Star size={15} />}
+              loading={heroPointBusy}
+              onClick={() => void awardHeroPoints()}
+            >
+              Award Hero Points
+            </Button>
+          </>
+        }
+      >
+        <div className="stack">
+          {heroPointError ? <div className="auth-error">{heroPointError}</div> : null}
+          <Field
+            label="Amount"
+            hint="Hero Points are capped at 3. Award 1 for a notable heroic act, or more for an especially memorable moment."
+          >
+            <Select
+              value={heroPointAmount}
+              onChange={(event) => setHeroPointAmount(event.target.value)}
+            >
+              <option value="1">1 Hero Point</option>
+              <option value="2">2 Hero Points</option>
+              <option value="3">3 Hero Points</option>
+            </Select>
+          </Field>
+          <div className="row-between">
+            <strong>Recipients</strong>
+            <div className="row" style={{ gap: 6 }}>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                onClick={() => setHeroPointRecipientIds(characters.map((entry) => entry.id))}
+              >
+                All
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                onClick={() => setHeroPointRecipientIds([])}
+              >
+                None
+              </Button>
+            </div>
+          </div>
+          <div className="stack" style={{ gap: 4 }}>
+            {characters.map((entry) => (
+              <Checkbox
+                key={entry.id}
+                label={`${entry.name} (${entry.summary?.heroPoints ?? 0} / 3)`}
+                checked={heroPointRecipientIds.includes(entry.id)}
+                onChange={(checked) => toggleHeroPointRecipient(entry.id, checked)}
+              />
+            ))}
+          </div>
+          <div className="divider" />
+          <div>
+            <strong>Start a new session</strong>
+            <p className="tiny muted">
+              Sets every character's Hero Points to 1. HP, focus, spells, conditions, and session
+              status are unchanged.
+            </p>
+            <Button
+              type="button"
+              variant="secondary"
+              loading={heroPointBusy}
+              onClick={() => void startNewSession()}
+            >
+              Start new session (reset to 1)
+            </Button>
           </div>
         </div>
       </Modal>

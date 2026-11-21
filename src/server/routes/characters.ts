@@ -35,6 +35,8 @@ import {
   spendCurrency,
 } from "../../shared/inventory";
 import { conditionsFromSheet } from "../../shared/tokens";
+import { applyHeroicRecovery } from "../../shared/damage";
+import { logAudit } from "../audit";
 import { newId, now, parseJson, safeString } from "../util";
 
 function parseDraft(raw: unknown, fallbackName = "New Hero"): CharacterDraft {
@@ -394,6 +396,59 @@ export async function registerCharacterRoutes(app: FastifyInstance): Promise<voi
         canView: true,
         canAdvance: canAdvanceCharacter(updated!, request.user.id),
       }),
+    });
+  });
+
+  app.post("/api/characters/:id/heroic-recovery", async (request, reply) => {
+    if (!request.user) return reply.code(401).send({ error: "Sign in to continue." });
+    const { id } = request.params as { id: string };
+    const character = getCharacter(id);
+    if (!character) return reply.code(404).send({ error: "Character not found." });
+    if (!canEditCharacter(character, request.user.id)) {
+      return reply.code(403).send({ error: "You can't use Heroic Recovery for that character." });
+    }
+    let draft: CharacterDraft;
+    try {
+      draft = normalizeCharacterDraft(JSON.parse(character.data), character.name);
+    } catch {
+      return reply.code(400).send({ error: "That character's draft could not be read." });
+    }
+    const result = applyHeroicRecovery(draft);
+    if (!result.applied) {
+      const message =
+        result.reason === "dead"
+          ? "That character is dead."
+          : result.reason === "not-dying"
+            ? "That character is not dying."
+            : "That character has no Hero Points to spend.";
+      return reply.code(400).send({ error: message });
+    }
+    const summary = characterSummary(result.draft, contextForDraft(result.draft));
+    db.prepare(
+      "UPDATE characters SET data = ?, summary = ?, updated_at = ?, revision = revision + 1 WHERE id = ?"
+    ).run(JSON.stringify(result.draft), JSON.stringify(summary), now(), character.id);
+    syncCharacterDraft(app, character, result.draft, summary);
+    if (character.campaign_id) touchCampaign(character.campaign_id);
+    logAudit({
+      action: "character.heroic_recovery",
+      actor: request.user,
+      targetType: "character",
+      targetId: character.id,
+      detail: `${result.draft.name}: spent ${result.spent} Hero Point${
+        result.spent === 1 ? "" : "s"
+      }`,
+      request,
+    });
+    const updated = getCharacter(character.id)!;
+    const owner = getUser(updated.user_id);
+    return reply.send({
+      character: serializeCharacter(updated, owner?.display_name ?? "", {
+        canEdit: true,
+        canView: true,
+        canAdvance: canAdvanceCharacter(updated, request.user.id),
+      }),
+      spent: result.spent,
+      notes: result.notes,
     });
   });
 

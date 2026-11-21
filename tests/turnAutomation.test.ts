@@ -13,11 +13,11 @@ function sequence(values: number[]): TurnAutomationRng {
   return () => values[Math.min(index++, values.length - 1)] ?? 0;
 }
 
-function hero(conditions: CharacterCondition[] = [], hp = 20): CharacterDraft {
+function hero(conditions: CharacterCondition[] = [], hp = 20, heroPoints = 0): CharacterDraft {
   const draft = emptyCharacterDraft("Automation Hero");
   return {
     ...draft,
-    play: { ...draft.play, hp, conditions },
+    play: { ...draft.play, hp, conditions, heroPoints },
   };
 }
 
@@ -55,6 +55,15 @@ describe("start-of-turn automation", () => {
     expect(conditionValue(result.draft, "wounded")).toBe(1);
     expect(result.ended).toBe(true);
     expect(result.dead).toBe(false);
+  });
+
+  it("defers the recovery check when Heroic Recovery is available", () => {
+    const draft = hero([{ name: "Dying", value: 1 }], 0, 1);
+    const result = resolveStartOfTurn(draft, { rng: () => 0.99 });
+    expect(result.recovery).toBeNull();
+    expect(result.heroicRecoveryAvailable).toBe(true);
+    expect(result.changed).toBe(false);
+    expect(result.dyingBefore).toBe(1);
   });
 
   it("critically fails a recovery check and dies at the threshold", () => {
