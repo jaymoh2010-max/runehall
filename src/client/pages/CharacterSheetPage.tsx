@@ -15,6 +15,7 @@ import {
   Pencil,
   Plus,
   Printer,
+  RotateCcw,
   ScrollText,
   Shield,
   Shuffle,
@@ -83,10 +84,14 @@ import { xpProgress } from "../../shared/xp";
 import { spellTraditionLabel, stripHtml } from "../../shared/compendium";
 import {
   AFFLICTION_TYPES,
+  afflictionOnsetPassed,
   afflictionTypeLabel,
   applyAfflictionSave,
+  initialIntervalRemaining,
+  initialOnsetRemaining,
   newAfflictionId,
   normalizeAffliction,
+  resetAfflictionTimers,
 } from "../../shared/afflictions";
 import {
   PERSISTENT_DAMAGE_DC,
@@ -138,6 +143,8 @@ function emptyAfflictionForm(): CharacterAffliction {
     interval: "",
     duration: "",
     onset: "",
+    onsetRemaining: 0,
+    intervalRemaining: null,
     virulent: false,
     virulentSuccesses: 0,
     virulentCrit: "reduce",
@@ -1007,11 +1014,11 @@ export function CharacterSheetPage() {
     const formula = `1d20${signed(derived.saves[affliction.save])}`;
     roll(formula, `${affliction.name} stage save`, affliction.dc, (result) => {
       if (!result.degree) return;
-      const applied = applyAfflictionSave(affliction, result.degree);
+      const applied = applyAfflictionSave(afflictionOnsetPassed(affliction), result.degree);
       update((current) => {
         const active = current.play.afflictions.find((entry) => entry.id === affliction.id);
         if (!active) return current;
-        const next = applyAfflictionSave(active, result.degree!);
+        const next = applyAfflictionSave(afflictionOnsetPassed(active), result.degree!);
         return {
           ...current,
           play: {
@@ -2707,6 +2714,22 @@ export function CharacterSheetPage() {
                         {affliction.interval ? `every ${affliction.interval}` : "no interval save"}
                         {affliction.duration ? ` · max ${affliction.duration}` : ""}
                         {affliction.onset ? ` · onset ${affliction.onset}` : ""}
+                        {affliction.onsetRemaining !== null && affliction.onsetRemaining > 0
+                          ? ` · onset in ${affliction.onsetRemaining} round${
+                              affliction.onsetRemaining === 1 ? "" : "s"
+                            }`
+                          : affliction.onsetRemaining === null && affliction.onset
+                            ? " · onset manual"
+                            : ""}
+                        {affliction.intervalRemaining !== null && affliction.intervalRemaining > 0
+                          ? ` · next save in ${affliction.intervalRemaining} round${
+                              affliction.intervalRemaining === 1 ? "" : "s"
+                            }`
+                          : affliction.interval &&
+                              affliction.intervalRemaining === null &&
+                              affliction.onsetRemaining !== null
+                            ? " · interval manual"
+                            : ""}
                         {affliction.virulent
                           ? ` · ${affliction.virulentSuccesses} / 2 consecutive successes`
                           : ""}
@@ -2725,6 +2748,34 @@ export function CharacterSheetPage() {
                             onClick={() => rollAfflictionSave(affliction)}
                           >
                             Stage save
+                          </Button>
+                        ) : null}
+                        {affliction.onsetRemaining === null && affliction.onset.trim() ? (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            aria-label={`Mark onset passed for ${affliction.name}`}
+                            onClick={() =>
+                              updateAffliction(affliction.id, (current) =>
+                                afflictionOnsetPassed(current)
+                              )
+                            }
+                          >
+                            Onset passed
+                          </Button>
+                        ) : null}
+                        {affliction.onset.trim() || affliction.interval.trim() ? (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            aria-label={`Reset timers for ${affliction.name}`}
+                            onClick={() =>
+                              updateAffliction(affliction.id, (current) =>
+                                resetAfflictionTimers(current)
+                              )
+                            }
+                          >
+                            <RotateCcw size={13} />
                           </Button>
                         ) : null}
                         <Button
@@ -3410,20 +3461,32 @@ export function CharacterSheetPage() {
           <div className="row" style={{ gap: 10, flexWrap: "wrap" }}>
             <Field label="Onset">
               <Input
+                aria-label="Affliction onset"
                 value={afflictionForm.onset}
-                onChange={(event) =>
-                  setAfflictionForm((current) => ({ ...current, onset: event.target.value }))
-                }
+                onChange={(event) => {
+                  const onset = event.target.value;
+                  setAfflictionForm((current) => ({
+                    ...current,
+                    onset,
+                    onsetRemaining: initialOnsetRemaining(onset),
+                  }));
+                }}
                 placeholder="e.g. 1 round or 1 hour"
                 maxLength={40}
               />
             </Field>
             <Field label="Stage interval">
               <Input
+                aria-label="Affliction stage interval"
                 value={afflictionForm.interval}
-                onChange={(event) =>
-                  setAfflictionForm((current) => ({ ...current, interval: event.target.value }))
-                }
+                onChange={(event) => {
+                  const interval = event.target.value;
+                  setAfflictionForm((current) => ({
+                    ...current,
+                    interval,
+                    intervalRemaining: initialIntervalRemaining(interval),
+                  }));
+                }}
                 placeholder="blank = no periodic save"
                 maxLength={40}
               />
@@ -3441,7 +3504,8 @@ export function CharacterSheetPage() {
           </div>
           <p className="tiny muted">
             One interval drives the Stage save button. Record per-stage interval differences and
-            effects in the notes.
+            effects in the notes. Use a round-based onset and interval (for example, 1 round) to
+            tick them automatically at the end of your turn; other units stay manual.
           </p>
           <Checkbox
             label="Virulent (two consecutive successes per stage)"

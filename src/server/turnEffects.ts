@@ -4,7 +4,7 @@ import { contextForDraft } from "./compendium";
 import { db, type CharacterRow, type TokenRow } from "./db";
 import { serializeMessage, serializeToken, touchCampaign } from "./serialize";
 import { tokenBroadcaster } from "./tokenEvents";
-import { characterSummary, normalizeCharacterDraft } from "../shared/rules";
+import { characterSummary, computeCharacter, normalizeCharacterDraft } from "../shared/rules";
 import { conditionsFromSheet, normalizeTokenConditions } from "../shared/tokens";
 import {
   resolveEndOfTurn,
@@ -13,6 +13,7 @@ import {
 } from "../shared/turnAutomation";
 import { normalizeTokenTurnEffects, tokenTurnHealing } from "../shared/tokenTurnEffects";
 import { characterTokenTurnEffects } from "../shared/characterTurnEffects";
+import { resolveAfflictionTurnEnd } from "../shared/afflictions";
 import type {
   CharacterDraft,
   InitiativeEntry,
@@ -286,7 +287,31 @@ export function runTurnEnd(
           );
         }
       }
-      if (result.changed) persistCharacterDraft(io, campaignId, character, result.draft);
+      let nextDraft = result.draft;
+      let changed = result.changed;
+      if (nextDraft.play.afflictions.length && !result.dead) {
+        const derived = computeCharacter(nextDraft, contextForDraft(nextDraft));
+        const afflictions = resolveAfflictionTurnEnd(nextDraft, derived.saves, {
+          labelPrefix: character.name,
+        });
+        for (const roll of afflictions.rolls) {
+          postAutomationRoll(
+            io,
+            campaignId,
+            { characterId: character.id },
+            roll,
+            Boolean(token.hidden)
+          );
+        }
+        if (afflictions.notes.length) {
+          postAutomationNote(io, campaignId, afflictions.notes.join(" "), Boolean(token.hidden));
+        }
+        if (afflictions.changed) {
+          nextDraft = afflictions.draft;
+          changed = true;
+        }
+      }
+      if (changed) persistCharacterDraft(io, campaignId, character, nextDraft);
     } catch (error) {
       // A malformed draft should not block the initiative advance.
       console.error("[turn-effects] end-of-turn failed", error);

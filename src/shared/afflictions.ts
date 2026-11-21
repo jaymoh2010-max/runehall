@@ -1,4 +1,12 @@
-import type { AfflictionType, CharacterAffliction, DegreeOfSuccess } from "./types";
+import { rollFormula } from "./dice";
+import type {
+  AfflictionType,
+  CharacterAffliction,
+  CharacterDraft,
+  DegreeOfSuccess,
+  RollResult,
+  SaveKey,
+} from "./types";
 
 export const AFFLICTION_TYPES: AfflictionType[] = ["poison", "disease", "curse"];
 
@@ -32,6 +40,33 @@ function normalizeSave(value: unknown): "fortitude" | "reflex" | "will" {
   return value === "reflex" || value === "will" ? value : "fortitude";
 }
 
+/** Parse a round-based onset or interval such as "2 rounds"; other units stay manual. */
+export function afflictionRounds(text: string): number | null {
+  const match = String(text ?? "")
+    .trim()
+    .match(/^(\d+)\s*rounds?$/i);
+  if (!match) return null;
+  return clampInt(match[1], 1, 1_000, 1);
+}
+
+export function initialOnsetRemaining(onset: string): number | null {
+  if (!onset.trim()) return 0;
+  return afflictionRounds(onset);
+}
+
+export function initialIntervalRemaining(interval: string): number | null {
+  if (!interval.trim()) return null;
+  return afflictionRounds(interval);
+}
+
+function timerValue(value: unknown, fallback: number | null): number | null {
+  if (value === null) return null;
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return Math.max(0, Math.min(1_000, Math.round(value)));
+  }
+  return fallback;
+}
+
 /** Clamp one affliction from an untrusted save or form value. */
 export function normalizeAffliction(input: unknown): CharacterAffliction | null {
   if (!input || typeof input !== "object") return null;
@@ -41,6 +76,8 @@ export function normalizeAffliction(input: unknown): CharacterAffliction | null 
   const stageMax = clampInt(raw.stageMax, 1, 10, 3);
   const stage = clampInt(raw.stage, 1, stageMax, 1);
   const virulent = Boolean(raw.virulent);
+  const interval = typeof raw.interval === "string" ? raw.interval.trim().slice(0, 40) : "";
+  const onset = typeof raw.onset === "string" ? raw.onset.trim().slice(0, 40) : "";
   return {
     id:
       typeof raw.id === "string" && raw.id.trim() ? raw.id.trim().slice(0, 80) : newAfflictionId(),
@@ -50,9 +87,11 @@ export function normalizeAffliction(input: unknown): CharacterAffliction | null 
     save: normalizeSave(raw.save),
     stage,
     stageMax,
-    interval: typeof raw.interval === "string" ? raw.interval.trim().slice(0, 40) : "",
+    interval,
     duration: typeof raw.duration === "string" ? raw.duration.trim().slice(0, 40) : "",
-    onset: typeof raw.onset === "string" ? raw.onset.trim().slice(0, 40) : "",
+    onset,
+    onsetRemaining: timerValue(raw.onsetRemaining, initialOnsetRemaining(onset)),
+    intervalRemaining: timerValue(raw.intervalRemaining, initialIntervalRemaining(interval)),
     virulent,
     virulentSuccesses: virulent ? clampInt(raw.virulentSuccesses, 0, 1, 0) : 0,
     virulentCrit: raw.virulentCrit === "streak" ? "streak" : "reduce",
@@ -146,4 +185,134 @@ export function applyAfflictionSave(
 
 export function afflictionTypeLabel(type: AfflictionType): string {
   return type === "poison" ? "Poison" : type === "disease" ? "Disease" : "Curse";
+}
+
+export function resetAfflictionTimers(affliction: CharacterAffliction): CharacterAffliction {
+  return {
+    ...affliction,
+    onsetRemaining: initialOnsetRemaining(affliction.onset),
+    intervalRemaining: initialIntervalRemaining(affliction.interval),
+  };
+}
+
+export function afflictionOnsetPassed(affliction: CharacterAffliction): CharacterAffliction {
+  return {
+    ...affliction,
+    onsetRemaining: 0,
+    intervalRemaining: initialIntervalRemaining(affliction.interval),
+  };
+}
+
+export function hasAfflictionRoundTimers(affliction: CharacterAffliction): boolean {
+  if (affliction.onsetRemaining === null) return false;
+  if (affliction.onsetRemaining > 0) return true;
+  return affliction.intervalRemaining !== null && affliction.intervalRemaining > 0;
+}
+
+export interface AfflictionTurnAutomationResult {
+  draft: CharacterDraft;
+  changed: boolean;
+  rolls: RollResult[];
+  notes: string[];
+}
+
+export interface AfflictionTurnOptions {
+  rng?: () => number;
+  labelPrefix?: string;
+}
+
+function signed(value: number): string {
+  return value >= 0 ? `+${value}` : String(value);
+}
+
+function isDead(draft: CharacterDraft): boolean {
+  return draft.play.conditions.some(
+    (condition) =>
+      String(condition.name ?? "")
+        .trim()
+        .toLowerCase()
+        .replace(/\s+\d+$/, "") === "dead"
+  );
+}
+
+/**
+ * Advance round-based affliction timers at the end of a character's turn.
+ * Onset must finish before interval saves begin; a stage save is rolled when
+ * the interval countdown reaches zero. Non-round onsets and intervals are left
+ * manual, as are afflictions without a round countdown.
+ */
+export function resolveAfflictionTurnEnd(
+  draft: CharacterDraft,
+  saves: Record<SaveKey, number>,
+  options: AfflictionTurnOptions = {}
+): AfflictionTurnAutomationResult {
+  if (!draft.play.afflictions.length || isDead(draft)) {
+    return { draft, changed: false, rolls: [], notes: [] };
+  }
+
+  let changed = false;
+  const rolls: RollResult[] = [];
+  const notes: string[] = [];
+  const next: CharacterAffliction[] = [];
+
+  for (const affliction of draft.play.afflictions) {
+    let entry = affliction;
+    if (entry.onsetRemaining === null) {
+      next.push(entry);
+      continue;
+    }
+
+    if (entry.onsetRemaining > 0) {
+      entry = { ...entry, onsetRemaining: entry.onsetRemaining - 1 };
+      changed = true;
+      if (entry.onsetRemaining === 0) {
+        entry = {
+          ...entry,
+          intervalRemaining: initialIntervalRemaining(entry.interval),
+        };
+        notes.push(`${entry.name}: onset ends. Stage ${entry.stage} effects begin.`);
+      }
+      next.push(entry);
+      continue;
+    }
+
+    if (entry.intervalRemaining !== null && entry.intervalRemaining > 0) {
+      entry = { ...entry, intervalRemaining: entry.intervalRemaining - 1 };
+      changed = true;
+      if (entry.intervalRemaining === 0) {
+        const bonus = Math.round(Number(saves[entry.save]) || 0);
+        const roll = rollFormula(`1d20${signed(bonus)}`, {
+          dc: entry.dc,
+          label: options.labelPrefix
+            ? `${options.labelPrefix} · ${entry.name} stage save`
+            : `${entry.name} stage save`,
+          rng: options.rng,
+        });
+        rolls.push(roll);
+        const applied = applyAfflictionSave(entry, roll.degree ?? "failure");
+        notes.push(applied.message);
+        if (applied.affliction) {
+          entry = {
+            ...applied.affliction,
+            intervalRemaining: initialIntervalRemaining(applied.affliction.interval),
+          };
+          next.push(entry);
+        }
+        continue;
+      }
+    }
+
+    next.push(entry);
+  }
+
+  if (!changed) return { draft, changed: false, rolls: [], notes: [] };
+  return {
+    draft: {
+      ...draft,
+      play: { ...draft.play, afflictions: next },
+    },
+    changed: true,
+    rolls,
+    notes,
+  };
 }

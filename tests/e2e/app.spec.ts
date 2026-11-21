@@ -1600,8 +1600,8 @@ test("sheet tracks afflictions with stages and stage saves", async ({ page }) =>
   await addDialog.getByLabel("DC").fill("18");
   await addDialog.getByLabel("Current stage").fill("1");
   await addDialog.getByLabel("Maximum stage").fill("3");
-  await addDialog.getByLabel("Onset").fill("1 round");
-  await addDialog.getByLabel("Stage interval").fill("1 round");
+  await addDialog.getByLabel("Affliction onset").fill("1 round");
+  await addDialog.getByLabel("Affliction stage interval").fill("1 round");
   await addDialog
     .getByLabel("Stage effects / notes")
     .fill("Stage 1: clumsy 1. Stage 2: clumsy 2 and drained 1.");
@@ -1612,6 +1612,8 @@ test("sheet tracks afflictions with stages and stage saves", async ({ page }) =>
   await expect(row).toContainText("DC 18");
   await expect(row).toContainText("Fortitude");
   await expect(row).toContainText("onset 1 round");
+  await expect(row).toContainText("onset in 1 round");
+  await expect(row).toContainText("next save in 1 round");
 
   await row.getByRole("button", { name: "Increase stage of Giant Spider Venom" }).click();
   await expect(row).toContainText("Stage 2 / 3");
@@ -1625,6 +1627,11 @@ test("sheet tracks afflictions with stages and stage saves", async ({ page }) =>
   });
   await row.getByRole("button", { name: "Roll stage save for Giant Spider Venom" }).click();
   await expect(row).toContainText("Stage 2 / 3");
+  await expect(row).not.toContainText("onset in 1 round");
+  await expect(row).toContainText("next save in 1 round");
+
+  await row.getByRole("button", { name: "Reset timers for Giant Spider Venom" }).click();
+  await expect(row).toContainText("onset in 1 round");
 
   await row.getByRole("button", { name: "Edit Giant Spider Venom" }).click();
   const editDialog = page.getByRole("dialog", { name: "Edit affliction" });
