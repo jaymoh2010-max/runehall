@@ -691,6 +691,10 @@ export interface CharacterAffliction {
   duration: string;
   /** Onset text, e.g. "1 round" or "1 hour". */
   onset: string;
+  /** Rounds until onset ends; 0 = passed, null = manual/non-round onset. */
+  onsetRemaining: number | null;
+  /** Rounds until the next automatic stage save; 0 or null = no round timer. */
+  intervalRemaining: number | null;
   /** Virulent afflictions need two consecutive successes to reduce a stage. */
   virulent: boolean;
   /** Consecutive successful stage saves for a virulent affliction. */

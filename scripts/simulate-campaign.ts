@@ -1129,6 +1129,145 @@ async function runCampaignA(gm: Account, players: Account[]): Promise<void> {
 
   await check(
     campaignName,
+    "affliction onset and interval timers tick at the end of the turn",
+    async () => {
+      const hero = heroes[1];
+      const sheet = await api(`/api/characters/${hero.id}`, { cookie: players[1].cookie });
+      const draft = JSON.parse(JSON.stringify(sheet.payload.character.data)) as Json;
+      draft.play.hp = 20;
+      draft.play.tempHp = 0;
+      draft.play.conditions = [];
+      draft.play.persistentDamage = [];
+      draft.play.afflictions = [
+        {
+          id: "sim-affliction-venom",
+          name: "Sim Venom",
+          type: "poison",
+          dc: 1,
+          save: "fortitude",
+          stage: 5,
+          stageMax: 10,
+          interval: "1 round",
+          duration: "",
+          onset: "1 round",
+          onsetRemaining: 1,
+          intervalRemaining: null,
+          virulent: false,
+          virulentSuccesses: 0,
+          virulentCrit: "reduce",
+          savesCanEnd: true,
+          notes: "Stage 1: clumsy 1.",
+        },
+      ];
+      await api(`/api/characters/${hero.id}`, {
+        method: "PUT",
+        cookie: players[1].cookie,
+        body: { data: draft, force: true },
+      });
+
+      let table = await getTable(campaignId, gm.cookie);
+      let entries = table.initiative as Json[];
+      let heroIndex = entries.findIndex((entry) => entry.tokenId === tokens.get(hero.id)?.id);
+      assert(heroIndex >= 0, "Afflicted hero missing from initiative");
+      let otherIndex = (heroIndex + 1) % entries.length;
+      let round = Number(table.round) + 1;
+      await emitAndWait(
+        gmSocket,
+        "initiative:update",
+        { campaignId, entries, round, turnIndex: heroIndex },
+        "initiative:updated",
+        (payload) => payload.turnIndex === heroIndex
+      );
+
+      const onsetNote = waitForEvent<Json>(
+        gmSocket,
+        "chat:message",
+        (payload) => payload.type === "chat" && String(payload.content).includes("onset ends"),
+        5_000
+      );
+      const onsetUpdate = waitForEvent<Json>(
+        gmSocket,
+        "character:updated",
+        (payload) => payload.characterId === hero.id,
+        5_000
+      );
+      await emitAndWait(
+        gmSocket,
+        "initiative:update",
+        { campaignId, entries, round, turnIndex: otherIndex },
+        "initiative:updated",
+        (payload) => payload.turnIndex === otherIndex
+      );
+      await Promise.all([onsetNote, onsetUpdate]);
+      const afterOnset = await api(`/api/characters/${hero.id}`, {
+        cookie: players[1].cookie,
+      });
+      const onsetAffliction = afterOnset.payload.character.data.play.afflictions[0];
+      assertEqual(onsetAffliction?.onsetRemaining, 0, "Affliction onset countdown");
+      assertEqual(onsetAffliction?.intervalRemaining, 1, "Affliction interval start");
+      assertEqual(onsetAffliction?.stage, 5, "Affliction stage after onset");
+
+      table = await getTable(campaignId, gm.cookie);
+      entries = table.initiative as Json[];
+      heroIndex = entries.findIndex((entry) => entry.tokenId === tokens.get(hero.id)?.id);
+      otherIndex = (heroIndex + 1) % entries.length;
+      round = Number(table.round) + 1;
+      await emitAndWait(
+        gmSocket,
+        "initiative:update",
+        { campaignId, entries, round, turnIndex: heroIndex },
+        "initiative:updated",
+        (payload) => payload.turnIndex === heroIndex
+      );
+      const stageRoll = waitForEvent<Json>(
+        gmSocket,
+        "chat:message",
+        (payload) =>
+          payload.type === "roll" &&
+          String((payload.data as Json)?.label ?? "").includes("Sim Venom stage save"),
+        5_000
+      );
+      const stageUpdate = waitForEvent<Json>(
+        gmSocket,
+        "character:updated",
+        (payload) => payload.characterId === hero.id,
+        5_000
+      );
+      await emitAndWait(
+        gmSocket,
+        "initiative:update",
+        { campaignId, entries, round, turnIndex: otherIndex },
+        "initiative:updated",
+        (payload) => payload.turnIndex === otherIndex
+      );
+      await Promise.all([stageRoll, stageUpdate]);
+      const afterSave = await api(`/api/characters/${hero.id}`, {
+        cookie: players[1].cookie,
+      });
+      const savedAffliction = afterSave.payload.character.data.play.afflictions[0];
+      assert(savedAffliction, "Affliction ended after the interval save");
+      assert(
+        savedAffliction.stage !== 5 && savedAffliction.stage >= 3 && savedAffliction.stage <= 7,
+        `Affliction stage after interval save was ${savedAffliction.stage}`
+      );
+      assertEqual(savedAffliction.intervalRemaining, 1, "Affliction interval reset");
+
+      const restore = JSON.parse(JSON.stringify(sheet.payload.character.data)) as Json;
+      restore.play.hp = null;
+      restore.play.tempHp = 0;
+      restore.play.conditions = [];
+      restore.play.persistentDamage = [];
+      restore.play.afflictions = [];
+      await api(`/api/characters/${hero.id}`, {
+        method: "PUT",
+        cookie: players[1].cookie,
+        body: { data: restore, force: true },
+      });
+    }
+  );
+
+  await check(
+    campaignName,
     "unlinked token turn effects heal, damage, and resolve once",
     async () => {
       const created = await emitAck<Json>(gmSocket, "token:create", {

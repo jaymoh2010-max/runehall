@@ -29,6 +29,8 @@ function hero(level = 5): CharacterDraft {
       interval: "1 day",
       duration: "",
       onset: "1 hour",
+      onsetRemaining: null,
+      intervalRemaining: null,
       virulent: false,
       virulentSuccesses: 0,
       virulentCrit: "reduce",

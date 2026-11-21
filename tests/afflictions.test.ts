@@ -1,10 +1,17 @@
 import { describe, expect, it } from "vitest";
 import {
+  afflictionOnsetPassed,
+  afflictionRounds,
   applyAfflictionSave,
+  initialIntervalRemaining,
+  initialOnsetRemaining,
   normalizeAffliction,
   normalizeAfflictions,
+  resetAfflictionTimers,
+  resolveAfflictionTurnEnd,
 } from "../src/shared/afflictions";
-import type { CharacterAffliction } from "../src/shared/types";
+import { emptyCharacterDraft } from "../src/shared/rules";
+import type { CharacterAffliction, CharacterDraft } from "../src/shared/types";
 
 function affliction(overrides: Partial<CharacterAffliction> = {}): CharacterAffliction {
   return {
@@ -18,6 +25,8 @@ function affliction(overrides: Partial<CharacterAffliction> = {}): CharacterAffl
     interval: "1 round",
     duration: "1 minute",
     onset: "1 round",
+    onsetRemaining: 1,
+    intervalRemaining: 1,
     virulent: false,
     virulentSuccesses: 0,
     virulentCrit: "reduce",
@@ -25,6 +34,12 @@ function affliction(overrides: Partial<CharacterAffliction> = {}): CharacterAffl
     notes: "",
     ...overrides,
   };
+}
+
+function withAffliction(overrides: Partial<CharacterAffliction> = {}): CharacterDraft {
+  const draft = emptyCharacterDraft("Affliction Hero");
+  draft.play.afflictions = [affliction(overrides)];
+  return draft;
 }
 
 describe("afflictions", () => {
@@ -61,6 +76,119 @@ describe("afflictions", () => {
     expect(normalized!.notes).toHaveLength(1_000);
     expect(normalizeAffliction({ type: "poison" })).toBeNull();
     expect(normalizeAffliction({ name: "X", type: "unknown" })?.type).toBe("poison");
+  });
+
+  it("parses only round-based onset and interval timers", () => {
+    expect(afflictionRounds("1 round")).toBe(1);
+    expect(afflictionRounds(" 2 Rounds ")).toBe(2);
+    expect(afflictionRounds("1 minute")).toBeNull();
+    expect(afflictionRounds("")).toBeNull();
+    expect(initialOnsetRemaining("")).toBe(0);
+    expect(initialOnsetRemaining("1 round")).toBe(1);
+    expect(initialOnsetRemaining("1 hour")).toBeNull();
+    expect(initialIntervalRemaining("")).toBeNull();
+    expect(initialIntervalRemaining("3 rounds")).toBe(3);
+    expect(initialIntervalRemaining("1 day")).toBeNull();
+  });
+
+  it("derives timers for legacy afflictions and preserves explicit values", () => {
+    const derived = normalizeAffliction({
+      name: "Giant Spider Venom",
+      onset: "2 rounds",
+      interval: "3 rounds",
+    });
+    expect(derived?.onsetRemaining).toBe(2);
+    expect(derived?.intervalRemaining).toBe(3);
+
+    const explicit = normalizeAffliction({
+      name: "Grave Curse",
+      onset: "1 hour",
+      interval: "1 day",
+      onsetRemaining: null,
+      intervalRemaining: 0,
+    });
+    expect(explicit?.onsetRemaining).toBeNull();
+    expect(explicit?.intervalRemaining).toBe(0);
+  });
+
+  it("advances onset before rolling an interval save", () => {
+    const draft = withAffliction({
+      onset: "1 round",
+      onsetRemaining: 1,
+      interval: "1 round",
+      intervalRemaining: null,
+      stage: 2,
+    });
+    const saves = { fortitude: 10, reflex: 0, will: 0 };
+
+    const onset = resolveAfflictionTurnEnd(draft, saves, { rng: () => 0.5 });
+    expect(onset.changed).toBe(true);
+    expect(onset.rolls).toHaveLength(0);
+    expect(onset.notes.join(" ")).toContain("onset ends");
+    expect(onset.draft.play.afflictions[0].onsetRemaining).toBe(0);
+    expect(onset.draft.play.afflictions[0].intervalRemaining).toBe(1);
+
+    const saved = resolveAfflictionTurnEnd(onset.draft, saves, {
+      rng: () => 0.5,
+      labelPrefix: "Affliction Hero",
+    });
+    expect(saved.rolls).toHaveLength(1);
+    expect(saved.rolls[0].label).toBe("Affliction Hero · Giant Spider Venom stage save");
+    expect(saved.rolls[0].degree).toBe("success");
+    expect(saved.draft.play.afflictions[0].stage).toBe(1);
+    expect(saved.draft.play.afflictions[0].intervalRemaining).toBe(1);
+    expect(saved.notes.join(" ")).toContain("stage 2 → 1");
+  });
+
+  it("leaves non-round and manual-onset afflictions alone", () => {
+    const manualOnset = withAffliction({
+      onset: "1 hour",
+      onsetRemaining: null,
+      interval: "1 round",
+      intervalRemaining: 1,
+    });
+    const first = resolveAfflictionTurnEnd(
+      manualOnset,
+      { fortitude: 10, reflex: 0, will: 0 },
+      { rng: () => 0.5 }
+    );
+    expect(first.changed).toBe(false);
+    expect(first.rolls).toHaveLength(0);
+
+    const manualInterval = withAffliction({
+      onset: "",
+      onsetRemaining: 0,
+      interval: "1 day",
+      intervalRemaining: null,
+    });
+    const second = resolveAfflictionTurnEnd(
+      manualInterval,
+      { fortitude: 10, reflex: 0, will: 0 },
+      { rng: () => 0.5 }
+    );
+    expect(second.changed).toBe(false);
+    expect(second.rolls).toHaveLength(0);
+  });
+
+  it("does not tick afflictions for a dead character", () => {
+    const draft = withAffliction({ onsetRemaining: 1 });
+    draft.play.conditions = [{ name: "Dead", value: null, duration: null }];
+    const result = resolveAfflictionTurnEnd(
+      draft,
+      { fortitude: 10, reflex: 0, will: 0 },
+      { rng: () => 0.5 }
+    );
+    expect(result.changed).toBe(false);
+    expect(result.draft).toBe(draft);
+  });
+
+  it("resets and fast-forwards timers from their text", () => {
+    const base = affliction({ onset: "2 rounds", interval: "3 rounds" });
+    expect(resetAfflictionTimers(base).onsetRemaining).toBe(2);
+    expect(resetAfflictionTimers(base).intervalRemaining).toBe(3);
+    const passed = afflictionOnsetPassed(base);
+    expect(passed.onsetRemaining).toBe(0);
+    expect(passed.intervalRemaining).toBe(3);
   });
 
   it("drops duplicate ids and caps the list", () => {
