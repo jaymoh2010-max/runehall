@@ -2051,7 +2051,7 @@ export function CharacterSheetPage() {
                     ) : null}
                     <p className="tiny muted">
                       Recovery check DC {10 + derived.conditionEffects.dying} at the start of each
-                      turn.
+                      turn. In encounter mode, the GM's initiative advance rolls it automatically.
                     </p>
                   </div>
                   <Button
@@ -2341,6 +2341,10 @@ export function CharacterSheetPage() {
                   ) : null}
                 </div>
               </div>
+              <p className="tiny muted">
+                During combat, the GM's initiative advance applies the damage and flat checks at the
+                end of your turn.
+              </p>
               <div className="persistent-damage-list">
                 {draft.play.persistentDamage.map((instance) => (
                   <div className="persistent-damage-row" key={instance.id}>

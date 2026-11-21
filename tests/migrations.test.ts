@@ -128,6 +128,7 @@ describe("migrations", () => {
         "campaign_join_requests",
         "audio_library_tracks",
         "xp_awards",
+        "campaign_turn_marks",
       ])
     );
 

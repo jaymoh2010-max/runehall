@@ -617,4 +617,16 @@ export const migrations: Migration[] = [
       ALTER TABLE campaigns ADD COLUMN settlement_level INTEGER NOT NULL DEFAULT 1;
     `,
   },
+  {
+    version: 34,
+    name: "campaign_turn_marks",
+    sql: `
+      CREATE TABLE IF NOT EXISTS campaign_turn_marks (
+        campaign_id TEXT NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+        mark TEXT NOT NULL,
+        created_at INTEGER NOT NULL,
+        PRIMARY KEY (campaign_id, mark)
+      );
+    `,
+  },
 ];

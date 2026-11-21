@@ -44,6 +44,7 @@ Runehall is built for a private group of roughly 4–10 players and a GM. It run
 - The open character sheet and party cards receive live `character:updated` events, so token damage, GM rests, loot, conditions, and level-ups do not require a reload.
 - One-click **Long rest**: heals CON modifier (minimum 1) × level, clears temporary HP, resets spell slots, divine font, focus points, and shield, removes fatigued and recovering dying/unconscious, and reduces doomed/drained by 1.
 - **Damage and healing use PF2e life state.** Temporary HP absorbs damage first; reaching 0 HP applies dying and unconscious; healing above 0 clears them and adds or raises wounded; doomed lowers the death threshold. Direct HP corrections apply the same dying/unconscious state without silently consuming temporary HP. Sheet HP, token editor HP, token panel edits, group damage/healing, and unlinked-monster damage all use the same helper.
+- **Turn effects run from initiative.** Advancing the active turn automatically rolls linked characters' start-of-turn dying recovery and resolves end-of-turn persistent damage (damage once, then one DC 15 flat check per type). Every roll appears in chat as “Turn automation”; hidden tokens keep their rolls GM-only. The sheet buttons remain as fallbacks outside an encounter. Heroic Recovery is not prompted: a player who wants to spend Hero Points must say so before the GM advances past their turn.
 
 ### Shared table
 - Scene maps with automatic dimensions, interactive grid calibration, and map scaling.

@@ -43,6 +43,7 @@ import {
   touchCampaign,
 } from "./serialize";
 import { tokenBroadcaster } from "./tokenEvents";
+import { runTurnEnd, runTurnStart } from "./turnEffects";
 
 interface SocketData {
   user: PublicUser;
@@ -1384,6 +1385,9 @@ export function registerSocketServer(io: TypedServer): void {
       if (!requireGm(socket, campaignId)) return;
       if (!sceneBelongs(sceneId, campaignId)) return;
       rollInitiative(io, campaignId, sceneId, tokenIds);
+      const state = ensureState(campaignId);
+      const entries = serializeInitiative(JSON.parse(state.initiative || "[]"));
+      runTurnStart(io, campaignId, entries[state.turn_index], state.round);
       touchCampaign(campaignId);
     });
 
@@ -1419,24 +1423,24 @@ export function registerSocketServer(io: TypedServer): void {
         : [];
       const current = ensureState(campaignId);
       const nextTurn = safeInt(turnIndex, 0, 0, Math.max(0, clean.length - 1));
+      const nextRound = safeInt(round, current.round, 1, 999);
       const previousEntries = serializeInitiative(JSON.parse(current.initiative || "[]"));
       const previousActiveId = previousEntries[current.turn_index]?.id ?? null;
       const nextActiveId = clean[nextTurn]?.id ?? null;
+      const activeChanged = previousActiveId !== nextActiveId;
+      if (activeChanged) {
+        runTurnEnd(io, campaignId, previousEntries[current.turn_index], current.round);
+        tickConditionsForEntry(io, campaignId, previousEntries[current.turn_index]);
+      }
       // A new combatant's turn starts with a fresh movement count. Tie-order
       // changes keep the same active id and preserve the current total.
-      const normalized =
-        previousActiveId === nextActiveId
-          ? clean
-          : clean.map((entry) => ({ ...entry, movementUsed: 0, diagonalSteps: 0 }));
+      const normalized = activeChanged
+        ? clean.map((entry) => ({ ...entry, movementUsed: 0, diagonalSteps: 0 }))
+        : clean;
       db.prepare(
         "UPDATE campaign_state SET initiative = ?, round = ?, turn_index = ?, updated_at = ? WHERE campaign_id = ?"
-      ).run(
-        JSON.stringify(normalized),
-        safeInt(round, current.round, 1, 999),
-        nextTurn,
-        now(),
-        campaignId
-      );
+      ).run(JSON.stringify(normalized), nextRound, nextTurn, now(), campaignId);
+      if (activeChanged) runTurnStart(io, campaignId, clean[nextTurn], nextRound);
       broadcastInitiative(io, campaignId, ensureState(campaignId));
       touchCampaign(campaignId);
     });
@@ -1447,8 +1451,12 @@ export function registerSocketServer(io: TypedServer): void {
       const entries = serializeInitiative(JSON.parse(state.initiative || "[]"));
       if (!entries.length) return;
       const dir = direction === -1 ? -1 : 1;
-      // Conditions tick at the end of a combatant's turn, not when stepping back.
-      if (dir === 1) tickConditionsForEntry(io, campaignId, entries[state.turn_index]);
+      // Persistent damage and conditions resolve at the end of a combatant's
+      // turn, not when stepping back.
+      if (dir === 1) {
+        runTurnEnd(io, campaignId, entries[state.turn_index], state.round);
+        tickConditionsForEntry(io, campaignId, entries[state.turn_index]);
+      }
       let turn = state.turn_index + dir;
       let round = state.round;
       if (turn >= entries.length) {
@@ -1476,6 +1484,7 @@ export function registerSocketServer(io: TypedServer): void {
       db.prepare(
         "UPDATE campaign_state SET initiative = ?, turn_index = ?, round = ?, updated_at = ? WHERE campaign_id = ?"
       ).run(JSON.stringify(entries), turn, round, now(), campaignId);
+      if (dir === 1) runTurnStart(io, campaignId, entries[turn], round);
       broadcastInitiative(io, campaignId, ensureState(campaignId));
       touchCampaign(campaignId);
     });

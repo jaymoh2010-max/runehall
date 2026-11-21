@@ -749,6 +749,158 @@ async function runCampaignA(gm: Account, players: Account[]): Promise<void> {
 
   await check(
     campaignName,
+    "initiative advance resolves persistent damage once and posts a roll",
+    async () => {
+      const hero = heroes[1];
+      const sheet = await api(`/api/characters/${hero.id}`, { cookie: players[1].cookie });
+      const draft = JSON.parse(JSON.stringify(sheet.payload.character.data)) as Json;
+      draft.play.hp = 10;
+      draft.play.tempHp = 0;
+      draft.play.conditions = [];
+      draft.play.persistentDamage = [
+        { id: "sim-persistent-fire", formula: "1d2", type: "fire", dc: 15, notes: "" },
+      ];
+      await api(`/api/characters/${hero.id}`, {
+        method: "PUT",
+        cookie: players[1].cookie,
+        body: { data: draft, force: true },
+      });
+      await emitAndWait(
+        gmSocket,
+        "initiative:roll",
+        {
+          campaignId,
+          sceneId,
+          tokenIds: [...tokens.values()].map((token) => token.id),
+        },
+        "initiative:updated"
+      );
+      const rolled = await getTable(campaignId, gm.cookie);
+      const entries = rolled.initiative as Json[];
+      const heroIndex = entries.findIndex((entry) => entry.tokenId === tokens.get(hero.id)?.id);
+      assert(heroIndex >= 0, "Persistent damage hero missing from initiative");
+      await emitAndWait(
+        gmSocket,
+        "initiative:update",
+        { campaignId, entries, round: rolled.round, turnIndex: heroIndex },
+        "initiative:updated",
+        (payload) => payload.turnIndex === heroIndex
+      );
+      const damageRoll = waitForEvent<Json>(
+        gmSocket,
+        "chat:message",
+        (payload) =>
+          payload.type === "roll" &&
+          String((payload.data as Json)?.label ?? "").includes("Persistent fire damage"),
+        5_000
+      );
+      const characterUpdate = waitForEvent<Json>(
+        gmSocket,
+        "character:updated",
+        (payload) => payload.characterId === hero.id,
+        5_000
+      );
+      const nextTurn = waitForEvent<Json>(gmSocket, "initiative:updated", () => true, 5_000);
+      gmSocket.emit("initiative:next", { campaignId, direction: 1 });
+      await Promise.all([damageRoll, characterUpdate, nextTurn]);
+      const after = await api(`/api/characters/${hero.id}`, { cookie: players[1].cookie });
+      const afterHp = after.payload.character.data.play.hp as number;
+      assert(afterHp < 10 && afterHp >= 8, `Automated persistent damage produced HP ${afterHp}`);
+      assert(
+        [0, 1].includes(after.payload.character.data.play.persistentDamage.length),
+        "Persistent damage state was neither kept nor cleared"
+      );
+
+      await emitAndWait(
+        gmSocket,
+        "initiative:next",
+        { campaignId, direction: -1 },
+        "initiative:updated",
+        (payload) => payload.turnIndex === heroIndex
+      );
+      await emitAndWait(
+        gmSocket,
+        "initiative:next",
+        { campaignId, direction: 1 },
+        "initiative:updated"
+      );
+      const repeated = await api(`/api/characters/${hero.id}`, { cookie: players[1].cookie });
+      assertEqual(
+        repeated.payload.character.data.play.hp,
+        afterHp,
+        "Persistent damage repeated after stepping back"
+      );
+      const restore = JSON.parse(JSON.stringify(repeated.payload.character.data)) as Json;
+      restore.play.hp = null;
+      restore.play.tempHp = 0;
+      restore.play.conditions = [];
+      restore.play.persistentDamage = [];
+      await api(`/api/characters/${hero.id}`, {
+        method: "PUT",
+        cookie: players[1].cookie,
+        body: { data: restore, force: true },
+      });
+    }
+  );
+
+  await check(campaignName, "initiative start resolves a dying recovery check", async () => {
+    const hero = heroes[2];
+    const sheet = await api(`/api/characters/${hero.id}`, { cookie: players[2].cookie });
+    const draft = JSON.parse(JSON.stringify(sheet.payload.character.data)) as Json;
+    draft.play.hp = 0;
+    draft.play.tempHp = 0;
+    draft.play.conditions = [{ name: "Dying", value: 1 }];
+    await api(`/api/characters/${hero.id}`, {
+      method: "PUT",
+      cookie: players[2].cookie,
+      body: { data: draft, force: true },
+    });
+    const table = await getTable(campaignId, gm.cookie);
+    const entries = table.initiative as Json[];
+    const heroIndex = entries.findIndex((entry) => entry.tokenId === tokens.get(hero.id)?.id);
+    assert(heroIndex >= 0, "Dying hero missing from initiative");
+    const otherIndex = (heroIndex + 1) % entries.length;
+    await emitAndWait(
+      gmSocket,
+      "initiative:update",
+      { campaignId, entries, round: table.round, turnIndex: otherIndex },
+      "initiative:updated",
+      (payload) => payload.turnIndex === otherIndex
+    );
+    const recoveryRoll = waitForEvent<Json>(
+      gmSocket,
+      "chat:message",
+      (payload) =>
+        payload.type === "roll" &&
+        String((payload.data as Json)?.label ?? "").includes("Dying recovery check"),
+      5_000
+    );
+    await emitAndWait(
+      gmSocket,
+      "initiative:update",
+      { campaignId, entries, round: table.round, turnIndex: heroIndex },
+      "initiative:updated",
+      (payload) => payload.turnIndex === heroIndex
+    );
+    await recoveryRoll;
+    const after = await api(`/api/characters/${hero.id}`, { cookie: players[2].cookie });
+    assert(
+      after.payload.character.revision > sheet.payload.character.revision,
+      "Dying recovery did not update the character"
+    );
+    const restore = JSON.parse(JSON.stringify(sheet.payload.character.data)) as Json;
+    restore.play.hp = null;
+    restore.play.tempHp = 0;
+    restore.play.conditions = [];
+    await api(`/api/characters/${hero.id}`, {
+      method: "PUT",
+      cookie: players[2].cookie,
+      body: { data: restore, force: true },
+    });
+  });
+
+  await check(
+    campaignName,
     "hidden scene props are filtered from the player table and live updates",
     async () => {
       const visible = {
