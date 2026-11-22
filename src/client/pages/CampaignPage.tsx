@@ -76,6 +76,7 @@ import { connectSocket, joinCampaign } from "../socket";
 import { TravelTab } from "../components/campaign/TravelTab";
 import { SessionZeroTab } from "../components/campaign/SessionZeroTab";
 import { PeopleTab } from "../components/campaign/PeopleTab";
+import { NotesTab } from "../components/campaign/NotesTab";
 import { errorMessage } from "../stores";
 import { useSession, useToasts } from "../stores";
 import {
@@ -136,6 +137,7 @@ type Tab =
   | "npcs"
   | "assets"
   | "journal"
+  | "notes"
   | "gm-screen"
   | "settings";
 
@@ -159,6 +161,7 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode; gmOnly?: boolean }[
   { id: "npcs", label: "NPCs", icon: <UserRound size={15} />, gmOnly: true },
   { id: "assets", label: "Assets", icon: <Images size={15} />, gmOnly: true },
   { id: "journal", label: "Journal", icon: <ScrollText size={15} /> },
+  { id: "notes", label: "Notes", icon: <BookOpen size={15} /> },
   { id: "gm-screen", label: "GM Screen", icon: <Shield size={15} />, gmOnly: true },
   { id: "settings", label: "Settings", icon: <Settings size={15} /> },
 ];
@@ -183,6 +186,7 @@ export function CampaignPage() {
     rawTab === "npcs" ||
     rawTab === "assets" ||
     rawTab === "journal" ||
+    rawTab === "notes" ||
     rawTab === "gm-screen" ||
     rawTab === "settings"
       ? rawTab
@@ -1663,6 +1667,15 @@ export function CampaignPage() {
         ) : null}
 
         {tab === "assets" ? <AssetLibrary campaignId={campaign.id} toast={toast} /> : null}
+
+        {tab === "notes" ? (
+          <NotesTab
+            campaignId={campaign.id}
+            isGm={Boolean(isGm)}
+            refreshKey={campaign.updatedAt}
+            toast={toast}
+          />
+        ) : null}
 
         {tab === "journal" ? (
           <div className="page-inner journal-layout">

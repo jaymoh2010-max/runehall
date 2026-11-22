@@ -7,6 +7,8 @@ import type {
   CampaignMember,
   CampaignNpc,
   CampaignFaction,
+  CampaignKnowledgeEntry,
+  CampaignPlayerNote,
   CampaignSession,
   CampaignSummary,
   CampaignTravel,
@@ -62,6 +64,8 @@ import {
   type AudioTrackRow,
   type CampaignNpcRow,
   type CampaignFactionRow,
+  type CampaignKnowledgeRow,
+  type CampaignPlayerNoteRow,
   type CampaignRow,
   type CampaignSessionRow,
   type CampaignSessionZeroRow,
@@ -565,6 +569,30 @@ export function serializeCampaignFaction(
   };
   if (privateView) faction.gmNotes = row.gm_notes;
   return faction;
+}
+
+export function serializeCampaignPlayerNote(row: CampaignPlayerNoteRow): CampaignPlayerNote {
+  return {
+    id: row.id,
+    campaignId: row.campaign_id,
+    title: row.title,
+    content: row.content,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+export function serializeCampaignKnowledge(row: CampaignKnowledgeRow): CampaignKnowledgeEntry {
+  return {
+    id: row.id,
+    campaignId: row.campaign_id,
+    title: row.title,
+    content: row.content,
+    visible: Boolean(row.visible),
+    sortOrder: row.sort_order,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
 }
 
 export function serializeCampaignDashboard(

@@ -737,4 +737,33 @@ export const migrations: Migration[] = [
       ALTER TABLE campaign_npcs ADD COLUMN visible INTEGER NOT NULL DEFAULT 0;
     `,
   },
+  {
+    version: 40,
+    name: "campaign_player_notes_and_knowledge",
+    sql: `
+      CREATE TABLE IF NOT EXISTS campaign_player_notes (
+        id TEXT PRIMARY KEY,
+        campaign_id TEXT NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        title TEXT NOT NULL DEFAULT '',
+        content TEXT NOT NULL DEFAULT '',
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_campaign_player_notes_owner
+        ON campaign_player_notes(campaign_id, user_id, updated_at);
+      CREATE TABLE IF NOT EXISTS campaign_knowledge (
+        id TEXT PRIMARY KEY,
+        campaign_id TEXT NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+        title TEXT NOT NULL,
+        content TEXT NOT NULL DEFAULT '',
+        visible INTEGER NOT NULL DEFAULT 0,
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_campaign_knowledge_campaign
+        ON campaign_knowledge(campaign_id, sort_order);
+    `,
+  },
 ];
