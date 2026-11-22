@@ -710,6 +710,25 @@ export function VttTable({ initial, campaignId, user, isGm, active }: VttTablePr
     );
   };
 
+  const setInitiativeActions = (entryId: string, actions: number) => {
+    getSocket().emit("initiative:action", { campaignId, entryId, actions });
+  };
+
+  const setInitiativeReaction = (entryId: string, reactions: number) => {
+    getSocket().emit("initiative:action", { campaignId, entryId, reactions });
+  };
+
+  const resetTurnActions = () => {
+    const entry = initiative[turnIndex];
+    if (!entry) return;
+    getSocket().emit("initiative:action", {
+      campaignId,
+      entryId: entry.id,
+      actions: 0,
+      reactions: 0,
+    });
+  };
+
   const moveInitiativeEntry = (entryId: string, direction: -1 | 1) => {
     const index = initiative.findIndex((entry) => entry.id === entryId);
     const target = index + direction;
@@ -1125,6 +1144,7 @@ export function VttTable({ initial, campaignId, user, isGm, active }: VttTablePr
             round={round}
             turnIndex={turnIndex}
             isGm={isGm}
+            userId={user.id}
             selectedTokenId={selectedTokenId}
             onRoll={rollInitiative}
             onNext={() => getSocket().emit("initiative:next", { campaignId, direction: 1 })}
@@ -1138,6 +1158,9 @@ export function VttTable({ initial, campaignId, user, isGm, active }: VttTablePr
             onMove={moveInitiativeEntry}
             onTriggerReady={triggerReady}
             onResetMovement={resetMovement}
+            onResetTurnActions={resetTurnActions}
+            onSetActions={setInitiativeActions}
+            onSetReaction={setInitiativeReaction}
             onSelectToken={setSelectedTokenId}
           />
         </div>

@@ -36,9 +36,21 @@ import {
   removeItemQuantity,
   spendCurrency,
 } from "../../shared/inventory";
-import { conditionsFromSheet } from "../../shared/tokens";
+import { conditionNumericValue, conditionsFromSheet } from "../../shared/tokens";
 import { characterTokenTurnEffects } from "../../shared/characterTurnEffects";
 import { applyHeroicRecovery } from "../../shared/damage";
+import { rollFormula, signed } from "../../shared/dice";
+import {
+  RECOVERY_ACTIVITIES,
+  applyRecoveryToDraft,
+  clearRecoveryImmunities,
+  hasRecoveryFeat,
+  medicineRank,
+  recoveryActivityLabel,
+  recoveryDcsForRank,
+  recoveryHealingFormula,
+  type RecoveryActivity,
+} from "../../shared/recovery";
 import { lifestyleRate, upkeepCostCp } from "../../shared/upkeep";
 import { performDowntimeDay, type DowntimeActivityInput } from "../downtime";
 import { logAudit } from "../audit";
@@ -620,6 +632,202 @@ export async function registerCharacterRoutes(app: FastifyInstance): Promise<voi
       paidCp,
       lifestyle: rate.id,
       label: rate.label,
+    });
+  });
+
+  app.post("/api/characters/:id/recovery", async (request, reply) => {
+    if (!request.user) return reply.code(401).send({ error: "Sign in to continue." });
+    const { id } = request.params as { id: string };
+    const healer = getCharacter(id);
+    if (!healer) return reply.code(404).send({ error: "Character not found." });
+    if (!canEditCharacter(healer, request.user.id)) {
+      return reply.code(403).send({ error: "You can't use recovery for that character." });
+    }
+    let healerDraft: CharacterDraft;
+    try {
+      healerDraft = normalizeCharacterDraft(JSON.parse(healer.data), healer.name);
+    } catch {
+      return reply.code(400).send({ error: "That character's draft could not be read." });
+    }
+    const healerDerived = computeCharacter(healerDraft, contextForDraft(healerDraft));
+    const medicine = healerDerived.skills.find((skill) => skill.id === "medicine");
+    if (!medicine || medicine.rank < 1) {
+      return reply.code(400).send({
+        error: "Train Medicine before using Treat Wounds, Battle Medicine, or Stabilize.",
+      });
+    }
+
+    const body = (request.body ?? {}) as Record<string, unknown>;
+    const activity = safeString(body.activity, "treat-wounds", 40) as RecoveryActivity;
+    if (!RECOVERY_ACTIVITIES.includes(activity)) {
+      return reply.code(400).send({ error: "Choose a recovery activity." });
+    }
+    if (activity === "battle-medicine" && !hasRecoveryFeat(healerDerived, "Battle Medicine")) {
+      return reply.code(400).send({ error: "Battle Medicine requires the Battle Medicine feat." });
+    }
+    const targetId = safeString(body.targetId, healer.id, 120) || healer.id;
+    const target = targetId === healer.id ? healer : getCharacter(targetId);
+    if (!target) return reply.code(404).send({ error: "That recovery target was not found." });
+    if (target.id !== healer.id) {
+      if (!healer.campaign_id || target.campaign_id !== healer.campaign_id) {
+        return reply
+          .code(400)
+          .send({ error: "You can only treat another character in the same campaign." });
+      }
+      if (!getMembership(target.campaign_id, request.user.id)) {
+        return reply.code(403).send({ error: "You're not a member of that campaign." });
+      }
+    }
+    let targetDraft: CharacterDraft;
+    try {
+      targetDraft = normalizeCharacterDraft(JSON.parse(target.data), target.name);
+    } catch {
+      return reply.code(400).send({ error: "That recovery target's draft could not be read." });
+    }
+    if (targetDraft.play.conditions.some((entry) => entry.name.toLowerCase() === "dead")) {
+      return reply.code(400).send({ error: "That character is dead and cannot be treated." });
+    }
+
+    const allowedDcs = recoveryDcsForRank(medicine.rank, activity);
+    const requestedDc =
+      body.dc === undefined || body.dc === null
+        ? allowedDcs[0]
+        : safeInt(body.dc, allowedDcs[0], 1, 100);
+    if (!allowedDcs.includes(requestedDc)) {
+      return reply.code(400).send({
+        error: `${recoveryActivityLabel(activity)} at DC ${requestedDc} requires a higher Medicine rank. Choose ${allowedDcs.join(", ")}.`,
+      });
+    }
+    const dying = targetDraft.play.conditions.reduce((value, entry) => {
+      return entry.name.toLowerCase().replace(/\s+\d+$/, "") === "dying"
+        ? Math.max(value, conditionNumericValue(entry) ?? 0)
+        : value;
+    }, 0);
+    if (activity === "stabilize" && dying <= 0) {
+      return reply.code(400).send({ error: "Stabilize requires a dying creature." });
+    }
+    if (activity === "treat-wounds" && targetDraft.play.treatWoundsImmune) {
+      return reply.code(400).send({
+        error: `${target.name} is already immune to Treat Wounds. Wait an hour, take a long rest, or clear the immunity.`,
+      });
+    }
+    if (
+      activity === "battle-medicine" &&
+      targetDraft.play.battleMedicineImmuneBy.includes(healer.id)
+    ) {
+      return reply.code(400).send({
+        error: `${target.name} is already immune to ${healer.name}'s Battle Medicine.`,
+      });
+    }
+
+    const label = `${recoveryActivityLabel(activity)} on ${target.name}`;
+    const check = rollFormula(`1d20${signed(medicine.mod)}`, {
+      dc: requestedDc,
+      label: `${label} (Medicine)`,
+    });
+    const degree = check.degree ?? "failure";
+    const healingFormula =
+      activity === "stabilize" || degree === "failure" || degree === "critical-failure"
+        ? null
+        : recoveryHealingFormula(requestedDc);
+    const healingRoll = healingFormula
+      ? rollFormula(healingFormula, { label: `${label} healing` })
+      : null;
+    const damageRoll =
+      activity === "treat-wounds" && degree === "critical-failure"
+        ? rollFormula("1d8", { label: `${label} critical failure damage` })
+        : null;
+    const robustHealth = hasRecoveryFeat(healerDerived, "Robust Health");
+    const continualRecovery = hasRecoveryFeat(healerDerived, "Continual Recovery");
+    const targetDerived = computeCharacter(targetDraft, contextForDraft(targetDraft));
+    const applied = applyRecoveryToDraft({
+      draft: targetDraft,
+      maxHp: targetDerived.maxHp,
+      level: healerDraft.level,
+      activity,
+      degree,
+      healing: healingRoll?.total ?? 0,
+      damage: damageRoll?.total ?? 0,
+      healerId: healer.id,
+      robustHealth,
+      continualRecovery,
+    });
+    targetDraft = applied.draft;
+    const summary = summarize(targetDraft);
+    db.prepare(
+      "UPDATE characters SET data = ?, summary = ?, updated_at = ?, revision = revision + 1 WHERE id = ?"
+    ).run(JSON.stringify(targetDraft), JSON.stringify(summary), now(), target.id);
+    syncCharacterDraft(app, target, targetDraft, summary);
+    if (target.campaign_id) {
+      touchCampaign(target.campaign_id);
+      const campaign = getCampaign(target.campaign_id);
+      if (campaign) broadcastCampaignSummary(app, campaign);
+    }
+    logAudit({
+      action: "character.recovery",
+      actor: request.user,
+      targetType: "character",
+      targetId: target.id,
+      detail: `${healer.name} used ${recoveryActivityLabel(activity)} on ${target.name}: ${degree}${applied.healed ? `, healed ${applied.healed} HP` : ""}${applied.damage ? `, dealt ${applied.damage} damage` : ""}`,
+      request,
+    });
+    const updated = getCharacter(target.id)!;
+    const owner = getUser(updated.user_id);
+    return reply.send({
+      character: serializeCharacter(updated, owner?.display_name ?? "", {
+        canEdit: canEditCharacter(updated, request.user.id),
+        canView: true,
+        canAdvance: canAdvanceCharacter(updated, request.user.id),
+      }),
+      targetId: target.id,
+      targetName: target.name,
+      activity,
+      dc: requestedDc,
+      degree,
+      roll: check,
+      healingRoll,
+      damageRoll,
+      healed: applied.healed,
+      damage: applied.damage,
+      notes: applied.notes,
+    });
+  });
+
+  app.post("/api/characters/:id/recovery/clear", async (request, reply) => {
+    if (!request.user) return reply.code(401).send({ error: "Sign in to continue." });
+    const { id } = request.params as { id: string };
+    const character = getCharacter(id);
+    if (!character) return reply.code(404).send({ error: "Character not found." });
+    if (!canEditCharacter(character, request.user.id)) {
+      return reply
+        .code(403)
+        .send({ error: "You can't clear recovery immunities for that character." });
+    }
+    let draft: CharacterDraft;
+    try {
+      draft = normalizeCharacterDraft(JSON.parse(character.data), character.name);
+    } catch {
+      return reply.code(400).send({ error: "That character's draft could not be read." });
+    }
+    const cleared = clearRecoveryImmunities(draft);
+    const summary = summarize(cleared);
+    db.prepare(
+      "UPDATE characters SET data = ?, summary = ?, updated_at = ?, revision = revision + 1 WHERE id = ?"
+    ).run(JSON.stringify(cleared), JSON.stringify(summary), now(), character.id);
+    syncCharacterDraft(app, character, cleared, summary);
+    if (character.campaign_id) {
+      touchCampaign(character.campaign_id);
+      const campaign = getCampaign(character.campaign_id);
+      if (campaign) broadcastCampaignSummary(app, campaign);
+    }
+    const updated = getCharacter(character.id)!;
+    const owner = getUser(updated.user_id);
+    return reply.send({
+      character: serializeCharacter(updated, owner?.display_name ?? "", {
+        canEdit: true,
+        canView: true,
+        canAdvance: canAdvanceCharacter(updated, request.user.id),
+      }),
     });
   });
 

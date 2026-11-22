@@ -2855,8 +2855,11 @@ async function main() {
   }
   const trainingDraft = JSON.parse(JSON.stringify(downtimeCharacter.payload.character.data));
   trainingDraft.skills.trained = [
-    ...new Set([...(trainingDraft.skills.trained ?? []), "crafting"]),
+    ...new Set([...(trainingDraft.skills.trained ?? []), "crafting", "medicine"]),
   ];
+  trainingDraft.play.hp = 10;
+  trainingDraft.play.treatWoundsImmune = false;
+  trainingDraft.play.battleMedicineImmuneBy = [];
   const trainedCharacter = await api(`/api/characters/${character.id}`, {
     method: "PUT",
     cookie: playerCookie,
@@ -2975,6 +2978,42 @@ async function main() {
   });
   if (playerDowntime.status !== 403) throw new Error("Player granted downtime");
   log("the GM grants downtime and the player spends it on the sheet");
+
+  const recovery = await api(`/api/characters/${character.id}/recovery`, {
+    method: "POST",
+    cookie: playerCookie,
+    body: { activity: "treat-wounds", targetId: character.id, dc: 15 },
+  });
+  if (
+    !["critical-success", "success", "failure", "critical-failure"].includes(
+      recovery.payload.degree
+    )
+  ) {
+    throw new Error("Treat Wounds did not return a degree of success");
+  }
+  if (recovery.payload.character.data.play.treatWoundsImmune !== true) {
+    throw new Error("Treat Wounds did not record the target's immunity");
+  }
+  const immuneRecovery = await fetch(`${base}/api/characters/${character.id}/recovery`, {
+    method: "POST",
+    headers: { cookie: playerCookie, "content-type": "application/json" },
+    body: JSON.stringify({ activity: "treat-wounds", targetId: character.id, dc: 15 }),
+  });
+  if (immuneRecovery.status !== 400) throw new Error("Treat Wounds ignored immunity");
+  const notDying = await fetch(`${base}/api/characters/${character.id}/recovery`, {
+    method: "POST",
+    headers: { cookie: playerCookie, "content-type": "application/json" },
+    body: JSON.stringify({ activity: "stabilize", targetId: character.id, dc: 15 }),
+  });
+  if (notDying.status !== 400) throw new Error("Stabilize accepted a target that was not dying");
+  const clearedRecovery = await api(`/api/characters/${character.id}/recovery/clear`, {
+    method: "POST",
+    cookie: playerCookie,
+  });
+  if (clearedRecovery.payload.character.data.play.treatWoundsImmune !== false) {
+    throw new Error("Clearing recovery immunity did not update the character");
+  }
+  log("Treat Wounds rolls on the server and tracks immunity");
 
   const libraryResponse = await fetch(`${base}/api/campaigns/${campaign.id}/audio/library`, {
     headers: { cookie: gmCookie },

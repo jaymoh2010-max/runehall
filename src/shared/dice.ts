@@ -217,6 +217,14 @@ export function getDegreeOfSuccess(total: number, dc: number, d20: number | null
         : "critical-failure";
 }
 
+/**
+ * Evasion, Juggernaut, and similar features turn a success into a critical
+ * success without changing the natural d20 result.
+ */
+export function upgradeDegreeOfSuccess(degree: DegreeOfSuccess | null): DegreeOfSuccess | null {
+  return degree === "success" ? "critical-success" : degree;
+}
+
 export const DEGREE_LABELS: Record<DegreeOfSuccess, string> = {
   "critical-success": "Critical Success",
   success: "Success",

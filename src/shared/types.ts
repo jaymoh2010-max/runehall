@@ -678,6 +678,10 @@ export interface CharacterPlay {
   regenerationNote: string;
   /** Damage types that deactivate regeneration until the end of the next turn. */
   regenerationDeactivatedBy: string[];
+  /** The target has received Treat Wounds since their last daily reset. */
+  treatWoundsImmune: boolean;
+  /** Character IDs of healers whose Battle Medicine this target is immune to. */
+  battleMedicineImmuneBy: string[];
   xp: number;
   shieldRaised: boolean;
 }
@@ -978,6 +982,8 @@ export interface DerivedCharacter {
   perception: number;
   initiative: number;
   saves: Record<SaveKey, number>;
+  /** Class features that turn a successful save into a critical success. */
+  saveUpgrades: Record<SaveKey, boolean>;
   skills: DerivedSkill[];
   lore: DerivedLore[];
   classDc: number;
@@ -1693,6 +1699,10 @@ export interface InitiativeEntry {
   movementUsed?: number;
   /** Diagonal steps taken during the current turn, for PF2e 5/10 diagonals. */
   diagonalSteps?: number;
+  /** Actions spent during the current turn, 0-3. */
+  actionsUsed?: number;
+  /** Reactions spent since the start of this combatant's most recent turn, 0-1. */
+  reactionsUsed?: number;
 }
 
 export type JournalKind = "note" | "handout";
@@ -1832,6 +1842,8 @@ export interface RollResult {
   dc: number | null;
   degree: DegreeOfSuccess | null;
   label: string;
+  /** A class feature such as Evasion improved a success to a critical success. */
+  degreeUpgraded?: boolean;
   /** Set when this roll answered a GM request. */
   requestId?: string | null;
 }
@@ -1932,6 +1944,8 @@ export interface ClientToServerEvents {
       visibility?: "all" | "gm";
       characterId?: string | null;
       requestId?: string | null;
+      /** Upgrade a success to a critical success (Evasion, Juggernaut). */
+      upgradeSuccess?: boolean;
     },
     ack?: (message: ChatMessage | null) => void
   ) => void;
@@ -1957,6 +1971,12 @@ export interface ClientToServerEvents {
     turnIndex?: number;
   }) => void;
   "initiative:next": (payload: { campaignId: string; direction?: 1 | -1 }) => void;
+  "initiative:action": (payload: {
+    campaignId: string;
+    entryId: string;
+    actions?: number;
+    reactions?: number;
+  }) => void;
   "initiative:add": (payload: { campaignId: string; tokenId: string; value?: number }) => void;
   "initiative:reroll": (payload: { campaignId: string; entryId: string }) => void;
   "initiative:remove": (payload: { campaignId: string; entryId: string }) => void;

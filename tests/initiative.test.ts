@@ -2,7 +2,11 @@ import { describe, expect, it } from "vitest";
 import type { InitiativeEntry } from "../src/shared/types";
 import {
   filterInitiativeForPlayers,
+  normalizeInitiativeResources,
+  refreshInitiativeTurn,
   renameInitiativeEntries,
+  setInitiativeActions,
+  setInitiativeReaction,
   sortInitiativeEntries,
 } from "../src/shared/initiative";
 
@@ -82,6 +86,38 @@ describe("initiative chip renames", () => {
       groupId: "grp_1",
     });
     expect(renamed[0]?.name).toBe("Guard ×3");
+  });
+});
+
+describe("action economy", () => {
+  it("clamps persisted actions and reactions to the PF2e limits", () => {
+    const normalized = normalizeInitiativeResources({
+      ...entry("Hero", 20),
+      actionsUsed: 99,
+      reactionsUsed: -4,
+    });
+    expect(normalized.actionsUsed).toBe(3);
+    expect(normalized.reactionsUsed).toBe(0);
+  });
+
+  it("sets one entry's actions without touching its neighbours", () => {
+    const hero = { ...entry("Hero", 20), actionsUsed: 0 };
+    const other = { ...entry("Other", 15), actionsUsed: 2 };
+    const next = setInitiativeActions([hero, other], hero.id, 2);
+    expect(next[0].actionsUsed).toBe(2);
+    expect(next[1].actionsUsed).toBe(2);
+  });
+
+  it("sets a reaction and refreshes both resources at turn start", () => {
+    const spent = setInitiativeReaction(
+      [{ ...entry("Hero", 20), actionsUsed: 2, reactionsUsed: 0 }],
+      "Hero",
+      1
+    )[0];
+    expect(spent.reactionsUsed).toBe(1);
+    const refreshed = refreshInitiativeTurn(spent);
+    expect(refreshed.actionsUsed).toBe(0);
+    expect(refreshed.reactionsUsed).toBe(0);
   });
 });
 

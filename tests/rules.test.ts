@@ -22,6 +22,7 @@ import {
   normalizeCharacterDraft,
   ordinarySpellSlotsFor,
   preparedSlotSplits,
+  saveUpgradesFrom,
   spellRepertoireLimits,
   spellSlotsFor,
 } from "../src/shared/rules";
@@ -212,6 +213,29 @@ describe("PF2e character rules", () => {
     expect(draft.grantChoices["grant:cleric-domain"]).toEqual([]);
   });
 
+  it("derives Evasion and Juggernaut save upgrades from feature names", () => {
+    expect(saveUpgradesFrom(["Evasion"])).toEqual({
+      fortitude: false,
+      reflex: true,
+      will: false,
+    });
+    expect(saveUpgradesFrom(["Juggernaut", "Toughness"])).toEqual({
+      fortitude: true,
+      reflex: false,
+      will: false,
+    });
+    expect(saveUpgradesFrom(["Improved Evasion", "Greater Juggernaut"])).toEqual({
+      fortitude: true,
+      reflex: true,
+      will: false,
+    });
+    expect(saveUpgradesFrom(["Shield Block"])).toEqual({
+      fortitude: false,
+      reflex: false,
+      will: false,
+    });
+  });
+
   it("normalizes character condition values and durations", () => {
     const draft = normalizeCharacterDraft(
       {
@@ -263,6 +287,22 @@ describe("PF2e character rules", () => {
     expect(draft.play.regeneration).toBe(1000);
     expect(draft.play.regenerationActive).toBe(true);
     expect(draft.play.regenerationDeactivatedBy).toEqual(["fire", "acid"]);
+  });
+
+  it("normalizes recovery immunity fields and keeps them out of unrelated drafts", () => {
+    const defaults = emptyCharacterDraft("Defaults");
+    expect(defaults.play.treatWoundsImmune).toBe(false);
+    expect(defaults.play.battleMedicineImmuneBy).toEqual([]);
+
+    const draft = normalizeCharacterDraft({
+      name: "Recovering",
+      play: {
+        treatWoundsImmune: true,
+        battleMedicineImmuneBy: ["char_a", "char_a", 7, "", "char_b"],
+      },
+    });
+    expect(draft.play.treatWoundsImmune).toBe(true);
+    expect(draft.play.battleMedicineImmuneBy).toEqual(["char_a", "char_b"]);
   });
 
   it("preserves companion bestiary links when normalizing", () => {

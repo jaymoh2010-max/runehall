@@ -27,6 +27,7 @@ export function InitiativeBar({
   round,
   turnIndex,
   isGm,
+  userId,
   selectedTokenId,
   onRoll,
   onNext,
@@ -40,6 +41,9 @@ export function InitiativeBar({
   onMove,
   onTriggerReady,
   onResetMovement,
+  onResetTurnActions,
+  onSetActions,
+  onSetReaction,
   onSelectToken,
 }: {
   entries: InitiativeEntry[];
@@ -48,6 +52,7 @@ export function InitiativeBar({
   round: number;
   turnIndex: number;
   isGm: boolean;
+  userId: string;
   selectedTokenId: string | null;
   onRoll: () => void;
   onNext: () => void;
@@ -61,6 +66,9 @@ export function InitiativeBar({
   onMove: (entryId: string, direction: -1 | 1) => void;
   onTriggerReady: (entryId: string) => void;
   onResetMovement: () => void;
+  onResetTurnActions: () => void;
+  onSetActions: (entryId: string, actionsUsed: number) => void;
+  onSetReaction: (entryId: string, reactionsUsed: number) => void;
   onSelectToken: (tokenId: string) => void;
 }) {
   const active = entries[turnIndex] ?? null;
@@ -112,6 +120,11 @@ export function InitiativeBar({
               movementUsed > 0 || (index === turnIndex && speed !== null)
                 ? `${movementUsed}${speed !== null ? ` / ${speed}` : ""} ft.`
                 : null;
+            const actionsUsed = Math.max(0, Math.min(3, Math.round(entry.actionsUsed ?? 0)));
+            const reactionUsed = Math.max(0, Math.min(1, Math.round(entry.reactionsUsed ?? 0)));
+            const canManage = isGm || entry.ownerId === userId;
+            const canSpendActions = canManage && (isGm || index === turnIndex);
+            const canSpendReaction = canManage;
             const detail = [
               entry.tokenId ? "Click to select token" : entry.name,
               group ? `${group.count} creatures` : null,
@@ -120,6 +133,8 @@ export function InitiativeBar({
               movementLabel
                 ? `Movement: ${movementUsed}${speed !== null ? ` / ${speed}` : ""} ft.${overSpeed ? " (over Speed)" : ""}`
                 : null,
+              `Actions: ${3 - actionsUsed} / 3 left`,
+              `Reaction: ${reactionUsed ? "used" : "available"}`,
               conditions.length ? `Conditions: ${conditions.join(", ")}` : null,
             ]
               .filter(Boolean)
@@ -140,6 +155,72 @@ export function InitiativeBar({
                 <span className="initiative-name">{entry.name}</span>
                 <strong>{signed(entry.initiative)}</strong>
                 {hpLabel ? <span className="initiative-hp">{hpLabel}</span> : null}
+                {canManage || actionsUsed > 0 ? (
+                  <span
+                    className="initiative-actions"
+                    title={`${3 - actionsUsed} of 3 actions left this turn`}
+                  >
+                    {[0, 1, 2].map((pip) => {
+                      const used = pip < actionsUsed;
+                      return (
+                        <span
+                          key={pip}
+                          className={`action-pip ${used ? "is-used" : ""} ${canSpendActions ? "is-clickable" : ""}`}
+                          role={canSpendActions ? "button" : undefined}
+                          tabIndex={canSpendActions ? 0 : undefined}
+                          aria-label={`${used ? "Restore" : "Spend"} action ${pip + 1} for ${entry.name}`}
+                          onClick={
+                            canSpendActions
+                              ? (event) => {
+                                  event.stopPropagation();
+                                  onSetActions(entry.id, used ? pip : pip + 1);
+                                }
+                              : undefined
+                          }
+                          onKeyDown={
+                            canSpendActions
+                              ? (event) => {
+                                  if (event.key !== "Enter" && event.key !== " ") return;
+                                  event.preventDefault();
+                                  event.stopPropagation();
+                                  onSetActions(entry.id, used ? pip : pip + 1);
+                                }
+                              : undefined
+                          }
+                        />
+                      );
+                    })}
+                  </span>
+                ) : null}
+                {canManage || reactionUsed > 0 ? (
+                  <span
+                    className={`initiative-reaction ${reactionUsed ? "is-used" : ""} ${canSpendReaction ? "is-clickable" : ""}`}
+                    role={canSpendReaction ? "button" : undefined}
+                    tabIndex={canSpendReaction ? 0 : undefined}
+                    aria-label={`${reactionUsed ? "Restore" : "Spend"} reaction for ${entry.name}`}
+                    title={reactionUsed ? "Reaction used" : "Reaction available"}
+                    onClick={
+                      canSpendReaction
+                        ? (event) => {
+                            event.stopPropagation();
+                            onSetReaction(entry.id, reactionUsed ? 0 : 1);
+                          }
+                        : undefined
+                    }
+                    onKeyDown={
+                      canSpendReaction
+                        ? (event) => {
+                            if (event.key !== "Enter" && event.key !== " ") return;
+                            event.preventDefault();
+                            event.stopPropagation();
+                            onSetReaction(entry.id, reactionUsed ? 0 : 1);
+                          }
+                        : undefined
+                    }
+                  >
+                    R
+                  </span>
+                ) : null}
                 {movementLabel ? (
                   <span
                     className={`initiative-movement ${overSpeed ? "is-over" : ""}`}
@@ -338,6 +419,13 @@ export function InitiativeBar({
             <>
               <IconButton label="Reset movement" onClick={onResetMovement} disabled={!active}>
                 <Footprints size={16} />
+              </IconButton>
+              <IconButton
+                label="Reset turn actions"
+                onClick={onResetTurnActions}
+                disabled={!active}
+              >
+                <Zap size={16} />
               </IconButton>
               <IconButton label="Previous turn" onClick={onPrevious}>
                 <ChevronLeft size={16} />

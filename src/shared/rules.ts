@@ -1007,6 +1007,8 @@ export function emptyCharacterDraft(name = "New Hero"): CharacterDraft {
       regenerationActive: true,
       regenerationNote: "",
       regenerationDeactivatedBy: [],
+      treatWoundsImmune: false,
+      battleMedicineImmuneBy: [],
       xp: 0,
       shieldRaised: false,
     },
@@ -1283,6 +1285,14 @@ export function normalizeCharacterDraft(input: unknown, fallbackName = "New Hero
       afflictions: normalizeAfflictions(play.afflictions),
       persistentDamage: normalizePersistentDamageList(play.persistentDamage),
       ...normalizeCharacterTurnEffects(play),
+      treatWoundsImmune: play.treatWoundsImmune === true,
+      battleMedicineImmuneBy: [
+        ...new Set(
+          arr<string>(play.battleMedicineImmuneBy).filter(
+            (value): value is string => typeof value === "string" && value.length > 0
+          )
+        ),
+      ].slice(0, 40),
       xp: Math.max(0, num(play.xp, 0)),
       shieldRaised: Boolean(play.shieldRaised),
     },
@@ -2349,6 +2359,19 @@ export function monkUnarmedDamage(level: number): string {
 // ---------------------------------------------------------------------------
 // Character computation
 // ---------------------------------------------------------------------------
+/**
+ * Class features and feats that improve a successful save. Evasion and
+ * Juggernaut apply to every save of their type, not only to one hazard.
+ */
+export function saveUpgradesFrom(names: string[]): Record<SaveKey, boolean> {
+  const normalized = names.map((name) => name.trim().toLowerCase());
+  return {
+    fortitude: normalized.some((name) => /juggernaut\b/.test(name)),
+    reflex: normalized.some((name) => /\bevasion\b/.test(name)),
+    will: false,
+  };
+}
+
 export function computeCharacter(
   draft: CharacterDraft,
   context: CharacterContext
@@ -3459,6 +3482,12 @@ export function computeCharacter(
     grantedFeats.push({ name: chosenHeritageFeat.name, id: chosenHeritageFeat.id });
   }
 
+  const saveUpgrades = saveUpgradesFrom([
+    ...features.map((feature) => feature.name),
+    ...selectedFeats.map((feat) => feat.name),
+    ...grantedFeats.map((feat) => feat.name),
+  ]);
+
   let focusPointsMax =
     features.some((feature) =>
       /focus|devotion spells|conflux spells|link spells|hexes|revelation spells|grave spells|composition spells|psi cantrips/i.test(
@@ -3555,6 +3584,7 @@ export function computeCharacter(
     perception,
     initiative,
     saves,
+    saveUpgrades,
     skills: derivedSkills,
     lore,
     classDc,
