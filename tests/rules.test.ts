@@ -127,6 +127,7 @@ describe("PF2e character rules", () => {
     const { draft, context } = buildCleric();
     const readySummary = characterSummary(draft, context);
     expect(readySummary.validationErrors).toBe(0);
+    expect(readySummary.initiative).toBe(computeCharacter(draft, context).initiative);
   });
 
   it("blocks class feats that belong to another class", () => {
@@ -503,8 +504,11 @@ describe("PF2e character rules", () => {
     expect(ordinarySpellSlotsFor(1, "full", "Cleric")).toEqual([2]);
     expect(ordinarySpellSlotsFor(5, "full", "Cleric")).toEqual([3, 3, 2]);
     expect(ordinarySpellSlotsFor(19, "full", "Cleric")).toEqual([3, 3, 3, 3, 3, 3, 3, 3, 3, 1]);
-    expect(cantripLimitFor(classes.find((entry) => entry.name === "Wizard"))).toBe(6);
+    expect(cantripLimitFor(classes.find((entry) => entry.name === "Wizard"))).toBe(10);
     expect(cantripLimitFor(classes.find((entry) => entry.name === "Cleric"))).toBe(5);
+    expect(cantripLimitFor(classes.find((entry) => entry.name === "Oracle"))).toBe(5);
+    expect(cantripLimitFor(classes.find((entry) => entry.name === "Psychic"))).toBe(3);
+    expect(cantripLimitFor(classes.find((entry) => entry.name === "Animist"))).toBe(4);
     const heal = spells.find((entry) => entry.name === "Heal")!;
     const fireball = spells.find((entry) => entry.name === "Fireball")!;
     const abadar = deities.find((entry) => entry.name === "Abadar")!;
@@ -741,9 +745,10 @@ describe("PF2e character rules", () => {
   it("enforces spontaneous spell repertoire limits", () => {
     const bard = classes.find((entry) => entry.name === "Bard")!;
     const summoner = classes.find((entry) => entry.name === "Summoner")!;
-    expect(spellRepertoireLimits(bard, 1)).toEqual({ cantrips: 5, ranks: [2] });
-    expect(spellRepertoireLimits(bard, 5)).toEqual({ cantrips: 5, ranks: [3, 3, 2] });
+    expect(spellRepertoireLimits(bard, 1)).toEqual({ cantrips: 5, ranks: [3] });
+    expect(spellRepertoireLimits(bard, 5)).toEqual({ cantrips: 5, ranks: [4, 4, 3] });
     expect(spellRepertoireLimits(summoner, 3)).toEqual({ cantrips: 5, ranks: [2, 1] });
+    expect(spellRepertoireLimits(bard, 20)?.ranks[9]).toBe(2);
     expect(
       spellRepertoireLimits(
         classes.find((entry) => entry.name === "Wizard")!,
@@ -751,7 +756,7 @@ describe("PF2e character rules", () => {
       )
     ).toBeNull();
 
-    const rankOne = spells.filter((spell) => spell.rank === 1).slice(0, 3);
+    const rankOne = spells.filter((spell) => spell.rank === 1).slice(0, 4);
     const draft = emptyCharacterDraft("Test Bard");
     draft.classId = bard.id;
     draft.spells.known = rankOne.map((spell) => spell.id);
@@ -764,11 +769,11 @@ describe("PF2e character rules", () => {
     const over = computeCharacter(draft, context);
     expect(
       over.validation.some((issue) =>
-        issue.message.includes("knows 3 rank 1 spells but the repertoire allows 2")
+        issue.message.includes("knows 4 rank 1 spells but the repertoire allows 3")
       )
     ).toBe(true);
 
-    draft.spells.known = rankOne.slice(0, 2).map((spell) => spell.id);
+    draft.spells.known = rankOne.slice(0, 3).map((spell) => spell.id);
     const legal = computeCharacter(draft, context);
     expect(
       legal.validation.some((issue) =>

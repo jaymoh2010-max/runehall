@@ -78,6 +78,16 @@ export const CLASS_GRANTS: Record<string, ClassGrant> = {
     spells: [focus("spell:zTN6zuruDUKOea6h", "Rising Surf")],
   },
 
+  // Bard composition spells: one focus spell and one extra composition
+  // cantrip that does not count against the bard's normal cantrip limit.
+  "cf:s0VbbQJNlSgPocui": {
+    focusPoints: 1,
+    spells: [
+      focus("spell:WILXkjU5Yq3yw10r", "Counter Performance"),
+      repertoire("spell:IAjvwqgiDr3qGYxY", "Courageous Anthem", 0),
+    ],
+  },
+
   // Bard muses (the muse spell is repertoire, not focus)
   "cf:4ripp6EfdVpS0d60": {
     feats: [feat("feat:uVXEZblPRuCyPRua", "Bardic Lore")],
@@ -532,6 +542,12 @@ export function selectedClassGrants(
       const option = group.options.find((entry) => entry.id === id);
       if (option && option.level <= draft.level) addGrant(CLASS_GRANTS[option.id]);
     }
+  }
+
+  // Fixed grants can also hang off a class feature that every member gets,
+  // such as a bard's composition spells or a witch's starting hex.
+  for (const feature of classData.features) {
+    if (feature.level <= draft.level) addGrant(CLASS_GRANTS[feature.id]);
   }
 
   for (const group of activeGrantChoiceGroups(

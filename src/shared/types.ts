@@ -815,6 +815,8 @@ export interface CharacterDraft {
     preparedUsed: Record<string, number>;
     /** Divine font copies spent today, keyed by spell id. */
     fontUsed: Record<string, number>;
+    /** Spontaneous caster signature spells, which may be heightened freely. */
+    signature: string[];
     /** True after a long rest until a prepared caster confirms today's spells. */
     preparationsPending: boolean;
   };
@@ -850,6 +852,8 @@ export interface CharacterSummary {
   ac: number;
   speed: number;
   perception: number;
+  /** Perception plus initiative bonuses, used by the table's initiative roll. */
+  initiative: number;
   fortitude: number;
   reflex: number;
   will: number;

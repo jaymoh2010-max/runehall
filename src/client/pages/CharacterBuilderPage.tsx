@@ -143,7 +143,11 @@ import {
   rulesetIncludesLegacy,
   rulesetLabel,
 } from "../../shared/content";
-import { buildLevelUpWizardSteps, type LevelUpChoice } from "../../shared/levelup";
+import {
+  buildLevelUpWizardSteps,
+  levelUpCurrentHp,
+  type LevelUpChoice,
+} from "../../shared/levelup";
 import { summarizeRunes } from "../../shared/runes";
 import { heritageFeatTraits } from "../../shared/heritage";
 
@@ -660,9 +664,24 @@ export function CharacterBuilderPage() {
     const next = STEPS[stepIndex + direction];
     if (next) setStep(next.id);
   };
+  const applyLevel = (level: number) => {
+    update((current) => {
+      const afterDraft = { ...current, level };
+      const before = computeCharacter(current, context).maxHp;
+      const after = computeCharacter(afterDraft, context).maxHp;
+      const hp =
+        level > current.level ? levelUpCurrentHp(current.play.hp, before, after) : current.play.hp;
+      const wealthBudgetCp = current.wealthBudgetCp === null ? null : startingWealthCp(level);
+      return {
+        ...afterDraft,
+        wealthBudgetCp,
+        play: { ...current.play, hp },
+      };
+    });
+  };
   const completeLevelUp = (targetStep?: StepId) => {
     if (nextLevel === draft.level) return;
-    update((current) => ({ ...current, level: nextLevel }));
+    applyLevel(nextLevel);
     setLevelUpOpen(false);
     setStep(targetStep ?? levelUpItems[0]?.step ?? "review");
     toast(`Level ${nextLevel} reached. Review the new choices.`, "success");
@@ -760,9 +779,7 @@ export function CharacterBuilderPage() {
           <Field label="Level">
             <Select
               value={draft.level}
-              onChange={(event) =>
-                update((current) => ({ ...current, level: Number(event.target.value) }))
-              }
+              onChange={(event) => applyLevel(Number(event.target.value))}
               className="level-select"
               disabled={!canAdvance}
             >
@@ -1053,13 +1070,21 @@ export function CharacterBuilderPage() {
             }));
             update((current) => ({
               ...current,
-              feats: {
-                ...current.feats,
-                [picker.category]: {
-                  ...current.feats[picker.category],
-                  [String(picker.level)]: feat.id,
-                },
-              },
+              feats:
+                picker.target === "extras"
+                  ? {
+                      ...current.feats,
+                      extras: current.feats.extras.length
+                        ? [feat.id]
+                        : [...current.feats.extras, feat.id],
+                    }
+                  : {
+                      ...current.feats,
+                      [picker.category]: {
+                        ...current.feats[picker.category],
+                        [String(picker.level)]: feat.id,
+                      },
+                    },
             }));
           }}
         />

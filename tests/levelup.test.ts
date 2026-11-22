@@ -31,6 +31,7 @@ describe("level-up wizard", () => {
     expect(levelUpCurrentHp(null, 20, 27)).toBeNull();
     expect(levelUpCurrentHp(20, 20, 27)).toBeNull();
     expect(levelUpCurrentHp(19, 20, 27)).toBe(26);
+    expect(levelUpCurrentHp(0, 20, 27)).toBe(0);
   });
 
   it("still confirms a level with no new choices", () => {

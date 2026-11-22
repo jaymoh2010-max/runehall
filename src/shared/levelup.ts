@@ -8,8 +8,11 @@ export function levelUpCurrentHp(
   maxHpAfter: number
 ): number | null {
   if (currentHp === null || currentHp >= maxHpBefore) return null;
+  // A dying character stays at 0 HP and keeps their dying state. Leveling up
+  // must not revive them.
+  if (currentHp <= 0) return Math.max(0, currentHp);
   const gained = Math.max(0, maxHpAfter - maxHpBefore);
-  return Math.min(maxHpAfter, Math.max(0, currentHp) + gained);
+  return Math.min(maxHpAfter, currentHp + gained);
 }
 
 export interface LevelUpChoice {

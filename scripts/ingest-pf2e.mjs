@@ -1185,6 +1185,12 @@ const classes = raw.classes
         (a.sourceFeature?.level ?? 0) - (b.sourceFeature?.level ?? 0) ||
         a.prompt.localeCompare(b.prompt)
     );
+    // The upstream Swashbuckler class item lists odd skill-feat levels. Use
+    // the standard even progression instead of shipping illegal slots.
+    const skillFeatLevels =
+      j.name === "Swashbuckler"
+        ? [2, 4, 6, 8, 10, 12, 14, 16, 18, 20]
+        : (s.skillFeatLevels?.value ?? []).map(Number);
     return {
       id: `cls:${j._id}`,
       name: j.name,
@@ -1220,7 +1226,7 @@ const classes = raw.classes
       featLevels: {
         ancestry: (s.ancestryFeatLevels?.value ?? [1, 5, 9, 13, 17]).map(Number),
         class: (s.classFeatLevels?.value ?? []).map(Number),
-        skill: (s.skillFeatLevels?.value ?? []).map(Number),
+        skill: skillFeatLevels,
         general: (s.generalFeatLevels?.value ?? [3, 7, 11, 15, 19]).map(Number),
       },
       skillIncreaseLevels: (s.skillIncreaseLevels?.value ?? [3, 5, 7, 9, 11, 13, 15, 17, 19]).map(

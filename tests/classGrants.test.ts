@@ -35,6 +35,8 @@ const bard = byName(classes, "Bard");
 const wizard = byName(classes, "Wizard");
 const cleric = byName(classes, "Cleric");
 const sorcerer = byName(classes, "Sorcerer");
+const oracle = byName(classes, "Oracle");
+const witch = byName(classes, "Witch");
 
 function draftFor(classData: ClassData) {
   const draft = emptyCharacterDraft("Class Grant Test");
@@ -111,7 +113,7 @@ describe("class-choice grants", () => {
     expect(grants.spells).toEqual(
       expect.arrayContaining([expect.objectContaining({ name: "Sure Strike", kind: "repertoire" })])
     );
-    expect(spellRepertoireLimits(bard, 1)).toEqual({ cantrips: 5, ranks: [2] });
+    expect(spellRepertoireLimits(bard, 1)).toEqual({ cantrips: 5, ranks: [3] });
     const derived = computeCharacter(draft, contextForDraft(draft));
     expect(derived.grantedSpells.find((spell) => spell.name === "Sure Strike")?.kind).toBe(
       "repertoire"
@@ -365,5 +367,44 @@ describe("class-choice grants", () => {
     const unifiedGrants = selectedClassGrants(unified, wizard);
     expect(unifiedGrants.spells.filter((spell) => spell.kind === "curriculum")).toEqual([]);
     expect(unifiedGrants.notes.join(" ")).toMatch(/additional 1st-level wizard feat/i);
+  });
+
+  it("grants a bard's composition cantrip and focus spell", () => {
+    const grants = selectedClassGrants(draftFor(bard), bard);
+    expect(grants.spells).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: "Courageous Anthem",
+          kind: "repertoire",
+          rank: 0,
+        }),
+        expect.objectContaining({ name: "Counter Performance", kind: "focus" }),
+      ])
+    );
+    expect(grants.focusPoints).toBe(1);
+  });
+
+  it("grants a witch's chosen hex", () => {
+    const draft = draftFor(witch);
+    const patron = witch.choiceGroups.find((group) => group.tag === "witch-patron")!;
+    draft.classChoices[patron.key] = [patron.options[0].id];
+    draft.grantChoices["grant:witch-hex"] = ["patrons-puppet"];
+    const grants = selectedClassGrants(draft, witch);
+    expect(grants.spells).toEqual(
+      expect.arrayContaining([expect.objectContaining({ name: "Patron's Puppet", kind: "focus" })])
+    );
+    expect(grants.focusPoints).toBe(1);
+  });
+
+  it("grants an oracle's initial revelation by mystery", () => {
+    const draft = draftFor(oracle);
+    const mystery = oracle.choiceGroups.find((group) => group.tag === "oracle-mystery")!;
+    draft.classChoices[mystery.key] = ["cf:GTSvbFb36InvuH0w"];
+    draft.grantChoices["grant:oracle-mystery"] = ["flames"];
+    const grants = selectedClassGrants(draft, oracle);
+    expect(grants.spells).toEqual(
+      expect.arrayContaining([expect.objectContaining({ name: "Incendiary Aura", kind: "focus" })])
+    );
+    expect(grants.focusPoints).toBe(1);
   });
 });

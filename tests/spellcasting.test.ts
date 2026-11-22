@@ -178,12 +178,15 @@ describe("spell casting", () => {
     expect(castSpell(result!.draft, fireball, context, { rank: 3, resource: "slot" })).toBeNull();
   });
 
-  it("lets spontaneous casters heighten known spells into higher slots", () => {
+  it("only heightens spontaneous spells that are signatures", () => {
     const draft = draftFor(sorcerer);
     const context = contextFor(sorcerer, [fireball]);
     draft.level = 9;
     draft.spells.known = [fireball.id];
 
+    expect(spellCastOptions(fireball, draft, context).map((entry) => entry.rank)).toEqual([3]);
+
+    draft.spells.signature = [fireball.id];
     const options = spellCastOptions(fireball, draft, context);
     expect(options.map((entry) => entry.rank)).toEqual([3, 4, 5]);
     expect(options.every((entry) => entry.resource === "slot")).toBe(true);

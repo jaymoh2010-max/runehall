@@ -80,7 +80,7 @@ describe("GM Core table 10-9 item mix", () => {
     expect(treasureItemKind({ level: 1, type: "equipment", consumable: { category: "oil" } })).toBe(
       "consumable"
     );
-    expect(treasureItemKind({ level: 5, type: "equipment", traits: ["wand"] })).toBe("consumable");
+    expect(treasureItemKind({ level: 5, type: "equipment", traits: ["wand"] })).toBe("permanent");
     expect(treasureItemKind({ level: 1, type: "weapon", traits: ["consumable"] })).toBe(
       "consumable"
     );

@@ -538,6 +538,38 @@ export function FeatsStep({
         })}
       </div>
       {!slots.length ? <p className="muted small">No feat slots at this level.</p> : null}
+      {classTrait === "summoner" ? (
+        <Card className="feat-slot-card">
+          <div className="row-between">
+            <div>
+              <h3>Evolution Feat</h3>
+              <p className="muted small">
+                The summoner gains a bonus 1st-level evolution feat outside the normal class feat
+                slots.
+              </p>
+            </div>
+            <Button
+              size="sm"
+              variant={draft.feats.extras.length ? "ghost" : "primary"}
+              onClick={() =>
+                openPicker({ kind: "feat", category: "class", level: 1, target: "extras" })
+              }
+            >
+              {draft.feats.extras.length ? "Change" : "Choose"}
+            </Button>
+          </div>
+          <div className="chip-row" style={{ marginTop: 8 }}>
+            {draft.feats.extras.map((featId) => {
+              const feat = context.feats[featId];
+              return (
+                <Tag key={featId} tone="gold">
+                  {feat?.name ?? "Evolution feat"}
+                </Tag>
+              );
+            })}
+          </div>
+        </Card>
+      ) : null}
       {derived.grantedFeats.length ? (
         <Card className="granted-feats">
           <h3>Granted feats</h3>

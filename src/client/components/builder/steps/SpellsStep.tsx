@@ -314,6 +314,59 @@ export function SpellsStep({ draft, update, derived, context, setStep, openPicke
     );
   };
 
+  const focusCard = (
+    <Card className="spell-section">
+      <div className="row-between">
+        <div>
+          <h3>Focus spells</h3>
+          <p className="muted small">
+            Focus spells use your focus pool. {derived.focusPointsMax} focus point
+            {derived.focusPointsMax === 1 ? "" : "s"}.
+          </p>
+        </div>
+        <Button
+          size="sm"
+          icon={<Plus size={14} />}
+          onClick={() => openPicker({ kind: "spell", rank: null, focus: true, target: "focus" })}
+        >
+          Add focus spell
+        </Button>
+      </div>
+      <div className="spell-chip-grid">
+        {manualFocus.map((spell) => (
+          <div key={spell.id} className="spell-chip">
+            <span>
+              <strong>{spell.name}</strong>
+            </span>
+            <button
+              type="button"
+              className="icon-btn"
+              aria-label={`Remove ${spell.name}`}
+              onClick={() => removeSpell(spell.id, "focus")}
+            >
+              <Minus size={13} />
+            </button>
+          </div>
+        ))}
+        {grantedFocus.map((spell) => (
+          <div key={`granted-${spell.id}`} className="spell-chip">
+            <span>
+              <strong>{spell.name}</strong>
+              <span className="tiny muted">
+                {" "}
+                � granted{spell.rank ? ` � rank ${spell.rank}` : ""}
+              </span>
+            </span>
+            <Tag tone="gold">Granted</Tag>
+          </div>
+        ))}
+        {!manualFocus.length && !grantedFocus.length ? (
+          <p className="muted small">No focus spells selected.</p>
+        ) : null}
+      </div>
+    </Card>
+  );
+
   if (caster.progression === "none") {
     return (
       <div className="step">
@@ -322,16 +375,19 @@ export function SpellsStep({ draft, update, derived, context, setStep, openPicke
           title="No spellbook required."
           lede="Your class doesn't use spellcasting, though class features or archetypes may still grant magical tricks later."
         />
-        <EmptyState
-          icon={<FlaskConical size={28} />}
-          title="Martial at heart"
-          description="You can skip this step. If your character later gains a focus spell or innate magic, note it in Details."
-          action={
-            <Button variant="primary" onClick={() => setStep("gear")}>
-              Continue to equipment
-            </Button>
-          }
-        />
+        <div className="info-box">
+          <BookOpen size={16} />
+          <p>
+            Monk ki spells, ranger warden spells, and other focus abilities can be added below. They
+            use the same focus pool and Refocus rules as full spellcasters.
+          </p>
+        </div>
+        {focusCard}
+        <div className="step-actions">
+          <Button variant="primary" onClick={() => setStep("gear")}>
+            Continue to equipment
+          </Button>
+        </div>
       </div>
     );
   }
@@ -879,6 +935,59 @@ export function SpellsStep({ draft, update, derived, context, setStep, openPicke
             );
           })}
         </>
+      ) : null}
+
+      {!isPreparedCaster && caster.progression !== "focus" && draft.level >= 3 ? (
+        <Card className="spell-section">
+          <h3>Signature spells</h3>
+          <p className="muted small">
+            Choose one known spell per rank. Only signature spells can be heightened freely when you
+            cast them at the table. Selecting a spell replaces any other signature spell of the same
+            rank.
+          </p>
+          <div className="spell-chip-grid">
+            {known
+              .filter((spell) => spell.rank > 0)
+              .map((spell) => {
+                const signature = draft.spells.signature ?? [];
+                const selected = signature.includes(spell.id);
+                return (
+                  <button
+                    type="button"
+                    key={spell.id}
+                    className={`spell-chip ${selected ? "is-selected" : ""}`}
+                    aria-pressed={selected}
+                    onClick={() =>
+                      update((current) => {
+                        const currentSignature = current.spells.signature ?? [];
+                        const next = currentSignature.includes(spell.id)
+                          ? currentSignature.filter((id) => id !== spell.id)
+                          : [
+                              ...currentSignature.filter(
+                                (id) => context.spells[id]?.rank !== spell.rank
+                              ),
+                              spell.id,
+                            ];
+                        return {
+                          ...current,
+                          spells: { ...current.spells, signature: next },
+                        };
+                      })
+                    }
+                  >
+                    <span>
+                      <strong>{spell.name}</strong>
+                      <span className="tiny muted"> rank {spell.rank}</span>
+                    </span>
+                    {selected ? <Tag tone="gold">Signature</Tag> : null}
+                  </button>
+                );
+              })}
+            {!known.some((spell) => spell.rank > 0) ? (
+              <p className="muted small">Add a known spell before choosing signature spells.</p>
+            ) : null}
+          </div>
+        </Card>
       ) : null}
 
       <Card className="spell-section">

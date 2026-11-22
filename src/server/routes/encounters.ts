@@ -147,7 +147,8 @@ function tokenInitiativeBonus(token: TokenRow): number {
   const character = getCharacter(token.character_id);
   if (!character?.summary) return 0;
   try {
-    const summary = JSON.parse(character.summary) as { perception?: number };
+    const summary = JSON.parse(character.summary) as { initiative?: number; perception?: number };
+    if (typeof summary.initiative === "number") return summary.initiative;
     return typeof summary.perception === "number" ? summary.perception : 0;
   } catch {
     return 0;

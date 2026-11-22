@@ -456,13 +456,18 @@ const CANTRIP_LIMITS: Record<string, number> = {
   cleric: 5,
   druid: 5,
   bard: 5,
-  oracle: 6,
+  oracle: 5,
   sorcerer: 5,
   witch: 5,
-  wizard: 6,
+  // The wizard's spellbook starts with 10 cantrips and prepares five plus one
+  // curriculum cantrip each day.
+  wizard: 10,
   magus: 5,
   summoner: 5,
-  psychic: 5,
+  // Psychic gains three more psi cantrips from the conscious mind.
+  psychic: 3,
+  animist: 4,
+  necromancer: 5,
 };
 
 export function cantripLimitFor(classData: ClassData | null | undefined): number | null {
@@ -965,6 +970,7 @@ export function emptyCharacterDraft(name = "New Hero"): CharacterDraft {
       slotsUsed: {},
       preparedUsed: {},
       fontUsed: {},
+      signature: [],
       preparationsPending: false,
     },
     equipment: [],
@@ -1182,6 +1188,7 @@ export function normalizeCharacterDraft(input: unknown, fallbackName = "New Hero
       prepared: finalPrepared,
       preparedByRank,
       focus: arr<string>(spells.focus).filter((x) => typeof x === "string"),
+      signature: arr<string>(spells.signature).filter((x) => typeof x === "string"),
       divineFontUsed: Math.max(0, Math.min(10, Math.round(num(spells.divineFontUsed, 0)))),
       fontChoice:
         typeof spells.fontChoice === "string" &&
@@ -2018,13 +2025,20 @@ export function spellRepertoireLimits(
   const ranks: number[] = [];
   let previous: number[] = [];
   for (let current = 1; current <= level; current++) {
-    const slots = bounded ? boundedCasterSlots(current) : fullCasterSlots(current);
+    // Spontaneous full casters have four slots per rank, not the prepared
+    // caster's three. Their repertoire grows with those slots.
+    const slots = bounded ? boundedCasterSlots(current) : spontaneousFullCasterSlots(current);
     for (let index = 0; index < slots.length; index++) {
       const count = slots[index] ?? 0;
       const before = previous[index] ?? 0;
       if (count > before) ranks[index] = (ranks[index] ?? 0) + (count - before);
     }
     previous = slots;
+  }
+  // Magnum Opus, Bloodline Paragon, and Oracular Clarity add two 10th-rank
+  // spells to the repertoire. One is already counted by the rank-10 slot.
+  if (level >= 19 && ["bard", "oracle", "sorcerer"].includes(name)) {
+    ranks[9] = Math.max(ranks[9] ?? 0, 2);
   }
   return { cantrips: 5, ranks };
 }
@@ -3196,8 +3210,15 @@ export function computeCharacter(
       if (!spell) continue;
       knownByRank.set(spell.rank, (knownByRank.get(spell.rank) ?? 0) + 1);
     }
+    // The repertoire total includes class-granted spells such as a muse or
+    // bloodline spell. Subtract those before judging the player's own picks.
+    const grantedByRank = new Map<number, number>();
+    for (const spell of classGrants.spells) {
+      if (spell.kind === "focus" || spell.rank <= 0) continue;
+      grantedByRank.set(spell.rank, (grantedByRank.get(spell.rank) ?? 0) + 1);
+    }
     for (const [rank, count] of knownByRank) {
-      const limit = repertoire.ranks[rank - 1] ?? 0;
+      const limit = Math.max(0, (repertoire.ranks[rank - 1] ?? 0) - (grantedByRank.get(rank) ?? 0));
       if (count > limit) {
         issue(
           "error",
@@ -3205,6 +3226,33 @@ export function computeCharacter(
           "spells"
         );
       }
+    }
+  }
+
+  const spontaneousCaster =
+    caster.progression !== "none" &&
+    caster.progression !== "focus" &&
+    !isPreparedCasterClass(classData?.name);
+  if (spontaneousCaster && draft.spells.signature.length) {
+    if (draft.level < 3) {
+      issue("warning", "Signature spells are gained at 3rd level.", "spells");
+    }
+    const signatureRanks = new Map<number, string>();
+    for (const spellId of draft.spells.signature) {
+      const spell = context.spells[spellId];
+      if (!spell || !draft.spells.known.includes(spellId)) {
+        issue("warning", "A signature spell must be in your spell repertoire.", "spells");
+        continue;
+      }
+      if (spell.rank === 0) {
+        issue("warning", "Cantrips cannot be signature spells.", "spells");
+        continue;
+      }
+      const existing = signatureRanks.get(spell.rank);
+      if (existing && existing !== spellId) {
+        issue("warning", `Choose only one signature spell for rank ${spell.rank}.`, "spells");
+      }
+      signatureRanks.set(spell.rank, spellId);
     }
   }
 
@@ -3571,6 +3619,7 @@ export function characterSummary(draft: CharacterDraft, context: CharacterContex
     ac: derived.ac,
     speed: derived.speed,
     perception: derived.perception,
+    initiative: derived.initiative,
     fortitude: derived.saves.fortitude,
     reflex: derived.saves.reflex,
     will: derived.saves.will,
