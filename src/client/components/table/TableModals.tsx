@@ -371,6 +371,7 @@ export function AddTokenModal({
                           hpCurrent: selectedMonster.hp,
                           hpMax: selectedMonster.hp,
                           ac: selectedMonster.ac,
+                          monsterId: selectedMonster.id,
                           initiativeBonus: selectedMonster.perception,
                           groupId,
                           groupName: groupId ? selectedMonster.name : null,

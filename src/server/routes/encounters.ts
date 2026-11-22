@@ -645,12 +645,13 @@ export async function registerEncounterRoutes(app: FastifyInstance): Promise<voi
         }
         db.prepare(
           `INSERT INTO tokens
-            (id, scene_id, encounter_id, name, image_url, character_id, owner_id, x, y, size, color, hp_current, hp_max, ac, initiative_bonus, group_id, group_name, conditions, turn_effects, hidden, locked, sort_order, created_at, updated_at)
-           VALUES (?, ?, ?, ?, NULL, NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '[]', ?, ?, 0, ?, ?, ?)`
+            (id, scene_id, encounter_id, monster_id, name, image_url, character_id, owner_id, x, y, size, color, hp_current, hp_max, ac, initiative_bonus, group_id, group_name, conditions, turn_effects, hidden, locked, sort_order, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, NULL, NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '[]', ?, ?, 0, ?, ?, ?)`
         ).run(
           tokenId,
           scene.id,
           encounterId,
+          combatant.monster_id ?? null,
           name,
           x,
           y,

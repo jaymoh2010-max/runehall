@@ -397,6 +397,7 @@ export function serializeToken(row: TokenRow, ownerName?: string): Token {
     name: row.name,
     imageUrl: row.image_url,
     characterId: row.character_id,
+    monsterId: row.monster_id ?? null,
     ownerId: row.owner_id,
     ownerName,
     x: row.x,
