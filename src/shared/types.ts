@@ -1476,6 +1476,10 @@ export interface CampaignChapter {
   levelStart: number;
   levelEnd: number;
   status: ChapterStatus;
+  /** When false, only the GM sees this chapter. */
+  visible: boolean;
+  /** GM-only prep notes; omitted from player responses. */
+  gmNotes?: string;
   sortOrder: number;
   createdAt: number;
   updatedAt: number;
@@ -1570,6 +1574,8 @@ export interface Scene {
   props: SceneProp[];
   /** When enabled, every prop on the scene blocks token movement. */
   propCollision: boolean;
+  /** When false, only the GM receives this scene and its tokens. */
+  visible: boolean;
   sortOrder: number;
   createdAt: number;
   updatedAt: number;

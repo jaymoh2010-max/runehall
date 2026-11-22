@@ -794,13 +794,16 @@ export async function registerCharacterRoutes(app: FastifyInstance): Promise<voi
       ts
     );
     const created = getCharacter(newCharacterId)!;
-    return reply.code(201).send({
-      character: serializeCharacter(created, request.user.displayName, {
-        canEdit: true,
-        canView: true,
-        canAdvance: canAdvanceCharacter(created, request.user.id),
-      }),
+    const serialized = serializeCharacter(created, request.user.displayName, {
+      canEdit: true,
+      canView: true,
+      canAdvance: canAdvanceCharacter(created, request.user.id),
     });
+    if (row.campaign_id) {
+      touchCampaign(row.campaign_id);
+      app.broadcastCampaign(row.campaign_id, "character:created", { character: serialized });
+    }
+    return reply.code(201).send({ character: serialized });
   });
 
   app.delete("/api/characters/:id", async (request, reply) => {
@@ -811,7 +814,23 @@ export async function registerCharacterRoutes(app: FastifyInstance): Promise<voi
     if (!canEditCharacter(row, request.user.id)) {
       return reply.code(403).send({ error: "You can't delete that character." });
     }
+    const linkedTokenIds = row.campaign_id
+      ? (
+          db.prepare("SELECT id FROM tokens WHERE character_id = ?").all(id) as { id: string }[]
+        ).map((token) => token.id)
+      : [];
     db.prepare("DELETE FROM characters WHERE id = ?").run(id);
+    if (row.campaign_id) {
+      touchCampaign(row.campaign_id);
+      app.broadcastCampaign(row.campaign_id, "character:removed", { characterId: id });
+      for (const tokenId of linkedTokenIds) {
+        const token = db.prepare("SELECT * FROM tokens WHERE id = ?").get(tokenId) as
+          TokenRow | undefined;
+        if (token) {
+          app.broadcastCampaign(row.campaign_id, "token:updated", serializeToken(token));
+        }
+      }
+    }
     return reply.send({ ok: true });
   });
 

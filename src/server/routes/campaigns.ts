@@ -308,7 +308,7 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
     });
   });
 
-  app.post("/api/campaigns/import", { bodyLimit: 64 * 1024 * 1024 }, async (request, reply) => {
+  app.post("/api/campaigns/import", { bodyLimit: 256 * 1024 * 1024 }, async (request, reply) => {
     if (!request.user) return reply.code(401).send({ error: "Sign in to continue." });
     try {
       const result = importCampaign(request.user.id, request.body);
@@ -737,7 +737,7 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
           "SELECT * FROM campaign_chapters WHERE campaign_id = ? ORDER BY sort_order ASC, level_start ASC, created_at ASC"
         )
         .all(id) as CampaignChapterRow[]
-    ).map(serializeCampaignChapter);
+    ).map((chapter) => serializeCampaignChapter(chapter));
     const sessions = campaignSessionsFor(id, "gm", request.user.id);
     const audioTracks = (
       db
@@ -995,6 +995,14 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
     if (roleFor(row, request.user.id) !== "gm") {
       return reply.code(403).send({ error: "Only the GM can delete the campaign." });
     }
+    const body = (request.body ?? {}) as Record<string, unknown>;
+    const confirmName = safeString(body.confirmName, "", 80).trim();
+    if (confirmName !== row.name) {
+      return reply.code(400).send({
+        error: `Type the campaign name "${row.name}" exactly to confirm permanent deletion.`,
+      });
+    }
+    app.broadcastCampaign(id, "campaign:deleted", { campaignId: id });
     db.prepare("DELETE FROM campaigns WHERE id = ?").run(id);
     logAudit({
       action: "campaign.delete",

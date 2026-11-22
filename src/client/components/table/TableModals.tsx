@@ -489,6 +489,7 @@ export function SceneManagerModal({
   const [name, setName] = useState("");
   const [gridSize, setGridSize] = useState("70");
   const [activateOnCreate, setActivateOnCreate] = useState(true);
+  const [visibleOnCreate, setVisibleOnCreate] = useState(true);
   const [file, setFile] = useState<File | null>(null);
   const [uploadPreview, setUploadPreview] = useState<string | null>(null);
   const [selectedBuiltinId, setSelectedBuiltinId] = useState<string | null>(null);
@@ -584,6 +585,7 @@ export function SceneManagerModal({
           height: dimensions.height,
           gridSize: Number(gridSize) || 70,
           activate: activateOnCreate,
+          visible: visibleOnCreate,
         },
       });
       onCreated(result.scene);
@@ -654,6 +656,7 @@ export function SceneManagerModal({
                     <strong>{scene.name}</strong>
                     {scene.id === activeSceneId ? <Badge tone="gold">Active</Badge> : null}
                     {scene.id === previewSceneId ? <Badge tone="blue">Previewing</Badge> : null}
+                    {scene.visible === false ? <Badge tone="neutral">GM only</Badge> : null}
                   </div>
                   <p className="tiny muted">
                     {scene.width} × {scene.height} · {scene.gridSize}px grid ·{" "}
@@ -853,6 +856,15 @@ export function SceneManagerModal({
             </Field>
           </div>
           <Toggle
+            checked={visibleOnCreate}
+            onChange={setVisibleOnCreate}
+            label={
+              visibleOnCreate
+                ? "Visible to players"
+                : "GM only - players will not receive this scene"
+            }
+          />
+          <Toggle
             checked={activateOnCreate}
             onChange={setActivateOnCreate}
             label="Activate this scene after creating it"
@@ -923,6 +935,7 @@ export function SceneEditModal({
   const [offsetX, setOffsetX] = useState("0");
   const [offsetY, setOffsetY] = useState("0");
   const [fogEnabled, setFogEnabled] = useState(true);
+  const [sceneVisible, setSceneVisible] = useState(true);
   const [losEnabled, setLosEnabled] = useState(false);
   const [wallCollision, setWallCollision] = useState(false);
   const [ambientLight, setAmbientLight] = useState<AmbientLight>("bright");
@@ -945,6 +958,7 @@ export function SceneEditModal({
     setOffsetX(String(scene.gridOffsetX));
     setOffsetY(String(scene.gridOffsetY));
     setFogEnabled(scene.fogEnabled);
+    setSceneVisible(scene.visible !== false);
     setLosEnabled(Boolean(scene.losEnabled));
     setWallCollision(Boolean(scene.wallCollision));
     setAmbientLight(scene.ambientLight ?? "bright");
@@ -1083,6 +1097,7 @@ export function SceneEditModal({
           gridOffsetX: Number(offsetX) || 0,
           gridOffsetY: Number(offsetY) || 0,
           fogEnabled,
+          visible: sceneVisible,
           losEnabled,
           wallCollision,
           ambientLight,
@@ -1258,6 +1273,16 @@ export function SceneEditModal({
               max={300}
               aria-label="Grid size in pixels"
               onChange={(event) => setGridSize(event.target.value)}
+            />
+          </Field>
+          <Field
+            label="Player visibility"
+            hint="GM-only scenes are prep space: players never receive the map, its name, or its tokens."
+          >
+            <Toggle
+              checked={sceneVisible}
+              onChange={setSceneVisible}
+              label={sceneVisible ? "Visible to players" : "GM only"}
             />
           </Field>
           <Field label="Fog of war">

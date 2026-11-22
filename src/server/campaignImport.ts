@@ -116,6 +116,31 @@ function record(value: unknown): RecordValue {
   return value && typeof value === "object" && !Array.isArray(value) ? (value as RecordValue) : {};
 }
 
+function uniqueAssetFilename(uploadsPath: string, filename: string): string {
+  const extension = path.extname(filename);
+  const base = path.basename(filename, extension);
+  for (let index = 2; index < 10_000; index += 1) {
+    const candidate = `${base}-${index}${extension}`;
+    if (!fs.existsSync(path.join(uploadsPath, candidate))) return candidate;
+  }
+  throw new Error("Could not find a free filename for an embedded asset.");
+}
+
+/** Rewrite embedded-asset URLs after collision-safe renaming. */
+function remapUploadUrls(value: unknown, remap: ReadonlyMap<string, string>): unknown {
+  if (typeof value === "string") return remap.get(value) ?? value;
+  if (Array.isArray(value)) return value.map((entry) => remapUploadUrls(entry, remap));
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value as RecordValue).map(([key, entry]) => [
+        key,
+        remapUploadUrls(entry, remap),
+      ])
+    );
+  }
+  return value;
+}
+
 function records(value: unknown, max: number, label: string): RecordValue[] {
   if (value === undefined || value === null) return [];
   if (!Array.isArray(value)) throw new Error(`The ${label} section is invalid.`);
@@ -155,7 +180,7 @@ function uniqueInviteCode(): string {
 }
 
 export function importCampaign(userId: string, raw: unknown): CampaignImportResult {
-  const payload = record(raw);
+  let payload = record(raw);
   if (payload.format !== "runehall-campaign") {
     throw new Error("That file is not a Runehall campaign export.");
   }
@@ -237,6 +262,7 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
       [".webm", "audio/webm"],
     ]);
     let embeddedBytes = 0;
+    const assetUrlRemap = new Map<string, string>();
     for (const [assetUrl, encoded] of Object.entries(embeddedAssets)) {
       if (typeof encoded !== "string" || !assetUrl.startsWith("/uploads/")) continue;
       const filename = assetUrl.slice("/uploads/".length);
@@ -245,27 +271,49 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
       }
       const mimeType = allowedAssetExtensions.get(path.extname(filename).toLowerCase());
       if (!mimeType) continue;
-      if (encoded.length > 20 * 1024 * 1024) {
-        throw new Error("An embedded asset in this archive is larger than 20 MB.");
-      }
       const data = Buffer.from(encoded, "base64");
       if (!data.length) continue;
+      if (data.length > 25 * 1024 * 1024) {
+        throw new Error("An embedded asset in this archive is larger than 25 MB.");
+      }
       embeddedBytes += data.length;
       if (embeddedBytes > 50 * 1024 * 1024) {
         throw new Error("Embedded campaign assets exceed the 50 MB import limit.");
       }
-      fs.writeFileSync(path.join(uploadsDir(), filename), data);
+      // Never overwrite a file that may belong to another campaign. A
+      // collision gets a suffix and every URL in the archive is remapped.
+      const existingAsset = db
+        .prepare("SELECT id FROM uploaded_assets WHERE filename = ?")
+        .get(filename) as { id: string } | undefined;
+      let storedFilename = filename;
+      if (existingAsset || fs.existsSync(path.join(uploadsDir(), filename))) {
+        storedFilename = uniqueAssetFilename(uploadsDir(), filename);
+        assetUrlRemap.set(assetUrl, `/uploads/${storedFilename}`);
+      }
+      fs.writeFileSync(path.join(uploadsDir(), storedFilename), data);
       db.prepare(
         `INSERT OR IGNORE INTO uploaded_assets
            (id, filename, original_name, mime_type, size, campaign_id, uploaded_by, created_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-      ).run(newId("asset"), filename, filename, mimeType, data.length, campaignId, userId, ts);
+      ).run(
+        newId("asset"),
+        storedFilename,
+        storedFilename,
+        mimeType,
+        data.length,
+        campaignId,
+        userId,
+        ts
+      );
       stats.embeddedAssets += 1;
+    }
+    if (assetUrlRemap.size) {
+      payload = remapUploadUrls(payload, assetUrlRemap) as RecordValue;
     }
 
     const memberUserByExportId = new Map<string, string>();
     const memberIds = new Set<string>([userId]);
-    for (const member of records(payload.members, 50, "members")) {
+    for (const member of records(payload.members, 500, "members")) {
       if (member.role !== "player") continue;
       const username = text(member.username, "", 80);
       const local = username ? getUserByUsername(username) : null;
@@ -283,7 +331,7 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
 
     // Soundtrack files are not embedded in the JSON export. Restore metadata
     // only when the referenced upload or bundled library file exists here.
-    for (const track of records(payload.audioTracks, 100, "audioTracks")) {
+    for (const track of records(payload.audioTracks, 2_000, "audioTracks")) {
       const rawUrl = text(track.url, "", 500);
       const mimeType = text(track.mimeType, "audio/mpeg", 80);
       if (!["audio/mpeg", "audio/ogg", "audio/wav", "audio/webm"].includes(mimeType)) continue;
@@ -333,7 +381,7 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
     }
 
     const characterMap = new Map<string, string>();
-    for (const character of records(payload.characters, 200, "characters")) {
+    for (const character of records(payload.characters, 2_000, "characters")) {
       const oldId = text(character.id, "", 120);
       if (!oldId) continue;
       try {
@@ -369,14 +417,14 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
     }
 
     const sceneMap = new Map<string, string>();
-    for (const scene of records(payload.scenes, 200, "scenes")) {
+    for (const scene of records(payload.scenes, 5_000, "scenes")) {
       const oldId = text(scene.id, "", 120);
       if (!oldId) continue;
       const sceneId = newId("scene");
       db.prepare(
         `INSERT INTO scenes
-          (id, campaign_id, name, image_url, thumbnail_url, width, height, grid_size, grid_offset_x, grid_offset_y, fog_enabled, fog_revealed, templates, walls, los_enabled, wall_collision, ambient_light, vision_scope, props, prop_collision, sort_order, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          (id, campaign_id, name, image_url, thumbnail_url, width, height, grid_size, grid_offset_x, grid_offset_y, fog_enabled, fog_revealed, templates, walls, los_enabled, wall_collision, ambient_light, vision_scope, props, prop_collision, visible, sort_order, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).run(
         sceneId,
         campaignId,
@@ -404,6 +452,7 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
         normalizePartyVisionScope(scene.visionScope),
         JSON.stringify(normalizeSceneProps(scene.props)),
         scene.propCollision === true ? 1 : 0,
+        scene.visible === false ? 0 : 1,
         numberValue(scene.sortOrder, sceneMap.size),
         ts,
         ts
@@ -424,7 +473,7 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
 
     const groupMap = new Map<string, string>();
     const tokenMap = new Map<string, string>();
-    for (const token of records(payload.tokens, 10_000, "tokens")) {
+    for (const token of records(payload.tokens, 200_000, "tokens")) {
       const oldId = text(token.id, "", 120);
       const oldSceneId = text(token.sceneId, "", 120);
       const sceneId = sceneMap.get(oldSceneId);
@@ -516,7 +565,7 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
       ts
     );
 
-    for (const message of records(payload.messages, 1000, "messages")) {
+    for (const message of records(payload.messages, 200_000, "messages")) {
       const oldScene = text(message.sceneId, "", 120);
       const oldUser = text(message.userId, "", 120);
       const visibility = message.visibility === "gm" ? "gm" : "all";
@@ -537,7 +586,7 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
       stats.messages += 1;
     }
 
-    for (const entry of records(payload.journal, 500, "journal")) {
+    for (const entry of records(payload.journal, 50_000, "journal")) {
       db.prepare(
         `INSERT INTO journal_entries
           (id, campaign_id, title, content, visible, kind, attachments, quest_status, quest_xp, quest_rewarded_at, created_by, created_at, updated_at)
@@ -560,7 +609,7 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
       stats.journal += 1;
     }
 
-    for (const encounter of records(payload.encounters, 500, "encounters")) {
+    for (const encounter of records(payload.encounters, 20_000, "encounters")) {
       const encounterId = newId("enc");
       const oldScene = text(encounter.sceneId, "", 120);
       db.prepare(
@@ -604,7 +653,7 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
       stats.encounters += 1;
     }
 
-    for (const parcel of records(payload.loot, 300, "loot parcels")) {
+    for (const parcel of records(payload.loot, 20_000, "loot parcels")) {
       const oldRecipient = text(parcel.distributedTo, "", 120);
       db.prepare(
         `INSERT INTO loot_parcels
@@ -650,7 +699,7 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
       stats.shopStock += 1;
     }
 
-    const importedMerchants = records(payload.merchants, 50, "merchants");
+    const importedMerchants = records(payload.merchants, 500, "merchants");
     let hasActiveMerchant = false;
     for (const [index, merchant] of importedMerchants.entries()) {
       const rawStock = Array.isArray(merchant.stock) ? merchant.stock : [];
@@ -780,7 +829,7 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
     }
 
     const factionMap = new Map<string, string>();
-    for (const faction of records(payload.factions, 200, "factions")) {
+    for (const faction of records(payload.factions, 5_000, "factions")) {
       const oldId = text(faction.id, "", 120);
       const factionId = newId("faction");
       if (oldId) factionMap.set(oldId, factionId);
@@ -806,7 +855,7 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
       );
     }
 
-    for (const entry of records(payload.knowledge, 500, "knowledge entries")) {
+    for (const entry of records(payload.knowledge, 20_000, "knowledge entries")) {
       db.prepare(
         `INSERT INTO campaign_knowledge
            (id, campaign_id, title, content, visible, sort_order, created_at, updated_at)
@@ -824,13 +873,13 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
       stats.knowledge += 1;
     }
 
-    for (const chapter of records(payload.chapters, 100, "chapters")) {
+    for (const chapter of records(payload.chapters, 1_000, "chapters")) {
       const levelStart = normalizeChapterLevel(chapter.levelStart, 1);
       db.prepare(
         `INSERT INTO campaign_chapters
-           (id, campaign_id, title, summary, level_start, level_end, status, sort_order,
-            created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+           (id, campaign_id, title, summary, level_start, level_end, status, visible, gm_notes,
+            sort_order, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).run(
         newId("chapter"),
         campaignId,
@@ -839,6 +888,8 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
         levelStart,
         Math.max(levelStart, normalizeChapterLevel(chapter.levelEnd, levelStart)),
         normalizeChapterStatus(chapter.status),
+        chapter.visible === false ? 0 : 1,
+        longText(chapter.gmNotes, "", 8_000),
         numberValue(chapter.sortOrder, 0),
         ts,
         ts
@@ -846,7 +897,7 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
       stats.chapters += 1;
     }
 
-    for (const npc of records(payload.npcs, 300, "NPCs")) {
+    for (const npc of records(payload.npcs, 20_000, "NPCs")) {
       db.prepare(
         `INSERT INTO campaign_npcs
           (id, campaign_id, name, level, hp, ac, perception, size, color, image_url, description,
@@ -883,7 +934,7 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
       stats.npcs += 1;
     }
 
-    for (const session of records(payload.sessions, 500, "sessions")) {
+    for (const session of records(payload.sessions, 10_000, "sessions")) {
       const sessionId = newId("sess");
       db.prepare(
         "INSERT INTO campaign_sessions (id, campaign_id, title, scheduled_at, duration_minutes, notes, agenda, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"

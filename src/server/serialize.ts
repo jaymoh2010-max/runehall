@@ -369,6 +369,7 @@ export function serializeScene(row: SceneRow): Scene {
     visionScope: normalizePartyVisionScope(row.vision_scope),
     props: normalizeSceneProps(parseJson(row.props, [])),
     propCollision: Boolean(row.prop_collision),
+    visible: row.visible === undefined ? true : Boolean(row.visible),
     sortOrder: row.sort_order,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -611,8 +612,11 @@ export function serializeCampaignKnowledge(row: CampaignKnowledgeRow): CampaignK
   };
 }
 
-export function serializeCampaignChapter(row: CampaignChapterRow): CampaignChapter {
-  return {
+export function serializeCampaignChapter(
+  row: CampaignChapterRow,
+  privateView = true
+): CampaignChapter {
+  const chapter: CampaignChapter = {
     id: row.id,
     campaignId: row.campaign_id,
     title: row.title,
@@ -620,10 +624,13 @@ export function serializeCampaignChapter(row: CampaignChapterRow): CampaignChapt
     levelStart: normalizeChapterLevel(row.level_start),
     levelEnd: normalizeChapterLevel(row.level_end, normalizeChapterLevel(row.level_start)),
     status: normalizeChapterStatus(row.status),
+    visible: row.visible === undefined ? true : Boolean(row.visible),
     sortOrder: row.sort_order,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
+  if (privateView) chapter.gmNotes = row.gm_notes ?? "";
+  return chapter;
 }
 
 export function serializeCampaignDashboard(

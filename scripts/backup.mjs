@@ -59,14 +59,19 @@ if (fs.existsSync(uploadsDir)) {
   fs.mkdirSync(path.join(destination, "uploads"), { recursive: true });
 }
 
-// Keep a copy of the compendium manifest and, when explicitly requested, the
-// full compendium. The manifest alone is enough to identify the data version.
+// The compendium is required for the server to start and for the builder to
+// work. Include it in every backup so a restore into a clean machine is
+// actually usable. The manifest copy stays for quick version inspection.
 const manifestPath = path.join(compendiumDir, "manifest.json");
 if (fs.existsSync(manifestPath)) {
   fs.copyFileSync(manifestPath, path.join(destination, "compendium-manifest.json"));
 }
-if (args.includes("--with-compendium") && fs.existsSync(compendiumDir)) {
+if (fs.existsSync(compendiumDir)) {
   fs.cpSync(compendiumDir, path.join(destination, "compendium"), { recursive: true });
+} else {
+  console.warn(
+    `WARNING: no compendium found at ${compendiumDir}; the backup will not include rules data.`
+  );
 }
 
 let packageVersion = "unknown";
