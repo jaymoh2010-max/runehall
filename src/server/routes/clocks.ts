@@ -38,12 +38,11 @@ function clockRow(campaignId: string, clockId: string): CampaignClockRow | null 
 }
 
 function notifyClock(app: FastifyInstance, row: CampaignClockRow): void {
-  app.broadcastCampaign(
-    row.campaign_id,
-    "clocks:changed",
-    { campaignId: row.campaign_id },
-    row.visible ? "all" : "gm"
-  );
+  // Always refresh every client: hiding an existing clock must remove it from
+  // player views, and the refetch itself filters hidden rows.
+  app.broadcastCampaign(row.campaign_id, "clocks:changed", {
+    campaignId: row.campaign_id,
+  });
 }
 
 export async function registerClockRoutes(app: FastifyInstance): Promise<void> {
