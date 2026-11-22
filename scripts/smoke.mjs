@@ -2395,6 +2395,50 @@ async function main() {
   ) {
     throw new Error("Travel plan did not calculate progress or keep assignments");
   }
+  await api(`/api/campaigns/${campaign.id}/travel/waypoints`, {
+    method: "POST",
+    cookie: gmCookie,
+    body: {
+      name: "Smoke Bridge",
+      miles: 6,
+      description: "A muddy crossing.",
+      visible: true,
+    },
+  });
+  await api(`/api/campaigns/${campaign.id}/travel/waypoints`, {
+    method: "POST",
+    cookie: gmCookie,
+    body: { name: "Smoke Hidden Camp", miles: 18, visible: false },
+  });
+  const playerMap = await api(`/api/campaigns/${campaign.id}/travel`, {
+    cookie: playerCookie,
+  });
+  if (
+    playerMap.payload.travel.waypoints.length !== 1 ||
+    playerMap.payload.travel.waypoints[0].name !== "Smoke Bridge" ||
+    playerMap.payload.travel.encounterChecks
+  ) {
+    throw new Error("Player travel view leaked hidden waypoints or encounter checks");
+  }
+  const playerWaypoint = await fetch(`${base}/api/campaigns/${campaign.id}/travel/waypoints`, {
+    method: "POST",
+    headers: { "content-type": "application/json", cookie: playerCookie },
+    body: JSON.stringify({ name: "Player waypoint", miles: 1 }),
+  });
+  if (playerWaypoint.status !== 403) throw new Error("Player edited the route map");
+  const encounterCheck = await api(`/api/campaigns/${campaign.id}/travel/check`, {
+    method: "POST",
+    cookie: gmCookie,
+    body: { watch: 3, note: "Smoke patrol." },
+  });
+  if (
+    !encounterCheck.payload.check ||
+    encounterCheck.payload.check.roll < 1 ||
+    encounterCheck.payload.check.roll > 20 ||
+    encounterCheck.payload.travel.encounterChecks.length !== 1
+  ) {
+    throw new Error("Encounter check did not record a valid d20 result");
+  }
   const firstDay = await api(`/api/campaigns/${campaign.id}/travel/advance`, {
     method: "POST",
     cookie: gmCookie,
@@ -2410,6 +2454,11 @@ async function main() {
   });
   if (arrived.payload.travel.status !== "complete" || arrived.payload.travel.progressMiles !== 24) {
     throw new Error("Travel did not complete at the destination");
+  }
+  if (
+    !arrived.payload.travel.waypoints.find((waypoint) => waypoint.name === "Smoke Bridge")?.reached
+  ) {
+    throw new Error("Travel did not mark the waypoint as reached");
   }
   const playerAdvance = await fetch(`${base}/api/campaigns/${campaign.id}/travel/advance`, {
     method: "POST",

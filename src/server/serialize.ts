@@ -92,9 +92,11 @@ import { normalizeAoeTemplates } from "../shared/templates";
 import { normalizeGolarionDate } from "../shared/calendar";
 import {
   normalizeTravelActivities,
+  normalizeTravelEncounterChecks,
   normalizeTravelMiles,
   normalizeTravelTerrain,
   normalizeTravelWatches,
+  normalizeTravelWaypoints,
   normalizeTravelWeather,
   normalizeTravelSpeed,
   travelMilesPerDay,
@@ -138,13 +140,14 @@ export function serializeCampaignSummary(
 
 export function serializeCampaignTravel(
   row: CampaignTravelRow,
-  characterIds: Set<string>
+  characterIds: Set<string>,
+  privateView = false
 ): CampaignTravel {
   const distanceMiles = normalizeTravelMiles(row.distance_miles);
   const progressMiles = Math.min(distanceMiles, normalizeTravelMiles(row.progress_miles));
   const partySpeed = normalizeTravelSpeed(row.party_speed);
   const terrain = normalizeTravelTerrain(row.terrain);
-  return {
+  const travel: CampaignTravel = {
     campaignId: row.campaign_id,
     origin: row.origin,
     destination: row.destination,
@@ -156,11 +159,18 @@ export function serializeCampaignTravel(
     notes: row.notes,
     watches: normalizeTravelWatches(parseJson(row.watches, {}), characterIds),
     activities: normalizeTravelActivities(parseJson(row.activities, {}), characterIds),
+    waypoints: normalizeTravelWaypoints(parseJson(row.waypoints, []))
+      .filter((waypoint) => privateView || waypoint.visible)
+      .map((waypoint) => ({ ...waypoint, reached: waypoint.miles <= progressMiles })),
     daysTravelled: Math.max(0, Math.round(row.days_travelled)),
     dailyMiles: travelMilesPerDay(partySpeed, terrain),
     status: travelStatus(distanceMiles, progressMiles),
     updatedAt: row.updated_at,
   };
+  if (privateView) {
+    travel.encounterChecks = normalizeTravelEncounterChecks(parseJson(row.encounter_checks, []));
+  }
+  return travel;
 }
 
 export function serializeCampaignSessionZero(

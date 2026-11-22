@@ -1108,6 +1108,32 @@ export interface TravelWatches {
   fourth: string[];
 }
 
+export interface TravelWaypoint {
+  id: string;
+  name: string;
+  /** Distance from the origin in miles. */
+  miles: number;
+  description: string;
+  /** Shared with players when true; GM-only when false. */
+  visible: boolean;
+  /** True once the party's progress has reached this waypoint. */
+  reached: boolean;
+}
+
+export interface TravelEncounterCheck {
+  id: string;
+  day: number;
+  /** 1-4, matching the travel watch order. */
+  watch: number;
+  roll: number;
+  dc: number;
+  encounter: boolean;
+  terrain: TravelTerrain;
+  weather: TravelWeather;
+  note: string;
+  createdAt: number;
+}
+
 export interface CampaignTravel {
   campaignId: string;
   origin: string;
@@ -1121,6 +1147,9 @@ export interface CampaignTravel {
   watches: TravelWatches;
   /** Character id to exploration activity id. */
   activities: Record<string, string>;
+  waypoints: TravelWaypoint[];
+  /** GM-only encounter check history; omitted from player responses. */
+  encounterChecks?: TravelEncounterCheck[];
   daysTravelled: number;
   /** Miles the party covers on a normal travel day in the current terrain. */
   dailyMiles: number;

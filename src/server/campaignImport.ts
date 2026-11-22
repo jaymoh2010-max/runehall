@@ -15,10 +15,12 @@ import { normalizeGolarionDate } from "../shared/calendar";
 import { normalizeAdvancementSpeed } from "../shared/xp";
 import {
   normalizeTravelActivities,
+  normalizeTravelEncounterChecks,
   normalizeTravelMiles,
   normalizeTravelSpeed,
   normalizeTravelTerrain,
   normalizeTravelWatches,
+  normalizeTravelWaypoints,
   normalizeTravelWeather,
 } from "../shared/travel";
 import { normalizeSessionZeroChecklist } from "../shared/sessionZero";
@@ -616,11 +618,14 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
         if (newId && typeof activity === "string") remappedActivities[newId] = activity;
       }
       const distanceMiles = normalizeTravelMiles(importedTravel.distanceMiles);
+      const importedWaypoints = normalizeTravelWaypoints(importedTravel.waypoints);
+      const importedChecks = normalizeTravelEncounterChecks(importedTravel.encounterChecks);
       db.prepare(
         `INSERT INTO campaign_travel
            (campaign_id, origin, destination, terrain, distance_miles, progress_miles, party_speed,
-            weather, notes, watches, activities, days_travelled, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+            weather, notes, watches, activities, waypoints, encounter_checks, days_travelled,
+            created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).run(
         campaignId,
         text(importedTravel.origin, "", 120),
@@ -633,6 +638,13 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
         longText(importedTravel.notes, "", 4000),
         JSON.stringify(normalizeTravelWatches(remappedWatches, newCharacterIds)),
         JSON.stringify(normalizeTravelActivities(remappedActivities, newCharacterIds)),
+        JSON.stringify(
+          importedWaypoints.map(({ reached: _reached, ...entry }) => ({
+            ...entry,
+            id: newId("waypoint"),
+          }))
+        ),
+        JSON.stringify(importedChecks.map((check) => ({ ...check, id: newId("travel-check") }))),
         numberValue(importedTravel.daysTravelled, 0, 0, 100_000),
         ts,
         ts
