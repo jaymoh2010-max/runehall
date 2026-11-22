@@ -113,6 +113,7 @@ import {
 import { xpProgress } from "../../shared/xp";
 import { spellTraditionLabel, stripHtml } from "../../shared/compendium";
 import {
+  AFFLICTION_PRESETS,
   AFFLICTION_TYPES,
   afflictionOnsetPassed,
   afflictionDurationSeconds,
@@ -242,6 +243,7 @@ export function CharacterSheetPage() {
   const [afflictionOpen, setAfflictionOpen] = useState(false);
   const [afflictionEditingId, setAfflictionEditingId] = useState<string | null>(null);
   const [afflictionForm, setAfflictionForm] = useState<CharacterAffliction>(emptyAfflictionForm);
+  const [afflictionPresetId, setAfflictionPresetId] = useState("");
   const [persistentFormula, setPersistentFormula] = useState("1d6");
   const [persistentType, setPersistentType] = useState("fire");
   const [persistentDc, setPersistentDc] = useState(String(PERSISTENT_DAMAGE_DC));
@@ -1450,7 +1452,32 @@ export function CharacterSheetPage() {
       setAfflictionForm(emptyAfflictionForm());
       setAfflictionEditingId(null);
     }
+    setAfflictionPresetId("");
     setAfflictionOpen(true);
+  };
+
+  const applyAfflictionPreset = (presetId: string) => {
+    setAfflictionPresetId(presetId);
+    const preset = AFFLICTION_PRESETS.find((entry) => entry.id === presetId);
+    if (!preset) return;
+    setAfflictionForm((current) => ({
+      ...current,
+      name: current.name.trim() ? current.name : preset.label,
+      type: preset.type,
+      dc: preset.dc,
+      save: preset.save,
+      stage: 1,
+      stageMax: preset.stageMax,
+      interval: preset.interval,
+      intervalRemaining: initialIntervalRemaining(preset.interval),
+      duration: preset.duration,
+      durationRemaining: afflictionDurationSeconds(preset.duration),
+      onset: preset.onset,
+      onsetRemaining: initialOnsetRemaining(preset.onset),
+      virulent: preset.virulent,
+      virulentSuccesses: 0,
+      notes: preset.notes,
+    }));
   };
 
   const saveAffliction = () => {
@@ -4441,6 +4468,22 @@ export function CharacterSheetPage() {
         }
       >
         <div className="stack">
+          <Field
+            label="Start from a template"
+            hint="Fills the recovery frame; stage effects remain yours to adjudicate."
+          >
+            <Select
+              value={afflictionPresetId}
+              onChange={(event) => applyAfflictionPreset(event.target.value)}
+            >
+              <option value="">Custom affliction</option>
+              {AFFLICTION_PRESETS.map((preset) => (
+                <option key={preset.id} value={preset.id}>
+                  {preset.label}
+                </option>
+              ))}
+            </Select>
+          </Field>
           <Field label="Name">
             <Input
               autoFocus

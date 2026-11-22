@@ -670,7 +670,7 @@ Acceptance: a GM can prepare a full session in Runehall and start it with one �
   - Persistent damage rolls all types, applies the total once, updates dying once, then attempts one DC 15 flat check per type.
   - Hidden-token automation rolls stay in the GM room; visible rolls appear as “Turn automation” cards in chat.
   - Per-round/entry/phase marks prevent duplicate resolution when stepping backward and forward.
-  - The sheet's manual recovery and end-turn buttons remain for out-of-combat use. Unlinked monsters, fast healing/regeneration, and affliction timers remain manual.
+  - The sheet's manual recovery and end-turn buttons remain for out-of-combat use. Recovery-frame templates cover common poison, disease, and curse shapes; stage effects remain manual.
 - [x] **Monster turn effects**
   - Unlinked tokens store fast healing, regeneration, persistent damage, and activation/suppression notes.
   - Encounter launch seeds numeric fast healing/regeneration from monster ability names; conditional fast healing starts inactive.

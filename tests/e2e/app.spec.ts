@@ -2464,6 +2464,18 @@ test("sheet tracks afflictions with stages and stage saves", async ({ page }) =>
 
   await row.getByRole("button", { name: "End Giant Spider Venom" }).click();
   await expect(page.locator(".affliction-row")).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Add affliction" }).click();
+  const presetDialog = page.getByRole("dialog", { name: "Add affliction" });
+  await presetDialog.getByLabel("Start from a template").selectOption("poison-virulent");
+  await expect(presetDialog.getByLabel("DC")).toHaveValue("20");
+  await expect(presetDialog.getByLabel("Affliction stage interval")).toHaveValue("1 round");
+  await presetDialog.getByRole("button", { name: "Save affliction" }).click();
+  const presetRow = page.locator(".affliction-row").filter({ hasText: "Virulent poison template" });
+  await expect(presetRow).toContainText("Virulent");
+  await expect(presetRow).toContainText("0 / 2 consecutive successes");
+  await presetRow.getByRole("button", { name: "End Virulent poison template" }).click();
+  await expect(page.locator(".affliction-row")).toHaveCount(0);
 });
 
 test("sheet rolls dying recovery and persistent damage end-of-turn checks", async ({ page }) => {
