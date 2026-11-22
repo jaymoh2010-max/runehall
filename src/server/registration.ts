@@ -4,6 +4,8 @@ import type { RegistrationInvite, RegistrationMode, RegistrationStatus } from ".
 
 const MODES: RegistrationMode[] = ["open", "invite", "closed"];
 const REGISTRATION_KEY = "registration_mode";
+/** Keep the admin invite list small enough to review at a glance. */
+export const MAX_PENDING_INVITES = 50;
 
 function isMode(value: unknown): value is RegistrationMode {
   return typeof value === "string" && (MODES as string[]).includes(value);
@@ -105,11 +107,27 @@ function serializeInvite(
   };
 }
 
+export function pendingInviteCount(): number {
+  const row = db
+    .prepare(
+      `SELECT COUNT(*) AS count FROM registration_invites
+       WHERE used_by IS NULL AND used_at IS NULL
+         AND (expires_at IS NULL OR expires_at > ?)`
+    )
+    .get(now()) as { count: number };
+  return Number(row?.count ?? 0);
+}
+
 export function createRegistrationInvite(input: {
   note?: unknown;
   expiresInDays?: unknown;
   createdBy: string;
 }): RegistrationInvite {
+  if (pendingInviteCount() >= MAX_PENDING_INVITES) {
+    throw new Error(
+      `There are already ${MAX_PENDING_INVITES} open invites. Revoke one before creating another.`
+    );
+  }
   const note = safeString(input.note, "", 120);
   const days = Number(input.expiresInDays);
   const expiresAt =

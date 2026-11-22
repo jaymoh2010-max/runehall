@@ -115,6 +115,14 @@ describe("migrations", () => {
 
     const columns = db.prepare("PRAGMA table_info(users)").all() as { name: string }[];
     expect(columns.map((column) => column.name)).toContain("is_admin");
+    expect(columns.map((column) => column.name)).toContain("disabled_at");
+    expect(columns.map((column) => column.name)).toContain("disabled_reason");
+    const loginSessionColumns = db.prepare("PRAGMA table_info(sessions)").all() as {
+      name: string;
+    }[];
+    expect(loginSessionColumns.map((column) => column.name)).toContain("user_agent");
+    expect(loginSessionColumns.map((column) => column.name)).toContain("ip");
+    expect(loginSessionColumns.map((column) => column.name)).toContain("last_seen_at");
 
     const first = db.prepare("SELECT is_admin FROM users WHERE id = ?").get("usr_first") as {
       is_admin: number;

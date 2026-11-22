@@ -116,7 +116,7 @@ import {
   campaignRequestTitle,
   isCampaignRequestKind,
 } from "../../shared/requests";
-import { contextForDraft } from "../compendium";
+import { compendiumManifest, contextForDraft } from "../compendium";
 import { campaignSessionsFor } from "../sessionData";
 import { importCampaign } from "../campaignImport";
 import { logAudit } from "../audit";
@@ -1176,6 +1176,10 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
       format: "runehall-campaign",
       version: 1,
       exportedAt: new Date().toISOString(),
+      compendium: {
+        generatedAt: compendiumManifest.generatedAt ?? null,
+        sourceCommit: compendiumManifest.sourceCommit ?? null,
+      },
       campaign: serializeCampaignSummary(
         row,
         "gm",

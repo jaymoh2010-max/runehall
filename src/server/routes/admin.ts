@@ -1,5 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { db, type UserRow } from "../db";
+import { revokeAllSessions } from "../auth";
 import {
   auditStatus,
   listAudit,
@@ -19,24 +20,64 @@ import {
   userCount,
 } from "../registration";
 import { requireAdmin } from "./auth";
-import { safeString } from "../util";
+import type { AdminUser } from "../../shared/types";
+import { now, safeString } from "../util";
 
-function serializeUser(row: UserRow) {
+function serializeUser(
+  row: UserRow & { session_count?: number; last_seen_at?: number | null }
+): AdminUser {
   return {
     id: row.id,
     username: row.username,
     displayName: row.display_name,
     isAdmin: Boolean(row.is_admin),
     createdAt: row.created_at,
+    disabledAt: row.disabled_at ?? null,
+    disabledReason: row.disabled_reason ?? "",
+    sessionCount: Number(row.session_count ?? 0),
+    lastSeenAt: row.last_seen_at ?? null,
   };
+}
+
+function activeAdminCount(): number {
+  const row = db
+    .prepare("SELECT COUNT(*) AS count FROM users WHERE is_admin = 1 AND disabled_at IS NULL")
+    .get() as { count: number };
+  return Number(row?.count ?? 0);
+}
+
+function loadAdminUser(id: string) {
+  return (
+    (db
+      .prepare(
+        `SELECT u.*,
+           (SELECT COUNT(*) FROM sessions s WHERE s.user_id = u.id AND s.expires_at > ?) AS session_count,
+           (SELECT MAX(s.last_seen_at) FROM sessions s WHERE s.user_id = u.id) AS last_seen_at
+         FROM users u WHERE u.id = ?`
+      )
+      .get(now(), id) as
+      (UserRow & { session_count: number; last_seen_at: number | null }) | undefined) ?? null
+  );
+}
+
+/** Drop every live socket for an account so moderation takes effect at once. */
+function disconnectUserSockets(app: FastifyInstance, userId: string): void {
+  for (const socket of app.io.sockets.sockets.values()) {
+    const data = socket.data as { user?: { id?: string } };
+    if (data.user?.id === userId) socket.disconnect(true);
+  }
 }
 
 export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
   app.get("/api/admin/overview", async (request, reply) => {
     if (!requireAdmin(request, reply)) return;
+    const suspended = db
+      .prepare("SELECT COUNT(*) AS count FROM users WHERE disabled_at IS NOT NULL")
+      .get() as { count: number };
     return reply.send({
       registration: registrationStatus(),
       users: userCount(),
+      suspended: Number(suspended?.count ?? 0),
       invites: listRegistrationInvites().filter((invite) => !invite.usedAt && !invite.usedBy)
         .length,
       audit: auditStatus(),
@@ -172,7 +213,113 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
 
   app.get("/api/admin/users", async (request, reply) => {
     if (!requireAdmin(request, reply)) return;
-    const rows = db.prepare("SELECT * FROM users ORDER BY created_at ASC").all() as UserRow[];
+    const rows = db
+      .prepare(
+        `SELECT u.*,
+           (SELECT COUNT(*) FROM sessions s WHERE s.user_id = u.id AND s.expires_at > ?) AS session_count,
+           (SELECT MAX(s.last_seen_at) FROM sessions s WHERE s.user_id = u.id) AS last_seen_at
+         FROM users u ORDER BY u.created_at ASC`
+      )
+      .all(now()) as (UserRow & { session_count: number; last_seen_at: number | null })[];
     return reply.send({ users: rows.map(serializeUser) });
+  });
+
+  app.post("/api/admin/users/:id/disable", async (request, reply) => {
+    if (!requireAdmin(request, reply)) return;
+    const { id } = request.params as { id: string };
+    if (id === request.user!.id) {
+      return reply.code(400).send({ error: "You cannot suspend your own account." });
+    }
+    const target = loadAdminUser(id);
+    if (!target) return reply.code(404).send({ error: "User not found." });
+    if (target.is_admin && activeAdminCount() <= 1) {
+      return reply.code(400).send({ error: "Keep at least one active administrator." });
+    }
+    const body = (request.body ?? {}) as Record<string, unknown>;
+    const reason = safeString(body.reason, "", 200);
+    db.prepare("UPDATE users SET disabled_at = ?, disabled_reason = ? WHERE id = ?").run(
+      now(),
+      reason,
+      id
+    );
+    const revoked = revokeAllSessions(id);
+    disconnectUserSockets(app, id);
+    logAudit({
+      action: "admin.user_disable",
+      actor: request.user,
+      targetType: "user",
+      targetId: id,
+      detail: `${target.username}${reason ? `: ${reason}` : ""}; ${revoked} sessions revoked`,
+      request,
+    });
+    return reply.send({ user: serializeUser(loadAdminUser(id)!) });
+  });
+
+  app.post("/api/admin/users/:id/enable", async (request, reply) => {
+    if (!requireAdmin(request, reply)) return;
+    const { id } = request.params as { id: string };
+    const target = loadAdminUser(id);
+    if (!target) return reply.code(404).send({ error: "User not found." });
+    db.prepare("UPDATE users SET disabled_at = NULL, disabled_reason = '' WHERE id = ?").run(id);
+    logAudit({
+      action: "admin.user_enable",
+      actor: request.user,
+      targetType: "user",
+      targetId: id,
+      detail: target.username,
+      request,
+    });
+    return reply.send({ user: serializeUser(loadAdminUser(id)!) });
+  });
+
+  app.post("/api/admin/users/:id/admin", async (request, reply) => {
+    if (!requireAdmin(request, reply)) return;
+    const { id } = request.params as { id: string };
+    if (id === request.user!.id) {
+      return reply.code(400).send({ error: "You cannot change your own administrator role." });
+    }
+    const target = loadAdminUser(id);
+    if (!target) return reply.code(404).send({ error: "User not found." });
+    const body = (request.body ?? {}) as Record<string, unknown>;
+    if (typeof body.isAdmin !== "boolean") {
+      return reply.code(400).send({ error: "Choose whether the account is an administrator." });
+    }
+    const isAdmin = body.isAdmin;
+    if (!isAdmin && target.is_admin && activeAdminCount() <= 1) {
+      return reply.code(400).send({ error: "Keep at least one active administrator." });
+    }
+    db.prepare("UPDATE users SET is_admin = ? WHERE id = ?").run(isAdmin ? 1 : 0, id);
+    logAudit({
+      action: "admin.user_role",
+      actor: request.user,
+      targetType: "user",
+      targetId: id,
+      detail: `${target.username}: ${isAdmin ? "administrator" : "player"}`,
+      request,
+    });
+    return reply.send({ user: serializeUser(loadAdminUser(id)!) });
+  });
+
+  app.post("/api/admin/users/:id/sessions/revoke", async (request, reply) => {
+    if (!requireAdmin(request, reply)) return;
+    const { id } = request.params as { id: string };
+    if (id === request.user!.id) {
+      return reply
+        .code(400)
+        .send({ error: "Use Account → Sessions to sign out your own devices." });
+    }
+    const target = loadAdminUser(id);
+    if (!target) return reply.code(404).send({ error: "User not found." });
+    const revoked = revokeAllSessions(id);
+    disconnectUserSockets(app, id);
+    logAudit({
+      action: "admin.user_sessions_revoke",
+      actor: request.user,
+      targetType: "user",
+      targetId: id,
+      detail: `${target.username}: ${revoked} sessions revoked`,
+      request,
+    });
+    return reply.send({ user: serializeUser(loadAdminUser(id)!) });
   });
 }

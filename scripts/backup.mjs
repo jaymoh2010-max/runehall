@@ -35,13 +35,20 @@ if (!fs.existsSync(databasePath)) {
 
 const stamp = new Date().toISOString().replace(/[:.]/g, "-");
 const destination = path.join(backupRoot, `runehall-${stamp}`);
-fs.mkdirSync(destination, { recursive: true });
+// Build in a staging directory and publish with one rename so an interrupted
+// backup never looks like a complete archive.
+const staging = `${destination}.partial`;
+let finalized = false;
+fs.mkdirSync(staging, { recursive: true });
+process.on("exit", () => {
+  if (!finalized) fs.rmSync(staging, { recursive: true, force: true });
+});
 
 function sqlString(value) {
   return value.replace(/'/g, "''");
 }
 
-const snapshotPath = path.join(destination, "runehall.db");
+const snapshotPath = path.join(staging, "runehall.db");
 const source = new DatabaseSync(databasePath);
 try {
   source.exec("PRAGMA busy_timeout = 5000;");
@@ -54,9 +61,9 @@ try {
 }
 
 if (fs.existsSync(uploadsDir)) {
-  fs.cpSync(uploadsDir, path.join(destination, "uploads"), { recursive: true });
+  fs.cpSync(uploadsDir, path.join(staging, "uploads"), { recursive: true });
 } else {
-  fs.mkdirSync(path.join(destination, "uploads"), { recursive: true });
+  fs.mkdirSync(path.join(staging, "uploads"), { recursive: true });
 }
 
 // The compendium is required for the server to start and for the builder to
@@ -64,10 +71,10 @@ if (fs.existsSync(uploadsDir)) {
 // actually usable. The manifest copy stays for quick version inspection.
 const manifestPath = path.join(compendiumDir, "manifest.json");
 if (fs.existsSync(manifestPath)) {
-  fs.copyFileSync(manifestPath, path.join(destination, "compendium-manifest.json"));
+  fs.copyFileSync(manifestPath, path.join(staging, "compendium-manifest.json"));
 }
 if (fs.existsSync(compendiumDir)) {
-  fs.cpSync(compendiumDir, path.join(destination, "compendium"), { recursive: true });
+  fs.cpSync(compendiumDir, path.join(staging, "compendium"), { recursive: true });
 } else {
   console.warn(
     `WARNING: no compendium found at ${compendiumDir}; the backup will not include rules data.`
@@ -88,20 +95,20 @@ const walk = (directory) => {
     if (entry.isDirectory()) walk(full);
     else {
       files.push({
-        path: path.relative(destination, full).split(path.sep).join("/"),
+        path: path.relative(staging, full).split(path.sep).join("/"),
         bytes: fs.statSync(full).size,
         sha256: sha256File(full),
       });
     }
   }
 };
-walk(destination);
+walk(staging);
 files.sort((a, b) => a.path.localeCompare(b.path));
 const totalBytes = files.reduce((sum, file) => sum + file.bytes, 0);
 const digest = manifestDigest(files);
 
 fs.writeFileSync(
-  path.join(destination, "backup.json"),
+  path.join(staging, "backup.json"),
   JSON.stringify(
     {
       format: "runehall-backup",
@@ -118,6 +125,9 @@ fs.writeFileSync(
   )
 );
 
+fs.renameSync(staging, destination);
+finalized = true;
+
 console.log(`Runehall backup created:`);
 console.log(`  ${destination}`);
 console.log(`  ${(totalBytes / 1024 / 1024).toFixed(1)} MB, ${files.length} files`);
@@ -126,7 +136,12 @@ console.log(`  manifest ${digest.slice(0, 16)}…`);
 if (keep > 0) {
   const archives = fs
     .readdirSync(backupRoot, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory() && entry.name.startsWith("runehall-"))
+    .filter(
+      (entry) =>
+        entry.isDirectory() &&
+        entry.name.startsWith("runehall-") &&
+        !entry.name.includes(".partial")
+    )
     .map((entry) => entry.name)
     .sort()
     .reverse();

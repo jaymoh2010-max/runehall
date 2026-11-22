@@ -30,7 +30,7 @@ import { registerTravelRoutes } from "./routes/travel";
 import { registerUploadRoutes } from "./routes/uploads";
 import { isTrustedOrigin, registerSecurity } from "./security";
 import { setRevisionBroadcaster } from "./revisions";
-import { compendiumCounts } from "./compendium";
+import { compendiumCounts, compendiumManifest } from "./compendium";
 import { db } from "./db";
 import { registerSocketServer, type TypedServer } from "./socket";
 import { uploadsDir } from "./util";
@@ -141,6 +141,11 @@ app.get("/api/health", async (_request, reply) => {
     database,
     compendium: compendiumReady ? "ok" : "missing",
     counts: { feats: compendiumCounts.feats, monsters: compendiumCounts.monsters },
+    compendiumVersion: {
+      generatedAt: compendiumManifest.generatedAt ?? null,
+      sourceCommit: compendiumManifest.sourceCommit ?? null,
+      count: compendiumManifest.count ?? null,
+    },
   });
 });
 

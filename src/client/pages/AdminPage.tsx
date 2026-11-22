@@ -1,18 +1,23 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import {
+  Ban,
+  CheckCircle2,
   Copy,
   Download,
   KeyRound,
+  LogOut,
   Plus,
   RefreshCw,
   ScrollText,
   ShieldCheck,
   Trash2,
+  UserCog,
   Users,
 } from "lucide-react";
 import { api, copyText } from "../api";
 import { useSession, useToasts, errorMessage } from "../stores";
 import type {
+  AdminUser,
   AuditEntry,
   RegistrationInvite,
   RegistrationMode,
@@ -42,6 +47,7 @@ interface AuditOverview {
 interface Overview {
   registration: RegistrationStatus;
   users: number;
+  suspended: number;
   invites: number;
   audit: AuditOverview;
 }
@@ -75,6 +81,8 @@ export function AdminPage() {
   const toast = useToasts((state) => state.push);
   const [overview, setOverview] = useState<Overview | null>(null);
   const [invites, setInvites] = useState<RegistrationInvite[]>([]);
+  const [accounts, setAccounts] = useState<AdminUser[]>([]);
+  const [accountBusy, setAccountBusy] = useState<string | null>(null);
   const [audit, setAudit] = useState<AuditEntry[]>([]);
   const [auditTotal, setAuditTotal] = useState(0);
   const [auditFilter, setAuditFilter] = useState("");
@@ -114,12 +122,14 @@ export function AdminPage() {
     setLoading(true);
     setError("");
     try {
-      const [overviewResult, inviteResult] = await Promise.all([
+      const [overviewResult, inviteResult, userResult] = await Promise.all([
         api<Overview>("/api/admin/overview"),
         api<{ invites: RegistrationInvite[] }>("/api/admin/invites"),
+        api<{ users: AdminUser[] }>("/api/admin/users"),
       ]);
       setOverview(overviewResult);
       setInvites(inviteResult.invites);
+      setAccounts(userResult.users);
       setRetentionDays(String(overviewResult.audit.retentionDays));
       await loadAudit(0, false);
     } catch (err) {
@@ -202,6 +212,105 @@ export function AdminPage() {
       await loadAudit(0, false);
     } catch (err) {
       toast(errorMessage(err), "error");
+    }
+  };
+
+  const replaceAccount = (account: AdminUser) => {
+    setAccounts((current) => current.map((entry) => (entry.id === account.id ? account : entry)));
+  };
+
+  const revokeAccountSessions = async (account: AdminUser) => {
+    const confirmed = window.confirm(
+      `Sign ${account.displayName} out of every device? Their next request will ask them to sign in again.`
+    );
+    if (!confirmed) return;
+    setAccountBusy(account.id);
+    try {
+      const result = await api<{ user: AdminUser }>(
+        `/api/admin/users/${account.id}/sessions/revoke`,
+        { method: "POST" }
+      );
+      replaceAccount(result.user);
+      toast(`Signed ${account.displayName} out of every device.`, "success");
+      await loadAudit(0, false);
+    } catch (err) {
+      toast(errorMessage(err), "error");
+    } finally {
+      setAccountBusy(null);
+    }
+  };
+
+  const toggleAccountDisabled = async (account: AdminUser) => {
+    const enabling = Boolean(account.disabledAt);
+    let reason = "";
+    if (!enabling) {
+      const answer = window.prompt(
+        `Suspend ${account.displayName}? Their sessions will be revoked immediately.\n\nOptional reason:`,
+        account.disabledReason || ""
+      );
+      if (answer === null) return;
+      reason = answer;
+    } else if (!window.confirm(`Restore ${account.displayName}'s account?`)) {
+      return;
+    }
+    setAccountBusy(account.id);
+    try {
+      const result = await api<{ user: AdminUser }>(
+        `/api/admin/users/${account.id}/${enabling ? "enable" : "disable"}`,
+        { method: "POST", body: { reason } }
+      );
+      replaceAccount(result.user);
+      setOverview((current) =>
+        current
+          ? {
+              ...current,
+              suspended: Math.max(0, current.suspended + (enabling ? -1 : 1)),
+            }
+          : current
+      );
+      toast(
+        enabling
+          ? `${account.displayName} can sign in again.`
+          : `${account.displayName} suspended.`,
+        "success"
+      );
+      await loadAudit(0, false);
+    } catch (err) {
+      toast(errorMessage(err), "error");
+    } finally {
+      setAccountBusy(null);
+    }
+  };
+
+  const toggleAccountAdmin = async (account: AdminUser) => {
+    const promoting = !account.isAdmin;
+    if (
+      !window.confirm(
+        promoting
+          ? `Make ${account.displayName} an instance administrator?`
+          : `Remove ${account.displayName}'s administrator role?`
+      )
+    ) {
+      return;
+    }
+    setAccountBusy(account.id);
+    try {
+      const result = await api<{ user: AdminUser }>(`/api/admin/users/${account.id}/admin`, {
+        method: "POST",
+        body: { isAdmin: promoting },
+      });
+      replaceAccount(result.user);
+      toast(
+        promoting
+          ? `${account.displayName} is now an administrator.`
+          : `${account.displayName} is now a player account.`,
+        "success"
+      );
+      await loadAudit(0, false);
+    } catch (err) {
+      toast(errorMessage(err), "error");
+    } finally {
+      setAccountBusy(null);
     }
   };
 
@@ -292,7 +401,13 @@ export function AdminPage() {
       {error ? <ErrorState message={error} onRetry={() => void load()} /> : null}
 
       <div className="admin-stats">
-        <Stat label="Accounts" value={overview?.users ?? "—"} hint="All local users" />
+        <Stat
+          label="Accounts"
+          value={overview?.users ?? "-"}
+          hint={
+            overview?.suspended ? `${overview.suspended} suspended` : "All local users are active"
+          }
+        />
         <Stat
           label="Open invites"
           value={openInvites.length}
@@ -462,6 +577,82 @@ export function AdminPage() {
           </div>
         </Card>
       </div>
+
+      <Card className="admin-card admin-accounts">
+        <SectionTitle
+          title="Accounts"
+          subtitle="Suspend an account, revoke its sessions, or grant another administrator."
+          action={
+            <div className="row wrap" style={{ gap: 8 }}>
+              <Badge tone="blue">
+                {accounts.length} {accounts.length === 1 ? "account" : "accounts"}
+              </Badge>
+              <UserCog size={16} />
+            </div>
+          }
+        />
+        <div className="admin-user-list">
+          {accounts.map((account) => {
+            const self = account.id === user.id;
+            const suspended = Boolean(account.disabledAt);
+            const busy = accountBusy === account.id;
+            return (
+              <div className={`admin-user-row ${suspended ? "is-suspended" : ""}`} key={account.id}>
+                <div className="admin-user-main">
+                  <div className="row wrap" style={{ gap: 7 }}>
+                    <strong>{account.displayName}</strong>
+                    <span className="tiny muted">@{account.username}</span>
+                    {account.isAdmin ? <Badge tone="gold">Administrator</Badge> : null}
+                    {suspended ? <Badge tone="red">Suspended</Badge> : null}
+                    {self ? <Badge tone="neutral">You</Badge> : null}
+                  </div>
+                  <p className="tiny muted">
+                    Joined {when(account.createdAt)} · {account.sessionCount}{" "}
+                    {account.sessionCount === 1 ? "session" : "sessions"}
+                    {account.lastSeenAt ? ` · last active ${when(account.lastSeenAt)}` : ""}
+                  </p>
+                  {account.disabledReason ? (
+                    <p className="tiny muted">Reason: {account.disabledReason}</p>
+                  ) : null}
+                </div>
+                {!self ? (
+                  <div className="admin-user-actions">
+                    {!suspended ? (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        icon={<LogOut size={13} />}
+                        loading={busy}
+                        onClick={() => void revokeAccountSessions(account)}
+                      >
+                        Revoke sessions
+                      </Button>
+                    ) : null}
+                    <Button
+                      size="sm"
+                      variant={suspended ? "secondary" : "ghost"}
+                      icon={suspended ? <CheckCircle2 size={13} /> : <Ban size={13} />}
+                      loading={busy}
+                      onClick={() => void toggleAccountDisabled(account)}
+                    >
+                      {suspended ? "Restore" : "Suspend"}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      icon={<ShieldCheck size={13} />}
+                      loading={busy}
+                      onClick={() => void toggleAccountAdmin(account)}
+                    >
+                      {account.isAdmin ? "Remove admin" : "Make admin"}
+                    </Button>
+                  </div>
+                ) : null}
+              </div>
+            );
+          })}
+        </div>
+      </Card>
 
       <Card className="admin-card admin-retention">
         <SectionTitle

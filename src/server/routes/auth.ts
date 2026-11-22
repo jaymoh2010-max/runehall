@@ -5,6 +5,9 @@ import {
   destroySession,
   getSessionToken,
   hashPassword,
+  listSessions,
+  revokeOtherSessions,
+  revokeSession,
   safeEqualText,
   setSessionCookie,
   toPublicUser,
@@ -25,6 +28,14 @@ import { newId, now, safeString } from "../util";
 
 function isUniqueViolation(error: unknown): boolean {
   return error instanceof Error && /UNIQUE|constraint/i.test(error.message);
+}
+
+function sessionMeta(request: FastifyRequest) {
+  const userAgent = request.headers["user-agent"];
+  return {
+    userAgent: typeof userAgent === "string" ? userAgent : "",
+    ip: request.ip,
+  };
 }
 
 export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
@@ -100,7 +111,7 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
             : "open registration",
         request,
       });
-      const token = createSession(id);
+      const token = createSession(id, sessionMeta(request));
       setSessionCookie(reply, token);
       return reply.send({ user: toPublicUser(row) });
     } catch (error) {
@@ -124,7 +135,19 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
       });
       return reply.code(401).send({ error: "Incorrect username or password." });
     }
-    const token = createSession(row.id);
+    if (row.disabled_at) {
+      logAudit({
+        action: "auth.login_suspended",
+        targetType: "user",
+        targetId: row.id,
+        detail: row.disabled_reason || "account suspended",
+        request,
+      });
+      return reply
+        .code(403)
+        .send({ error: "That account is suspended. Ask an administrator for help." });
+    }
+    const token = createSession(row.id, sessionMeta(request));
     setSessionCookie(reply, token);
     logAudit({
       action: "auth.login",
@@ -183,6 +206,54 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
     });
   });
 
+  app.get("/api/auth/sessions", async (request, reply) => {
+    if (!request.user) return reply.code(401).send({ error: "Sign in to continue." });
+    return reply.send({
+      sessions: listSessions(request.user.id, getSessionToken(request)),
+    });
+  });
+
+  app.delete("/api/auth/sessions/:sessionId", async (request, reply) => {
+    if (!request.user) return reply.code(401).send({ error: "Sign in to continue." });
+    const { sessionId } = request.params as { sessionId: string };
+    const current = getSessionToken(request);
+    const target = listSessions(request.user.id, current).find(
+      (session) => session.id === sessionId
+    );
+    if (!target) return reply.code(404).send({ error: "Session not found." });
+    revokeSession(request.user.id, sessionId);
+    if (target.current && current) {
+      destroySession(current);
+      clearSessionCookie(reply);
+    }
+    logAudit({
+      action: "auth.session_revoke",
+      actor: request.user,
+      targetType: "session",
+      targetId: sessionId.slice(0, 12),
+      detail: target.current ? "current session" : "signed-out device",
+      request,
+    });
+    return reply.send({ ok: true, current: target.current });
+  });
+
+  app.post("/api/auth/sessions/revoke-others", async (request, reply) => {
+    if (!request.user) return reply.code(401).send({ error: "Sign in to continue." });
+    const removed = revokeOtherSessions(request.user.id, getSessionToken(request));
+    logAudit({
+      action: "auth.sessions_revoke_others",
+      actor: request.user,
+      targetType: "user",
+      targetId: request.user.id,
+      detail: `${removed} session${removed === 1 ? "" : "s"} signed out`,
+      request,
+    });
+    return reply.send({
+      removed,
+      sessions: listSessions(request.user.id, getSessionToken(request)),
+    });
+  });
+
   app.post("/api/auth/password", async (request, reply) => {
     if (!request.user) return reply.code(401).send({ error: "Sign in to continue." });
     const body = (request.body ?? {}) as Record<string, unknown>;
@@ -213,7 +284,7 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
       // Sign out every other device; then issue a fresh session for this one.
       db.prepare("DELETE FROM sessions WHERE user_id = ?").run(request.user!.id);
     });
-    const token = createSession(request.user.id);
+    const token = createSession(request.user.id, sessionMeta(request));
     setSessionCookie(reply, token);
     logAudit({
       action: "auth.password_change",

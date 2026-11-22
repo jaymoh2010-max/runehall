@@ -1,8 +1,8 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { KeyRound, Save, UserRound } from "lucide-react";
+import { KeyRound, LogOut, Monitor, Save, ShieldAlert, UserRound } from "lucide-react";
 import { api } from "../api";
 import { errorMessage, useSession, useToasts } from "../stores";
-import type { PublicUser } from "../../shared/types";
+import type { AuthSession, PublicUser } from "../../shared/types";
 import {
   Avatar,
   Badge,
@@ -14,6 +14,40 @@ import {
   SectionTitle,
 } from "../components/ui";
 
+function when(timestamp: number): string {
+  return new Date(timestamp).toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+function deviceLabel(userAgent: string): string {
+  if (!userAgent) return "Unknown device";
+  const browser = /Edg\//.test(userAgent)
+    ? "Edge"
+    : /Firefox\//.test(userAgent)
+      ? "Firefox"
+      : /Chrome\//.test(userAgent)
+        ? "Chrome"
+        : /Safari\//.test(userAgent)
+          ? "Safari"
+          : "Browser";
+  const platform = /Windows/.test(userAgent)
+    ? "Windows"
+    : /Android/.test(userAgent)
+      ? "Android"
+      : /iPhone|iPad/.test(userAgent)
+        ? "iOS"
+        : /Mac OS X/.test(userAgent)
+          ? "macOS"
+          : /Linux/.test(userAgent)
+            ? "Linux"
+            : "";
+  return platform ? `${browser} on ${platform}` : browser;
+}
+
 export function AccountPage() {
   const user = useSession((state) => state.user);
   const setUser = useSession((state) => state.setUser);
@@ -24,6 +58,9 @@ export function AccountPage() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [savingPassword, setSavingPassword] = useState(false);
+  const [sessions, setSessions] = useState<AuthSession[]>([]);
+  const [sessionsLoading, setSessionsLoading] = useState(true);
+  const [sessionBusy, setSessionBusy] = useState<string | null>(null);
 
   useEffect(() => {
     document.title = "Account · Runehall";
@@ -33,7 +70,68 @@ export function AccountPage() {
     setDisplayName(user?.displayName ?? "");
   }, [user?.displayName]);
 
+  const loadSessions = async () => {
+    setSessionsLoading(true);
+    try {
+      const result = await api<{ sessions: AuthSession[] }>("/api/auth/sessions");
+      setSessions(result.sessions);
+    } catch (err) {
+      toast(errorMessage(err), "error");
+    } finally {
+      setSessionsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (user) void loadSessions();
+    // Sessions only need to load when the signed-in account changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
+
   if (!user) return null;
+
+  const revokeSession = async (session: AuthSession) => {
+    setSessionBusy(session.id);
+    try {
+      const result = await api<{ ok: boolean; current: boolean }>(
+        `/api/auth/sessions/${session.id}`,
+        { method: "DELETE" }
+      );
+      if (result.current) {
+        window.location.assign("/login");
+        return;
+      }
+      setSessions((current) => current.filter((entry) => entry.id !== session.id));
+      toast("Device signed out.", "success");
+    } catch (err) {
+      toast(errorMessage(err), "error");
+    } finally {
+      setSessionBusy(null);
+    }
+  };
+
+  const signOutOthers = async () => {
+    setSessionBusy("others");
+    try {
+      const result = await api<{ removed: number; sessions: AuthSession[] }>(
+        "/api/auth/sessions/revoke-others",
+        { method: "POST" }
+      );
+      setSessions(result.sessions);
+      toast(
+        result.removed
+          ? `Signed out ${result.removed} other ${result.removed === 1 ? "device" : "devices"}.`
+          : "No other devices were signed in.",
+        "success"
+      );
+    } catch (err) {
+      toast(errorMessage(err), "error");
+    } finally {
+      setSessionBusy(null);
+    }
+  };
+
+  const otherSessions = sessions.filter((session) => !session.current);
 
   const saveProfile = async (event: FormEvent) => {
     event.preventDefault();
@@ -67,6 +165,7 @@ export function AccountPage() {
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
+      await loadSessions();
       toast("Password changed. Other sessions were signed out.", "success");
     } catch (err) {
       toast(errorMessage(err), "error");
@@ -174,6 +273,71 @@ export function AccountPage() {
           </p>
         </Card>
       </div>
+
+      <Card className="admin-card account-sessions">
+        <SectionTitle
+          title="Active sessions"
+          subtitle="Every device with a valid sign-in. Revoke anything you do not recognize."
+          action={
+            <Button
+              size="sm"
+              variant="secondary"
+              icon={<LogOut size={14} />}
+              loading={sessionBusy === "others"}
+              disabled={!otherSessions.length}
+              onClick={() => void signOutOthers()}
+            >
+              Sign out other devices
+            </Button>
+          }
+        />
+        {sessionsLoading ? (
+          <p className="muted small">Checking active sessions.</p>
+        ) : sessions.length ? (
+          <div className="account-session-list">
+            {sessions.map((session) => (
+              <div
+                className={`account-session ${session.current ? "is-current" : ""}`}
+                key={session.id}
+              >
+                <span className="account-session-icon">
+                  <Monitor size={16} />
+                </span>
+                <div className="grow">
+                  <div className="row wrap" style={{ gap: 7 }}>
+                    <strong>{deviceLabel(session.userAgent)}</strong>
+                    {session.current ? <Badge tone="green">This device</Badge> : null}
+                  </div>
+                  <p className="tiny muted">
+                    {session.ip || "unknown address"} · last active {when(session.lastSeenAt)} ·
+                    signed in {when(session.createdAt)}
+                  </p>
+                </div>
+                {!session.current ? (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    icon={<LogOut size={13} />}
+                    loading={sessionBusy === session.id}
+                    onClick={() => void revokeSession(session)}
+                  >
+                    Sign out
+                  </Button>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="muted small">No active sessions were found.</p>
+        )}
+        <div className="settings-note">
+          <ShieldAlert size={16} />
+          <span>
+            Passwords are stored with scrypt. Changing your password also signs out every other
+            device.
+          </span>
+        </div>
+      </Card>
 
       <Card className="admin-card account-note">
         <UserRound size={18} />

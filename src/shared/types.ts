@@ -1057,6 +1057,30 @@ export interface PublicUser {
   isAdmin: boolean;
 }
 
+/** A signed-in device. The id is an opaque session hash, never the cookie. */
+export interface AuthSession {
+  id: string;
+  current: boolean;
+  userAgent: string;
+  ip: string;
+  createdAt: number;
+  lastSeenAt: number;
+  expiresAt: number;
+}
+
+/** Administrator-facing account row with moderation state. */
+export interface AdminUser {
+  id: string;
+  username: string;
+  displayName: string;
+  isAdmin: boolean;
+  createdAt: number;
+  disabledAt: number | null;
+  disabledReason: string;
+  sessionCount: number;
+  lastSeenAt: number | null;
+}
+
 export interface CampaignMember extends PublicUser {
   role: "gm" | "player";
   joinedAt: number;

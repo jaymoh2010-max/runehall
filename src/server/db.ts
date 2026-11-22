@@ -92,6 +92,18 @@ export interface UserRow {
   avatar_url: string | null;
   is_admin: number;
   created_at: number;
+  disabled_at: number | null;
+  disabled_reason: string;
+}
+
+export interface SessionRow {
+  token_hash: string;
+  user_id: string;
+  expires_at: number;
+  created_at: number;
+  user_agent: string;
+  ip: string;
+  last_seen_at: number;
 }
 
 export interface AuditLogRow {

@@ -37,6 +37,24 @@ import {
 
 const compendiumDir = path.resolve(process.env.COMPENDIUM_DIR || "data/compendium");
 
+export interface CompendiumManifest {
+  generatedAt?: string;
+  source?: string;
+  sourceCommit?: string;
+  sourceDirty?: boolean;
+  count?: Record<string, number>;
+}
+
+/** Version metadata written by the ingest script; safe defaults if absent. */
+export const compendiumManifest: CompendiumManifest = (() => {
+  const full = path.join(compendiumDir, "manifest.json");
+  try {
+    return JSON.parse(fs.readFileSync(full, "utf8")) as CompendiumManifest;
+  } catch {
+    return {};
+  }
+})();
+
 function readArray<T>(file: string): T[] {
   const full = path.join(compendiumDir, file);
   if (!fs.existsSync(full)) {

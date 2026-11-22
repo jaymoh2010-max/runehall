@@ -870,4 +870,15 @@ export const migrations: Migration[] = [
         ON campaign_requests(campaign_id, status, created_at);
     `,
   },
+  {
+    version: 49,
+    name: "session_metadata_and_account_suspension",
+    sql: `
+      ALTER TABLE sessions ADD COLUMN user_agent TEXT NOT NULL DEFAULT '';
+      ALTER TABLE sessions ADD COLUMN ip TEXT NOT NULL DEFAULT '';
+      ALTER TABLE sessions ADD COLUMN last_seen_at INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE users ADD COLUMN disabled_at INTEGER;
+      ALTER TABLE users ADD COLUMN disabled_reason TEXT NOT NULL DEFAULT '';
+    `,
+  },
 ];

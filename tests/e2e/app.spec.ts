@@ -2624,3 +2624,52 @@ test("player requests downtime and proposes a journal entry for GM approval", as
 
   await adminContext.close();
 });
+
+test("account lists active sessions and can sign out other devices", async ({ page, browser }) => {
+  await signIn(page, admin);
+  await page.goto("/account");
+  await expect(page.getByRole("heading", { name: "Active sessions" })).toBeVisible();
+  await expect(page.locator(".account-session").filter({ hasText: "This device" })).toBeVisible();
+
+  const secondContext = await browser.newContext();
+  const secondPage = await secondContext.newPage();
+  await signIn(secondPage, admin);
+  await page.reload();
+  await expect(page.locator(".account-session").filter({ hasText: "This device" })).toBeVisible();
+  await expect(page.locator(".account-session")).not.toHaveCount(1);
+
+  await page.getByRole("button", { name: "Sign out other devices" }).click();
+  await expect(page.getByText(/Signed out \d+ other device/)).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator(".account-session")).toHaveCount(1);
+  const me = await secondPage.request.get("/api/auth/me");
+  expect(await me.json()).toEqual({ user: null });
+
+  await secondContext.close();
+});
+
+test("administrator suspends an account and revokes its sessions", async ({ page }) => {
+  await signIn(page, admin);
+  await page.goto("/admin");
+  await expect(page.getByRole("heading", { name: "Accounts", exact: true })).toBeVisible();
+  const importerRow = page.locator(".admin-user-row").filter({ hasText: "E2E Importer" });
+  await expect(importerRow).toBeVisible({ timeout: 15_000 });
+
+  page.once("dialog", (dialog) => dialog.accept("E2E moderation check"));
+  await importerRow.getByRole("button", { name: "Suspend" }).click();
+  await expect(page.getByText("E2E Importer suspended.")).toBeVisible({ timeout: 15_000 });
+  await expect(importerRow.getByText("Suspended", { exact: true })).toBeVisible();
+  await expect(importerRow.getByText("Reason: E2E moderation check")).toBeVisible();
+
+  const blocked = await page.request.post("/api/auth/login", {
+    data: { username: importer.username, password: importer.password },
+  });
+  expect(blocked.status()).toBe(403);
+
+  page.once("dialog", (dialog) => dialog.accept());
+  await importerRow.getByRole("button", { name: "Restore" }).click();
+  await expect(page.getByText("E2E Importer can sign in again.")).toBeVisible({
+    timeout: 15_000,
+  });
+  await expect(importerRow.getByText("Suspended", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("Reason: E2E moderation check")).toHaveCount(0);
+});
