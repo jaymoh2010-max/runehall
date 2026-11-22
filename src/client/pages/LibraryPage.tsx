@@ -1,4 +1,4 @@
-import { useEffect, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { BookOpen, Dices, Search, Shield, Skull, Sparkles, Swords } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import type { Deity, Equipment, Feat, Monster, Spell } from "../../shared/types";
@@ -87,13 +87,14 @@ export function LibraryPage() {
   const query = searchParams.get("q") ?? "";
   const legacy = searchParams.get("legacy") === "1";
   const selectedId = searchParams.get("entry");
+  const offset = Math.max(0, Number(searchParams.get("offset")) || 0);
   const [items, setItems] = useState<Entry[]>([]);
   const [total, setTotal] = useState(0);
   const [next, setNext] = useState<number | null>(null);
-  const [offset, setOffset] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [retryToken, setRetryToken] = useState(0);
+  const queryKeyRef = useRef<string | null>(null);
   const activeTab = TABS.find((entry) => entry.id === tab) ?? TABS[0];
   const selected = items.find((item) => item.id === selectedId) ?? items[0] ?? null;
   const returnTo = `/library${searchParams.toString() ? `?${searchParams.toString()}` : ""}`;
@@ -106,8 +107,26 @@ export function LibraryPage() {
     setItems([]);
     setTotal(0);
     setNext(null);
-    setOffset(0);
   }, [tab]);
+
+  useEffect(() => {
+    const key = `${tab}|${query}|${legacy}`;
+    if (queryKeyRef.current === null) {
+      queryKeyRef.current = key;
+      return;
+    }
+    if (queryKeyRef.current !== key && offset > 0) {
+      setSearchParams(
+        (current) => {
+          const nextParams = new URLSearchParams(current);
+          nextParams.delete("offset");
+          return nextParams;
+        },
+        { replace: true }
+      );
+    }
+    queryKeyRef.current = key;
+  }, [tab, query, legacy, offset, setSearchParams]);
 
   useEffect(() => {
     if (!selectedId || loading || !items.length) return;
@@ -142,21 +161,18 @@ export function LibraryPage() {
 
   const selectTab = (nextTab: Tab) => {
     if (nextTab === tab) return;
-    updateParams({ tab: nextTab === "feats" ? null : nextTab, entry: null });
-    setOffset(0);
+    updateParams({ tab: nextTab === "feats" ? null : nextTab, entry: null, offset: null });
     setItems([]);
     setNext(null);
     setLoading(true);
   };
 
   const setQuery = (value: string) => {
-    updateParams({ q: value, entry: null });
-    setOffset(0);
+    updateParams({ q: value, entry: null, offset: null });
   };
 
   const setLegacy = (value: boolean) => {
-    updateParams({ legacy: value ? "1" : null, entry: null });
-    setOffset(0);
+    updateParams({ legacy: value ? "1" : null, entry: null, offset: null });
   };
 
   const onTabKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
@@ -280,12 +296,18 @@ export function LibraryPage() {
         ) : null}
       </div>
 
-      {error ? (
-        <ErrorState message={error} onRetry={() => setRetryToken((current) => current + 1)} />
-      ) : (
-        <div id="library-panel" role="tabpanel" aria-labelledby={`library-tab-${tab}`}>
+      <div id="library-panel" role="tabpanel" aria-labelledby={`library-tab-${tab}`}>
+        {error && !items.length ? (
+          <ErrorState message={error} onRetry={() => setRetryToken((current) => current + 1)} />
+        ) : (
           <div className="library-layout">
             <div className="library-list" id="library-results" aria-busy={loading}>
+              {error ? (
+                <ErrorState
+                  message={error}
+                  onRetry={() => setRetryToken((current) => current + 1)}
+                />
+              ) : null}
               {items.map((item) => (
                 <HoverCard
                   key={item.id}
@@ -338,7 +360,12 @@ export function LibraryPage() {
               ) : null}
               {loading ? <Spinner label="Searching the archive…" /> : null}
               {next !== null && !loading ? (
-                <Button variant="ghost" size="sm" block onClick={() => setOffset(next)}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  block
+                  onClick={() => updateParams({ offset: next === 0 ? null : String(next) })}
+                >
                   Load more ({items.length} of {total})
                 </Button>
               ) : null}
@@ -372,8 +399,8 @@ export function LibraryPage() {
               )}
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

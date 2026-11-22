@@ -625,6 +625,7 @@ test("lazy library, compendium entry, rules, and account routes load", async ({ 
   const spellRow = page.getByRole("button", { name: /Fireball/ }).first();
   await expect(spellRow).toBeVisible();
   await spellRow.click();
+  await expect(page).toHaveURL(/entry=/);
   await page.getByRole("link", { name: "Open full page" }).click();
   await expect(page).toHaveURL(/\/library\/spell\//);
   await expect(page.getByRole("heading", { name: "Fireball", level: 1 })).toBeVisible();
@@ -640,6 +641,7 @@ test("lazy library, compendium entry, rules, and account routes load", async ({ 
   await expect(page.getByRole("heading", { name: "Rules at the table" })).toBeVisible();
   await page.getByRole("tab", { name: "Actions" }).click();
   await page.getByRole("button", { name: /^Aid/ }).click();
+  await expect(page.getByRole("heading", { name: "Aid", level: 2 })).toBeVisible();
   await page.getByRole("textbox", { name: "Search actions" }).fill("Stride");
   await expect(page.getByRole("heading", { name: "Stride", level: 2 })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Aid", level: 2 })).toHaveCount(0);

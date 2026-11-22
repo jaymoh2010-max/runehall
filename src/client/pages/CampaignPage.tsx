@@ -319,6 +319,10 @@ export function CampaignPage() {
     };
   }, [partyActionsOpen]);
 
+  useEffect(() => {
+    setPartyActionsOpen(false);
+  }, [tab]);
+
   const load = async () => {
     if (!id) return;
     setLoading(true);
