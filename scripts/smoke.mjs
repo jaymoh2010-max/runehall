@@ -1581,6 +1581,68 @@ async function main() {
   });
   log("private player notes stayed private and shared knowledge respected visibility");
 
+  const firstChapter = await api(`/api/campaigns/${campaign.id}/chapters`, {
+    method: "POST",
+    cookie: gmCookie,
+    body: {
+      title: "Smoke: The Ashen Crown",
+      summary: "The party learns the crown is waking.",
+      levelStart: 1,
+      levelEnd: 4,
+      status: "active",
+    },
+  });
+  const secondChapter = await api(`/api/campaigns/${campaign.id}/chapters`, {
+    method: "POST",
+    cookie: gmCookie,
+    body: {
+      title: "Smoke: Beneath the City",
+      summary: "The road into the vault.",
+      levelStart: 5,
+      levelEnd: 8,
+    },
+  });
+  if (firstChapter.payload.chapters.length !== 1 || secondChapter.payload.chapters.length !== 2) {
+    throw new Error("Adventure chapters were not saved");
+  }
+  const playerChapters = await api(`/api/campaigns/${campaign.id}/chapters`, {
+    cookie: playerCookie,
+  });
+  if (playerChapters.payload.chapters.length !== 2) {
+    throw new Error("Player could not read the adventure arc");
+  }
+  const playerChapterWrite = await fetch(`${base}/api/campaigns/${campaign.id}/chapters`, {
+    method: "POST",
+    headers: { cookie: playerCookie, "content-type": "application/json" },
+    body: JSON.stringify({ title: "Player chapter", levelStart: 1, levelEnd: 1 }),
+  });
+  if (playerChapterWrite.status !== 403) {
+    throw new Error("Player edited the adventure arc");
+  }
+  const switched = await api(
+    `/api/campaigns/${campaign.id}/chapters/${secondChapter.payload.chapter.id}`,
+    {
+      method: "PATCH",
+      cookie: gmCookie,
+      body: { status: "active" },
+    }
+  );
+  const statusFor = (id) => switched.payload.chapters.find((chapter) => chapter.id === id)?.status;
+  if (
+    statusFor(firstChapter.payload.chapter.id) !== "planned" ||
+    statusFor(secondChapter.payload.chapter.id) !== "active"
+  ) {
+    throw new Error("Only one adventure chapter should be active");
+  }
+  const deletedChapter = await api(
+    `/api/campaigns/${campaign.id}/chapters/${firstChapter.payload.chapter.id}`,
+    { method: "DELETE", cookie: gmCookie }
+  );
+  if (deletedChapter.payload.chapters.length !== 1) {
+    throw new Error("Adventure chapter was not deleted");
+  }
+  log("adventure chapters stay GM-managed and keep one active arc");
+
   const gmSocket = await connectSocket(gmCookie);
   const playerSocket = await connectSocket(playerCookie);
   await emitAck(gmSocket, "campaign:join", { campaignId: campaign.id });

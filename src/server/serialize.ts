@@ -8,6 +8,7 @@ import type {
   CampaignNpc,
   CampaignFaction,
   CampaignKnowledgeEntry,
+  CampaignChapter,
   CampaignPlayerNote,
   CampaignSession,
   CampaignSummary,
@@ -65,6 +66,7 @@ import {
   type CampaignNpcRow,
   type CampaignFactionRow,
   type CampaignKnowledgeRow,
+  type CampaignChapterRow,
   type CampaignPlayerNoteRow,
   type CampaignRow,
   type CampaignSessionRow,
@@ -104,6 +106,7 @@ import {
 } from "../shared/travel";
 import { normalizeSessionZeroChecklist } from "../shared/sessionZero";
 import { normalizeNpcAttitude, normalizeReputation } from "../shared/people";
+import { normalizeChapterLevel, normalizeChapterStatus } from "../shared/chapters";
 
 export function serializeCampaignSummary(
   campaign: CampaignRow,
@@ -602,6 +605,21 @@ export function serializeCampaignKnowledge(row: CampaignKnowledgeRow): CampaignK
     title: row.title,
     content: row.content,
     visible: Boolean(row.visible),
+    sortOrder: row.sort_order,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+export function serializeCampaignChapter(row: CampaignChapterRow): CampaignChapter {
+  return {
+    id: row.id,
+    campaignId: row.campaign_id,
+    title: row.title,
+    summary: row.summary,
+    levelStart: normalizeChapterLevel(row.level_start),
+    levelEnd: normalizeChapterLevel(row.level_end, normalizeChapterLevel(row.level_start)),
+    status: normalizeChapterStatus(row.status),
     sortOrder: row.sort_order,
     createdAt: row.created_at,
     updatedAt: row.updated_at,

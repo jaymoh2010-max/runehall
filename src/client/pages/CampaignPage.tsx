@@ -20,6 +20,7 @@ import {
   Images,
   LayoutGrid,
   LogOut,
+  Milestone,
   Moon,
   Pencil,
   Plus,
@@ -78,6 +79,7 @@ import { TravelTab } from "../components/campaign/TravelTab";
 import { SessionZeroTab } from "../components/campaign/SessionZeroTab";
 import { PeopleTab } from "../components/campaign/PeopleTab";
 import { NotesTab } from "../components/campaign/NotesTab";
+import { CampaignArcTab } from "../components/campaign/CampaignArcTab";
 import { errorMessage } from "../stores";
 import { useSession, useToasts } from "../stores";
 import {
@@ -131,6 +133,7 @@ type Tab =
   | "session-zero"
   | "party"
   | "people"
+  | "arc"
   | "travel"
   | "sessions"
   | "encounters"
@@ -155,6 +158,7 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode; gmOnly?: boolean }[
   { id: "session-zero", label: "Session zero", icon: <HeartHandshake size={15} /> },
   { id: "party", label: "Party", icon: <Users size={15} /> },
   { id: "people", label: "People", icon: <Shield size={15} /> },
+  { id: "arc", label: "Adventure arc", icon: <Milestone size={15} /> },
   { id: "travel", label: "Travel", icon: <Compass size={15} /> },
   { id: "journal", label: "Journal", icon: <ScrollText size={15} /> },
   { id: "notes", label: "Notes", icon: <BookOpen size={15} /> },
@@ -182,6 +186,7 @@ export function CampaignPage() {
     rawTab === "session-zero" ||
     rawTab === "party" ||
     rawTab === "people" ||
+    rawTab === "arc" ||
     rawTab === "travel" ||
     rawTab === "sessions" ||
     rawTab === "encounters" ||
@@ -1553,6 +1558,15 @@ export function CampaignPage() {
 
         {tab === "people" ? (
           <PeopleTab campaignId={campaign.id} refreshKey={campaign.updatedAt} />
+        ) : null}
+
+        {tab === "arc" ? (
+          <CampaignArcTab
+            campaignId={campaign.id}
+            isGm={Boolean(isGm)}
+            refreshKey={campaign.updatedAt}
+            toast={toast}
+          />
         ) : null}
 
         {tab === "travel" ? (

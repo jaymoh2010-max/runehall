@@ -21,6 +21,7 @@ import {
   type CampaignDashboardRow,
   type CampaignFactionRow,
   type CampaignKnowledgeRow,
+  type CampaignChapterRow,
   type CampaignNpcRow,
   type CampaignRow,
   type CampaignSessionZeroRow,
@@ -39,6 +40,7 @@ import {
   serializeCampaignDashboard,
   serializeCampaignFaction,
   serializeCampaignKnowledge,
+  serializeCampaignChapter,
   serializeCampaignNpc,
   serializeCampaignSummary,
   serializeCampaignTravel,
@@ -696,6 +698,13 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
         )
         .all(id) as CampaignKnowledgeRow[]
     ).map(serializeCampaignKnowledge);
+    const chapters = (
+      db
+        .prepare(
+          "SELECT * FROM campaign_chapters WHERE campaign_id = ? ORDER BY sort_order ASC, level_start ASC, created_at ASC"
+        )
+        .all(id) as CampaignChapterRow[]
+    ).map(serializeCampaignChapter);
     const sessions = campaignSessionsFor(id, "gm", request.user.id);
     const audioTracks = (
       db
@@ -737,6 +746,7 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
       npcs,
       factions,
       knowledge,
+      chapters,
       sessions,
       messages,
       journal,

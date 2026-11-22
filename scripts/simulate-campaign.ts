@@ -2812,6 +2812,17 @@ async function runCampaignA(gm: Account, players: Account[]): Promise<void> {
         cookie: players[0].cookie,
         body: { title: "Private suspicions", content: privateNoteText },
       });
+      await api(`/api/campaigns/${campaignId}/chapters`, {
+        method: "POST",
+        cookie: gm.cookie,
+        body: {
+          title: "The Ashen Crown",
+          summary: "The court wakes beneath the city.",
+          levelStart: 1,
+          levelEnd: 10,
+          status: "active",
+        },
+      });
       const exported = await api(`/api/campaigns/${campaignId}/export`, { cookie: gm.cookie });
       const payload = exported.payload;
       assertEqual(payload.format, "runehall-campaign", "Export format");
@@ -2847,6 +2858,8 @@ async function runCampaignA(gm: Account, players: Account[]): Promise<void> {
       );
       assertEqual(payload.factions[0].reputation, -70, "Export faction reputation");
       assertEqual(payload.knowledge.length, 2, "Export knowledge count");
+      assertEqual(payload.chapters.length, 1, "Export chapter count");
+      assertEqual(payload.chapters[0].status, "active", "Export active chapter");
       assertEqual(payload.knowledge[0].visible, true, "Export visible knowledge");
       assertEqual(payload.knowledge[1].visible, false, "Export hidden knowledge");
       assert(
@@ -2939,6 +2952,16 @@ async function runCampaignA(gm: Account, players: Account[]): Promise<void> {
       assertEqual(importedNotes.payload.knowledge[0].visible, true, "Imported visible knowledge");
       assertEqual(importedNotes.payload.knowledge[1].visible, false, "Imported hidden knowledge");
       assertEqual(importedNotes.payload.notes.length, 0, "Import invented private notes");
+      const importedChapters = await api(`/api/campaigns/${importedCampaign.id}/chapters`, {
+        cookie: gm.cookie,
+      });
+      assertEqual(importedChapters.payload.chapters.length, 1, "Imported chapter count");
+      assertEqual(
+        importedChapters.payload.chapters[0].title,
+        "The Ashen Crown",
+        "Imported chapter title"
+      );
+      assertEqual(importedChapters.payload.chapters[0].status, "active", "Imported chapter status");
       const importedNpcs = await api(`/api/campaigns/${importedCampaign.id}/npcs`, {
         cookie: gm.cookie,
       });

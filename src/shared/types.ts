@@ -1446,6 +1446,21 @@ export interface CampaignKnowledgeEntry {
   updatedAt: number;
 }
 
+export type ChapterStatus = "planned" | "active" | "complete";
+
+export interface CampaignChapter {
+  id: string;
+  campaignId: string;
+  title: string;
+  summary: string;
+  levelStart: number;
+  levelEnd: number;
+  status: ChapterStatus;
+  sortOrder: number;
+  createdAt: number;
+  updatedAt: number;
+}
+
 export interface CampaignNotesView {
   /** Only the signed-in member's private notes; never another member's. */
   notes: CampaignPlayerNote[];

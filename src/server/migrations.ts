@@ -783,4 +783,24 @@ export const migrations: Migration[] = [
       ALTER TABLE campaign_session_zero ADD COLUMN party_hooks TEXT NOT NULL DEFAULT '';
     `,
   },
+  {
+    version: 43,
+    name: "campaign_chapters",
+    sql: `
+      CREATE TABLE IF NOT EXISTS campaign_chapters (
+        id TEXT PRIMARY KEY,
+        campaign_id TEXT NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+        title TEXT NOT NULL,
+        summary TEXT NOT NULL DEFAULT '',
+        level_start INTEGER NOT NULL DEFAULT 1,
+        level_end INTEGER NOT NULL DEFAULT 1,
+        status TEXT NOT NULL DEFAULT 'planned',
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_campaign_chapters_campaign
+        ON campaign_chapters(campaign_id, sort_order);
+    `,
+  },
 ];
