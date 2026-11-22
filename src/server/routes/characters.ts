@@ -38,8 +38,9 @@ import { conditionsFromSheet } from "../../shared/tokens";
 import { characterTokenTurnEffects } from "../../shared/characterTurnEffects";
 import { applyHeroicRecovery } from "../../shared/damage";
 import { lifestyleRate, upkeepCostCp } from "../../shared/upkeep";
+import { performDowntimeDay, type DowntimeActivityInput } from "../downtime";
 import { logAudit } from "../audit";
-import { newId, now, parseJson, safeInt, safeString } from "../util";
+import { newId, now, parseJson, safeInt, safeString, sanitizeUserText } from "../util";
 
 function parseDraft(raw: unknown, fallbackName = "New Hero"): CharacterDraft {
   const draft = normalizeCharacterDraft(raw, fallbackName);
@@ -475,6 +476,80 @@ export async function registerCharacterRoutes(app: FastifyInstance): Promise<voi
       return reply.code(400).send({ error: "That character's draft could not be read." });
     }
     const body = (request.body ?? {}) as Record<string, unknown>;
+    const rawActivity =
+      body.activity && typeof body.activity === "object" && !Array.isArray(body.activity)
+        ? (body.activity as Record<string, unknown>)
+        : null;
+    if (rawActivity) {
+      const input: DowntimeActivityInput = {
+        activityId: safeString(rawActivity.activityId, "", 80) || undefined,
+        kind: safeString(rawActivity.kind, "", 40) || undefined,
+        skill: safeString(rawActivity.skill, "", 120) || undefined,
+        taskLevel:
+          rawActivity.taskLevel === undefined
+            ? undefined
+            : safeInt(rawActivity.taskLevel, 0, 0, 20),
+        dc: rawActivity.dc === undefined ? undefined : safeInt(rawActivity.dc, 15, 1, 100),
+        label: safeString(rawActivity.label, "", 120) || undefined,
+        daysRequired:
+          rawActivity.daysRequired === undefined
+            ? undefined
+            : safeInt(rawActivity.daysRequired, 4, 1, 3650),
+        notes:
+          rawActivity.notes === undefined ? undefined : sanitizeUserText(rawActivity.notes, 4000),
+      };
+      const derived = computeCharacter(draft, contextForDraft(draft));
+      const campaign = character.campaign_id ? getCampaign(character.campaign_id) : null;
+      const result = performDowntimeDay({
+        draft,
+        skills: derived.skills,
+        lore: derived.lore,
+        input,
+        settlementLevel: campaign?.settlement_level ?? 1,
+        now: now(),
+        id: newId("downtime"),
+      });
+      if ("error" in result) {
+        return reply.code(result.code).send({ error: result.error });
+      }
+      const rate = lifestyleRate(draft.play.lifestyle);
+      const summary = characterSummary(draft, contextForDraft(draft));
+      db.prepare(
+        "UPDATE characters SET data = ?, summary = ?, updated_at = ?, revision = revision + 1 WHERE id = ?"
+      ).run(JSON.stringify(draft), JSON.stringify(summary), now(), character.id);
+      syncCharacterDraft(app, character, draft, summary);
+      if (character.campaign_id) touchCampaign(character.campaign_id);
+      const activity = result.activity;
+      logAudit({
+        action: "character.downtime_activity",
+        actor: request.user,
+        targetType: "character",
+        targetId: character.id,
+        detail: `${draft.name}: ${activity?.kind ?? "downtime"} day${
+          result.earnedCp ? `, earned ${result.earnedCp} cp` : ""
+        }${result.paidCp ? `, paid ${result.paidCp} cp upkeep` : ""}`,
+        request,
+      });
+      const updated = getCharacter(character.id)!;
+      const owner = getUser(updated.user_id);
+      return reply.send({
+        character: serializeCharacter(updated, owner?.display_name ?? "", {
+          canEdit: true,
+          canView: true,
+          canAdvance: canAdvanceCharacter(updated, request.user.id),
+        }),
+        days: 1,
+        paidCp: result.paidCp,
+        lifestyle: rate.id,
+        label: rate.label,
+        activity,
+        roll: result.roll,
+        degree: result.degree,
+        earnedCp: result.earnedCp,
+        upkeepWaived: result.upkeepWaived,
+        completed: result.completed,
+      });
+    }
     const days = safeInt(body.days, 1, 1, 3650);
     if (draft.play.downtimeDays < days) {
       return reply.code(400).send({
@@ -498,14 +573,7 @@ export async function registerCharacterRoutes(app: FastifyInstance): Promise<voi
       "UPDATE characters SET data = ?, summary = ?, updated_at = ?, revision = revision + 1 WHERE id = ?"
     ).run(JSON.stringify(draft), JSON.stringify(summary), now(), character.id);
     syncCharacterDraft(app, character, draft, summary);
-    if (character.campaign_id) {
-      touchCampaign(character.campaign_id);
-      app.broadcastCampaign(character.campaign_id, "character:updated", {
-        characterId: character.id,
-        summary,
-        name: draft.name,
-      });
-    }
+    if (character.campaign_id) touchCampaign(character.campaign_id);
     logAudit({
       action: "character.downtime_spend",
       actor: request.user,

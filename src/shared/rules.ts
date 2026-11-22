@@ -34,6 +34,7 @@ import { conditionModifiers } from "./conditions";
 import { normalizeAfflictions } from "./afflictions";
 import { normalizePersistentDamageList } from "./persistentDamage";
 import { normalizeLifestyle } from "./upkeep";
+import { normalizeDowntimeActivities } from "./downtime";
 import { clampHeroPoints } from "./heroPoints";
 import { normalizeCharacterTurnEffects } from "./characterTurnEffects";
 import {
@@ -989,6 +990,7 @@ export function emptyCharacterDraft(name = "New Hero"): CharacterDraft {
       focusPoints: 1,
       downtimeDays: 0,
       lifestyle: "subsistence",
+      downtimeActivities: [],
       conditions: [],
       afflictions: [],
       persistentDamage: [],
@@ -1263,6 +1265,7 @@ export function normalizeCharacterDraft(input: unknown, fallbackName = "New Hero
       focusPoints: Math.max(0, Math.min(3, Math.floor(num(play.focusPoints, 1)))),
       downtimeDays: Math.max(0, Math.min(9_999, Math.floor(num(play.downtimeDays, 0)))),
       lifestyle: normalizeLifestyle(play.lifestyle),
+      downtimeActivities: normalizeDowntimeActivities(play.downtimeActivities),
       conditions: arr<Record<string, unknown>>(play.conditions)
         .filter((c) => c && typeof c.name === "string")
         .map((c) => ({

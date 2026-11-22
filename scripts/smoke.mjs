@@ -2098,21 +2098,30 @@ async function main() {
   const downtimeGrant = await api(`/api/campaigns/${campaign.id}/downtime`, {
     method: "POST",
     cookie: gmCookie,
-    body: { days: 3, characterIds: [character.id] },
+    body: { days: 8, characterIds: [character.id] },
   });
   const downtimeSummary = downtimeGrant.payload.characters?.find(
     (entry) => entry.id === character.id
   )?.summary?.downtimeDays;
-  if (downtimeGrant.payload.recipients !== 1 || downtimeSummary !== 3) {
+  if (downtimeGrant.payload.recipients !== 1 || downtimeSummary !== 8) {
     throw new Error("Downtime grant did not reach the character summary");
   }
   const downtimeCharacter = await api(`/api/characters/${character.id}`, {
     cookie: playerCookie,
   });
-  if (downtimeCharacter.payload.character.data.play.downtimeDays !== 3) {
+  if (downtimeCharacter.payload.character.data.play.downtimeDays !== 8) {
     throw new Error("Downtime grant did not reach the character data");
   }
-  const beforePurse = downtimeCharacter.payload.character.data.currency;
+  const trainingDraft = JSON.parse(JSON.stringify(downtimeCharacter.payload.character.data));
+  trainingDraft.skills.trained = [
+    ...new Set([...(trainingDraft.skills.trained ?? []), "crafting"]),
+  ];
+  const trainedCharacter = await api(`/api/characters/${character.id}`, {
+    method: "PUT",
+    cookie: playerCookie,
+    body: { data: trainingDraft, force: true },
+  });
+  const beforePurse = trainedCharacter.payload.character.data.currency;
   const beforePurseCp =
     (beforePurse?.gp ?? 0) * 100 + (beforePurse?.sp ?? 0) * 10 + (beforePurse?.cp ?? 0);
   const spent = await api(`/api/characters/${character.id}/downtime/spend`, {
@@ -2120,7 +2129,7 @@ async function main() {
     cookie: playerCookie,
     body: { days: 1 },
   });
-  if (spent.payload.character.data.play.downtimeDays !== 2) {
+  if (spent.payload.character.data.play.downtimeDays !== 7) {
     throw new Error("Spending downtime did not update the character data");
   }
   if (spent.payload.paidCp !== 6 || spent.payload.lifestyle !== "subsistence") {
@@ -2131,6 +2140,85 @@ async function main() {
     (afterPurse?.gp ?? 0) * 100 + (afterPurse?.sp ?? 0) * 10 + (afterPurse?.cp ?? 0);
   if (afterPurseCp !== beforePurseCp - 6) {
     throw new Error("Downtime spend did not deduct cost of living from the purse");
+  }
+
+  const earn = await api(`/api/characters/${character.id}/downtime/spend`, {
+    method: "POST",
+    cookie: playerCookie,
+    body: {
+      activity: {
+        kind: "earn-income",
+        skill: "crafting",
+        taskLevel: 0,
+        dc: 1,
+        label: "Smoke job",
+      },
+    },
+  });
+  if (
+    earn.payload.activity?.kind !== "earn-income" ||
+    earn.payload.activity.daysSpent !== 1 ||
+    earn.payload.activity.dailyEarnedCp === null ||
+    earn.payload.paidCp !== 6
+  ) {
+    throw new Error("Earn Income did not record a job and charge upkeep");
+  }
+  if (earn.payload.character.data.play.downtimeDays !== 6) {
+    throw new Error("Earn Income did not consume a downtime day");
+  }
+  const continued = await api(`/api/characters/${character.id}/downtime/spend`, {
+    method: "POST",
+    cookie: playerCookie,
+    body: { activity: { activityId: earn.payload.activity.id } },
+  });
+  if (
+    continued.payload.roll !== null ||
+    continued.payload.earnedCp !== earn.payload.activity.dailyEarnedCp ||
+    continued.payload.character.data.play.downtimeDays !== 5
+  ) {
+    throw new Error("Earn Income did not repeat the first day's pay");
+  }
+
+  const subsist = await api(`/api/characters/${character.id}/downtime/spend`, {
+    method: "POST",
+    cookie: playerCookie,
+    body: { activity: { kind: "subsist", skill: "survival", dc: 1 } },
+  });
+  const subsistWaived =
+    subsist.payload.degree === "success" || subsist.payload.degree === "critical-success";
+  if (subsist.payload.upkeepWaived !== subsistWaived) {
+    throw new Error("Subsist did not report whether upkeep was waived");
+  }
+  if (subsistWaived && subsist.payload.paidCp !== 0) {
+    throw new Error("A successful Subsist still charged upkeep");
+  }
+  if (
+    !subsistWaived &&
+    !subsist.payload.character.data.play.conditions.some(
+      (condition) => condition.name === "Fatigued"
+    )
+  ) {
+    throw new Error("A failed Subsist did not apply fatigue");
+  }
+
+  const craft = await api(`/api/characters/${character.id}/downtime/spend`, {
+    method: "POST",
+    cookie: playerCookie,
+    body: { activity: { kind: "craft", label: "Smoke project", daysRequired: 2 } },
+  });
+  if (craft.payload.completed || craft.payload.activity?.daysSpent !== 1) {
+    throw new Error("A crafting project completed too early");
+  }
+  const crafted = await api(`/api/characters/${character.id}/downtime/spend`, {
+    method: "POST",
+    cookie: playerCookie,
+    body: { activity: { activityId: craft.payload.activity.id } },
+  });
+  if (!crafted.payload.completed || crafted.payload.activity?.daysSpent !== 2) {
+    throw new Error("A crafting project did not complete on its last day");
+  }
+  if (crafted.payload.character.data.play.downtimeDays !== 2) {
+    throw new Error("Downtime activities did not consume the expected days");
   }
   const spentTable = await api(`/api/campaigns/${campaign.id}/table`, { cookie: gmCookie });
   if (

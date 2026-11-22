@@ -332,6 +332,26 @@ test("GM controls advancement and milestone mode hides XP awards", async ({ page
     page.getByText(/Spent 1 downtime day and 1 sp 5 cp on comfortable living/)
   ).toBeVisible({ timeout: 15_000 });
   await expect(page.locator(".point-row").filter({ hasText: "Downtime" })).toContainText("2 days");
+
+  await page.getByRole("button", { name: "Activities", exact: true }).click();
+  const downtimeActivities = page.getByRole("dialog", { name: "Downtime activities" });
+  await expect(downtimeActivities).toBeVisible();
+  await downtimeActivities
+    .getByRole("combobox", { name: "Downtime activity" })
+    .selectOption("craft");
+  await downtimeActivities.getByLabel("Project").fill("E2E downtime project");
+  await downtimeActivities.getByLabel("Days required").fill("2");
+  await downtimeActivities.getByRole("button", { name: "Spend a day", exact: true }).click();
+  await expect(downtimeActivities.getByText("1 of 2 days")).toBeVisible({ timeout: 15_000 });
+  await downtimeActivities
+    .locator(".downtime-activity")
+    .getByRole("button", { name: "Spend a day", exact: true })
+    .click();
+  await expect(page.getByText(/E2E downtime project complete after 2 days/)).toBeVisible({
+    timeout: 15_000,
+  });
+  await downtimeActivities.locator(".modal-foot").getByRole("button", { name: "Close" }).click();
+  await expect(page.locator(".point-row").filter({ hasText: "Downtime" })).toContainText("0 days");
 });
 
 test("GM awards XP in XP tracking mode without automatic level-up", async ({ page }) => {

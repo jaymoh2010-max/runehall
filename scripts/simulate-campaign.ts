@@ -2132,7 +2132,7 @@ async function runCampaignA(gm: Account, players: Account[]): Promise<void> {
     if (level === 5) {
       await check(
         campaignLabel,
-        "downtime days are granted by the GM and spent by the player",
+        "downtime days fund upkeep, Earn Income, Subsist, and projects",
         async () => {
           const grant = await api(`/api/campaigns/${campaignId}/downtime`, {
             method: "POST",
@@ -2176,7 +2176,77 @@ async function runCampaignA(gm: Account, players: Account[]): Promise<void> {
             "Downtime summary after spending"
           );
           const reduced = JSON.parse(JSON.stringify(spend.payload.character.data)) as Json;
-          reduced.play.downtimeDays = 6;
+          const activitySheet = await api(`/api/characters/${heroes[0].id}`, {
+            cookie: players[0].cookie,
+          });
+          let trained = (activitySheet.payload.character.data.skills.trained as string[]) ?? [];
+          if (!trained.length) {
+            const trainedDraft = JSON.parse(
+              JSON.stringify(activitySheet.payload.character.data)
+            ) as Json;
+            trainedDraft.skills.trained = ["crafting"];
+            await api(`/api/characters/${heroes[0].id}`, {
+              method: "PUT",
+              cookie: players[0].cookie,
+              body: { data: trainedDraft, force: true },
+            });
+            trained = ["crafting"];
+          }
+          const earn = await api(`/api/characters/${heroes[0].id}/downtime/spend`, {
+            method: "POST",
+            cookie: players[0].cookie,
+            body: {
+              activity: {
+                kind: "earn-income",
+                skill: trained[0],
+                taskLevel: 0,
+                dc: 1,
+                label: "Simulated job",
+              },
+            },
+          });
+          assertEqual(earn.payload.activity?.kind, "earn-income", "Earn Income activity");
+          assertEqual(earn.payload.activity?.daysSpent, 1, "Earn Income first day");
+          assert(earn.payload.activity?.dailyEarnedCp !== null, "Earn Income daily pay");
+          const continued = await api(`/api/characters/${heroes[0].id}/downtime/spend`, {
+            method: "POST",
+            cookie: players[0].cookie,
+            body: { activity: { activityId: earn.payload.activity.id } },
+          });
+          assertEqual(continued.payload.roll, null, "Earn Income only rolls once");
+          assertEqual(
+            continued.payload.earnedCp,
+            earn.payload.activity.dailyEarnedCp,
+            "Earn Income repeat pay"
+          );
+          const subsist = await api(`/api/characters/${heroes[0].id}/downtime/spend`, {
+            method: "POST",
+            cookie: players[0].cookie,
+            body: { activity: { kind: "subsist", skill: "survival", dc: 1 } },
+          });
+          const subsistWaived =
+            subsist.payload.degree === "success" || subsist.payload.degree === "critical-success";
+          assertEqual(subsist.payload.upkeepWaived, subsistWaived, "Subsist upkeep waiver");
+          if (subsistWaived) assertEqual(subsist.payload.paidCp, 0, "Subsist free day");
+          const project = await api(`/api/characters/${heroes[0].id}/downtime/spend`, {
+            method: "POST",
+            cookie: players[0].cookie,
+            body: { activity: { kind: "retrain", label: "Simulated retrain", daysRequired: 2 } },
+          });
+          assertEqual(project.payload.completed, false, "Project first day");
+          const projectDone = await api(`/api/characters/${heroes[0].id}/downtime/spend`, {
+            method: "POST",
+            cookie: players[0].cookie,
+            body: { activity: { activityId: project.payload.activity.id } },
+          });
+          assertEqual(projectDone.payload.completed, true, "Project completion");
+          const activityTable = await getTable(campaignId, gm.cookie);
+          assertEqual(
+            summaryFor(activityTable, heroes[0].id).downtimeDays,
+            2,
+            "Downtime summary after activities"
+          );
+          reduced.play.downtimeDays = 1;
           const rejected = await api(`/api/characters/${heroes[0].id}`, {
             method: "PUT",
             cookie: players[0].cookie,
