@@ -129,6 +129,7 @@ import {
   Toggle,
 } from "../components/ui";
 import { HoverCard } from "../components/HoverCard";
+import { DailyPreparationsModal } from "../components/DailyPreparationsModal";
 import { ShopModal } from "../components/campaign/ShopModal";
 
 function emptyAfflictionForm(): CharacterAffliction {
@@ -223,6 +224,7 @@ export function CharacterSheetPage() {
   const [shopOpen, setShopOpen] = useState(false);
   const [restOpen, setRestOpen] = useState(false);
   const [restRough, setRestRough] = useState(false);
+  const [prepOpen, setPrepOpen] = useState(false);
   const [heroicRecoveryBusy, setHeroicRecoveryBusy] = useState(false);
   const [castState, setCastState] = useState<{
     spellId: string;
@@ -630,7 +632,13 @@ export function CharacterSheetPage() {
     setHp(parsed);
   };
 
-  const restPreview = draft && derived ? applyLongRest(draft, derived, { rough: restRough }) : null;
+  const restPreview =
+    draft && derived
+      ? applyLongRest(draft, derived, {
+          rough: restRough,
+          preparedCaster: isPreparedCasterClass(context.classData?.name),
+        })
+      : null;
 
   const openCast = (
     spell: NonNullable<CharacterContext["spells"][string]>,
@@ -699,7 +707,10 @@ export function CharacterSheetPage() {
 
   const takeLongRest = () => {
     if (!draft || !derived) return;
-    const result = applyLongRest(draft, derived, { rough: restRough });
+    const result = applyLongRest(draft, derived, {
+      rough: restRough,
+      preparedCaster: isPreparedCasterClass(context.classData?.name),
+    });
     skipInitialSave.current = false;
     draftRef.current = result.draft;
     dirtyRef.current = true;
@@ -708,12 +719,24 @@ export function CharacterSheetPage() {
     setRestOpen(false);
     setRestRough(false);
     void saveDraft();
+    if (isPreparedCasterClass(context.classData?.name)) setPrepOpen(true);
     toast(
       result.summary.healed > 0
         ? `Long rest complete: +${result.summary.healed} HP, spell slots and focus reset.`
         : "Long rest complete: spell slots and focus reset.",
       "success"
     );
+  };
+
+  const applyDailyPreparations = (next: CharacterDraft) => {
+    skipInitialSave.current = false;
+    draftRef.current = next;
+    dirtyRef.current = true;
+    setDraft(next);
+    setCastRanks({});
+    setPrepOpen(false);
+    void saveDraft();
+    toast("Daily preparations complete.", "success");
   };
 
   const applyUpdatedCharacter = useCallback(
@@ -1531,10 +1554,24 @@ export function CharacterSheetPage() {
             <Card className="sheet-section" id="sheet-spells">
               <div className="sheet-section-head">
                 <h2>Spells</h2>
-                <span className="tiny muted">
-                  Spell attack {derived.spellAttack === null ? "—" : signed(derived.spellAttack)} ·
-                  DC {derived.spellDc}
-                </span>
+                <div className="row" style={{ gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                  <span className="tiny muted">
+                    Spell attack {derived.spellAttack === null ? "—" : signed(derived.spellAttack)}{" "}
+                    · DC {derived.spellDc}
+                  </span>
+                  {canEdit && isPreparedCasterClass(classData?.name) ? (
+                    <Button
+                      size="sm"
+                      variant={draft.spells.preparationsPending ? "primary" : "secondary"}
+                      icon={<BookOpen size={14} />}
+                      onClick={() => setPrepOpen(true)}
+                    >
+                      {draft.spells.preparationsPending
+                        ? "Prepare today's spells"
+                        : "Daily preparations"}
+                    </Button>
+                  ) : null}
+                </div>
               </div>
               {derived.spellSlots ? (
                 <div className="sheet-slots">
@@ -3034,9 +3071,9 @@ export function CharacterSheetPage() {
               title="Use this when the night was uncomfortable, interrupted, or spent without shelter."
             />
             <p className="tiny muted">
-              Prepared spells stay selected so you can adjust them for the new day. Hero points and
-              XP are unchanged, and companion HP is not touched. Other conditions are left for the
-              GM to adjudicate.
+              Prepared casters choose today&apos;s spells after the rest; their current prepared
+              list stays selected as the starting point. Hero points and XP are unchanged, and
+              companion HP is not touched. Other conditions are left for the GM to adjudicate.
             </p>
             {draft.play.afflictions.length ? (
               <p className="tiny muted">
@@ -3056,6 +3093,15 @@ export function CharacterSheetPage() {
           </div>
         ) : null}
       </Modal>
+
+      <DailyPreparationsModal
+        open={prepOpen}
+        onClose={() => setPrepOpen(false)}
+        draft={draft}
+        context={context}
+        derived={derived}
+        onApply={applyDailyPreparations}
+      />
 
       <ShopModal
         open={shopOpen}

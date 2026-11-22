@@ -1129,6 +1129,10 @@ test("builder completes a level-1 Cleric with split divine-font preparation", as
   await expect(
     page.locator(".sheet-slots .sheet-slot-row:not(.slot-row-font)").filter({ hasText: "Rank 1" })
   ).toContainText("2 / 2");
+  const dailyPrep = page.getByRole("dialog", { name: "Daily preparations" });
+  await expect(dailyPrep).toBeVisible({ timeout: 15_000 });
+  await dailyPrep.getByRole("button", { name: "Cancel" }).click();
+  await expect(dailyPrep).toHaveCount(0);
 });
 
 test("builder completes a level-1 Wizard using granted curriculum spells", async ({ page }) => {
@@ -1506,6 +1510,25 @@ test("level-5 prepared upcasting moves Heal into the rank-3 font pool", async ({
     .locator(".sheet-slots .sheet-slot-row:not(.slot-row-font)")
     .filter({ hasText: "Rank 1" });
   await expect(rankOneRow).toContainText("2 / 3");
+
+  await page.getByRole("button", { name: "Long rest" }).click();
+  const restDialog = page.getByRole("dialog", { name: "Take a long rest" });
+  await restDialog.getByRole("button", { name: "Take long rest" }).click();
+  const prepDialog = page.getByRole("dialog", { name: "Daily preparations" });
+  await expect(prepDialog).toBeVisible({ timeout: 15_000 });
+  await expect(prepDialog.getByText("Preparations pending")).toBeVisible();
+  await expect(prepDialog.getByLabel("Spell to prepare at rank 1")).toBeVisible();
+
+  await prepDialog.getByRole("button", { name: "Decrease prepared Bless at rank 1" }).click();
+  await prepDialog.getByLabel("Spell to prepare at rank 1").selectOption({ label: "Heal" });
+  await prepDialog.getByRole("button", { name: "Prepare selected spell at rank 1" }).click();
+  await prepDialog.getByRole("button", { name: "Apply daily preparations" }).click();
+  await expect(prepDialog).toHaveCount(0);
+  await expect(page.getByText("Daily preparations complete.")).toBeVisible({ timeout: 15_000 });
+  await expect(healRow.getByTestId("sheet-prepared-heal")).toContainText("Prepared ×7");
+  await expect(healRow.getByTestId("sheet-prepared-ranks-heal")).toContainText(
+    "rank 1 ordinary ×2"
+  );
 });
 
 test("level-9 Wizard upcasts Fireball into a rank-5 prepared slot", async ({ page }) => {

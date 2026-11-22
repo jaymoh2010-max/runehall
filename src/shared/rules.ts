@@ -750,6 +750,107 @@ export function removePreparedSpellEverywhere(
   };
 }
 
+/** Ordinary prepared slots available at one rank, excluding the divine font. */
+export function ordinaryPreparedLimitAt(
+  draft: CharacterDraft,
+  derived: Pick<DerivedCharacter, "spellSlots" | "divineFontSlots" | "divineFontRank">,
+  classData: ClassData | null | undefined,
+  rank: number
+): number {
+  const caster = casterInfo(classData);
+  const ordinarySlots = ordinarySpellSlotsFor(draft.level, caster.progression, classData?.name);
+  const fontAtRank = derived.divineFontRank === rank ? (derived.divineFontSlots ?? 0) : 0;
+  return (
+    ordinarySlots?.[rank - 1] ?? Math.max(0, (derived.spellSlots?.[rank - 1] ?? 0) - fontAtRank)
+  );
+}
+
+/**
+ * Whether another prepared copy of this spell fits at this rank. Mirrors the
+ * builder's preparation rules, including the wizard curriculum slot and the
+ * cleric divine font.
+ */
+export function canPrepareSpellAtRank(
+  draft: CharacterDraft,
+  derived: Pick<
+    DerivedCharacter,
+    "spellSlots" | "divineFontSlots" | "divineFontRank" | "maxSpellRank" | "grantedSpells"
+  >,
+  context: Pick<CharacterContext, "spells" | "deity" | "classData">,
+  spell: Spell,
+  rank: number
+): boolean {
+  if (!Number.isInteger(rank) || rank < Math.max(1, spell.rank) || rank > derived.maxSpellRank) {
+    return false;
+  }
+  const entries = preparedEntries(draft, context);
+  const summary = preparedRankSummaries(entries).get(rank);
+  const totalCount = summary?.total ?? 0;
+  const ordinaryCount = summary?.ordinary ?? 0;
+  const fontCount = summary?.font ?? 0;
+  const ordinaryLimit = ordinaryPreparedLimitAt(draft, derived, context.classData, rank);
+  const curriculumIds = new Set(
+    derived.grantedSpells.filter((entry) => entry.kind === "curriculum").map((entry) => entry.id)
+  );
+  const curriculumRanks = new Set(
+    derived.grantedSpells
+      .filter((entry) => entry.kind === "curriculum" && entry.rank > 0)
+      .map((entry) => entry.rank)
+  );
+  const wizardCurriculum = context.classData?.name.toLowerCase() === "wizard";
+
+  if (wizardCurriculum && curriculumRanks.has(rank)) {
+    if (curriculumIds.has(spell.id)) return totalCount < ordinaryLimit;
+    const nonCurriculum = entries.filter(
+      (entry) => entry.rank === rank && !curriculumIds.has(entry.id)
+    ).length;
+    return totalCount < ordinaryLimit && nonCurriculum < Math.max(0, ordinaryLimit - 1);
+  }
+
+  const fontRank = derived.divineFontRank;
+  const fontSlots = derived.divineFontSlots ?? 0;
+  const fontChoice = effectiveFontChoice(draft, context);
+  const fontRoom =
+    fontRank === rank &&
+    isFontSpell(spell, context.deity) &&
+    (fontChoice === null || isChosenFontSpell(spell, context.deity, fontChoice)) &&
+    fontCount < fontSlots;
+  return fontRoom || ordinaryCount < ordinaryLimit;
+}
+
+/**
+ * Add one prepared copy and lock in the divine font choice when a dual-font
+ * cleric prepares their first Heal or Harm at the font rank.
+ */
+export function addPreparedSpellCopy(
+  draft: CharacterDraft,
+  context: Pick<CharacterContext, "spells" | "deity" | "classData">,
+  spell: Spell,
+  rank: number
+): CharacterDraft {
+  const font = divineFontInfo(draft.level, context.classData?.name);
+  const choices = deityFontChoices(context.deity);
+  const name = spell.name.trim().toLowerCase();
+  let chosenFont: DivineFontChoice | null = null;
+  if (
+    font &&
+    font.slots > 0 &&
+    font.rank === rank &&
+    isFontSpell(spell, context.deity) &&
+    (name === "heal" || name === "harm")
+  ) {
+    const existing = effectiveFontChoice(draft, context);
+    chosenFont =
+      existing ?? (choices.length > 1 ? (name as DivineFontChoice) : (choices[0] ?? null));
+  }
+  const next = addPreparedCopy(draft, context, spell.id, rank);
+  if (!chosenFont || draft.spells.fontChoice) return next;
+  return {
+    ...next,
+    spells: { ...next.spells, fontChoice: chosenFont },
+  };
+}
+
 export function preparedSlotSplits(
   prepared: string[],
   spells: Record<string, Spell>,
@@ -862,6 +963,7 @@ export function emptyCharacterDraft(name = "New Hero"): CharacterDraft {
       slotsUsed: {},
       preparedUsed: {},
       fontUsed: {},
+      preparationsPending: false,
     },
     equipment: [],
     companions: [],
@@ -1095,6 +1197,7 @@ export function normalizeCharacterDraft(input: unknown, fallbackName = "New Hero
           .filter(([, value]) => typeof value === "number" && Number.isFinite(value))
           .map(([key, value]) => [key, Math.max(0, Math.floor(value as number))])
       ) as Record<string, number>,
+      preparationsPending: spells.preparationsPending === true,
     },
     equipment: equipmentEntries,
     companions: arr<Record<string, unknown>>(raw.companions)

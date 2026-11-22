@@ -120,6 +120,13 @@ describe("PF2e long rest", () => {
     });
   });
 
+  it("marks prepared casters for daily preparations after resting", () => {
+    const prepared = applyLongRest(hero(5), derived, { preparedCaster: true });
+    expect(prepared.draft.spells.preparationsPending).toBe(true);
+    const spontaneous = applyLongRest(hero(5), derived, { preparedCaster: false });
+    expect(spontaneous.draft.spells.preparationsPending).toBe(false);
+  });
+
   it("removes fatigued and reduces doomed and drained by one", () => {
     const result = applyLongRest(hero(5), derived);
     expect(result.draft.play.conditions).toEqual([
