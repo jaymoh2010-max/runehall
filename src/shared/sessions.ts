@@ -4,6 +4,7 @@ import type {
   SessionAttendanceStatus,
   SessionCheckin,
   SessionCheckinStatus,
+  SessionRecurrence,
   SessionStatus,
 } from "./types";
 
@@ -12,6 +13,40 @@ export const SESSION_STATUS_LABELS: Record<SessionStatus, string> = {
   played: "Played",
   canceled: "Canceled",
 };
+
+export const SESSION_RECURRENCE_LABELS: Record<SessionRecurrence, string> = {
+  none: "Does not repeat",
+  weekly: "Weekly",
+  biweekly: "Every 2 weeks",
+  monthly: "Monthly",
+};
+
+export function isSessionRecurrence(value: unknown): value is SessionRecurrence {
+  return value === "none" || value === "weekly" || value === "biweekly" || value === "monthly";
+}
+
+export function normalizeSessionRecurrence(value: unknown): SessionRecurrence {
+  return isSessionRecurrence(value) ? value : "none";
+}
+
+/**
+ * The next occurrence of a session. Weekly cadences keep the same local
+ * weekday and time; monthly repeats clamp to the last day of shorter months.
+ */
+export function nextSessionTimestamp(timestamp: number, recurrence: SessionRecurrence): number {
+  const date = new Date(timestamp);
+  if (recurrence === "weekly" || recurrence === "biweekly") {
+    date.setDate(date.getDate() + (recurrence === "weekly" ? 7 : 14));
+    return date.getTime();
+  }
+  if (recurrence !== "monthly") return timestamp;
+  const day = date.getDate();
+  date.setDate(1);
+  date.setMonth(date.getMonth() + 1);
+  const daysInMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+  date.setDate(Math.min(day, daysInMonth));
+  return date.getTime();
+}
 
 export const ATTENDANCE_STATUS_LABELS: Record<SessionAttendanceStatus, string> = {
   attended: "Attended",
@@ -76,6 +111,77 @@ export function sessionCheckinSummary(checkins: SessionCheckin[]) {
     },
     { yes: 0, maybe: 0, no: 0, unanswered: 0 }
   );
+}
+
+function icsTimestamp(timestamp: number): string {
+  return new Date(timestamp)
+    .toISOString()
+    .replace(/[-:]/g, "")
+    .replace(/\.\d{3}Z$/, "Z");
+}
+
+function escapeIcsText(value: string): string {
+  return value
+    .replace(/\\/g, "\\\\")
+    .replace(/\r?\n/g, "\\n")
+    .replace(/;/g, "\\;")
+    .replace(/,/g, "\\,");
+}
+
+function foldIcsLine(line: string): string {
+  if (line.length <= 73) return line;
+  const parts: string[] = [];
+  let rest = line;
+  parts.push(rest.slice(0, 73));
+  rest = rest.slice(73);
+  while (rest.length) {
+    parts.push(` ${rest.slice(0, 72)}`);
+    rest = rest.slice(72);
+  }
+  return parts.join("\r\n");
+}
+
+/**
+ * A player-safe calendar feed. GM notes and the prep agenda are deliberately
+ * excluded; canceled sessions are left out so subscribed calendars stay clean.
+ */
+export function campaignSessionsIcs({
+  campaignName,
+  sessions,
+  now = Date.now(),
+}: {
+  campaignName: string;
+  sessions: CampaignSession[];
+  now?: number;
+}): string {
+  const stamp = icsTimestamp(now);
+  const lines: string[] = [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//Runehall//Campaign Sessions//EN",
+    "CALSCALE:GREGORIAN",
+    "METHOD:PUBLISH",
+    `X-WR-CALNAME:${escapeIcsText(campaignName)}`,
+  ];
+  for (const session of sessions) {
+    if (session.status === "canceled") continue;
+    const end = session.scheduledAt + Math.max(1, session.durationMinutes) * 60_000;
+    lines.push(
+      "BEGIN:VEVENT",
+      `UID:${escapeIcsText(session.id)}@runehall.local`,
+      `DTSTAMP:${stamp}`,
+      `DTSTART:${icsTimestamp(session.scheduledAt)}`,
+      `DTEND:${icsTimestamp(end)}`,
+      `SUMMARY:${escapeIcsText(session.title)}`,
+      `DESCRIPTION:${escapeIcsText(
+        `Runehall campaign session (${SESSION_STATUS_LABELS[session.status]}).`
+      )}`,
+      `STATUS:${session.status === "played" ? "CONFIRMED" : "TENTATIVE"}`,
+      "END:VEVENT"
+    );
+  }
+  lines.push("END:VCALENDAR");
+  return `${lines.map(foldIcsLine).join("\r\n")}\r\n`;
 }
 
 export function isSessionStatus(value: unknown): value is SessionStatus {

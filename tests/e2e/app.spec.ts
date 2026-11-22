@@ -694,13 +694,26 @@ test("GM schedules from Sessions and overdue sessions stay current", async ({ pa
   await expect(dialog).toBeVisible();
   await dialog.getByLabel("Title").fill("E2E Overdue Session");
   await dialog.getByLabel("Date and time").fill("2020-01-05T19:00");
+  await dialog.getByLabel("Repeat").selectOption("weekly");
   await dialog.getByRole("button", { name: "Schedule session" }).click();
   await expect(page.getByText("Session scheduled.")).toBeVisible();
 
   const card = page.locator(".session-card").filter({ hasText: "E2E Overdue Session" });
   await expect(card.getByText("Overdue", { exact: true })).toBeVisible();
+  await expect(card.getByText("Weekly", { exact: true })).toBeVisible();
   await expect(card.getByText("Check-in", { exact: true })).toBeVisible();
   await expect(card.getByRole("button", { name: "Mark played" })).toBeVisible();
+
+  const downloadPromise = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Calendar (.ics)" }).click();
+  const calendar = await downloadPromise;
+  expect(calendar.suggestedFilename()).toBe("runehall-sessions.ics");
+
+  await card.getByRole("button", { name: "Mark played" }).click();
+  await expect(page.getByText("Session marked played. Next session scheduled.")).toBeVisible();
+  await expect(
+    page.locator(".session-card").filter({ hasText: "E2E Overdue Session" })
+  ).toHaveCount(2);
 
   await page
     .locator(".campaign-tabs")

@@ -95,6 +95,7 @@ describe("migrations", () => {
       name: string;
     }[];
     expect(sessionColumns.map((column) => column.name)).toContain("agenda");
+    expect(sessionColumns.map((column) => column.name)).toContain("recurrence");
     const tokenColumns = db.prepare("PRAGMA table_info(tokens)").all() as {
       name: string;
     }[];

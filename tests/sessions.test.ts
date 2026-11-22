@@ -1,8 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
   SESSION_CHECKIN_LABELS,
+  SESSION_RECURRENCE_LABELS,
+  campaignSessionsIcs,
   nextScheduledSession,
+  nextSessionTimestamp,
   normalizeSessionAgenda,
+  normalizeSessionRecurrence,
   sessionCheckinSummary,
   sessionTiming,
 } from "../src/shared/sessions";
@@ -43,6 +47,7 @@ function session(overrides: Partial<CampaignSession> = {}): CampaignSession {
     notes: "",
     agenda: [],
     status: "scheduled",
+    recurrence: "none",
     attendance: [],
     checkins: [],
     createdAt: 0,
@@ -67,6 +72,60 @@ describe("session timing", () => {
       session({ id: "canceled", scheduledAt: 500, status: "canceled" }),
     ]);
     expect(next?.id).toBe("late");
+  });
+});
+
+describe("session recurrence", () => {
+  it("labels and normalizes the cadence options", () => {
+    expect(SESSION_RECURRENCE_LABELS.weekly).toBe("Weekly");
+    expect(SESSION_RECURRENCE_LABELS.biweekly).toBe("Every 2 weeks");
+    expect(SESSION_RECURRENCE_LABELS.monthly).toBe("Monthly");
+    expect(normalizeSessionRecurrence("weekly")).toBe("weekly");
+    expect(normalizeSessionRecurrence("yearly")).toBe("none");
+  });
+
+  it("advances weekly and biweekly sessions by exact days", () => {
+    const start = Date.UTC(2026, 0, 5, 19, 0);
+    expect(nextSessionTimestamp(start, "weekly") - start).toBe(7 * 86_400_000);
+    expect(nextSessionTimestamp(start, "biweekly") - start).toBe(14 * 86_400_000);
+    expect(nextSessionTimestamp(start, "none")).toBe(start);
+  });
+
+  it("clamps monthly sessions to the end of shorter months", () => {
+    const january = new Date(2026, 0, 31, 19, 0).getTime();
+    const february = new Date(nextSessionTimestamp(january, "monthly"));
+    expect(february.getMonth()).toBe(1);
+    expect(february.getDate()).toBe(28);
+    expect(february.getHours()).toBe(19);
+  });
+});
+
+describe("session calendar feed", () => {
+  it("exports upcoming sessions without GM notes and skips canceled entries", () => {
+    const start = Date.UTC(2026, 0, 5, 19, 0);
+    const ics = campaignSessionsIcs({
+      campaignName: "Ashen Crown",
+      now: start,
+      sessions: [
+        session({
+          id: "sess_one",
+          title: "Session 5, The Ashen Gate",
+          scheduledAt: start,
+          durationMinutes: 180,
+          notes: "Secret traitor reveal.",
+        }),
+        session({ id: "sess_canceled", status: "canceled", scheduledAt: start + 86_400_000 }),
+      ],
+    });
+    expect(ics.startsWith("BEGIN:VCALENDAR\r\n")).toBe(true);
+    expect(ics.endsWith("END:VCALENDAR\r\n")).toBe(true);
+    expect(ics).toContain("UID:sess_one@runehall.local");
+    expect(ics).toContain("DTSTART:20260105T190000Z");
+    expect(ics).toContain("DTEND:20260105T220000Z");
+    expect(ics).toContain("SUMMARY:Session 5\\, The Ashen Gate");
+    expect(ics).toContain("STATUS:TENTATIVE");
+    expect(ics).not.toContain("Secret traitor reveal.");
+    expect(ics).not.toContain("sess_canceled");
   });
 });
 

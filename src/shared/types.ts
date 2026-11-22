@@ -1505,6 +1505,8 @@ export interface SessionAttendance {
   note: string;
 }
 
+export type SessionRecurrence = "none" | "weekly" | "biweekly" | "monthly";
+
 export interface CampaignSession {
   id: string;
   campaignId: string;
@@ -1516,6 +1518,8 @@ export interface CampaignSession {
   /** GM-only prep checklist. */
   agenda: SessionAgendaItem[];
   status: SessionStatus;
+  /** How the next session should be scheduled when this one is marked played. */
+  recurrence: SessionRecurrence;
   attendance: SessionAttendance[];
   checkins: SessionCheckin[];
   createdAt: number;

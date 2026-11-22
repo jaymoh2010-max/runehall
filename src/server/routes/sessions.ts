@@ -4,10 +4,14 @@ import { db, type CampaignSessionRow } from "../db";
 import { campaignSessionsFor } from "../sessionData";
 import { touchCampaign } from "../serialize";
 import {
+  campaignSessionsIcs,
   isAttendanceStatus,
   isSessionCheckinStatus,
+  isSessionRecurrence,
   isSessionStatus,
+  nextSessionTimestamp,
   normalizeSessionAgenda,
+  normalizeSessionRecurrence,
   normalizeSessionStatus,
 } from "../../shared/sessions";
 import { clamp, newId, now, safeString, sanitizeUserText } from "../util";
@@ -57,6 +61,23 @@ export async function registerSessionRoutes(app: FastifyInstance): Promise<void>
     });
   });
 
+  app.get("/api/campaigns/:id/sessions.ics", async (request, reply) => {
+    if (!request.user) return reply.code(401).send({ error: "Sign in to continue." });
+    const { id } = request.params as { id: string };
+    const campaign = getCampaign(id);
+    if (!campaign) return reply.code(404).send({ error: "Campaign not found." });
+    const role = getCampaignRole(id, request.user.id);
+    if (!role) return reply.code(403).send({ error: "You're not a member of that campaign." });
+    const ics = campaignSessionsIcs({
+      campaignName: campaign.name,
+      sessions: campaignSessionsFor(id, role, request.user.id),
+    });
+    return reply
+      .header("Content-Type", "text/calendar; charset=utf-8")
+      .header("Content-Disposition", 'attachment; filename="runehall-sessions.ics"')
+      .send(ics);
+  });
+
   app.post("/api/campaigns/:id/sessions", async (request, reply) => {
     if (!request.user) return reply.code(401).send({ error: "Sign in to continue." });
     const { id } = request.params as { id: string };
@@ -72,13 +93,16 @@ export async function registerSessionRoutes(app: FastifyInstance): Promise<void>
     if (body.status !== undefined && !isSessionStatus(body.status)) {
       return reply.code(400).send({ error: "Choose a valid session status." });
     }
+    if (body.recurrence !== undefined && !isSessionRecurrence(body.recurrence)) {
+      return reply.code(400).send({ error: "Choose a valid session recurrence." });
+    }
     const sessionId = newId("sess");
     const ts = now();
     const agenda = normalizeSessionAgenda(body.agenda);
     db.prepare(
       `INSERT INTO campaign_sessions
-        (id, campaign_id, title, scheduled_at, duration_minutes, notes, agenda, status, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        (id, campaign_id, title, scheduled_at, duration_minutes, notes, agenda, status, recurrence, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       sessionId,
       id,
@@ -88,6 +112,7 @@ export async function registerSessionRoutes(app: FastifyInstance): Promise<void>
       sanitizeUserText(body.notes, 20_000),
       JSON.stringify(agenda),
       body.status === undefined ? "scheduled" : normalizeSessionStatus(body.status),
+      normalizeSessionRecurrence(body.recurrence),
       ts,
       ts
     );
@@ -110,6 +135,9 @@ export async function registerSessionRoutes(app: FastifyInstance): Promise<void>
     if (body.status !== undefined && !isSessionStatus(body.status)) {
       return reply.code(400).send({ error: "Choose a valid session status." });
     }
+    if (body.recurrence !== undefined && !isSessionRecurrence(body.recurrence)) {
+      return reply.code(400).send({ error: "Choose a valid session recurrence." });
+    }
     let scheduledAt = existing.scheduled_at;
     if (body.scheduledAt !== undefined) {
       const value = Number(body.scheduledAt);
@@ -118,9 +146,16 @@ export async function registerSessionRoutes(app: FastifyInstance): Promise<void>
       }
       scheduledAt = Math.round(value);
     }
+    const previousStatus = normalizeSessionStatus(existing.status);
+    const nextStatus =
+      body.status === undefined ? previousStatus : normalizeSessionStatus(body.status);
+    const recurrence =
+      body.recurrence === undefined
+        ? normalizeSessionRecurrence(existing.recurrence)
+        : normalizeSessionRecurrence(body.recurrence);
     db.prepare(
       `UPDATE campaign_sessions
-       SET title = ?, scheduled_at = ?, duration_minutes = ?, notes = ?, agenda = ?, status = ?, updated_at = ?
+       SET title = ?, scheduled_at = ?, duration_minutes = ?, notes = ?, agenda = ?, status = ?, recurrence = ?, updated_at = ?
        WHERE id = ?`
     ).run(
       body.title === undefined ? existing.title : safeString(body.title, existing.title, 140),
@@ -132,16 +167,45 @@ export async function registerSessionRoutes(app: FastifyInstance): Promise<void>
       body.agenda === undefined
         ? existing.agenda
         : JSON.stringify(normalizeSessionAgenda(body.agenda)),
-      body.status === undefined
-        ? normalizeSessionStatus(existing.status)
-        : normalizeSessionStatus(body.status),
+      nextStatus,
+      recurrence,
       now(),
       sessionId
     );
+    let nextSession: ReturnType<typeof sessionFor> = null;
+    if (previousStatus !== "played" && nextStatus === "played" && recurrence !== "none") {
+      const nextAt = nextSessionTimestamp(scheduledAt, recurrence);
+      const duplicate = db
+        .prepare(
+          "SELECT id FROM campaign_sessions WHERE campaign_id = ? AND scheduled_at = ? AND title = ? LIMIT 1"
+        )
+        .get(id, nextAt, existing.title) as { id: string } | undefined;
+      const nextId = duplicate?.id ?? newId("sess");
+      if (!duplicate) {
+        const ts = now();
+        db.prepare(
+          `INSERT INTO campaign_sessions
+            (id, campaign_id, title, scheduled_at, duration_minutes, notes, agenda, status, recurrence, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, 'scheduled', ?, ?, ?)`
+        ).run(
+          nextId,
+          id,
+          existing.title,
+          nextAt,
+          existing.duration_minutes,
+          existing.notes,
+          existing.agenda,
+          recurrence,
+          ts,
+          ts
+        );
+      }
+      nextSession = sessionFor(id, nextId);
+    }
     syncDashboardNextSession(id);
     touchCampaign(id);
     notifySessionsChanged(app, id);
-    return reply.send({ session: sessionFor(id, sessionId) });
+    return reply.send({ session: sessionFor(id, sessionId), nextSession });
   });
 
   app.delete("/api/campaigns/:id/sessions/:sessionId", async (request, reply) => {

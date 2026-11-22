@@ -59,6 +59,7 @@ import {
   isSessionCheckinStatus,
   normalizeAttendanceStatus,
   normalizeSessionAgenda,
+  normalizeSessionRecurrence,
   normalizeSessionStatus,
 } from "../shared/sessions";
 import {
@@ -971,7 +972,7 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
     for (const session of records(payload.sessions, 10_000, "sessions")) {
       const sessionId = newId("sess");
       db.prepare(
-        "INSERT INTO campaign_sessions (id, campaign_id, title, scheduled_at, duration_minutes, notes, agenda, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        "INSERT INTO campaign_sessions (id, campaign_id, title, scheduled_at, duration_minutes, notes, agenda, status, recurrence, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
       ).run(
         sessionId,
         campaignId,
@@ -981,6 +982,7 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
         longText(session.notes, "", 20_000),
         JSON.stringify(normalizeSessionAgenda(session.agenda)),
         normalizeSessionStatus(session.status),
+        normalizeSessionRecurrence(session.recurrence),
         ts,
         ts
       );

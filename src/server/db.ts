@@ -428,6 +428,7 @@ export interface CampaignSessionRow {
   notes: string;
   agenda: string;
   status: string;
+  recurrence: string;
   created_at: number;
   updated_at: number;
 }

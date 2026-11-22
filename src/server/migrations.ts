@@ -927,4 +927,11 @@ export const migrations: Migration[] = [
       ALTER TABLE campaign_npcs ADD COLUMN routine TEXT NOT NULL DEFAULT '';
     `,
   },
+  {
+    version: 54,
+    name: "session_recurrence",
+    sql: `
+      ALTER TABLE campaign_sessions ADD COLUMN recurrence TEXT NOT NULL DEFAULT 'none';
+    `,
+  },
 ];

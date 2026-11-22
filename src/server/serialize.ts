@@ -57,6 +57,7 @@ import {
   isSessionCheckinStatus,
   normalizeAttendanceStatus,
   normalizeSessionAgenda,
+  normalizeSessionRecurrence,
   normalizeSessionStatus,
 } from "../shared/sessions";
 import {
@@ -567,6 +568,7 @@ export function serializeCampaignSession(
     notes: role === "gm" ? row.notes : "",
     agenda: role === "gm" ? normalizeSessionAgenda(parseJson(row.agenda, [])) : [],
     status: normalizeSessionStatus(row.status),
+    recurrence: normalizeSessionRecurrence(row.recurrence),
     attendance: visibleMembers.map((member) => {
       const attendance = attendanceByUser.get(member.id);
       return {

@@ -87,7 +87,7 @@ The campaign simulation exercises two complete 1–20 campaigns, including XP an
 | Stage | Support | Status |
 | --- | --- | --- |
 | Session zero | Shared charter, genre/tone, content limits, safety tools, private lines/veils, anonymous pause signal, allowed sources, party goal/hooks | Strong |
-| Scheduling | Sessions, check-ins, attendance, next-session date, live updates | Strong; no external reminders/ICS |
+| Scheduling | Sessions, check-ins, attendance, recurrence, .ics export, next-session date, live updates | Strong; no email/push reminders |
 | Onboarding | Registration/invites, join requests, Pathbuilder import, character assignment | Strong |
 | Character build | 1–20 builder, prerequisites, slots, runes, companions, budget, import, Free Archetype and ABP | Strong; uncommon effects remain manual |
 | Advancement | Milestone or XP, GM approval, player requests, catch-up, wealth top-up | Strong |
@@ -127,7 +127,7 @@ These are optional campaign variants; the base Remastered rules do not require t
 ### Campaign depth
 
 - No hex/pointcrawl map, automatic weather effects, chase track, or foraging/tracking checks.
-- No external reminders, ICS export, time-zone scheduling, or recurring sessions.
+- No email/push reminders, time-zone-specific scheduling, or third-party calendar sync. Recurring sessions and a downloadable .ics feed are supported.
 - No published-adventure importer, kingdom building, vehicles, mass combat, or automated companion advancement.
 - No third-party anonymous safety channel; the GM-only pause signal is the supported path.
 - Public hosting still needs TLS, a reverse proxy, off-machine backups, and the deployment checklist in `docs/DEPLOY.md`. Session revocation, moderation, invite limits, and backup atomicity are in place.

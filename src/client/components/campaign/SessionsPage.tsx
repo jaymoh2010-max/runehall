@@ -1,15 +1,26 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { CalendarClock, Check, ListChecks, Pencil, Plus, Trash2, Users } from "lucide-react";
+import {
+  CalendarClock,
+  Check,
+  Download,
+  ListChecks,
+  Pencil,
+  Plus,
+  Trash2,
+  Users,
+} from "lucide-react";
 import type {
   CampaignSession,
   SessionAgendaItem,
   SessionAttendanceStatus,
   SessionCheckinStatus,
+  SessionRecurrence,
   SessionStatus,
 } from "../../../shared/types";
 import {
   ATTENDANCE_STATUS_LABELS,
   SESSION_CHECKIN_LABELS,
+  SESSION_RECURRENCE_LABELS,
   SESSION_STATUS_LABELS,
   sessionCheckinSummary,
   sessionTiming,
@@ -180,12 +191,18 @@ export function SessionsPage({
   const markPlayed = async (session: CampaignSession) => {
     setBusy(true);
     try {
-      const result = await api<{ session: CampaignSession }>(
+      const result = await api<{ session: CampaignSession; nextSession?: CampaignSession | null }>(
         `/api/campaigns/${campaignId}/sessions/${session.id}`,
         { method: "PATCH", body: { status: "played" } }
       );
       replaceSession(result.session);
-      toast("Session marked played.", "success");
+      if (result.nextSession) replaceSession(result.nextSession);
+      toast(
+        result.nextSession
+          ? "Session marked played. Next session scheduled."
+          : "Session marked played.",
+        "success"
+      );
     } catch (err) {
       toast(errorMessage(err), "error");
     } finally {
@@ -244,6 +261,9 @@ export function SessionsPage({
                       ? "In progress"
                       : SESSION_STATUS_LABELS[session.status]}
                 </Badge>
+                {session.recurrence !== "none" ? (
+                  <Tag tone="blue">{SESSION_RECURRENCE_LABELS[session.recurrence]}</Tag>
+                ) : null}
               </div>
               <p className="tiny muted">
                 {formatSessionTime(session.scheduledAt)} · {session.durationMinutes} min
@@ -423,11 +443,27 @@ export function SessionsPage({
           <h2>Sessions</h2>
           <p>Schedule the next gathering, keep the calendar visible, and track who made it.</p>
         </div>
-        {isGm ? (
-          <Button variant="primary" icon={<Plus size={15} />} onClick={() => setEditor("new")}>
-            Schedule session
+        <div className="row wrap" style={{ gap: 8 }}>
+          <Button
+            variant="secondary"
+            icon={<Download size={15} />}
+            onClick={() => {
+              const link = document.createElement("a");
+              link.href = `/api/campaigns/${campaignId}/sessions.ics`;
+              link.download = "runehall-sessions.ics";
+              document.body.appendChild(link);
+              link.click();
+              link.remove();
+            }}
+          >
+            Calendar (.ics)
           </Button>
-        ) : null}
+          {isGm ? (
+            <Button variant="primary" icon={<Plus size={15} />} onClick={() => setEditor("new")}>
+              Schedule session
+            </Button>
+          ) : null}
+        </div>
       </div>
 
       {error ? (
@@ -485,10 +521,18 @@ export function SessionsPage({
         session={editor}
         campaignId={campaignId}
         onClose={() => setEditor(null)}
-        onSaved={(session) => {
+        onSaved={(session, nextSession) => {
           replaceSession(session);
+          if (nextSession) replaceSession(nextSession);
           setEditor(null);
-          toast(editor === "new" ? "Session scheduled." : "Session saved.", "success");
+          toast(
+            nextSession
+              ? "Session saved. Next session scheduled."
+              : editor === "new"
+                ? "Session scheduled."
+                : "Session saved.",
+            "success"
+          );
         }}
         onError={(message) => toast(message, "error")}
       />
@@ -508,7 +552,7 @@ function SessionEditor({
   session: CampaignSession | "new" | null;
   campaignId: string;
   onClose: () => void;
-  onSaved: (session: CampaignSession) => void;
+  onSaved: (session: CampaignSession, nextSession?: CampaignSession | null) => void;
   onError: (message: string) => void;
 }) {
   const editing = session && session !== "new" ? session : null;
@@ -516,6 +560,7 @@ function SessionEditor({
   const [scheduledAt, setScheduledAt] = useState(defaultSessionDate());
   const [duration, setDuration] = useState("180");
   const [status, setStatus] = useState<SessionStatus>("scheduled");
+  const [recurrence, setRecurrence] = useState<SessionRecurrence>("none");
   const [notes, setNotes] = useState("");
   const [agenda, setAgenda] = useState<SessionAgendaItem[]>([]);
   const [agendaText, setAgendaText] = useState("");
@@ -528,6 +573,7 @@ function SessionEditor({
     setScheduledAt(editing ? toDateTimeLocal(editing.scheduledAt) : defaultSessionDate());
     setDuration(String(editing?.durationMinutes ?? 180));
     setStatus(editing?.status ?? "scheduled");
+    setRecurrence(editing?.recurrence ?? "none");
     setNotes(editing?.notes ?? "");
     setAgenda(editing?.agenda ?? []);
     setAgendaText("");
@@ -576,22 +622,26 @@ function SessionEditor({
         scheduledAt: new Date(scheduledAt).getTime(),
         durationMinutes: Number(duration) || 180,
         status,
+        recurrence,
         notes,
         agenda,
       };
       const result = editing
-        ? await api<{ session: CampaignSession }>(
+        ? await api<{ session: CampaignSession; nextSession?: CampaignSession | null }>(
             `/api/campaigns/${campaignId}/sessions/${editing.id}`,
             {
               method: "PATCH",
               body: payload,
             }
           )
-        : await api<{ session: CampaignSession }>(`/api/campaigns/${campaignId}/sessions`, {
-            method: "POST",
-            body: payload,
-          });
-      onSaved(result.session);
+        : await api<{ session: CampaignSession; nextSession?: CampaignSession | null }>(
+            `/api/campaigns/${campaignId}/sessions`,
+            {
+              method: "POST",
+              body: payload,
+            }
+          );
+      onSaved(result.session, result.nextSession ?? null);
     } catch (err) {
       const message = errorMessage(err);
       setError(message);
@@ -653,6 +703,25 @@ function SessionEditor({
               <option value="scheduled">Scheduled</option>
               <option value="played">Played</option>
               <option value="canceled">Canceled</option>
+            </Select>
+          </Field>
+          <Field
+            label="Repeat"
+            hint={
+              recurrence === "none"
+                ? "No session is created automatically."
+                : "Marking this session played schedules the next one."
+            }
+          >
+            <Select
+              value={recurrence}
+              onChange={(event) => setRecurrence(event.target.value as SessionRecurrence)}
+            >
+              {(Object.keys(SESSION_RECURRENCE_LABELS) as SessionRecurrence[]).map((value) => (
+                <option key={value} value={value}>
+                  {SESSION_RECURRENCE_LABELS[value]}
+                </option>
+              ))}
             </Select>
           </Field>
         </div>

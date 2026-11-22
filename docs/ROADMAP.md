@@ -253,10 +253,13 @@ Then immediately add **guided level-up**: a dedicated “Level up” flow that e
 - [x] **Session scheduling and attendance**
   - Shared **Sessions** tab with upcoming and past sessions, dates, duration, and status.
   - GM can schedule, edit, delete, and mark sessions played.
+  - Sessions can repeat weekly, every two weeks, or monthly; marking one played schedules the next occurrence.
+  - Any member can download a player-safe .ics calendar feed; GM notes and the agenda are excluded.
   - GM records attendance as attended, late, absent, excused, or unmarked.
   - Players see the schedule and their own attendance only; GM notes stay hidden.
   - The next scheduled session syncs to the Overview dashboard automatically.
-  - Campaign export includes sessions and attendance.
+  - Campaign export includes sessions, attendance, and recurrence.
+  - Remaining: email/push reminders and time-zone-specific display.
 - [x] **GM screen**
   - Quick level-based DC reference with Easy/Normal/Hard/Very Hard/Incredibly Hard adjustments.
   - Simple DCs for Untrained through Legendary, clickable into the roll form.
