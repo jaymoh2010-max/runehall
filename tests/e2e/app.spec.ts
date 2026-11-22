@@ -1185,6 +1185,51 @@ test("sheet recovery performs Treat Wounds and tracks immunity", async ({ page }
   await dialog.locator(".modal-foot").getByRole("button", { name: "Close" }).click();
 });
 
+test("sheet uses potions, invests items, and tracks daily charges", async ({ page }) => {
+  test.setTimeout(60_000);
+  await signIn(page, admin);
+  const campaignId = campaignPath.split("/").pop();
+  const created = await page.request.post("/api/characters", {
+    data: { name: "E2E Items", campaignId },
+  });
+  expect(created.status()).toBe(201);
+  const record = (await created.json()) as {
+    character: { id: string; data: Record<string, unknown> };
+  };
+  const draft = structuredClone(record.character.data) as {
+    equipment: unknown[];
+    play: { hp: number };
+  };
+  draft.equipment = [
+    { itemId: "item:e0vSAQfxhHauiAoD", quantity: 2, equipped: false },
+    { itemId: "item:o1zKhvYUUc1hE2AE", quantity: 1, equipped: true, invested: false },
+  ];
+  draft.play.hp = 5;
+  const saved = await page.request.put(`/api/characters/${record.character.id}`, {
+    data: { data: draft, force: true },
+  });
+  expect(saved.ok()).toBe(true);
+
+  await page.goto(`/characters/${record.character.id}`);
+  await expect(page.getByRole("heading", { name: "E2E Items" })).toBeVisible({
+    timeout: 15_000,
+  });
+  const potionRow = page.locator(".sheet-equipment-row").filter({ hasText: "Healing Potion" });
+  await expect(potionRow).toContainText("×2");
+  await potionRow.getByRole("button", { name: "Use" }).click();
+  await expect(potionRow).toContainText("×1");
+
+  const glovesRow = page.locator(".sheet-equipment-row").filter({ hasText: "Healer's Gloves" });
+  const investedSwitch = glovesRow.getByRole("switch", { name: "Invested" });
+  await investedSwitch.click();
+  await expect(investedSwitch).toHaveAttribute("aria-checked", "true");
+  await expect(page.getByText(/Invested 1 \/ 10/)).toBeVisible();
+  await expect(glovesRow).toContainText("1 / 1 uses");
+  await glovesRow.getByRole("button", { name: "Activate" }).click();
+  await expect(glovesRow).toContainText("0 / 1 uses");
+  await expect(glovesRow.getByRole("button", { name: "Activate" })).toBeDisabled();
+});
+
 test("Pathbuilder JSON import creates a character from the dashboard", async ({ page }) => {
   await signIn(page, admin);
   await page.getByRole("button", { name: "Import Pathbuilder" }).click();

@@ -41,6 +41,8 @@ import {
   type CharacterRecord,
   type CharacterCondition,
   type CharacterAffliction,
+  type CharacterEquipment,
+  type Equipment,
   type AfflictionType,
   type PersistentDamageInstance,
   type ConditionRef,
@@ -90,6 +92,13 @@ import {
   recoveryHealingFormula,
   type RecoveryActivity,
 } from "../../shared/recovery";
+import {
+  INVESTED_LIMIT,
+  activateItemOnDraft,
+  investedCount,
+  itemUseInfo,
+  setItemInvested,
+} from "../../shared/itemActivation";
 import { xpProgress } from "../../shared/xp";
 import { spellTraditionLabel, stripHtml } from "../../shared/compendium";
 import {
@@ -890,6 +899,56 @@ export function CharacterSheetPage() {
       setRecoveryError(errorMessage(err));
     } finally {
       setRecoveryBusy(false);
+    }
+  };
+
+  const consumeItem = (entry: CharacterEquipment, item: Equipment | null) => {
+    if (!canEdit || !derived) return;
+    const current = draftRef.current ?? draft;
+    if (!current) return;
+    const activation = activateItemOnDraft(current, entry.itemId, item);
+    if (activation.blocked) {
+      toast(activation.blocked, "error");
+      return;
+    }
+    let next = activation.draft;
+    let healed = 0;
+    if (activation.healingFormula) {
+      try {
+        const rolled = rollFormula(activation.healingFormula, {
+          label: `${item?.name ?? entry.itemId} healing`,
+        });
+        const applied = applyHpEditToDraft(next, derived.maxHp, {
+          type: "heal",
+          amount: rolled.total,
+        });
+        next = applied.draft;
+        healed = applied.healed;
+        setRollLog(rolled);
+      } catch (err) {
+        toast(errorMessage(err), "error");
+        return;
+      }
+    }
+    update(() => next);
+    toast(
+      `${activation.notes[0] ?? "Item used."}${healed > 0 ? ` Healed ${healed} HP.` : ""}`,
+      "success"
+    );
+  };
+
+  const investItem = (entry: CharacterEquipment, item: Equipment | null, value: boolean) => {
+    if (!canEdit) return;
+    const current = draftRef.current ?? draft;
+    if (!current) return;
+    const result = setItemInvested(current, entry.itemId, value);
+    if (result.blocked) {
+      toast(result.blocked, "error");
+      return;
+    }
+    update(() => result.draft);
+    if (value) {
+      toast(`Invested ${item?.name ?? entry.itemId}.`, "success");
     }
   };
 
@@ -2565,7 +2624,7 @@ export function CharacterSheetPage() {
               <span className="tiny muted">
                 {draft.equipment.length} {draft.equipment.length === 1 ? "stack" : "stacks"} ·{" "}
                 {derived.bulk.total} / {derived.bulk.capacity} bulk · {formatCp(inventoryValue)}{" "}
-                gear value
+                gear value · Invested {investedCount(draft)} / {INVESTED_LIMIT}
               </span>
             </div>
             <div className="sheet-purse">
@@ -2592,6 +2651,16 @@ export function CharacterSheetPage() {
                 const item = context.equipment[entry.itemId] ?? null;
                 const name = item?.name ?? entry.itemId;
                 const canTransfer = Boolean(canEdit && character.campaignId);
+                const useInfo = itemUseInfo(item);
+                const storedUsesMax = Math.max(0, Math.round(entry.usesMax ?? 0));
+                const usesMax =
+                  useInfo?.kind === "charged"
+                    ? Math.max(0, Math.round(storedUsesMax > 0 ? storedUsesMax : useInfo.usesMax))
+                    : 0;
+                const usesUsed = Math.max(0, Math.round(entry.usesUsed ?? 0));
+                const investable =
+                  Boolean(item?.traits?.includes("invested")) || Boolean(entry.invested);
+                const atInvestedLimit = investedCount(draft) >= INVESTED_LIMIT && !entry.invested;
                 return (
                   <div key={entry.itemId} className="sheet-equipment-row">
                     <span className="grow">
@@ -2601,6 +2670,15 @@ export function CharacterSheetPage() {
                       ) : null}
                       {entry.runes?.length ? (
                         <span className="tiny muted"> · {entry.runes.length} runes</span>
+                      ) : null}
+                      {useInfo?.frequency ? (
+                        <span className="tiny muted"> · {useInfo.frequency}</span>
+                      ) : null}
+                      {usesMax > 0 ? (
+                        <span className="tiny muted">
+                          {" "}
+                          · {Math.max(0, usesMax - usesUsed)} / {usesMax} uses
+                        </span>
                       ) : null}
                     </span>
                     <span className="qty-control sheet-qty">
@@ -2655,6 +2733,40 @@ export function CharacterSheetPage() {
                       label="Equipped"
                       disabled={!canEdit}
                     />
+                    {investable ? (
+                      <span
+                        title={
+                          atInvestedLimit
+                            ? `All ${INVESTED_LIMIT} invested slots are full`
+                            : undefined
+                        }
+                      >
+                        <Toggle
+                          checked={entry.invested === true}
+                          onChange={(value) => investItem(entry, item, value)}
+                          label="Invested"
+                          disabled={!canEdit}
+                        />
+                      </span>
+                    ) : null}
+                    {useInfo ? (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => consumeItem(entry, item)}
+                        disabled={
+                          !canEdit ||
+                          (useInfo.kind === "charged" && usesMax > 0 && usesUsed >= usesMax)
+                        }
+                        title={
+                          useInfo.kind === "consumable"
+                            ? `Use one ${name}`
+                            : `Activate ${name}${useInfo.frequency ? ` (${useInfo.frequency})` : ""}`
+                        }
+                      >
+                        {useInfo.label}
+                      </Button>
+                    ) : null}
                     <button
                       type="button"
                       className="icon-btn"

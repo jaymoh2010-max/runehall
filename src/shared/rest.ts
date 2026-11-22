@@ -1,4 +1,5 @@
 import { conditionBaseName, conditionNameWithoutValue, conditionNumericValue } from "./tokens";
+import { resetItemUses } from "./itemActivation";
 import type { CharacterCondition, CharacterDraft, DerivedCharacter } from "./types";
 
 export interface LongRestOptions {
@@ -149,7 +150,7 @@ export function applyLongRest(
   );
 
   return {
-    draft: {
+    draft: resetItemUses({
       ...draft,
       spells: {
         ...draft.spells,
@@ -169,7 +170,7 @@ export function applyLongRest(
         battleMedicineImmuneBy: [],
         shieldRaised: false,
       },
-    },
+    }),
     summary: {
       healing,
       healed,

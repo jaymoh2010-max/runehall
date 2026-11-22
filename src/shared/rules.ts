@@ -37,6 +37,7 @@ import { normalizeLifestyle } from "./upkeep";
 import { normalizeDowntimeActivities } from "./downtime";
 import { clampHeroPoints } from "./heroPoints";
 import { normalizeCharacterTurnEffects } from "./characterTurnEffects";
+import { INVESTED_LIMIT, investedCount } from "./itemActivation";
 import {
   FEAT_CHOICES,
   FEAT_GRANTS,
@@ -1110,6 +1111,8 @@ export function normalizeCharacterDraft(input: unknown, fallbackName = "New Hero
     quantity: number;
     equipped: boolean;
     invested: boolean;
+    usesUsed: number;
+    usesMax?: number;
     runes: string[];
   };
   const equipmentMap = new Map<string, NormalizedEquipment>();
@@ -1124,6 +1127,13 @@ export function normalizeCharacterDraft(input: unknown, fallbackName = "New Hero
       existing.quantity += Math.max(1, Math.floor(num(item.quantity, 1)));
       existing.equipped = existing.equipped || Boolean(item.equipped);
       existing.invested = existing.invested || Boolean(item.invested);
+      existing.usesUsed = Math.max(
+        existing.usesUsed,
+        Math.max(0, Math.floor(num(item.usesUsed, 0)))
+      );
+      if (typeof item.usesMax === "number" && Number.isFinite(item.usesMax)) {
+        existing.usesMax = Math.max(0, Math.min(999, Math.floor(item.usesMax)));
+      }
       existing.runes = [...new Set([...existing.runes, ...runes])].slice(0, 12);
     } else {
       equipmentMap.set(itemId, {
@@ -1131,6 +1141,10 @@ export function normalizeCharacterDraft(input: unknown, fallbackName = "New Hero
         quantity: Math.max(1, Math.floor(num(item.quantity, 1))),
         equipped: Boolean(item.equipped),
         invested: Boolean(item.invested),
+        usesUsed: Math.max(0, Math.min(999, Math.floor(num(item.usesUsed, 0)))),
+        ...(typeof item.usesMax === "number" && Number.isFinite(item.usesMax)
+          ? { usesMax: Math.max(0, Math.min(999, Math.floor(item.usesMax))) }
+          : {}),
         runes,
       });
     }
@@ -2931,6 +2945,15 @@ export function computeCharacter(
       "Your equipment and coins exceed the standard starting wealth for this level.",
       "gear"
     );
+
+  const invested = investedCount(draft);
+  if (invested > INVESTED_LIMIT) {
+    issue(
+      "error",
+      `Invested ${invested} items; PF2e allows at most ${INVESTED_LIMIT}. Uninvest one before play.`,
+      "gear"
+    );
+  }
 
   for (const { entry, item } of ownedEquipment) {
     if (!entry.runes?.length) continue;

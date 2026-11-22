@@ -203,6 +203,44 @@ describe("PF2e character rules", () => {
     expect(draft.details.notes).toBe("Hello");
   });
 
+  it("normalizes item use counters and invested flags", () => {
+    const draft = normalizeCharacterDraft({
+      name: "Item Tracker",
+      equipment: [
+        {
+          itemId: "item:wand",
+          quantity: 1,
+          equipped: true,
+          invested: true,
+          usesUsed: 7,
+          usesMax: 1,
+        },
+        { itemId: "item:rope", quantity: 2, equipped: false, usesUsed: -3 },
+      ],
+    });
+    expect(draft.equipment[0]).toMatchObject({
+      itemId: "item:wand",
+      invested: true,
+      usesUsed: 7,
+      usesMax: 1,
+    });
+    expect(draft.equipment[1].usesUsed).toBe(0);
+  });
+
+  it("warns when more than ten items are invested", () => {
+    const draft = emptyCharacterDraft("Over-Invested");
+    draft.equipment = Array.from({ length: 11 }, (_, index) => ({
+      itemId: `item:invested-${index}`,
+      quantity: 1,
+      equipped: true,
+      invested: true,
+    }));
+    const derived = computeCharacter(draft, { feats: {}, spells: {}, equipment: {} });
+    expect(derived.validation.some((issue) => issue.message.includes("Invested 11 items"))).toBe(
+      true
+    );
+  });
+
   it("normalizes free class grant choices safely", () => {
     expect(emptyCharacterDraft("Defaults").grantChoices).toEqual({});
     const draft = normalizeCharacterDraft({

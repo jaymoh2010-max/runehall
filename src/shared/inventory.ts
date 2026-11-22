@@ -56,6 +56,8 @@ export function removeItemQuantity(
     quantity: amount,
     equipped: false,
     invested: false,
+    ...(wholeStack && (entry.usesUsed ?? 0) > 0 ? { usesUsed: entry.usesUsed } : {}),
+    ...(wholeStack && typeof entry.usesMax === "number" ? { usesMax: entry.usesMax } : {}),
     runes: wholeStack ? [...(entry.runes ?? [])] : [],
   };
   const equipment = draft.equipment.flatMap((candidate, candidateIndex) => {
@@ -96,6 +98,8 @@ export function addItemToDraft(draft: CharacterDraft, moved: CharacterEquipment)
         quantity,
         equipped: false,
         invested: false,
+        ...(moved.usesUsed ? { usesUsed: moved.usesUsed } : {}),
+        ...(typeof moved.usesMax === "number" ? { usesMax: moved.usesMax } : {}),
         runes: [...new Set(moved.runes ?? [])].slice(0, 12),
       },
     ],

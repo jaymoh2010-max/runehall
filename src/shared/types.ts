@@ -556,6 +556,10 @@ export interface CharacterEquipment {
   quantity: number;
   equipped: boolean;
   invested?: boolean;
+  /** Daily or per-activation charges already spent on this item. */
+  usesUsed?: number;
+  /** Optional manual charge cap; otherwise derived from the item's activation. */
+  usesMax?: number;
   /** Equipment IDs for runes etched onto this weapon, armor, or shield. */
   runes?: string[];
 }

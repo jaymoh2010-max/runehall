@@ -196,6 +196,21 @@ describe("PF2e long rest", () => {
     expect(result.draft.play.xp).toBe(450);
   });
 
+  it("resets per-day item uses during daily preparations", () => {
+    const draft = hero(5);
+    draft.equipment = [
+      {
+        itemId: "item:wand",
+        quantity: 1,
+        equipped: true,
+        usesUsed: 1,
+        usesMax: 1,
+      },
+    ];
+    const result = applyLongRest(draft, derived);
+    expect(result.draft.equipment[0].usesUsed).toBe(0);
+  });
+
   it("does not mutate the input draft", () => {
     const draft = hero(5);
     const before = JSON.stringify(draft);
