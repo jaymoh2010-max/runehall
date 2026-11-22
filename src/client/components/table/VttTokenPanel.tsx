@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Dices,
   Eye,
@@ -82,12 +82,21 @@ export function VttTokenPanel({
   const [bulkCondition, setBulkCondition] = useState("");
   const [bulkValue, setBulkValue] = useState("");
   const [bulkDuration, setBulkDuration] = useState("");
+  const tokenScrollRef = useRef<HTMLDivElement>(null);
+  const editorRef = useRef<HTMLDivElement>(null);
   const selectedTokens = sceneTokens.filter((token) => selectedTokenIds.includes(token.id));
   const groupTokens = selectedToken?.groupId
     ? sceneTokens.filter((token) => token.groupId === selectedToken.groupId)
     : [];
   const group = groupTokens.length > 1 ? groupHp(groupTokens) : null;
   const groupName = selectedToken?.groupName || groupTokens[0]?.name || "Group";
+
+  useEffect(() => {
+    tokenScrollRef.current
+      ?.querySelector<HTMLElement>(".vtt-token-row.is-selected")
+      ?.scrollIntoView({ block: "nearest" });
+    editorRef.current?.scrollTo({ top: 0 });
+  }, [selectedTokenId, selectedTokenIds.length, sceneTokens.length]);
 
   const applyBulkCondition = () => {
     const name = bulkCondition.trim();
@@ -213,56 +222,60 @@ export function VttTokenPanel({
           ) : null}
         </div>
       ) : null}
-      <div className="vtt-token-list">
-        {sceneTokens.map((token) => {
-          const character = token.characterId
-            ? characters.find((c) => c.id === token.characterId)
-            : null;
-          const portrait = token.imageUrl || character?.summary?.portraitUrl;
-          return (
-            <HoverCard
-              key={token.id}
-              title={token.name}
-              subtitle={
-                character?.summary
-                  ? `Level ${character.summary.level} ${character.summary.className || "adventurer"}`
-                  : (token.groupName ?? "Token")
-              }
-              meta={
-                <span>
-                  {token.hpMax !== null ? `${token.hpCurrent ?? "?"} / ${token.hpMax} HP` : "No HP"}
-                  {token.ac !== null ? ` · AC ${token.ac}` : ""}
-                  {token.conditions.length ? ` · ${tokenConditionSummary(token.conditions)}` : ""}
-                </span>
-              }
-              footer={character ? "Double-click for the character sheet" : undefined}
-            >
-              <button
-                type="button"
-                className={`vtt-token-row ${selectedTokenIds.includes(token.id) || selectedTokenId === token.id ? "is-selected" : ""} ${token.hidden ? "is-hidden" : ""}`}
-                onClick={() => setSelectedTokenId(token.id)}
-                onDoubleClick={() =>
-                  character && window.open(`/characters/${character.id}`, "_blank")
+      <div className="vtt-token-scroll" ref={tokenScrollRef}>
+        <div className="vtt-token-list">
+          {sceneTokens.map((token) => {
+            const character = token.characterId
+              ? characters.find((c) => c.id === token.characterId)
+              : null;
+            const portrait = token.imageUrl || character?.summary?.portraitUrl;
+            return (
+              <HoverCard
+                key={token.id}
+                title={token.name}
+                subtitle={
+                  character?.summary
+                    ? `Level ${character.summary.level} ${character.summary.className || "adventurer"}`
+                    : (token.groupName ?? "Token")
                 }
-              >
-                <Avatar name={token.name} src={portrait} size={34} />
-                <span className="grow">
-                  <strong>{token.name}</strong>
-                  <span className="tiny muted">
+                meta={
+                  <span>
                     {token.hpMax !== null
                       ? `${token.hpCurrent ?? "?"} / ${token.hpMax} HP`
                       : "No HP"}
                     {token.ac !== null ? ` · AC ${token.ac}` : ""}
+                    {token.conditions.length ? ` · ${tokenConditionSummary(token.conditions)}` : ""}
                   </span>
-                </span>
-                {token.hidden ? <EyeOff size={12} /> : null}
-                {token.locked ? <Lock size={12} /> : null}
-                {token.ownerId === user.id ? <Badge tone="blue">Yours</Badge> : null}
-              </button>
-            </HoverCard>
-          );
-        })}
-        {!sceneTokens.length ? <p className="muted small">No tokens on this scene.</p> : null}
+                }
+                footer={character ? "Double-click for the character sheet" : undefined}
+              >
+                <button
+                  type="button"
+                  className={`vtt-token-row ${selectedTokenIds.includes(token.id) || selectedTokenId === token.id ? "is-selected" : ""} ${token.hidden ? "is-hidden" : ""}`}
+                  onClick={() => setSelectedTokenId(token.id)}
+                  onDoubleClick={() =>
+                    character && window.open(`/characters/${character.id}`, "_blank")
+                  }
+                >
+                  <Avatar name={token.name} src={portrait} size={34} />
+                  <span className="grow">
+                    <strong>{token.name}</strong>
+                    <span className="tiny muted">
+                      {token.hpMax !== null
+                        ? `${token.hpCurrent ?? "?"} / ${token.hpMax} HP`
+                        : "No HP"}
+                      {token.ac !== null ? ` · AC ${token.ac}` : ""}
+                    </span>
+                  </span>
+                  {token.hidden ? <EyeOff size={12} /> : null}
+                  {token.locked ? <Lock size={12} /> : null}
+                  {token.ownerId === user.id ? <Badge tone="blue">Yours</Badge> : null}
+                </button>
+              </HoverCard>
+            );
+          })}
+          {!sceneTokens.length ? <p className="muted small">No tokens on this scene.</p> : null}
+        </div>
       </div>
       {isGm ? (
         <Button
@@ -276,7 +289,7 @@ export function VttTokenPanel({
         </Button>
       ) : null}
       {selectedToken ? (
-        <div className="token-editor">
+        <div className="token-editor" ref={editorRef}>
           <div className="row-between">
             <h3>Selected token</h3>
             <IconButton label="Deselect" onClick={() => setSelectedTokenId(null)}>
@@ -467,7 +480,11 @@ export function VttTokenPanel({
                   size="sm"
                   variant="danger"
                   icon={<Trash2 size={13} />}
-                  onClick={() => deleteToken(selectedToken.id)}
+                  onClick={() => {
+                    if (window.confirm(`Delete ${selectedToken.name}?`)) {
+                      deleteToken(selectedToken.id);
+                    }
+                  }}
                 >
                   Delete
                 </Button>

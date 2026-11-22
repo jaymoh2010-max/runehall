@@ -193,16 +193,32 @@ export function BackgroundStep({
             type="button"
             key={background.id}
             className={`selection-card ${draft.backgroundId === background.id ? "is-selected" : ""}`}
-            onClick={() =>
+            onClick={() => {
+              const same = draft.backgroundId === background.id;
+              const clears = [
+                draft.backgroundFeat ? "starting feat" : null,
+                draft.boosts.background.some(Boolean) ? "background ability boosts" : null,
+                draft.skills.background.length ? "background skill choices" : null,
+                draft.skills.backgroundLore.length ? "background Lore choices" : null,
+              ].filter(Boolean);
+              if (
+                clears.length &&
+                !window.confirm(
+                  `${same ? "Remove" : "Change"} background? This will clear: ${clears.join(", ")}. Other choices are kept.`
+                )
+              ) {
+                return;
+              }
               update((current) => {
                 const flex = background.boosts.filter((boost) => !boost.fixed);
+                const sameBackground = current.backgroundId === background.id;
                 return {
                   ...current,
-                  backgroundId: current.backgroundId === background.id ? null : background.id,
+                  backgroundId: sameBackground ? null : background.id,
                   backgroundFeat: null,
                   boosts: {
                     ...current.boosts,
-                    background: current.backgroundId === background.id ? [] : flex.map(() => null),
+                    background: sameBackground ? [] : flex.map(() => null),
                   },
                   skills: {
                     ...current.skills,
@@ -210,8 +226,8 @@ export function BackgroundStep({
                     backgroundLore: [],
                   },
                 };
-              })
-            }
+              });
+            }}
           >
             <span className="selection-emblem">{background.name[0]}</span>
             <span className="selection-copy">
