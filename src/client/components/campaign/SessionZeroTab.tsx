@@ -84,6 +84,7 @@ export function SessionZeroTab({
   const [limits, setLimits] = useState(() => preferenceForm(null));
   const [signalNote, setSignalNote] = useState("");
   const [loading, setLoading] = useState(true);
+  const [showCharter, setShowCharter] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState("");
   const profileRef = useRef<CampaignSessionZero | null>(null);
@@ -225,62 +226,72 @@ export function SessionZeroTab({
 
       {error ? <div className="auth-error">{error}</div> : null}
 
-      <Card className="session-zero-charter">
-        <div className="row-between">
-          <div>
-            <PageEyebrow>Shared charter</PageEyebrow>
-            <h3>How we play</h3>
-          </div>
-          <HeartHandshake size={22} />
+      {isGm ? (
+        <div className="session-zero-preview-row">
+          <Button variant="ghost" size="sm" onClick={() => setShowCharter((current) => !current)}>
+            {showCharter ? "Hide player-facing charter" : "Preview player-facing charter"}
+          </Button>
         </div>
-        {hasCharter ? (
-          <div className="session-zero-sections">
-            {profile?.pitch ? (
-              <section>
-                <h4>Pitch</h4>
-                <p>{profile.pitch}</p>
-              </section>
-            ) : null}
-            {profile?.genre || profile?.tone || profile?.themes ? (
-              <section>
-                <h4>Genre, tone, and themes</h4>
-                <p>
-                  {[profile?.genre, profile?.tone, profile?.themes].filter(Boolean).join(" · ")}
-                </p>
-              </section>
-            ) : null}
-            {profile?.expectations ? (
-              <section>
-                <h4>Expectations</h4>
-                <p>{profile.expectations}</p>
-              </section>
-            ) : null}
-            {profile?.houseRules ? (
-              <section>
-                <h4>House rules</h4>
-                <p>{profile.houseRules}</p>
-              </section>
-            ) : null}
-            {profile?.contentLimits ? (
-              <section>
-                <h4>Content limits</h4>
-                <p>{profile.contentLimits}</p>
-              </section>
-            ) : null}
-            {profile?.safetyTools ? (
-              <section>
-                <h4>Safety tools</h4>
-                <p>{profile.safetyTools}</p>
-              </section>
-            ) : null}
+      ) : null}
+
+      {!isGm || showCharter ? (
+        <Card className="session-zero-charter">
+          <div className="row-between">
+            <div>
+              <PageEyebrow>Shared charter</PageEyebrow>
+              <h3>How we play</h3>
+            </div>
+            <HeartHandshake size={22} />
           </div>
-        ) : (
-          <p className="muted small">
-            The GM has not written the shared charter yet. Start with the campaign pitch and the
-            tone everyone wants at the table.
-          </p>
-        )}
-      </Card>
+          {hasCharter ? (
+            <div className="session-zero-sections">
+              {profile?.pitch ? (
+                <section>
+                  <h4>Pitch</h4>
+                  <p>{profile.pitch}</p>
+                </section>
+              ) : null}
+              {profile?.genre || profile?.tone || profile?.themes ? (
+                <section>
+                  <h4>Genre, tone, and themes</h4>
+                  <p>
+                    {[profile?.genre, profile?.tone, profile?.themes].filter(Boolean).join(" · ")}
+                  </p>
+                </section>
+              ) : null}
+              {profile?.expectations ? (
+                <section>
+                  <h4>Expectations</h4>
+                  <p>{profile.expectations}</p>
+                </section>
+              ) : null}
+              {profile?.houseRules ? (
+                <section>
+                  <h4>House rules</h4>
+                  <p>{profile.houseRules}</p>
+                </section>
+              ) : null}
+              {profile?.contentLimits ? (
+                <section>
+                  <h4>Content limits</h4>
+                  <p>{profile.contentLimits}</p>
+                </section>
+              ) : null}
+              {profile?.safetyTools ? (
+                <section>
+                  <h4>Safety tools</h4>
+                  <p>{profile.safetyTools}</p>
+                </section>
+              ) : null}
+            </div>
+          ) : (
+            <p className="muted small">
+              The GM has not written the shared charter yet. Start with the campaign pitch and the
+              tone everyone wants at the table.
+            </p>
+          )}
+        </Card>
+      ) : null}
 
       {isGm ? (
         <Card className="session-zero-editor">

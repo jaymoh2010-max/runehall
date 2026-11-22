@@ -85,7 +85,14 @@ export const useToasts = create<ToastState>((set) => ({
   toasts: [],
   push: (message, kind = "info") => {
     const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    set((state) => ({ toasts: [...state.toasts.slice(-3), { id, message, kind }] }));
+    set((state) => ({
+      toasts: [
+        ...state.toasts
+          .filter((toast) => toast.message !== message || toast.kind !== kind)
+          .slice(-3),
+        { id, message, kind },
+      ],
+    }));
     window.setTimeout(() => {
       set((state) => ({ toasts: state.toasts.filter((toast) => toast.id !== id) }));
     }, 5000);

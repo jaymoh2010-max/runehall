@@ -91,7 +91,7 @@
 }
 .builder-steps {
   position: sticky;
-  top: calc(var(--topbar-h) + 74px);
+  top: calc(var(--topbar-h) + 96px);
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -156,7 +156,25 @@
 }
 .builder-step-icon {
   display: none;
+  position: relative;
   color: var(--gold-deep);
+}
+.builder-step.is-done .builder-step-icon::after,
+.builder-step.is-error .builder-step-icon::after {
+  content: "";
+  position: absolute;
+  top: -5px;
+  right: -7px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px #0d121a;
+}
+.builder-step.is-done .builder-step-icon::after {
+  background: var(--green);
+}
+.builder-step.is-error .builder-step-icon::after {
+  background: var(--red);
 }
 .builder-step-label {
   flex: 1;
@@ -1298,7 +1316,7 @@
 /* Summary */
 .builder-summary {
   position: sticky;
-  top: calc(var(--topbar-h) + 22px);
+  top: calc(var(--topbar-h) + 96px);
   display: flex;
   flex-direction: column;
   gap: 9px;
@@ -2543,6 +2561,15 @@
   position: sticky;
   top: calc(var(--topbar-h) + 20px);
 }
+@media (min-width: 1161px) {
+  .sheet-sidebar {
+    max-height: calc(100vh - var(--topbar-h) - 40px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding-right: 2px;
+    scrollbar-width: thin;
+  }
+}
 .sheet-play-card {
   padding: 17px;
 }
@@ -3232,6 +3259,22 @@
 .campaign-meta {
   min-width: 0;
 }
+.campaign-card-badges {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+.campaign-card-copy {
+  display: block;
+  color: inherit;
+}
+.campaign-card-copy:hover {
+  text-decoration: none;
+}
+.campaign-card-copy:hover h2 {
+  color: var(--gold-bright);
+}
 .campaign-meta h2 {
   font-size: 1.2rem;
   margin-top: 5px;
@@ -3445,15 +3488,72 @@
   color: var(--muted);
 }
 .campaign-tabs {
+  position: sticky;
+  top: var(--topbar-h);
+  z-index: 24;
   display: flex;
   align-items: center;
   gap: 2px;
   padding: 0 28px;
   border-bottom: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.01);
-  overflow-x: auto;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(200, 169, 107, 0.35) transparent;
+  background: rgba(10, 14, 21, 0.96);
+  backdrop-filter: blur(12px);
+  overflow: visible;
+}
+.campaign-tab-group {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.campaign-tab-prep-current {
+  padding-left: 7px;
+  border-left: 1px solid rgba(200, 169, 107, 0.25);
+  color: var(--gold);
+  font-size: 0.68rem;
+  font-weight: 600;
+}
+.campaign-tab-prep svg:last-child {
+  transition: transform 0.15s ease;
+}
+.campaign-tab-prep svg.is-open {
+  transform: rotate(180deg);
+}
+.campaign-tab-menu {
+  position: absolute;
+  top: calc(100% - 1px);
+  left: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 210px;
+  padding: 5px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #111823;
+  box-shadow: var(--shadow);
+}
+.campaign-tabs .campaign-tab-menu button {
+  justify-content: flex-start;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 6px;
+  color: var(--text-2);
+  font-size: 0.82rem;
+}
+.campaign-tabs .campaign-tab-menu button:hover {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+}
+.campaign-tabs .campaign-tab-menu button.is-active {
+  background: rgba(200, 169, 107, 0.09);
+  color: var(--gold-bright);
+}
+.campaign-tab-menu button svg:last-child {
+  margin-left: auto;
+}
+.campaign-tab-settings {
+  margin-left: auto;
 }
 .campaign-tabs::-webkit-scrollbar {
   height: 5px;
@@ -5704,6 +5804,30 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
+}
+.levelup-checklist-head {
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.levelup-checklist-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: none;
+  color: var(--gold);
+  font-size: 0.74rem;
+  font-weight: 600;
+}
+.levelup-checklist-toggle svg {
+  transition: transform 0.15s ease;
+}
+.levelup-checklist-toggle svg.is-open {
+  transform: rotate(180deg);
 }
 .levelup-checklist-head > div {
   display: flex;
@@ -8483,7 +8607,7 @@
     position: absolute;
     top: 0;
     right: 0;
-    bottom: 0;
+    bottom: 62px;
     width: min(340px, 90vw);
     z-index: 22;
     box-shadow: -16px 0 50px rgba(0, 0, 0, 0.42);
@@ -8964,6 +9088,11 @@
 }
 
 /* Session zero and safety */
+.session-zero-preview-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 8px;
+}
 .session-zero-charter,
 .session-zero-editor,
 .session-zero-limits,

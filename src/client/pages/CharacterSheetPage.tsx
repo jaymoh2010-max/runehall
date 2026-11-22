@@ -3698,7 +3698,7 @@ export function CharacterSheetPage() {
 
       <Modal
         open={Boolean(conflict)}
-        onClose={() => void applyServerVersion()}
+        onClose={() => setConflict(null)}
         closeOnBackdrop={false}
         title="This sheet changed elsewhere"
         subtitle="Another tab, device, or the GM saved this character while you were editing."

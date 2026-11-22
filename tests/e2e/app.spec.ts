@@ -168,6 +168,14 @@ test("GM creates a campaign and builds a character through the lazy routes", asy
   campaignPath = new URL(page.url()).pathname;
   await expect(page.getByRole("heading", { name: campaignName })).toBeVisible();
 
+  await page.setViewportSize({ width: 1024, height: 768 });
+  expect(
+    await page
+      .locator(".campaign-tabs")
+      .evaluate((element) => element.scrollWidth <= element.clientWidth + 1)
+  ).toBe(true);
+  await page.setViewportSize({ width: 1280, height: 720 });
+
   const inviteDialog = page.getByRole("dialog", { name: "Invite players" });
   await expect(inviteDialog).toBeVisible();
   inviteCode = await inviteDialog.locator(".invite-code-input").inputValue();
@@ -193,8 +201,9 @@ test("GM creates a campaign and builds a character through the lazy routes", asy
     timeout: 15_000,
   });
   const builderChecklist = page.locator(".levelup-checklist");
-  await expect(builderChecklist.getByText("Choose an ancestry.")).toBeVisible();
   await expect(builderChecklist.getByText(/required choices? remaining/)).toBeVisible();
+  await builderChecklist.getByRole("button", { name: /Show details/ }).click();
+  await expect(builderChecklist.getByText("Choose an ancestry.")).toBeVisible();
 
   await page
     .locator(".builder-steps")
@@ -494,10 +503,8 @@ test("character sheet shop buys and sells common gear", async ({ page }) => {
 test("GM plans a journey and advances a travel day", async ({ page }) => {
   await signIn(page, admin);
   await page.goto(campaignPath);
-  await page
-    .locator(".campaign-tabs")
-    .getByRole("button", { name: /^Travel/ })
-    .click();
+  await page.locator(".campaign-tabs").getByRole("button", { name: "Prep", exact: true }).click();
+  await page.getByRole("menuitem", { name: /^Travel/ }).click();
   await expect(page.getByRole("heading", { name: "Travel & watches" })).toBeVisible();
 
   await page.getByLabel("Origin").fill("E2E Start");
@@ -536,10 +543,8 @@ test("GM plans a journey and advances a travel day", async ({ page }) => {
 test("GM writes the session zero charter and checklist", async ({ page }) => {
   await signIn(page, admin);
   await page.goto(campaignPath);
-  await page
-    .locator(".campaign-tabs")
-    .getByRole("button", { name: /^Session zero/ })
-    .click();
+  await page.locator(".campaign-tabs").getByRole("button", { name: "Prep", exact: true }).click();
+  await page.getByRole("menuitem", { name: /^Session zero/ }).click();
   await expect(page.getByRole("heading", { name: "Session zero & safety" })).toBeVisible();
 
   await page.getByLabel("Campaign pitch", { exact: true }).fill("A city of ash and old debts.");
@@ -562,6 +567,7 @@ test("GM writes the session zero charter and checklist", async ({ page }) => {
     .check();
   await page.getByRole("button", { name: "Save session zero" }).click();
   await expect(page.getByText("Session zero charter saved.")).toBeVisible({ timeout: 15_000 });
+  await page.getByRole("button", { name: "Preview player-facing charter" }).click();
   await expect(
     page.locator(".session-zero-charter").getByText("A city of ash and old debts.")
   ).toBeVisible();

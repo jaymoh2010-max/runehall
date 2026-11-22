@@ -174,6 +174,7 @@ export function CharacterBuilderPage() {
   const [saveState, setSaveState] = useState<"saved" | "saving" | "dirty" | "error">("saved");
   const [pendingSheet, setPendingSheet] = useState(false);
   const [conflict, setConflict] = useState<CharacterRecord | null>(null);
+  const [checklistOpen, setChecklistOpen] = useState(false);
   const initialized = useRef(false);
   const skipInitialSave = useRef(true);
   const saveInFlight = useRef(false);
@@ -827,6 +828,7 @@ export function CharacterBuilderPage() {
                 className={`builder-step ${step === entry.id ? "is-active" : ""} is-${status}`}
                 onClick={() => setStep(entry.id)}
                 aria-label={`${entry.label}, ${status === "done" ? "complete" : status === "error" ? "needs attention" : status === "optional" ? "optional" : "pending"}`}
+                title={`${entry.label} · ${status === "done" ? "complete" : status === "error" ? "needs attention" : status === "optional" ? "optional" : "pending"}`}
               >
                 <span className="builder-step-num">
                   {status === "done" ? <Check size={13} /> : index + 1}
@@ -846,8 +848,13 @@ export function CharacterBuilderPage() {
 
         <main className="builder-content">
           {outstandingChoices.length ? (
-            <div className="levelup-checklist">
-              <div className="levelup-checklist-head">
+            <div className={`levelup-checklist ${checklistOpen ? "is-open" : ""}`}>
+              <button
+                type="button"
+                className="levelup-checklist-head"
+                aria-expanded={checklistOpen}
+                onClick={() => setChecklistOpen((current) => !current)}
+              >
                 <div>
                   <span className="page-eyebrow">CHARACTER CHECKLIST</span>
                   <strong>
@@ -855,24 +862,30 @@ export function CharacterBuilderPage() {
                     {outstandingChoices.length === 1 ? "" : "s"} remaining
                   </strong>
                 </div>
-              </div>
-              <div className="levelup-checklist-items">
-                {outstandingChoices.map((task) => (
-                  <button
-                    key={task.id}
-                    type="button"
-                    className="levelup-checklist-item"
-                    onClick={() => setStep(task.step)}
-                  >
-                    <span className="levelup-checklist-check" />
-                    <span>
-                      <strong>{task.label}</strong>
-                      <small>{task.detail}</small>
-                    </span>
-                    <ArrowRight size={13} />
-                  </button>
-                ))}
-              </div>
+                <span className="levelup-checklist-toggle">
+                  {checklistOpen ? "Hide details" : "Show details"}
+                  <ChevronDown size={14} className={checklistOpen ? "is-open" : ""} />
+                </span>
+              </button>
+              {checklistOpen ? (
+                <div className="levelup-checklist-items">
+                  {outstandingChoices.map((task) => (
+                    <button
+                      key={task.id}
+                      type="button"
+                      className="levelup-checklist-item"
+                      onClick={() => setStep(task.step)}
+                    >
+                      <span className="levelup-checklist-check" />
+                      <span>
+                        <strong>{task.label}</strong>
+                        <small>{task.detail}</small>
+                      </span>
+                      <ArrowRight size={13} />
+                    </button>
+                  ))}
+                </div>
+              ) : null}
             </div>
           ) : null}
           {renderStep()}
@@ -1281,7 +1294,7 @@ export function CharacterBuilderPage() {
       </Modal>
       <Modal
         open={Boolean(conflict)}
-        onClose={() => void applyServerVersion()}
+        onClose={() => setConflict(null)}
         closeOnBackdrop={false}
         title="This sheet changed elsewhere"
         subtitle="Another tab, device, or the GM saved this character while you were editing."
