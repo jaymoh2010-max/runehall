@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { ArrowLeft, BookOpen } from "lucide-react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useLocation, useParams } from "react-router-dom";
 import type { CompendiumEntry } from "../components/CompendiumDetail";
 import { CompendiumDetail } from "../components/CompendiumDetail";
 import { EmptyState, ErrorState, Spinner } from "../components/ui";
@@ -13,6 +13,9 @@ import {
 import { api } from "../api";
 
 export function CompendiumEntryPage() {
+  const location = useLocation();
+  const from = (location.state as { from?: string } | null)?.from;
+  const backTo = from && /^\/library(\?|$)/.test(from) ? from : "/library";
   const { kind: rawKind, id } = useParams<{ kind: string; id: string }>();
   const kind = isCompendiumEntryKind(rawKind) ? rawKind : null;
   const [entry, setEntry] = useState<CompendiumEntry | null>(null);
@@ -62,7 +65,7 @@ export function CompendiumEntryPage() {
     <div className="page library-page compendium-entry-page">
       <div className="page-head">
         <div>
-          <Link to="/library" className="back-link">
+          <Link to={backTo} className="back-link">
             <ArrowLeft size={14} /> Back to the library
           </Link>
           <h1>{entry?.name ?? (kind ? COMPENDIUM_KIND_LABELS[kind] : "Compendium entry")}</h1>

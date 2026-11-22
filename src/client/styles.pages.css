@@ -2794,14 +2794,6 @@
 .sheet-roll-result.critical-failure strong {
   color: var(--red);
 }
-.sheet-condition-ribbon {
-  position: fixed;
-  right: 20px;
-  bottom: 20px;
-  display: flex;
-  gap: 5px;
-  z-index: 30;
-}
 .rest-preview {
   display: grid;
   gap: 7px;
@@ -3554,6 +3546,56 @@
 }
 .campaign-tab-settings {
   margin-left: auto;
+}
+.party-actions {
+  position: relative;
+}
+.party-actions .btn > span:last-child > svg {
+  transition: transform 0.15s ease;
+}
+.party-actions .btn > span:last-child > svg.is-open {
+  transform: rotate(180deg);
+}
+.party-actions-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 210px;
+  padding: 5px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #111823;
+  box-shadow: var(--shadow);
+}
+.party-actions-menu > button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-2);
+  padding: 8px 10px;
+  font-size: 0.82rem;
+  text-align: left;
+  cursor: pointer;
+}
+.party-actions-menu > button svg {
+  color: var(--muted);
+  flex: none;
+}
+.party-actions-menu > button:hover {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+}
+.party-actions-menu > button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 .campaign-tabs::-webkit-scrollbar {
   height: 5px;
@@ -6457,8 +6499,19 @@
   flex-direction: column;
   gap: 10px;
   padding: 11px;
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
   min-width: 0;
+}
+.vtt-token-scroll {
+  display: flex;
+  flex: 0 1 42%;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 110px;
+  overflow-y: auto;
+  padding-right: 2px;
+  scrollbar-width: thin;
 }
 .vtt-left-head {
   display: flex;
@@ -6511,7 +6564,9 @@
   text-overflow: ellipsis;
 }
 .vtt-left-tip {
-  margin-top: auto;
+  flex: 1;
+  margin-top: 0;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -6529,8 +6584,13 @@
   border-top: 1px solid var(--line);
   padding-top: 11px;
   display: flex;
+  flex: 1 1 58%;
   flex-direction: column;
   gap: 8px;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 2px;
+  scrollbar-width: thin;
 }
 .token-editor h3 {
   font-size: 0.87rem;
@@ -8235,6 +8295,33 @@
   grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.25fr);
   gap: 14px;
   min-height: 620px;
+}
+@media (min-width: 961px) {
+  .library-page.library-index-page {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - var(--topbar-h));
+    height: calc(100dvh - var(--topbar-h));
+    min-height: 0;
+    overflow: hidden;
+    padding-bottom: 24px;
+  }
+  .library-index-page .library-layout {
+    flex: 1 1 0;
+    min-height: 0;
+    grid-template-columns: minmax(300px, 0.9fr) minmax(0, 1.25fr);
+  }
+  .library-index-page .library-list,
+  .library-index-page .library-detail {
+    min-height: 0;
+    max-height: none;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .library-index-page .library-list {
+    scrollbar-gutter: stable;
+  }
 }
 .library-list {
   display: flex;

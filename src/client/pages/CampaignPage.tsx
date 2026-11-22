@@ -197,6 +197,8 @@ export function CampaignPage() {
   const [campaign, setCampaign] = useState<CampaignSummary | null>(null);
   const [prepOpen, setPrepOpen] = useState(false);
   const prepRef = useRef<HTMLDivElement>(null);
+  const [partyActionsOpen, setPartyActionsOpen] = useState(false);
+  const partyActionsRef = useRef<HTMLDivElement>(null);
   const [members, setMembers] = useState<CampaignMember[]>([]);
   const [characters, setCharacters] = useState<CharacterRecord[]>([]);
   const [joinRequests, setJoinRequests] = useState<CampaignJoinRequest[]>([]);
@@ -300,6 +302,26 @@ export function CampaignPage() {
       window.removeEventListener("keydown", onKeyDown);
     };
   }, [prepOpen]);
+
+  useEffect(() => {
+    if (!partyActionsOpen) return;
+    const onPointerDown = (event: MouseEvent) => {
+      if (!partyActionsRef.current?.contains(event.target as Node)) setPartyActionsOpen(false);
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setPartyActionsOpen(false);
+    };
+    window.addEventListener("mousedown", onPointerDown);
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("mousedown", onPointerDown);
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [partyActionsOpen]);
+
+  useEffect(() => {
+    setPartyActionsOpen(false);
+  }, [tab]);
 
   const load = async () => {
     if (!id) return;
@@ -1566,37 +1588,70 @@ export function CampaignPage() {
                     <Button variant="secondary" icon={<Star size={15} />} onClick={openHeroPoints}>
                       Hero Points
                     </Button>
-                    <Button
-                      variant="secondary"
-                      icon={<Moon size={15} />}
-                      loading={restBusy}
-                      onClick={longRestParty}
-                    >
-                      Long rest party
-                    </Button>
-                    <Button
-                      variant="secondary"
-                      icon={<Sparkles size={15} />}
-                      loading={levelUpBusy}
-                      onClick={() => void levelUpCharacters()}
-                    >
-                      Level up party
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      icon={<Users size={15} />}
-                      loading={catchUpBusy}
-                      onClick={() => void catchUpParty()}
-                    >
-                      Catch up party
-                    </Button>
-                    <Button
-                      variant="secondary"
-                      icon={<CalendarClock size={15} />}
-                      onClick={openDowntime}
-                    >
-                      Grant downtime
-                    </Button>
+                    <div className="party-actions" ref={partyActionsRef}>
+                      <Button
+                        variant="secondary"
+                        icon={<Sparkles size={15} />}
+                        aria-expanded={partyActionsOpen}
+                        aria-haspopup="menu"
+                        loading={restBusy || levelUpBusy || catchUpBusy}
+                        onClick={() => setPartyActionsOpen((current) => !current)}
+                      >
+                        Party actions
+                        <ChevronDown size={13} className={partyActionsOpen ? "is-open" : ""} />
+                      </Button>
+                      {partyActionsOpen ? (
+                        <div className="party-actions-menu" role="menu" aria-label="Party actions">
+                          <button
+                            type="button"
+                            role="menuitem"
+                            disabled={restBusy}
+                            onClick={() => {
+                              setPartyActionsOpen(false);
+                              void longRestParty();
+                            }}
+                          >
+                            <Moon size={15} />
+                            <span>Long rest party</span>
+                          </button>
+                          <button
+                            type="button"
+                            role="menuitem"
+                            disabled={levelUpBusy}
+                            onClick={() => {
+                              setPartyActionsOpen(false);
+                              void levelUpCharacters();
+                            }}
+                          >
+                            <Sparkles size={15} />
+                            <span>Level up party</span>
+                          </button>
+                          <button
+                            type="button"
+                            role="menuitem"
+                            disabled={catchUpBusy}
+                            onClick={() => {
+                              setPartyActionsOpen(false);
+                              void catchUpParty();
+                            }}
+                          >
+                            <Users size={15} />
+                            <span>Catch up party</span>
+                          </button>
+                          <button
+                            type="button"
+                            role="menuitem"
+                            onClick={() => {
+                              setPartyActionsOpen(false);
+                              openDowntime();
+                            }}
+                          >
+                            <CalendarClock size={15} />
+                            <span>Grant downtime</span>
+                          </button>
+                        </div>
+                      ) : null}
+                    </div>
                   </>
                 ) : null}
                 <Button variant="primary" icon={<Plus size={15} />} onClick={createCharacter}>

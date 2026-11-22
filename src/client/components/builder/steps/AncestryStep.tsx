@@ -171,28 +171,51 @@ export function AncestryStep({
             type="button"
             key={ancestry.id}
             className={`selection-card ${draft.ancestryId === ancestry.id ? "is-selected" : ""}`}
-            onClick={() =>
+            onClick={() => {
+              const sameAncestry = draft.ancestryId === ancestry.id;
+              const heritage = staticData.heritages.find((h) => h.id === draft.heritageId);
+              const heritageSurvives =
+                heritage?.versatile ||
+                heritage?.ancestry === ancestry.name ||
+                heritage?.ancestrySlug === ancestry.name.toLowerCase();
+              const heritageLost = sameAncestry
+                ? Boolean(draft.heritageId)
+                : Boolean(draft.heritageId && !heritageSurvives);
+              const clears = [
+                heritageLost ? "heritage" : null,
+                draft.boosts.ancestry.some(Boolean) ? "ancestry ability boosts" : null,
+              ].filter(Boolean);
+              if (
+                clears.length &&
+                !window.confirm(
+                  `${sameAncestry ? "Remove" : "Change"} ancestry? This will clear: ${clears.join(", ")}. Other choices are kept.`
+                )
+              ) {
+                return;
+              }
               update((current) => {
                 const flex = flexibleBoosts(ancestry);
-                const sameAncestry = current.ancestryId === ancestry.id;
-                const heritage = staticData.heritages.find((h) => h.id === current.heritageId);
+                const same = current.ancestryId === ancestry.id;
+                const currentHeritage = staticData.heritages.find(
+                  (h) => h.id === current.heritageId
+                );
                 return {
                   ...current,
-                  ancestryId: sameAncestry ? null : ancestry.id,
-                  heritageId: sameAncestry
+                  ancestryId: same ? null : ancestry.id,
+                  heritageId: same
                     ? null
-                    : heritage?.versatile ||
-                        heritage?.ancestry === ancestry.name ||
-                        heritage?.ancestrySlug === ancestry.name.toLowerCase()
+                    : currentHeritage?.versatile ||
+                        currentHeritage?.ancestry === ancestry.name ||
+                        currentHeritage?.ancestrySlug === ancestry.name.toLowerCase()
                       ? current.heritageId
                       : null,
                   boosts: {
                     ...current.boosts,
-                    ancestry: sameAncestry ? [] : flex.map(() => null),
+                    ancestry: same ? [] : flex.map(() => null),
                   },
                 };
-              })
-            }
+              });
+            }}
           >
             <span className="selection-emblem">{ancestry.name[0]}</span>
             <span className="selection-copy">
