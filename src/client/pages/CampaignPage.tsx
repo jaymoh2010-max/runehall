@@ -43,11 +43,13 @@ import {
   UserPlus,
   UserRound,
   Users,
+  X,
 } from "lucide-react";
 import type {
   CampaignJoinRequest,
   CampaignMember,
   CampaignAsset,
+  CampaignRequest,
   CampaignRuleset,
   AdvancementSpeed,
   CampaignSummary,
@@ -69,6 +71,7 @@ import {
   rulesetLabel,
 } from "../../shared/content";
 import { QUEST_STATUS_OPTIONS, normalizeQuestXp } from "../../shared/journal";
+import { CAMPAIGN_REQUEST_KIND_LABELS, campaignRequestStatusLabel } from "../../shared/requests";
 import {
   ACCOMPLISHMENT_LABELS,
   ACCOMPLISHMENT_TIERS,
@@ -86,6 +89,7 @@ import { connectSocket, joinCampaign } from "../socket";
 import { TravelTab } from "../components/campaign/TravelTab";
 import { SessionZeroTab } from "../components/campaign/SessionZeroTab";
 import { PeopleTab } from "../components/campaign/PeopleTab";
+import { PlayerRequestsCard } from "../components/campaign/PlayerRequestsCard";
 import { NotesTab } from "../components/campaign/NotesTab";
 import { CampaignArcTab } from "../components/campaign/CampaignArcTab";
 import { errorMessage } from "../stores";
@@ -158,6 +162,7 @@ interface CampaignDetails {
   members: CampaignMember[];
   characters: CharacterRecord[];
   joinRequests?: CampaignJoinRequest[];
+  requests?: CampaignRequest[];
 }
 
 const TABS: { id: Tab; label: string; icon: React.ReactNode; gmOnly?: boolean }[] = [
@@ -217,6 +222,23 @@ export function CampaignPage() {
   const [characters, setCharacters] = useState<CharacterRecord[]>([]);
   const [joinRequests, setJoinRequests] = useState<CampaignJoinRequest[]>([]);
   const [joinRequestBusy, setJoinRequestBusy] = useState<string | null>(null);
+  const [requests, setRequests] = useState<CampaignRequest[]>([]);
+  const [requestLevelUpBusy, setRequestLevelUpBusy] = useState<string | null>(null);
+  const [requestDowntimeCharacter, setRequestDowntimeCharacter] = useState<CharacterRecord | null>(
+    null
+  );
+  const [requestDowntimeDays, setRequestDowntimeDays] = useState("1");
+  const [requestDowntimeNote, setRequestDowntimeNote] = useState("");
+  const [requestDowntimeBusy, setRequestDowntimeBusy] = useState(false);
+  const [requestWithdrawBusy, setRequestWithdrawBusy] = useState<string | null>(null);
+  const [reviewRequest, setReviewRequest] = useState<CampaignRequest | null>(null);
+  const [reviewNote, setReviewNote] = useState("");
+  const [reviewBusy, setReviewBusy] = useState<"approve" | "deny" | null>(null);
+  const [journalProposalOpen, setJournalProposalOpen] = useState(false);
+  const [proposalTitle, setProposalTitle] = useState("");
+  const [proposalContent, setProposalContent] = useState("");
+  const [proposalNote, setProposalNote] = useState("");
+  const [proposalBusy, setProposalBusy] = useState(false);
   const [tableData, setTableData] = useState<CampaignTable | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -398,6 +420,7 @@ export function CampaignPage() {
       setMembers(details.members);
       setCharacters(details.characters);
       setJoinRequests(details.joinRequests ?? []);
+      setRequests(details.requests ?? []);
       setTableData(table);
       setSettingsName(details.campaign.name);
       setSettingsDescription(details.campaign.description);
@@ -462,6 +485,7 @@ export function CampaignPage() {
         setMembers(details.members);
         setCharacters(details.characters);
         setJoinRequests(details.joinRequests ?? []);
+        setRequests(details.requests ?? []);
       })
       .catch(() => undefined);
     return () => {
@@ -504,8 +528,18 @@ export function CampaignPage() {
           setMembers(details.members);
           setCharacters(details.characters);
           setJoinRequests(details.joinRequests ?? []);
+          setRequests(details.requests ?? []);
         })
         .catch(() => undefined);
+    };
+    const refreshRequests = () => {
+      api<CampaignDetails>(`/api/campaigns/${id}`)
+        .then((details) => setRequests(details.requests ?? []))
+        .catch(() => undefined);
+    };
+    const onRequestCreated = (payload: { title: string; playerName: string }) => {
+      toast(`${payload.playerName} sent a request: ${payload.title}`, "info");
+      refreshRequests();
     };
     const onCharacterRemoved = ({ characterId }: { characterId: string }) => {
       setCharacters((current) => current.filter((character) => character.id !== characterId));
@@ -569,6 +603,8 @@ export function CampaignPage() {
     socket.on("journal:deleted", onJournalDeleted);
     socket.on("join-request:created", refreshDetails);
     socket.on("join-request:updated", refreshDetails);
+    socket.on("campaign-request:created", onRequestCreated);
+    socket.on("campaign-request:updated", refreshRequests);
     socket.on("safety:signal", onSafetySignal);
     const leaveCampaignRoom = joinCampaign(id);
     return () => {
@@ -581,6 +617,8 @@ export function CampaignPage() {
       socket.off("journal:deleted", onJournalDeleted);
       socket.off("join-request:created", refreshDetails);
       socket.off("join-request:updated", refreshDetails);
+      socket.off("campaign-request:created", onRequestCreated);
+      socket.off("campaign-request:updated", refreshRequests);
       socket.off("safety:signal", onSafetySignal);
       leaveCampaignRoom();
     };
@@ -960,6 +998,7 @@ export function CampaignPage() {
       setMembers(details.members);
       setCharacters(details.characters);
       setJoinRequests(details.joinRequests ?? []);
+      setRequests(details.requests ?? []);
       toast(
         decision === "approve"
           ? `${request.characterName} joined the party.`
@@ -1140,6 +1179,141 @@ export function CampaignPage() {
       toast(errorMessage(err), "error");
     } finally {
       setWealthBusyId(null);
+    }
+  };
+
+  const requestLevelUp = async (character: CharacterRecord) => {
+    if (!id) return;
+    setRequestLevelUpBusy(character.id);
+    try {
+      const result = await api<{ request: CampaignRequest }>(`/api/campaigns/${id}/requests`, {
+        method: "POST",
+        body: { kind: "level-up", characterId: character.id },
+      });
+      setRequests((current) => [
+        result.request,
+        ...current.filter((entry) => entry.id !== result.request.id),
+      ]);
+      toast(`Level-up request sent for ${character.name}. The GM will review it.`, "success");
+    } catch (err) {
+      toast(errorMessage(err), "error");
+    } finally {
+      setRequestLevelUpBusy(null);
+    }
+  };
+
+  const openRequestDowntime = (character: CharacterRecord) => {
+    setRequestDowntimeCharacter(character);
+    setRequestDowntimeDays("1");
+    setRequestDowntimeNote("");
+  };
+
+  const submitDowntimeRequest = async () => {
+    if (!id || !requestDowntimeCharacter) return;
+    const days = Math.max(1, Math.min(3650, Math.round(Number(requestDowntimeDays) || 1)));
+    setRequestDowntimeBusy(true);
+    try {
+      const result = await api<{ request: CampaignRequest }>(`/api/campaigns/${id}/requests`, {
+        method: "POST",
+        body: {
+          kind: "downtime",
+          characterId: requestDowntimeCharacter.id,
+          days,
+          note: requestDowntimeNote,
+        },
+      });
+      setRequests((current) => [
+        result.request,
+        ...current.filter((entry) => entry.id !== result.request.id),
+      ]);
+      setRequestDowntimeCharacter(null);
+      toast("Downtime request sent to the GM.", "success");
+    } catch (err) {
+      toast(errorMessage(err), "error");
+    } finally {
+      setRequestDowntimeBusy(false);
+    }
+  };
+
+  const withdrawRequest = async (entry: CampaignRequest) => {
+    if (!id) return;
+    setRequestWithdrawBusy(entry.id);
+    try {
+      await api(`/api/campaigns/${id}/requests/${entry.id}`, { method: "DELETE" });
+      setRequests((current) =>
+        current.map((row) => (row.id === entry.id ? { ...row, status: "withdrawn" as const } : row))
+      );
+      toast("Request withdrawn.", "info");
+    } catch (err) {
+      toast(errorMessage(err), "error");
+    } finally {
+      setRequestWithdrawBusy(null);
+    }
+  };
+
+  const openRequestReview = (entry: CampaignRequest) => {
+    setReviewRequest(entry);
+    setReviewNote("");
+  };
+
+  const resolveRequest = async (decision: "approve" | "deny") => {
+    if (!id || !reviewRequest) return;
+    setReviewBusy(decision);
+    try {
+      await api<{ request: CampaignRequest }>(
+        `/api/campaigns/${id}/requests/${reviewRequest.id}/${decision}`,
+        { method: "POST", body: { note: reviewNote } }
+      );
+      const details = await api<CampaignDetails>(`/api/campaigns/${id}`);
+      setRequests(details.requests ?? []);
+      setCharacters(details.characters);
+      setTableData((current) =>
+        current ? { ...current, characters: details.characters } : current
+      );
+      setReviewRequest(null);
+      toast(
+        decision === "approve"
+          ? `Approved: ${reviewRequest.title}.`
+          : `Denied: ${reviewRequest.title}.`,
+        decision === "approve" ? "success" : "info"
+      );
+    } catch (err) {
+      toast(errorMessage(err), "error");
+    } finally {
+      setReviewBusy(null);
+    }
+  };
+
+  const submitJournalProposal = async () => {
+    if (!id) return;
+    if (!proposalTitle.trim() || !proposalContent.trim()) {
+      toast("Add a title and some text for the GM to review.", "error");
+      return;
+    }
+    setProposalBusy(true);
+    try {
+      const result = await api<{ request: CampaignRequest }>(`/api/campaigns/${id}/requests`, {
+        method: "POST",
+        body: {
+          kind: "journal",
+          title: proposalTitle,
+          content: proposalContent,
+          note: proposalNote,
+        },
+      });
+      setRequests((current) => [
+        result.request,
+        ...current.filter((entry) => entry.id !== result.request.id),
+      ]);
+      setJournalProposalOpen(false);
+      setProposalTitle("");
+      setProposalContent("");
+      setProposalNote("");
+      toast("Journal entry sent to the GM for approval.", "success");
+    } catch (err) {
+      toast(errorMessage(err), "error");
+    } finally {
+      setProposalBusy(false);
     }
   };
 
@@ -1777,6 +1951,15 @@ export function CampaignPage() {
                 </Button>
               </div>
             </div>
+            {isGm || requests.length ? (
+              <PlayerRequestsCard
+                requests={requests}
+                isGm={isGm}
+                withdrawBusy={requestWithdrawBusy}
+                onReview={openRequestReview}
+                onWithdraw={(entry) => void withdrawRequest(entry)}
+              />
+            ) : null}
             <div className="party-grid">
               {characters.map((character) => {
                 const progress = character.summary
@@ -1881,6 +2064,26 @@ export function CampaignPage() {
                             onClick={() => void levelUpCharacters(character.id)}
                           >
                             Level up
+                          </Button>
+                        </>
+                      ) : character.permissions?.canEdit ? (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            icon={<Sparkles size={14} />}
+                            loading={requestLevelUpBusy === character.id}
+                            onClick={() => void requestLevelUp(character)}
+                          >
+                            Request level up
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            icon={<CalendarClock size={14} />}
+                            onClick={() => openRequestDowntime(character)}
+                          >
+                            Request downtime
                           </Button>
                         </>
                       ) : null}
@@ -2017,7 +2220,21 @@ export function CampaignPage() {
                     >
                       New entry
                     </Button>
-                  ) : null}
+                  ) : (
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      icon={<FilePlus2 size={14} />}
+                      onClick={() => {
+                        setProposalTitle("");
+                        setProposalContent("");
+                        setProposalNote("");
+                        setJournalProposalOpen(true);
+                      }}
+                    >
+                      Propose entry
+                    </Button>
+                  )}
                 </div>
               </div>
               <div className="segmented journal-filter">
@@ -3266,6 +3483,173 @@ export function CampaignPage() {
               <strong>Level up party</strong> when you decide.
             </span>
           </div>
+        </div>
+      </Modal>
+
+      <Modal
+        open={Boolean(requestDowntimeCharacter)}
+        onClose={() => setRequestDowntimeCharacter(null)}
+        title="Request downtime"
+        subtitle={
+          requestDowntimeCharacter
+            ? `Ask the GM to grant downtime days to ${requestDowntimeCharacter.name}.`
+            : undefined
+        }
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setRequestDowntimeCharacter(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              icon={<CalendarClock size={15} />}
+              loading={requestDowntimeBusy}
+              onClick={() => void submitDowntimeRequest()}
+            >
+              Send request
+            </Button>
+          </>
+        }
+      >
+        <div className="stack">
+          <Field
+            label="Downtime days"
+            hint="The GM can approve the request as written or deny it with a note."
+          >
+            <Input
+              type="number"
+              min={1}
+              max={3650}
+              value={requestDowntimeDays}
+              onChange={(event) => setRequestDowntimeDays(event.target.value)}
+            />
+          </Field>
+          <Field label="What do you want to do? (optional)">
+            <Textarea
+              value={requestDowntimeNote}
+              onChange={(event) => setRequestDowntimeNote(event.target.value)}
+              placeholder="Craft a striking rune, retrain a skill, earn income..."
+              rows={3}
+            />
+          </Field>
+        </div>
+      </Modal>
+
+      <Modal
+        open={Boolean(reviewRequest)}
+        onClose={() => setReviewRequest(null)}
+        title="Review request"
+        subtitle={reviewRequest?.title}
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setReviewRequest(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              icon={<X size={15} />}
+              loading={reviewBusy === "deny"}
+              disabled={reviewBusy === "approve"}
+              onClick={() => void resolveRequest("deny")}
+            >
+              Deny
+            </Button>
+            <Button
+              variant="primary"
+              icon={<Check size={15} />}
+              loading={reviewBusy === "approve"}
+              disabled={reviewBusy === "deny"}
+              onClick={() => void resolveRequest("approve")}
+            >
+              Approve
+            </Button>
+          </>
+        }
+      >
+        {reviewRequest ? (
+          <div className="stack">
+            <div className="request-review-meta">
+              <Tag tone="violet">{CAMPAIGN_REQUEST_KIND_LABELS[reviewRequest.kind]}</Tag>
+              <span className="tiny muted">
+                From {reviewRequest.playerName || "a player"} ·{" "}
+                {formatDate(reviewRequest.createdAt)}
+              </span>
+            </div>
+            <p>{reviewRequest.detail}</p>
+            {reviewRequest.note ? <p className="request-note">“{reviewRequest.note}”</p> : null}
+            {reviewRequest.kind === "journal" ? (
+              <div className="request-proposal">
+                <strong>{reviewRequest.payload.title}</strong>
+                <p>{reviewRequest.payload.content}</p>
+              </div>
+            ) : null}
+            <Field
+              label="GM note (optional)"
+              hint="The player sees this note with the request's resolution."
+            >
+              <Textarea
+                value={reviewNote}
+                onChange={(event) => setReviewNote(event.target.value)}
+                placeholder="Approved. Spend the days before the next session."
+                rows={3}
+              />
+            </Field>
+            <div className="settings-note">
+              <Sparkles size={16} />
+              <span>
+                Approving applies the change immediately. Level-ups consume XP in XP tracking mode;
+                journal proposals become shared entries.
+              </span>
+            </div>
+          </div>
+        ) : null}
+      </Modal>
+
+      <Modal
+        open={journalProposalOpen}
+        onClose={() => setJournalProposalOpen(false)}
+        title="Propose a journal entry"
+        subtitle="The GM reviews player-written recaps, lore, and handouts before they join the chronicle."
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setJournalProposalOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              icon={<FilePlus2 size={15} />}
+              loading={proposalBusy}
+              onClick={() => void submitJournalProposal()}
+            >
+              Send to GM
+            </Button>
+          </>
+        }
+      >
+        <div className="stack">
+          <Field label="Title">
+            <Input
+              value={proposalTitle}
+              maxLength={140}
+              onChange={(event) => setProposalTitle(event.target.value)}
+              placeholder="Session 12: The Sunken Gate"
+            />
+          </Field>
+          <Field label="Entry" hint="Markdown is supported.">
+            <Textarea
+              value={proposalContent}
+              onChange={(event) => setProposalContent(event.target.value)}
+              placeholder="What happened, who we met, and what we owe..."
+              rows={9}
+            />
+          </Field>
+          <Field label="Note to the GM (optional)">
+            <Input
+              value={proposalNote}
+              onChange={(event) => setProposalNote(event.target.value)}
+              placeholder="This is the recap I promised."
+            />
+          </Field>
         </div>
       </Modal>
 

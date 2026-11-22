@@ -3745,6 +3745,77 @@
   flex-wrap: wrap;
   gap: 6px;
 }
+.request-card {
+  margin-bottom: 14px;
+  padding: 16px;
+}
+.request-card-head {
+  align-items: flex-start;
+  gap: 12px;
+}
+.request-card-head h3 {
+  font-size: 1.02rem;
+}
+.request-card-head svg {
+  color: var(--muted);
+  flex: none;
+}
+.request-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+.request-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.02);
+}
+.request-row-main {
+  min-width: 0;
+}
+.request-row-main > strong {
+  display: block;
+  margin-top: 3px;
+}
+.request-row-actions {
+  display: flex;
+  flex: none;
+  gap: 6px;
+}
+.request-note {
+  margin: 6px 0 0;
+  padding-left: 9px;
+  border-left: 2px solid rgba(200, 169, 107, 0.4);
+  color: var(--text-2);
+  font-size: 0.82rem;
+}
+.request-proposal {
+  margin-top: 8px;
+  padding: 9px 11px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.18);
+}
+.request-proposal p {
+  margin: 4px 0 0;
+  white-space: pre-wrap;
+}
+.request-review-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+@media (max-width: 720px) {
+  .request-row {
+    flex-direction: column;
+  }
+}
 .journal-layout {
   display: grid;
   grid-template-columns: 300px minmax(0, 1fr);

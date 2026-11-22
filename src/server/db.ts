@@ -346,6 +346,23 @@ export interface XpAwardRow {
   created_at: number;
 }
 
+export interface CampaignRequestRow {
+  id: string;
+  campaign_id: string;
+  character_id: string | null;
+  kind: string;
+  title: string;
+  detail: string;
+  note: string;
+  payload: string;
+  status: string;
+  player_id: string;
+  gm_note: string;
+  resolved_by: string | null;
+  created_at: number;
+  resolved_at: number | null;
+}
+
 export interface EncounterRow {
   id: string;
   campaign_id: string;

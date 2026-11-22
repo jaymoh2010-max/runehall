@@ -10,6 +10,7 @@ import type {
   CampaignKnowledgeEntry,
   CampaignChapter,
   CampaignPlayerNote,
+  CampaignRequest,
   CampaignSession,
   CampaignSummary,
   CampaignTravel,
@@ -68,6 +69,7 @@ import {
   type CampaignKnowledgeRow,
   type CampaignChapterRow,
   type CampaignPlayerNoteRow,
+  type CampaignRequestRow,
   type CampaignRow,
   type CampaignSessionRow,
   type CampaignSessionZeroRow,
@@ -107,6 +109,7 @@ import {
 import { normalizeSessionZeroChecklist } from "../shared/sessionZero";
 import { normalizeNpcAttitude, normalizeReputation } from "../shared/people";
 import { normalizeChapterLevel, normalizeChapterStatus } from "../shared/chapters";
+import { isCampaignRequestKind, isCampaignRequestStatus } from "../shared/requests";
 
 export function serializeCampaignSummary(
   campaign: CampaignRow,
@@ -306,6 +309,34 @@ export function serializeJoinRequest(
     report: parseJson(row.report, null) as PathbuilderImportReport | null,
     validation,
     createdAt: row.created_at,
+  };
+}
+
+export function serializeCampaignRequest(
+  row: CampaignRequestRow,
+  names: {
+    playerName?: string | null;
+    characterName?: string | null;
+    resolvedByName?: string | null;
+  } = {}
+): CampaignRequest {
+  return {
+    id: row.id,
+    campaignId: row.campaign_id,
+    characterId: row.character_id,
+    characterName: names.characterName ?? "",
+    kind: isCampaignRequestKind(row.kind) ? row.kind : "journal",
+    title: row.title,
+    detail: row.detail,
+    note: row.note,
+    status: isCampaignRequestStatus(row.status) ? row.status : "pending",
+    playerId: row.player_id,
+    playerName: names.playerName ?? "",
+    gmNote: row.gm_note,
+    resolvedByName: names.resolvedByName ?? null,
+    createdAt: row.created_at,
+    resolvedAt: row.resolved_at ?? null,
+    payload: parseJson(row.payload, {}) as CampaignRequest["payload"],
   };
 }
 

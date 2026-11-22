@@ -90,6 +90,7 @@ describe("migrations", () => {
       .all() as { name: string }[];
     expect(tablesAfterAssets.map((table) => table.name)).toContain("uploaded_assets");
     expect(tablesAfterAssets.map((table) => table.name)).toContain("session_checkins");
+    expect(tablesAfterAssets.map((table) => table.name)).toContain("campaign_requests");
     const sessionColumns = db.prepare("PRAGMA table_info(campaign_sessions)").all() as {
       name: string;
     }[];

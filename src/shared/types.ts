@@ -1084,6 +1084,39 @@ export interface CampaignJoinRequest extends PendingJoinRequest {
   validation: ValidationIssue[];
 }
 
+/** Player-initiated actions that wait for the GM's approval. */
+export type CampaignRequestKind = "level-up" | "downtime" | "journal";
+export type CampaignRequestStatus = "pending" | "approved" | "denied" | "withdrawn";
+
+/**
+ * A queued player request. The server keeps the validated payload so approval
+ * can apply the exact action the player proposed.
+ */
+export interface CampaignRequest {
+  id: string;
+  campaignId: string;
+  characterId: string | null;
+  characterName: string;
+  kind: CampaignRequestKind;
+  title: string;
+  detail: string;
+  note: string;
+  status: CampaignRequestStatus;
+  playerId: string;
+  playerName: string;
+  gmNote: string;
+  resolvedByName: string | null;
+  createdAt: number;
+  resolvedAt: number | null;
+  payload: {
+    fromLevel?: number;
+    toLevel?: number;
+    days?: number;
+    title?: string;
+    content?: string;
+  };
+}
+
 export interface CampaignSummary {
   id: string;
   name: string;
@@ -2059,6 +2092,16 @@ export interface ServerToClientEvents {
   "join-request:updated": (payload: {
     requestId: string | null;
     status: "approved" | "declined" | "withdrawn";
+  }) => void;
+  "campaign-request:created": (payload: {
+    requestId: string;
+    kind: CampaignRequestKind;
+    title: string;
+    playerName: string;
+  }) => void;
+  "campaign-request:updated": (payload: {
+    requestId: string;
+    status: CampaignRequestStatus;
   }) => void;
   "campaign:revision": (payload: { revision: number }) => void;
   "campaign:updated": (campaign: CampaignSummary) => void;

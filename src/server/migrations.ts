@@ -846,4 +846,28 @@ export const migrations: Migration[] = [
       ALTER TABLE tokens ADD COLUMN monster_id TEXT;
     `,
   },
+  {
+    version: 48,
+    name: "campaign_player_requests",
+    sql: `
+      CREATE TABLE IF NOT EXISTS campaign_requests (
+        id TEXT PRIMARY KEY,
+        campaign_id TEXT NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+        character_id TEXT REFERENCES characters(id) ON DELETE SET NULL,
+        kind TEXT NOT NULL,
+        title TEXT NOT NULL,
+        detail TEXT NOT NULL DEFAULT '',
+        note TEXT NOT NULL DEFAULT '',
+        payload TEXT NOT NULL DEFAULT '{}',
+        status TEXT NOT NULL DEFAULT 'pending',
+        player_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        gm_note TEXT NOT NULL DEFAULT '',
+        resolved_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+        created_at INTEGER NOT NULL,
+        resolved_at INTEGER
+      );
+      CREATE INDEX IF NOT EXISTS idx_campaign_requests_campaign
+        ON campaign_requests(campaign_id, status, created_at);
+    `,
+  },
 ];

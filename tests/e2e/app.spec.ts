@@ -2514,3 +2514,113 @@ test("sheet rolls dying recovery and persistent damage end-of-turn checks", asyn
     0
   );
 });
+
+test("player requests a level-up and the GM approves it", async ({ page, browser }) => {
+  test.setTimeout(90_000);
+  await signIn(page, importer);
+  await page.goto(`${campaignPath}?tab=party`);
+  const heroCard = page.locator(".party-card").filter({ hasText: "Pathbuilder E2E Hero" });
+  await expect(heroCard).toContainText("Level 1", { timeout: 15_000 });
+
+  await heroCard.getByRole("button", { name: "Request level up" }).click();
+  await expect(page.getByText(/Level-up request sent for Pathbuilder E2E Hero/)).toBeVisible({
+    timeout: 15_000,
+  });
+  const playerRequests = page.locator(".request-card");
+  await expect(playerRequests.getByText("Level up Pathbuilder E2E Hero to level 2")).toBeVisible();
+
+  const adminContext = await browser.newContext();
+  const adminPage = await adminContext.newPage();
+  await signIn(adminPage, admin);
+  await adminPage.goto(`${campaignPath}?tab=party`);
+  const adminRequests = adminPage.locator(".request-card");
+  await expect(adminRequests.getByText("Level up Pathbuilder E2E Hero to level 2")).toBeVisible({
+    timeout: 15_000,
+  });
+  await adminRequests.getByRole("button", { name: "Review" }).click();
+
+  const review = adminPage.getByRole("dialog", { name: "Review request" });
+  await expect(review).toBeVisible();
+  await expect(review).toContainText("Pathbuilder E2E Hero advances from level 1 to level 2.");
+  await review.getByLabel("GM note (optional)").fill("Approved for the milestone.");
+  await review.getByRole("button", { name: "Approve" }).click();
+  await expect(
+    adminPage.getByText("Approved: Level up Pathbuilder E2E Hero to level 2.")
+  ).toBeVisible({ timeout: 15_000 });
+
+  await expect(heroCard).toContainText("Level 2", { timeout: 15_000 });
+  await expect(playerRequests.getByText("Approved").first()).toBeVisible();
+  await expect(playerRequests.getByText(/Approved by E2E GM/)).toBeVisible();
+
+  await adminContext.close();
+});
+
+test("player requests downtime and proposes a journal entry for GM approval", async ({
+  page,
+  browser,
+}) => {
+  test.setTimeout(90_000);
+  await signIn(page, importer);
+  await page.goto(`${campaignPath}?tab=party`);
+  const heroCard = page.locator(".party-card").filter({ hasText: "Pathbuilder E2E Hero" });
+  await expect(heroCard).toContainText("Level 2", { timeout: 15_000 });
+
+  await heroCard.getByRole("button", { name: "Request downtime" }).click();
+  const downtimeDialog = page.getByRole("dialog", { name: "Request downtime" });
+  await expect(downtimeDialog).toBeVisible();
+  await downtimeDialog.getByLabel("Downtime days").fill("3");
+  await downtimeDialog
+    .getByLabel("What do you want to do? (optional)")
+    .fill("Craft a striking rune.");
+  await downtimeDialog.getByRole("button", { name: "Send request" }).click();
+  await expect(page.getByText("Downtime request sent to the GM.")).toBeVisible({
+    timeout: 15_000,
+  });
+  await expect(page.locator(".request-card").getByText("Grant 3 downtime days")).toBeVisible();
+
+  await page.goto(`${campaignPath}?tab=journal`);
+  await page.getByRole("button", { name: "Propose entry" }).click();
+  const journalDialog = page.getByRole("dialog", { name: "Propose a journal entry" });
+  await expect(journalDialog).toBeVisible();
+  await journalDialog.getByLabel("Title").fill("E2E Player Recap");
+  await journalDialog.getByLabel("Entry").fill("We held the Sunken Gate until dawn.");
+  await journalDialog.getByRole("button", { name: "Send to GM" }).click();
+  await expect(page.getByText("Journal entry sent to the GM for approval.")).toBeVisible({
+    timeout: 15_000,
+  });
+
+  const adminContext = await browser.newContext();
+  const adminPage = await adminContext.newPage();
+  await signIn(adminPage, admin);
+  await adminPage.goto(`${campaignPath}?tab=party`);
+  const adminRequests = adminPage.locator(".request-card");
+  const downtimeRow = adminRequests
+    .locator(".request-row")
+    .filter({ hasText: "Grant 3 downtime days" });
+  await expect(downtimeRow).toBeVisible({ timeout: 15_000 });
+  await downtimeRow.getByRole("button", { name: "Review" }).click();
+  const review = adminPage.getByRole("dialog", { name: "Review request" });
+  await expect(review).toContainText("3 downtime days for Pathbuilder E2E Hero.");
+  await review.getByRole("button", { name: "Approve" }).click();
+  await expect(adminPage.getByText("Approved: Grant 3 downtime days.")).toBeVisible({
+    timeout: 15_000,
+  });
+
+  const journalRow = adminRequests.locator(".request-row").filter({ hasText: "E2E Player Recap" });
+  await expect(journalRow).toBeVisible();
+  await journalRow.getByRole("button", { name: "Review" }).click();
+  await expect(review).toContainText("We held the Sunken Gate until dawn.");
+  await review.getByLabel("GM note (optional)").fill("Canon now.");
+  await review.getByRole("button", { name: "Approve" }).click();
+  await expect(adminPage.getByText("Approved: E2E Player Recap.")).toBeVisible({
+    timeout: 15_000,
+  });
+
+  await expect(page.getByText("E2E Player Recap")).toBeVisible({ timeout: 15_000 });
+  await page.goto(`${campaignPath}?tab=party`);
+  await expect(heroCard.locator(".party-stats").getByText("3 d")).toBeVisible({
+    timeout: 15_000,
+  });
+
+  await adminContext.close();
+});

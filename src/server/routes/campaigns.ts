@@ -25,6 +25,7 @@ import {
   type CampaignChapterRow,
   type CampaignMerchantRow,
   type CampaignNpcRow,
+  type CampaignRequestRow,
   type CampaignRow,
   type CampaignSessionZeroRow,
   type CampaignTravelRow,
@@ -44,6 +45,7 @@ import {
   serializeCampaignKnowledge,
   serializeCampaignChapter,
   serializeCampaignNpc,
+  serializeCampaignRequest,
   serializeCampaignSummary,
   serializeCampaignTravel,
   serializeCampaignSessionZero,
@@ -109,6 +111,11 @@ import {
 } from "../../shared/shop";
 import { grantHeroPoints, resetHeroPoints } from "../../shared/heroPoints";
 import { normalizeGolarionDate, shiftGolarionDate } from "../../shared/calendar";
+import {
+  campaignRequestDetail,
+  campaignRequestTitle,
+  isCampaignRequestKind,
+} from "../../shared/requests";
 import { contextForDraft } from "../compendium";
 import { campaignSessionsFor } from "../sessionData";
 import { importCampaign } from "../campaignImport";
@@ -221,6 +228,121 @@ function joinRequestViews(campaignId: string) {
     const character = request.character_id ? getCharacter(request.character_id) : null;
     return serializeJoinRequest(request, joinRequestValidation(character));
   });
+}
+
+function campaignRequestViews(campaignId: string, viewerId: string, isGm: boolean) {
+  const rows = db
+    .prepare(
+      `SELECT * FROM campaign_requests
+       WHERE campaign_id = ?
+       ORDER BY CASE WHEN status = 'pending' THEN 0 ELSE 1 END, created_at DESC
+       LIMIT 100`
+    )
+    .all(campaignId) as CampaignRequestRow[];
+  return rows
+    .filter((row) => isGm || row.player_id === viewerId)
+    .map((row) => {
+      const character = row.character_id ? getCharacter(row.character_id) : null;
+      const resolver = row.resolved_by ? getUser(row.resolved_by) : null;
+      return serializeCampaignRequest(row, {
+        playerName: getUser(row.player_id)?.display_name ?? "",
+        characterName: character?.name ?? "",
+        resolvedByName: resolver?.display_name ?? null,
+      });
+    });
+}
+
+function getCampaignRequest(campaignId: string, requestId: string): CampaignRequestRow | null {
+  return (
+    (db
+      .prepare("SELECT * FROM campaign_requests WHERE id = ? AND campaign_id = ?")
+      .get(requestId, campaignId) as CampaignRequestRow | undefined) ?? null
+  );
+}
+
+function requestView(row: CampaignRequestRow) {
+  const character = row.character_id ? getCharacter(row.character_id) : null;
+  const resolver = row.resolved_by ? getUser(row.resolved_by) : null;
+  return serializeCampaignRequest(row, {
+    playerName: getUser(row.player_id)?.display_name ?? "",
+    characterName: character?.name ?? "",
+    resolvedByName: resolver?.display_name ?? null,
+  });
+}
+
+/** Advance one campaign character and keep linked tokens in sync. */
+function advanceCharacterLevel(
+  app: FastifyInstance,
+  campaign: CampaignRow,
+  character: CharacterRow
+) {
+  let draft;
+  try {
+    draft = normalizeCharacterDraft(JSON.parse(character.data), character.name);
+  } catch {
+    return null;
+  }
+  if (draft.level >= 20) return null;
+  const before = characterSummary(draft, contextForDraft(draft));
+  draft.level += 1;
+  if (normalizeXpMode(campaign.xp_mode) === "xp") {
+    draft.play.xp = consumeLevelXp(
+      draft.play.xp,
+      normalizeAdvancementSpeed(campaign.advancement_speed)
+    );
+  }
+  const after = characterSummary(draft, contextForDraft(draft));
+  // A wounded character gains the new maximum's HP increase, not just a
+  // higher cap that leaves them further below full.
+  draft.play.hp = levelUpCurrentHp(draft.play.hp, before.hp, after.hp);
+  const summary = characterSummary(draft, contextForDraft(draft));
+  db.prepare(
+    "UPDATE characters SET data = ?, summary = ?, updated_at = ?, revision = revision + 1 WHERE id = ?"
+  ).run(JSON.stringify(draft), JSON.stringify(summary), now(), character.id);
+
+  const linkedTokens = db
+    .prepare("SELECT * FROM tokens WHERE character_id = ?")
+    .all(character.id) as TokenRow[];
+  for (const token of linkedTokens) {
+    const nextHp = Math.min(draft.play.hp ?? summary.hp, summary.hp);
+    db.prepare(
+      "UPDATE tokens SET name = ?, hp_max = ?, hp_current = ?, ac = ?, updated_at = ? WHERE id = ?"
+    ).run(draft.name, summary.hp, nextHp, summary.ac, now(), token.id);
+    const updatedToken = db.prepare("SELECT * FROM tokens WHERE id = ?").get(token.id) as TokenRow;
+    tokenEventsFor(app, campaign.id).updated(serializeToken(updatedToken), Boolean(token.hidden));
+  }
+
+  app.broadcastCampaign(campaign.id, "character:updated", {
+    characterId: character.id,
+    summary,
+    name: draft.name,
+  });
+  return summary;
+}
+
+function grantCharacterDowntime(
+  app: FastifyInstance,
+  campaignId: string,
+  character: CharacterRow,
+  days: number
+) {
+  let draft;
+  try {
+    draft = normalizeCharacterDraft(JSON.parse(character.data), character.name);
+  } catch {
+    return null;
+  }
+  draft.play.downtimeDays = Math.min(9_999, draft.play.downtimeDays + days);
+  const summary = characterSummary(draft, contextForDraft(draft));
+  db.prepare(
+    "UPDATE characters SET data = ?, summary = ?, updated_at = ?, revision = revision + 1 WHERE id = ?"
+  ).run(JSON.stringify(draft), JSON.stringify(summary), now(), character.id);
+  app.broadcastCampaign(campaignId, "character:updated", {
+    characterId: character.id,
+    summary,
+    name: draft.name,
+  });
+  return summary;
 }
 
 export async function registerCampaignRoutes(app: FastifyInstance): Promise<void> {
@@ -603,7 +725,300 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
       members,
       characters,
       joinRequests: role === "gm" ? joinRequestViews(id) : [],
+      requests: campaignRequestViews(id, request.user.id, role === "gm"),
     });
+  });
+
+  app.post("/api/campaigns/:id/requests", async (request, reply) => {
+    if (!request.user) return reply.code(401).send({ error: "Sign in to continue." });
+    const { id } = request.params as { id: string };
+    const row = getCampaign(id);
+    if (!row) return reply.code(404).send({ error: "Campaign not found." });
+    const role = roleFor(row, request.user.id);
+    if (!role) return reply.code(403).send({ error: "You're not a member of that campaign." });
+    const body = (request.body ?? {}) as Record<string, unknown>;
+    if (!isCampaignRequestKind(body.kind)) {
+      return reply.code(400).send({ error: "Choose a level-up, downtime, or journal request." });
+    }
+    const kind = body.kind;
+    const note = sanitizeUserText(body.note, 2000);
+    let characterId: string | null = null;
+    let title = "";
+    let detail = "";
+    let payload: Record<string, unknown> = {};
+
+    if (kind === "journal") {
+      const journalTitle = safeString(body.title, "", 140);
+      const content = sanitizeUserText(body.content, 100_000);
+      if (!journalTitle) {
+        return reply.code(400).send({ error: "Give your proposed entry a title." });
+      }
+      if (!content.trim()) {
+        return reply.code(400).send({ error: "Write something for the GM to review." });
+      }
+      payload = { title: journalTitle, content };
+      title = campaignRequestTitle({ kind, journalTitle });
+      detail = campaignRequestDetail({ kind });
+    } else {
+      if (typeof body.characterId !== "string") {
+        return reply.code(400).send({ error: "Choose one of your characters." });
+      }
+      const character = getCharacter(body.characterId);
+      if (!character || character.campaign_id !== id) {
+        return reply.code(404).send({ error: "That character is not in this campaign." });
+      }
+      if (!canEditCharacter(character, request.user.id)) {
+        return reply
+          .code(403)
+          .send({ error: "You can only request changes for your own character." });
+      }
+      characterId = character.id;
+      const duplicate = db
+        .prepare(
+          `SELECT id FROM campaign_requests
+           WHERE campaign_id = ? AND player_id = ? AND character_id = ? AND kind = ? AND status = 'pending'`
+        )
+        .get(id, request.user.id, character.id, kind);
+      if (duplicate) {
+        return reply
+          .code(409)
+          .send({ error: "You already have a pending request of that kind for this character." });
+      }
+      if (kind === "level-up") {
+        let draft;
+        try {
+          draft = normalizeCharacterDraft(JSON.parse(character.data), character.name);
+        } catch {
+          return reply.code(400).send({ error: "That character's sheet could not be read." });
+        }
+        if (draft.level >= 20) {
+          return reply.code(400).send({ error: "That character is already level 20." });
+        }
+        payload = { fromLevel: draft.level, toLevel: draft.level + 1 };
+        title = campaignRequestTitle({
+          kind,
+          characterName: character.name,
+          toLevel: draft.level + 1,
+        });
+        detail = campaignRequestDetail({
+          kind,
+          characterName: character.name,
+          fromLevel: draft.level,
+          toLevel: draft.level + 1,
+        });
+      } else {
+        const days = safeInt(body.days, 0, 1, 3650);
+        if (days < 1) {
+          return reply.code(400).send({ error: "Request at least one downtime day." });
+        }
+        payload = { days };
+        title = campaignRequestTitle({ kind, days });
+        detail = campaignRequestDetail({ kind, characterName: character.name, days });
+      }
+    }
+
+    const requestId = newId("req");
+    const ts = now();
+    db.prepare(
+      `INSERT INTO campaign_requests
+       (id, campaign_id, character_id, kind, title, detail, note, payload, status, player_id, gm_note, resolved_by, created_at, resolved_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, '', NULL, ?, NULL)`
+    ).run(
+      requestId,
+      id,
+      characterId,
+      kind,
+      title,
+      detail,
+      note,
+      JSON.stringify(payload),
+      request.user.id,
+      ts
+    );
+    const created = getCampaignRequest(id, requestId)!;
+    logAudit({
+      action: "campaign.request.create",
+      actor: request.user,
+      targetType: "campaign_request",
+      targetId: requestId,
+      detail: `${kind}: ${title}`,
+      request,
+    });
+    app.broadcastCampaign(
+      id,
+      "campaign-request:created",
+      {
+        requestId,
+        kind,
+        title,
+        playerName: request.user.displayName,
+      },
+      "gm"
+    );
+    return reply.code(201).send({ request: requestView(created) });
+  });
+
+  app.post("/api/campaigns/:id/requests/:requestId/approve", async (request, reply) => {
+    if (!request.user) return reply.code(401).send({ error: "Sign in to continue." });
+    const { id, requestId } = request.params as { id: string; requestId: string };
+    const row = getCampaign(id);
+    if (!row) return reply.code(404).send({ error: "Campaign not found." });
+    if (roleFor(row, request.user.id) !== "gm") {
+      return reply.code(403).send({ error: "Only the GM can approve player requests." });
+    }
+    const existing = getCampaignRequest(id, requestId);
+    if (!existing) return reply.code(404).send({ error: "Request not found." });
+    if (existing.status !== "pending") {
+      return reply.code(409).send({ error: "That request has already been resolved." });
+    }
+    const body = (request.body ?? {}) as Record<string, unknown>;
+    const gmNote = sanitizeUserText(body.note, 2000);
+
+    if (existing.kind === "level-up") {
+      const character = existing.character_id ? getCharacter(existing.character_id) : null;
+      if (!character || character.campaign_id !== id) {
+        return reply.code(409).send({ error: "That character is no longer in this campaign." });
+      }
+      if (!advanceCharacterLevel(app, row, character)) {
+        return reply
+          .code(409)
+          .send({ error: "That character cannot advance right now. Check their sheet." });
+      }
+    } else if (existing.kind === "downtime") {
+      const character = existing.character_id ? getCharacter(existing.character_id) : null;
+      if (!character || character.campaign_id !== id) {
+        return reply.code(409).send({ error: "That character is no longer in this campaign." });
+      }
+      const payload = parseJson(existing.payload, {}) as { days?: number };
+      const days = safeInt(payload.days, 1, 1, 3650);
+      if (!grantCharacterDowntime(app, id, character, days)) {
+        return reply.code(409).send({ error: "That character's sheet could not be updated." });
+      }
+    } else if (existing.kind === "journal") {
+      const payload = parseJson(existing.payload, {}) as {
+        title?: string;
+        content?: string;
+      };
+      const title = safeString(payload.title, "Player journal entry", 140);
+      const content = sanitizeUserText(payload.content, 100_000);
+      if (!content.trim()) {
+        return reply.code(409).send({ error: "The proposed entry is empty." });
+      }
+      const entryId = newId("journal");
+      const ts = now();
+      db.prepare(
+        `INSERT INTO journal_entries
+         (id, campaign_id, title, content, visible, kind, attachments, quest_status, quest_xp, quest_rewarded_at, created_by, created_at, updated_at)
+         VALUES (?, ?, ?, ?, 1, 'note', '[]', 'none', 0, NULL, ?, ?, ?)`
+      ).run(entryId, id, title, content, existing.player_id, ts, ts);
+      const entry = db
+        .prepare("SELECT * FROM journal_entries WHERE id = ?")
+        .get(entryId) as JournalRow;
+      broadcastJournalCreated(
+        app,
+        id,
+        serializeJournal({
+          ...entry,
+          author_name: getUser(existing.player_id)?.display_name ?? null,
+        })
+      );
+      touchCampaign(id);
+    } else {
+      return reply.code(400).send({ error: "That request type cannot be approved." });
+    }
+
+    const ts = now();
+    db.prepare(
+      `UPDATE campaign_requests
+       SET status = 'approved', gm_note = ?, resolved_by = ?, resolved_at = ?
+       WHERE id = ?`
+    ).run(gmNote, request.user.id, ts, requestId);
+    const updated = getCampaignRequest(id, requestId)!;
+    logAudit({
+      action: "campaign.request.approve",
+      actor: request.user,
+      targetType: "campaign_request",
+      targetId: requestId,
+      detail: `${existing.kind}: ${existing.title}${gmNote ? ` — ${gmNote}` : ""}`,
+      request,
+    });
+    app.broadcastCampaign(id, "campaign-request:updated", {
+      requestId,
+      status: "approved",
+    });
+    return reply.send({ request: requestView(updated) });
+  });
+
+  app.post("/api/campaigns/:id/requests/:requestId/deny", async (request, reply) => {
+    if (!request.user) return reply.code(401).send({ error: "Sign in to continue." });
+    const { id, requestId } = request.params as { id: string; requestId: string };
+    const row = getCampaign(id);
+    if (!row) return reply.code(404).send({ error: "Campaign not found." });
+    if (roleFor(row, request.user.id) !== "gm") {
+      return reply.code(403).send({ error: "Only the GM can deny player requests." });
+    }
+    const existing = getCampaignRequest(id, requestId);
+    if (!existing) return reply.code(404).send({ error: "Request not found." });
+    if (existing.status !== "pending") {
+      return reply.code(409).send({ error: "That request has already been resolved." });
+    }
+    const body = (request.body ?? {}) as Record<string, unknown>;
+    const gmNote = sanitizeUserText(body.note, 2000);
+    db.prepare(
+      `UPDATE campaign_requests
+       SET status = 'denied', gm_note = ?, resolved_by = ?, resolved_at = ?
+       WHERE id = ?`
+    ).run(gmNote, request.user.id, now(), requestId);
+    const updated = getCampaignRequest(id, requestId)!;
+    logAudit({
+      action: "campaign.request.deny",
+      actor: request.user,
+      targetType: "campaign_request",
+      targetId: requestId,
+      detail: `${existing.kind}: ${existing.title}${gmNote ? ` — ${gmNote}` : ""}`,
+      request,
+    });
+    app.broadcastCampaign(id, "campaign-request:updated", {
+      requestId,
+      status: "denied",
+    });
+    return reply.send({ request: requestView(updated) });
+  });
+
+  app.delete("/api/campaigns/:id/requests/:requestId", async (request, reply) => {
+    if (!request.user) return reply.code(401).send({ error: "Sign in to continue." });
+    const { id, requestId } = request.params as { id: string; requestId: string };
+    const row = getCampaign(id);
+    if (!row) return reply.code(404).send({ error: "Campaign not found." });
+    const role = roleFor(row, request.user.id);
+    if (!role) return reply.code(403).send({ error: "You're not a member of that campaign." });
+    const existing = getCampaignRequest(id, requestId);
+    if (!existing) return reply.code(404).send({ error: "Request not found." });
+    if (existing.player_id !== request.user.id && role !== "gm") {
+      return reply.code(403).send({ error: "You can only withdraw your own request." });
+    }
+    if (existing.status !== "pending") {
+      return reply.code(409).send({ error: "That request has already been resolved." });
+    }
+    db.prepare(
+      `UPDATE campaign_requests
+       SET status = 'withdrawn', resolved_by = ?, resolved_at = ?
+       WHERE id = ?`
+    ).run(request.user.id, now(), requestId);
+    const updated = getCampaignRequest(id, requestId)!;
+    logAudit({
+      action: "campaign.request.withdraw",
+      actor: request.user,
+      targetType: "campaign_request",
+      targetId: requestId,
+      detail: `${existing.kind}: ${existing.title}`,
+      request,
+    });
+    app.broadcastCampaign(id, "campaign-request:updated", {
+      requestId,
+      status: "withdrawn",
+    });
+    return reply.send({ request: requestView(updated) });
   });
 
   app.get("/api/campaigns/:id/export", async (request, reply) => {
@@ -1183,54 +1598,18 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
     let atMaxLevel = 0;
     let skipped = 0;
     for (const character of characterRows) {
-      let draft;
+      const summary = advanceCharacterLevel(app, row, character);
+      if (summary) {
+        leveled += 1;
+        continue;
+      }
       try {
-        draft = normalizeCharacterDraft(JSON.parse(character.data), character.name);
+        const draft = normalizeCharacterDraft(JSON.parse(character.data), character.name);
+        if (draft.level >= 20) atMaxLevel += 1;
+        else skipped += 1;
       } catch {
         skipped += 1;
-        continue;
       }
-      if (draft.level >= 20) {
-        atMaxLevel += 1;
-        continue;
-      }
-      const before = characterSummary(draft, contextForDraft(draft));
-      draft.level += 1;
-      if (normalizeXpMode(row.xp_mode) === "xp") {
-        draft.play.xp = consumeLevelXp(
-          draft.play.xp,
-          normalizeAdvancementSpeed(row.advancement_speed)
-        );
-      }
-      const after = characterSummary(draft, contextForDraft(draft));
-      // A wounded character gains the new maximum's HP increase, not just a
-      // higher cap that leaves them further below full.
-      draft.play.hp = levelUpCurrentHp(draft.play.hp, before.hp, after.hp);
-      const summary = characterSummary(draft, contextForDraft(draft));
-      db.prepare(
-        "UPDATE characters SET data = ?, summary = ?, updated_at = ?, revision = revision + 1 WHERE id = ?"
-      ).run(JSON.stringify(draft), JSON.stringify(summary), now(), character.id);
-
-      const linkedTokens = db
-        .prepare("SELECT * FROM tokens WHERE character_id = ?")
-        .all(character.id) as TokenRow[];
-      for (const token of linkedTokens) {
-        const nextHp = Math.min(draft.play.hp ?? summary.hp, summary.hp);
-        db.prepare(
-          "UPDATE tokens SET name = ?, hp_max = ?, hp_current = ?, ac = ?, updated_at = ? WHERE id = ?"
-        ).run(draft.name, summary.hp, nextHp, summary.ac, now(), token.id);
-        const updatedToken = db
-          .prepare("SELECT * FROM tokens WHERE id = ?")
-          .get(token.id) as TokenRow;
-        tokenEventsFor(app, id).updated(serializeToken(updatedToken), Boolean(token.hidden));
-      }
-
-      app.broadcastCampaign(id, "character:updated", {
-        characterId: character.id,
-        summary,
-        name: draft.name,
-      });
-      leveled += 1;
     }
 
     touchCampaign(id);
@@ -1726,24 +2105,11 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
     let recipients = 0;
     let skipped = 0;
     for (const character of selected) {
-      let draft;
-      try {
-        draft = normalizeCharacterDraft(JSON.parse(character.data), character.name);
-      } catch {
+      if (grantCharacterDowntime(app, id, character, days)) {
+        recipients += 1;
+      } else {
         skipped += 1;
-        continue;
       }
-      draft.play.downtimeDays = Math.min(9_999, draft.play.downtimeDays + days);
-      const summary = characterSummary(draft, contextForDraft(draft));
-      db.prepare(
-        "UPDATE characters SET data = ?, summary = ?, updated_at = ?, revision = revision + 1 WHERE id = ?"
-      ).run(JSON.stringify(draft), JSON.stringify(summary), now(), character.id);
-      app.broadcastCampaign(id, "character:updated", {
-        characterId: character.id,
-        summary,
-        name: draft.name,
-      });
-      recipients += 1;
     }
     touchCampaign(id);
     logAudit({
