@@ -686,6 +686,30 @@ hr {
 .search-box .input {
   padding-left: 36px;
 }
+.search-box.has-clear .input {
+  padding-right: 34px;
+}
+.search-box .search-clear {
+  position: absolute;
+  right: 6px;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted-2);
+  cursor: pointer;
+}
+.search-box .search-clear:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.06);
+}
+.search-box .search-clear svg {
+  position: static;
+  pointer-events: auto;
+}
 
 .segmented {
   display: inline-flex;

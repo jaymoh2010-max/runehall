@@ -725,6 +725,7 @@ export function CharacterBuilderPage() {
             to={character?.campaignId ? `/campaigns/${character.campaignId}` : "/campaigns"}
             className="icon-btn"
             title="Back to campaigns"
+            aria-label="Back to campaigns"
           >
             <ArrowLeft size={18} />
           </Link>

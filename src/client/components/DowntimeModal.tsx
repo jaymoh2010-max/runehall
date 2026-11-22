@@ -71,11 +71,12 @@ function activityMessage(result: DowntimeResponse): string {
   }
   if (kind === "craft" || kind === "retrain") {
     const activity = result.activity;
+    const daysSpent = activity?.daysSpent ?? 0;
     return result.completed
-      ? `${activity?.label ?? "Project"} complete after ${activity?.daysSpent ?? 0} days. Paid ${formatCp(
-          result.paidCp
-        )} upkeep.`
-      : `${activity?.label ?? "Project"}: day ${activity?.daysSpent ?? 0} of ${
+      ? `${activity?.label ?? "Project"} complete after ${daysSpent} ${
+          daysSpent === 1 ? "day" : "days"
+        }. Paid ${formatCp(result.paidCp)} upkeep.`
+      : `${activity?.label ?? "Project"}: day ${daysSpent} of ${
           activity?.daysRequired ?? 0
         }. Paid ${formatCp(result.paidCp)} upkeep.`;
   }
@@ -341,7 +342,9 @@ export function DowntimeModal({
                     <ProgressBar
                       value={activity.daysSpent}
                       max={activity.daysRequired}
-                      label={`${activity.daysSpent} of ${activity.daysRequired} days`}
+                      label={`${activity.daysSpent} of ${activity.daysRequired} ${
+                        activity.daysRequired === 1 ? "day" : "days"
+                      }`}
                     />
                   ) : (
                     <p className="tiny muted">

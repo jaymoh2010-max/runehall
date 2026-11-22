@@ -130,6 +130,10 @@ export function AdminPage() {
   }, [loadAudit]);
 
   useEffect(() => {
+    document.title = "Admin · Runehall";
+  }, []);
+
+  useEffect(() => {
     if (user?.isAdmin) void load();
   }, [user?.isAdmin, load]);
 
@@ -465,7 +469,9 @@ export function AdminPage() {
           subtitle="Automatically prune security and administrative log entries. Set 0 to keep them forever."
           action={
             <Badge tone="blue">
-              {retentionDays === "0" ? "Keep forever" : `${retentionDays} days`}
+              {retentionDays === "0"
+                ? "Keep forever"
+                : `${retentionDays} ${retentionDays === "1" ? "day" : "days"}`}
             </Badge>
           }
         />

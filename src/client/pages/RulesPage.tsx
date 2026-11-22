@@ -5,7 +5,7 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
   type ReactNode,
 } from "react";
-import { BookOpen, Dices, Search, Shield, Sword } from "lucide-react";
+import { BookOpen, Dices, Search, Shield, Sword, X } from "lucide-react";
 import type { ActionRef, ConditionRef } from "../../shared/types";
 import { titleCase } from "../../shared/rules";
 import { SKILLS } from "../../shared/types";
@@ -154,7 +154,7 @@ export function RulesPage() {
           ))}
         </div>
         {tab !== "basics" ? (
-          <div className="search-box library-search">
+          <div className={`search-box library-search${query ? " has-clear" : ""}`}>
             <Search size={16} aria-hidden="true" />
             <Input
               value={query}
@@ -163,6 +163,16 @@ export function RulesPage() {
               aria-label={`Search ${tab}`}
               autoComplete="off"
             />
+            {query ? (
+              <button
+                type="button"
+                className="search-clear"
+                aria-label="Clear search input"
+                onClick={clearSearch}
+              >
+                <X size={14} aria-hidden="true" />
+              </button>
+            ) : null}
           </div>
         ) : null}
       </div>

@@ -423,7 +423,8 @@ export function DashboardPage() {
                   <Users size={14} /> {campaign.memberCount} at the table
                 </span>
                 <span>
-                  <BookUser size={14} /> {campaign.characterCount} characters
+                  <BookUser size={14} /> {campaign.characterCount}{" "}
+                  {campaign.characterCount === 1 ? "character" : "characters"}
                 </span>
               </div>
               <div className="campaign-card-foot">
@@ -530,15 +531,19 @@ export function DashboardPage() {
                     Edit
                   </Link>
                   <button
+                    type="button"
                     className="icon-btn"
                     title="Duplicate"
+                    aria-label={`Duplicate ${character.name}`}
                     onClick={() => duplicateCharacter(character)}
                   >
                     <Copy size={14} />
                   </button>
                   <button
+                    type="button"
                     className="icon-btn"
                     title="Delete"
+                    aria-label={`Delete ${character.name}`}
                     onClick={() => deleteCharacter(character)}
                   >
                     <Trash2 size={14} />
@@ -610,8 +615,9 @@ export function DashboardPage() {
               <PageEyebrow>Ready to import</PageEyebrow>
               <h3>{importPreview.name}</h3>
               <p className="muted small">
-                {rulesetLabel(importPreview.ruleset)} · {importPreview.members} members ·{" "}
-                {importPreview.characters} characters
+                {rulesetLabel(importPreview.ruleset)} · {importPreview.members}{" "}
+                {importPreview.members === 1 ? "member" : "members"} · {importPreview.characters}{" "}
+                {importPreview.characters === 1 ? "character" : "characters"}
               </p>
               <p className="tiny muted">
                 Characters owned by players without a local account are assigned to you. Uploaded

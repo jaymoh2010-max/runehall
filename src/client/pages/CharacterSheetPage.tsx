@@ -1708,6 +1708,16 @@ export function CharacterSheetPage() {
                         style={{ maxWidth: 82 }}
                         title="Remaining duration in rounds"
                       />
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="secondary"
+                        disabled={!conditionName.trim()}
+                        aria-label="Add condition"
+                        onClick={() => addCondition(conditionName)}
+                      >
+                        Add
+                      </Button>
                     </div>
                   ) : null}
                 </div>
@@ -2288,7 +2298,9 @@ export function CharacterSheetPage() {
             <div className="sheet-section-head">
               <h2>Feats &amp; features</h2>
               <span className="tiny muted">
-                {derived.selectedFeats.length} feats · {derived.features.length} class features
+                {derived.selectedFeats.length}{" "}
+                {derived.selectedFeats.length === 1 ? "feat" : "feats"} · {derived.features.length}{" "}
+                class {derived.features.length === 1 ? "feature" : "features"}
               </span>
             </div>
             <div className="sheet-feature-list">
@@ -2441,6 +2453,7 @@ export function CharacterSheetPage() {
                       type="button"
                       className="icon-btn"
                       title={`Remove ${name}`}
+                      aria-label={`Remove ${name}`}
                       disabled={!canEdit}
                       onClick={() => {
                         if (!window.confirm(`Remove ${name} from the pack?`)) return;

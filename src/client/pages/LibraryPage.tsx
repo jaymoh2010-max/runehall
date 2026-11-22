@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
-import { BookOpen, Dices, Search, Shield, Skull, Sparkles, Swords } from "lucide-react";
+import { BookOpen, Dices, Search, Shield, Skull, Sparkles, Swords, X } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import type { Deity, Equipment, Feat, Monster, Spell } from "../../shared/types";
 import {
@@ -312,7 +312,7 @@ export function LibraryPage() {
             </button>
           ))}
         </div>
-        <div className="search-box library-search">
+        <div className={`search-box library-search${searchText ? " has-clear" : ""}`}>
           <Search size={16} aria-hidden="true" />
           <Input
             value={searchText}
@@ -321,6 +321,16 @@ export function LibraryPage() {
             aria-label={`Search ${activeTab.label.toLowerCase()}`}
             autoComplete="off"
           />
+          {searchText ? (
+            <button
+              type="button"
+              className="search-clear"
+              aria-label="Clear search input"
+              onClick={() => onSearchChange("")}
+            >
+              <X size={14} aria-hidden="true" />
+            </button>
+          ) : null}
         </div>
         {tab !== "deities" ? (
           <Toggle checked={legacy} onChange={setLegacy} label="Include legacy" />

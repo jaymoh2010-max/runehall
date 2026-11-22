@@ -387,7 +387,8 @@ export function JoinCampaignPage() {
               <Users size={14} /> {campaign.memberCount} at the table
             </span>
             <span>
-              <ScrollText size={14} /> {campaign.characterCount} characters
+              <ScrollText size={14} /> {campaign.characterCount}{" "}
+              {campaign.characterCount === 1 ? "character" : "characters"}
             </span>
           </div>
         </div>
