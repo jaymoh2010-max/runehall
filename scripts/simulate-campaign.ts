@@ -1617,6 +1617,13 @@ async function runCampaignA(gm: Account, players: Account[]): Promise<void> {
     async () => {
       const owned = tokens.get(heroes[0].id)!;
       const other = tokens.get(heroes[1].id)!;
+      const current = await getTable(campaignId, gm.cookie);
+      await emitAndWait(
+        gmSocket,
+        "initiative:update",
+        { campaignId, entries: [], round: current.round, turnIndex: 0 },
+        "initiative:updated"
+      );
       const moved = waitForEvent<Json>(
         gmSocket,
         "token:moved",
@@ -1633,6 +1640,169 @@ async function runCampaignA(gm: Account, players: Account[]): Promise<void> {
       );
       playerSocket.emit("token:move", { campaignId, sceneId, tokenId: other.id, x: 300, y: 120 });
       await error;
+    }
+  );
+
+  await check(
+    campaignName,
+    "movement enforces turn order and remaining Speed for players",
+    async () => {
+      const owned = tokens.get(heroes[0].id)!;
+      const other = tokens.get(heroes[1].id)!;
+      await emitAndWait(
+        gmSocket,
+        "initiative:roll",
+        { campaignId, sceneId, tokenIds: [owned.id, other.id] },
+        "initiative:updated"
+      );
+      let table = await getTable(campaignId, gm.cookie);
+      let entries = table.initiative as Json[];
+      const ownedIndex = entries.findIndex((entry) => entry.tokenId === owned.id);
+      const otherIndex = entries.findIndex((entry) => entry.tokenId === other.id);
+      assert(ownedIndex >= 0 && otherIndex >= 0, "Movement heroes missing from initiative");
+      const sceneRow = (table.scenes as Json[]).find((entry) => entry.id === sceneId);
+      const startToken = (table.tokens as Json[]).find((entry) => entry.id === owned.id);
+      assert(startToken, "Owned token missing from the table snapshot");
+      const start = { x: Number(startToken.x), y: Number(startToken.y) };
+      const grid = Number(sceneRow?.gridSize ?? 70);
+      const speed = Number(summaryFor(table, heroes[0].id).speed) || 25;
+
+      await emitAndWait(
+        gmSocket,
+        "initiative:update",
+        { campaignId, entries, round: table.round, turnIndex: otherIndex },
+        "initiative:updated",
+        (payload) => payload.turnIndex === otherIndex
+      );
+      const offTurnError = waitForEvent<Json>(
+        playerSocket,
+        "error:toast",
+        (payload) => String(payload.message).includes("isn't this token's turn"),
+        4_000
+      );
+      const offTurnSnap = waitForEvent<Json>(
+        gmSocket,
+        "token:moved",
+        (event) => event.tokenId === owned.id && event.x === start.x && event.y === start.y,
+        4_000
+      );
+      playerSocket.emit("token:move", {
+        campaignId,
+        sceneId,
+        tokenId: owned.id,
+        x: start.x + grid,
+        y: start.y,
+      });
+      await Promise.all([offTurnError, offTurnSnap]);
+
+      table = await getTable(campaignId, gm.cookie);
+      entries = table.initiative as Json[];
+      await emitAndWait(
+        gmSocket,
+        "initiative:update",
+        { campaignId, entries, round: table.round, turnIndex: ownedIndex },
+        "initiative:updated",
+        (payload) => payload.turnIndex === ownedIndex
+      );
+      table = await getTable(campaignId, gm.cookie);
+      entries = (table.initiative as Json[]).map((entry) =>
+        entry.tokenId === owned.id ? { ...entry, movementUsed: Math.max(0, speed - 5) } : entry
+      );
+      await emitAndWait(
+        gmSocket,
+        "initiative:update",
+        { campaignId, entries, round: table.round, turnIndex: ownedIndex },
+        "initiative:updated",
+        (payload) => payload.turnIndex === ownedIndex
+      );
+      const overSpeedError = waitForEvent<Json>(
+        playerSocket,
+        "error:toast",
+        (payload) => String(payload.message).includes("movement left"),
+        4_000
+      );
+      const overSpeedSnap = waitForEvent<Json>(
+        gmSocket,
+        "token:moved",
+        (event) => event.tokenId === owned.id && event.x === start.x && event.y === start.y,
+        4_000
+      );
+      playerSocket.emit("token:move", {
+        campaignId,
+        sceneId,
+        tokenId: owned.id,
+        x: start.x + grid * 2,
+        y: start.y,
+      });
+      await Promise.all([overSpeedError, overSpeedSnap]);
+
+      const withinBudget = waitForEvent<Json>(
+        gmSocket,
+        "token:moved",
+        (event) => event.tokenId === owned.id && event.x === start.x + grid && event.y === start.y,
+        4_000
+      );
+      playerSocket.emit("token:move", {
+        campaignId,
+        sceneId,
+        tokenId: owned.id,
+        x: start.x + grid,
+        y: start.y,
+      });
+      await withinBudget;
+
+      const noMovementError = waitForEvent<Json>(
+        playerSocket,
+        "error:toast",
+        (payload) => String(payload.message).includes("No movement left"),
+        4_000
+      );
+      const noMovementSnap = waitForEvent<Json>(
+        gmSocket,
+        "token:moved",
+        (event) => event.tokenId === owned.id && event.x === start.x + grid && event.y === start.y,
+        4_000
+      );
+      playerSocket.emit("token:move", {
+        campaignId,
+        sceneId,
+        tokenId: owned.id,
+        x: start.x + grid * 2,
+        y: start.y,
+      });
+      await Promise.all([noMovementError, noMovementSnap]);
+
+      const sceneWidth = Number(sceneRow?.width ?? 1200);
+      const gmTarget = start.x < sceneWidth / 2 ? sceneWidth - 10 : 10;
+      const gmOverride = waitForEvent<Json>(
+        gmSocket,
+        "token:moved",
+        (event) => event.tokenId === owned.id && event.x === gmTarget && event.y === start.y,
+        4_000
+      );
+      gmSocket.emit("token:move", {
+        campaignId,
+        sceneId,
+        tokenId: owned.id,
+        x: gmTarget,
+        y: start.y,
+      });
+      await gmOverride;
+
+      const restored = waitForEvent<Json>(
+        gmSocket,
+        "token:moved",
+        (event) => event.tokenId === owned.id && event.x === start.x && event.y === start.y,
+        4_000
+      );
+      gmSocket.emit("token:move", {
+        campaignId,
+        sceneId,
+        tokenId: owned.id,
+        x: start.x,
+        y: start.y,
+      });
+      await restored;
     }
   );
 
