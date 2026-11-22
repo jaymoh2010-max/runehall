@@ -21,6 +21,7 @@ import {
   normalizeTravelWatches,
   normalizeTravelWeather,
 } from "../shared/travel";
+import { normalizeSessionZeroChecklist } from "../shared/sessionZero";
 import {
   MAX_SHOP_STOCK_ROWS,
   normalizeSettlementLevel,
@@ -634,6 +635,30 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
         ts
       );
       stats.travel += 1;
+    }
+
+    const importedSessionZero = record(payload.sessionZero);
+    if (Object.keys(importedSessionZero).length) {
+      db.prepare(
+        `INSERT INTO campaign_session_zero
+           (campaign_id, pitch, genre, tone, themes, expectations, house_rules,
+            content_limits, safety_tools, gm_notes, checklist, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).run(
+        campaignId,
+        longText(importedSessionZero.pitch, "", 20_000),
+        text(importedSessionZero.genre, "", 120),
+        text(importedSessionZero.tone, "", 200),
+        longText(importedSessionZero.themes, "", 4_000),
+        longText(importedSessionZero.expectations, "", 8_000),
+        longText(importedSessionZero.houseRules, "", 8_000),
+        longText(importedSessionZero.contentLimits, "", 8_000),
+        longText(importedSessionZero.safetyTools, "", 8_000),
+        longText(importedSessionZero.gmNotes, "", 20_000),
+        JSON.stringify(normalizeSessionZeroChecklist(importedSessionZero.checklist)),
+        ts,
+        ts
+      );
     }
 
     const dashboard = record(payload.dashboard);

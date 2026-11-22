@@ -1133,6 +1133,47 @@ export interface CampaignTravelState {
   suggestedSpeed: number;
 }
 
+export interface CampaignSessionZero {
+  campaignId: string;
+  pitch: string;
+  genre: string;
+  tone: string;
+  themes: string;
+  expectations: string;
+  houseRules: string;
+  contentLimits: string;
+  safetyTools: string;
+  checklist: Record<string, boolean>;
+  /** GM-only notes; omitted from player responses. */
+  gmNotes?: string;
+  updatedAt: number;
+}
+
+export interface SafetyPreference {
+  lines: string;
+  veils: string;
+  notes: string;
+  anonymous: boolean;
+  updatedAt: number;
+}
+
+export interface SafetyResponse {
+  id: string;
+  authorName: string | null;
+  anonymous: boolean;
+  lines: string;
+  veils: string;
+  notes: string;
+  updatedAt: number;
+}
+
+export interface SessionZeroState {
+  profile: CampaignSessionZero;
+  preference: SafetyPreference | null;
+  /** GM-only list. Players receive an empty array. */
+  responses: SafetyResponse[];
+}
+
 export interface EncounterCombatant {
   id: string;
   encounterId: string;
@@ -1832,6 +1873,7 @@ export interface ServerToClientEvents {
   }) => void;
   "campaign:revision": (payload: { revision: number }) => void;
   "campaign:updated": (campaign: CampaignSummary) => void;
+  "safety:signal": (payload: { message: string; createdAt: number }) => void;
   "error:toast": (payload: { message: string }) => void;
 }
 

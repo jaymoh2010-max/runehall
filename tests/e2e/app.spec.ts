@@ -533,6 +533,41 @@ test("GM plans a journey and advances a travel day", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Plan a journey" })).toBeVisible();
 });
 
+test("GM writes the session zero charter and checklist", async ({ page }) => {
+  await signIn(page, admin);
+  await page.goto(campaignPath);
+  await page
+    .locator(".campaign-tabs")
+    .getByRole("button", { name: /^Session zero/ })
+    .click();
+  await expect(page.getByRole("heading", { name: "Session zero & safety" })).toBeVisible();
+
+  await page.getByLabel("Campaign pitch", { exact: true }).fill("A city of ash and old debts.");
+  await page.getByLabel("Genre", { exact: true }).fill("Dark fantasy");
+  await page.getByLabel("Tone", { exact: true }).fill("Heroic with sharp edges");
+  await page
+    .getByLabel("Expectations", { exact: true })
+    .fill("Share the spotlight and flag rules questions.");
+  await page.getByLabel("House rules", { exact: true }).fill("Free archetype.");
+  await page.getByLabel("Content limits", { exact: true }).fill("No graphic torture.");
+  await page
+    .getByLabel("Safety tools", { exact: true })
+    .fill("Use the pause signal or message the GM privately.");
+  const editor = page.locator(".session-zero-editor");
+  await editor
+    .getByRole("checkbox", { name: "Share the campaign pitch, genre, and tone." })
+    .check();
+  await editor
+    .getByRole("checkbox", { name: "Agree on themes, expectations, and house rules." })
+    .check();
+  await page.getByRole("button", { name: "Save session zero" }).click();
+  await expect(page.getByText("Session zero charter saved.")).toBeVisible({ timeout: 15_000 });
+  await expect(
+    page.locator(".session-zero-charter").getByText("A city of ash and old debts.")
+  ).toBeVisible();
+  await expect(page.getByText("2/7 checklist")).toBeVisible();
+});
+
 test("GM schedules from Sessions and overdue sessions stay current", async ({ page }) => {
   await signIn(page, admin);
   await page.goto(`${campaignPath}?tab=sessions`);
@@ -634,6 +669,28 @@ test("player registers, joins with the invite code, and sees a player-safe table
   await liveDialog.getByLabel("Date and time").fill("2031-06-14T18:30");
   await liveDialog.getByRole("button", { name: "Schedule session" }).click();
   await expect(page.getByText("E2E Live Session")).toBeVisible({ timeout: 15_000 });
+
+  await page.goto(`${campaignPath}?tab=session-zero`);
+  await expect(page.getByRole("heading", { name: "Session zero & safety" })).toBeVisible();
+  await expect(
+    page.locator(".session-zero-charter").getByText("A city of ash and old debts.")
+  ).toBeVisible();
+  await page.getByLabel("Lines I do not want").fill("Spiders");
+  await page.getByLabel("Veils (fade to black)").fill("Torture");
+  await page.getByRole("checkbox", { name: "Hide my name from the GM's response list" }).check();
+  await page.getByRole("button", { name: "Save my limits" }).click();
+  await expect(page.getByText("Your safety preference was saved privately.")).toBeVisible({
+    timeout: 15_000,
+  });
+  await page.getByLabel("Optional note").fill("Need a pause.");
+  await page.getByRole("button", { name: "Pause / X-card" }).click();
+  await expect(page.getByText("The GM has been signalled. Take the pause you need.")).toBeVisible({
+    timeout: 15_000,
+  });
+
+  await adminPage.goto(`${campaignPath}?tab=session-zero`);
+  await expect(adminPage.getByText("Anonymous player")).toBeVisible({ timeout: 15_000 });
+  await expect(adminPage.getByText("Spiders")).toBeVisible();
 
   await adminContext.close();
 });

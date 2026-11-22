@@ -133,6 +133,8 @@ describe("migrations", () => {
         "campaign_turn_marks",
         "campaign_shop_stock",
         "campaign_travel",
+        "campaign_session_zero",
+        "campaign_safety_preferences",
       ])
     );
 

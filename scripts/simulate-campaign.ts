@@ -2414,6 +2414,107 @@ async function runCampaignA(gm: Account, players: Account[]): Promise<void> {
           assertEqual(playerAdvance.status, 403, "Player travel advance");
         }
       );
+
+      await check(
+        campaignLabel,
+        "session zero keeps a shared charter and private safety limits",
+        async () => {
+          const playerEdit = await api(`/api/campaigns/${campaignId}/session-zero`, {
+            method: "PUT",
+            cookie: players[0].cookie,
+            body: { pitch: "Player pitch" },
+            expect: null,
+          });
+          assertEqual(playerEdit.status, 403, "Player session zero edit");
+          const charter = await api(`/api/campaigns/${campaignId}/session-zero`, {
+            method: "PUT",
+            cookie: gm.cookie,
+            body: {
+              pitch: "The Ashen Crown wakes beneath the city.",
+              genre: "Dark fantasy",
+              tone: "Heroic, costly",
+              themes: "Loyalty and old debts",
+              expectations: "Share the spotlight.",
+              houseRules: "Free archetype.",
+              contentLimits: "No graphic torture.",
+              safetyTools: "Pause signal and private GM messages.",
+              gmNotes: "The Ash Warden is the final antagonist.",
+              checklist: { pitch: true, themes: true, safety: true },
+            },
+          });
+          assertEqual(
+            charter.payload.profile.pitch,
+            "The Ashen Crown wakes beneath the city.",
+            "Session zero pitch"
+          );
+          assertEqual(
+            charter.payload.profile.gmNotes,
+            "The Ash Warden is the final antagonist.",
+            "Session zero GM notes"
+          );
+          const playerView = await api(`/api/campaigns/${campaignId}/session-zero`, {
+            cookie: players[0].cookie,
+          });
+          assertEqual(
+            playerView.payload.profile.pitch,
+            charter.payload.profile.pitch,
+            "Player charter"
+          );
+          assert(
+            !("gmNotes" in playerView.payload.profile),
+            "Player session zero view leaked GM notes"
+          );
+          await api(`/api/campaigns/${campaignId}/session-zero/preference`, {
+            method: "PUT",
+            cookie: players[0].cookie,
+            body: {
+              lines: "Spiders",
+              veils: "Torture",
+              notes: "Check in after hard scenes.",
+            },
+          });
+          const gmView = await api(`/api/campaigns/${campaignId}/session-zero`, {
+            cookie: gm.cookie,
+          });
+          const named = gmView.payload.responses.find((entry: Json) => entry.lines === "Spiders");
+          assert(named?.authorName, "GM could not read the named safety response");
+          await api(`/api/campaigns/${campaignId}/session-zero/preference`, {
+            method: "PUT",
+            cookie: players[0].cookie,
+            body: { anonymous: true },
+          });
+          const anonymousView = await api(`/api/campaigns/${campaignId}/session-zero`, {
+            cookie: gm.cookie,
+          });
+          const anonymous = anonymousView.payload.responses.find(
+            (entry: Json) => entry.lines === "Spiders"
+          );
+          assert(
+            anonymous?.anonymous === true && anonymous.authorName === null,
+            "Anonymous safety response exposed the player"
+          );
+          const signal = await api(`/api/campaigns/${campaignId}/session-zero/signal`, {
+            method: "POST",
+            cookie: players[0].cookie,
+            body: { note: "Need a pause." },
+          });
+          assertEqual(signal.payload.ok, true, "Safety signal acknowledgement");
+          const gmTable = await getTable(campaignId, gm.cookie);
+          const playerTable = await getTable(campaignId, players[0].cookie);
+          assert(
+            (gmTable.messages as Json[]).some((message) =>
+              String(message.content).includes("safety pause")
+            ),
+            "GM did not receive the safety signal"
+          );
+          assert(
+            !(playerTable.messages as Json[]).some((message) =>
+              String(message.content).includes("safety pause")
+            ),
+            "Safety signal leaked to the player"
+          );
+        }
+      );
     }
 
     if (level === 10) {
@@ -2555,6 +2656,7 @@ async function runCampaignA(gm: Account, players: Account[]): Promise<void> {
         ["PUT", `/api/campaigns/${campaignId}/shop/stock`, { mode: "stocked", items: [] }],
         ["PUT", `/api/campaigns/${campaignId}/travel`, { origin: "No", distanceMiles: 1 }],
         ["POST", `/api/campaigns/${campaignId}/travel/advance`, {}],
+        ["PUT", `/api/campaigns/${campaignId}/session-zero`, { pitch: "No" }],
         ["GET", `/api/campaigns/${campaignId}/export`, undefined],
         ["GET", `/api/campaigns/${campaignId}/loot`, undefined],
         ["GET", `/api/campaigns/${campaignId}/npcs`, undefined],
@@ -2601,6 +2703,11 @@ async function runCampaignA(gm: Account, players: Account[]): Promise<void> {
       assertEqual(payload.shopStock[0].quantity, 3, "Export shop stock quantity");
       assertEqual(payload.travel.origin, "Ashen Ford", "Export travel origin");
       assertEqual(payload.travel.status, "complete", "Export travel status");
+      assertEqual(
+        payload.sessionZero.pitch,
+        "The Ashen Crown wakes beneath the city.",
+        "Export session zero pitch"
+      );
       assertEqual(payload.characters.length, 4, "Export character count");
       assert(
         payload.characters.every((character: Json) => character.data.level === 20),
@@ -2657,6 +2764,19 @@ async function runCampaignA(gm: Account, players: Account[]): Promise<void> {
         importedTravel.payload.travel.activities[importedHero.id],
         "scout",
         "Imported travel activity was not remapped"
+      );
+      const importedSessionZero = await api(`/api/campaigns/${importedCampaign.id}/session-zero`, {
+        cookie: gm.cookie,
+      });
+      assertEqual(
+        importedSessionZero.payload.profile.pitch,
+        "The Ashen Crown wakes beneath the city.",
+        "Imported session zero pitch"
+      );
+      assertEqual(
+        importedSessionZero.payload.profile.checklist.pitch,
+        true,
+        "Imported session zero checklist"
       );
       metric("campaignA.importedCampaignId", importedCampaign.id);
       await api(`/api/campaigns/${campaignId}/shop/stock`, {

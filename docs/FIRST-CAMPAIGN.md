@@ -125,6 +125,7 @@ This is the short checklist for the friend hosting Runehall and for the GM runni
   intentionally leaves character, NPC, and manually created tokens on the table.
 - The character sheet autosaves after a short delay. Wait for the saved indicator before immediately
   leaving the sheet.
+- Session zero and safety tools are built in: a shared table charter, private lines/veils, and an anonymous pause/X-card signal to the GM.
 - The Travel tab tracks a journey, watches, weather, and exploration activities, but there is no hex/pointcrawl map, automatic weather or encounter checks, or AP chapter importer yet.
 - The soundtrack is one shared track list, not per-player playlists. Sync is on play/pause/track
   change and is not sample-accurate.

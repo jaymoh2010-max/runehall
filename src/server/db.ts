@@ -166,6 +166,33 @@ export interface CampaignTravelRow {
   updated_at: number;
 }
 
+export interface CampaignSessionZeroRow {
+  campaign_id: string;
+  pitch: string;
+  genre: string;
+  tone: string;
+  themes: string;
+  expectations: string;
+  house_rules: string;
+  content_limits: string;
+  safety_tools: string;
+  gm_notes: string;
+  checklist: string;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface CampaignSafetyPreferenceRow {
+  campaign_id: string;
+  user_id: string;
+  lines: string;
+  veils: string;
+  notes: string;
+  anonymous: number;
+  created_at: number;
+  updated_at: number;
+}
+
 export interface CharacterRow {
   id: string;
   user_id: string;
