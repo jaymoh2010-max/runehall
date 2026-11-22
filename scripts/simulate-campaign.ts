@@ -2144,18 +2144,46 @@ async function runCampaignA(gm: Account, players: Account[]): Promise<void> {
             cookie: players[0].cookie,
           });
           const draft = JSON.parse(JSON.stringify(sheet.payload.character.data)) as Json;
-          draft.play.downtimeDays = 7;
+          draft.play.lifestyle = "comfortable";
           await api(`/api/characters/${heroes[0].id}`, {
             method: "PUT",
             cookie: players[0].cookie,
             body: { data: draft, force: true },
           });
+          const beforePurse = draft.currency as Json;
+          const beforePurseCp =
+            (Number(beforePurse.gp) || 0) * 100 +
+            (Number(beforePurse.sp) || 0) * 10 +
+            (Number(beforePurse.cp) || 0);
+          const spend = await api(`/api/characters/${heroes[0].id}/downtime/spend`, {
+            method: "POST",
+            cookie: players[0].cookie,
+            body: { days: 7 },
+          });
+          assertEqual(spend.payload.days, 7, "Spent downtime days");
+          assertEqual(spend.payload.paidCp, 100, "Comfortable upkeep for seven days");
+          assertEqual(spend.payload.lifestyle, "comfortable", "Upkeep lifestyle");
+          const afterPurse = spend.payload.character.data.currency as Json;
+          const afterPurseCp =
+            (Number(afterPurse.gp) || 0) * 100 +
+            (Number(afterPurse.sp) || 0) * 10 +
+            (Number(afterPurse.cp) || 0);
+          assertEqual(afterPurseCp, beforePurseCp - 100, "Purse after upkeep");
           const table = await getTable(campaignId, gm.cookie);
           assertEqual(
             summaryFor(table, heroes[0].id).downtimeDays,
             7,
             "Downtime summary after spending"
           );
+          const reduced = JSON.parse(JSON.stringify(spend.payload.character.data)) as Json;
+          reduced.play.downtimeDays = 6;
+          const rejected = await api(`/api/characters/${heroes[0].id}`, {
+            method: "PUT",
+            cookie: players[0].cookie,
+            body: { data: reduced, force: true },
+            expect: null,
+          });
+          assertEqual(rejected.status, 400, "Direct downtime reduction rejected");
         }
       );
 
@@ -2421,7 +2449,52 @@ async function runCampaignA(gm: Account, players: Account[]): Promise<void> {
       audit.characters.every((character: Json) => character.expectedCp > 0),
       "Character wealth benchmark missing"
     );
+    assertEqual(audit.mix.levels.length, 2, "Level 20 item bands");
+    assertEqual(audit.mix.levels[0].permanentTarget, 4, "Level 20 permanent target");
+    assertEqual(audit.mix.levels[0].consumableTarget, 4, "Level 20 consumable target");
+    assert(Array.isArray(audit.mix.warnings), "Item mix warnings missing");
     metric("campaignA.treasureDistributedCp", audit.distributedCp);
+  });
+
+  await check(campaignName, "loot audit separates permanent and consumable items", async () => {
+    const permanentResponse = await api(
+      `/api/compendium/equipment?levelMin=19&levelMax=19&type=weapon&limit=1`,
+      { cookie: gm.cookie }
+    );
+    const consumableResponse = await api(
+      `/api/compendium/equipment?levelMin=19&levelMax=19&type=consumable&limit=1`,
+      { cookie: gm.cookie }
+    );
+    const permanent = permanentResponse.payload.items[0] as Json;
+    const consumable = consumableResponse.payload.items[0] as Json;
+    assert(permanent?.id, "No level 19 permanent item found");
+    assert(consumable?.id, "No level 19 consumable item found");
+    const parcel = (
+      await api(`/api/campaigns/${campaignId}/loot`, {
+        method: "POST",
+        cookie: gm.cookie,
+        body: { name: "Item mix audit", description: "Simulated permanent and consumable mix" },
+      })
+    ).payload.parcel;
+    for (const item of [permanent, consumable]) {
+      await api(`/api/campaigns/${campaignId}/loot/${parcel.id}/items`, {
+        method: "POST",
+        cookie: gm.cookie,
+        body: { itemId: item.id, quantity: 2 },
+      });
+    }
+    const audit = (await api(`/api/campaigns/${campaignId}/loot/audit`, { cookie: gm.cookie }))
+      .payload.audit;
+    assertEqual(audit.mix.permanent, 2, "Permanent item mix");
+    assertEqual(audit.mix.consumable, 2, "Consumable item mix");
+    const level19 = audit.mix.levels.find((row: Json) => row.level === 19);
+    assertEqual(level19.permanent, 2, "Level 19 permanent items");
+    assertEqual(level19.consumable, 2, "Level 19 consumables");
+    assertEqual(level19.consumableTarget, 2, "Level 19 consumable target");
+    await api(`/api/campaigns/${campaignId}/loot/${parcel.id}`, {
+      method: "DELETE",
+      cookie: gm.cookie,
+    });
   });
 
   await check(
@@ -2470,7 +2543,7 @@ async function runCampaignA(gm: Account, players: Account[]): Promise<void> {
   observe(
     campaignName,
     "Treasure audit is advisory",
-    `Valued ${parcelCount} distributed parcels (${TREASURE_CURRENCY_GP[0]} gp at level 1 to ${TREASURE_CURRENCY_GP[19]} gp at level 20) and each character's gear and coins. Parcels are not tagged by level, and the app does not enforce the permanent-item/consumable item mix from GM Core table 10-9.`
+    `Valued ${parcelCount} distributed parcels (${TREASURE_CURRENCY_GP[0]} gp at level 1 to ${TREASURE_CURRENCY_GP[19]} gp at level 20) and each character's gear and coins, and audited permanent/consumable item counts against GM Core table 10-9. The mix is advisory and does not block distribution, and parcels are not tagged by level.`
   );
 
   gmSocket.close();

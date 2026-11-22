@@ -2112,13 +2112,26 @@ async function main() {
   if (downtimeCharacter.payload.character.data.play.downtimeDays !== 3) {
     throw new Error("Downtime grant did not reach the character data");
   }
-  const spentDraft = JSON.parse(JSON.stringify(downtimeCharacter.payload.character.data));
-  spentDraft.play.downtimeDays = 2;
-  await api(`/api/characters/${character.id}`, {
-    method: "PUT",
+  const beforePurse = downtimeCharacter.payload.character.data.currency;
+  const beforePurseCp =
+    (beforePurse?.gp ?? 0) * 100 + (beforePurse?.sp ?? 0) * 10 + (beforePurse?.cp ?? 0);
+  const spent = await api(`/api/characters/${character.id}/downtime/spend`, {
+    method: "POST",
     cookie: playerCookie,
-    body: { data: spentDraft, force: true },
+    body: { days: 1 },
   });
+  if (spent.payload.character.data.play.downtimeDays !== 2) {
+    throw new Error("Spending downtime did not update the character data");
+  }
+  if (spent.payload.paidCp !== 6 || spent.payload.lifestyle !== "subsistence") {
+    throw new Error("Downtime spend did not charge the subsistence upkeep");
+  }
+  const afterPurse = spent.payload.character.data.currency;
+  const afterPurseCp =
+    (afterPurse?.gp ?? 0) * 100 + (afterPurse?.sp ?? 0) * 10 + (afterPurse?.cp ?? 0);
+  if (afterPurseCp !== beforePurseCp - 6) {
+    throw new Error("Downtime spend did not deduct cost of living from the purse");
+  }
   const spentTable = await api(`/api/campaigns/${campaign.id}/table`, { cookie: gmCookie });
   if (
     spentTable.payload.characters.find((entry) => entry.id === character.id)?.summary

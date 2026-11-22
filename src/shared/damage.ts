@@ -66,6 +66,7 @@ function stateDraft(state: HpState): CharacterDraft {
       heroPoints: 0,
       focusPoints: 0,
       downtimeDays: 0,
+      lifestyle: "subsistence",
       afflictions: [],
       persistentDamage: [],
       xp: 0,

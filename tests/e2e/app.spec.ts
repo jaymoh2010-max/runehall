@@ -322,6 +322,16 @@ test("GM controls advancement and milestone mode hides XP awards", async ({ page
   await downtimeDialog.getByRole("button", { name: "Grant downtime" }).click();
   await expect(page.getByText(/Granted 3 downtime days/)).toBeVisible({ timeout: 15_000 });
   await expect(page.locator(".party-stats").getByText("3 d")).toBeVisible();
+
+  await page.locator(".party-card").first().getByRole("link", { name: "Sheet" }).click();
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("E2E Hero");
+  await page.getByRole("combobox", { name: "Cost of living" }).selectOption("comfortable");
+  await expect(page.getByText("1 sp 5 cp/day")).toBeVisible();
+  await page.getByRole("button", { name: "Spend", exact: true }).click();
+  await expect(
+    page.getByText(/Spent 1 downtime day and 1 sp 5 cp on comfortable living/)
+  ).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator(".point-row").filter({ hasText: "Downtime" })).toContainText("2 days");
 });
 
 test("GM awards XP in XP tracking mode without automatic level-up", async ({ page }) => {
@@ -383,6 +393,8 @@ test("loot audit and replacement wealth top-up are available", async ({ page }) 
   await page.goto(`${campaignPath}?tab=loot`);
   await expect(page.getByRole("heading", { name: /Level \d+ hoard/ })).toBeVisible();
   await expect(page.getByText("Character wealth")).toBeVisible();
+  await expect(page.getByText("Item mix")).toBeVisible();
+  await expect(page.getByText(/permanent/).first()).toBeVisible();
   await expect(page.getByText("Open parcels")).toBeVisible();
   await expect(page.getByText("Level budget")).toBeVisible();
 
