@@ -8,6 +8,7 @@ import {
   cantripLimitFor,
   characterSummary,
   checkFeatPrerequisite,
+  classSituationalDamage,
   computeCharacter,
   divineFontInfo,
   emptyCharacterDraft,
@@ -17,6 +18,7 @@ import {
   fullCasterSlots,
   grantedTrainedSkills,
   isFontSpell,
+  monkUnarmedDamage,
   normalizeCharacterDraft,
   ordinarySpellSlotsFor,
   preparedSlotSplits,
@@ -740,6 +742,31 @@ describe("PF2e character rules", () => {
       equipment: {},
     });
     expect(derived.skills.find((skill) => skill.id === "crafting")?.rank).toBe(3);
+  });
+
+  it("reports conditional class damage without inflating base attacks", () => {
+    const rogue = classes.find((entry) => entry.name === "Rogue")!;
+    const barbarian = classes.find((entry) => entry.name === "Barbarian")!;
+    const swashbuckler = classes.find((entry) => entry.name === "Swashbuckler")!;
+    expect(classSituationalDamage(rogue, 17, false)).toContainEqual({
+      formula: "4d6",
+      type: "precision",
+      label: "Sneak Attack",
+    });
+    expect(classSituationalDamage(barbarian, 11, false)).toContainEqual({
+      formula: "6",
+      type: "untyped",
+      label: "Rage",
+    });
+    expect(classSituationalDamage(barbarian, 11, true)).toEqual([]);
+    expect(classSituationalDamage(swashbuckler, 5, false)).toContainEqual({
+      formula: "2d6",
+      type: "precision",
+      label: "Precise Strike",
+    });
+    expect(monkUnarmedDamage(1)).toBe("1d6");
+    expect(monkUnarmedDamage(10)).toBe("2d6");
+    expect(monkUnarmedDamage(20)).toBe("4d6");
   });
 
   it("enforces spontaneous spell repertoire limits", () => {

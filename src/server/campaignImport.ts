@@ -495,14 +495,15 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
       const tokenId = newId("tok");
       db.prepare(
         `INSERT INTO tokens
-          (id, scene_id, name, image_url, character_id, owner_id, x, y, size, vision_radius, light_radius, light_color, vision_mode, color, hp_current, hp_max, ac, initiative_bonus, group_id, group_name, conditions, turn_effects, hidden, locked, sort_order, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          (id, scene_id, name, image_url, character_id, monster_id, owner_id, x, y, size, vision_radius, light_radius, light_color, vision_mode, color, hp_current, hp_max, ac, initiative_bonus, group_id, group_name, conditions, turn_effects, hidden, locked, sort_order, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).run(
         tokenId,
         sceneId,
         text(token.name, "Token", 80),
         token.imageUrl ? text(token.imageUrl, "", 500) : null,
         characterId,
+        token.monsterId ? text(token.monsterId, "", 120) || null : null,
         ownerId,
         numberValue(token.x, 0),
         numberValue(token.y, 0),

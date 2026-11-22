@@ -2046,6 +2046,42 @@ async function main() {
   await delay(150);
   log("hidden tokens and hidden moves stay GM-only");
 
+  const apothecarySearch = await api("/api/compendium/monsters?q=Apothecary&limit=1", {
+    cookie: gmCookie,
+  });
+  const apothecary = apothecarySearch.payload.items?.[0];
+  if (!apothecary?.id) throw new Error("Could not find a monster with a known resistance");
+  const resistantToken = await emitAck(gmSocket, "token:create", {
+    campaignId: campaign.id,
+    sceneId: scene.id,
+    token: {
+      name: "Resistance Test",
+      monsterId: apothecary.id,
+      x: 320,
+      y: 320,
+      size: 1,
+      hpCurrent: 20,
+      hpMax: 20,
+      ac: 15,
+    },
+  });
+  const resisted = await emitAck(gmSocket, "token:damage", {
+    campaignId: campaign.id,
+    tokenId: resistantToken.id,
+    amount: 10,
+    damageType: "poison",
+  });
+  if (resisted?.applied !== 8 || !resisted.notes?.some((note) => /Resistance 2/.test(note))) {
+    throw new Error("Monster resistance was not applied to typed damage");
+  }
+  const resistedTable = await api(`/api/campaigns/${campaign.id}/table`, { cookie: gmCookie });
+  const resistedRow = resistedTable.payload.tokens.find((entry) => entry.id === resistantToken.id);
+  if (resistedRow?.hpCurrent !== 12) {
+    throw new Error("Resistant monster token did not lose the reduced damage");
+  }
+  gmSocket.emit("token:delete", { campaignId: campaign.id, tokenId: resistantToken.id });
+  log("typed damage applies monster resistances and weaknesses");
+
   const hpTable = await api(`/api/campaigns/${campaign.id}/table`, { cookie: gmCookie });
   const linkedToken = hpTable.payload.tokens.find((entry) => entry.id === token.id);
   const linkedCharacter = hpTable.payload.characters.find((entry) => entry.id === character.id);

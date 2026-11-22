@@ -257,6 +257,7 @@ export interface TokenRow {
   image_url: string | null;
   character_id: string | null;
   encounter_id: string | null;
+  monster_id: string | null;
   owner_id: string | null;
   x: number;
   y: number;

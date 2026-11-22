@@ -1,6 +1,6 @@
 import type { Server, Socket } from "socket.io";
 import { getCampaignRole, getCharacter, getMembership, getUser } from "./access";
-import { contextForDraft } from "./compendium";
+import { contextForDraft, monsters } from "./compendium";
 import { db, type CampaignRow, type MessageRow, type SceneRow, type TokenRow } from "./db";
 import { userFromCookieHeader } from "./auth";
 import { now, newId, safeInt, safeString, parseJson, clamp, sanitizeUserText } from "./util";
@@ -13,6 +13,7 @@ import {
   tickTokenConditions,
 } from "../shared/tokens";
 import { applyHpEditToDraft, applyHpEditToState } from "../shared/damage";
+import { applyDamageDefenses } from "../shared/damageDefenses";
 import {
   filterInitiativeForPlayers,
   renameInitiativeEntries,
@@ -457,15 +458,20 @@ function createToken(
         normalizeCharacterDraft(parseJson(character.data, {}), character.name).play
       )
     : normalizeTokenTurnEffects(incoming.turnEffects);
+  const monsterId =
+    typeof incoming.monsterId === "string" && incoming.monsterId
+      ? safeString(incoming.monsterId, "", 120) || null
+      : null;
   db.prepare(
-    `INSERT INTO tokens (id, scene_id, name, image_url, character_id, owner_id, x, y, size, vision_radius, light_radius, light_color, vision_mode, color, hp_current, hp_max, ac, initiative_bonus, group_id, group_name, conditions, turn_effects, hidden, locked, sort_order, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO tokens (id, scene_id, name, image_url, character_id, monster_id, owner_id, x, y, size, vision_radius, light_radius, light_color, vision_mode, color, hp_current, hp_max, ac, initiative_bonus, group_id, group_name, conditions, turn_effects, hidden, locked, sort_order, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     id,
     sceneId,
     name,
     incoming.imageUrl ? safeString(incoming.imageUrl, "", 500) : character ? null : null,
     character?.id ?? null,
+    monsterId,
     ownerId,
     x,
     y,
@@ -934,7 +940,7 @@ export function registerSocketServer(io: TypedServer): void {
       touchCampaign(campaignId);
     });
 
-    on("token:damage", ({ campaignId, tokenId, amount, critical }) => {
+    on("token:damage", ({ campaignId, tokenId, amount, critical, damageType, nonlethal }, ack) => {
       const row = tokenRow(tokenId);
       if (!row) return;
       const role = getCampaignRole(campaignId, socket.data.user.id);
@@ -964,6 +970,11 @@ export function registerSocketServer(io: TypedServer): void {
             amount: damage,
             critical: Boolean(critical),
           });
+          if (nonlethal && result.droppedToZero) {
+            result.draft.play.conditions = result.draft.play.conditions.filter(
+              (condition) => condition.name.replace(/\s+\d+$/, "").toLowerCase() !== "dying"
+            );
+          }
           const summary = characterSummary(result.draft, contextForDraft(result.draft));
           db.prepare(
             "UPDATE characters SET data = ?, summary = ?, updated_at = ?, revision = revision + 1 WHERE id = ?"
@@ -994,6 +1005,7 @@ export function registerSocketServer(io: TypedServer): void {
             summary,
             name: draft.name,
           });
+          ack?.({ applied: damage, notes: [] });
           touchCampaign(campaignId);
         } catch {
           sendError(socket, "That character's sheet could not be updated.");
@@ -1003,14 +1015,34 @@ export function registerSocketServer(io: TypedServer): void {
 
       const maxHp = row.hp_max;
       if (maxHp === null) return;
+      const monster = row.monster_id
+        ? (monsters.find((entry) => entry.id === row.monster_id) ?? null)
+        : null;
+      const defenses = applyDamageDefenses({
+        amount: damage,
+        damageType,
+        nonlethal,
+        immunities: monster?.immunities,
+        weaknesses: monster?.weaknesses,
+        resistances: monster?.resistances,
+      });
+      if (defenses.amount <= 0) {
+        ack?.({ applied: 0, notes: defenses.notes });
+        return;
+      }
       const result = applyHpEditToState(
         {
           hp: row.hp_current ?? maxHp,
           conditions: normalizeTokenConditions(parseJson(row.conditions, [])),
         },
         maxHp,
-        { type: "damage", amount: damage, critical: Boolean(critical) }
+        { type: "damage", amount: defenses.amount, critical: Boolean(critical) }
       );
+      if (nonlethal && result.droppedToZero) {
+        result.draft.play.conditions = result.draft.play.conditions.filter(
+          (condition) => condition.name.replace(/\s+\d+$/, "").toLowerCase() !== "dying"
+        );
+      }
       db.prepare(
         "UPDATE tokens SET hp_current = ?, conditions = ?, updated_at = ? WHERE id = ?"
       ).run(result.draft.play.hp ?? 0, JSON.stringify(result.draft.play.conditions), ts, row.id);
@@ -1018,6 +1050,7 @@ export function registerSocketServer(io: TypedServer): void {
       if (updated) {
         socketTokenEvents(io, campaignId).updated(tokenWithOwner(updated), Boolean(updated.hidden));
       }
+      ack?.({ applied: defenses.amount, notes: defenses.notes });
       touchCampaign(campaignId);
     });
 

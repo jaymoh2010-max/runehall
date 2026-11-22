@@ -15,6 +15,11 @@ import {
 import type { CharacterRecord, PublicUser, Scene, Token } from "../../../shared/types";
 import { groupHp, tokenConditionLabel, tokenConditionSummary } from "../../../shared/tokens";
 import {
+  DAMAGE_TYPE_GROUPS,
+  DEFAULT_DAMAGE_TYPE,
+  damageTypeLabel,
+} from "../../../shared/damageDefenses";
+import {
   Avatar,
   Badge,
   Button,
@@ -64,7 +69,12 @@ export function VttTokenPanel({
   setTokens: (updater: (current: Token[]) => Token[]) => void;
   selectedToken: Token | null;
   updateToken: (tokenId: string, patch: Partial<Token>) => void;
-  onDamage: (tokenId: string, amount: number, critical?: boolean) => void;
+  onDamage: (
+    tokenId: string,
+    amount: number,
+    critical?: boolean,
+    options?: { damageType?: string; nonlethal?: boolean }
+  ) => void;
   addSelectedToInitiative: () => void;
   setEditingTokenId: (tokenId: string | null) => void;
   deleteToken: (tokenId: string) => void;
@@ -79,6 +89,9 @@ export function VttTokenPanel({
   onBulkDelete: () => void;
 }) {
   const [groupAmount, setGroupAmount] = useState("5");
+  const [damageAmount, setDamageAmount] = useState("1");
+  const [damageType, setDamageType] = useState(DEFAULT_DAMAGE_TYPE);
+  const [nonlethal, setNonlethal] = useState(false);
   const [bulkCondition, setBulkCondition] = useState("");
   const [bulkValue, setBulkValue] = useState("");
   const [bulkDuration, setBulkDuration] = useState("");
@@ -491,6 +504,44 @@ export function VttTokenPanel({
                   Delete
                 </Button>
               </div>
+              <div className="token-damage-apply">
+                <Input
+                  type="number"
+                  min={1}
+                  value={damageAmount}
+                  aria-label="Damage amount"
+                  onChange={(event) => setDamageAmount(event.target.value)}
+                />
+                <Select
+                  value={damageType}
+                  aria-label="Damage type"
+                  onChange={(event) => setDamageType(event.target.value)}
+                >
+                  <option value={DEFAULT_DAMAGE_TYPE}>Untyped</option>
+                  {DAMAGE_TYPE_GROUPS.map((group) => (
+                    <optgroup key={group.label} label={group.label}>
+                      {group.types.map((type) => (
+                        <option key={type} value={type}>
+                          {damageTypeLabel(type)}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </Select>
+                <Button
+                  size="sm"
+                  variant="danger"
+                  onClick={() => {
+                    const amount = Math.max(0, Math.round(Number(damageAmount) || 0));
+                    if (amount > 0) {
+                      onDamage(selectedToken.id, amount, false, { damageType, nonlethal });
+                    }
+                  }}
+                >
+                  Apply
+                </Button>
+              </div>
+              <Toggle checked={nonlethal} onChange={setNonlethal} label="Nonlethal damage" />
             </>
           ) : (
             <>
@@ -543,6 +594,44 @@ export function VttTokenPanel({
                   </Button>
                 </div>
               ) : null}
+              <div className="token-damage-apply">
+                <Input
+                  type="number"
+                  min={1}
+                  value={damageAmount}
+                  aria-label="Damage amount"
+                  onChange={(event) => setDamageAmount(event.target.value)}
+                />
+                <Select
+                  value={damageType}
+                  aria-label="Damage type"
+                  onChange={(event) => setDamageType(event.target.value)}
+                >
+                  <option value={DEFAULT_DAMAGE_TYPE}>Untyped</option>
+                  {DAMAGE_TYPE_GROUPS.map((group) => (
+                    <optgroup key={group.label} label={group.label}>
+                      {group.types.map((type) => (
+                        <option key={type} value={type}>
+                          {damageTypeLabel(type)}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </Select>
+                <Button
+                  size="sm"
+                  variant="danger"
+                  onClick={() => {
+                    const amount = Math.max(0, Math.round(Number(damageAmount) || 0));
+                    if (amount > 0) {
+                      onDamage(selectedToken.id, amount, false, { damageType, nonlethal });
+                    }
+                  }}
+                >
+                  Apply
+                </Button>
+              </div>
+              <Toggle checked={nonlethal} onChange={setNonlethal} label="Nonlethal damage" />
             </>
           )}
           {selectedToken.conditions.length ? (

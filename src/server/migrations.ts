@@ -839,4 +839,11 @@ export const migrations: Migration[] = [
       ALTER TABLE campaign_chapters ADD COLUMN gm_notes TEXT NOT NULL DEFAULT '';
     `,
   },
+  {
+    version: 47,
+    name: "token_monster_link",
+    sql: `
+      ALTER TABLE tokens ADD COLUMN monster_id TEXT;
+    `,
+  },
 ];

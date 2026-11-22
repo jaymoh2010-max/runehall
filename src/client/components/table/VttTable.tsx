@@ -525,8 +525,19 @@ export function VttTable({ initial, campaignId, user, isGm, active }: VttTablePr
     getSocket().emit("token:update", { campaignId, token: { id: tokenId, ...patch } });
   };
 
-  const damageToken = (tokenId: string, amount: number, critical = false) => {
-    getSocket().emit("token:damage", { campaignId, tokenId, amount, critical });
+  const damageToken = (
+    tokenId: string,
+    amount: number,
+    critical = false,
+    options: { damageType?: string; nonlethal?: boolean } = {}
+  ) => {
+    getSocket().emit(
+      "token:damage",
+      { campaignId, tokenId, amount, critical, ...options },
+      (result) => {
+        if (result.notes.length) toast(result.notes.join("; "), "info");
+      }
+    );
   };
 
   const bulkHp = (delta: number, full = false) => {

@@ -1639,6 +1639,8 @@ export interface Token {
   name: string;
   imageUrl: string | null;
   characterId: string | null;
+  /** Bestiary source for an unlinked monster token, used for defenses. */
+  monsterId?: string | null;
   ownerId: string | null;
   ownerName?: string;
   x: number;
@@ -1881,12 +1883,17 @@ export interface ClientToServerEvents {
     ack?: (token: Token | null) => void
   ) => void;
   "token:update": (payload: { campaignId: string; token: Partial<Token> & { id: string } }) => void;
-  "token:damage": (payload: {
-    campaignId: string;
-    tokenId: string;
-    amount: number;
-    critical?: boolean;
-  }) => void;
+  "token:damage": (
+    payload: {
+      campaignId: string;
+      tokenId: string;
+      amount: number;
+      critical?: boolean;
+      damageType?: string;
+      nonlethal?: boolean;
+    },
+    ack?: (result: { applied: number; notes: string[] }) => void
+  ) => void;
   "token:delete": (payload: { campaignId: string; tokenId: string }) => void;
   "fog:update": (payload: {
     campaignId: string;

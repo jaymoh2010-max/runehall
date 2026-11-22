@@ -2301,6 +2301,51 @@ function weaponSpecializationBonus(features: { name: string }[], rank: number): 
   return values[rank] ?? 0;
 }
 
+/**
+ * Conditional class damage that is rolled in addition to the weapon's normal
+ * damage. Keeping it separate avoids silently adding sneak attack or rage
+ * damage to every attack when the condition is not true.
+ */
+export function classSituationalDamage(
+  classData: ClassData | null | undefined,
+  level: number,
+  ranged: boolean
+): { formula: string; type: string; label: string }[] {
+  const name = classData?.name.toLowerCase();
+  const out: { formula: string; type: string; label: string }[] = [];
+  if (name === "rogue") {
+    const dice = level >= 17 ? 4 : level >= 11 ? 3 : level >= 5 ? 2 : 1;
+    out.push({ formula: `${dice}d6`, type: "precision", label: "Sneak Attack" });
+  }
+  if (name === "swashbuckler") {
+    const dice = level >= 17 ? 4 : level >= 11 ? 3 : level >= 5 ? 2 : 1;
+    out.push({ formula: `${dice}d6`, type: "precision", label: "Precise Strike" });
+  }
+  if (name === "investigator") {
+    const dice = level >= 17 ? 5 : level >= 13 ? 4 : level >= 9 ? 3 : level >= 5 ? 2 : 1;
+    out.push({ formula: `${dice}d6`, type: "precision", label: "Strategic Strike" });
+  }
+  if (name === "barbarian" && !ranged) {
+    const bonus =
+      level >= 19 ? 12 : level >= 15 ? 8 : level >= 11 ? 6 : level >= 7 ? 4 : level >= 3 ? 3 : 2;
+    out.push({ formula: `${bonus}`, type: "untyped", label: "Rage" });
+  }
+  if (name === "ranger") {
+    const dice = level >= 11 ? "2d8" : "1d8";
+    out.push({ formula: dice, type: "precision", label: "Hunter's Edge" });
+  }
+  return out;
+}
+
+/** Monk unarmed strikes scale with class level. */
+export function monkUnarmedDamage(level: number): string {
+  if (level >= 20) return "4d6";
+  if (level >= 15) return "3d6";
+  if (level >= 10) return "2d6";
+  if (level >= 5) return "1d8";
+  return "1d6";
+}
+
 // ---------------------------------------------------------------------------
 // Character computation
 // ---------------------------------------------------------------------------
@@ -2934,6 +2979,7 @@ export function computeCharacter(
     const extraDamage = runes.property
       .map((rune) => propertyRuneDamage(rune))
       .filter((entry): entry is { formula: string; type: string; label: string } => Boolean(entry));
+    extraDamage.push(...classSituationalDamage(classData, draft.level, ranged));
     const notes = [
       isThrown ? "Thrown" : ranged ? "Ranged" : "",
       finesse ? "Finesse" : "",
@@ -2970,14 +3016,17 @@ export function computeCharacter(
     conditionEffects.checks[fistAbilityKey] +
     conditionEffects.attackCircumstance;
   const fistDamage = abilityMods.str + weaponSpecializationBonus(activeFeatures, fistRank);
+  const unarmedBase =
+    classData?.name.toLowerCase() === "monk" ? monkUnarmedDamage(draft.level) : "1d4";
   attacks.push({
     id: "unarmed:fist",
-    name: "Fist",
+    name: classData?.name.toLowerCase() === "monk" ? "Unarmed strike" : "Fist",
     sourceItemId: null,
     attackBonus: fistAttack,
     attackFormula: `1d20${signed(fistAttack)}`,
-    damageFormula: fistDamage === 0 ? "1d4" : `1d4${signed(fistDamage)}`,
+    damageFormula: fistDamage === 0 ? unarmedBase : `${unarmedBase}${signed(fistDamage)}`,
     damageType: "bludgeoning",
+    extraDamage: classSituationalDamage(classData, draft.level, false),
     traits: ["agile", "finesse", "nonlethal", "unarmed"],
     hands: 1,
     ranged: false,
