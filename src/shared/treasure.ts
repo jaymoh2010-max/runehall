@@ -16,12 +16,19 @@ export const TREASURE_CURRENCY_GP = [
   30_000, 48_000, 80_000, 140_000,
 ];
 
-export function treasureBudgetGp(level: number): TreasureBudget {
+/** Table 10-9 is for four PCs; add or remove a quarter share per PC. */
+export function treasurePartyMultiplier(partySize: number): number {
+  const safe = Math.max(1, Math.min(8, Math.round(partySize || 4)));
+  return 1 + (safe - 4) * 0.25;
+}
+
+export function treasureBudgetGp(level: number, partySize = 4): TreasureBudget {
   const safe = Math.max(1, Math.min(20, Math.round(level || 1)));
+  const multiplier = treasurePartyMultiplier(partySize);
   return {
     level: safe,
-    totalGp: TREASURE_TOTAL_GP[safe - 1],
-    currencyGp: TREASURE_CURRENCY_GP[safe - 1],
+    totalGp: Math.round(TREASURE_TOTAL_GP[safe - 1] * multiplier),
+    currencyGp: Math.round(TREASURE_CURRENCY_GP[safe - 1] * multiplier),
   };
 }
 
@@ -82,15 +89,21 @@ function emptyMixRow(level: number, permanentTarget: number, consumableTarget: n
  * party and at party level; consumables span one level above through one
  * below. Levels 1 and 20 use the table's special rows.
  */
-export function treasureItemTargets(level: number): TreasureItemMixRow[] {
+export function treasureItemTargets(level: number, partySize = 4): TreasureItemMixRow[] {
   const safe = Math.max(1, Math.min(20, Math.round(level || 1)));
+  const scale = treasurePartyMultiplier(partySize);
+  const scaled = (count: number) => Math.max(0, Math.round(count * scale));
   if (safe === 20) {
-    return [emptyMixRow(20, 4, 4), emptyMixRow(19, 0, 2)];
+    return [emptyMixRow(20, scaled(4), scaled(4)), emptyMixRow(19, 0, scaled(2))];
   }
   if (safe === 1) {
-    return [emptyMixRow(2, 2, 2), emptyMixRow(1, 2, 3)];
+    return [emptyMixRow(2, scaled(2), scaled(2)), emptyMixRow(1, scaled(2), scaled(3))];
   }
-  return [emptyMixRow(safe + 1, 2, 2), emptyMixRow(safe, 2, 2), emptyMixRow(safe - 1, 0, 2)];
+  return [
+    emptyMixRow(safe + 1, scaled(2), scaled(2)),
+    emptyMixRow(safe, scaled(2), scaled(2)),
+    emptyMixRow(safe - 1, 0, scaled(2)),
+  ];
 }
 
 export function countTreasureItemKinds(
@@ -115,9 +128,10 @@ export function treasureItemMix(
   level: number,
   items: ReadonlyArray<{ itemId: string; quantity: number }>,
   factsById: ReadonlyMap<string, TreasureItemFacts>,
-  priceCpById: ReadonlyMap<string, number> = new Map()
+  priceCpById: ReadonlyMap<string, number> = new Map(),
+  partySize = 4
 ): TreasureItemMix {
-  const rows = treasureItemTargets(level);
+  const rows = treasureItemTargets(level, partySize);
   const rowByLevel = new Map(rows.map((row) => [row.level, row]));
   let permanent = 0;
   let consumable = 0;

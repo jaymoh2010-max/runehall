@@ -50,6 +50,7 @@ import {
   Stat,
   Tag,
   Textarea,
+  Toggle,
 } from "../ui";
 
 export interface EncounterLaunchResult {
@@ -102,6 +103,7 @@ export function EncounterBuilder({
   const [launchSceneId, setLaunchSceneId] = useState("");
   const [launchWave, setLaunchWave] = useState("all");
   const [launchMode, setLaunchMode] = useState<EncounterLaunchMode>("fresh");
+  const [launchHidden, setLaunchHidden] = useState(false);
 
   const defaults = useMemo(
     () => partyDefaults(characters.map((character) => character.summary?.level ?? null)),
@@ -376,6 +378,7 @@ export function EncounterBuilder({
     setLaunchSceneId(selected.sceneId ?? activeLaunchSceneId ?? scenes[0]?.id ?? "");
     setLaunchWave("all");
     setLaunchMode("fresh");
+    setLaunchHidden(false);
     setLaunchOpen(true);
   };
 
@@ -421,6 +424,7 @@ export function EncounterBuilder({
             sceneId: launchSceneId || selected.sceneId || null,
             wave: launchWave === "all" ? null : Number(launchWave),
             mode: launchMode,
+            hidden: launchHidden,
           },
         }
       );
@@ -1037,6 +1041,16 @@ export function EncounterBuilder({
                   Add to current order
                 </Button>
               </div>
+            </Field>
+            <Field
+              label="Ambush"
+              hint="Hidden creatures still roll initiative for the GM but are omitted from player tokens and the player initiative list until revealed."
+            >
+              <Toggle
+                checked={launchHidden}
+                onChange={setLaunchHidden}
+                label={launchHidden ? "Launch hidden from players" : "Launch visible"}
+              />
             </Field>
             <div className="encounter-launch-preview">
               <Waves size={18} />

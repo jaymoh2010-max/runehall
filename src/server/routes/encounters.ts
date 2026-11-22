@@ -297,9 +297,12 @@ export async function registerEncounterRoutes(app: FastifyInstance): Promise<voi
     if (!access.row) return reply.code(access.code ?? 403).send({ error: access.error });
     if (!getEncounter(id, encounterId))
       return reply.code(404).send({ error: "Encounter not found." });
+    // Remove tokens this encounter launched before deleting its row, otherwise
+    // they become orphaned and can no longer be cleared through the encounter.
+    const removed = clearLaunchedTokens(app, id, encounterId);
     db.prepare("DELETE FROM encounters WHERE id = ?").run(encounterId);
     touchCampaign(id);
-    return reply.send({ ok: true });
+    return reply.send({ ok: true, removed });
   });
 
   app.post("/api/campaigns/:id/encounters/:encounterId/duplicate", async (request, reply) => {
@@ -566,6 +569,20 @@ export async function registerEncounterRoutes(app: FastifyInstance): Promise<voi
     if (!combatants.length) {
       return reply.code(400).send({ error: `Wave ${wave} has no combatants.` });
     }
+    const hidden = body.hidden === true || body.visible === false;
+    if (mode === "reinforce") {
+      const waveNames = new Set(combatants.map((combatant) => combatant.name));
+      const launched = db
+        .prepare("SELECT name, group_name FROM tokens WHERE encounter_id = ? AND scene_id = ?")
+        .all(encounterId, scene.id) as { name: string; group_name: string | null }[];
+      if (
+        launched.some((token) => waveNames.has(token.group_name ?? "") || waveNames.has(token.name))
+      ) {
+        return reply
+          .code(400)
+          .send({ error: "That wave is already on the table. Clear it before reinforcing again." });
+      }
+    }
     if (mode === "fresh") {
       // A fresh launch replaces only the tokens this encounter already placed
       // on the target scene; linked character and NPC tokens are untouched.
@@ -629,7 +646,7 @@ export async function registerEncounterRoutes(app: FastifyInstance): Promise<voi
         db.prepare(
           `INSERT INTO tokens
             (id, scene_id, encounter_id, name, image_url, character_id, owner_id, x, y, size, color, hp_current, hp_max, ac, initiative_bonus, group_id, group_name, conditions, turn_effects, hidden, locked, sort_order, created_at, updated_at)
-           VALUES (?, ?, ?, ?, NULL, NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '[]', ?, 0, 0, ?, ?, ?)`
+           VALUES (?, ?, ?, ?, NULL, NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '[]', ?, ?, 0, ?, ?, ?)`
         ).run(
           tokenId,
           scene.id,
@@ -646,6 +663,7 @@ export async function registerEncounterRoutes(app: FastifyInstance): Promise<voi
           groupId,
           combatant.name,
           JSON.stringify(turnEffects),
+          hidden ? 1 : 0,
           Date.now(),
           ts,
           ts
@@ -657,11 +675,13 @@ export async function registerEncounterRoutes(app: FastifyInstance): Promise<voi
       }
     }
 
+    // Include hidden tokens launched by this encounter so an ambush appears in
+    // the GM's initiative order. Player broadcasts still filter them out.
     const sceneTokens = db
       .prepare(
-        "SELECT * FROM tokens WHERE scene_id = ? AND hidden = 0 ORDER BY sort_order ASC, created_at ASC"
+        "SELECT * FROM tokens WHERE scene_id = ? AND (hidden = 0 OR encounter_id = ?) ORDER BY sort_order ASC, created_at ASC"
       )
-      .all(scene.id) as TokenRow[];
+      .all(scene.id, encounterId) as TokenRow[];
     let entries: InitiativeEntry[];
     let round = 1;
     let turnIndex = 0;

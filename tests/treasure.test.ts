@@ -166,6 +166,13 @@ describe("GM Core table 10-9 item mix", () => {
       )
     ).toEqual({ permanent: 2, consumable: 1, other: 5 });
   });
+
+  it("scales the budget and item targets for larger parties", () => {
+    expect(treasureBudgetGp(1, 5).totalGp).toBe(219);
+    expect(treasureBudgetGp(1, 6).totalGp).toBe(263);
+    expect(treasureItemTargets(1, 6)[0].permanentTarget).toBe(3);
+    expect(treasureItemMix(1, [], new Map(), new Map(), 6).levels[0].permanentTarget).toBe(3);
+  });
 });
 
 describe("GM Core table 10-10 new-character wealth", () => {

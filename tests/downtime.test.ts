@@ -7,6 +7,7 @@ import {
   normalizeDowntimeActivities,
 } from "../src/shared/downtime";
 import { performDowntimeDay } from "../src/server/downtime";
+import { dcForLevel } from "../src/shared/gmScreen";
 import type { DerivedCharacter } from "../src/shared/types";
 
 const skills = [
@@ -85,6 +86,37 @@ describe("downtime activity normalization", () => {
     expect(normalizeCharacterDraft({ name: "Legacy" }, "Legacy").play.downtimeActivities).toEqual(
       []
     );
+  });
+});
+
+describe("downtime task validation", () => {
+  it("caps the task level at the settlement and derives the DC on the server", () => {
+    const draft = draftWithCoins(1_000);
+    const tooHigh = performDowntimeDay({
+      draft,
+      skills,
+      lore: [],
+      input: { kind: "earn-income", skill: "crafting", taskLevel: 20, dc: 1 },
+      settlementLevel: 5,
+      now: 1_000,
+      id: "downtime_bad",
+      rng: () => 0.5,
+    });
+    expect("error" in tooHigh).toBe(true);
+
+    const result = check(
+      performDowntimeDay({
+        draft,
+        skills,
+        lore: [],
+        input: { kind: "earn-income", skill: "crafting", taskLevel: 5, dc: 1 },
+        settlementLevel: 5,
+        now: 1_000,
+        id: "downtime_good",
+        rng: () => 0.99,
+      })
+    );
+    expect(result.activity?.dc).toBe(dcForLevel(5));
   });
 });
 

@@ -26,6 +26,8 @@ import { contextForDraft } from "../compendium";
 import { importPathbuilder } from "../pathbuilder";
 import { db, type CampaignRow, type CharacterRow, type TokenRow } from "../db";
 import { serializeCharacter, serializeToken, touchCampaign } from "../serialize";
+import { shiftGolarionDate } from "../../shared/calendar";
+import { broadcastCampaignSummary } from "../campaignEvents";
 import { tokenEventsFor } from "../tokenEvents";
 import {
   addCurrency,
@@ -53,6 +55,22 @@ function parseDraft(raw: unknown, fallbackName = "New Hero"): CharacterDraft {
 
 function summarize(draft: CharacterDraft): CharacterSummary {
   return characterSummary(draft, contextForDraft(draft));
+}
+
+/** Downtime and long rests consume in-world days, not just character resources. */
+function advanceCampaignDate(app: FastifyInstance, campaignId: string, days: number): void {
+  if (days <= 0) return;
+  const campaign = getCampaign(campaignId);
+  if (!campaign) return;
+  const worldDate = shiftGolarionDate(
+    { year: campaign.world_year, month: campaign.world_month, day: campaign.world_day },
+    days
+  );
+  db.prepare(
+    "UPDATE campaigns SET world_year = ?, world_month = ?, world_day = ?, updated_at = ? WHERE id = ?"
+  ).run(worldDate.year, worldDate.month, worldDate.day, now(), campaignId);
+  const updated = getCampaign(campaignId);
+  if (updated) broadcastCampaignSummary(app, updated);
 }
 
 export function syncCharacterDraft(
@@ -518,7 +536,10 @@ export async function registerCharacterRoutes(app: FastifyInstance): Promise<voi
         "UPDATE characters SET data = ?, summary = ?, updated_at = ?, revision = revision + 1 WHERE id = ?"
       ).run(JSON.stringify(draft), JSON.stringify(summary), now(), character.id);
       syncCharacterDraft(app, character, draft, summary);
-      if (character.campaign_id) touchCampaign(character.campaign_id);
+      if (character.campaign_id) {
+        touchCampaign(character.campaign_id);
+        advanceCampaignDate(app, character.campaign_id, 1);
+      }
       const activity = result.activity;
       logAudit({
         action: "character.downtime_activity",
@@ -573,7 +594,10 @@ export async function registerCharacterRoutes(app: FastifyInstance): Promise<voi
       "UPDATE characters SET data = ?, summary = ?, updated_at = ?, revision = revision + 1 WHERE id = ?"
     ).run(JSON.stringify(draft), JSON.stringify(summary), now(), character.id);
     syncCharacterDraft(app, character, draft, summary);
-    if (character.campaign_id) touchCampaign(character.campaign_id);
+    if (character.campaign_id) {
+      touchCampaign(character.campaign_id);
+      advanceCampaignDate(app, character.campaign_id, days);
+    }
     logAudit({
       action: "character.downtime_spend",
       actor: request.user,

@@ -599,9 +599,13 @@ test("GM plans a journey and advances a travel day", async ({ page }) => {
   await expect(
     page.locator(".travel-player-grid").getByText("Scout", { exact: true })
   ).toBeVisible();
-  await expect(
-    page.locator(".travel-page").getByText("2 Abadius, 4726 AR", { exact: true })
-  ).toBeVisible();
+  const travelDateBefore = await page
+    .locator(".travel-page")
+    .getByText(/Abadius, 4726 AR/)
+    .first()
+    .innerText();
+  const travelDayBefore = Number(travelDateBefore.split(" ")[0]);
+  expect(travelDayBefore).toBeGreaterThan(0);
 
   await page.getByLabel("Waypoint name").fill("E2E Broken Bridge");
   await page.getByLabel("Miles from origin").fill("10");
@@ -622,7 +626,9 @@ test("GM plans a journey and advances a travel day", async ({ page }) => {
   await expect(page.locator(".travel-map-card").getByText("E2E Broken Bridge")).toBeVisible();
   await expect(page.locator(".travel-map-card").getByText("Reached")).toBeVisible();
   await expect(
-    page.locator(".travel-page").getByText("3 Abadius, 4726 AR", { exact: true })
+    page
+      .locator(".travel-page")
+      .getByText(`${travelDayBefore + 1} Abadius, 4726 AR`, { exact: true })
   ).toBeVisible();
 
   page.once("dialog", (dialog) => dialog.accept());
@@ -954,7 +960,9 @@ test("player registers, joins with the invite code, and sees a player-safe table
   await signIn(adminPage, admin);
   await adminPage.goto(`${campaignPath}?tab=settings`);
   await expect(adminPage.getByRole("heading", { name: "Members" })).toBeVisible();
-  await expect(adminPage.getByText(player.displayName)).toBeVisible();
+  await expect(
+    adminPage.locator(".member-list").getByText(player.displayName).first()
+  ).toBeVisible();
 
   // The in-world date must reach a player who is already looking at Overview.
   await page.goto(`${campaignPath}?tab=overview`);

@@ -157,16 +157,21 @@ export async function registerLootRoutes(app: FastifyInstance): Promise<void> {
       };
     });
     const party = partyDefaults(characters.map((character) => character.level));
+    // Only compare the current level's parcels with the current level's item
+    // bands; older levels would otherwise inflate the mix.
+    const currentLevelParcels = stored.filter((parcel) => parcel.level === party.partyLevel);
     const mix = treasureItemMix(
       party.partyLevel,
-      stored.flatMap((parcel) => parcel.items),
+      currentLevelParcels.flatMap((parcel) => parcel.items),
       factsById,
-      priceCpById
+      priceCpById,
+      party.partySize
     );
     const byLevel = [...new Set(parcels.map((parcel) => parcel.level))]
       .sort((a, b) => a - b)
       .map((level) => {
         const atLevel = parcels.filter((parcel) => parcel.level === level);
+        const atLevelStored = stored.filter((parcel) => parcel.level === level);
         return {
           level,
           parcelCount: atLevel.length,
@@ -176,14 +181,21 @@ export async function registerLootRoutes(app: FastifyInstance): Promise<void> {
           distributedCp: atLevel
             .filter((parcel) => parcel.status === "distributed")
             .reduce((sum, parcel) => sum + parcel.valueCp, 0),
-          budgetGp: treasureBudgetGp(level).totalGp,
+          mix: treasureItemMix(
+            level,
+            atLevelStored.flatMap((parcel) => parcel.items),
+            factsById,
+            priceCpById,
+            party.partySize
+          ),
+          budgetGp: treasureBudgetGp(level, party.partySize).totalGp,
         };
       });
     return reply.send({
       audit: {
         partyLevel: party.partyLevel,
         partySize: party.partySize,
-        budget: treasureBudgetGp(party.partyLevel),
+        budget: treasureBudgetGp(party.partyLevel, party.partySize),
         preparedCp,
         distributedCp,
         mix,

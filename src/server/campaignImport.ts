@@ -12,7 +12,7 @@ import {
 } from "../shared/content";
 import { normalizeCampaignThreads } from "../shared/dashboard";
 import { normalizeGolarionDate } from "../shared/calendar";
-import { normalizeAdvancementSpeed } from "../shared/xp";
+import { normalizeAdvancementSpeed, normalizeXpAwardKind } from "../shared/xp";
 import {
   normalizeTravelActivities,
   normalizeTravelEncounterChecks,
@@ -104,6 +104,7 @@ export interface CampaignImportStats {
   chapters: number;
   sessions: number;
   audioTracks: number;
+  xpAwards: number;
   embeddedAssets: number;
 }
 
@@ -217,6 +218,7 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
     chapters: 0,
     sessions: 0,
     audioTracks: 0,
+    xpAwards: 0,
     embeddedAssets: 0,
   };
 
@@ -487,7 +489,9 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
       const oldCharacter = text(token.characterId, "", 120);
       const characterId = oldCharacter ? (characterMap.get(oldCharacter) ?? null) : null;
       const oldOwner = text(token.ownerId, "", 120);
-      const ownerId = oldOwner && memberIds.has(oldOwner) ? oldOwner : null;
+      const ownerId = oldOwner
+        ? (memberUserByExportId.get(oldOwner) ?? (memberIds.has(oldOwner) ? oldOwner : null))
+        : null;
       const tokenId = newId("tok");
       db.prepare(
         `INSERT INTO tokens
@@ -548,7 +552,10 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
               name: text(entry.name, "Combatant", 80),
               initiative: numberValue(entry.initiative, 0, -100, 1000),
               color: text(entry.color, "#c8a96b", 30),
-              ownerId: oldOwner && memberIds.has(oldOwner) ? oldOwner : null,
+              ownerId: oldOwner
+                ? (memberUserByExportId.get(oldOwner) ??
+                  (memberIds.has(oldOwner) ? oldOwner : null))
+                : null,
               sceneId: oldScene ? (sceneMap.get(oldScene) ?? null) : null,
               groupId: oldGroup ? (groupMap.get(oldGroup) ?? null) : null,
             };
@@ -575,7 +582,9 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
         newId("msg"),
         campaignId,
         oldScene ? (sceneMap.get(oldScene) ?? null) : null,
-        oldUser && memberIds.has(oldUser) ? oldUser : null,
+        oldUser
+          ? (memberUserByExportId.get(oldUser) ?? (memberIds.has(oldUser) ? oldUser : null))
+          : null,
         text(message.authorName, "Imported user", 80),
         text(message.type, "chat", 20),
         longText(message.content, "", 5000),
@@ -602,7 +611,12 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
         normalizeQuestStatus(entry.questStatus),
         normalizeQuestXp(entry.questXp),
         entry.questRewardedAt ? timestamp(entry.questRewardedAt, ts) : null,
-        userId,
+        (() => {
+          const oldAuthor = text(entry.createdBy, "", 120);
+          return oldAuthor
+            ? (memberUserByExportId.get(oldAuthor) ?? (memberIds.has(oldAuthor) ? oldAuthor : null))
+            : userId;
+        })(),
         timestamp(entry.createdAt, ts),
         timestamp(entry.updatedAt, ts)
       );
@@ -980,6 +994,24 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
         ).run(sessionId, localUserId, checkin.status, ts);
       }
       stats.sessions += 1;
+    }
+
+    for (const award of records(payload.xpAwards, 50_000, "XP awards")) {
+      db.prepare(
+        `INSERT INTO xp_awards
+           (id, campaign_id, actor_id, kind, amount, reason, recipient_count, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+      ).run(
+        newId("xpa"),
+        campaignId,
+        userId,
+        normalizeXpAwardKind(award.kind),
+        numberValue(award.amount, 0, 0, 1_000_000),
+        longText(award.reason, "", 2_000),
+        numberValue(award.recipientCount, 0, 0, 1_000),
+        timestamp(award.createdAt, ts)
+      );
+      stats.xpAwards += 1;
     }
 
     return { campaignId, stats };
