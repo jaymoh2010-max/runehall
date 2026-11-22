@@ -8,6 +8,7 @@ import type {
   CampaignNpc,
   CampaignSession,
   CampaignSummary,
+  CampaignTravel,
   CharacterRecord,
   ChatMessage,
   Encounter,
@@ -58,6 +59,7 @@ import {
   type CampaignNpcRow,
   type CampaignRow,
   type CampaignSessionRow,
+  type CampaignTravelRow,
   type CharacterRow,
   type EncounterCombatantRow,
   type EncounterRow,
@@ -77,6 +79,16 @@ import { bumpCampaign } from "./revisions";
 import { normalizeTokenConditions } from "../shared/tokens";
 import { normalizeAoeTemplates } from "../shared/templates";
 import { normalizeGolarionDate } from "../shared/calendar";
+import {
+  normalizeTravelActivities,
+  normalizeTravelMiles,
+  normalizeTravelTerrain,
+  normalizeTravelWatches,
+  normalizeTravelWeather,
+  normalizeTravelSpeed,
+  travelMilesPerDay,
+  travelStatus,
+} from "../shared/travel";
 
 export function serializeCampaignSummary(
   campaign: CampaignRow,
@@ -108,6 +120,33 @@ export function serializeCampaignSummary(
     createdAt: campaign.created_at,
     updatedAt: campaign.updated_at,
     lastPlayedAt: campaign.last_played_at,
+  };
+}
+
+export function serializeCampaignTravel(
+  row: CampaignTravelRow,
+  characterIds: Set<string>
+): CampaignTravel {
+  const distanceMiles = normalizeTravelMiles(row.distance_miles);
+  const progressMiles = Math.min(distanceMiles, normalizeTravelMiles(row.progress_miles));
+  const partySpeed = normalizeTravelSpeed(row.party_speed);
+  const terrain = normalizeTravelTerrain(row.terrain);
+  return {
+    campaignId: row.campaign_id,
+    origin: row.origin,
+    destination: row.destination,
+    terrain,
+    distanceMiles,
+    progressMiles,
+    partySpeed,
+    weather: normalizeTravelWeather(row.weather),
+    notes: row.notes,
+    watches: normalizeTravelWatches(parseJson(row.watches, {}), characterIds),
+    activities: normalizeTravelActivities(parseJson(row.activities, {}), characterIds),
+    daysTravelled: Math.max(0, Math.round(row.days_travelled)),
+    dailyMiles: travelMilesPerDay(partySpeed, terrain),
+    status: travelStatus(distanceMiles, progressMiles),
+    updatedAt: row.updated_at,
   };
 }
 

@@ -132,6 +132,7 @@ describe("migrations", () => {
         "xp_awards",
         "campaign_turn_marks",
         "campaign_shop_stock",
+        "campaign_travel",
       ])
     );
 

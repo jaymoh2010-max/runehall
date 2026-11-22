@@ -491,6 +491,48 @@ test("character sheet shop buys and sells common gear", async ({ page }) => {
   });
 });
 
+test("GM plans a journey and advances a travel day", async ({ page }) => {
+  await signIn(page, admin);
+  await page.goto(campaignPath);
+  await page
+    .locator(".campaign-tabs")
+    .getByRole("button", { name: /^Travel/ })
+    .click();
+  await expect(page.getByRole("heading", { name: "Travel & watches" })).toBeVisible();
+
+  await page.getByLabel("Origin").fill("E2E Start");
+  await page.getByLabel("Destination").fill("E2E End");
+  await page.getByLabel("Distance (miles)").fill("20");
+  await page.getByLabel("Party speed").fill("25");
+  await page.getByRole("checkbox", { name: "E2E Hero First watch" }).check();
+  await page.getByRole("combobox", { name: "E2E Hero exploration activity" }).selectOption("scout");
+  await page.getByRole("button", { name: "Save journey" }).click();
+  await expect(page.getByText("Journey saved.")).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText(/0 of 20 miles/)).toBeVisible();
+  await expect(
+    page.locator(".travel-player-grid").getByText("E2E Hero", { exact: true }).first()
+  ).toBeVisible();
+  await expect(
+    page.locator(".travel-player-grid").getByText("Scout", { exact: true })
+  ).toBeVisible();
+  await expect(
+    page.locator(".travel-page").getByText("2 Abadius, 4726 AR", { exact: true })
+  ).toBeVisible();
+
+  await page.getByRole("button", { name: "Advance day" }).click();
+  await expect(page.getByText(/The party arrives after 1 day/)).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText(/20 of 20 miles/)).toBeVisible();
+  await expect(page.getByText("Arrived", { exact: true })).toBeVisible();
+  await expect(
+    page.locator(".travel-page").getByText("3 Abadius, 4726 AR", { exact: true })
+  ).toBeVisible();
+
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.getByRole("button", { name: "Clear journey" }).click();
+  await expect(page.getByText("Journey cleared.")).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole("heading", { name: "Plan a journey" })).toBeVisible();
+});
+
 test("GM schedules from Sessions and overdue sessions stay current", async ({ page }) => {
   await signIn(page, admin);
   await page.goto(`${campaignPath}?tab=sessions`);

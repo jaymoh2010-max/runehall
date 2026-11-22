@@ -14,6 +14,14 @@ import { normalizeCampaignThreads } from "../shared/dashboard";
 import { normalizeGolarionDate } from "../shared/calendar";
 import { normalizeAdvancementSpeed } from "../shared/xp";
 import {
+  normalizeTravelActivities,
+  normalizeTravelMiles,
+  normalizeTravelSpeed,
+  normalizeTravelTerrain,
+  normalizeTravelWatches,
+  normalizeTravelWeather,
+} from "../shared/travel";
+import {
   MAX_SHOP_STOCK_ROWS,
   normalizeSettlementLevel,
   normalizeShopStockMode,
@@ -84,6 +92,7 @@ export interface CampaignImportStats {
   encounters: number;
   loot: number;
   shopStock: number;
+  travel: number;
   npcs: number;
   sessions: number;
   audioTracks: number;
@@ -167,6 +176,7 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
     encounters: 0,
     loot: 0,
     shopStock: 0,
+    travel: 0,
     npcs: 0,
     sessions: 0,
     audioTracks: 0,
@@ -582,6 +592,48 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
            updated_at = excluded.updated_at`
       ).run(campaignId, itemId, quantity, ts, ts);
       stats.shopStock += 1;
+    }
+
+    const importedTravel = record(payload.travel);
+    if (Object.keys(importedTravel).length) {
+      const newCharacterIds = new Set(characterMap.values());
+      const oldWatches = record(importedTravel.watches);
+      const remappedWatches: Record<string, string[]> = {};
+      for (const key of ["first", "second", "third", "fourth"]) {
+        const raw = Array.isArray(oldWatches[key]) ? oldWatches[key] : [];
+        remappedWatches[key] = raw
+          .map((value) => (typeof value === "string" ? characterMap.get(value) : undefined))
+          .filter((value): value is string => Boolean(value));
+      }
+      const oldActivities = record(importedTravel.activities);
+      const remappedActivities: Record<string, string> = {};
+      for (const [oldId, activity] of Object.entries(oldActivities)) {
+        const newId = characterMap.get(oldId);
+        if (newId && typeof activity === "string") remappedActivities[newId] = activity;
+      }
+      const distanceMiles = normalizeTravelMiles(importedTravel.distanceMiles);
+      db.prepare(
+        `INSERT INTO campaign_travel
+           (campaign_id, origin, destination, terrain, distance_miles, progress_miles, party_speed,
+            weather, notes, watches, activities, days_travelled, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).run(
+        campaignId,
+        text(importedTravel.origin, "", 120),
+        text(importedTravel.destination, "", 120),
+        normalizeTravelTerrain(importedTravel.terrain),
+        distanceMiles,
+        Math.min(distanceMiles, normalizeTravelMiles(importedTravel.progressMiles)),
+        normalizeTravelSpeed(importedTravel.partySpeed),
+        normalizeTravelWeather(importedTravel.weather),
+        longText(importedTravel.notes, "", 4000),
+        JSON.stringify(normalizeTravelWatches(remappedWatches, newCharacterIds)),
+        JSON.stringify(normalizeTravelActivities(remappedActivities, newCharacterIds)),
+        numberValue(importedTravel.daysTravelled, 0, 0, 100_000),
+        ts,
+        ts
+      );
+      stats.travel += 1;
     }
 
     const dashboard = record(payload.dashboard);

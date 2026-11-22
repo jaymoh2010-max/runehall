@@ -7,6 +7,7 @@ import {
   CalendarDays,
   Check,
   Coins,
+  Compass,
   Copy,
   Crown,
   DoorOpen,
@@ -71,6 +72,7 @@ import {
 import { startingWealthCp } from "../../shared/rules";
 import { api, copyText, formatCp, formatDate, uploadImage } from "../api";
 import { connectSocket, joinCampaign } from "../socket";
+import { TravelTab } from "../components/campaign/TravelTab";
 import { errorMessage } from "../stores";
 import { useSession, useToasts } from "../stores";
 import {
@@ -122,6 +124,7 @@ type Tab =
   | "table"
   | "overview"
   | "party"
+  | "travel"
   | "sessions"
   | "encounters"
   | "loot"
@@ -142,6 +145,7 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode; gmOnly?: boolean }[
   { id: "table", label: "Table", icon: <LayoutGrid size={15} /> },
   { id: "overview", label: "Overview", icon: <CalendarDays size={15} /> },
   { id: "party", label: "Party", icon: <Users size={15} /> },
+  { id: "travel", label: "Travel", icon: <Compass size={15} /> },
   { id: "sessions", label: "Sessions", icon: <CalendarClock size={15} /> },
   { id: "encounters", label: "Encounters", icon: <Skull size={15} />, gmOnly: true },
   { id: "loot", label: "Loot", icon: <Coins size={15} />, gmOnly: true },
@@ -163,6 +167,7 @@ export function CampaignPage() {
   const requestedTab: Tab =
     rawTab === "overview" ||
     rawTab === "party" ||
+    rawTab === "travel" ||
     rawTab === "sessions" ||
     rawTab === "encounters" ||
     rawTab === "loot" ||
@@ -1368,6 +1373,17 @@ export function CampaignPage() {
               setSelectedJournalId(entry.id);
             }}
             onInvite={() => setInviteOpen(true)}
+            toast={toast}
+          />
+        ) : null}
+
+        {tab === "travel" ? (
+          <TravelTab
+            campaignId={campaign.id}
+            isGm={isGm}
+            characters={characters}
+            worldDate={campaign.worldDate}
+            refreshKey={campaign.updatedAt}
             toast={toast}
           />
         ) : null}

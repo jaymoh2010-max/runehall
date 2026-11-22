@@ -2335,6 +2335,85 @@ async function runCampaignA(gm: Account, players: Account[]): Promise<void> {
           assertEqual(formatGolarionDate(leap), "29 Calistril, 4728 AR", "Calendar leap label");
         }
       );
+
+      await check(
+        campaignLabel,
+        "travel planner advances the calendar and keeps watches",
+        async () => {
+          const start = await getTable(campaignId, gm.cookie);
+          const startDate = (start.campaign as Json).worldDate as Json;
+          const initial = await api(`/api/campaigns/${campaignId}/travel`, {
+            cookie: players[0].cookie,
+          });
+          assert(initial.payload.travel === null, "New travel plan was not empty");
+          assert(initial.payload.suggestedSpeed >= 5, "Travel speed suggestion missing");
+          const playerEdit = await api(`/api/campaigns/${campaignId}/travel`, {
+            method: "PUT",
+            cookie: players[0].cookie,
+            body: { origin: "Nowhere", destination: "Elsewhere", distanceMiles: 1 },
+            expect: null,
+          });
+          assertEqual(playerEdit.status, 403, "Player travel edit");
+          const plan = await api(`/api/campaigns/${campaignId}/travel`, {
+            method: "PUT",
+            cookie: gm.cookie,
+            body: {
+              origin: "Ashen Ford",
+              destination: "The Obsidian Keep",
+              terrain: "normal",
+              distanceMiles: 40,
+              partySpeed: 20,
+              weather: "rain",
+              notes: "The old road is washed out.",
+              watches: { first: [heroes[0].id] },
+              activities: { [heroes[0].id]: "scout" },
+            },
+          });
+          assertEqual(plan.payload.travel.dailyMiles, 16, "Travel daily miles");
+          assertEqual(plan.payload.travel.status, "traveling", "Travel status");
+          assertEqual(
+            plan.payload.travel.watches.first[0],
+            heroes[0].id,
+            "Travel watch assignment"
+          );
+          assertEqual(
+            plan.payload.travel.activities[heroes[0].id],
+            "scout",
+            "Travel exploration activity"
+          );
+          const dayOne = await api(`/api/campaigns/${campaignId}/travel/advance`, {
+            method: "POST",
+            cookie: gm.cookie,
+            body: {},
+          });
+          assertEqual(dayOne.payload.travel.progressMiles, 16, "First travel day");
+          assertEqual(dayOne.payload.travel.daysTravelled, 1, "Travel day count");
+          assertEqual(
+            formatGolarionDate(dayOne.payload.worldDate),
+            formatGolarionDate(shiftGolarionDate(startDate, 1)),
+            "Travel calendar advance"
+          );
+          await api(`/api/campaigns/${campaignId}/travel/advance`, {
+            method: "POST",
+            cookie: gm.cookie,
+            body: {},
+          });
+          const arrived = await api(`/api/campaigns/${campaignId}/travel/advance`, {
+            method: "POST",
+            cookie: gm.cookie,
+            body: {},
+          });
+          assertEqual(arrived.payload.travel.status, "complete", "Travel completion");
+          assertEqual(arrived.payload.travel.progressMiles, 40, "Travel distance cap");
+          const playerAdvance = await api(`/api/campaigns/${campaignId}/travel/advance`, {
+            method: "POST",
+            cookie: players[0].cookie,
+            body: {},
+            expect: null,
+          });
+          assertEqual(playerAdvance.status, 403, "Player travel advance");
+        }
+      );
     }
 
     if (level === 10) {
@@ -2474,6 +2553,8 @@ async function runCampaignA(gm: Account, players: Account[]): Promise<void> {
         ["POST", `/api/campaigns/${campaignId}/long-rest`, {}],
         ["POST", `/api/campaigns/${campaignId}/downtime`, { days: 1 }],
         ["PUT", `/api/campaigns/${campaignId}/shop/stock`, { mode: "stocked", items: [] }],
+        ["PUT", `/api/campaigns/${campaignId}/travel`, { origin: "No", distanceMiles: 1 }],
+        ["POST", `/api/campaigns/${campaignId}/travel/advance`, {}],
         ["GET", `/api/campaigns/${campaignId}/export`, undefined],
         ["GET", `/api/campaigns/${campaignId}/loot`, undefined],
         ["GET", `/api/campaigns/${campaignId}/npcs`, undefined],
@@ -2518,6 +2599,8 @@ async function runCampaignA(gm: Account, players: Account[]): Promise<void> {
       assertEqual(payload.campaign.shopMode, "stocked", "Export shop mode");
       assertEqual(payload.shopStock.length, 1, "Export shop stock rows");
       assertEqual(payload.shopStock[0].quantity, 3, "Export shop stock quantity");
+      assertEqual(payload.travel.origin, "Ashen Ford", "Export travel origin");
+      assertEqual(payload.travel.status, "complete", "Export travel status");
       assertEqual(payload.characters.length, 4, "Export character count");
       assert(
         payload.characters.every((character: Json) => character.data.level === 20),
@@ -2557,6 +2640,23 @@ async function runCampaignA(gm: Account, players: Account[]): Promise<void> {
         importedShop.payload.shop.stock.find((entry: Json) => entry.itemId === daggerId)?.quantity,
         3,
         "Imported shop stock quantity"
+      );
+      const importedTravel = await api(`/api/campaigns/${importedCampaign.id}/travel`, {
+        cookie: gm.cookie,
+      });
+      const importedHero = (importedTable.characters as Json[]).find(
+        (character) => character.name === heroes[0].name
+      );
+      assertEqual(importedTravel.payload.travel.origin, "Ashen Ford", "Imported travel origin");
+      assertEqual(importedTravel.payload.travel.status, "complete", "Imported travel status");
+      assert(
+        importedHero && importedTravel.payload.travel.watches.first.includes(importedHero.id),
+        "Imported travel watch was not remapped"
+      );
+      assertEqual(
+        importedTravel.payload.travel.activities[importedHero.id],
+        "scout",
+        "Imported travel activity was not remapped"
       );
       metric("campaignA.importedCampaignId", importedCampaign.id);
       await api(`/api/campaigns/${campaignId}/shop/stock`, {

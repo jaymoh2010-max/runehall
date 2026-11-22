@@ -149,6 +149,23 @@ export interface CampaignShopStockRow {
   updated_at: number;
 }
 
+export interface CampaignTravelRow {
+  campaign_id: string;
+  origin: string;
+  destination: string;
+  terrain: string;
+  distance_miles: number;
+  progress_miles: number;
+  party_speed: number;
+  weather: string;
+  notes: string;
+  watches: string;
+  activities: string;
+  days_travelled: number;
+  created_at: number;
+  updated_at: number;
+}
+
 export interface CharacterRow {
   id: string;
   user_id: string;

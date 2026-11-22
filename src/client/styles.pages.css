@@ -8837,3 +8837,128 @@
     flex-wrap: wrap;
   }
 }
+
+/* Travel planner */
+.travel-summary,
+.travel-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+.travel-route {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  color: var(--gold-bright);
+}
+.travel-place {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.travel-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+.travel-stats > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 9px 10px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--panel-2);
+}
+.travel-stats span {
+  font-size: 0.76rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.travel-form-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.travel-watch-editor,
+.travel-activity-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.travel-table-wrap {
+  overflow-x: auto;
+}
+.travel-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+.travel-table th,
+.travel-table td {
+  padding: 7px 9px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+}
+.travel-table th:not(:first-child),
+.travel-table td:not(:first-child) {
+  text-align: center;
+  width: 120px;
+}
+.travel-table th {
+  color: var(--muted);
+  font-size: 0.76rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.travel-activity-row {
+  display: grid;
+  grid-template-columns: minmax(140px, 1fr) minmax(180px, 1.3fr);
+  gap: 10px;
+  align-items: center;
+}
+.travel-player-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+.travel-watch-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 7px;
+  border-bottom: 1px solid var(--line);
+}
+.travel-watch-row:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+.travel-watch-row span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+}
+.travel-actions {
+  flex-wrap: wrap;
+}
+@media (max-width: 900px) {
+  .travel-form-grid,
+  .travel-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 640px) {
+  .travel-form-grid,
+  .travel-stats,
+  .travel-player-grid {
+    grid-template-columns: 1fr;
+  }
+  .travel-activity-row {
+    grid-template-columns: 1fr;
+  }
+}

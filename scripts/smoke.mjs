@@ -2163,6 +2163,70 @@ async function main() {
   if (playerCalendar.status !== 403) throw new Error("Player advanced the in-world calendar");
   log("the GM controls the in-world calendar");
 
+  const initialTravel = await api(`/api/campaigns/${campaign.id}/travel`, {
+    cookie: playerCookie,
+  });
+  if (initialTravel.payload.travel !== null || initialTravel.payload.suggestedSpeed < 5) {
+    throw new Error("A new campaign did not start without a travel plan");
+  }
+  const playerTravelEdit = await fetch(`${base}/api/campaigns/${campaign.id}/travel`, {
+    method: "PUT",
+    headers: { "content-type": "application/json", cookie: playerCookie },
+    body: JSON.stringify({ origin: "Nowhere", destination: "Elsewhere", distanceMiles: 1 }),
+  });
+  if (playerTravelEdit.status !== 403) throw new Error("Player edited the travel plan");
+  const journey = await api(`/api/campaigns/${campaign.id}/travel`, {
+    method: "PUT",
+    cookie: gmCookie,
+    body: {
+      origin: "Smoke Start",
+      destination: "Smoke End",
+      terrain: "difficult",
+      distanceMiles: 24,
+      partySpeed: 30,
+      weather: "rain",
+      notes: "A muddy road.",
+      watches: { first: [character.id] },
+      activities: { [character.id]: "scout" },
+    },
+  });
+  if (
+    journey.payload.travel.dailyMiles !== 12 ||
+    journey.payload.travel.status !== "traveling" ||
+    journey.payload.travel.watches.first[0] !== character.id ||
+    journey.payload.travel.activities[character.id] !== "scout"
+  ) {
+    throw new Error("Travel plan did not calculate progress or keep assignments");
+  }
+  const firstDay = await api(`/api/campaigns/${campaign.id}/travel/advance`, {
+    method: "POST",
+    cookie: gmCookie,
+    body: {},
+  });
+  if (firstDay.payload.travel.progressMiles !== 12 || firstDay.payload.travel.daysTravelled !== 1) {
+    throw new Error("Advancing travel did not add the day's miles");
+  }
+  const arrived = await api(`/api/campaigns/${campaign.id}/travel/advance`, {
+    method: "POST",
+    cookie: gmCookie,
+    body: {},
+  });
+  if (arrived.payload.travel.status !== "complete" || arrived.payload.travel.progressMiles !== 24) {
+    throw new Error("Travel did not complete at the destination");
+  }
+  const playerAdvance = await fetch(`${base}/api/campaigns/${campaign.id}/travel/advance`, {
+    method: "POST",
+    headers: { "content-type": "application/json", cookie: playerCookie },
+    body: "{}",
+  });
+  if (playerAdvance.status !== 403) throw new Error("Player advanced the journey");
+  await api(`/api/campaigns/${campaign.id}/travel`, { method: "DELETE", cookie: gmCookie });
+  const clearedTravel = await api(`/api/campaigns/${campaign.id}/travel`, {
+    cookie: playerCookie,
+  });
+  if (clearedTravel.payload.travel !== null) throw new Error("Travel plan was not cleared");
+  log("the GM plans journeys and advances travel days");
+
   const downtimeGrant = await api(`/api/campaigns/${campaign.id}/downtime`, {
     method: "POST",
     cookie: gmCookie,
