@@ -803,4 +803,24 @@ export const migrations: Migration[] = [
         ON campaign_chapters(campaign_id, sort_order);
     `,
   },
+  {
+    version: 44,
+    name: "campaign_merchants",
+    sql: `
+      CREATE TABLE IF NOT EXISTS campaign_merchants (
+        id TEXT PRIMARY KEY,
+        campaign_id TEXT NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        description TEXT NOT NULL DEFAULT '',
+        mode TEXT NOT NULL DEFAULT 'open',
+        stock TEXT NOT NULL DEFAULT '[]',
+        active INTEGER NOT NULL DEFAULT 0,
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_campaign_merchants_campaign
+        ON campaign_merchants(campaign_id, sort_order);
+    `,
+  },
 ];

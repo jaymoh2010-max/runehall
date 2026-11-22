@@ -474,6 +474,19 @@ export interface CampaignChapterRow {
   updated_at: number;
 }
 
+export interface CampaignMerchantRow {
+  id: string;
+  campaign_id: string;
+  name: string;
+  description: string;
+  mode: string;
+  stock: string;
+  active: number;
+  sort_order: number;
+  created_at: number;
+  updated_at: number;
+}
+
 export interface CampaignDashboardRow {
   campaign_id: string;
   last_session_summary: string;

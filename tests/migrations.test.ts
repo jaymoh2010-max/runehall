@@ -145,6 +145,7 @@ describe("migrations", () => {
         "campaign_player_notes",
         "campaign_knowledge",
         "campaign_chapters",
+        "campaign_merchants",
       ])
     );
 

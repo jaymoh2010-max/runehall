@@ -97,6 +97,7 @@ export interface CampaignImportStats {
   encounters: number;
   loot: number;
   shopStock: number;
+  merchants: number;
   travel: number;
   npcs: number;
   knowledge: number;
@@ -184,6 +185,7 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
     encounters: 0,
     loot: 0,
     shopStock: 0,
+    merchants: 0,
     travel: 0,
     npcs: 0,
     knowledge: 0,
@@ -644,6 +646,40 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
            updated_at = excluded.updated_at`
       ).run(campaignId, itemId, quantity, ts, ts);
       stats.shopStock += 1;
+    }
+
+    const importedMerchants = records(payload.merchants, 50, "merchants");
+    let hasActiveMerchant = false;
+    for (const [index, merchant] of importedMerchants.entries()) {
+      const rawStock = Array.isArray(merchant.stock) ? merchant.stock : [];
+      const stock = new Map<string, number>();
+      for (const raw of rawStock.slice(0, MAX_SHOP_STOCK_ROWS)) {
+        if (!raw || typeof raw !== "object") continue;
+        const entry = raw as Record<string, unknown>;
+        const itemId = text(entry.itemId, "", 200);
+        if (!itemId || !equipment.some((item) => item.id === itemId)) continue;
+        stock.set(itemId, shopStockCount(entry.quantity));
+      }
+      const active = merchant.active === true && !hasActiveMerchant ? 1 : 0;
+      if (active) hasActiveMerchant = true;
+      db.prepare(
+        `INSERT INTO campaign_merchants
+           (id, campaign_id, name, description, mode, stock, active, sort_order,
+            created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).run(
+        newId("merchant"),
+        campaignId,
+        text(merchant.name, `Merchant ${index + 1}`, 120),
+        longText(merchant.description, "", 2_000),
+        normalizeShopStockMode(merchant.mode),
+        JSON.stringify([...stock.entries()].map(([itemId, quantity]) => ({ itemId, quantity }))),
+        active,
+        numberValue(merchant.sortOrder, index),
+        ts,
+        ts
+      );
+      stats.merchants += 1;
     }
 
     const importedTravel = record(payload.travel);

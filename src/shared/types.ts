@@ -1095,6 +1095,16 @@ export interface ShopState {
   mode: ShopStockMode;
   settlementLevel: number;
   stock: ShopStockEntry[];
+  merchantId: string;
+  merchantName: string;
+  merchantDescription: string;
+  merchants: Array<{
+    id: string;
+    name: string;
+    mode: ShopStockMode;
+    active: boolean;
+    stockCount: number;
+  }>;
 }
 
 export type TravelTerrain = "normal" | "difficult" | "greater-difficult";

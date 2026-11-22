@@ -11,6 +11,7 @@ import { contextForDraft, equipment } from "../compendium";
 import {
   db,
   transaction,
+  type CampaignMerchantRow,
   type CampaignRow,
   type CampaignShopStockRow,
   type CharacterRow,
@@ -37,7 +38,7 @@ import {
 } from "../../shared/shop";
 import type { CharacterDraft, ShopState, ShopStockEntry } from "../../shared/types";
 import { logAudit } from "../audit";
-import { now, parseJson, safeString } from "../util";
+import { newId, now, parseJson, safeString, sanitizeUserText } from "../util";
 
 function expectedRevisionFrom(body: Record<string, unknown>): number | null {
   return typeof body.expectedRevision === "number" && Number.isFinite(body.expectedRevision)
@@ -72,8 +73,8 @@ function findItem(itemId: string) {
 
 class StockUnavailableError extends Error {}
 
-function stockEntry(row: CampaignShopStockRow): ShopStockEntry | null {
-  const item = findItem(row.item_id);
+function stockEntryFor(itemId: string, quantity: number, updatedAt: number): ShopStockEntry | null {
+  const item = findItem(itemId);
   if (!item) return null;
   return {
     itemId: item.id,
@@ -83,35 +84,122 @@ function stockEntry(row: CampaignShopStockRow): ShopStockEntry | null {
     bulk: item.bulk,
     rarity: item.rarity,
     type: item.type,
-    quantity: shopStockCount(row.quantity),
-    updatedAt: row.updated_at,
+    quantity: shopStockCount(quantity),
+    updatedAt,
   };
 }
 
-function stockEntries(campaignId: string): ShopStockEntry[] {
-  return (
-    db
-      .prepare("SELECT * FROM campaign_shop_stock WHERE campaign_id = ? ORDER BY item_id ASC")
-      .all(campaignId) as CampaignShopStockRow[]
-  )
-    .map(stockEntry)
+function merchantStockMap(merchant: CampaignMerchantRow): Map<string, number> {
+  const raw = parseJson<unknown>(merchant.stock, []);
+  const map = new Map<string, number>();
+  if (!Array.isArray(raw)) return map;
+  for (const entry of raw.slice(0, MAX_SHOP_STOCK_ROWS)) {
+    if (!entry || typeof entry !== "object") continue;
+    const value = entry as Record<string, unknown>;
+    const itemId = safeString(value.itemId, "", 200);
+    if (!itemId || !findItem(itemId)) continue;
+    map.set(itemId, shopStockCount(value.quantity));
+  }
+  return map;
+}
+
+function saveMerchantStock(merchantId: string, stock: Map<string, number>, ts = now()): void {
+  db.prepare("UPDATE campaign_merchants SET stock = ?, updated_at = ? WHERE id = ?").run(
+    JSON.stringify([...stock.entries()].map(([itemId, quantity]) => ({ itemId, quantity }))),
+    ts,
+    merchantId
+  );
+}
+
+function stockEntriesForMerchant(merchant: CampaignMerchantRow): ShopStockEntry[] {
+  return [...merchantStockMap(merchant).entries()]
+    .map(([itemId, quantity]) => stockEntryFor(itemId, quantity, merchant.updated_at))
     .filter((entry): entry is ShopStockEntry => Boolean(entry))
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
+function merchantsFor(campaignId: string): CampaignMerchantRow[] {
+  return db
+    .prepare(
+      "SELECT * FROM campaign_merchants WHERE campaign_id = ? ORDER BY sort_order ASC, name ASC"
+    )
+    .all(campaignId) as CampaignMerchantRow[];
+}
+
+function nextMerchantSortOrder(campaignId: string): number {
+  const row = db
+    .prepare(
+      "SELECT COALESCE(MAX(sort_order), 0) + 1 AS next FROM campaign_merchants WHERE campaign_id = ?"
+    )
+    .get(campaignId) as { next: number };
+  return row.next;
+}
+
+function legacyStock(campaignId: string): Map<string, number> {
+  const rows = db
+    .prepare("SELECT * FROM campaign_shop_stock WHERE campaign_id = ?")
+    .all(campaignId) as CampaignShopStockRow[];
+  return new Map(rows.map((row) => [row.item_id, shopStockCount(row.quantity)]));
+}
+
+/** Create and activate a default merchant once so older campaigns keep their shop. */
+function ensureActiveMerchant(campaign: CampaignRow): CampaignMerchantRow {
+  const existing = merchantsFor(campaign.id);
+  const active = existing.find((merchant) => Boolean(merchant.active));
+  if (active) return active;
+  if (existing.length) {
+    const first = existing[0];
+    db.prepare("UPDATE campaign_merchants SET active = 1, updated_at = ? WHERE id = ?").run(
+      now(),
+      first.id
+    );
+    return { ...first, active: 1 };
+  }
+  const ts = now();
+  const merchantId = newId("merchant");
+  const stock = legacyStock(campaign.id);
+  db.prepare(
+    `INSERT INTO campaign_merchants
+       (id, campaign_id, name, description, mode, stock, active, sort_order,
+        created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, 1, 1, ?, ?)`
+  ).run(
+    merchantId,
+    campaign.id,
+    "Settlement merchant",
+    "The campaign's default shop.",
+    normalizeShopStockMode(campaign.shop_mode),
+    JSON.stringify([...stock.entries()].map(([itemId, quantity]) => ({ itemId, quantity }))),
+    ts,
+    ts
+  );
+  return db
+    .prepare("SELECT * FROM campaign_merchants WHERE id = ?")
+    .get(merchantId) as CampaignMerchantRow;
+}
+
 function shopStateFor(campaign: CampaignRow): ShopState {
+  const active = ensureActiveMerchant(campaign);
   return {
-    mode: normalizeShopStockMode(campaign.shop_mode),
+    mode: normalizeShopStockMode(active.mode),
     settlementLevel: normalizeSettlementLevel(campaign.settlement_level),
-    stock: stockEntries(campaign.id),
+    stock: stockEntriesForMerchant(active),
+    merchantId: active.id,
+    merchantName: active.name,
+    merchantDescription: active.description,
+    merchants: merchantsFor(campaign.id).map((merchant) => ({
+      id: merchant.id,
+      name: merchant.name,
+      mode: normalizeShopStockMode(merchant.mode),
+      active: Boolean(merchant.active),
+      stockCount: merchantStockMap(merchant).size,
+    })),
   };
 }
 
-function stockQuantity(campaignId: string, itemId: string): number {
-  const row = db
-    .prepare("SELECT quantity FROM campaign_shop_stock WHERE campaign_id = ? AND item_id = ?")
-    .get(campaignId, itemId) as { quantity: number } | undefined;
-  return shopStockCount(row?.quantity);
+function stockQuantity(campaign: CampaignRow, itemId: string): number {
+  const merchant = ensureActiveMerchant(campaign);
+  return merchantStockMap(merchant).get(itemId) ?? 0;
 }
 
 function saveShopDraft(
@@ -146,6 +234,227 @@ export async function registerShopRoutes(app: FastifyInstance): Promise<void> {
     return reply.send({ shop: shopStateFor(campaign) });
   });
 
+  app.get("/api/campaigns/:id/shop/merchants", async (request, reply) => {
+    if (!request.user) return reply.code(401).send({ error: "Sign in to continue." });
+    const { id } = request.params as { id: string };
+    const campaign = getCampaign(id);
+    if (!campaign) return reply.code(404).send({ error: "Campaign not found." });
+    if (!getCampaignRole(id, request.user.id)) {
+      return reply.code(403).send({ error: "You are not a member of this campaign." });
+    }
+    const active = ensureActiveMerchant(campaign);
+    return reply.send({
+      merchants: merchantsFor(id).map((merchant) => ({
+        id: merchant.id,
+        name: merchant.name,
+        description: merchant.description,
+        mode: normalizeShopStockMode(merchant.mode),
+        active: Boolean(merchant.active),
+        stockCount: merchantStockMap(merchant).size,
+      })),
+      activeMerchantId: active.id,
+    });
+  });
+
+  app.post("/api/campaigns/:id/shop/merchants", async (request, reply) => {
+    if (!request.user) return reply.code(401).send({ error: "Sign in to continue." });
+    const { id } = request.params as { id: string };
+    const campaign = getCampaign(id);
+    if (!campaign) return reply.code(404).send({ error: "Campaign not found." });
+    if (getCampaignRole(id, request.user.id) !== "gm") {
+      return reply.code(403).send({ error: "Only the GM can add merchants." });
+    }
+    const body = (request.body ?? {}) as Record<string, unknown>;
+    const name = safeString(body.name, "", 120);
+    if (!name) return reply.code(400).send({ error: "Give the merchant a name." });
+    const mode = body.mode === undefined ? normalizeShopStockMode(campaign.shop_mode) : body.mode;
+    if (!isShopStockMode(mode)) {
+      return reply.code(400).send({ error: "Choose open market or tracked merchant stock." });
+    }
+    const existing = merchantsFor(id);
+    const active = existing.find((merchant) => Boolean(merchant.active));
+    const copyFromId = safeString(body.copyFromMerchantId, "", 120);
+    const copyFrom = copyFromId
+      ? (existing.find((merchant) => merchant.id === copyFromId) ?? null)
+      : null;
+    const stock = copyFrom ? merchantStockMap(copyFrom) : new Map<string, number>();
+    const merchantId = newId("merchant");
+    const ts = now();
+    db.prepare(
+      `INSERT INTO campaign_merchants
+         (id, campaign_id, name, description, mode, stock, active, sort_order,
+          created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(
+      merchantId,
+      id,
+      name,
+      sanitizeUserText(body.description, 2_000),
+      mode,
+      JSON.stringify([...stock.entries()].map(([itemId, quantity]) => ({ itemId, quantity }))),
+      existing.length ? 0 : 1,
+      nextMerchantSortOrder(id),
+      ts,
+      ts
+    );
+    touchCampaign(id);
+    logAudit({
+      action: "campaign.merchant_created",
+      actor: request.user,
+      targetType: "campaign",
+      targetId: id,
+      detail: `Created merchant ${name}${active && !existing.length ? " (active)" : ""}`,
+      request,
+    });
+    const updated = getCampaign(id)!;
+    return reply.code(201).send({ shop: shopStateFor(updated) });
+  });
+
+  app.patch("/api/campaigns/:id/shop/merchants/:merchantId", async (request, reply) => {
+    if (!request.user) return reply.code(401).send({ error: "Sign in to continue." });
+    const { id, merchantId } = request.params as { id: string; merchantId: string };
+    const campaign = getCampaign(id);
+    if (!campaign) return reply.code(404).send({ error: "Campaign not found." });
+    if (getCampaignRole(id, request.user.id) !== "gm") {
+      return reply.code(403).send({ error: "Only the GM can edit merchants." });
+    }
+    const merchant = db
+      .prepare("SELECT * FROM campaign_merchants WHERE id = ? AND campaign_id = ?")
+      .get(merchantId, id) as CampaignMerchantRow | undefined;
+    if (!merchant) return reply.code(404).send({ error: "Merchant not found." });
+    const body = (request.body ?? {}) as Record<string, unknown>;
+    const name =
+      body.name === undefined ? merchant.name : safeString(body.name, merchant.name, 120);
+    if (!name) return reply.code(400).send({ error: "Give the merchant a name." });
+    const mode = body.mode === undefined ? normalizeShopStockMode(merchant.mode) : body.mode;
+    if (!isShopStockMode(mode)) {
+      return reply.code(400).send({ error: "Choose open market or tracked merchant stock." });
+    }
+    db.prepare(
+      `UPDATE campaign_merchants
+       SET name = ?, description = ?, mode = ?, updated_at = ?
+       WHERE id = ?`
+    ).run(
+      name,
+      body.description === undefined
+        ? merchant.description
+        : sanitizeUserText(body.description, 2_000),
+      mode,
+      now(),
+      merchantId
+    );
+    if (Boolean(merchant.active)) {
+      db.prepare("UPDATE campaigns SET shop_mode = ?, updated_at = ? WHERE id = ?").run(
+        mode,
+        now(),
+        id
+      );
+    }
+    touchCampaign(id);
+    const updated = getCampaign(id)!;
+    return reply.send({ shop: shopStateFor(updated) });
+  });
+
+  app.post("/api/campaigns/:id/shop/merchants/:merchantId/activate", async (request, reply) => {
+    if (!request.user) return reply.code(401).send({ error: "Sign in to continue." });
+    const { id, merchantId } = request.params as { id: string; merchantId: string };
+    const campaign = getCampaign(id);
+    if (!campaign) return reply.code(404).send({ error: "Campaign not found." });
+    if (getCampaignRole(id, request.user.id) !== "gm") {
+      return reply.code(403).send({ error: "Only the GM can switch merchants." });
+    }
+    const merchant = db
+      .prepare("SELECT * FROM campaign_merchants WHERE id = ? AND campaign_id = ?")
+      .get(merchantId, id) as CampaignMerchantRow | undefined;
+    if (!merchant) return reply.code(404).send({ error: "Merchant not found." });
+    const ts = now();
+    transaction(() => {
+      db.prepare(
+        "UPDATE campaign_merchants SET active = CASE WHEN id = ? THEN 1 ELSE 0 END, updated_at = ? WHERE campaign_id = ?"
+      ).run(merchantId, ts, id);
+      db.prepare("UPDATE campaigns SET shop_mode = ?, updated_at = ? WHERE id = ?").run(
+        normalizeShopStockMode(merchant.mode),
+        ts,
+        id
+      );
+    });
+    touchCampaign(id);
+    logAudit({
+      action: "campaign.merchant_activated",
+      actor: request.user,
+      targetType: "campaign",
+      targetId: id,
+      detail: `Activated merchant ${merchant.name}`,
+      request,
+    });
+    const updated = getCampaign(id)!;
+    return reply.send({ shop: shopStateFor(updated) });
+  });
+
+  app.delete("/api/campaigns/:id/shop/merchants/:merchantId", async (request, reply) => {
+    if (!request.user) return reply.code(401).send({ error: "Sign in to continue." });
+    const { id, merchantId } = request.params as { id: string; merchantId: string };
+    const campaign = getCampaign(id);
+    if (!campaign) return reply.code(404).send({ error: "Campaign not found." });
+    if (getCampaignRole(id, request.user.id) !== "gm") {
+      return reply.code(403).send({ error: "Only the GM can delete merchants." });
+    }
+    const merchants = merchantsFor(id);
+    const merchant = merchants.find((entry) => entry.id === merchantId);
+    if (!merchant) return reply.code(404).send({ error: "Merchant not found." });
+    if (merchants.length <= 1) {
+      return reply.code(400).send({ error: "Keep at least one merchant in the campaign." });
+    }
+    db.prepare("DELETE FROM campaign_merchants WHERE id = ?").run(merchantId);
+    if (Boolean(merchant.active)) {
+      const replacement = merchants.find((entry) => entry.id !== merchantId)!;
+      db.prepare("UPDATE campaign_merchants SET active = 1, updated_at = ? WHERE id = ?").run(
+        now(),
+        replacement.id
+      );
+    }
+    touchCampaign(id);
+    const updated = getCampaign(id)!;
+    return reply.send({ shop: shopStateFor(updated) });
+  });
+
+  app.post("/api/campaigns/:id/shop/merchants/:merchantId/restock", async (request, reply) => {
+    if (!request.user) return reply.code(401).send({ error: "Sign in to continue." });
+    const { id, merchantId } = request.params as { id: string; merchantId: string };
+    const campaign = getCampaign(id);
+    if (!campaign) return reply.code(404).send({ error: "Campaign not found." });
+    if (getCampaignRole(id, request.user.id) !== "gm") {
+      return reply.code(403).send({ error: "Only the GM can restock merchants." });
+    }
+    const merchant = db
+      .prepare("SELECT * FROM campaign_merchants WHERE id = ? AND campaign_id = ?")
+      .get(merchantId, id) as CampaignMerchantRow | undefined;
+    if (!merchant) return reply.code(404).send({ error: "Merchant not found." });
+    const body = (request.body ?? {}) as Record<string, unknown>;
+    const quantity = shopStockCount(body.quantity ?? 5);
+    const onlySoldOut = body.onlySoldOut === true;
+    const stock = merchantStockMap(merchant);
+    if (!stock.size) {
+      return reply.code(400).send({ error: "Add items to this merchant before restocking." });
+    }
+    for (const [itemId, current] of stock) {
+      if (onlySoldOut && current > 0) continue;
+      stock.set(itemId, quantity);
+    }
+    saveMerchantStock(merchantId, stock);
+    touchCampaign(id);
+    logAudit({
+      action: "campaign.merchant_restock",
+      actor: request.user,
+      targetType: "campaign",
+      targetId: id,
+      detail: `Restocked ${merchant.name}${onlySoldOut ? " sold-out items" : " to " + quantity}`,
+      request,
+    });
+    const updated = getCampaign(id)!;
+    return reply.send({ shop: shopStateFor(updated) });
+  });
+
   app.put("/api/campaigns/:id/shop/stock", async (request, reply) => {
     if (!request.user) return reply.code(401).send({ error: "Sign in to continue." });
     const { id } = request.params as { id: string };
@@ -158,7 +467,8 @@ export async function registerShopRoutes(app: FastifyInstance): Promise<void> {
     if (body.mode !== undefined && !isShopStockMode(body.mode)) {
       return reply.code(400).send({ error: "Choose open market or tracked merchant stock." });
     }
-    const mode = body.mode === undefined ? normalizeShopStockMode(campaign.shop_mode) : body.mode;
+    const merchant = ensureActiveMerchant(campaign);
+    const mode = body.mode === undefined ? normalizeShopStockMode(merchant.mode) : body.mode;
     const items = body.items;
     if (items !== undefined && !Array.isArray(items)) {
       return reply.code(400).send({ error: "Shop stock must be a list of items." });
@@ -193,17 +503,12 @@ export async function registerShopRoutes(app: FastifyInstance): Promise<void> {
         ts,
         id
       );
-      if (rawItems) {
-        db.prepare("DELETE FROM campaign_shop_stock WHERE campaign_id = ?").run(id);
-        const insert = db.prepare(
-          `INSERT INTO campaign_shop_stock
-             (campaign_id, item_id, quantity, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?)`
-        );
-        for (const [itemId, quantity] of stock) {
-          insert.run(id, itemId, quantity, ts, ts);
-        }
-      }
+      db.prepare("UPDATE campaign_merchants SET mode = ?, updated_at = ? WHERE id = ?").run(
+        mode,
+        ts,
+        merchant.id
+      );
+      if (rawItems) saveMerchantStock(merchant.id, stock, ts);
     });
     touchCampaign(id);
     logAudit({
@@ -245,13 +550,14 @@ export async function registerShopRoutes(app: FastifyInstance): Promise<void> {
     const itemId = safeString(body.itemId, "", 200);
     const item = findItem(itemId);
     if (!item) return reply.code(404).send({ error: "That item is not in the compendium." });
-    const mode = normalizeShopStockMode(campaign.shop_mode);
+    const merchant = ensureActiveMerchant(campaign);
+    const mode = normalizeShopStockMode(merchant.mode);
     const settlementLevel = normalizeSettlementLevel(campaign.settlement_level);
     if (mode === "stocked") {
       if (item.price.cpTotal <= 0) {
         return reply.code(400).send({ error: "That item has no purchase price." });
       }
-      const available = stockQuantity(id, item.id);
+      const available = stockQuantity(campaign, item.id);
       if (available < 1) {
         return reply.code(400).send({ error: `${item.name} is out of stock.` });
       }
@@ -289,14 +595,15 @@ export async function registerShopRoutes(app: FastifyInstance): Promise<void> {
         const result = saveShopDraft(character, draft);
         if (!result.moved) return { moved: false as const, summary: result.summary };
         if (mode === "stocked") {
-          const update = db
-            .prepare(
-              `UPDATE campaign_shop_stock
-               SET quantity = quantity - ?, updated_at = ?
-               WHERE campaign_id = ? AND item_id = ? AND quantity >= ?`
-            )
-            .run(quantity, now(), id, item.id, quantity);
-          if (Number(update.changes) === 0) throw new StockUnavailableError();
+          const currentMerchant = db
+            .prepare("SELECT * FROM campaign_merchants WHERE id = ?")
+            .get(merchant.id) as CampaignMerchantRow | undefined;
+          if (!currentMerchant) throw new StockUnavailableError();
+          const currentStock = merchantStockMap(currentMerchant);
+          const available = currentStock.get(item.id) ?? 0;
+          if (available < quantity) throw new StockUnavailableError();
+          currentStock.set(item.id, available - quantity);
+          saveMerchantStock(merchant.id, currentStock);
         }
         return { moved: true as const, summary: result.summary };
       });
@@ -333,7 +640,7 @@ export async function registerShopRoutes(app: FastifyInstance): Promise<void> {
       item: { id: item.id, name: item.name, level: item.level },
       quantity,
       totalCp,
-      stockQuantity: mode === "stocked" ? stockQuantity(id, item.id) : null,
+      stockQuantity: mode === "stocked" ? stockQuantity(campaign, item.id) : null,
     });
   });
 
@@ -396,20 +703,19 @@ export async function registerShopRoutes(app: FastifyInstance): Promise<void> {
       currency: addCurrency(removed.draft.currency, totalCp),
       wealthBudgetCp: null,
     };
-    const mode = normalizeShopStockMode(campaign.shop_mode);
+    const merchant = ensureActiveMerchant(campaign);
+    const mode = normalizeShopStockMode(merchant.mode);
     const saved = transaction(() => {
       const result = saveShopDraft(character, draft);
       if (!result.moved) return { moved: false as const, summary: result.summary };
       if (mode === "stocked") {
-        const ts = now();
-        db.prepare(
-          `INSERT INTO campaign_shop_stock
-             (campaign_id, item_id, quantity, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?)
-           ON CONFLICT(campaign_id, item_id) DO UPDATE SET
-             quantity = MIN(9999, campaign_shop_stock.quantity + excluded.quantity),
-             updated_at = excluded.updated_at`
-        ).run(id, item.id, quantity, ts, ts);
+        const currentMerchant = db
+          .prepare("SELECT * FROM campaign_merchants WHERE id = ?")
+          .get(merchant.id) as CampaignMerchantRow | undefined;
+        if (!currentMerchant) throw new Error("The active merchant disappeared.");
+        const stock = merchantStockMap(currentMerchant);
+        stock.set(item.id, Math.min(9_999, (stock.get(item.id) ?? 0) + quantity));
+        saveMerchantStock(merchant.id, stock);
       }
       return { moved: true as const, summary: result.summary };
     });
@@ -438,7 +744,7 @@ export async function registerShopRoutes(app: FastifyInstance): Promise<void> {
       item: { id: item.id, name: item.name, level: item.level },
       quantity,
       totalCp,
-      stockQuantity: mode === "stocked" ? stockQuantity(id, item.id) : null,
+      stockQuantity: mode === "stocked" ? stockQuantity(campaign, item.id) : null,
     });
   });
 }

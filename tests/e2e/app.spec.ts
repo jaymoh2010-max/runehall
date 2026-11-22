@@ -542,6 +542,22 @@ test("character sheet shop buys and sells common gear", async ({ page }) => {
   await expect(page.getByText("Shop changed to an open market.")).toBeVisible({
     timeout: 15_000,
   });
+
+  page.once("dialog", (dialog) => dialog.accept("5"));
+  await shop.getByRole("button", { name: "Restock", exact: true }).click();
+  await expect(page.getByText(/Restocked .* to 5\./)).toBeVisible({ timeout: 15_000 });
+
+  page.once("dialog", (dialog) => dialog.accept("E2E Traveling Trader"));
+  await shop.getByRole("button", { name: "New merchant", exact: true }).click();
+  await expect(page.getByText(/Merchant “E2E Traveling Trader” added\./)).toBeVisible({
+    timeout: 15_000,
+  });
+  await shop.getByLabel("Active merchant").selectOption({
+    label: "E2E Traveling Trader (open)",
+  });
+  await expect(page.getByText("Now shopping at E2E Traveling Trader.")).toBeVisible({
+    timeout: 15_000,
+  });
 });
 
 test("GM plans a journey and advances a travel day", async ({ page }) => {

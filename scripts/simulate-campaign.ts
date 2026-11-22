@@ -2788,6 +2788,15 @@ async function runCampaignA(gm: Account, players: Account[]): Promise<void> {
         cookie: gm.cookie,
         body: { mode: "stocked", items: [{ itemId: daggerId, quantity: 3 }] },
       });
+      await api(`/api/campaigns/${campaignId}/shop/merchants`, {
+        method: "POST",
+        cookie: gm.cookie,
+        body: {
+          name: "The Ashen Outfitters",
+          description: "A second merchant for the road.",
+          mode: "stocked",
+        },
+      });
       const visibleKnowledge = await api(`/api/campaigns/${campaignId}/knowledge`, {
         method: "POST",
         cookie: gm.cookie,
@@ -2828,6 +2837,7 @@ async function runCampaignA(gm: Account, players: Account[]): Promise<void> {
       assertEqual(payload.format, "runehall-campaign", "Export format");
       assertEqual(payload.campaign.shopMode, "stocked", "Export shop mode");
       assertEqual(payload.shopStock.length, 1, "Export shop stock rows");
+      assertEqual(payload.merchants.length, 2, "Export merchant count");
       assertEqual(payload.shopStock[0].quantity, 3, "Export shop stock quantity");
       assertEqual(payload.travel.origin, "Ashen Ford", "Export travel origin");
       assertEqual(payload.travel.status, "complete", "Export travel status");
@@ -2901,6 +2911,7 @@ async function runCampaignA(gm: Account, players: Account[]): Promise<void> {
         cookie: gm.cookie,
       });
       assertEqual(importedShop.payload.shop.mode, "stocked", "Imported shop state mode");
+      assertEqual(importedShop.payload.shop.merchants.length, 2, "Imported merchant count");
       assertEqual(
         importedShop.payload.shop.stock.find((entry: Json) => entry.itemId === daggerId)?.quantity,
         3,
