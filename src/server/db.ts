@@ -140,6 +140,7 @@ export interface CampaignRow {
   advancement_speed: string;
   settlement_level: number;
   free_archetype: number;
+  automatic_bonus_progression: number;
   shop_mode: string;
   world_year: number;
   world_month: number;

@@ -950,6 +950,8 @@ export function emptyCharacterDraft(name = "New Hero"): CharacterDraft {
       background: [],
       backgroundLore: [],
     },
+    abpSkill: null,
+    abpApex: null,
     feats: {
       ancestry: {},
       class: {},
@@ -1184,6 +1186,8 @@ export function normalizeCharacterDraft(input: unknown, fallbackName = "New Hero
       }),
       levels,
     },
+    abpSkill: SKILLS.some((skill) => skill.id === raw.abpSkill) ? (raw.abpSkill as SkillId) : null,
+    abpApex: ABILITIES.includes(raw.abpApex as AbilityKey) ? (raw.abpApex as AbilityKey) : null,
     skills: {
       trained: arr<string>(skills.trained).filter((x) => typeof x === "string"),
       increases,
@@ -1487,6 +1491,44 @@ export interface FeatSlot {
   level: number;
   /** Free Archetype slots use the separate even-level bucket. */
   freeArchetype?: boolean;
+}
+
+export interface AutomaticBonusProgression {
+  /** Item bonus to weapon and unarmed attack rolls. */
+  attack: number;
+  /** Minimum weapon damage dice. */
+  damageDice: number;
+  /** Item bonus to AC. */
+  defense: number;
+  /** Item bonus to all saving throws. */
+  saves: number;
+  /** Item bonus to Perception. */
+  perception: number;
+  /** Item bonus to the skill chosen for ABP potency. */
+  skill: number;
+}
+
+/**
+ * PF2e Automatic Bonus Progression (GM Core). Fundamental rune bonuses are
+ * replaced by level-based potency; property runes still apply normally.
+ */
+export function automaticBonusProgression(level: number): AutomaticBonusProgression {
+  const lvl = Math.max(1, Math.min(20, Math.round(level)));
+  return {
+    attack: lvl >= 16 ? 3 : lvl >= 10 ? 2 : lvl >= 2 ? 1 : 0,
+    damageDice: lvl >= 19 ? 4 : lvl >= 12 ? 3 : lvl >= 4 ? 2 : 1,
+    defense: lvl >= 15 ? 3 : lvl >= 9 ? 2 : lvl >= 3 ? 1 : 0,
+    saves: lvl >= 17 ? 3 : lvl >= 14 ? 2 : lvl >= 8 ? 1 : 0,
+    perception: lvl >= 18 ? 3 : lvl >= 11 ? 2 : lvl >= 5 ? 1 : 0,
+    skill: lvl >= 18 ? 3 : lvl >= 11 ? 2 : lvl >= 5 ? 1 : 0,
+  };
+}
+
+function bumpDamageDice(formula: string, minimumDice: number): string {
+  const match = formula.match(/^(\d+)d(\d+)/);
+  if (!match) return formula;
+  const dice = Math.max(Number(match[1]), minimumDice);
+  return `${dice}d${match[2]}${formula.slice(match[0].length)}`;
 }
 
 export function featSlotsFor(
@@ -2434,6 +2476,14 @@ export function computeCharacter(
   const background = context.background ?? null;
   const classGrants = selectedClassGrants(draft, classData, context.deity);
   const abilities = baseAbilityScores(draft, context);
+  if (
+    context.automaticBonusProgression &&
+    draft.level >= 17 &&
+    draft.abpApex &&
+    ABILITIES.includes(draft.abpApex)
+  ) {
+    abilities[draft.abpApex] += 2;
+  }
   // Validate the 1st-level allocation independently of later milestones.
   const rawAbilities = baseAbilityScores({ ...draft, level: 1 }, context, false);
   const abilityMods = Object.fromEntries(
@@ -2512,6 +2562,9 @@ export function computeCharacter(
       ? [...draft.play.conditions, { name: "Encumbered", value: null, duration: null }]
       : draft.play.conditions;
   const conditionEffects = conditionModifiers(effectiveConditions, { level: draft.level });
+  const abp = context.automaticBonusProgression
+    ? automaticBonusProgression(draft.level)
+    : { attack: 0, damageDice: 1, defense: 0, saves: 0, perception: 0, skill: 0 };
   const validation: ValidationIssue[] = [];
   const issue = (severity: Severity, message: string, step?: string) =>
     validation.push({ severity, message, step });
@@ -2781,7 +2834,10 @@ export function computeCharacter(
       proficiency +
       abilityMods[skill.ability] +
       (skill.armorPenalty ? armorCheckPenalty : 0) +
-      (itemMods.skillItemBonus?.[skill.id] ?? 0) +
+      Math.max(
+        itemMods.skillItemBonus?.[skill.id] ?? 0,
+        draft.abpSkill === skill.id ? abp.skill : 0
+      ) +
       conditionEffects.checks[skill.ability];
     return {
       id: skill.id,
@@ -2914,7 +2970,7 @@ export function computeCharacter(
       10 +
       dex +
       armor.armor.acBonus +
-      armorRunes.armorPotency +
+      Math.max(armorRunes.armorPotency, abp.defense) +
       proficiencyBonus(prof.defenses[armorCategory] ?? 0, draft.level) +
       shieldBonus +
       (itemMods.acItemBonus ?? 0);
@@ -2923,9 +2979,9 @@ export function computeCharacter(
     ac =
       10 +
       abilityMods.dex +
+      Math.max(abp.defense, itemMods.acItemBonus ?? 0) +
       proficiencyBonus(prof.defenses.unarmored ?? 0, draft.level) +
-      shieldBonus +
-      (itemMods.acItemBonus ?? 0);
+      shieldBonus;
   }
   if (shield?.shield?.speedPenalty) speed += shield.shield.speedPenalty;
   speed = Math.max(5, speed + conditionEffects.speed);
@@ -2935,26 +2991,26 @@ export function computeCharacter(
     fortitude:
       proficiencyBonus(prof.fortitude, draft.level) +
       abilityMods.con +
-      armorRunes.resilient +
+      Math.max(armorRunes.resilient, abp.saves) +
       (itemMods.saveItemBonus?.fortitude ?? 0) +
       conditionEffects.saves.fortitude,
     reflex:
       proficiencyBonus(prof.reflex, draft.level) +
       abilityMods.dex +
-      armorRunes.resilient +
+      Math.max(armorRunes.resilient, abp.saves) +
       (itemMods.saveItemBonus?.reflex ?? 0) +
       conditionEffects.saves.reflex,
     will:
       proficiencyBonus(prof.will, draft.level) +
       abilityMods.wis +
-      armorRunes.resilient +
+      Math.max(armorRunes.resilient, abp.saves) +
       (itemMods.saveItemBonus?.will ?? 0) +
       conditionEffects.saves.will,
   };
   const perception =
     proficiencyBonus(prof.perception, draft.level) +
     abilityMods.wis +
-    (itemMods.perceptionItemBonus ?? 0) +
+    Math.max(itemMods.perceptionItemBonus ?? 0, abp.perception) +
     conditionEffects.perception;
   const initiative = perception + (featMods.initiativeBonus ?? 0);
   const classDc = classData
@@ -3064,14 +3120,14 @@ export function computeCharacter(
       attackAbilityKey = abilityMods.dex > abilityMods.str ? "dex" : "str";
       damageAbility = thief ? Math.max(abilityMods.str, abilityMods.dex) : abilityMods.str;
     }
+    const attackPotency = Math.max(weapon.bonus || 0, runes.weaponPotency, abp.attack);
     const attackBonus =
       proficiencyBonus(rank, draft.level) +
       attackAbility +
-      (weapon.bonus || 0) +
-      runes.weaponPotency +
+      attackPotency +
       conditionEffects.checks[attackAbilityKey] +
       conditionEffects.attackCircumstance;
-    const damageDice = Math.max(weapon.damage.dice, runes.strikingDice);
+    const damageDice = Math.max(weapon.damage.dice, runes.strikingDice, abp.damageDice);
     const damageBase = `${damageDice}${weapon.damage.die}`;
     // Alchemical bombs have an item bonus to attack rolls but not to damage.
     const weaponDamageBonus = isBomb(item) ? 0 : weapon.bonus || 0;
@@ -3086,8 +3142,8 @@ export function computeCharacter(
       isThrown ? "Thrown" : ranged ? "Ranged" : "",
       finesse ? "Finesse" : "",
       item.traits.includes("propulsive") ? "Propulsive" : "",
-      runes.weaponPotency ? `+${runes.weaponPotency} potency` : "",
-      runes.strikingDice > 1 ? `${runes.strikingDice} damage dice` : "",
+      attackPotency ? `+${attackPotency} attack potency` : "",
+      damageDice > 1 ? `${damageDice} damage dice` : "",
       ...runes.property.map((rune) => rune.name),
     ].filter(Boolean);
     attacks.push({
@@ -3115,11 +3171,14 @@ export function computeCharacter(
   const fistAttack =
     proficiencyBonus(fistRank, draft.level) +
     Math.max(abilityMods.str, abilityMods.dex) +
+    abp.attack +
     conditionEffects.checks[fistAbilityKey] +
     conditionEffects.attackCircumstance;
   const fistDamage = abilityMods.str + weaponSpecializationBonus(activeFeatures, fistRank);
-  const unarmedBase =
-    classData?.name.toLowerCase() === "monk" ? monkUnarmedDamage(draft.level) : "1d4";
+  const unarmedBase = bumpDamageDice(
+    classData?.name.toLowerCase() === "monk" ? monkUnarmedDamage(draft.level) : "1d4",
+    abp.damageDice
+  );
   attacks.push({
     id: "unarmed:fist",
     name: classData?.name.toLowerCase() === "monk" ? "Unarmed strike" : "Fist",
@@ -3472,6 +3531,16 @@ export function computeCharacter(
         "feats"
       );
     }
+  }
+  if (context.automaticBonusProgression && draft.level >= 5 && !draft.abpSkill) {
+    issue("warning", "Choose a skill for Automatic Bonus Progression skill potency.", "feats");
+  }
+  if (context.automaticBonusProgression && draft.level >= 17 && !draft.abpApex) {
+    issue(
+      "warning",
+      "Choose an ability for Automatic Bonus Progression's 17th-level apex.",
+      "feats"
+    );
   }
   for (const id of draft.feats.extras) selectedFeatIds.push(id);
   for (const id of Object.values(draft.feats.freeArchetype)) selectedFeatIds.push(id);

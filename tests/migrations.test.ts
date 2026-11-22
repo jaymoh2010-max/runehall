@@ -112,6 +112,7 @@ describe("migrations", () => {
     expect(campaignColumns.map((column) => column.name)).toContain("advancement_speed");
     expect(campaignColumns.map((column) => column.name)).toContain("settlement_level");
     expect(campaignColumns.map((column) => column.name)).toContain("free_archetype");
+    expect(campaignColumns.map((column) => column.name)).toContain("automatic_bonus_progression");
     expect(campaignColumns.map((column) => column.name)).toContain("shop_mode");
 
     const columns = db.prepare("PRAGMA table_info(users)").all() as { name: string }[];

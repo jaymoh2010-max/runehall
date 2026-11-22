@@ -799,6 +799,10 @@ export interface CharacterDraft {
     /** Player picks for background-granted Lore choices. */
     backgroundLore: string[];
   };
+  /** Automatic Bonus Progression: the skill chosen for item-bonus potency. */
+  abpSkill?: SkillId | null;
+  /** Automatic Bonus Progression: the ability chosen for the 17th-level apex. */
+  abpApex?: AbilityKey | null;
   feats: {
     ancestry: Record<string, string>;
     class: Record<string, string>;
@@ -916,6 +920,8 @@ export interface CharacterRecord {
   campaignSettlementLevel?: number | null;
   /** Set when the campaign uses the Free Archetype variant. */
   campaignFreeArchetype?: boolean | null;
+  /** Set when the campaign uses Automatic Bonus Progression. */
+  campaignAutomaticBonusProgression?: boolean | null;
   createdAt: number;
   updatedAt: number;
   /** Optimistic-lock version, incremented on every save. */
@@ -964,6 +970,8 @@ export interface CharacterContext {
   featNames?: string[];
   /** Campaign variant: grant an extra archetype feat at every even level. */
   freeArchetype?: boolean;
+  /** Campaign variant: apply automatic bonus progression to attacks and defenses. */
+  automaticBonusProgression?: boolean;
 }
 
 export interface DerivedSkill {
@@ -1178,6 +1186,8 @@ export interface CampaignSummary {
   settlementLevel: number;
   /** Campaign variant: grant an extra archetype feat at every even level. */
   freeArchetype: boolean;
+  /** Campaign variant: grant automatic attack/defense/save/Perception/skill potency. */
+  automaticBonusProgression: boolean;
   /** Open market (infinite common stock) or a GM-curated finite merchant list. */
   shopMode: ShopStockMode;
   /** Current in-world date for this campaign. */

@@ -4,7 +4,7 @@
 **Scope:** PF2e Remastered play from session zero through level 20, compared with GM Core, Player Core, and the practical needs of a long-running table.  
 **Verification:** `npm run check`, `npm run smoke`, `npm run e2e`, and `npm run simulate:campaign`.
 
-> **Current status:** Runehall can run a full 1–20 campaign with a GM and roughly 4–10 players. The core loop — invite, party, builder, sheet, table, encounter, initiative, conditions, rest, loot, journal, sessions, downtime, travel, clocks, archive, and restore — is implemented and covered by tests. Free Archetype is supported as a campaign variant; Automatic Bonus Progression and multiclass-archetype spellcasting remain manual.
+> **Current status:** Runehall can run a full 1–20 campaign with a GM and roughly 4–10 players. The core loop — invite, party, builder, sheet, table, encounter, initiative, conditions, rest, loot, journal, sessions, downtime, travel, clocks, archive, and restore — is implemented and covered by tests. Free Archetype and Automatic Bonus Progression are supported as campaign variants; multiclass-archetype spellcasting remains manual.
 
 ---
 
@@ -40,6 +40,7 @@ The campaign simulation exercises two complete 1–20 campaigns, including XP an
 
 - Level 1–20 builder with ancestry, heritage, background, class, deity, ability boosts, skills, feats, spells, gear, runes, companions, details, and review.
 - Optional **Free Archetype** campaign variant: an extra archetype feat slot at every even level, an archetype-only picker, and validation that the chosen feat has the archetype trait and fits the slot level.
+- Optional **Automatic Bonus Progression** campaign variant: level-based attack potency, devastating attack dice, defense potency, save potency, Perception potency, a chosen skill potency, and a 17th-level ability apex. Fundamental rune bonuses do not stack with ABP; property runes still apply.
 - PF2e prerequisites, class access, feat-slot categories, spell repertoires, prepared slots, divine font, focus, innate spells, rituals, and cantrip limits.
 - Derived HP, AC, saves, Perception, class/spell DCs, attacks, damage, skills, lore, speed, senses, Bulk, invested items, and wealth.
 - Encumbrance: carrying more than `5 + Strength` Bulk automatically applies Encumbered (Clumsy 1 and −10 ft Speed); exceeding the hard maximum adds a validation warning.
@@ -88,7 +89,7 @@ The campaign simulation exercises two complete 1–20 campaigns, including XP an
 | Session zero | Shared charter, genre/tone, content limits, safety tools, private lines/veils, anonymous pause signal, allowed sources, party goal/hooks | Strong |
 | Scheduling | Sessions, check-ins, attendance, next-session date, live updates | Strong; no external reminders/ICS |
 | Onboarding | Registration/invites, join requests, Pathbuilder import, character assignment | Strong |
-| Character build | 1–20 builder, prerequisites, slots, runes, companions, budget, import, Free Archetype | Strong; uncommon effects remain manual |
+| Character build | 1–20 builder, prerequisites, slots, runes, companions, budget, import, Free Archetype and ABP | Strong; uncommon effects remain manual |
 | Advancement | Milestone or XP, GM approval, player requests, catch-up, wealth top-up | Strong |
 | Combat | Budgets, waves, initiative, actions, conditions, typed damage, IWR, death/recovery, afflictions | Strong with manual edge cases |
 | Exploration | Travel pace, terrain, weather, watches, activities, waypoints, calendar | Partial; no hexcrawl map or automatic weather effects |
@@ -110,7 +111,6 @@ These are known boundaries, not silent failures. The sheet and UI label manual e
 
 ### Optional variant rules
 
-- **Automatic Bonus Progression** is not modeled. Use normal runes or manual notes.
 - **Multiclass-archetype spellcasting** (for example, Wizard Dedication spellcasting feats) is not parsed into slots. Record the granted spells and slots manually.
 
 These are optional campaign variants; the base Remastered rules do not require them.

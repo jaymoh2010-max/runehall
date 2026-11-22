@@ -283,7 +283,12 @@ function advanceCharacterLevel(
     return null;
   }
   if (draft.level >= 20) return null;
-  const before = characterSummary(draft, contextForDraft(draft));
+  const context = contextForDraft(
+    draft,
+    Boolean(campaign.free_archetype),
+    Boolean(campaign.automatic_bonus_progression)
+  );
+  const before = characterSummary(draft, context);
   draft.level += 1;
   if (normalizeXpMode(campaign.xp_mode) === "xp") {
     draft.play.xp = consumeLevelXp(
@@ -291,11 +296,25 @@ function advanceCharacterLevel(
       normalizeAdvancementSpeed(campaign.advancement_speed)
     );
   }
-  const after = characterSummary(draft, contextForDraft(draft));
+  const after = characterSummary(
+    draft,
+    contextForDraft(
+      draft,
+      Boolean(campaign.free_archetype),
+      Boolean(campaign.automatic_bonus_progression)
+    )
+  );
   // A wounded character gains the new maximum's HP increase, not just a
   // higher cap that leaves them further below full.
   draft.play.hp = levelUpCurrentHp(draft.play.hp, before.hp, after.hp);
-  const summary = characterSummary(draft, contextForDraft(draft));
+  const summary = characterSummary(
+    draft,
+    contextForDraft(
+      draft,
+      Boolean(campaign.free_archetype),
+      Boolean(campaign.automatic_bonus_progression)
+    )
+  );
   db.prepare(
     "UPDATE characters SET data = ?, summary = ?, updated_at = ?, revision = revision + 1 WHERE id = ?"
   ).run(JSON.stringify(draft), JSON.stringify(summary), now(), character.id);
@@ -332,8 +351,16 @@ function grantCharacterDowntime(
   } catch {
     return null;
   }
+  const campaign = getCampaign(campaignId);
   draft.play.downtimeDays = Math.min(9_999, draft.play.downtimeDays + days);
-  const summary = characterSummary(draft, contextForDraft(draft));
+  const summary = characterSummary(
+    draft,
+    contextForDraft(
+      draft,
+      Boolean(campaign?.free_archetype),
+      Boolean(campaign?.automatic_bonus_progression)
+    )
+  );
   db.prepare(
     "UPDATE characters SET data = ?, summary = ?, updated_at = ?, revision = revision + 1 WHERE id = ?"
   ).run(JSON.stringify(draft), JSON.stringify(summary), now(), character.id);
@@ -343,6 +370,49 @@ function grantCharacterDowntime(
     name: draft.name,
   });
   return summary;
+}
+
+function refreshVariantSummaries(app: FastifyInstance, campaign: CampaignRow): void {
+  const rows = db
+    .prepare("SELECT * FROM characters WHERE campaign_id = ?")
+    .all(campaign.id) as CharacterRow[];
+  for (const character of rows) {
+    let draft;
+    try {
+      draft = normalizeCharacterDraft(JSON.parse(character.data), character.name);
+    } catch {
+      continue;
+    }
+    const summary = characterSummary(
+      draft,
+      contextForDraft(
+        draft,
+        Boolean(campaign.free_archetype),
+        Boolean(campaign.automatic_bonus_progression)
+      )
+    );
+    db.prepare(
+      "UPDATE characters SET summary = ?, updated_at = ?, revision = revision + 1 WHERE id = ?"
+    ).run(JSON.stringify(summary), now(), character.id);
+    const linkedTokens = db
+      .prepare("SELECT * FROM tokens WHERE character_id = ?")
+      .all(character.id) as TokenRow[];
+    for (const token of linkedTokens) {
+      const nextHp = Math.min(draft.play.hp ?? summary.hp, summary.hp);
+      db.prepare(
+        "UPDATE tokens SET hp_max = ?, hp_current = ?, ac = ?, updated_at = ? WHERE id = ?"
+      ).run(summary.hp, nextHp, summary.ac, now(), token.id);
+      const updatedToken = db
+        .prepare("SELECT * FROM tokens WHERE id = ?")
+        .get(token.id) as TokenRow;
+      tokenEventsFor(app, campaign.id).updated(serializeToken(updatedToken), Boolean(token.hidden));
+    }
+    app.broadcastCampaign(campaign.id, "character:updated", {
+      characterId: character.id,
+      summary,
+      name: draft.name,
+    });
+  }
 }
 
 export async function registerCampaignRoutes(app: FastifyInstance): Promise<void> {
@@ -413,10 +483,9 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
       ts,
       ts
     );
-    db.prepare("UPDATE campaigns SET free_archetype = ? WHERE id = ?").run(
-      body.freeArchetype === true ? 1 : 0,
-      id
-    );
+    db.prepare(
+      "UPDATE campaigns SET free_archetype = ?, automatic_bonus_progression = ? WHERE id = ?"
+    ).run(body.freeArchetype === true ? 1 : 0, body.automaticBonusProgression === true ? 1 : 0, id);
     db.prepare(
       "INSERT INTO campaign_members (campaign_id, user_id, role, joined_at) VALUES (?, ?, 'gm', ?)"
     ).run(id, request.user.id, ts);
@@ -1307,8 +1376,15 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
         : body.settlementLevel;
     const freeArchetype =
       body.freeArchetype === undefined ? Boolean(row.free_archetype) : body.freeArchetype === true;
+    const automaticBonusProgression =
+      body.automaticBonusProgression === undefined
+        ? Boolean(row.automatic_bonus_progression)
+        : body.automaticBonusProgression === true;
+    const variantsChanged =
+      freeArchetype !== Boolean(row.free_archetype) ||
+      automaticBonusProgression !== Boolean(row.automatic_bonus_progression);
     db.prepare(
-      "UPDATE campaigns SET name = ?, description = ?, ruleset = ?, xp_mode = ?, advancement_speed = ?, settlement_level = ?, free_archetype = ?, updated_at = ? WHERE id = ?"
+      "UPDATE campaigns SET name = ?, description = ?, ruleset = ?, xp_mode = ?, advancement_speed = ?, settlement_level = ?, free_archetype = ?, automatic_bonus_progression = ?, updated_at = ? WHERE id = ?"
     ).run(
       name,
       description,
@@ -1317,6 +1393,7 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
       advancementSpeed,
       settlementLevel,
       freeArchetype ? 1 : 0,
+      automaticBonusProgression ? 1 : 0,
       now(),
       id
     );
@@ -1340,6 +1417,7 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
       }
     }
     const updated = getCampaign(id)!;
+    if (variantsChanged) refreshVariantSummaries(app, updated);
     broadcastCampaignSummary(app, updated);
     return reply.send({
       campaign: serializeCampaignSummary(updated, "gm", campaignCounts(updated)),

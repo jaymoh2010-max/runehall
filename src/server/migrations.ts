@@ -909,4 +909,11 @@ export const migrations: Migration[] = [
       ALTER TABLE campaigns ADD COLUMN free_archetype INTEGER NOT NULL DEFAULT 0;
     `,
   },
+  {
+    version: 52,
+    name: "campaign_automatic_bonus_progression",
+    sql: `
+      ALTER TABLE campaigns ADD COLUMN automatic_bonus_progression INTEGER NOT NULL DEFAULT 0;
+    `,
+  },
 ];

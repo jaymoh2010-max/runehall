@@ -198,6 +198,7 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
   const advancementSpeed = normalizeAdvancementSpeed(campaignData.advancementSpeed);
   const settlementLevel = normalizeSettlementLevel(campaignData.settlementLevel);
   const freeArchetype = campaignData.freeArchetype === true;
+  const automaticBonusProgression = campaignData.automaticBonusProgression === true;
   const shopMode = normalizeShopStockMode(campaignData.shopMode);
   const worldDate = normalizeGolarionDate(campaignData.worldDate);
 
@@ -246,10 +247,9 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
       ts,
       ts
     );
-    db.prepare("UPDATE campaigns SET free_archetype = ? WHERE id = ?").run(
-      freeArchetype ? 1 : 0,
-      campaignId
-    );
+    db.prepare(
+      "UPDATE campaigns SET free_archetype = ?, automatic_bonus_progression = ? WHERE id = ?"
+    ).run(freeArchetype ? 1 : 0, automaticBonusProgression ? 1 : 0, campaignId);
     db.prepare(
       "INSERT INTO campaign_members (campaign_id, user_id, role, joined_at) VALUES (?, ?, 'gm', ?)"
     ).run(campaignId, userId, ts);
@@ -398,7 +398,10 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
         );
         draft.contentMode = rulesetContentMode(ruleset);
         draft.includeLegacy = rulesetIncludesLegacy(ruleset);
-        const summary = characterSummary(draft, contextForDraft(draft));
+        const summary = characterSummary(
+          draft,
+          contextForDraft(draft, freeArchetype, automaticBonusProgression)
+        );
         const exportOwner = text(character.userId, "", 120);
         const mappedOwner = memberUserByExportId.get(exportOwner);
         const ownerId = mappedOwner ?? userId;

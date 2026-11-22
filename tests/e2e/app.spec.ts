@@ -2757,3 +2757,29 @@ test("GM enables Free Archetype and a character fills an extra archetype slot", 
   await page.getByRole("button", { name: "Take Archer Dedication" }).click();
   await expect(slot).toContainText("Archer Dedication");
 });
+
+test("GM enables Automatic Bonus Progression and a character chooses its skill", async ({
+  page,
+}) => {
+  test.setTimeout(45_000);
+  await signIn(page, admin);
+  await page.goto(`${campaignPath}?tab=settings`);
+  await page.getByLabel("Automatic Bonus Progression").check();
+  await page.getByRole("button", { name: "Save changes" }).click();
+  await expect(page.getByText("Campaign settings saved.")).toBeVisible({ timeout: 15_000 });
+
+  const campaignId = campaignPath.split("/").pop();
+  const detailsResponse = await page.request.get(`/api/campaigns/${campaignId}`);
+  const details = (await detailsResponse.json()) as {
+    characters: { id: string; name: string }[];
+  };
+  const hero = details.characters.find((character) => character.name === "E2E Hero");
+  expect(hero).toBeTruthy();
+
+  await page.goto(`/characters/${hero!.id}/edit`);
+  await expect(page.getByRole("heading", { name: "E2E Hero" })).toBeVisible({ timeout: 15_000 });
+  await goToStep(page, "Feats");
+  await expect(page.getByText("Automatic skill potency")).toBeVisible();
+  await page.getByLabel("Skill potency").selectOption("athletics");
+  await expect(page.getByLabel("Skill potency")).toHaveValue("athletics");
+});

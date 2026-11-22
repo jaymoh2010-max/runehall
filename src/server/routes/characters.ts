@@ -71,7 +71,11 @@ function summarize(draft: CharacterDraft): CharacterSummary {
 
 function contextForCharacter(row: CharacterRow, draft: CharacterDraft) {
   const campaign = row.campaign_id ? getCampaign(row.campaign_id) : null;
-  return contextForDraft(draft, Boolean(campaign?.free_archetype));
+  return contextForDraft(
+    draft,
+    Boolean(campaign?.free_archetype),
+    Boolean(campaign?.automatic_bonus_progression)
+  );
 }
 
 /** Downtime and long rests consume in-world days, not just character resources. */
@@ -397,7 +401,7 @@ export async function registerCharacterRoutes(app: FastifyInstance): Promise<voi
         draft.includeLegacy = rulesetIncludesLegacy(ruleset);
       }
     }
-    const summary = summarize(draft);
+    const summary = characterSummary(draft, contextForCharacter(row, draft));
     const updatedAt = now();
     const update =
       !force && expectedRevision !== null

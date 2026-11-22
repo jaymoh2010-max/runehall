@@ -367,6 +367,64 @@ export function FeatsStep({
           ))}
         </Card>
       ) : null}
+      {context.automaticBonusProgression ? (
+        <Card className="feat-slot is-filled">
+          <div className="feat-slot-head">
+            <div className="feat-slot-level">ABP</div>
+            <div className="grow">
+              <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
+                <strong>Automatic skill potency</strong>
+                <Badge tone="gold">Variant</Badge>
+              </div>
+              <p className="tiny muted">
+                Choose the skill that receives the automatic item bonus (+1 at 5th, +2 at 11th, +3
+                at 18th).
+              </p>
+            </div>
+          </div>
+          <Field label="Skill potency">
+            <Select
+              value={draft.abpSkill ?? ""}
+              onChange={(event) =>
+                update((current) => ({
+                  ...current,
+                  abpSkill: (event.target.value || null) as SkillId | null,
+                }))
+              }
+            >
+              <option value="">Choose a skill.</option>
+              {SKILLS.map((skill) => (
+                <option key={skill.id} value={skill.id}>
+                  {skill.name}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          {draft.level >= 17 ? (
+            <Field
+              label="Ability apex"
+              hint="At 17th level, one ability score gains a +2 item bonus from ABP."
+            >
+              <Select
+                value={draft.abpApex ?? ""}
+                onChange={(event) =>
+                  update((current) => ({
+                    ...current,
+                    abpApex: (event.target.value || null) as AbilityKey | null,
+                  }))
+                }
+              >
+                <option value="">Choose an ability.</option>
+                {ABILITIES.map((ability) => (
+                  <option key={ability} value={ability}>
+                    {ABILITY_LABELS[ability]}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          ) : null}
+        </Card>
+      ) : null}
       <div className="feat-slots">
         {slots.map((slot) => {
           const bucket = slot.freeArchetype

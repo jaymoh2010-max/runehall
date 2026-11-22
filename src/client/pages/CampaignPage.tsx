@@ -280,6 +280,7 @@ export function CampaignPage() {
     useState<AdvancementSpeed>("medium");
   const [settingsSettlementLevel, setSettingsSettlementLevel] = useState("1");
   const [settingsFreeArchetype, setSettingsFreeArchetype] = useState(false);
+  const [settingsAutomaticBonusProgression, setSettingsAutomaticBonusProgression] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [levelUpBusy, setLevelUpBusy] = useState(false);
   const [catchUpBusy, setCatchUpBusy] = useState(false);
@@ -435,6 +436,7 @@ export function CampaignPage() {
       setSettingsAdvancementSpeed(details.campaign.advancementSpeed);
       setSettingsSettlementLevel(String(details.campaign.settlementLevel));
       setSettingsFreeArchetype(details.campaign.freeArchetype);
+      setSettingsAutomaticBonusProgression(details.campaign.automaticBonusProgression);
       if (details.campaign.role === "gm") {
         try {
           const ledger = await api<{ awards: XpAward[] }>(`/api/campaigns/${id}/xp-awards`);
@@ -899,6 +901,7 @@ export function CampaignPage() {
           advancementSpeed: settingsAdvancementSpeed,
           settlementLevel: Number(settingsSettlementLevel) || 0,
           freeArchetype: settingsFreeArchetype,
+          automaticBonusProgression: settingsAutomaticBonusProgression,
         },
       });
       setCampaign(result.campaign);
@@ -915,6 +918,7 @@ export function CampaignPage() {
                 advancementSpeed: result.campaign.advancementSpeed,
                 settlementLevel: result.campaign.settlementLevel,
                 freeArchetype: result.campaign.freeArchetype,
+                automaticBonusProgression: result.campaign.automaticBonusProgression,
               },
             }
           : current
@@ -2539,6 +2543,18 @@ export function CampaignPage() {
                   <p className="tiny muted">
                     Adds an extra archetype feat slot at every even level. Existing characters gain
                     the slots the next time their builder or sheet loads.
+                  </p>
+                </div>
+                <div>
+                  <Checkbox
+                    label="Automatic Bonus Progression"
+                    checked={settingsAutomaticBonusProgression}
+                    onChange={setSettingsAutomaticBonusProgression}
+                    disabled={!isGm}
+                  />
+                  <p className="tiny muted">
+                    Replaces fundamental weapon and armor rune math with level-based attack, damage,
+                    AC, save, Perception, and skill potency. Property runes still work.
                   </p>
                 </div>
                 <Field

@@ -6,6 +6,7 @@ import {
   boundedCasterSlots,
   casterInfo,
   cantripLimitFor,
+  automaticBonusProgression,
   characterSummary,
   checkFeatPrerequisite,
   classSituationalDamage,
@@ -205,6 +206,80 @@ describe("PF2e character rules", () => {
     expect(
       invalidDerived.validation.some((issue) => issue.message.includes("is not an archetype feat"))
     ).toBe(true);
+  });
+
+  it("applies Automatic Bonus Progression potency without stacking runes", () => {
+    expect(automaticBonusProgression(1)).toMatchObject({
+      attack: 0,
+      damageDice: 1,
+      defense: 0,
+      saves: 0,
+      perception: 0,
+      skill: 0,
+    });
+    expect(automaticBonusProgression(12)).toMatchObject({
+      attack: 2,
+      damageDice: 3,
+      defense: 2,
+      saves: 1,
+      perception: 2,
+      skill: 2,
+    });
+    expect(automaticBonusProgression(19)).toMatchObject({
+      attack: 3,
+      damageDice: 4,
+      defense: 3,
+      saves: 3,
+      perception: 3,
+      skill: 3,
+    });
+
+    const { draft, context } = buildCleric();
+    draft.level = 12;
+    draft.abpSkill = "medicine";
+    const longsword = equipment.find((entry) => entry.name === "Longsword")!;
+    const chainMail = equipment.find((entry) => entry.name === "Chain Mail")!;
+    draft.equipment = [
+      { itemId: longsword.id, quantity: 1, equipped: true },
+      { itemId: chainMail.id, quantity: 1, equipped: true },
+    ];
+    const gearContext = {
+      ...context,
+      equipment: {
+        ...context.equipment,
+        [longsword.id]: longsword,
+        [chainMail.id]: chainMail,
+      },
+    };
+    const base = computeCharacter(draft, gearContext);
+    const progressed = computeCharacter(draft, {
+      ...gearContext,
+      automaticBonusProgression: true,
+    });
+    expect(progressed.ac - base.ac).toBe(2);
+    expect(progressed.saves.fortitude - base.saves.fortitude).toBe(1);
+    expect(progressed.perception - base.perception).toBe(2);
+    expect(
+      (progressed.attacks.find((attack) => attack.name === "Longsword")?.attackBonus ?? 0) -
+        (base.attacks.find((attack) => attack.name === "Longsword")?.attackBonus ?? 0)
+    ).toBe(2);
+    expect(progressed.attacks.find((attack) => attack.name === "Longsword")?.damageFormula).toMatch(
+      /^3d8/
+    );
+    expect(
+      (progressed.skills.find((skill) => skill.id === "medicine")?.mod ?? 0) -
+        (base.skills.find((skill) => skill.id === "medicine")?.mod ?? 0)
+    ).toBe(2);
+
+    draft.level = 17;
+    draft.abpApex = "str";
+    const apexBase = computeCharacter(draft, gearContext);
+    const apex = computeCharacter(draft, {
+      ...gearContext,
+      automaticBonusProgression: true,
+    });
+    expect(apex.abilities.str - apexBase.abilities.str).toBe(2);
+    expect(apex.validation.some((issue) => issue.message.includes("17th-level apex"))).toBe(false);
   });
 
   it("trains background, class, and deity skills", () => {

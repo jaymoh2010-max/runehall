@@ -461,7 +461,11 @@ function featIdsFromDraft(draft: CharacterDraft): string[] {
   return [...ids];
 }
 
-export function contextForDraft(draft: CharacterDraft, freeArchetype = false): CharacterContext {
+export function contextForDraft(
+  draft: CharacterDraft,
+  freeArchetype = false,
+  automaticBonusProgression = false
+): CharacterContext {
   const ancestry = draft.ancestryId ? (maps.ancestry.get(draft.ancestryId) ?? null) : null;
   const heritage = draft.heritageId ? (maps.heritage.get(draft.heritageId) ?? null) : null;
   const background = draft.backgroundId ? (maps.background.get(draft.backgroundId) ?? null) : null;
@@ -556,6 +560,7 @@ export function contextForDraft(draft: CharacterDraft, freeArchetype = false): C
     monsters: monsterMap,
     featNames,
     freeArchetype,
+    automaticBonusProgression,
   };
 }
 
