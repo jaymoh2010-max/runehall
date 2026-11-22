@@ -17,7 +17,7 @@ It is **not yet a full adventure-path runner or a complete exploration/downtime 
 1. **Rules trust:** conditions, dying/wounded, and hero/focus points are automated; staged afflictions are tracked with stage saves, and round-based onset/interval timing is automatic, but compendium presets and non-round timers are manual. Spell heightening and most feat/item effects are still partly manual.
 2. **Campaign economy:** advancement speed, hazard/accomplishment XP, a treasure-by-level audit including permanent/consumable item mix, replacement-character wealth, a settlement-level shop with optional tracked merchant stock, cost-of-living upkeep, and a downtime activity planner for Earn Income, Subsist, and projects are now supported. Full Craft cost/task-discovery automation is still missing.
 3. **The other two-thirds of play:** weather effects, hex/pointcrawl mapping, social reputation/factions, and player knowledge need a first-class model. Travel now has a campaign journey planner with mileage, terrain, watches, weather metadata, and exploration activities; downtime has a planner for the common activities, but rituals and long-running projects remain manual.
-4. **Campaign continuity:** no session-zero/safety tools, private player notes, AP chapter/level scaffolding, or self-contained archive.
+4. **Campaign continuity:** the session-zero charter and private safety preferences are supported, but private player notes, AP chapter/level scaffolding, and a self-contained archive are still missing.
 
 ---
 
@@ -49,7 +49,7 @@ Two simulated campaigns were run against an isolated server with real accounts a
   - Mid-campaign replacement character advanced to party level, then topped up to the level-10 lump-sum wealth benchmark.
   - Sessions/recap/handout in milestone play.
 
-**Result (current release pass):** 84 passing checks, 0 failing checks, 1 recorded gap. Encounter cleanup is now exercised after every simulated act, milestone XP awards are verified as blocked, the fast advancement threshold, hazard XP, accomplishment XP, and award ledger are exercised, the loot audit (including permanent/consumable item counts) plus replacement-wealth grant are verified at level 20 and level 10, downtime spending charges upkeep and exercises Earn Income repetition, Subsist waivers, and project completion, the travel planner advances the calendar and persists watches/activities, the settlement shop is exercised with purchase, sale, above-level, ownership, tracked-stock decrement/replenish, and export/import checks, initiative advance is verified to roll dying recovery and resolve persistent damage exactly once, and unlinked monsters are verified to heal, take persistent damage, and seed regeneration from a statblock. Two linked-token bugs were found and fixed:
+**Result (current release pass):** 85 passing checks, 0 failing checks, 1 recorded gap. Encounter cleanup is now exercised after every simulated act, milestone XP awards are verified as blocked, the fast advancement threshold, hazard XP, accomplishment XP, and award ledger are exercised, the loot audit (including permanent/consumable item counts) plus replacement-wealth grant are verified at level 20 and level 10, downtime spending charges upkeep and exercises Earn Income repetition, Subsist waivers, and project completion, the travel planner advances the calendar and persists watches/activities, session zero keeps a shared charter with private anonymous safety limits and a GM-only pause signal, the settlement shop is exercised with purchase, sale, above-level, ownership, tracked-stock decrement/replenish, and export/import checks, initiative advance is verified to roll dying recovery and resolve persistent damage exactly once, and unlinked monsters are verified to heal, take persistent damage, and seed regeneration from a statblock. Two linked-token bugs were found and fixed:
 
 - Hiding a token after initiative was rolled still exposed its name in the player's initiative order. The server now filters hidden combatants from player snapshots and live initiative broadcasts, with a shared helper and unit coverage (`src/shared/initiative.ts`, `src/server/routes/table.ts`, `src/server/socket.ts`, `tests/initiative.test.ts`).
 - Creating a token for a wounded character reset its current HP to full. New tokens now start at the sheet's current HP unless the GM explicitly supplies one (`src/server/socket.ts`).
@@ -71,7 +71,7 @@ npm run simulate:campaign -- --report campaign-simulation-report.json
 
 | Lifecycle stage | PF2e need | Current support | Status |
 | --- | --- | --- | --- |
-| Session zero | Pitch/tone, content limits, safety tools, allowed sources, house rules, party hooks | Campaign description; ruleset/content mode; first-run checklist | Partial |
+| Session zero | Pitch/tone, content limits, safety tools, allowed sources, house rules, party hooks | Campaign description and ruleset; a shared Session zero tab with pitch, genre/tone/themes, expectations, house rules, content limits, safety tools, a GM checklist, private lines/veils, anonymous GM responses, and a pause/X-card signal; no automated source checklist or party-hook questionnaire | Partial |
 | Scheduling | Cadence, time zones, RSVP, quorum, attendance, reminders | Sessions, check-ins, attendance, next-session date/teaser; no reminders/ICS/time zones | Partial |
 | Player onboarding | Join, bring/create a character, ruleset inheritance | Invite links/codes, account flow, character assignment | Strong |
 | Character build | 1–20 math, ancestry/heritage/background/class, feats/spells/gear/runes | Live math, prerequisites, slots, runes, companions roster, Pathbuilder import; common level-1 heritage mechanics, a gear-plus-coins starting budget, and curated fixed plus free class grants for Druid/Bard/Wizard/Sorcerer/Cleric/Champion | Strong with automation caveats |
@@ -85,7 +85,7 @@ npm run simulate:campaign -- --report campaign-simulation-report.json
 | World clock | In-world date, downtime, afflictions, sessions | Golarion calendar with leap day and GM advance | Strong |
 | Table | Maps, fog, walls/doors, lighting, tokens, conditions, chat, dice, music | Deep implementation; see table gaps below | Strong with caveats |
 | Archive/portability | Self-contained backup, JSON, assets, restore | SQLite backup/restore drill; campaign JSON metadata; assets referenced by URL; import caps/ownership caveats | Partial |
-| Safety/access | Private limits, consent, player-safe views | GM-only data is separated; no safety profile or content-limit channel | Missing |
+| Safety/access | Private limits, consent, player-safe views | GM-only data is separated. Players can save private lines, veils, and notes, choose anonymity in the GM's response list, and send an anonymous GM-only pause signal; there is no separate anonymous third-party channel or content-warning automation | Partial |
 | Adventure path | Chapters, level gates, encounter/quest pacing, AP import | None | Missing |
 
 ---
@@ -125,7 +125,7 @@ These are the items most likely to make a sheet or combat state look right while
 | Victory Point clocks | One generic clock/VP primitive for research, influence, chase, infiltration, reputation, and projects. | M |
 | NPC/faction ledger | Attitude, location, faction, secrets, obligations, relationship history, rumors; ideally a graph. | L |
 | Player knowledge layer | Private player notes, known/rumored/secret/disproven clues, per-player reveals, absentee recap. | L |
-| Session zero and safety | Campaign pitch template, content limits, lines/veils/X-card, anonymous safety channel, source/house-rule checklist. | S–M |
+| Session zero and safety | A shared Session zero tab covers pitch, genre/tone/themes, expectations, house rules, content limits, safety tools, and a GM checklist. Each member can save private lines/veils/notes, hide their name from the GM's response list, and send an anonymous pause/X-card signal that reaches the GM as a live toast and GM-only chat card. Missing: allowed-source checklist, party-hook questionnaire, and a third-party anonymous channel. | Partial |
 | AP scaffold | Chapters/books, level bands, encounter/quest pacing, treasure checkpoints, AP import/conversion. | L |
 | Self-contained archive | Copy assets/audio into the export, validate URLs, remove import caps, preserve playback state and asset rows. | M |
 | Ownership lifecycle | Leaving/kicking currently leaves `characters.campaign_id` set; add unassignment, GM transfer, co-GM, per-character portability. | S–M |
@@ -172,7 +172,7 @@ Remaining:
 1. Party XP pool, catch-up, and absent-player awards. (Advancement speed and hazard/accomplishment awards are done.)
 2. Permanent/consumable item-mix planner and level-tagged parcels. (The party budget, wealth audit, and replacement top-up are done.)
 3. Persistent merchant stock and a richer downtime planner. (The settlement shop now supports tracked stock; task discovery, rituals, full crafting costs, multiple merchants, and restock schedules remain.)
-4. Session-zero/safety checklist and private player notes.
+4. Session-zero/safety checklist and private player notes. (The shared charter, private limits, anonymous responses, and pause signal are done; private player notes and a source checklist remain.)
 
 **Exit criteria:** a GM can run a level without guessing treasure, equip a replacement PC correctly, and resolve a full downtime phase in-app.
 

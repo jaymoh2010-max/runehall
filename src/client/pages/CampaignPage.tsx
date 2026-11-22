@@ -14,6 +14,7 @@ import {
   Download,
   FileImage,
   FilePlus2,
+  HeartHandshake,
   ImagePlus,
   Images,
   LayoutGrid,
@@ -73,6 +74,7 @@ import { startingWealthCp } from "../../shared/rules";
 import { api, copyText, formatCp, formatDate, uploadImage } from "../api";
 import { connectSocket, joinCampaign } from "../socket";
 import { TravelTab } from "../components/campaign/TravelTab";
+import { SessionZeroTab } from "../components/campaign/SessionZeroTab";
 import { errorMessage } from "../stores";
 import { useSession, useToasts } from "../stores";
 import {
@@ -123,6 +125,7 @@ function questStatusTone(status: QuestStatus): "blue" | "green" | "red" {
 type Tab =
   | "table"
   | "overview"
+  | "session-zero"
   | "party"
   | "travel"
   | "sessions"
@@ -144,6 +147,7 @@ interface CampaignDetails {
 const TABS: { id: Tab; label: string; icon: React.ReactNode; gmOnly?: boolean }[] = [
   { id: "table", label: "Table", icon: <LayoutGrid size={15} /> },
   { id: "overview", label: "Overview", icon: <CalendarDays size={15} /> },
+  { id: "session-zero", label: "Session zero", icon: <HeartHandshake size={15} /> },
   { id: "party", label: "Party", icon: <Users size={15} /> },
   { id: "travel", label: "Travel", icon: <Compass size={15} /> },
   { id: "sessions", label: "Sessions", icon: <CalendarClock size={15} /> },
@@ -166,6 +170,7 @@ export function CampaignPage() {
   const rawTab = searchParams.get("tab");
   const requestedTab: Tab =
     rawTab === "overview" ||
+    rawTab === "session-zero" ||
     rawTab === "party" ||
     rawTab === "travel" ||
     rawTab === "sessions" ||
@@ -432,6 +437,9 @@ export function CampaignPage() {
           : current
       );
     };
+    const onSafetySignal = (payload: { message: string }) => {
+      toast(payload.message, "error");
+    };
     socket.on("campaign:updated", applySummary);
     socket.on("character:updated", onCharacterUpdated);
     socket.on("character:created", onCharacterCreated);
@@ -441,6 +449,7 @@ export function CampaignPage() {
     socket.on("journal:deleted", onJournalDeleted);
     socket.on("join-request:created", refreshDetails);
     socket.on("join-request:updated", refreshDetails);
+    socket.on("safety:signal", onSafetySignal);
     const leaveCampaignRoom = joinCampaign(id);
     return () => {
       socket.off("campaign:updated", applySummary);
@@ -452,9 +461,10 @@ export function CampaignPage() {
       socket.off("journal:deleted", onJournalDeleted);
       socket.off("join-request:created", refreshDetails);
       socket.off("join-request:updated", refreshDetails);
+      socket.off("safety:signal", onSafetySignal);
       leaveCampaignRoom();
     };
-  }, [id]);
+  }, [id, toast]);
 
   useEffect(() => {
     if (!journalEditor || journalEditor === "new") {
@@ -1373,6 +1383,15 @@ export function CampaignPage() {
               setSelectedJournalId(entry.id);
             }}
             onInvite={() => setInviteOpen(true)}
+            toast={toast}
+          />
+        ) : null}
+
+        {tab === "session-zero" ? (
+          <SessionZeroTab
+            campaignId={campaign.id}
+            isGm={isGm}
+            refreshKey={campaign.updatedAt}
             toast={toast}
           />
         ) : null}

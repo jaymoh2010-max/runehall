@@ -9,6 +9,9 @@ import type {
   CampaignSession,
   CampaignSummary,
   CampaignTravel,
+  CampaignSessionZero,
+  SafetyPreference,
+  SafetyResponse,
   CharacterRecord,
   ChatMessage,
   Encounter,
@@ -59,6 +62,8 @@ import {
   type CampaignNpcRow,
   type CampaignRow,
   type CampaignSessionRow,
+  type CampaignSessionZeroRow,
+  type CampaignSafetyPreferenceRow,
   type CampaignTravelRow,
   type CharacterRow,
   type EncounterCombatantRow,
@@ -89,6 +94,7 @@ import {
   travelMilesPerDay,
   travelStatus,
 } from "../shared/travel";
+import { normalizeSessionZeroChecklist } from "../shared/sessionZero";
 
 export function serializeCampaignSummary(
   campaign: CampaignRow,
@@ -146,6 +152,57 @@ export function serializeCampaignTravel(
     daysTravelled: Math.max(0, Math.round(row.days_travelled)),
     dailyMiles: travelMilesPerDay(partySpeed, terrain),
     status: travelStatus(distanceMiles, progressMiles),
+    updatedAt: row.updated_at,
+  };
+}
+
+export function serializeCampaignSessionZero(
+  row: CampaignSessionZeroRow | null,
+  campaignId: string,
+  isGm: boolean
+): CampaignSessionZero {
+  const profile: CampaignSessionZero = {
+    campaignId,
+    pitch: row?.pitch ?? "",
+    genre: row?.genre ?? "",
+    tone: row?.tone ?? "",
+    themes: row?.themes ?? "",
+    expectations: row?.expectations ?? "",
+    houseRules: row?.house_rules ?? "",
+    contentLimits: row?.content_limits ?? "",
+    safetyTools: row?.safety_tools ?? "",
+    checklist: normalizeSessionZeroChecklist(parseJson(row?.checklist, {})),
+    updatedAt: row?.updated_at ?? 0,
+  };
+  if (isGm) profile.gmNotes = row?.gm_notes ?? "";
+  return profile;
+}
+
+export function serializeSafetyPreference(
+  row: CampaignSafetyPreferenceRow | null
+): SafetyPreference | null {
+  if (!row) return null;
+  return {
+    lines: row.lines,
+    veils: row.veils,
+    notes: row.notes,
+    anonymous: Boolean(row.anonymous),
+    updatedAt: row.updated_at,
+  };
+}
+
+export function serializeSafetyResponse(
+  row: CampaignSafetyPreferenceRow,
+  authorName: string | null,
+  index: number
+): SafetyResponse {
+  return {
+    id: `safety_${index}_${row.updated_at}`,
+    authorName: row.anonymous ? null : authorName,
+    anonymous: Boolean(row.anonymous),
+    lines: row.lines,
+    veils: row.veils,
+    notes: row.notes,
     updatedAt: row.updated_at,
   };
 }

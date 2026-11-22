@@ -19,6 +19,7 @@ import {
   type CampaignDashboardRow,
   type CampaignNpcRow,
   type CampaignRow,
+  type CampaignSessionZeroRow,
   type CampaignTravelRow,
   type CharacterRow,
   type EncounterRow,
@@ -35,6 +36,7 @@ import {
   serializeCampaignNpc,
   serializeCampaignSummary,
   serializeCampaignTravel,
+  serializeCampaignSessionZero,
   serializeCharacter,
   serializeEncounter,
   serializeInitiative,
@@ -650,6 +652,10 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
     const travel = travelRow
       ? serializeCampaignTravel(travelRow, new Set(characters.map((entry) => entry.id)))
       : null;
+    const sessionZeroRow = db
+      .prepare("SELECT * FROM campaign_session_zero WHERE campaign_id = ?")
+      .get(id) as CampaignSessionZeroRow | undefined;
+    const sessionZero = serializeCampaignSessionZero(sessionZeroRow ?? null, id, true);
     const dashboardRow = db
       .prepare("SELECT * FROM campaign_dashboard WHERE campaign_id = ?")
       .get(id) as CampaignDashboardRow | undefined;
@@ -697,6 +703,7 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
       loot,
       shopStock,
       travel,
+      sessionZero,
       dashboard,
       npcs,
       sessions,

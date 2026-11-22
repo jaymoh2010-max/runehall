@@ -414,6 +414,11 @@ Acceptance: a GM can prepare a full session in Runehall and start it with one â€
   - The server validates item level, rarity, quantity, price, ownership, and revision; players cannot shop for characters they do not control.
   - The GM can switch to tracked merchant stock, curate finite quantities from the compendium (including uncommon or above-level items), and restock by editing quantities. Purchases decrement stock and sales add items back; open-market mode remains the default.
   - Shopping is abstract rather than downtime-gated; automatic restock schedules and multiple merchants per settlement are not simulated.
+- [x] **Session zero and safety**
+  - A shared Session zero tab publishes the campaign pitch, genre, tone, themes, expectations, house rules, content limits, safety tools, and a GM checklist.
+  - Each member can save private lines, veils, and notes. Anonymous responses hide the player's name from the GM's response list; private safety preferences are never included in campaign export.
+  - The GM receives a live pause/X-card signal as a toast and GM-only chat card, without the player's identity attached.
+  - No automated source checklist, party-hook questionnaire, or third-party anonymous channel yet.
 - [x] **Campaign travel planner**
   - A Travel tab stores one journey per campaign: origin, destination, distance, terrain, party speed, weather metadata, notes, four watches, and per-character exploration activities.
   - Daily mileage follows PF2e Travel Speed (Speed Ã— 0.8), halved for difficult terrain and one-third for greater difficult terrain; the GM can override party speed.
@@ -735,4 +740,4 @@ A campaign-level review compared Runehall against PF2e GM Core/Player Core progr
 
 - Full report: [CAMPAIGN-READINESS.md](CAMPAIGN-READINESS.md)
 - Repeatable simulation: `npm run simulate:campaign`
-- Next priority: hex/pointcrawl travel and encounter checks, social/faction ledgers, session-zero/safety tools, and AP scaffolding.
+- Next priority: hex/pointcrawl travel and encounter checks, social/faction ledgers, private player notes, and AP scaffolding.

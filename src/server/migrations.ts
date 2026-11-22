@@ -675,4 +675,36 @@ export const migrations: Migration[] = [
       );
     `,
   },
+  {
+    version: 38,
+    name: "campaign_session_zero",
+    sql: `
+      CREATE TABLE IF NOT EXISTS campaign_session_zero (
+        campaign_id TEXT PRIMARY KEY REFERENCES campaigns(id) ON DELETE CASCADE,
+        pitch TEXT NOT NULL DEFAULT '',
+        genre TEXT NOT NULL DEFAULT '',
+        tone TEXT NOT NULL DEFAULT '',
+        themes TEXT NOT NULL DEFAULT '',
+        expectations TEXT NOT NULL DEFAULT '',
+        house_rules TEXT NOT NULL DEFAULT '',
+        content_limits TEXT NOT NULL DEFAULT '',
+        safety_tools TEXT NOT NULL DEFAULT '',
+        gm_notes TEXT NOT NULL DEFAULT '',
+        checklist TEXT NOT NULL DEFAULT '{}',
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS campaign_safety_preferences (
+        campaign_id TEXT NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        lines TEXT NOT NULL DEFAULT '',
+        veils TEXT NOT NULL DEFAULT '',
+        notes TEXT NOT NULL DEFAULT '',
+        anonymous INTEGER NOT NULL DEFAULT 0,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        PRIMARY KEY (campaign_id, user_id)
+      );
+    `,
+  },
 ];

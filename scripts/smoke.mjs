@@ -2227,6 +2227,108 @@ async function main() {
   if (clearedTravel.payload.travel !== null) throw new Error("Travel plan was not cleared");
   log("the GM plans journeys and advances travel days");
 
+  const emptySessionZero = await api(`/api/campaigns/${campaign.id}/session-zero`, {
+    cookie: gmCookie,
+  });
+  if (emptySessionZero.payload.profile.pitch !== "") {
+    throw new Error("A new campaign did not start without a session zero charter");
+  }
+  const playerCharterEdit = await fetch(`${base}/api/campaigns/${campaign.id}/session-zero`, {
+    method: "PUT",
+    headers: { "content-type": "application/json", cookie: playerCookie },
+    body: JSON.stringify({ pitch: "Player-written pitch" }),
+  });
+  if (playerCharterEdit.status !== 403) throw new Error("Player edited the session zero charter");
+  const charter = await api(`/api/campaigns/${campaign.id}/session-zero`, {
+    method: "PUT",
+    cookie: gmCookie,
+    body: {
+      pitch: "A city of ash and old debts.",
+      genre: "Dark fantasy",
+      tone: "Heroic with sharp edges",
+      themes: "Loyalty, costly magic",
+      expectations: "Share the spotlight and flag rules questions.",
+      houseRules: "Free archetype.",
+      contentLimits: "No graphic torture.",
+      safetyTools: "Use the pause signal or message the GM privately.",
+      gmNotes: "The Ash Warden is the final antagonist.",
+      checklist: { pitch: true, themes: true, safety: true },
+    },
+  });
+  if (
+    charter.payload.profile.pitch !== "A city of ash and old debts." ||
+    charter.payload.profile.gmNotes !== "The Ash Warden is the final antagonist."
+  ) {
+    throw new Error("GM session zero charter did not save");
+  }
+  const playerCharterView = await api(`/api/campaigns/${campaign.id}/session-zero`, {
+    cookie: playerCookie,
+  });
+  if (
+    playerCharterView.payload.profile.pitch !== "A city of ash and old debts." ||
+    "gmNotes" in playerCharterView.payload.profile
+  ) {
+    throw new Error("Player session zero view leaked GM notes or missed the charter");
+  }
+  const preference = await api(`/api/campaigns/${campaign.id}/session-zero/preference`, {
+    method: "PUT",
+    cookie: playerCookie,
+    body: { lines: "Spiders", veils: "Torture", notes: "Check in after hard scenes." },
+  });
+  if (preference.payload.preference.lines !== "Spiders") {
+    throw new Error("Safety preference did not save");
+  }
+  const responses = await api(`/api/campaigns/${campaign.id}/session-zero`, {
+    cookie: gmCookie,
+  });
+  const namedResponse = responses.payload.responses.find((entry) => entry.lines === "Spiders");
+  if (!namedResponse || !namedResponse.authorName || namedResponse.anonymous) {
+    throw new Error("GM could not read a named safety response");
+  }
+  await api(`/api/campaigns/${campaign.id}/session-zero/preference`, {
+    method: "PUT",
+    cookie: playerCookie,
+    body: { anonymous: true },
+  });
+  const anonymousResponses = await api(`/api/campaigns/${campaign.id}/session-zero`, {
+    cookie: gmCookie,
+  });
+  const anonymousResponse = anonymousResponses.payload.responses.find(
+    (entry) => entry.lines === "Spiders"
+  );
+  if (!anonymousResponse?.anonymous || anonymousResponse.authorName !== null) {
+    throw new Error("Anonymous safety response exposed the player");
+  }
+  const signal = await fetch(`${base}/api/campaigns/${campaign.id}/session-zero/signal`, {
+    method: "POST",
+    headers: { "content-type": "application/json", cookie: playerCookie },
+    body: JSON.stringify({ note: "Need a pause." }),
+  });
+  if (signal.status !== 200) throw new Error("Safety pause signal failed");
+  const gmTableView = await api(`/api/campaigns/${campaign.id}/table`, { cookie: gmCookie });
+  const playerTableView = await api(`/api/campaigns/${campaign.id}/table`, {
+    cookie: playerCookie,
+  });
+  const signalMessage = gmTableView.payload.messages.find((message) =>
+    message.content.includes("safety pause")
+  );
+  const leakedSignal = playerTableView.payload.messages.some((message) =>
+    message.content.includes("safety pause")
+  );
+  if (!signalMessage || leakedSignal) {
+    throw new Error("Safety signal was not GM-only");
+  }
+  const sessionZeroExport = await api(`/api/campaigns/${campaign.id}/export`, {
+    cookie: gmCookie,
+  });
+  if (
+    sessionZeroExport.payload.sessionZero.pitch !== "A city of ash and old debts." ||
+    "safetyPreferences" in sessionZeroExport.payload
+  ) {
+    throw new Error("Campaign export did not include the charter or leaked safety preferences");
+  }
+  log("session zero, private safety limits, and the pause signal work");
+
   const downtimeGrant = await api(`/api/campaigns/${campaign.id}/downtime`, {
     method: "POST",
     cookie: gmCookie,
