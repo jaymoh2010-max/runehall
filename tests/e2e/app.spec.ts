@@ -622,6 +622,17 @@ test("GM schedules from Sessions and overdue sessions stay current", async ({ pa
   await expect(nextCard.locator('input[type="datetime-local"]')).toHaveCount(0);
 });
 
+test("GM downloads a self-contained campaign archive", async ({ page }) => {
+  await signIn(page, admin);
+  await page.goto(`${campaignPath}?tab=settings`);
+  await expect(page.getByRole("heading", { name: "Campaign archive" })).toBeVisible();
+  const downloadPromise = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Export with files" }).click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toMatch(/\.runehall\.self-contained\.json$/);
+  await expect(page.getByText("Self-contained campaign archive exported.")).toBeVisible();
+});
+
 test("lazy library, compendium entry, rules, and account routes load", async ({ page }) => {
   await signIn(page, admin);
   await page.goto("/library");

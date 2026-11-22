@@ -1095,6 +1095,33 @@ async function main() {
   if (playerAssets.status !== 403) throw new Error("Player could read the GM asset library");
   log("campaign assets track usage and delete unused files");
 
+  const selfContainedExport = await api(`/api/campaigns/${campaign.id}/export?selfContained=1`, {
+    cookie: gmCookie,
+  });
+  const embedded = selfContainedExport.payload.embeddedAssets?.[firstAsset.url];
+  if (embedded !== pixel.toString("base64")) {
+    throw new Error("Self-contained export did not embed the referenced asset");
+  }
+  const importedArchive = await api("/api/campaigns/import", {
+    method: "POST",
+    cookie: gmCookie,
+    body: selfContainedExport.payload,
+  });
+  if (importedArchive.payload.stats.embeddedAssets < 1) {
+    throw new Error("Import did not restore embedded assets");
+  }
+  const importedAssets = await api(`/api/campaigns/${importedArchive.payload.campaign.id}/assets`, {
+    cookie: gmCookie,
+  });
+  if (!importedAssets.payload.assets.some((asset) => asset.filename === firstAsset.filename)) {
+    throw new Error("Imported campaign did not register the embedded asset");
+  }
+  await api(`/api/campaigns/${importedArchive.payload.campaign.id}`, {
+    method: "DELETE",
+    cookie: gmCookie,
+  });
+  log("self-contained archive embeds and restores uploaded files");
+
   const uploadsPath = path.join(tempDir, "uploads");
   const filesBeforeRejects = new Set(fs.existsSync(uploadsPath) ? fs.readdirSync(uploadsPath) : []);
   const rawUpload = async ({

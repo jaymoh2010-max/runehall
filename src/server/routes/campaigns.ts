@@ -1,4 +1,6 @@
 import type { FastifyInstance } from "fastify";
+import fs from "node:fs";
+import path from "node:path";
 import {
   campaignCharacterCount,
   campaignCharacters,
@@ -102,7 +104,16 @@ import { contextForDraft } from "../compendium";
 import { campaignSessionsFor } from "../sessionData";
 import { importCampaign } from "../campaignImport";
 import { logAudit } from "../audit";
-import { inviteCode, newId, now, parseJson, safeInt, safeString, sanitizeUserText } from "../util";
+import {
+  inviteCode,
+  newId,
+  now,
+  parseJson,
+  safeInt,
+  safeString,
+  sanitizeUserText,
+  uploadsDir,
+} from "../util";
 
 function campaignCounts(row: CampaignRow) {
   return {
@@ -289,7 +300,7 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
     });
   });
 
-  app.post("/api/campaigns/import", { bodyLimit: 25 * 1024 * 1024 }, async (request, reply) => {
+  app.post("/api/campaigns/import", { bodyLimit: 64 * 1024 * 1024 }, async (request, reply) => {
     if (!request.user) return reply.code(401).send({ error: "Sign in to continue." });
     try {
       const result = importCampaign(request.user.id, request.body);
@@ -703,7 +714,7 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
       if (character.summary?.portraitUrl) assets.add(character.summary.portraitUrl);
     for (const track of audioTracks) assets.add(track.url);
 
-    const payload = {
+    const payload: Record<string, unknown> = {
       format: "runehall-campaign",
       version: 1,
       exportedAt: new Date().toISOString(),
@@ -739,9 +750,50 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
       assets: [...assets],
       note: "Image and audio files are referenced by URL. Use `npm run backup` to archive the database and data/uploads together. Private player notes are never included in campaign exports.",
     };
+    const selfContained =
+      (request.query as { selfContained?: string } | undefined)?.selfContained === "1";
+    if (selfContained) {
+      const allowedExtensions = new Set([
+        ".png",
+        ".jpg",
+        ".jpeg",
+        ".webp",
+        ".gif",
+        ".avif",
+        ".mp3",
+        ".ogg",
+        ".wav",
+        ".m4a",
+        ".webm",
+      ]);
+      const embeddedAssets: Record<string, string> = {};
+      const referencedUploads = new Set<string>();
+      for (const match of JSON.stringify(payload).matchAll(/\/uploads\/([A-Za-z0-9._-]+)/g)) {
+        referencedUploads.add(match[1]);
+      }
+      let totalBytes = 0;
+      for (const filename of referencedUploads) {
+        if (!allowedExtensions.has(path.extname(filename).toLowerCase())) continue;
+        const filePath = path.join(uploadsDir(), filename);
+        if (!fs.existsSync(filePath)) continue;
+        const data = fs.readFileSync(filePath);
+        totalBytes += data.length;
+        if (totalBytes > 50 * 1024 * 1024) {
+          return reply.code(413).send({
+            error:
+              "This campaign's uploads exceed 50 MB. Use `npm run backup` for a full database and uploads archive.",
+          });
+        }
+        embeddedAssets[`/uploads/${filename}`] = data.toString("base64");
+      }
+      payload.embeddedAssets = embeddedAssets;
+      payload.note =
+        "Self-contained export: uploaded images and audio are embedded as base64. Import this file to restore the campaign without the original uploads folder. Private player notes are never included.";
+    }
     const safeName = row.name.replace(/[^a-z0-9-_]+/gi, "-").replace(/^-+|-+$/g, "") || "campaign";
+    const suffix = selfContained ? ".runehall.self-contained.json" : ".runehall.json";
     return reply
-      .header("Content-Disposition", `attachment; filename="${safeName}.runehall.json"`)
+      .header("Content-Disposition", `attachment; filename="${safeName}${suffix}"`)
       .send(payload);
   });
 

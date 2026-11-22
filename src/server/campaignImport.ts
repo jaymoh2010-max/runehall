@@ -101,6 +101,7 @@ export interface CampaignImportStats {
   knowledge: number;
   sessions: number;
   audioTracks: number;
+  embeddedAssets: number;
 }
 
 export interface CampaignImportResult {
@@ -186,6 +187,7 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
     knowledge: 0,
     sessions: 0,
     audioTracks: 0,
+    embeddedAssets: 0,
   };
 
   return transaction(() => {
@@ -214,6 +216,47 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
     db.prepare(
       "INSERT INTO campaign_members (campaign_id, user_id, role, joined_at) VALUES (?, ?, 'gm', ?)"
     ).run(campaignId, userId, ts);
+
+    const embeddedAssets = record(payload.embeddedAssets);
+    const allowedAssetExtensions = new Map<string, string>([
+      [".png", "image/png"],
+      [".jpg", "image/jpeg"],
+      [".jpeg", "image/jpeg"],
+      [".webp", "image/webp"],
+      [".gif", "image/gif"],
+      [".avif", "image/avif"],
+      [".mp3", "audio/mpeg"],
+      [".ogg", "audio/ogg"],
+      [".wav", "audio/wav"],
+      [".m4a", "audio/mp4"],
+      [".webm", "audio/webm"],
+    ]);
+    let embeddedBytes = 0;
+    for (const [assetUrl, encoded] of Object.entries(embeddedAssets)) {
+      if (typeof encoded !== "string" || !assetUrl.startsWith("/uploads/")) continue;
+      const filename = assetUrl.slice("/uploads/".length);
+      if (!/^[A-Za-z0-9._-]+$/.test(filename) || filename === "." || filename === "..") {
+        continue;
+      }
+      const mimeType = allowedAssetExtensions.get(path.extname(filename).toLowerCase());
+      if (!mimeType) continue;
+      if (encoded.length > 20 * 1024 * 1024) {
+        throw new Error("An embedded asset in this archive is larger than 20 MB.");
+      }
+      const data = Buffer.from(encoded, "base64");
+      if (!data.length) continue;
+      embeddedBytes += data.length;
+      if (embeddedBytes > 50 * 1024 * 1024) {
+        throw new Error("Embedded campaign assets exceed the 50 MB import limit.");
+      }
+      fs.writeFileSync(path.join(uploadsDir(), filename), data);
+      db.prepare(
+        `INSERT OR IGNORE INTO uploaded_assets
+           (id, filename, original_name, mime_type, size, campaign_id, uploaded_by, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+      ).run(newId("asset"), filename, filename, mimeType, data.length, campaignId, userId, ts);
+      stats.embeddedAssets += 1;
+    }
 
     const memberUserByExportId = new Map<string, string>();
     const memberIds = new Set<string>([userId]);

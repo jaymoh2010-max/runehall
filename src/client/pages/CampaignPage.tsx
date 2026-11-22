@@ -866,18 +866,25 @@ export function CampaignPage() {
     }
   };
 
-  const exportCampaign = async () => {
+  const exportCampaign = async (selfContained = false) => {
     if (!id || !campaign) return;
     try {
-      const payload = await api<Record<string, unknown>>(`/api/campaigns/${id}/export`);
+      const payload = await api<Record<string, unknown>>(
+        `/api/campaigns/${id}/export${selfContained ? "?selfContained=1" : ""}`
+      );
       const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement("a");
       anchor.href = url;
-      anchor.download = `${campaign.name.replace(/[^a-z0-9-_ ]/gi, "").trim() || "campaign"}.runehall.json`;
+      anchor.download = `${campaign.name.replace(/[^a-z0-9-_ ]/gi, "").trim() || "campaign"}${
+        selfContained ? ".runehall.self-contained.json" : ".runehall.json"
+      }`;
       anchor.click();
       URL.revokeObjectURL(url);
-      toast("Campaign archive exported.", "success");
+      toast(
+        selfContained ? "Self-contained campaign archive exported." : "Campaign archive exported.",
+        "success"
+      );
     } catch (err) {
       toast(errorMessage(err), "error");
     }
@@ -2343,16 +2350,26 @@ export function CampaignPage() {
                     <h3>Campaign archive</h3>
                     <p className="muted small">
                       Export characters, scenes, tokens, chat, journal, and state as portable JSON.
-                      Use <code>npm run backup</code> for a database + uploads archive.
+                      Choose <strong>with files</strong> to embed uploaded images and audio in the
+                      archive. Private player notes are never included.
                     </p>
                   </div>
-                  <Button
-                    variant="secondary"
-                    icon={<Download size={14} />}
-                    onClick={exportCampaign}
-                  >
-                    Export campaign
-                  </Button>
+                  <div className="row wrap" style={{ gap: 8 }}>
+                    <Button
+                      variant="secondary"
+                      icon={<Download size={14} />}
+                      onClick={() => void exportCampaign()}
+                    >
+                      Export campaign
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      icon={<Download size={14} />}
+                      onClick={() => void exportCampaign(true)}
+                    >
+                      Export with files
+                    </Button>
+                  </div>
                 </div>
               ) : null}
               <div className="divider" />
