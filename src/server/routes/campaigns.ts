@@ -1380,11 +1380,15 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
       body.automaticBonusProgression === undefined
         ? Boolean(row.automatic_bonus_progression)
         : body.automaticBonusProgression === true;
+    const playerItemGrant =
+      body.playerItemGrant === undefined
+        ? Boolean(row.player_item_grant)
+        : body.playerItemGrant === true;
     const variantsChanged =
       freeArchetype !== Boolean(row.free_archetype) ||
       automaticBonusProgression !== Boolean(row.automatic_bonus_progression);
     db.prepare(
-      "UPDATE campaigns SET name = ?, description = ?, ruleset = ?, xp_mode = ?, advancement_speed = ?, settlement_level = ?, free_archetype = ?, automatic_bonus_progression = ?, updated_at = ? WHERE id = ?"
+      "UPDATE campaigns SET name = ?, description = ?, ruleset = ?, xp_mode = ?, advancement_speed = ?, settlement_level = ?, free_archetype = ?, automatic_bonus_progression = ?, player_item_grant = ?, updated_at = ? WHERE id = ?"
     ).run(
       name,
       description,
@@ -1394,6 +1398,7 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
       settlementLevel,
       freeArchetype ? 1 : 0,
       automaticBonusProgression ? 1 : 0,
+      playerItemGrant ? 1 : 0,
       now(),
       id
     );

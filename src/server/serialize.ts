@@ -137,6 +137,7 @@ export function serializeCampaignSummary(
     settlementLevel: normalizeSettlementLevel(campaign.settlement_level),
     freeArchetype: Boolean(campaign.free_archetype),
     automaticBonusProgression: Boolean(campaign.automatic_bonus_progression),
+    playerItemGrant: Boolean(campaign.player_item_grant),
     shopMode: normalizeShopStockMode(campaign.shop_mode),
     worldDate: normalizeGolarionDate({
       year: campaign.world_year,
@@ -358,7 +359,7 @@ export function serializeCharacter(
   const campaignRow = row.campaign_id
     ? (db
         .prepare(
-          "SELECT ruleset, advancement_speed, settlement_level, free_archetype, automatic_bonus_progression FROM campaigns WHERE id = ?"
+          "SELECT ruleset, advancement_speed, settlement_level, free_archetype, automatic_bonus_progression, player_item_grant FROM campaigns WHERE id = ?"
         )
         .get(row.campaign_id) as
         | {
@@ -367,6 +368,7 @@ export function serializeCharacter(
             settlement_level: number;
             free_archetype: number;
             automatic_bonus_progression: number;
+            player_item_grant: number;
           }
         | undefined)
     : undefined;
@@ -391,6 +393,7 @@ export function serializeCharacter(
     campaignAutomaticBonusProgression: campaignRow
       ? Boolean(campaignRow.automatic_bonus_progression)
       : null,
+    campaignPlayerItemGrant: campaignRow ? Boolean(campaignRow.player_item_grant) : null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     revision: Number(row.revision ?? 1),

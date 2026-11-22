@@ -2296,42 +2296,10 @@ async function main() {
   gmSocket.emit("token:delete", { campaignId: campaign.id, tokenId: unlinkedToken.id });
   log("direct token HP edits share temp HP, dying, and wounded rules");
 
-  const detourPromise = waitForEvent(
-    gmSocket,
-    "token:moved",
-    (event) => event.tokenId === token.id && (event.x !== 100 || event.y !== 100)
-  );
-  playerSocket.emit("token:move", {
-    campaignId: campaign.id,
-    sceneId: scene.id,
-    tokenId: token.id,
-    x: 200,
-    y: 180,
-  });
-  const detourEvent = await detourPromise;
-  const detourTable = await api(`/api/campaigns/${campaign.id}/table`, { cookie: gmCookie });
-  const detourToken = detourTable.payload.tokens.find((entry) => entry.id === token.id);
-  if (!detourToken) throw new Error("Token disappeared during a prop detour");
-  if (detourToken.x === 200 && detourToken.y === 180) {
-    throw new Error("Prop collision did not stop the token inside the crate");
-  }
-  if (detourToken.x > 150 && detourToken.x < 250 && detourToken.y > 130 && detourToken.y < 230) {
-    throw new Error("Prop detour ended inside the crate");
-  }
-  if (detourEvent.x !== detourToken.x || detourEvent.y !== detourToken.y) {
-    throw new Error("Detour position did not match the authoritative token state");
-  }
-  await api(`/api/scenes/${scene.id}`, {
-    method: "PATCH",
-    cookie: gmCookie,
-    body: { propCollision: false },
-  });
-  log("prop collision routes a move around the crate and stops at the last reachable square");
-
   const movedPromise = waitForEvent(
     gmSocket,
     "token:moved",
-    (event) => event.tokenId && event.x === 200 && event.y === 180
+    (event) => event.tokenId === token.id && event.x === 200 && event.y === 180
   );
   const revisionPromise = waitForEvent(
     gmSocket,
@@ -2350,7 +2318,12 @@ async function main() {
   if (revisionEvent.revision <= revisedTable.payload.revision) {
     throw new Error("Campaign revision did not advance for a token move");
   }
-  log("player moved their own token and GM received the update");
+  const movedTable = await api(`/api/campaigns/${campaign.id}/table`, { cookie: gmCookie });
+  const movedToken = movedTable.payload.tokens.find((entry) => entry.id === token.id);
+  if (!movedToken || movedToken.x !== 200 || movedToken.y !== 180) {
+    throw new Error("Free movement was not persisted as dragged");
+  }
+  log("player moved their own token freely and GM received the update");
 
   const chatPromise = waitForEvent(
     gmSocket,
@@ -3317,207 +3290,7 @@ async function main() {
   reconnectedPlayer.close();
   log("disconnected client caught up from the authoritative snapshot");
 
-  const movementSetup = waitForEvent(
-    gmSocket,
-    "initiative:updated",
-    (payload) => payload.entries.length === 1 && payload.entries[0].id === "init_move_test"
-  );
-  gmSocket.emit("initiative:update", {
-    campaignId: campaign.id,
-    entries: [
-      {
-        id: "init_move_test",
-        tokenId: token.id,
-        name: "Smoke Hero",
-        initiative: 20,
-        color: "#c8a96b",
-        ownerId: player.id,
-        sceneId: scene.id,
-        movementUsed: 0,
-        diagonalSteps: 0,
-      },
-    ],
-    round: 1,
-    turnIndex: 0,
-  });
-  await movementSetup;
-
-  const firstMove = waitForEvent(gmSocket, "initiative:updated", (payload) => {
-    const active = payload.entries[payload.turnIndex];
-    return (
-      active?.id === "init_move_test" && active.movementUsed === 15 && active.diagonalSteps === 2
-    );
-  });
-  gmSocket.emit("token:move", {
-    campaignId: campaign.id,
-    sceneId: scene.id,
-    tokenId: token.id,
-    x: 560,
-    y: 500,
-  });
-  await firstMove;
-
-  const secondMove = waitForEvent(gmSocket, "initiative:updated", (payload) => {
-    const active = payload.entries[payload.turnIndex];
-    return (
-      active?.id === "init_move_test" && active.movementUsed === 20 && active.diagonalSteps === 3
-    );
-  });
-  gmSocket.emit("token:move", {
-    campaignId: campaign.id,
-    sceneId: scene.id,
-    tokenId: token.id,
-    x: 630,
-    y: 570,
-  });
-  await secondMove;
-
-  const movementReset = waitForEvent(gmSocket, "initiative:updated", (payload) => {
-    const active = payload.entries[payload.turnIndex];
-    return active?.id === "init_move_test" && active.movementUsed === 0;
-  });
-  gmSocket.emit("initiative:next", { campaignId: campaign.id, direction: 1 });
-  await movementReset;
-  log("movement carries the 5/10 diagonal count across moves and resets on the next turn");
-
-  const speedCrate = {
-    id: "prop_speed",
-    name: "Speed crate",
-    imageUrl: "/props/crate.svg",
-    x: 665,
-    y: 735,
-    width: 100,
-    height: 100,
-    rotation: 0,
-    layer: "ground",
-    visible: true,
-    locked: false,
-    z: 1,
-  };
-  const speedProps = waitForEvent(
-    gmSocket,
-    "scene:props",
-    (payload) =>
-      payload.sceneId === scene.id && payload.props?.some((prop) => prop.id === "prop_speed")
-  );
-  gmSocket.emit("scene:props", {
-    campaignId: campaign.id,
-    sceneId: scene.id,
-    props: [speedCrate],
-  });
-  await speedProps;
-  await api(`/api/scenes/${scene.id}`, {
-    method: "PATCH",
-    cookie: gmCookie,
-    body: { propCollision: true },
-  });
-  const speedSetup = waitForEvent(gmSocket, "initiative:updated", (payload) => {
-    const active = payload.entries[payload.turnIndex];
-    return active?.id === "init_move_test" && active.movementUsed === 20;
-  });
-  gmSocket.emit("initiative:update", {
-    campaignId: campaign.id,
-    entries: [
-      {
-        id: "init_move_test",
-        tokenId: token.id,
-        name: "Smoke Hero",
-        initiative: 20,
-        color: "#c8a96b",
-        ownerId: player.id,
-        sceneId: scene.id,
-        movementUsed: 20,
-        diagonalSteps: 0,
-      },
-    ],
-    round: 1,
-    turnIndex: 0,
-  });
-  await speedSetup;
-
-  const speedPlayer = await connectSocket(playerCookie);
-  await emitAck(speedPlayer, "campaign:join", { campaignId: campaign.id });
-  const speedMove = waitForEvent(gmSocket, "token:moved", (event) => event.tokenId === token.id);
-  const speedMovement = waitForEvent(gmSocket, "initiative:updated", (payload) => {
-    const active = payload.entries[payload.turnIndex];
-    return active?.id === "init_move_test" && active.movementUsed === 25;
-  });
-  speedPlayer.emit("token:move", {
-    campaignId: campaign.id,
-    sceneId: scene.id,
-    tokenId: token.id,
-    x: 665,
-    y: 875,
-  });
-  const speedEvent = await speedMove;
-  await speedMovement;
-  speedPlayer.close();
-  if (speedEvent.x === 665 && speedEvent.y === 875) {
-    throw new Error("A speed-limited detour reached a square beyond the remaining Speed");
-  }
-  const speedTable = await api(`/api/campaigns/${campaign.id}/table`, { cookie: gmCookie });
-  const speedToken = speedTable.payload.tokens.find((entry) => entry.id === token.id);
-  if (!speedToken || speedToken.x !== speedEvent.x || speedToken.y !== speedEvent.y) {
-    throw new Error("Speed-limited detour position did not match the authoritative token state");
-  }
-  await api(`/api/scenes/${scene.id}`, {
-    method: "PATCH",
-    cookie: gmCookie,
-    body: { propCollision: false },
-  });
-  log("a detour stops at the last square covered by the remaining Speed");
-
-  const wallStart = { x: speedEvent.x, y: speedEvent.y };
-  const wallTarget = { x: wallStart.x + 140, y: wallStart.y };
-  const wallBarrier = {
-    id: "wall_move_smoke",
-    x1: wallStart.x + 35,
-    y1: wallStart.y - 140,
-    x2: wallStart.x + 35,
-    y2: wallStart.y + 140,
-    kind: "wall",
-  };
-  const wallBarrierPromise = waitForEvent(
-    gmSocket,
-    "scene:walls",
-    (payload) =>
-      payload.sceneId === scene.id && payload.walls?.some((wall) => wall.id === "wall_move_smoke")
-  );
-  gmSocket.emit("scene:walls", {
-    campaignId: campaign.id,
-    sceneId: scene.id,
-    walls: [wallBarrier],
-  });
-  await wallBarrierPromise;
-  const wallMove = waitForEvent(
-    gmSocket,
-    "token:moved",
-    (event) => event.tokenId === token.id && event.x === wallTarget.x && event.y === wallTarget.y
-  );
-  const wallMovement = waitForEvent(gmSocket, "initiative:updated", (payload) => {
-    const active = payload.entries[payload.turnIndex];
-    return active?.id === "init_move_test" && (active.movementUsed ?? 0) > 35;
-  });
-  gmSocket.emit("token:move", {
-    campaignId: campaign.id,
-    sceneId: scene.id,
-    tokenId: token.id,
-    x: wallTarget.x,
-    y: wallTarget.y,
-  });
-  await wallMove;
-  await wallMovement;
-  await api(`/api/scenes/${scene.id}`, {
-    method: "PATCH",
-    cookie: gmCookie,
-    body: { wallCollision: false },
-  });
-  gmSocket.emit("scene:walls", {
-    campaignId: campaign.id,
-    sceneId: scene.id,
-    walls: [],
-  });
-  log("wall collision routes a move around a wall and charges the detour distance");
+  // Movement, speed limits, and wall/prop collision are table judgement calls now.
 
   const smokeEncounter = (
     await api(`/api/campaigns/${campaign.id}/encounters`, {

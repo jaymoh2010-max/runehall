@@ -1,4 +1,11 @@
-# Runehall — product and architecture plan
+# Runehall - product and architecture plan
+
+> **Current direction (back to basics).** Runehall is now a manual-first table:
+> shared map, tokens, fog, dice/chat, soundtrack, a manual initiative order, the
+> compendium/bestiary, and a character builder/sheet that opens inside the table.
+> Campaign navigation is limited to Table, Party, Journal, and Settings.
+> Sections below describe features that may still exist in the codebase but are
+> not part of the core UI. Do not treat them as current product requirements.
 
 ## 1. Vision
 

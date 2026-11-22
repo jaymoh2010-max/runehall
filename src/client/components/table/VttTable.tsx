@@ -1,73 +1,29 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  ChevronLeft,
-  ChevronRight,
-  Dices,
-  Eye,
-  EyeOff,
-  Grid3X3,
-  Keyboard,
-  Lock,
-  Map,
-  Maximize2,
-  MessageSquare,
-  Minimize2,
-  Minus,
-  MousePointer2,
-  Plus,
-  Ruler,
-  Shield,
-  Swords,
-  Trash2,
-  Unlock,
-  Users,
-  X,
-} from "lucide-react";
+import { Map, Plus, Volume2 } from "lucide-react";
 import type {
   CampaignTable,
   InitiativeEntry,
   Monster,
   PublicUser,
   Scene,
-  SceneProp,
-  ScenePropLayer,
   Token,
-  Wall,
-  WallKind,
 } from "../../../shared/types";
-import type { PropPreset } from "../../../shared/props";
-import { tokenTurnEffectsFromMonster } from "../../../shared/tokenTurnEffects";
 import { suggestedTokenPosition } from "../../../shared/tokens";
 import { errorMessage, useToasts } from "../../stores";
 import { api } from "../../api";
 import { getSocket } from "../../socket";
-import {
-  Avatar,
-  Badge,
-  Button,
-  Card,
-  EmptyState,
-  Field,
-  IconButton,
-  Input,
-  Select,
-  Stat,
-  Tag,
-  Toggle,
-} from "../ui";
+import { Button, EmptyState } from "../ui";
 import { SceneCanvas } from "./SceneCanvas";
 import { ChatPanel } from "./ChatPanel";
 import { InitiativeBar } from "./InitiativeBar";
 import { PartyRail } from "./PartyRail";
-import { TokenEditModal } from "./TokenEditModal";
 import { AddTokenModal, SceneEditModal, SceneManagerModal } from "./TableModals";
-import { VttToolbar } from "./VttToolbar";
-import { VttTokenPanel } from "./VttTokenPanel";
 import { BestiaryPalette } from "./BestiaryPalette";
-import { PropPalette } from "./PropPalette";
 import { SoundPanel } from "./SoundPanel";
+import { CoreToolbar } from "./CoreToolbar";
+import { TokenQuickPanel } from "./TokenQuickPanel";
+import { CharacterSheetView } from "../sheet/CharacterSheetView";
 import { useCampaignTable } from "./useCampaignTable";
-import type { AoeTemplate, TemplateKind } from "../../../shared/templates";
 
 interface VttTableProps {
   initial: CampaignTable;
@@ -103,28 +59,17 @@ export function VttTable({ initial, campaignId, user, isGm, active }: VttTablePr
     remotePointer,
     connectionStatus,
   } = useCampaignTable({ initial, campaignId, toast });
-  const [editingTokenId, setEditingTokenId] = useState<string | null>(null);
+
   const [fogBrush, setFogBrush] = useState<"reveal" | "hide" | null>(null);
   const [brushSize, setBrushSize] = useState(3);
   const [measureMode, setMeasureMode] = useState(false);
-  const [wallMode, setWallMode] = useState(false);
-  const [wallKind, setWallKind] = useState<WallKind>("wall");
-  const [wallHidden, setWallHidden] = useState(false);
-  const [propMode, setPropMode] = useState(false);
-  const [propPaletteOpen, setPropPaletteOpen] = useState(false);
-  const [propLayer, setPropLayer] = useState<ScenePropLayer>("ground");
-  const [pendingProp, setPendingProp] = useState<PropPreset | null>(null);
-  const [selectedPropId, setSelectedPropId] = useState<string | null>(null);
   const [sceneManagerOpen, setSceneManagerOpen] = useState(false);
   const [editingScene, setEditingScene] = useState<Scene | null>(null);
   const [addTokenOpen, setAddTokenOpen] = useState(false);
   const [bestiaryOpen, setBestiaryOpen] = useState(false);
-  const [templateKind, setTemplateKind] = useState<TemplateKind | null>(null);
-  const [templateSize, setTemplateSize] = useState(20);
-  const [templateHidden, setTemplateHidden] = useState(false);
-  const [previewSceneId, setPreviewSceneId] = useState<string | null>(null);
-  const [leftOpen, setLeftOpen] = useState(true);
+  const [partyOpen, setPartyOpen] = useState(true);
   const [rightOpen, setRightOpen] = useState(true);
+  const [sheetCharacterId, setSheetCharacterId] = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [theaterMode, setTheaterMode] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -133,6 +78,11 @@ export function VttTable({ initial, campaignId, user, isGm, active }: VttTablePr
     const onFullscreenChange = () => setIsFullscreen(Boolean(document.fullscreenElement));
     document.addEventListener("fullscreenchange", onFullscreenChange);
     return () => document.removeEventListener("fullscreenchange", onFullscreenChange);
+  }, []);
+
+  useEffect(() => {
+    if (window.innerWidth < 1160) setRightOpen(false);
+    if (window.innerWidth < 900) setPartyOpen(false);
   }, []);
 
   const toggleFullscreen = useCallback(() => {
@@ -145,8 +95,6 @@ export function VttTable({ initial, campaignId, user, isGm, active }: VttTablePr
       setTheaterMode(false);
       return;
     }
-    // Enter theater mode immediately so the button always responds, even in
-    // embedded browsers where the Fullscreen API is blocked or never settles.
     setTheaterMode(true);
     if (document.fullscreenEnabled && rootRef.current?.requestFullscreen) {
       rootRef.current
@@ -158,58 +106,27 @@ export function VttTable({ initial, campaignId, user, isGm, active }: VttTablePr
     }
   }, [theaterMode]);
 
-  const activeScene =
-    scenes.find((scene) => scene.id === (previewSceneId ?? activeSceneId)) ?? null;
-  const previewing = Boolean(previewSceneId);
+  const activeScene = scenes.find((scene) => scene.id === activeSceneId) ?? null;
   const sceneTokens = useMemo(
-    () =>
-      tokens.filter(
-        (token) =>
-          token.sceneId === (previewSceneId ?? activeSceneId) &&
-          ((!previewing && isGm) || !token.hidden)
-      ),
-    [tokens, activeSceneId, previewSceneId, previewing, isGm]
+    () => tokens.filter((token) => token.sceneId === activeSceneId && (isGm || !token.hidden)),
+    [tokens, activeSceneId, isGm]
   );
-  const activeMovement = useMemo(() => {
-    const entry = initiative[turnIndex];
-    if (!entry?.tokenId || !activeSceneId || entry.sceneId !== activeSceneId) return null;
-    const token = tokens.find((item) => item.id === entry.tokenId);
-    if (!token) return null;
-    const speed = token.characterId
-      ? characters.find((record) => record.id === token.characterId)?.summary?.speed
-      : null;
-    return {
-      tokenId: token.id,
-      speed: typeof speed === "number" && Number.isFinite(speed) && speed > 0 ? speed : null,
-      movementUsed: Math.max(0, Math.round(entry.movementUsed ?? 0)),
-      diagonalSteps: Math.max(0, Math.round(entry.diagonalSteps ?? 0)),
-    };
-  }, [initiative, turnIndex, activeSceneId, tokens, characters]);
   const selectedToken = sceneTokens.find((token) => token.id === selectedTokenId) ?? null;
-  const editingToken = tokens.find((token) => token.id === editingTokenId) ?? null;
+  const myCharacterId =
+    characters
+      .filter((character) => character.userId === user.id)
+      .sort(
+        (a, b) =>
+          Number(Boolean(b.summary)) - Number(Boolean(a.summary)) || b.updatedAt - a.updatedAt
+      )[0]?.id ?? null;
+  const canvasScene = useMemo(
+    () =>
+      activeScene
+        ? { ...activeScene, wallCollision: false, propCollision: false, losEnabled: false }
+        : null,
+    [activeScene]
+  );
 
-  useEffect(() => {
-    setSelectedPropId(null);
-    setPendingProp(null);
-  }, [activeSceneId, previewSceneId]);
-
-  useEffect(() => {
-    setPreviewSceneId(null);
-  }, [activeSceneId]);
-
-  useEffect(() => {
-    if (previewSceneId && !scenes.some((scene) => scene.id === previewSceneId)) {
-      setPreviewSceneId(null);
-    }
-  }, [scenes, previewSceneId]);
-
-  // ---- Realtime -----------------------------------------------------------
-  useEffect(() => {
-    if (window.innerWidth < 1160) setRightOpen(false);
-    if (window.innerWidth < 760) setLeftOpen(false);
-  }, []);
-
-  // ---- Actions ------------------------------------------------------------
   const activateScene = (sceneId: string) => {
     if (!isGm) return;
     setActiveSceneId(sceneId);
@@ -217,30 +134,9 @@ export function VttTable({ initial, campaignId, user, isGm, active }: VttTablePr
     getSocket().emit("scene:activate", { campaignId, sceneId });
   };
 
-  const placeTemplate = (next: AoeTemplate) => {
-    if (!activeSceneId) return;
-    getSocket().emit("template:add", { campaignId, sceneId: activeSceneId, template: next });
-  };
-
-  const clearTemplates = () => {
-    if (!activeSceneId) return;
-    getSocket().emit("template:clear", { campaignId, sceneId: activeSceneId });
-  };
-
   const reorderScenes = (sceneIds: string[]) => {
     if (!isGm) return;
     getSocket().emit("scene:reorder", { campaignId, sceneIds });
-  };
-
-  const previewScene = (sceneId: string) => {
-    if (!isGm) return;
-    setPreviewSceneId(sceneId);
-    setSelectedTokenId(null);
-  };
-
-  const exitPreview = () => {
-    setPreviewSceneId(null);
-    setSelectedTokenId(null);
   };
 
   const duplicateScene = async (sceneId: string) => {
@@ -294,123 +190,8 @@ export function VttTable({ initial, campaignId, user, isGm, active }: VttTablePr
     getSocket().emit("fog:update", { campaignId, sceneId: activeSceneId, cells, mode });
   };
 
-  const saveWalls = (walls: Wall[]) => {
-    if (!isGm || !activeSceneId) return;
-    setScenes((current) =>
-      current.map((scene) => (scene.id === activeSceneId ? { ...scene, walls } : scene))
-    );
-    getSocket().emit("scene:walls", { campaignId, sceneId: activeSceneId, walls });
-  };
-
-  const clearWalls = () => {
-    if (!isGm) return;
-    if (!window.confirm("Remove all walls and doors from this scene?")) return;
-    saveWalls([]);
-  };
-
-  const enterWallMode = useCallback((next: boolean) => {
-    setWallMode(next);
-    setPropMode(false);
-    setPropPaletteOpen(false);
-    setPendingProp(null);
-    setSelectedPropId(null);
-    if (!next) return;
-    setFogBrush(null);
-    setMeasureMode(false);
-    setTemplateKind(null);
-  }, []);
-
-  const saveProps = (props: SceneProp[]) => {
-    if (!isGm || !activeSceneId) return;
-    setScenes((current) =>
-      current.map((scene) => (scene.id === activeSceneId ? { ...scene, props } : scene))
-    );
-    getSocket().emit("scene:props", { campaignId, sceneId: activeSceneId, props });
-  };
-
-  const placeProp = (x: number, y: number) => {
-    if (!activeScene || !pendingProp) return;
-    const width = Math.max(8, pendingProp.squaresW * activeScene.gridSize);
-    const height = Math.max(8, pendingProp.squaresH * activeScene.gridSize);
-    const z = Math.max(0, ...(activeScene.props ?? []).map((prop) => prop.z)) + 1;
-    const prop: SceneProp = {
-      id: `prop_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`,
-      name: pendingProp.name,
-      imageUrl: pendingProp.imageUrl,
-      x,
-      y,
-      width,
-      height,
-      rotation: 0,
-      layer: propLayer,
-      visible: true,
-      locked: false,
-      z,
-    };
-    saveProps([...(activeScene.props ?? []), prop]);
-    setSelectedPropId(prop.id);
-    setPendingProp(null);
-  };
-
-  const updateProp = (propId: string, patch: Partial<SceneProp>) => {
-    if (!activeScene) return;
-    saveProps(
-      (activeScene.props ?? []).map((prop) => (prop.id === propId ? { ...prop, ...patch } : prop))
-    );
-  };
-
-  const deleteProp = (propId: string) => {
-    if (!activeScene) return;
-    saveProps((activeScene.props ?? []).filter((prop) => prop.id !== propId));
-    setSelectedPropId((current) => (current === propId ? null : current));
-  };
-
-  const enterPropMode = useCallback((next: boolean) => {
-    setPropMode(next);
-    setPropPaletteOpen(next);
-    if (!next) {
-      setPendingProp(null);
-      setSelectedPropId(null);
-      return;
-    }
-    setWallMode(false);
-    setFogBrush(null);
-    setMeasureMode(false);
-    setTemplateKind(null);
-    setBestiaryOpen(false);
-  }, []);
-
-  const setPropCollision = async (enabled: boolean) => {
-    if (!activeScene || !isGm) return;
-    const sceneId = activeScene.id;
-    setScenes((current) =>
-      current.map((scene) => (scene.id === sceneId ? { ...scene, propCollision: enabled } : scene))
-    );
-    try {
-      const result = await api<{ scene: Scene }>(`/api/scenes/${sceneId}`, {
-        method: "PATCH",
-        body: { propCollision: enabled },
-      });
-      setScenes((current) =>
-        current.map((scene) => (scene.id === result.scene.id ? result.scene : scene))
-      );
-      toast(`Prop collision ${enabled ? "enabled" : "disabled"}.`, "success");
-    } catch (error) {
-      setScenes((current) =>
-        current.map((scene) =>
-          scene.id === sceneId ? { ...scene, propCollision: !enabled } : scene
-        )
-      );
-      toast(errorMessage(error), "error");
-    }
-  };
-
   const createToken = (partial: Partial<Token>) => {
     if (!activeSceneId) return;
-    if (previewSceneId) {
-      toast("Exit preview before placing tokens.", "info");
-      return;
-    }
     getSocket().emit(
       "token:create",
       { campaignId, sceneId: activeSceneId, token: partial },
@@ -430,10 +211,6 @@ export function VttTable({ initial, campaignId, user, isGm, active }: VttTablePr
 
   const createTokens = (partials: Partial<Token>[]) => {
     if (!activeSceneId || !partials.length) return;
-    if (previewSceneId) {
-      toast("Exit preview before placing tokens.", "info");
-      return;
-    }
     const socket = getSocket();
     Promise.all(
       partials.map(
@@ -465,10 +242,6 @@ export function VttTable({ initial, campaignId, user, isGm, active }: VttTablePr
 
   const placeMonster = (monster: Monster, count: number, x?: number, y?: number) => {
     if (!activeScene) return;
-    if (previewSceneId) {
-      toast("Exit preview before placing tokens.", "info");
-      return;
-    }
     const total = Math.max(1, Math.min(20, Math.round(count) || 1));
     const groupId =
       total > 1 ? `grp_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}` : null;
@@ -494,7 +267,6 @@ export function VttTable({ initial, campaignId, user, isGm, active }: VttTablePr
         groupId,
         groupName: groupId ? monster.name : null,
         conditions: [],
-        turnEffects: tokenTurnEffectsFromMonster(monster),
         hidden: false,
         locked: false,
       };
@@ -502,103 +274,11 @@ export function VttTable({ initial, campaignId, user, isGm, active }: VttTablePr
     createTokens(partials);
   };
 
-  const updateGroupHp = (groupId: string, delta: number) => {
-    if (!activeSceneId) return;
-    const members = tokens.filter(
-      (token) =>
-        token.sceneId === activeSceneId && token.groupId === groupId && token.hpMax !== null
-    );
-    for (const member of members) {
-      if (delta < 0) {
-        damageToken(member.id, Math.abs(delta));
-        continue;
-      }
-      const current = member.hpCurrent ?? member.hpMax ?? 0;
-      const next = Math.max(0, Math.min(member.hpMax ?? 0, current + delta));
-      updateToken(member.id, { hpCurrent: next });
-    }
-  };
-
   const updateToken = (tokenId: string, patch: Partial<Token>) => {
     setTokens((current) =>
       current.map((token) => (token.id === tokenId ? { ...token, ...patch } : token))
     );
     getSocket().emit("token:update", { campaignId, token: { id: tokenId, ...patch } });
-  };
-
-  const damageToken = (
-    tokenId: string,
-    amount: number,
-    critical = false,
-    options: { damageType?: string; nonlethal?: boolean } = {}
-  ) => {
-    getSocket().emit(
-      "token:damage",
-      { campaignId, tokenId, amount, critical, ...options },
-      (result) => {
-        if (result.notes.length) toast(result.notes.join("; "), "info");
-      }
-    );
-  };
-
-  const bulkHp = (delta: number, full = false) => {
-    const selected = tokens.filter(
-      (token) => selectedTokenIds.includes(token.id) && token.sceneId === activeSceneId
-    );
-    for (const token of selected) {
-      const max = token.hpMax;
-      const current = token.hpCurrent ?? max ?? 0;
-      if (full) {
-        updateToken(token.id, { hpCurrent: max ?? current });
-      } else if (delta < 0) {
-        damageToken(token.id, Math.abs(delta));
-      } else {
-        updateToken(token.id, {
-          hpCurrent: Math.min(max ?? 1_000_000, current + delta),
-        });
-      }
-    }
-  };
-
-  const bulkCondition = (name: string, value: number | null, duration: number | null) => {
-    const selected = tokens.filter(
-      (token) => selectedTokenIds.includes(token.id) && token.sceneId === activeSceneId
-    );
-    for (const token of selected) {
-      if (
-        token.conditions.some((condition) => condition.name.toLowerCase() === name.toLowerCase())
-      ) {
-        continue;
-      }
-      updateToken(token.id, { conditions: [...token.conditions, { name, value, duration }] });
-    }
-  };
-
-  const bulkClearConditions = () => {
-    const selected = tokens.filter(
-      (token) => selectedTokenIds.includes(token.id) && token.sceneId === activeSceneId
-    );
-    for (const token of selected) updateToken(token.id, { conditions: [] });
-  };
-
-  const bulkPatch = (patch: Partial<Token>) => {
-    const selected = tokens.filter(
-      (token) => selectedTokenIds.includes(token.id) && token.sceneId === activeSceneId
-    );
-    for (const token of selected) updateToken(token.id, patch);
-  };
-
-  const bulkDelete = () => {
-    const selected = tokens.filter(
-      (token) => selectedTokenIds.includes(token.id) && token.sceneId === activeSceneId
-    );
-    if (!selected.length) return;
-    const ids = new Set(selected.map((token) => token.id));
-    setTokens((current) => current.filter((token) => !ids.has(token.id)));
-    for (const token of selected) {
-      getSocket().emit("token:delete", { campaignId, tokenId: token.id });
-    }
-    setSelectedTokenId(null);
   };
 
   const deleteToken = (tokenId: string) => {
@@ -650,11 +330,6 @@ export function VttTable({ initial, campaignId, user, isGm, active }: VttTablePr
     getSocket().emit("initiative:roll", { campaignId, sceneId: activeSceneId });
   };
 
-  const clearInitiative = () => {
-    if (!window.confirm("Clear the entire initiative order?")) return;
-    getSocket().emit("initiative:update", { campaignId, entries: [], round: 1, turnIndex: 0 });
-  };
-
   const emitInitiative = (entries: InitiativeEntry[], nextRound = round, nextTurn = turnIndex) => {
     getSocket().emit("initiative:update", {
       campaignId,
@@ -664,89 +339,60 @@ export function VttTable({ initial, campaignId, user, isGm, active }: VttTablePr
     });
   };
 
-  const delayEntry = (entryId: string) => {
-    const index = initiative.findIndex((entry) => entry.id === entryId);
-    if (index < 0) return;
-    const entry = { ...initiative[index], delayed: true, readied: false };
-    const next = [...initiative.filter((item) => item.id !== entryId), entry];
-    emitInitiative(next, round, Math.min(index, Math.max(0, next.length - 1)));
+  const clearInitiative = () => {
+    if (!window.confirm("Clear the entire initiative order?")) return;
+    emitInitiative([], 1, 0);
   };
 
-  const readyEntry = (entryId: string) => {
-    const next = initiative.map((entry) =>
-      entry.id === entryId ? { ...entry, readied: true, delayed: false } : entry
-    );
-    let nextTurn = turnIndex + 1;
-    let nextRound = round;
-    if (nextTurn >= next.length) {
-      nextTurn = 0;
-      nextRound += 1;
+  const addSelectedToInitiative = () => {
+    if (!selectedToken) {
+      toast("Select a token first.", "info");
+      return;
     }
-    emitInitiative(next, nextRound, nextTurn);
-  };
-
-  const triggerReady = (entryId: string) => {
-    const entry = initiative.find((item) => item.id === entryId);
-    if (!entry?.readied) return;
-    emitInitiative(
-      initiative.map((item) => (item.id === entryId ? { ...item, readied: false } : item))
-    );
-    sendChat(`${entry.name}'s readied action triggers.`, false);
-  };
-
-  const clearInitiativeState = (entryId: string) => {
-    emitInitiative(
-      initiative.map((entry) =>
-        entry.id === entryId ? { ...entry, delayed: false, readied: false } : entry
-      )
-    );
-  };
-
-  const resetMovement = () => {
-    if (!initiative.length) return;
-    emitInitiative(
-      initiative.map((entry, index) =>
-        index === turnIndex ? { ...entry, movementUsed: 0, diagonalSteps: 0 } : entry
-      )
-    );
-  };
-
-  const setInitiativeActions = (entryId: string, actions: number) => {
-    getSocket().emit("initiative:action", { campaignId, entryId, actions });
-  };
-
-  const setInitiativeReaction = (entryId: string, reactions: number) => {
-    getSocket().emit("initiative:action", { campaignId, entryId, reactions });
-  };
-
-  const resetTurnActions = () => {
-    const entry = initiative[turnIndex];
-    if (!entry) return;
-    getSocket().emit("initiative:action", {
-      campaignId,
-      entryId: entry.id,
-      actions: 0,
-      reactions: 0,
-    });
+    getSocket().emit("initiative:add", { campaignId, tokenId: selectedToken.id });
   };
 
   const moveInitiativeEntry = (entryId: string, direction: -1 | 1) => {
     const index = initiative.findIndex((entry) => entry.id === entryId);
     const target = index + direction;
     if (index < 0 || target < 0 || target >= initiative.length) return;
-    if (initiative[target].initiative !== initiative[index].initiative) return;
     const next = [...initiative];
     [next[index], next[target]] = [next[target], next[index]];
-    const normalized = next.map((entry, order) => ({ ...entry, tieBreak: order }));
     let nextTurn = turnIndex;
     if (turnIndex === index) nextTurn = target;
     else if (turnIndex === target) nextTurn = index;
-    emitInitiative(normalized, round, nextTurn);
+    emitInitiative(next, round, nextTurn);
   };
 
-  const addSelectedToInitiative = () => {
-    if (!selectedToken) return;
-    getSocket().emit("initiative:add", { campaignId, tokenId: selectedToken.id });
+  const setInitiativeValue = (entryId: string, value: number) => {
+    emitInitiative(
+      initiative.map((entry) => (entry.id === entryId ? { ...entry, initiative: value } : entry))
+    );
+  };
+
+  const addManualInitiative = (name: string, value: number) => {
+    const activeId = initiative[turnIndex]?.id ?? null;
+    const next = [
+      ...initiative,
+      {
+        id: `init_manual_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`,
+        tokenId: null,
+        name,
+        initiative: value,
+        color: "#c8a96b",
+        ownerId: null,
+        sceneId: activeSceneId,
+        groupId: null,
+        perception: undefined,
+      },
+    ].sort((a, b) => b.initiative - a.initiative || a.name.localeCompare(b.name));
+    const nextTurn = activeId
+      ? Math.max(
+          0,
+          next.findIndex((entry) => entry.id === activeId)
+        )
+      : 0;
+    emitInitiative(next, round, nextTurn);
   };
 
   const requestRoll = (formula: string, label: string, dc: number | null) => {
@@ -756,7 +402,6 @@ export function VttTable({ initial, campaignId, user, isGm, active }: VttTablePr
     });
   };
 
-  // Keyboard shortcuts stay out of the way whenever a form control has focus.
   useEffect(() => {
     if (!active) return;
     const onKeyDown = (event: KeyboardEvent) => {
@@ -765,18 +410,12 @@ export function VttTable({ initial, campaignId, user, isGm, active }: VttTablePr
       if (target?.closest("input, textarea, select, [contenteditable='true'], [role='dialog']"))
         return;
       const key = event.key.toLowerCase();
-
       if (event.key === "Escape") {
         setFogBrush(null);
         setMeasureMode(false);
-        setWallMode(false);
-        setPropMode(false);
-        setPropPaletteOpen(false);
-        setPendingProp(null);
-        setSelectedPropId(null);
         setSelectedTokenId(null);
+        setSheetCharacterId(null);
         setTheaterMode(false);
-        setTemplateKind(null);
         return;
       }
       if (key === "f") {
@@ -788,19 +427,6 @@ export function VttTable({ initial, campaignId, user, isGm, active }: VttTablePr
         event.preventDefault();
         setMeasureMode((current) => !current);
         setFogBrush(null);
-        setWallMode(false);
-        setPropMode(false);
-        setPropPaletteOpen(false);
-        return;
-      }
-      if (key === "a" && isGm) {
-        event.preventDefault();
-        setTemplateKind((current) => (current ? null : "burst"));
-        setFogBrush(null);
-        setMeasureMode(false);
-        setWallMode(false);
-        setPropMode(false);
-        setPropPaletteOpen(false);
         return;
       }
       if (key === "c") {
@@ -810,47 +436,25 @@ export function VttTable({ initial, campaignId, user, isGm, active }: VttTablePr
       }
       if (key === "p") {
         event.preventDefault();
-        setLeftOpen((open) => !open);
+        setPartyOpen((open) => !open);
         return;
       }
       if (!isGm) return;
-
       if (key === "r" && activeScene?.fogEnabled) {
         event.preventDefault();
         setFogBrush((current) => (current === "reveal" ? null : "reveal"));
         setMeasureMode(false);
-        setWallMode(false);
-        setPropMode(false);
-        setPropPaletteOpen(false);
         return;
       }
       if (key === "h" && activeScene?.fogEnabled) {
         event.preventDefault();
         setFogBrush((current) => (current === "hide" ? null : "hide"));
         setMeasureMode(false);
-        setWallMode(false);
-        setPropMode(false);
-        setPropPaletteOpen(false);
-        return;
-      }
-      if (key === "w") {
-        event.preventDefault();
-        enterWallMode(!wallMode);
-        return;
-      }
-      if (key === "g") {
-        event.preventDefault();
-        enterPropMode(!propMode);
         return;
       }
       if (key === "t") {
         event.preventDefault();
         setAddTokenOpen(true);
-        return;
-      }
-      if (key === "e" && selectedTokenId) {
-        event.preventDefault();
-        setEditingTokenId(selectedTokenId);
         return;
       }
       if (key === "i" && activeSceneId) {
@@ -875,14 +479,10 @@ export function VttTable({ initial, campaignId, user, isGm, active }: VttTablePr
     activeScene?.fogEnabled,
     activeSceneId,
     campaignId,
-    enterPropMode,
-    enterWallMode,
     initiative.length,
     isGm,
-    propMode,
-    selectedTokenId,
+    setSelectedTokenId,
     toggleFullscreen,
-    wallMode,
   ]);
 
   const expanded = isFullscreen || theaterMode;
@@ -896,7 +496,7 @@ export function VttTable({ initial, campaignId, user, isGm, active }: VttTablePr
     ? suggestedTokenPosition(activeScene, tokens)
     : { x: 100, y: 100 };
 
-  if (!activeScene) {
+  if (!activeScene || !canvasScene) {
     return (
       <div className="table-empty">
         <EmptyState
@@ -919,12 +519,12 @@ export function VttTable({ initial, campaignId, user, isGm, active }: VttTablePr
           campaignId={campaignId}
           scenes={scenes}
           activeSceneId={activeSceneId}
-          previewSceneId={previewSceneId}
+          previewSceneId={null}
           onActivate={activateScene}
           onDelete={deleteScene}
           onDuplicate={duplicateScene}
           onReorder={reorderScenes}
-          onPreview={previewScene}
+          onPreview={() => undefined}
           onCreated={(scene) =>
             setScenes((current) =>
               current.some((item) => item.id === scene.id) ? current : [...current, scene]
@@ -939,244 +539,155 @@ export function VttTable({ initial, campaignId, user, isGm, active }: VttTablePr
   return (
     <div
       ref={rootRef}
-      className={`vtt ${leftOpen ? "" : "left-collapsed"} ${rightOpen ? "" : "right-collapsed"} ${theaterMode ? "is-theater" : ""}`}
+      className={`vtt core-table-vtt ${partyOpen ? "" : "party-collapsed"} ${rightOpen ? "" : "right-collapsed"} ${theaterMode ? "is-theater" : ""}`}
     >
-      <VttToolbar
+      <CoreToolbar
         isGm={isGm}
         activeSceneName={activeScene.name}
         onPreviousScene={previousScene ? () => activateScene(previousScene.id) : undefined}
         onNextScene={nextScene ? () => activateScene(nextScene.id) : undefined}
-        setSceneManagerOpen={setSceneManagerOpen}
+        onOpenScenes={() => setSceneManagerOpen(true)}
+        onAddToken={() => setAddTokenOpen(true)}
+        bestiaryOpen={bestiaryOpen}
+        onToggleBestiary={() => {
+          setBestiaryOpen((open) => !open);
+          setFogBrush(null);
+          setMeasureMode(false);
+        }}
         fogBrush={fogBrush}
-        setFogBrush={(next) => {
-          setWallMode(false);
-          setPropMode(false);
-          setPropPaletteOpen(false);
-          setPendingProp(null);
-          setSelectedPropId(null);
+        onFogBrush={(next) => {
           setFogBrush(next);
+          setMeasureMode(false);
         }}
         brushSize={brushSize}
-        setBrushSize={setBrushSize}
+        onBrushSize={setBrushSize}
         measureMode={measureMode}
-        setMeasureMode={(next) => {
-          setWallMode(false);
-          setPropMode(false);
-          setPropPaletteOpen(false);
-          setPendingProp(null);
-          setSelectedPropId(null);
+        onMeasureMode={(next) => {
           setMeasureMode(next);
+          setFogBrush(null);
         }}
-        wallMode={wallMode}
-        setWallMode={enterWallMode}
-        wallKind={wallKind}
-        setWallKind={setWallKind}
-        wallHidden={wallHidden}
-        setWallHidden={setWallHidden}
-        onClearWalls={clearWalls}
-        propMode={propMode}
-        setPropMode={enterPropMode}
-        setAddTokenOpen={setAddTokenOpen}
-        bestiaryOpen={bestiaryOpen}
-        setBestiaryOpen={(next) => {
-          setPropMode(false);
-          setPropPaletteOpen(false);
-          setPendingProp(null);
-          setSelectedPropId(null);
-          setBestiaryOpen(next);
-        }}
-        templateHidden={templateHidden}
-        setTemplateHidden={setTemplateHidden}
-        templateKind={templateKind}
-        setTemplateKind={(next) => {
-          setWallMode(false);
-          setPropMode(false);
-          setPropPaletteOpen(false);
-          setPendingProp(null);
-          setSelectedPropId(null);
-          setTemplateKind(next);
-        }}
-        templateSize={templateSize}
-        setTemplateSize={setTemplateSize}
-        hasTemplate={Boolean(activeScene?.templates.length)}
-        onClearTemplate={clearTemplates}
         connectionStatus={connectionStatus}
         presence={presence}
-        leftOpen={leftOpen}
-        setLeftOpen={setLeftOpen}
+        partyOpen={partyOpen}
+        onPartyOpen={setPartyOpen}
         rightOpen={rightOpen}
-        setRightOpen={setRightOpen}
+        onRightOpen={setRightOpen}
         expanded={expanded}
-        toggleFullscreen={toggleFullscreen}
-        toast={toast}
+        onFullscreen={toggleFullscreen}
+        myCharacterId={myCharacterId}
+        onOpenMySheet={() => {
+          if (myCharacterId) setSheetCharacterId(myCharacterId);
+          else toast("You do not have a character in this campaign yet.", "info");
+        }}
       />
 
-      {previewing && activeScene ? (
-        <div className="vtt-preview-banner">
-          <Eye size={14} />
-          <span>
-            Previewing <strong>{activeScene.name}</strong> as players see it. The table is still on{" "}
-            <strong>
-              {scenes.find((scene) => scene.id === activeSceneId)?.name ?? "another scene"}
-            </strong>
-            .
-            {activeScene.visionScope === "per-player"
-              ? " Per-player scenes use shared party vision in preview."
-              : ""}
-          </span>
-          <Button size="sm" variant="ghost" onClick={exitPreview}>
-            Exit preview
-          </Button>
-        </div>
-      ) : null}
-
       <div className="vtt-body">
-        {leftOpen ? (
-          <VttTokenPanel
-            activeScene={activeScene}
-            isGm={isGm}
-            sceneTokens={sceneTokens}
+        {partyOpen ? (
+          <PartyRail
             characters={characters}
+            tokens={tokens}
+            presence={presence}
+            sceneId={activeSceneId}
             selectedTokenId={selectedTokenId}
-            selectedTokenIds={selectedTokenIds}
-            setSelectedTokenId={setSelectedTokenId}
-            setTokens={setTokens}
-            selectedToken={selectedToken}
-            updateToken={updateToken}
-            onDamage={damageToken}
-            addSelectedToInitiative={addSelectedToInitiative}
-            setEditingTokenId={setEditingTokenId}
-            deleteToken={deleteToken}
-            setAddTokenOpen={setAddTokenOpen}
-            setEditingScene={setEditingScene}
-            user={user}
-            onRoll={roll}
-            onSend={sendChat}
-            onGroupHp={updateGroupHp}
-            onBulkHp={bulkHp}
-            onBulkCondition={bulkCondition}
-            onBulkClearConditions={bulkClearConditions}
-            onBulkPatch={bulkPatch}
-            onBulkDelete={bulkDelete}
+            onSelectToken={setSelectedTokenId}
+            onOpenCharacter={setSheetCharacterId}
           />
         ) : null}
 
-        <PartyRail
-          characters={characters}
-          tokens={tokens}
-          presence={presence}
-          sceneId={activeSceneId}
-          selectedTokenId={selectedTokenId}
-          onSelectToken={setSelectedTokenId}
-          onOpenCharacter={(characterId) => window.open(`/characters/${characterId}`, "_blank")}
-        />
-
         <div className="vtt-center">
           <SceneCanvas
-            scene={activeScene}
+            scene={canvasScene}
             tokens={sceneTokens}
             characters={characters}
-            isGm={isGm && !previewing}
+            isGm={isGm}
             userId={user.id}
             selectedTokenId={selectedTokenId}
             selectedTokenIds={selectedTokenIds}
-            activeMovement={activeMovement}
+            activeMovement={null}
             onSelectToken={selectToken}
             onSelectTokens={selectTokens}
-            onOpenCharacter={(id) => window.open(`/characters/${id}`, "_blank")}
-            onEditToken={isGm && !previewing ? setEditingTokenId : undefined}
+            onOpenCharacter={setSheetCharacterId}
+            onEditToken={undefined}
             onMoveToken={moveToken}
             onFog={applyFog}
-            fogBrush={previewing ? null : activeScene.fogEnabled ? fogBrush : null}
+            fogBrush={activeScene.fogEnabled ? fogBrush : null}
             brushSize={brushSize}
             measureMode={measureMode}
-            wallMode={previewing ? false : wallMode}
-            wallKind={wallKind}
-            wallHidden={wallHidden}
-            onWalls={saveWalls}
-            previewMode={previewing}
-            propMode={previewing ? false : propMode}
-            pendingProp={pendingProp}
-            selectedPropId={selectedPropId}
-            onPlaceProp={placeProp}
-            onSelectProp={setSelectedPropId}
-            onMoveProp={(propId, x, y) => updateProp(propId, { x, y })}
+            wallMode={false}
+            wallKind="wall"
+            wallHidden={false}
+            onWalls={() => undefined}
+            previewMode={false}
+            propMode={false}
+            pendingProp={null}
+            selectedPropId={null}
+            onPlaceProp={() => undefined}
+            onSelectProp={() => undefined}
+            onMoveProp={() => undefined}
             onPing={(x, y) =>
               getSocket().emit("pointer", { campaignId, sceneId: activeScene.id, x, y })
             }
             remotePointer={remotePointer}
-            onDropMonster={previewing ? undefined : placeMonster}
-            templateKind={previewing ? null : templateKind}
-            templateSize={templateSize}
-            templateHidden={templateHidden}
-            onTemplate={placeTemplate}
+            onDropMonster={isGm ? placeMonster : undefined}
+            templateKind={null}
+            templateSize={20}
+            templateHidden={false}
+            onTemplate={() => undefined}
           />
+
           {isGm && bestiaryOpen ? (
             <BestiaryPalette
               onAdd={(monster, count) => placeMonster(monster, count)}
               onClose={() => setBestiaryOpen(false)}
             />
           ) : null}
-          {isGm && propPaletteOpen && !previewing ? (
-            <PropPalette
-              scene={activeScene}
-              campaignId={campaignId}
-              selectedPropId={selectedPropId}
-              pendingProp={pendingProp}
-              layer={propLayer}
-              setLayer={setPropLayer}
-              onSetCollision={(enabled) => void setPropCollision(enabled)}
-              onPick={(preset) => {
-                setPendingProp(preset);
-                setSelectedPropId(null);
-              }}
-              onSelect={(propId) => {
-                setSelectedPropId(propId);
-                setPendingProp(null);
-              }}
-              onUpdate={updateProp}
-              onDelete={deleteProp}
-              onClose={() => enterPropMode(false)}
-              toast={toast}
+
+          {selectedToken && !sheetCharacterId ? (
+            <TokenQuickPanel
+              token={selectedToken}
+              characters={characters}
+              isGm={isGm}
+              canManage={isGm || selectedToken.ownerId === user.id}
+              onClose={() => setSelectedTokenId(null)}
+              onUpdate={(patch) => updateToken(selectedToken.id, patch)}
+              onDelete={() => deleteToken(selectedToken.id)}
+              onOpenCharacter={setSheetCharacterId}
+              onAddToInitiative={addSelectedToInitiative}
             />
           ) : null}
+
           <InitiativeBar
             entries={initiative}
-            tokens={tokens}
-            characters={characters}
             round={round}
             turnIndex={turnIndex}
             isGm={isGm}
-            userId={user.id}
-            selectedTokenId={selectedTokenId}
             onRoll={rollInitiative}
             onNext={() => getSocket().emit("initiative:next", { campaignId, direction: 1 })}
             onPrevious={() => getSocket().emit("initiative:next", { campaignId, direction: -1 })}
             onClear={clearInitiative}
             onRemove={(entryId) => getSocket().emit("initiative:remove", { campaignId, entryId })}
             onReroll={(entryId) => getSocket().emit("initiative:reroll", { campaignId, entryId })}
-            onDelay={delayEntry}
-            onReady={readyEntry}
-            onClearState={clearInitiativeState}
             onMove={moveInitiativeEntry}
-            onTriggerReady={triggerReady}
-            onResetMovement={resetMovement}
-            onResetTurnActions={resetTurnActions}
-            onSetActions={setInitiativeActions}
-            onSetReaction={setInitiativeReaction}
-            onSelectToken={setSelectedTokenId}
+            onSetValue={setInitiativeValue}
+            onAddManual={addManualInitiative}
+            onSetTurn={(index) => emitInitiative(initiative, round, index)}
           />
         </div>
 
         {rightOpen ? (
           <aside className="vtt-right">
-            <SoundPanel
-              campaignId={campaignId}
-              isGm={isGm}
-              tracks={audioTracks}
-              state={audioState}
-              onTracksChange={setAudioTracks}
-            />
+            <details className="core-audio">
+              <summary>
+                <Volume2 size={13} /> Soundtrack
+              </summary>
+              <SoundPanel
+                campaignId={campaignId}
+                isGm={isGm}
+                tracks={audioTracks}
+                state={audioState}
+                onTracksChange={setAudioTracks}
+              />
+            </details>
             <ChatPanel
               messages={messages}
               presence={presence}
@@ -1196,12 +707,12 @@ export function VttTable({ initial, campaignId, user, isGm, active }: VttTablePr
         campaignId={campaignId}
         scenes={scenes}
         activeSceneId={activeSceneId}
-        previewSceneId={previewSceneId}
+        previewSceneId={null}
         onActivate={activateScene}
         onDelete={deleteScene}
         onDuplicate={duplicateScene}
         onReorder={reorderScenes}
-        onPreview={previewScene}
+        onPreview={() => undefined}
         onCreated={(scene) => {
           setScenes((current) =>
             current.some((item) => item.id === scene.id) ? current : [...current, scene]
@@ -1229,24 +740,15 @@ export function VttTable({ initial, campaignId, user, isGm, active }: VttTablePr
         defaultPosition={defaultPosition}
         gridSize={activeScene.gridSize}
       />
-      <TokenEditModal
-        open={Boolean(editingToken)}
-        token={editingToken}
-        campaignId={campaignId}
-        characters={characters}
-        members={initial.members}
-        onClose={() => setEditingTokenId(null)}
-        onSave={(patch) => {
-          if (!editingToken) return;
-          updateToken(editingToken.id, patch);
-          toast("Token updated.", "success");
-        }}
-        onDelete={(tokenId) => {
-          deleteToken(tokenId);
-          toast("Token deleted.", "success");
-        }}
-        onOpenCharacter={(characterId) => window.open(`/characters/${characterId}`, "_blank")}
-      />
+
+      {sheetCharacterId ? (
+        <CharacterSheetView
+          characterId={sheetCharacterId}
+          mode="overlay"
+          onClose={() => setSheetCharacterId(null)}
+          onRoll={roll}
+        />
+      ) : null}
     </div>
   );
 }

@@ -21,8 +21,10 @@ const CharacterBuilderPage = lazy(() =>
     default: module.CharacterBuilderPage,
   }))
 );
-const CharacterSheetPage = lazy(() =>
-  import("./pages/CharacterSheetPage").then((module) => ({ default: module.CharacterSheetPage }))
+const PathbuilderSheetPage = lazy(() =>
+  import("./pages/PathbuilderSheetPage").then((module) => ({
+    default: module.PathbuilderSheetPage,
+  }))
 );
 const LibraryPage = lazy(() =>
   import("./pages/LibraryPage").then((module) => ({ default: module.LibraryPage }))
@@ -73,7 +75,7 @@ export default function App() {
             >
               <Route path="/campaigns" element={<DashboardPage />} />
               <Route path="/campaigns/:id" element={<CampaignPage />} />
-              <Route path="/characters/:id" element={<CharacterSheetPage />} />
+              <Route path="/characters/:id" element={<PathbuilderSheetPage />} />
               <Route path="/characters/:id/edit" element={<CharacterBuilderPage />} />
               <Route path="/library" element={<LibraryPage />} />
               <Route path="/library/:kind/:id" element={<CompendiumEntryPage />} />

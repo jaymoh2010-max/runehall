@@ -22,7 +22,7 @@ import {
   rulesetContentMode,
   rulesetIncludesLegacy,
 } from "../../shared/content";
-import { contextForDraft } from "../compendium";
+import { contextForDraft, equipment } from "../compendium";
 import { importPathbuilder } from "../pathbuilder";
 import { db, type CampaignRow, type CharacterRow, type TokenRow } from "../db";
 import { serializeCharacter, serializeToken, touchCampaign } from "../serialize";
@@ -998,6 +998,77 @@ export async function registerCharacterRoutes(app: FastifyInstance): Promise<voi
       : parseDraft(parseJson(row.data, {}), row.name);
     const context = contextForCharacter(row, draft);
     return reply.send({ context });
+  });
+
+  app.post("/api/characters/:id/items", async (request, reply) => {
+    if (!request.user) return reply.code(401).send({ error: "Sign in to continue." });
+    const { id } = request.params as { id: string };
+    const row = getCharacter(id);
+    if (!row) return reply.code(404).send({ error: "Character not found." });
+    if (!canEditCharacter(row, request.user.id)) {
+      return reply.code(403).send({ error: "You can't edit that character's gear." });
+    }
+    const body = (request.body ?? {}) as Record<string, unknown>;
+    const itemId = safeString(body.itemId, "", 120);
+    const item = equipment.find((entry) => entry.id === itemId) ?? null;
+    if (!item) return reply.code(404).send({ error: "That item is not in the compendium." });
+    if (item.price.cpTotal <= 0) {
+      return reply.code(400).send({ error: "That item has no purchase price." });
+    }
+    const quantity = Math.max(1, Math.min(999, Math.round(Number(body.quantity) || 1)));
+    const mode = body.mode === "grant" ? "grant" : "buy";
+    const campaign = row.campaign_id ? getCampaign(row.campaign_id) : null;
+    const role = row.campaign_id ? getCampaignRole(row.campaign_id, request.user.id) : null;
+    if (mode === "grant") {
+      const canGrant = role === "gm" || !campaign || Boolean(campaign.player_item_grant);
+      if (!canGrant) {
+        return reply
+          .code(403)
+          .send({ error: "The GM has not allowed players to add gear without paying." });
+      }
+    }
+
+    const draft = parseDraft(parseJson(row.data, {}), row.name);
+    const costCp = Math.max(0, Math.round(item.price.cpTotal)) * quantity;
+    if (mode === "buy") {
+      const currency = spendCurrency(draft.currency, costCp);
+      if (!currency) {
+        return reply
+          .code(400)
+          .send({ error: `Not enough coins for ${quantity}× ${item.name} (${costCp} cp).` });
+      }
+      draft.currency = currency;
+    }
+    const nextDraft = addItemToDraft(draft, {
+      itemId,
+      quantity,
+      equipped: false,
+      invested: false,
+      runes: [],
+    });
+    const summary = characterSummary(nextDraft, contextForCharacter(row, nextDraft));
+    db.prepare(
+      "UPDATE characters SET data = ?, summary = ?, updated_at = ?, revision = revision + 1 WHERE id = ?"
+    ).run(JSON.stringify(nextDraft), JSON.stringify(summary), now(), id);
+    syncCharacterDraft(app, row, nextDraft, summary);
+    const updated = getCharacter(id)!;
+    if (row.campaign_id) {
+      app.broadcastCampaign(row.campaign_id, "character:updated", {
+        characterId: id,
+        summary,
+        name: nextDraft.name,
+      });
+    }
+    const owner = getUser(row.user_id);
+    return reply.code(201).send({
+      character: serializeCharacter(updated, owner?.display_name ?? "", {
+        canEdit: canEditCharacter(updated, request.user.id),
+        canView: true,
+        canAdvance: canAdvanceCharacter(updated, request.user.id),
+      }),
+      costCp: mode === "buy" ? costCp : 0,
+      mode,
+    });
   });
 
   app.post("/api/characters/:id/duplicate", async (request, reply) => {

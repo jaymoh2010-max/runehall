@@ -922,6 +922,8 @@ export interface CharacterRecord {
   campaignFreeArchetype?: boolean | null;
   /** Set when the campaign uses Automatic Bonus Progression. */
   campaignAutomaticBonusProgression?: boolean | null;
+  /** Set when the GM allows players to add gear without paying. */
+  campaignPlayerItemGrant?: boolean | null;
   createdAt: number;
   updatedAt: number;
   /** Optimistic-lock version, incremented on every save. */
@@ -1188,6 +1190,8 @@ export interface CampaignSummary {
   freeArchetype: boolean;
   /** Campaign variant: grant automatic attack/defense/save/Perception/skill potency. */
   automaticBonusProgression: boolean;
+  /** Players may add compendium gear without paying, when the GM allows it. */
+  playerItemGrant: boolean;
   /** Open market (infinite common stock) or a GM-curated finite merchant list. */
   shopMode: ShopStockMode;
   /** Current in-world date for this campaign. */

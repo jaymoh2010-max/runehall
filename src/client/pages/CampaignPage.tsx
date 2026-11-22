@@ -126,6 +126,7 @@ import {
 } from "../components/campaign/EncounterBuilder";
 import { LootBuilder } from "../components/campaign/LootBuilder";
 import { CampaignDashboard } from "../components/campaign/CampaignDashboard";
+import { CorePartyPanel } from "../components/campaign/CorePartyPanel";
 import { AssetLibrary } from "../components/campaign/AssetLibrary";
 import { NpcLibrary } from "../components/campaign/NpcLibrary";
 import { SessionsPage } from "../components/campaign/SessionsPage";
@@ -170,25 +171,12 @@ interface CampaignDetails {
 
 const TABS: { id: Tab; label: string; icon: React.ReactNode; gmOnly?: boolean }[] = [
   { id: "table", label: "Table", icon: <LayoutGrid size={15} /> },
-  { id: "overview", label: "Overview", icon: <CalendarDays size={15} /> },
-  { id: "session-zero", label: "Session zero", icon: <HeartHandshake size={15} /> },
   { id: "party", label: "Party", icon: <Users size={15} /> },
-  { id: "people", label: "People", icon: <Shield size={15} /> },
-  { id: "arc", label: "Adventure arc", icon: <Milestone size={15} /> },
-  { id: "travel", label: "Travel", icon: <Compass size={15} /> },
-  { id: "clocks", label: "Clocks", icon: <Timer size={15} /> },
   { id: "journal", label: "Journal", icon: <ScrollText size={15} /> },
-  { id: "notes", label: "Notes & lore", icon: <BookOpen size={15} /> },
-  { id: "sessions", label: "Sessions", icon: <CalendarClock size={15} /> },
-  { id: "encounters", label: "Encounters", icon: <Skull size={15} />, gmOnly: true },
-  { id: "loot", label: "Loot", icon: <Coins size={15} />, gmOnly: true },
-  { id: "npcs", label: "NPCs", icon: <UserRound size={15} />, gmOnly: true },
-  { id: "assets", label: "Assets", icon: <Images size={15} />, gmOnly: true },
-  { id: "gm-screen", label: "GM Screen", icon: <Shield size={15} />, gmOnly: true },
   { id: "settings", label: "Settings", icon: <Settings size={15} /> },
 ];
 
-const PRIMARY_TAB_IDS = new Set<Tab>(["table", "overview", "party", "people", "journal"]);
+const PRIMARY_TAB_IDS = new Set<Tab>(["table", "party", "journal"]);
 
 export function CampaignPage() {
   const { id } = useParams<{ id: string }>();
@@ -281,6 +269,7 @@ export function CampaignPage() {
   const [settingsSettlementLevel, setSettingsSettlementLevel] = useState("1");
   const [settingsFreeArchetype, setSettingsFreeArchetype] = useState(false);
   const [settingsAutomaticBonusProgression, setSettingsAutomaticBonusProgression] = useState(false);
+  const [settingsPlayerItemGrant, setSettingsPlayerItemGrant] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [levelUpBusy, setLevelUpBusy] = useState(false);
   const [catchUpBusy, setCatchUpBusy] = useState(false);
@@ -437,6 +426,7 @@ export function CampaignPage() {
       setSettingsSettlementLevel(String(details.campaign.settlementLevel));
       setSettingsFreeArchetype(details.campaign.freeArchetype);
       setSettingsAutomaticBonusProgression(details.campaign.automaticBonusProgression);
+      setSettingsPlayerItemGrant(details.campaign.playerItemGrant);
       if (details.campaign.role === "gm") {
         try {
           const ledger = await api<{ awards: XpAward[] }>(`/api/campaigns/${id}/xp-awards`);
@@ -902,6 +892,7 @@ export function CampaignPage() {
           settlementLevel: Number(settingsSettlementLevel) || 0,
           freeArchetype: settingsFreeArchetype,
           automaticBonusProgression: settingsAutomaticBonusProgression,
+          playerItemGrant: settingsPlayerItemGrant,
         },
       });
       setCampaign(result.campaign);
@@ -919,6 +910,7 @@ export function CampaignPage() {
                 settlementLevel: result.campaign.settlementLevel,
                 freeArchetype: result.campaign.freeArchetype,
                 automaticBonusProgression: result.campaign.automaticBonusProgression,
+                playerItemGrant: result.campaign.playerItemGrant,
               },
             }
           : current
@@ -1868,286 +1860,13 @@ export function CampaignPage() {
         {tab === "clocks" ? <ClocksTab campaignId={campaign.id} isGm={isGm} /> : null}
 
         {tab === "party" ? (
-          <div className="page-inner">
-            <div className="section-title">
-              <div>
-                <PageEyebrow>The party</PageEyebrow>
-                <h2>Who's at the table?</h2>
-                <p>
-                  Every hero in this campaign. The GM controls advancement; XP never levels a
-                  character automatically.
-                </p>
-              </div>
-              <div className="row wrap" style={{ gap: 8 }}>
-                {isGm ? (
-                  <>
-                    {campaign.xpMode === "xp" ? (
-                      <Button variant="secondary" icon={<Award size={15} />} onClick={openXpAward}>
-                        Award XP
-                      </Button>
-                    ) : null}
-                    <Button variant="secondary" icon={<Star size={15} />} onClick={openHeroPoints}>
-                      Hero Points
-                    </Button>
-                    <div className="party-actions" ref={partyActionsRef}>
-                      <Button
-                        variant="secondary"
-                        icon={<Sparkles size={15} />}
-                        aria-expanded={partyActionsOpen}
-                        aria-haspopup="menu"
-                        loading={restBusy || levelUpBusy || catchUpBusy}
-                        onClick={() => setPartyActionsOpen((current) => !current)}
-                      >
-                        Party actions
-                        <ChevronDown size={13} className={partyActionsOpen ? "is-open" : ""} />
-                      </Button>
-                      {partyActionsOpen ? (
-                        <div
-                          className="party-actions-menu"
-                          role="menu"
-                          aria-label="Party actions"
-                          ref={partyActionsMenuRef}
-                          onKeyDown={handlePartyActionsMenuKeyDown}
-                        >
-                          <button
-                            type="button"
-                            role="menuitem"
-                            disabled={restBusy}
-                            onClick={() => {
-                              setPartyActionsOpen(false);
-                              void longRestParty();
-                            }}
-                          >
-                            <Moon size={15} />
-                            <span>Long rest party</span>
-                          </button>
-                          <button
-                            type="button"
-                            role="menuitem"
-                            disabled={levelUpBusy}
-                            onClick={() => {
-                              setPartyActionsOpen(false);
-                              void levelUpCharacters();
-                            }}
-                          >
-                            <Sparkles size={15} />
-                            <span>Level up party</span>
-                          </button>
-                          <button
-                            type="button"
-                            role="menuitem"
-                            disabled={catchUpBusy}
-                            onClick={() => {
-                              setPartyActionsOpen(false);
-                              void catchUpParty();
-                            }}
-                          >
-                            <Users size={15} />
-                            <span>Catch up party</span>
-                          </button>
-                          <button
-                            type="button"
-                            role="menuitem"
-                            onClick={() => {
-                              setPartyActionsOpen(false);
-                              openDowntime();
-                            }}
-                          >
-                            <CalendarClock size={15} />
-                            <span>Grant downtime</span>
-                          </button>
-                        </div>
-                      ) : null}
-                    </div>
-                  </>
-                ) : null}
-                <Button variant="primary" icon={<Plus size={15} />} onClick={createCharacter}>
-                  New character
-                </Button>
-              </div>
-            </div>
-            {isGm || requests.length ? (
-              <PlayerRequestsCard
-                requests={requests}
-                isGm={isGm}
-                withdrawBusy={requestWithdrawBusy}
-                onReview={openRequestReview}
-                onWithdraw={(entry) => void withdrawRequest(entry)}
-              />
-            ) : null}
-            <div className="party-grid">
-              {characters.map((character) => {
-                const progress = character.summary
-                  ? xpProgress(
-                      character.summary.xp ?? 0,
-                      character.summary.level,
-                      campaign?.advancementSpeed ?? character.campaignAdvancementSpeed ?? "medium"
-                    )
-                  : null;
-                return (
-                  <article key={character.id} className="party-card card">
-                    <div className="party-card-top">
-                      <Avatar
-                        name={character.name}
-                        src={character.summary?.portraitUrl}
-                        size={58}
-                      />
-                      <div className="grow">
-                        <div className="row wrap" style={{ gap: 7 }}>
-                          <h3>{character.name}</h3>
-                          {character.permissions?.canEdit ? (
-                            <Badge tone="gold">Editable</Badge>
-                          ) : null}
-                          {(character.summary?.validationErrors ?? 0) > 0 ? (
-                            <Badge tone="red">Needs choices</Badge>
-                          ) : null}
-                        </div>
-                        <p className="tiny muted">
-                          {character.summary
-                            ? `Level ${character.summary.level} ${character.summary.className || ""} · ${character.summary.ancestry || "No ancestry"}`
-                            : "Unfinished character"}
-                        </p>
-                        <p className="tiny muted">
-                          {character.ownerName ? `Played by ${character.ownerName}` : ""}
-                        </p>
-                      </div>
-                    </div>
-                    {character.summary ? (
-                      <div className="party-stats">
-                        <Stat
-                          label="HP"
-                          value={`${character.summary.currentHp ?? character.summary.hp} / ${character.summary.hp}`}
-                          tone="red"
-                        />
-                        <Stat label="AC" value={character.summary.ac} tone="gold" />
-                        <Stat label="Speed" value={`${character.summary.speed} ft.`} />
-                        <Stat label="Hero" value={`${character.summary.heroPoints ?? 0} / 3`} />
-                        <Stat label="Downtime" value={`${character.summary.downtimeDays ?? 0} d`} />
-                      </div>
-                    ) : null}
-                    {campaign.xpMode === "xp" && progress ? (
-                      <div className="party-xp">
-                        <div className="row-between">
-                          <span className="tiny muted">XP</span>
-                          <strong>
-                            {progress.xp.toLocaleString()}
-                            {progress.required !== null
-                              ? ` / ${progress.required.toLocaleString()}`
-                              : ""}
-                          </strong>
-                        </div>
-                        {progress.required !== null ? (
-                          <ProgressBar
-                            value={Math.min(progress.xp, progress.required)}
-                            max={progress.required}
-                          />
-                        ) : null}
-                        {progress.ready ? <Badge tone="gold">Ready to level</Badge> : null}
-                        {progress.required === null ? (
-                          <span className="tiny muted">Maximum level</span>
-                        ) : null}
-                      </div>
-                    ) : null}
-                    <div className="party-card-actions">
-                      <Link to={`/characters/${character.id}`} className="btn btn-secondary btn-sm">
-                        <ScrollText size={14} /> Sheet
-                      </Link>
-                      {character.permissions?.canEdit ? (
-                        <Link
-                          to={`/characters/${character.id}/edit`}
-                          className="btn btn-ghost btn-sm"
-                        >
-                          <Pencil size={14} /> Edit
-                        </Link>
-                      ) : null}
-                      {isGm ? (
-                        <>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            icon={<Coins size={14} />}
-                            loading={wealthBusyId === character.id}
-                            onClick={() => void topUpWealth(character)}
-                          >
-                            Top up wealth
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            icon={<Sparkles size={14} />}
-                            loading={levelingId === character.id}
-                            onClick={() => void levelUpCharacters(character.id)}
-                          >
-                            Level up
-                          </Button>
-                        </>
-                      ) : character.permissions?.canEdit ? (
-                        <>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            icon={<Sparkles size={14} />}
-                            loading={requestLevelUpBusy === character.id}
-                            onClick={() => void requestLevelUp(character)}
-                          >
-                            Request level up
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            icon={<CalendarClock size={14} />}
-                            onClick={() => openRequestDowntime(character)}
-                          >
-                            Request downtime
-                          </Button>
-                        </>
-                      ) : null}
-                    </div>
-                  </article>
-                );
-              })}
-              {!characters.length ? (
-                <EmptyState
-                  icon={<Users size={30} />}
-                  title="No heroes yet"
-                  description="Create the first character for this campaign."
-                  action={
-                    <Button variant="primary" icon={<Plus size={15} />} onClick={createCharacter}>
-                      Create a character
-                    </Button>
-                  }
-                />
-              ) : null}
-            </div>
-            {isGm && campaign.xpMode === "xp" && xpAwards.length ? (
-              <Card className="xp-ledger">
-                <div className="section-title">
-                  <div>
-                    <PageEyebrow>XP ledger</PageEyebrow>
-                    <h3>Recent awards</h3>
-                  </div>
-                </div>
-                <div className="stack" style={{ gap: 8 }}>
-                  {xpAwards.slice(0, 6).map((award) => (
-                    <div key={award.id} className="row-between xp-ledger-row">
-                      <div>
-                        <div className="row wrap" style={{ gap: 8 }}>
-                          <strong>{award.amount.toLocaleString()} XP</strong>
-                          <Badge tone="neutral">{XP_AWARD_KIND_LABELS[award.kind]}</Badge>
-                        </div>
-                        <p className="tiny muted">{award.reason || "No reason recorded"}</p>
-                      </div>
-                      <span className="tiny muted">
-                        {award.recipientCount}{" "}
-                        {award.recipientCount === 1 ? "character" : "characters"} ·{" "}
-                        {formatDate(award.createdAt)}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </Card>
-            ) : null}
-          </div>
+          <CorePartyPanel
+            characters={characters}
+            isGm={isGm}
+            onNewCharacter={createCharacter}
+            onLevelUp={(characterId) => void levelUpCharacters(characterId)}
+            levelingId={levelingId}
+          />
         ) : null}
 
         {tab === "sessions" ? (
@@ -2555,6 +2274,18 @@ export function CampaignPage() {
                   <p className="tiny muted">
                     Replaces fundamental weapon and armor rune math with level-based attack, damage,
                     AC, save, Perception, and skill potency. Property runes still work.
+                  </p>
+                </div>
+                <div>
+                  <Checkbox
+                    label="Players may add gear without paying"
+                    checked={settingsPlayerItemGrant}
+                    onChange={setSettingsPlayerItemGrant}
+                    disabled={!isGm}
+                  />
+                  <p className="tiny muted">
+                    Adds a free “Grant” action beside Buy in every character&apos;s gear browser.
+                    The GM can always grant gear.
                   </p>
                 </div>
                 <Field

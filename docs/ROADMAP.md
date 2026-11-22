@@ -1,4 +1,9 @@
-# Runehall — review and execution roadmap
+# Runehall - review and execution roadmap
+
+> **Product reset.** The current core is the table plus the character sheet:
+> maps, tokens, fog, dice/chat, soundtrack, manual initiative, compendium/bestiary,
+> and campaign invites/party/journal. Combat automation is intentionally off.
+> Sprints below are historical notes unless the section says otherwise.
 
 ## Review snapshot
 

@@ -17,17 +17,13 @@ import { applyDamageDefenses } from "../shared/damageDefenses";
 import {
   filterInitiativeForPlayers,
   normalizeInitiativeResources,
-  refreshInitiativeTurn,
   renameInitiativeEntries,
   setInitiativeActions,
   setInitiativeReaction,
   sortInitiativeEntries,
 } from "../shared/initiative";
-import { applyGridPath } from "../shared/movement";
-import { blockingPropForMove } from "../shared/collision";
-import { findPathAroundProps } from "../shared/pathfinding";
 import { normalizeAoeTemplate, normalizeAoeTemplates } from "../shared/templates";
-import { blockingWallForMove, normalizeWalls } from "../shared/walls";
+import { normalizeWalls } from "../shared/walls";
 import { normalizeSceneProps } from "../shared/props";
 import { normalizeLightColor, normalizeTokenVisionMode } from "../shared/lighting";
 import { normalizeTokenTurnEffects } from "../shared/tokenTurnEffects";
@@ -50,7 +46,6 @@ import {
   touchCampaign,
 } from "./serialize";
 import { tokenBroadcaster } from "./tokenEvents";
-import { runTurnEnd, runTurnStart } from "./turnEffects";
 
 interface SocketData {
   user: PublicUser;
@@ -583,115 +578,10 @@ export function registerSocketServer(io: TypedServer): void {
         sendError(socket, "You can only move your own unlocked token.");
         return;
       }
-      const nx = clamp(Number(x) || 0, 0, scene.width);
-      const ny = clamp(Number(y) || 0, 0, scene.height);
-      const state = ensureState(campaignId);
-      const entries = serializeInitiative(JSON.parse(state.initiative || "[]"));
-      const active = entries[state.turn_index];
-      const activeMatch = Boolean(
-        active &&
-        active.sceneId === sceneId &&
-        (active.tokenId === tokenId ||
-          (active.groupId && row.group_id && active.groupId === row.group_id))
-      );
-      const speed = speedForToken(row);
-      if (role !== "gm" && entries.length > 0 && !activeMatch) {
-        sendError(socket, "It isn't this token's turn. The GM can move it if needed.");
-        socketTokenEvents(io, campaignId).moved(
-          { tokenId, sceneId, x: row.x, y: row.y },
-          Boolean(row.hidden)
-        );
-        return;
-      }
-      let targetX = nx;
-      let targetY = ny;
-      let pathPoints: Array<{ x: number; y: number }> | null = null;
-      const props = normalizeSceneProps(parseJson(scene.props, []));
-      const walls = normalizeWalls(parseJson(scene.walls, []));
-      const blockedProp = scene.prop_collision
-        ? blockingPropForMove(
-            props,
-            { size: row.size },
-            { x: row.x, y: row.y },
-            { x: nx, y: ny },
-            scene.grid_size,
-            true
-          )
-        : null;
-      const blockedWall = scene.wall_collision
-        ? blockingWallForMove(walls, { x: row.x, y: row.y }, { x: nx, y: ny })
-        : null;
-      if (blockedProp || blockedWall) {
-        const budget =
-          role !== "gm" && activeMatch && speed !== null
-            ? Math.max(0, speed - Math.max(0, active.movementUsed ?? 0))
-            : null;
-        const path = findPathAroundProps({
-          props,
-          propCollision: Boolean(scene.prop_collision),
-          walls,
-          wallCollision: Boolean(scene.wall_collision),
-          gridSize: scene.grid_size,
-          gridOffsetX: scene.grid_offset_x,
-          gridOffsetY: scene.grid_offset_y,
-          width: scene.width,
-          height: scene.height,
-          tokenSize: row.size,
-          from: { x: row.x, y: row.y },
-          to: { x: nx, y: ny },
-          budget,
-          diagonalStart: activeMatch ? (active.diagonalSteps ?? 0) : 0,
-        });
-        if (!path.points.length) {
-          const blocker = blockedProp ? blockedProp.name : "the blocking wall";
-          sendError(
-            socket,
-            path.unreachable
-              ? `There is no path around ${blocker}.`
-              : `Not enough movement left to get around ${blocker}.`
-          );
-          socketTokenEvents(io, campaignId).moved(
-            {
-              tokenId,
-              sceneId,
-              x: row.x,
-              y: row.y,
-            },
-            Boolean(row.hidden)
-          );
-          return;
-        }
-        const last = path.points[path.points.length - 1];
-        targetX = last.x;
-        targetY = last.y;
-        pathPoints = path.points;
-      }
-      const movement = activeMatch
-        ? applyGridPath(
-            {
-              movementUsed: active.movementUsed ?? 0,
-              diagonalSteps: active.diagonalSteps ?? 0,
-            },
-            { x: row.x, y: row.y },
-            pathPoints ?? [{ x: targetX, y: targetY }],
-            scene.grid_size,
-            speed
-          )
-        : null;
-      if (role !== "gm" && activeMatch && movement?.overSpeed) {
-        const remaining = Math.max(0, (speed ?? 0) - Math.max(0, active.movementUsed ?? 0));
-        sendError(
-          socket,
-          remaining > 0
-            ? `Only ${remaining} ft. of movement left this turn.`
-            : "No movement left this turn."
-        );
-        socketTokenEvents(io, campaignId).moved(
-          { tokenId, sceneId, x: row.x, y: row.y },
-          Boolean(row.hidden)
-        );
-        return;
-      }
+      // Movement is free and manual. The server only enforces ownership,
+      // locks, and scene bounds; speed and walls are table judgement calls.
+      const targetX = clamp(Number(x) || 0, 0, scene.width);
+      const targetY = clamp(Number(y) || 0, 0, scene.height);
       db.prepare("UPDATE tokens SET x = ?, y = ?, updated_at = ? WHERE id = ?").run(
         targetX,
         targetY,
@@ -699,25 +589,9 @@ export function registerSocketServer(io: TypedServer): void {
         tokenId
       );
       socketTokenEvents(io, campaignId).moved(
-        {
-          tokenId,
-          sceneId,
-          x: targetX,
-          y: targetY,
-        },
+        { tokenId, sceneId, x: targetX, y: targetY },
         Boolean(row.hidden)
       );
-      if (active && movement && movement.feet > 0) {
-        entries[state.turn_index] = {
-          ...active,
-          movementUsed: movement.movementUsed,
-          diagonalSteps: movement.diagonalSteps,
-        };
-        db.prepare(
-          "UPDATE campaign_state SET initiative = ?, updated_at = ? WHERE campaign_id = ?"
-        ).run(JSON.stringify(entries), now(), campaignId);
-        broadcastInitiative(io, campaignId, ensureState(campaignId));
-      }
       touchCampaign(campaignId);
     });
 
@@ -1521,9 +1395,6 @@ export function registerSocketServer(io: TypedServer): void {
       if (!requireGm(socket, campaignId)) return;
       if (!sceneBelongs(sceneId, campaignId)) return;
       rollInitiative(io, campaignId, sceneId, tokenIds);
-      const state = ensureState(campaignId);
-      const entries = serializeInitiative(JSON.parse(state.initiative || "[]"));
-      runTurnStart(io, campaignId, entries[state.turn_index], state.round);
       touchCampaign(campaignId);
     });
 
@@ -1562,27 +1433,11 @@ export function registerSocketServer(io: TypedServer): void {
       const current = ensureState(campaignId);
       const nextTurn = safeInt(turnIndex, 0, 0, Math.max(0, clean.length - 1));
       const nextRound = safeInt(round, current.round, 1, 999);
-      const previousEntries = serializeInitiative(JSON.parse(current.initiative || "[]"));
-      const previousActiveId = previousEntries[current.turn_index]?.id ?? null;
-      const nextActiveId = clean[nextTurn]?.id ?? null;
-      const activeChanged = previousActiveId !== nextActiveId;
-      if (activeChanged) {
-        runTurnEnd(io, campaignId, previousEntries[current.turn_index], current.round);
-        tickConditionsForEntry(io, campaignId, previousEntries[current.turn_index]);
-      }
-      // A new combatant's turn starts with a fresh movement count and a fresh
-      // action economy. Tie-order changes keep the same active id and preserve
-      // the current totals.
-      const normalized = activeChanged
-        ? clean.map((entry) => {
-            const reset = { ...entry, movementUsed: 0, diagonalSteps: 0 };
-            return entry.id === nextActiveId ? refreshInitiativeTurn(reset) : reset;
-          })
-        : clean;
+      // The order is a reference, not a rules engine. Changing it (including
+      // the active marker) never applies damage, conditions, or turn effects.
       db.prepare(
         "UPDATE campaign_state SET initiative = ?, round = ?, turn_index = ?, updated_at = ? WHERE campaign_id = ?"
-      ).run(JSON.stringify(normalized), nextRound, nextTurn, now(), campaignId);
-      if (activeChanged) runTurnStart(io, campaignId, clean[nextTurn], nextRound);
+      ).run(JSON.stringify(clean), nextRound, nextTurn, now(), campaignId);
       broadcastInitiative(io, campaignId, ensureState(campaignId));
       touchCampaign(campaignId);
     });
@@ -1593,12 +1448,6 @@ export function registerSocketServer(io: TypedServer): void {
       const entries = serializeInitiative(JSON.parse(state.initiative || "[]"));
       if (!entries.length) return;
       const dir = direction === -1 ? -1 : 1;
-      // Persistent damage and conditions resolve at the end of a combatant's
-      // turn, not when stepping back.
-      if (dir === 1) {
-        runTurnEnd(io, campaignId, entries[state.turn_index], state.round);
-        tickConditionsForEntry(io, campaignId, entries[state.turn_index]);
-      }
       let turn = state.turn_index + dir;
       let round = state.round;
       if (turn >= entries.length) {
@@ -1608,29 +1457,9 @@ export function registerSocketServer(io: TypedServer): void {
         turn = entries.length - 1;
         round = Math.max(1, round - 1);
       }
-      // Movement is per turn. Reset both the turn that just ended and the
-      // turn that is starting (the latter matters when stepping backward).
-      if (entries[state.turn_index]) {
-        entries[state.turn_index] = {
-          ...entries[state.turn_index],
-          movementUsed: 0,
-          diagonalSteps: 0,
-        };
-      }
-      if (entries[turn]) {
-        entries[turn] = refreshInitiativeTurn({
-          ...entries[turn],
-          movementUsed: 0,
-          diagonalSteps: 0,
-        });
-      }
-      if (entries[turn]?.readied) {
-        entries[turn] = { ...entries[turn], readied: false };
-      }
       db.prepare(
-        "UPDATE campaign_state SET initiative = ?, turn_index = ?, round = ?, updated_at = ? WHERE campaign_id = ?"
-      ).run(JSON.stringify(entries), turn, round, now(), campaignId);
-      if (dir === 1) runTurnStart(io, campaignId, entries[turn], round);
+        "UPDATE campaign_state SET turn_index = ?, round = ?, updated_at = ? WHERE campaign_id = ?"
+      ).run(turn, round, now(), campaignId);
       broadcastInitiative(io, campaignId, ensureState(campaignId));
       touchCampaign(campaignId);
     });

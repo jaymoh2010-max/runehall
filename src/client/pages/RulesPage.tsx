@@ -129,6 +129,14 @@ export function RulesPage() {
       `${condition.name} ${condition.description}`.toLowerCase().includes(q)
     );
   }, [conditions, query]);
+  const filteredSkills = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return SKILLS;
+    const matches = SKILLS.filter((skill) => skill.name.toLowerCase() === q);
+    return matches.length
+      ? matches
+      : SKILLS.filter((skill) => skill.name.toLowerCase().includes(q));
+  }, [query]);
 
   const activeAction =
     filteredActions.find((action) => action.id === activeActionId) ?? filteredActions[0] ?? null;
@@ -275,7 +283,7 @@ export function RulesPage() {
               <Card className="rules-card">
                 <h2>Skills</h2>
                 <div className="rules-skill-grid">
-                  {SKILLS.map((skill) => (
+                  {filteredSkills.map((skill) => (
                     <div key={skill.id} className="rules-skill-row">
                       <strong>{skill.name}</strong>
                       <span className="tiny muted">{skill.ability.toUpperCase()}</span>

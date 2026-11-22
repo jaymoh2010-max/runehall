@@ -51,9 +51,8 @@ export function PartyRail({
               <button
                 type="button"
                 className={`party-avatar-button ${isSelected ? "is-selected" : ""} ${token ? "is-on-scene" : ""}`}
-                aria-label={`${character.name}${summary ? `, level ${summary.level} ${summary.className}` : ", unfinished character"}. ${isOnline ? "Online" : "Offline"}. Hover for stats.`}
-                onClick={() => (token ? onSelectToken(token.id) : onOpenCharacter(character.id))}
-                onDoubleClick={() => onOpenCharacter(character.id)}
+                aria-label={`${character.name}${summary ? `, level ${summary.level} ${summary.className}` : ", unfinished character"}. ${isOnline ? "Online" : "Offline"}. Open character sheet.`}
+                onClick={() => onOpenCharacter(character.id)}
               >
                 <Avatar name={character.name} src={summary?.portraitUrl} size={34} />
                 <span className="party-avatar-level">{summary?.level ?? "?"}</span>

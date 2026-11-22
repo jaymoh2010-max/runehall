@@ -141,6 +141,7 @@ export interface CampaignRow {
   settlement_level: number;
   free_archetype: number;
   automatic_bonus_progression: number;
+  player_item_grant: number;
   shop_mode: string;
   world_year: number;
   world_month: number;
