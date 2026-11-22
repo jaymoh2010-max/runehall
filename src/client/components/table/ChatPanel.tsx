@@ -492,6 +492,11 @@ export function RollCard({ data }: { data: RollResult }) {
             {DEGREE_LABELS[data.degree]}
           </Badge>
         ) : null}
+        {data.degreeUpgraded ? (
+          <span title="A class feature upgraded this success">
+            <Badge tone="gold">Upgraded</Badge>
+          </span>
+        ) : null}
         {data.dc !== null ? <span className="tiny muted">vs DC {data.dc}</span> : null}
       </div>
       <div className="roll-card-breakdown">{data.breakdown}</div>

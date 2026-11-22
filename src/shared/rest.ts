@@ -165,6 +165,8 @@ export function applyLongRest(
         tempHp: 0,
         focusPoints: focusMax,
         conditions: conditionResult.conditions,
+        treatWoundsImmune: false,
+        battleMedicineImmuneBy: [],
         shieldRaised: false,
       },
     },

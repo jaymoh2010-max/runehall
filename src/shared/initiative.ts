@@ -1,5 +1,57 @@
 import type { InitiativeEntry } from "./types";
 
+export const ACTIONS_PER_TURN = 3;
+export const REACTIONS_PER_ROUND = 1;
+
+function clampInt(value: unknown, fallback: number, min: number, max: number): number {
+  const number = typeof value === "number" && Number.isFinite(value) ? Math.round(value) : fallback;
+  return Math.max(min, Math.min(max, number));
+}
+
+/** Keep a persisted initiative entry's per-turn action economy inside the rules. */
+export function normalizeInitiativeResources(entry: InitiativeEntry): InitiativeEntry {
+  return {
+    ...entry,
+    actionsUsed: clampInt(entry.actionsUsed, 0, 0, ACTIONS_PER_TURN),
+    reactionsUsed: clampInt(entry.reactionsUsed, 0, 0, REACTIONS_PER_ROUND),
+  };
+}
+
+export function setInitiativeActions(
+  entries: InitiativeEntry[],
+  entryId: string,
+  actionsUsed: number
+): InitiativeEntry[] {
+  return entries.map((entry) =>
+    entry.id === entryId
+      ? {
+          ...entry,
+          actionsUsed: clampInt(actionsUsed, 0, 0, ACTIONS_PER_TURN),
+        }
+      : entry
+  );
+}
+
+export function setInitiativeReaction(
+  entries: InitiativeEntry[],
+  entryId: string,
+  reactionsUsed: number
+): InitiativeEntry[] {
+  return entries.map((entry) =>
+    entry.id === entryId
+      ? {
+          ...entry,
+          reactionsUsed: clampInt(reactionsUsed, 0, 0, REACTIONS_PER_ROUND),
+        }
+      : entry
+  );
+}
+
+/** A creature's actions and reaction refresh when its own turn begins. */
+export function refreshInitiativeTurn(entry: InitiativeEntry): InitiativeEntry {
+  return { ...entry, actionsUsed: 0, reactionsUsed: 0 };
+}
+
 export function compareInitiative(a: InitiativeEntry, b: InitiativeEntry): number {
   return (
     b.initiative - a.initiative ||

@@ -5,7 +5,7 @@ import { db, type CampaignRow, type MessageRow, type SceneRow, type TokenRow } f
 import { userFromCookieHeader } from "./auth";
 import { now, newId, safeInt, safeString, parseJson, clamp, sanitizeUserText } from "./util";
 import { characterSummary, computeCharacter, normalizeCharacterDraft } from "../shared/rules";
-import { rollFormula, validateFormula } from "../shared/dice";
+import { rollFormula, upgradeDegreeOfSuccess, validateFormula } from "../shared/dice";
 import {
   normalizeTokenConditions,
   sheetConditionsFromToken,
@@ -16,7 +16,11 @@ import { applyHpEditToDraft, applyHpEditToState } from "../shared/damage";
 import { applyDamageDefenses } from "../shared/damageDefenses";
 import {
   filterInitiativeForPlayers,
+  normalizeInitiativeResources,
+  refreshInitiativeTurn,
   renameInitiativeEntries,
+  setInitiativeActions,
+  setInitiativeReaction,
   sortInitiativeEntries,
 } from "../shared/initiative";
 import { applyGridPath } from "../shared/movement";
@@ -278,6 +282,8 @@ function initiativeEntryForToken(row: TokenRow, value?: number): InitiativeEntry
     perception: bonus,
     movementUsed: 0,
     diagonalSteps: 0,
+    actionsUsed: 0,
+    reactionsUsed: 0,
   };
 }
 
@@ -298,6 +304,8 @@ function initiativeEntryForGroup(rows: TokenRow[]): InitiativeEntry {
     perception: bonus,
     movementUsed: 0,
     diagonalSteps: 0,
+    actionsUsed: 0,
+    reactionsUsed: 0,
   };
 }
 
@@ -1409,7 +1417,10 @@ export function registerSocketServer(io: TypedServer): void {
 
     on(
       "dice:roll",
-      ({ campaignId, formula, label, dc, visibility, characterId, requestId }, ack) => {
+      (
+        { campaignId, formula, label, dc, visibility, characterId, requestId, upgradeSuccess },
+        ack
+      ) => {
         if (!getMembership(campaignId, socket.data.user.id)) {
           sendError(socket, "You're not a member of that campaign.");
           ack?.(null);
@@ -1420,6 +1431,10 @@ export function registerSocketServer(io: TypedServer): void {
             dc: typeof dc === "number" ? dc : null,
             label: safeString(label, "", 120),
           });
+          if (upgradeSuccess === true && result.degree === "success") {
+            result.degree = upgradeDegreeOfSuccess(result.degree);
+            result.degreeUpgraded = true;
+          }
           const id = newId("msg");
           const ts = now();
           const vis = visibility === "gm" ? "gm" : "all";
@@ -1540,6 +1555,8 @@ export function registerSocketServer(io: TypedServer): void {
               readied: entry.readied === true,
               movementUsed: safeInt(entry.movementUsed, 0, 0, 100_000),
               diagonalSteps: safeInt(entry.diagonalSteps, 0, 0, 10_000),
+              actionsUsed: safeInt(entry.actionsUsed, 0, 0, 3),
+              reactionsUsed: safeInt(entry.reactionsUsed, 0, 0, 1),
             }))
         : [];
       const current = ensureState(campaignId);
@@ -1553,10 +1570,14 @@ export function registerSocketServer(io: TypedServer): void {
         runTurnEnd(io, campaignId, previousEntries[current.turn_index], current.round);
         tickConditionsForEntry(io, campaignId, previousEntries[current.turn_index]);
       }
-      // A new combatant's turn starts with a fresh movement count. Tie-order
-      // changes keep the same active id and preserve the current total.
+      // A new combatant's turn starts with a fresh movement count and a fresh
+      // action economy. Tie-order changes keep the same active id and preserve
+      // the current totals.
       const normalized = activeChanged
-        ? clean.map((entry) => ({ ...entry, movementUsed: 0, diagonalSteps: 0 }))
+        ? clean.map((entry) => {
+            const reset = { ...entry, movementUsed: 0, diagonalSteps: 0 };
+            return entry.id === nextActiveId ? refreshInitiativeTurn(reset) : reset;
+          })
         : clean;
       db.prepare(
         "UPDATE campaign_state SET initiative = ?, round = ?, turn_index = ?, updated_at = ? WHERE campaign_id = ?"
@@ -1597,7 +1618,11 @@ export function registerSocketServer(io: TypedServer): void {
         };
       }
       if (entries[turn]) {
-        entries[turn] = { ...entries[turn], movementUsed: 0, diagonalSteps: 0 };
+        entries[turn] = refreshInitiativeTurn({
+          ...entries[turn],
+          movementUsed: 0,
+          diagonalSteps: 0,
+        });
       }
       if (entries[turn]?.readied) {
         entries[turn] = { ...entries[turn], readied: false };
@@ -1606,6 +1631,44 @@ export function registerSocketServer(io: TypedServer): void {
         "UPDATE campaign_state SET initiative = ?, turn_index = ?, round = ?, updated_at = ? WHERE campaign_id = ?"
       ).run(JSON.stringify(entries), turn, round, now(), campaignId);
       if (dir === 1) runTurnStart(io, campaignId, entries[turn], round);
+      broadcastInitiative(io, campaignId, ensureState(campaignId));
+      touchCampaign(campaignId);
+    });
+
+    on("initiative:action", ({ campaignId, entryId, actions, reactions }) => {
+      const role = getCampaignRole(campaignId, socket.data.user.id);
+      if (!role) return;
+      const state = ensureState(campaignId);
+      const entries = serializeInitiative(JSON.parse(state.initiative || "[]"));
+      const index = entries.findIndex((entry) => entry.id === entryId);
+      if (index < 0) return;
+      const entry = entries[index];
+      const active = index === state.turn_index;
+      if (role !== "gm") {
+        if (entry.ownerId !== socket.data.user.id) {
+          sendError(socket, "You can only track actions for your own character.");
+          return;
+        }
+        if (actions !== undefined && !active) {
+          sendError(socket, "You can only spend actions on your turn.");
+          return;
+        }
+      }
+      let next = entries;
+      if (actions !== undefined) {
+        next = setInitiativeActions(next, entryId, safeInt(actions, entry.actionsUsed ?? 0, 0, 3));
+      }
+      if (reactions !== undefined) {
+        next = setInitiativeReaction(
+          next,
+          entryId,
+          safeInt(reactions, entry.reactionsUsed ?? 0, 0, 1)
+        );
+      }
+      const normalized = next.map(normalizeInitiativeResources);
+      db.prepare(
+        "UPDATE campaign_state SET initiative = ?, updated_at = ? WHERE campaign_id = ?"
+      ).run(JSON.stringify(normalized), now(), campaignId);
       broadcastInitiative(io, campaignId, ensureState(campaignId));
       touchCampaign(campaignId);
     });
@@ -1664,6 +1727,8 @@ export function registerSocketServer(io: TypedServer): void {
         id: current.id,
         movementUsed: current.movementUsed ?? 0,
         diagonalSteps: current.diagonalSteps ?? 0,
+        actionsUsed: current.actionsUsed ?? 0,
+        reactionsUsed: current.reactionsUsed ?? 0,
       };
       entries.sort((a, b) => b.initiative - a.initiative || a.name.localeCompare(b.name));
       const nextTurn = activeId

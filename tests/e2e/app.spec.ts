@@ -1135,6 +1135,56 @@ test("sheet HP corrections and GM conditions stay live", async ({ page, browser 
   await adminContext.close();
 });
 
+test("sheet recovery performs Treat Wounds and tracks immunity", async ({ page }) => {
+  test.setTimeout(60_000);
+  await signIn(page, admin);
+  const campaignId = campaignPath.split("/").pop();
+  const created = await page.request.post("/api/characters", {
+    data: { name: "E2E Medic", campaignId },
+  });
+  expect(created.status()).toBe(201);
+  const record = (await created.json()) as {
+    character: { id: string; data: Record<string, unknown> };
+  };
+  const draft = structuredClone(record.character.data) as {
+    skills: { trained: string[] };
+    play: {
+      hp: number;
+      treatWoundsImmune: boolean;
+      battleMedicineImmuneBy: string[];
+    };
+  };
+  draft.skills.trained = [...new Set([...draft.skills.trained, "medicine"])];
+  draft.play.hp = 10;
+  draft.play.treatWoundsImmune = false;
+  draft.play.battleMedicineImmuneBy = [];
+  const saved = await page.request.put(`/api/characters/${record.character.id}`, {
+    data: { data: draft, force: true },
+  });
+  expect(saved.ok()).toBe(true);
+
+  await page.goto(`/characters/${record.character.id}`);
+  await expect(page.getByRole("heading", { name: "E2E Medic" })).toBeVisible({
+    timeout: 15_000,
+  });
+  await page.getByRole("button", { name: "Recovery" }).click();
+  const dialog = page.getByRole("dialog", { name: "Recovery" });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByLabel("Medicine", { exact: true })).toHaveValue(/[+-]\d+ \(Trained\)/);
+  await dialog.getByRole("button", { name: "Perform Treat Wounds" }).click();
+  await expect(dialog.getByText(/Treat Wounds: \d+ vs DC 15/)).toBeVisible({
+    timeout: 15_000,
+  });
+  await expect(dialog.getByText(/immune to Treat Wounds/).first()).toBeVisible();
+  await dialog.locator(".modal-foot").getByRole("button", { name: "Close" }).click();
+
+  await page.getByRole("button", { name: "Recovery" }).click();
+  await expect(dialog.getByRole("button", { name: "Perform Treat Wounds" })).toBeDisabled();
+  await dialog.getByRole("button", { name: "Clear immunity" }).click();
+  await expect(dialog.getByRole("button", { name: "Perform Treat Wounds" })).toBeEnabled();
+  await dialog.locator(".modal-foot").getByRole("button", { name: "Close" }).click();
+});
+
 test("Pathbuilder JSON import creates a character from the dashboard", async ({ page }) => {
   await signIn(page, admin);
   await page.getByRole("button", { name: "Import Pathbuilder" }).click();
@@ -1179,6 +1229,12 @@ test("GM places a token, chats, rolls, and opens the scenes manager", async ({ p
   await page.getByRole("button", { name: "Roll initiative" }).click();
   await expect(page.getByText("0 / 25 ft.", { exact: true })).toBeVisible({ timeout: 15_000 });
   await expect(page.getByRole("button", { name: "Reset movement" })).toBeVisible();
+  const activeChip = page.locator(".initiative-chip.is-active");
+  await expect(activeChip.locator(".action-pip")).toHaveCount(3);
+  await activeChip.locator(".action-pip").first().click();
+  await expect(activeChip.locator(".action-pip.is-used")).toHaveCount(1);
+  await activeChip.locator(".initiative-reaction").click();
+  await expect(activeChip.locator(".initiative-reaction.is-used")).toHaveCount(1);
 
   await page.getByRole("button", { name: /E2E Hero, character token/ }).click();
   await page.getByRole("button", { name: "Edit token" }).click();

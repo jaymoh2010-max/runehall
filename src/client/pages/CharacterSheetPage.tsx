@@ -10,6 +10,7 @@ import {
   Dices,
   EyeOff,
   Heart,
+  HeartPulse,
   Minus,
   Moon,
   Pencil,
@@ -74,11 +75,21 @@ import {
   applyAttackPenalty,
   mod,
   rollFormula,
+  upgradeDegreeOfSuccess,
   validateFormula,
 } from "../../shared/dice";
 import { currencyToCp } from "../../shared/inventory";
 import { applyLongRest } from "../../shared/rest";
 import { applyHpEditToDraft, applyDyingRecovery } from "../../shared/damage";
+import {
+  RECOVERY_ACTIVITIES,
+  RECOVERY_LABELS,
+  hasRecoveryFeat,
+  medicineRank,
+  recoveryDcsForRank,
+  recoveryHealingFormula,
+  type RecoveryActivity,
+} from "../../shared/recovery";
 import { xpProgress } from "../../shared/xp";
 import { spellTraditionLabel, stripHtml } from "../../shared/compendium";
 import {
@@ -225,6 +236,27 @@ export function CharacterSheetPage() {
   const [shopOpen, setShopOpen] = useState(false);
   const [restOpen, setRestOpen] = useState(false);
   const [restRough, setRestRough] = useState(false);
+  const [recoveryOpen, setRecoveryOpen] = useState(false);
+  const [recoveryActivity, setRecoveryActivity] = useState<RecoveryActivity>("treat-wounds");
+  const [recoveryDc, setRecoveryDc] = useState(15);
+  const [recoveryTargetId, setRecoveryTargetId] = useState("");
+  const [recoveryParty, setRecoveryParty] = useState<CharacterRecord[]>([]);
+  const [recoveryBusy, setRecoveryBusy] = useState(false);
+  const [recoveryError, setRecoveryError] = useState("");
+  const [recoveryResult, setRecoveryResult] = useState<{
+    character: CharacterRecord;
+    targetId: string;
+    targetName: string;
+    activity: RecoveryActivity;
+    dc: number;
+    degree: RollResult["degree"];
+    roll: RollResult;
+    healingRoll: RollResult | null;
+    damageRoll: RollResult | null;
+    healed: number;
+    damage: number;
+    notes: string[];
+  } | null>(null);
   const [prepOpen, setPrepOpen] = useState(false);
   const [heroicRecoveryBusy, setHeroicRecoveryBusy] = useState(false);
   const [downtimeBusy, setDowntimeBusy] = useState(false);
@@ -649,6 +681,26 @@ export function CharacterSheetPage() {
         })
       : null;
 
+  const recoveryRank = derived ? medicineRank(derived) : 0;
+  const recoveryActivityOptions = RECOVERY_ACTIVITIES.filter(
+    (activity) =>
+      activity !== "battle-medicine" || (derived && hasRecoveryFeat(derived, "Battle Medicine"))
+  );
+  const recoveryDcs = recoveryDcsForRank(recoveryRank, recoveryActivity);
+  const recoveryTarget = recoveryParty.find((entry) => entry.id === recoveryTargetId) ?? null;
+  const recoveryTargetName = recoveryTarget?.name ?? character?.name ?? "Target";
+  const recoveryTargetHp = recoveryTarget?.summary
+    ? `${recoveryTarget.summary.currentHp} / ${recoveryTarget.summary.hp} HP`
+    : null;
+  const recoverySelf = recoveryTargetId === character?.id;
+  const recoveryTreatImmune = recoveryTarget?.data.play.treatWoundsImmune === true;
+  const recoveryBattleImmune =
+    recoveryTarget?.data.play.battleMedicineImmuneBy?.includes(character?.id ?? "") ?? false;
+  const recoveryBlocked =
+    recoveryRank < 1 ||
+    (recoveryActivity === "treat-wounds" && recoveryTreatImmune) ||
+    (recoveryActivity === "battle-medicine" && recoveryBattleImmune);
+
   const openCast = (
     spell: NonNullable<CharacterContext["spells"][string]>,
     kind: "known" | "cantrip" | "focus"
@@ -735,6 +787,110 @@ export function CharacterSheetPage() {
         : "Long rest complete: spell slots and focus reset.",
       "success"
     );
+  };
+
+  const openRecovery = async () => {
+    if (!character || !draft || !derived) return;
+    if (dirtyRef.current) {
+      await saveDraft();
+      if (conflictRef.current) {
+        toast("Resolve the sheet conflict before using recovery.", "error");
+        return;
+      }
+    }
+    const rank = medicineRank(derived);
+    const activities = RECOVERY_ACTIVITIES.filter(
+      (activity) => activity !== "battle-medicine" || hasRecoveryFeat(derived, "Battle Medicine")
+    );
+    const activity = activities[0] ?? "treat-wounds";
+    setRecoveryActivity(activity);
+    setRecoveryDc(recoveryDcsForRank(rank, activity)[0] ?? 15);
+    setRecoveryTargetId(character.id);
+    setRecoveryParty([character]);
+    setRecoveryResult(null);
+    setRecoveryError("");
+    setRecoveryOpen(true);
+    if (!character.campaignId) return;
+    try {
+      const result = await api<{ characters: CharacterRecord[] }>(
+        `/api/characters?campaignId=${character.campaignId}`
+      );
+      setRecoveryParty(result.characters);
+    } catch (err) {
+      setRecoveryError(errorMessage(err));
+    }
+  };
+
+  const chooseRecoveryActivity = (activity: RecoveryActivity) => {
+    setRecoveryActivity(activity);
+    setRecoveryDc(recoveryDcsForRank(derived ? medicineRank(derived) : 0, activity)[0] ?? 15);
+    setRecoveryResult(null);
+    setRecoveryError("");
+  };
+
+  const runRecovery = async () => {
+    if (!character || recoveryBusy) return;
+    setRecoveryBusy(true);
+    setRecoveryError("");
+    try {
+      const result = await api<{
+        character: CharacterRecord;
+        targetId: string;
+        targetName: string;
+        activity: RecoveryActivity;
+        dc: number;
+        degree: RollResult["degree"];
+        roll: RollResult;
+        healingRoll: RollResult | null;
+        damageRoll: RollResult | null;
+        healed: number;
+        damage: number;
+        notes: string[];
+      }>(`/api/characters/${character.id}/recovery`, {
+        method: "POST",
+        body: {
+          activity: recoveryActivity,
+          dc: recoveryDc,
+          targetId: recoveryTargetId || character.id,
+        },
+      });
+      setRecoveryResult(result);
+      setRecoveryParty((current) =>
+        current.map((entry) => (entry.id === result.targetId ? result.character : entry))
+      );
+      if (result.targetId === character.id) applyUpdatedCharacter(result.character);
+      toast(
+        `${result.targetName}: ${result.degree ? DEGREE_LABELS[result.degree] : "check"}${result.healed ? `, +${result.healed} HP` : ""}${result.damage ? `, ${result.damage} damage` : ""}`,
+        result.degree === "critical-failure" || result.degree === "failure" ? "error" : "success"
+      );
+    } catch (err) {
+      setRecoveryError(errorMessage(err));
+      setRecoveryResult(null);
+    } finally {
+      setRecoveryBusy(false);
+    }
+  };
+
+  const clearRecoveryImmunity = async () => {
+    if (!character || recoveryBusy) return;
+    setRecoveryBusy(true);
+    setRecoveryError("");
+    try {
+      const result = await api<{ character: CharacterRecord }>(
+        `/api/characters/${character.id}/recovery/clear`,
+        { method: "POST" }
+      );
+      applyUpdatedCharacter(result.character);
+      setRecoveryParty((current) =>
+        current.map((entry) => (entry.id === character.id ? result.character : entry))
+      );
+      setRecoveryResult(null);
+      toast("Recovery immunities cleared.", "success");
+    } catch (err) {
+      setRecoveryError(errorMessage(err));
+    } finally {
+      setRecoveryBusy(false);
+    }
   };
 
   const applyDailyPreparations = (next: CharacterDraft) => {
@@ -906,7 +1062,13 @@ export function CharacterSheetPage() {
     label: string,
     dc?: number | null,
     onResult?: (result: RollResult) => void,
-    options: { heroPoint?: boolean; visibility?: "all" | "gm"; useTargetDc?: boolean } = {}
+    options: {
+      heroPoint?: boolean;
+      visibility?: "all" | "gm";
+      useTargetDc?: boolean;
+      /** Evasion, Juggernaut, or another success-to-critical feature. */
+      upgradeSuccess?: boolean;
+    } = {}
   ) => {
     if (!draft) return;
     const parsedDc = targetDc.trim() ? Number(targetDc) : null;
@@ -935,6 +1097,10 @@ export function CharacterSheetPage() {
     if (!character?.campaignId) {
       try {
         const result = rollFormula(formula, { dc: effectiveDc, label: rollLabel });
+        if (options.upgradeSuccess && result.degree === "success") {
+          result.degree = upgradeDegreeOfSuccess(result.degree);
+          result.degreeUpgraded = true;
+        }
         setRollLog(result);
         toast(
           `${rollLabel}: ${result.total}${result.degree ? ` · ${DEGREE_LABELS[result.degree]}` : ""}`,
@@ -958,6 +1124,7 @@ export function CharacterSheetPage() {
             dc: effectiveDc,
             visibility,
             characterId: character.id,
+            upgradeSuccess: options.upgradeSuccess === true,
           },
           (message) => {
             if (!message) return;
@@ -1078,27 +1245,33 @@ export function CharacterSheetPage() {
   const rollAfflictionSave = (affliction: CharacterAffliction) => {
     if (!draft || !derived) return;
     const formula = `1d20${signed(derived.saves[affliction.save])}`;
-    roll(formula, `${affliction.name} stage save`, affliction.dc, (result) => {
-      if (!result.degree) return;
-      const applied = applyAfflictionSave(afflictionOnsetPassed(affliction), result.degree);
-      update((current) => {
-        const active = current.play.afflictions.find((entry) => entry.id === affliction.id);
-        if (!active) return current;
-        const next = applyAfflictionSave(afflictionOnsetPassed(active), result.degree!);
-        return {
-          ...current,
-          play: {
-            ...current.play,
-            afflictions: next.affliction
-              ? current.play.afflictions.map((entry) =>
-                  entry.id === affliction.id ? next.affliction! : entry
-                )
-              : current.play.afflictions.filter((entry) => entry.id !== affliction.id),
-          },
-        };
-      });
-      toast(applied.message, applied.outcome === "worsened" ? "error" : "success");
-    });
+    roll(
+      formula,
+      `${affliction.name} stage save`,
+      affliction.dc,
+      (result) => {
+        if (!result.degree) return;
+        const applied = applyAfflictionSave(afflictionOnsetPassed(affliction), result.degree);
+        update((current) => {
+          const active = current.play.afflictions.find((entry) => entry.id === affliction.id);
+          if (!active) return current;
+          const next = applyAfflictionSave(afflictionOnsetPassed(active), result.degree!);
+          return {
+            ...current,
+            play: {
+              ...current.play,
+              afflictions: next.affliction
+                ? current.play.afflictions.map((entry) =>
+                    entry.id === affliction.id ? next.affliction! : entry
+                  )
+                : current.play.afflictions.filter((entry) => entry.id !== affliction.id),
+            },
+          };
+        });
+        toast(applied.message, applied.outcome === "worsened" ? "error" : "success");
+      },
+      { upgradeSuccess: derived.saveUpgrades?.[affliction.save] === true }
+    );
   };
 
   const addPersistentDamage = () => {
@@ -1282,6 +1455,16 @@ export function CharacterSheetPage() {
             <Button
               variant="secondary"
               size="sm"
+              icon={<HeartPulse size={14} />}
+              onClick={() => void openRecovery()}
+            >
+              Recovery
+            </Button>
+          ) : null}
+          {canEdit ? (
+            <Button
+              variant="secondary"
+              size="sm"
               icon={<Moon size={14} />}
               onClick={() => setRestOpen(true)}
             >
@@ -1392,19 +1575,42 @@ export function CharacterSheetPage() {
               <span className="tiny muted">Roll a save against an effect</span>
             </div>
             <div className="defense-grid">
-              {(["fortitude", "reflex", "will"] as const).map((save) => (
-                <button
-                  key={save}
-                  type="button"
-                  className="roll-card"
-                  onClick={() => roll(`1d20${signed(derived.saves[save])}`, SAVE_LABELS[save])}
-                >
-                  <span>{SAVE_LABELS[save]}</span>
-                  <strong>{signed(derived.saves[save])}</strong>
-                  <span className="tiny muted">{PROFICIENCY_NAMES[derived.prof[save]]}</span>
-                  <Dices size={14} />
-                </button>
-              ))}
+              {(["fortitude", "reflex", "will"] as const).map((save) => {
+                const upgraded = derived.saveUpgrades?.[save] === true;
+                const upgradeLabel =
+                  save === "reflex" ? "Evasion" : save === "fortitude" ? "Juggernaut" : null;
+                return (
+                  <button
+                    key={save}
+                    type="button"
+                    className="roll-card"
+                    title={
+                      upgraded && upgradeLabel
+                        ? `${upgradeLabel}: a success becomes a critical success.`
+                        : undefined
+                    }
+                    onClick={() =>
+                      roll(
+                        `1d20${signed(derived.saves[save])}`,
+                        SAVE_LABELS[save],
+                        null,
+                        undefined,
+                        {
+                          upgradeSuccess: upgraded,
+                        }
+                      )
+                    }
+                  >
+                    <span>{SAVE_LABELS[save]}</span>
+                    <strong>{signed(derived.saves[save])}</strong>
+                    <span className="tiny muted">
+                      {PROFICIENCY_NAMES[derived.prof[save]]}
+                      {upgraded && upgradeLabel ? ` · ${upgradeLabel}` : ""}
+                    </span>
+                    <Dices size={14} />
+                  </button>
+                );
+              })}
               <button
                 type="button"
                 className="roll-card"
@@ -3132,6 +3338,165 @@ export function CharacterSheetPage() {
             ) : null}
           </div>
         ) : null}
+      </Modal>
+
+      <Modal
+        open={recoveryOpen}
+        onClose={() => setRecoveryOpen(false)}
+        title="Recovery"
+        subtitle="Treat Wounds, Battle Medicine, and Stabilize, rolled by the server."
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setRecoveryOpen(false)}>
+              Close
+            </Button>
+            {recoverySelf && (recoveryTreatImmune || recoveryBattleImmune) ? (
+              <Button variant="ghost" onClick={() => void clearRecoveryImmunity()}>
+                Clear immunity
+              </Button>
+            ) : null}
+            <Button
+              variant="primary"
+              icon={<HeartPulse size={14} />}
+              disabled={recoveryBusy || recoveryBlocked}
+              onClick={() => void runRecovery()}
+            >
+              {recoveryBusy ? "Treating…" : `Perform ${RECOVERY_LABELS[recoveryActivity]}`}
+            </Button>
+          </>
+        }
+      >
+        <div className="stack">
+          {recoveryError ? (
+            <div className="settings-note">
+              <CircleAlert size={16} />
+              <span>{recoveryError}</span>
+            </div>
+          ) : null}
+          <div className="form-grid two">
+            <Field label="Activity">
+              <Select
+                value={recoveryActivity}
+                onChange={(event) => chooseRecoveryActivity(event.target.value as RecoveryActivity)}
+              >
+                {recoveryActivityOptions.map((activity) => (
+                  <option key={activity} value={activity}>
+                    {RECOVERY_LABELS[activity]}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <Field label="Target">
+              <Select
+                value={recoveryTargetId}
+                onChange={(event) => {
+                  setRecoveryTargetId(event.target.value);
+                  setRecoveryResult(null);
+                }}
+              >
+                {recoveryParty.map((entry) => (
+                  <option key={entry.id} value={entry.id}>
+                    {entry.name}
+                    {entry.id === character?.id ? " (you)" : ""}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <Field label="Medicine DC">
+              <Select
+                value={String(recoveryDc)}
+                onChange={(event) => {
+                  setRecoveryDc(Number(event.target.value));
+                  setRecoveryResult(null);
+                }}
+                disabled={recoveryActivity === "stabilize"}
+              >
+                {recoveryDcs.map((dc) => (
+                  <option key={dc} value={dc}>
+                    DC {dc}
+                    {recoveryHealingFormula(dc) ? ` — heals ${recoveryHealingFormula(dc)}` : ""}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <Field label="Medicine">
+              <Input
+                readOnly
+                value={
+                  derived?.skills.find((skill) => skill.id === "medicine")
+                    ? `${signed(derived.skills.find((skill) => skill.id === "medicine")!.mod)} (${PROFICIENCY_NAMES[recoveryRank] ?? "Untrained"})`
+                    : "Untrained"
+                }
+              />
+            </Field>
+          </div>
+          <p className="tiny muted">
+            {recoveryActivity === "treat-wounds"
+              ? "10 minutes. Success restores the listed healing; a critical success doubles it, and a critical failure deals 1d8 damage. The target is then immune to Treat Wounds for 1 hour."
+              : recoveryActivity === "battle-medicine"
+                ? "1 action. Uses the same DC and healing as Treat Wounds and does not remove wounded. The target is then immune to this healer's Battle Medicine for 1 day."
+                : "2 actions, DC 15. Success ends dying; a critical success also restores 1 HP. A critical failure increases dying by 1."}
+          </p>
+          {recoveryRank < 1 ? (
+            <div className="settings-note">
+              <CircleAlert size={16} />
+              <span>
+                Train Medicine before using recovery activities. The healer's own Medicine rank and
+                modifier are used.
+              </span>
+            </div>
+          ) : null}
+          {recoveryTargetHp ? (
+            <p className="tiny muted">
+              {recoveryTargetName}: {recoveryTargetHp}
+              {recoveryTreatImmune ? " · immune to Treat Wounds" : ""}
+              {recoveryBattleImmune ? " · immune to your Battle Medicine" : ""}
+            </p>
+          ) : null}
+          {recoveryResult ? (
+            <div className="settings-note">
+              <div className="stack" style={{ width: "100%" }}>
+                <div className="row-between">
+                  <strong>
+                    {RECOVERY_LABELS[recoveryResult.activity]}: {recoveryResult.roll.total} vs DC{" "}
+                    {recoveryResult.dc}
+                  </strong>
+                  {recoveryResult.degree ? (
+                    <Badge
+                      tone={
+                        recoveryResult.degree === "critical-success" ||
+                        recoveryResult.degree === "success"
+                          ? "green"
+                          : "red"
+                      }
+                    >
+                      {DEGREE_LABELS[recoveryResult.degree]}
+                    </Badge>
+                  ) : null}
+                </div>
+                {recoveryResult.healingRoll ? (
+                  <p className="tiny muted">
+                    Healing roll {recoveryResult.healingRoll.total}; {recoveryResult.healed} HP
+                    restored after the HP cap.
+                  </p>
+                ) : null}
+                {recoveryResult.damageRoll ? (
+                  <p className="tiny muted">
+                    Critical-failure damage roll {recoveryResult.damageRoll.total};{" "}
+                    {recoveryResult.damage} HP lost.
+                  </p>
+                ) : null}
+                <ul className="rest-preview">
+                  {recoveryResult.notes.map((note, index) => (
+                    <li key={`${note}-${index}`}>
+                      <span>{note}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          ) : null}
+        </div>
       </Modal>
 
       <DailyPreparationsModal
