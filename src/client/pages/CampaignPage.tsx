@@ -76,6 +76,7 @@ import {
   XP_AWARD_KIND_LABELS,
   XP_AWARD_KINDS,
   hazardXp,
+  xpPerLevel,
   xpProgress,
   type AccomplishmentTier,
 } from "../../shared/xp";
@@ -240,6 +241,8 @@ export function CampaignPage() {
   const journalFileInputRef = useRef<HTMLInputElement>(null);
   const [settingsBusy, setSettingsBusy] = useState(false);
   const [settingsName, setSettingsName] = useState("");
+  const [transferTarget, setTransferTarget] = useState("");
+  const [transferBusy, setTransferBusy] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState("");
   const [deleteBusy, setDeleteBusy] = useState(false);
@@ -890,6 +893,39 @@ export function CampaignPage() {
     }
   };
 
+  const transferCampaign = async () => {
+    if (!id || !transferTarget) return;
+    const target = members.find((member) => member.id === transferTarget);
+    if (
+      !target ||
+      !window.confirm(
+        `Make ${target.displayName} the GM? You will become a player and lose GM controls.`
+      )
+    ) {
+      return;
+    }
+    setTransferBusy(true);
+    try {
+      const result = await api<{ campaign: CampaignSummary }>(`/api/campaigns/${id}/transfer`, {
+        method: "POST",
+        body: { userId: transferTarget },
+      });
+      setCampaign(result.campaign);
+      setMembers((current) =>
+        current.map((member) => ({
+          ...member,
+          role: member.id === transferTarget ? "gm" : "player",
+        }))
+      );
+      setTransferTarget("");
+      toast(`${target.displayName} is now the GM.`, "success");
+    } catch (err) {
+      toast(errorMessage(err), "error");
+    } finally {
+      setTransferBusy(false);
+    }
+  };
+
   const removeMember = async (member: CampaignMember) => {
     if (!id || !window.confirm(`Remove ${member.displayName} from the campaign?`)) return;
     try {
@@ -974,9 +1010,13 @@ export function CampaignPage() {
   const levelUpCharacters = async (characterId?: string) => {
     if (!id || !campaign) return;
     const target = characterId ? characters.find((entry) => entry.id === characterId) : null;
+    const cost =
+      campaign.xpMode === "xp"
+        ? `this consumes up to ${xpPerLevel(campaign.advancementSpeed).toLocaleString()} XP`
+        : "milestone advancement costs no XP";
     const message = target
-      ? `Advance ${target.name} by one level? The GM controls advancement, and this consumes up to 1,000 XP.`
-      : "Advance every character in this campaign by one level? The GM controls advancement, and each character consumes up to 1,000 XP.";
+      ? `Advance ${target.name} by one level? The GM controls advancement, and ${cost}.`
+      : `Advance every character in this campaign by one level? The GM controls advancement, and each character advances with ${cost}.`;
     if (!window.confirm(message)) return;
     if (target) setLevelingId(target.id);
     else setLevelUpBusy(true);
@@ -2278,6 +2318,37 @@ export function CampaignPage() {
                     disabled={!isGm}
                   />
                 </Field>
+                {isGm ? (
+                  <Field
+                    label="Transfer GM"
+                    hint="Hand this campaign to another member. You become a player and lose GM controls."
+                  >
+                    <div className="row wrap" style={{ gap: 8 }}>
+                      <Select
+                        value={transferTarget}
+                        onChange={(event) => setTransferTarget(event.target.value)}
+                      >
+                        <option value="">Choose a member.</option>
+                        {members
+                          .filter((member) => member.id !== campaign?.gmId)
+                          .map((member) => (
+                            <option key={member.id} value={member.id}>
+                              {member.displayName}
+                            </option>
+                          ))}
+                      </Select>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        loading={transferBusy}
+                        disabled={!transferTarget}
+                        onClick={() => void transferCampaign()}
+                      >
+                        Transfer
+                      </Button>
+                    </div>
+                  </Field>
+                ) : null}
                 {isGm ? (
                   <Button type="submit" variant="primary" loading={settingsBusy}>
                     Save changes

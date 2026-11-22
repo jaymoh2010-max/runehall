@@ -3532,6 +3532,17 @@ async function main() {
   ) {
     throw new Error("Reinforcement wave did not create one grouped initiative entry");
   }
+  const duplicateWave = await fetch(
+    `${base}/api/campaigns/${campaign.id}/encounters/${smokeEncounter.id}/launch`,
+    {
+      method: "POST",
+      headers: { cookie: gmCookie, "content-type": "application/json" },
+      body: JSON.stringify({ sceneId: scene.id, wave: 3, mode: "reinforce" }),
+    }
+  );
+  if (duplicateWave.status !== 400) {
+    throw new Error("Reinforcing an already-launched wave was allowed");
+  }
   const playerEncounter = await fetch(`${base}/api/campaigns/${campaign.id}/encounters`, {
     headers: { cookie: playerCookie },
   });
@@ -3539,6 +3550,19 @@ async function main() {
 
   // Hidden combatants stay out of the player-facing initiative order even when
   // a reinforcement launch re-broadcasts the authoritative order.
+  await api(`/api/campaigns/${campaign.id}/encounters/${smokeEncounter.id}/combatants`, {
+    method: "POST",
+    cookie: gmCookie,
+    body: {
+      name: "Wave Four Guard",
+      level: 2,
+      count: 1,
+      hp: 20,
+      ac: 16,
+      perception: 8,
+      wave: 4,
+    },
+  });
   const hiddenWatcher = await connectSocket(playerCookie);
   await emitAck(hiddenWatcher, "campaign:join", { campaignId: campaign.id });
   const hiddenCombatant = await emitAck(gmSocket, "token:create", {
@@ -3569,12 +3593,12 @@ async function main() {
     throw new Error(`Hidden combatant removal failed: ${error.message}`);
   });
   const playerReinforcement = waitForEvent(hiddenWatcher, "initiative:updated", (payload) =>
-    payload.entries?.some((entry) => String(entry.name).startsWith("Wave Two Guard"))
+    payload.entries?.some((entry) => String(entry.name).startsWith("Wave Four Guard"))
   );
   await api(`/api/campaigns/${campaign.id}/encounters/${smokeEncounter.id}/launch`, {
     method: "POST",
     cookie: gmCookie,
-    body: { sceneId: scene.id, wave: 3, mode: "reinforce" },
+    body: { sceneId: scene.id, wave: 4, mode: "reinforce" },
   });
   const playerReinforcementPayload = await playerReinforcement.catch((error) => {
     throw new Error(`Reinforcement did not reach the player: ${error.message}`);
@@ -3634,6 +3658,33 @@ async function main() {
 
   gmSocket.close();
   playerSocket.close();
+
+  const transfer = await api(`/api/campaigns/${campaign.id}/transfer`, {
+    method: "POST",
+    cookie: gmCookie,
+    body: { userId: player.id },
+  });
+  if (transfer.payload.campaign.gmId !== player.id) {
+    throw new Error("GM transfer did not change the campaign owner");
+  }
+  const playerAudit = await fetch(`${base}/api/campaigns/${campaign.id}/loot/audit`, {
+    headers: { cookie: playerCookie },
+  });
+  const formerGmAudit = await fetch(`${base}/api/campaigns/${campaign.id}/loot/audit`, {
+    headers: { cookie: gmCookie },
+  });
+  if (playerAudit.status !== 200 || formerGmAudit.status !== 403) {
+    throw new Error("GM permissions did not change immediately after transfer");
+  }
+  const transferBack = await api(`/api/campaigns/${campaign.id}/transfer`, {
+    method: "POST",
+    cookie: playerCookie,
+    body: { userId: gm.id },
+  });
+  if (transferBack.payload.campaign.gmId !== gm.id) {
+    throw new Error("The new GM could not transfer the campaign back");
+  }
+  log("campaign ownership transfers between members");
 
   const unconfirmedDelete = await fetch(`${base}/api/campaigns/${campaign.id}`, {
     method: "DELETE",

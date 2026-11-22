@@ -358,12 +358,10 @@ export function LootBuilder({
               <PageEyebrow>Treasure budget</PageEyebrow>
               <h3>Level {audit.partyLevel} hoard</h3>
               <p className="tiny muted">
-                GM Core suggests about {formatCp(audit.budget.totalGp * 100)} of treasure for a
-                four-character party at this level, including about{" "}
-                {formatCp(audit.budget.currencyGp * 100)} in coins. This campaign has{" "}
-                {audit.partySize} {audit.partySize === 1 ? "character" : "characters"}. The
-                character benchmark is the table's lump-sum cash option, not the full item
-                allotment.
+                GM Core suggests about {formatCp(audit.budget.totalGp * 100)} of treasure for this{" "}
+                {audit.partySize}-character party at this level, including about{" "}
+                {formatCp(audit.budget.currencyGp * 100)} in coins. The character benchmark is the
+                table's lump-sum cash option, not the full item allotment.
               </p>
             </div>
             <div className="treasure-audit-stats">
@@ -375,7 +373,7 @@ export function LootBuilder({
                 <span>Distributed</span>
                 <strong>{formatCp(audit.distributedCp)}</strong>
               </div>
-              <div title="Guideline for a four-character party at the current party level.">
+              <div title="Guideline scaled for this party's size at the current party level.">
                 <span>Level budget</span>
                 <strong>{formatCp(audit.budget.totalGp * 100)}</strong>
               </div>
@@ -400,7 +398,8 @@ export function LootBuilder({
                     </span>
                     <span className="tiny muted">
                       {formatCp(row.distributedCp)} distributed · {formatCp(row.preparedCp)} open ·{" "}
-                      {formatCp(row.budgetGp * 100)} budget
+                      {formatCp(row.budgetGp * 100)} budget · {row.mix.permanent} permanent,{" "}
+                      {row.mix.consumable} consumable
                     </span>
                   </div>
                 ))}

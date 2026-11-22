@@ -1346,6 +1346,7 @@ export interface TreasureAudit {
     parcelCount: number;
     preparedCp: number;
     distributedCp: number;
+    mix: TreasureItemMix;
     budgetGp: number;
   }>;
   characters: TreasureAuditCharacter[];

@@ -133,23 +133,25 @@ export function performDowntimeDay(options: {
     }
   }
 
-  const taskLevel =
+  const maxTaskLevel = Math.max(0, Math.min(20, settlementLevel));
+  const requestedTaskLevel =
     kind === "earn-income"
       ? existing
         ? clampInt(existing.taskLevel, 0, 0, 20)
         : clampInt(input.taskLevel, 0, 0, 20)
       : null;
+  if (kind === "earn-income" && requestedTaskLevel !== null && requestedTaskLevel > maxTaskLevel) {
+    return failure(`Earn Income task level cannot exceed the settlement level (${maxTaskLevel}).`);
+  }
+  const taskLevel = kind === "earn-income" ? requestedTaskLevel : null;
+  // DC is derived on the server from the task/settlement level. Player-supplied
+  // DCs would let a level-1 character earn level-20 pay.
   const dcValue =
-    kind === "earn-income" || kind === "subsist"
-      ? clampInt(
-          existing?.dc ??
-            input.dc ??
-            (kind === "subsist" ? defaultSubsistDc(settlementLevel) : dcForLevel(taskLevel ?? 0)),
-          15,
-          1,
-          100
-        )
-      : null;
+    kind === "earn-income"
+      ? dcForLevel(taskLevel ?? 0)
+      : kind === "subsist"
+        ? defaultSubsistDc(settlementLevel)
+        : null;
 
   const rollCheck = (label: string): RollResult => {
     if (!check || dcValue === null) throw new Error("A downtime check needs a skill and DC.");
@@ -227,7 +229,7 @@ export function performDowntimeDay(options: {
       dc: dcValue,
       daysRequired:
         kind === "craft" || kind === "retrain"
-          ? clampInt(input.daysRequired, kind === "craft" ? 4 : 7, 1, 3_650)
+          ? Math.max(2, clampInt(input.daysRequired, kind === "craft" ? 4 : 7, 1, 3_650))
           : null,
       daysSpent: 0,
       earnedCp: 0,

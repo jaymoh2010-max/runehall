@@ -17,6 +17,7 @@ import {
 import {
   db,
   createDefaultScene,
+  transaction,
   type AudioTrackRow,
   type CampaignDashboardRow,
   type CampaignFactionRow,
@@ -785,6 +786,11 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
       messages,
       journal,
       audioTracks,
+      xpAwards: (
+        db
+          .prepare("SELECT * FROM xp_awards WHERE campaign_id = ? ORDER BY created_at ASC")
+          .all(id) as XpAwardRow[]
+      ).map(serializeXpAward),
       state: {
         activeSceneId: state?.active_scene_id ?? null,
         initiative: serializeInitiative(parseJson(state?.initiative, [])),
@@ -1015,6 +1021,60 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
     return reply.send({ ok: true });
   });
 
+  app.post("/api/campaigns/:id/transfer", async (request, reply) => {
+    if (!request.user) return reply.code(401).send({ error: "Sign in to continue." });
+    const { id } = request.params as { id: string };
+    const row = getCampaign(id);
+    if (!row) return reply.code(404).send({ error: "Campaign not found." });
+    if (roleFor(row, request.user.id) !== "gm") {
+      return reply.code(403).send({ error: "Only the GM can transfer the campaign." });
+    }
+    const body = (request.body ?? {}) as Record<string, unknown>;
+    const targetId = safeString(body.userId, "", 120);
+    if (!targetId) return reply.code(400).send({ error: "Choose a campaign member." });
+    if (targetId === row.gm_id) {
+      return reply.code(400).send({ error: "That member is already the GM." });
+    }
+    const membership = getMembership(id, targetId);
+    if (!membership) {
+      return reply
+        .code(400)
+        .send({ error: "The new GM must already be a member of this campaign." });
+    }
+    const ts = now();
+    transaction(() => {
+      db.prepare("UPDATE campaigns SET gm_id = ?, updated_at = ? WHERE id = ?").run(
+        targetId,
+        ts,
+        id
+      );
+      db.prepare(
+        "UPDATE campaign_members SET role = 'player' WHERE campaign_id = ? AND user_id = ?"
+      ).run(id, row.gm_id);
+      db.prepare(
+        "UPDATE campaign_members SET role = 'gm' WHERE campaign_id = ? AND user_id = ?"
+      ).run(id, targetId);
+    });
+    touchCampaign(id);
+    logAudit({
+      action: "campaign.transfer",
+      actor: request.user,
+      targetType: "campaign",
+      targetId: id,
+      detail: `Transferred GM from ${getUser(row.gm_id)?.display_name ?? row.gm_id} to ${getUser(targetId)?.display_name ?? targetId}`,
+      request,
+    });
+    broadcastCampaignSummary(app, getCampaign(id)!);
+    return reply.send({
+      campaign: serializeCampaignSummary(
+        getCampaign(id)!,
+        "gm",
+        campaignCounts(getCampaign(id)!),
+        request.user.displayName
+      ),
+    });
+  });
+
   app.post("/api/campaigns/:id/leave", async (request, reply) => {
     if (!request.user) return reply.code(401).send({ error: "Sign in to continue." });
     const { id } = request.params as { id: string };
@@ -1230,7 +1290,16 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
 
     const targetLevel = Math.max(...parsed.map((entry) => entry.draft.level));
     const xpMode = normalizeXpMode(row.xp_mode) === "xp";
-    const targetXp = xpMode ? Math.max(...parsed.map((entry) => entry.draft.play.xp)) : 0;
+    // Only characters already at the target level define the party's current
+    // XP progress. A lagging character's higher XP must not raise everyone.
+    const targetXp = xpMode
+      ? Math.max(
+          0,
+          ...parsed
+            .filter((entry) => entry.draft.level === targetLevel)
+            .map((entry) => entry.draft.play.xp)
+        )
+      : 0;
     const selected = characterId
       ? parsed.filter((entry) => entry.character.id === characterId)
       : parsed;
@@ -1239,14 +1308,16 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
     let alreadyCurrent = 0;
     for (const { character, draft } of selected) {
       const levelChanged = draft.level < targetLevel;
-      const xpChanged = xpMode && draft.play.xp < targetXp;
+      // Catch up XP only for characters who actually gain a level. Giving the
+      // party's top XP to an already-current character is unearned progress.
+      const xpChanged = xpMode && levelChanged && draft.play.xp < targetXp;
       if (!levelChanged && !xpChanged) {
         alreadyCurrent += 1;
         continue;
       }
       const before = characterSummary(draft, contextForDraft(draft));
       if (levelChanged) draft.level = targetLevel;
-      if (xpMode) draft.play.xp = Math.max(draft.play.xp, targetXp);
+      if (xpChanged) draft.play.xp = Math.max(draft.play.xp, targetXp);
       const after = characterSummary(draft, contextForDraft(draft));
       if (levelChanged) {
         draft.play.hp = levelUpCurrentHp(draft.play.hp, before.hp, after.hp);
@@ -1772,6 +1843,14 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
     }
 
     touchCampaign(id);
+    const restDate = shiftGolarionDate(
+      { year: row.world_year, month: row.world_month, day: row.world_day },
+      1
+    );
+    db.prepare(
+      "UPDATE campaigns SET world_year = ?, world_month = ?, world_day = ?, updated_at = ? WHERE id = ?"
+    ).run(restDate.year, restDate.month, restDate.day, now(), id);
+    broadcastCampaignSummary(app, getCampaign(id)!);
     const characters = campaignCharacters(id).map((character) =>
       serializeCharacter(character, character.owner_name, {
         canEdit: true,

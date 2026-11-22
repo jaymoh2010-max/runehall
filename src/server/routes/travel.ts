@@ -188,18 +188,19 @@ export async function registerTravelRoutes(app: FastifyInstance): Promise<void> 
       return reply.code(400).send({ error: "This journey is already complete." });
     }
     const body = (request.body ?? {}) as Record<string, unknown>;
-    const miles =
-      body.miles === undefined
-        ? travelMilesPerDay(row.party_speed, row.terrain)
-        : normalizeTravelMiles(body.miles);
+    const dailyMiles = travelMilesPerDay(row.party_speed, row.terrain);
+    const miles = body.miles === undefined ? dailyMiles : normalizeTravelMiles(body.miles);
     if (miles <= 0) return reply.code(400).send({ error: "Travel at least some distance." });
+    // A custom distance that exceeds one day's travel consumes the matching
+    // number of calendar days instead of always advancing a single day.
+    const days = Math.max(1, Math.ceil(miles / Math.max(1, dailyMiles)));
     const nextProgress = Math.min(distanceMiles, progressMiles + miles);
     const currentDate = {
       year: campaign.world_year,
       month: campaign.world_month,
       day: campaign.world_day,
     };
-    const worldDate = shiftGolarionDate(currentDate, 1);
+    const worldDate = shiftGolarionDate(currentDate, days);
     const ts = now();
     transaction(() => {
       db.prepare(
@@ -207,9 +208,9 @@ export async function registerTravelRoutes(app: FastifyInstance): Promise<void> 
       ).run(worldDate.year, worldDate.month, worldDate.day, ts, id);
       db.prepare(
         `UPDATE campaign_travel
-         SET progress_miles = ?, days_travelled = days_travelled + 1, updated_at = ?
+         SET progress_miles = ?, days_travelled = days_travelled + ?, updated_at = ?
          WHERE campaign_id = ?`
-      ).run(nextProgress, ts, id);
+      ).run(nextProgress, days, ts, id);
     });
     touchCampaign(id);
     logAudit({
@@ -217,7 +218,7 @@ export async function registerTravelRoutes(app: FastifyInstance): Promise<void> 
       actor: request.user,
       targetType: "campaign",
       targetId: id,
-      detail: `${miles} miles; ${nextProgress}/${distanceMiles} total`,
+      detail: `${miles} miles over ${days} day${days === 1 ? "" : "s"}; ${nextProgress}/${distanceMiles} total`,
       request,
     });
     const updated = getCampaign(id)!;
