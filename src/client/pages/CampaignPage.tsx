@@ -1,4 +1,11 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+  type KeyboardEvent as ReactKeyboardEvent,
+} from "react";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   Award,
@@ -157,7 +164,7 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode; gmOnly?: boolean }[
   { id: "people", label: "People", icon: <Shield size={15} /> },
   { id: "travel", label: "Travel", icon: <Compass size={15} /> },
   { id: "journal", label: "Journal", icon: <ScrollText size={15} /> },
-  { id: "notes", label: "Notes", icon: <BookOpen size={15} /> },
+  { id: "notes", label: "Notes & lore", icon: <BookOpen size={15} /> },
   { id: "sessions", label: "Sessions", icon: <CalendarClock size={15} /> },
   { id: "encounters", label: "Encounters", icon: <Skull size={15} />, gmOnly: true },
   { id: "loot", label: "Loot", icon: <Coins size={15} />, gmOnly: true },
@@ -199,6 +206,7 @@ export function CampaignPage() {
   const prepRef = useRef<HTMLDivElement>(null);
   const [partyActionsOpen, setPartyActionsOpen] = useState(false);
   const partyActionsRef = useRef<HTMLDivElement>(null);
+  const partyActionsMenuRef = useRef<HTMLDivElement>(null);
   const [members, setMembers] = useState<CampaignMember[]>([]);
   const [characters, setCharacters] = useState<CharacterRecord[]>([]);
   const [joinRequests, setJoinRequests] = useState<CampaignJoinRequest[]>([]);
@@ -318,6 +326,49 @@ export function CampaignPage() {
       window.removeEventListener("keydown", onKeyDown);
     };
   }, [partyActionsOpen]);
+
+  useEffect(() => {
+    if (!partyActionsOpen) return;
+    const items = partyActionsMenuRef.current?.querySelectorAll<HTMLButtonElement>(
+      '[role="menuitem"]:not(:disabled)'
+    );
+    items?.[0]?.focus();
+  }, [partyActionsOpen]);
+
+  const handlePartyActionsMenuKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      setPartyActionsOpen(false);
+      partyActionsRef.current?.querySelector<HTMLButtonElement>("button")?.focus();
+      return;
+    }
+
+    if (event.key === "Tab") {
+      setPartyActionsOpen(false);
+      partyActionsRef.current?.querySelector<HTMLButtonElement>("button")?.focus();
+      return;
+    }
+
+    const items = Array.from(
+      event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="menuitem"]:not(:disabled)')
+    );
+    if (!items.length) return;
+    const currentIndex = items.indexOf(document.activeElement as HTMLButtonElement);
+
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      items[(currentIndex + 1) % items.length]?.focus();
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      items[currentIndex <= 0 ? items.length - 1 : currentIndex - 1]?.focus();
+    } else if (event.key === "Home") {
+      event.preventDefault();
+      items[0]?.focus();
+    } else if (event.key === "End") {
+      event.preventDefault();
+      items[items.length - 1]?.focus();
+    }
+  };
 
   useEffect(() => {
     setPartyActionsOpen(false);
@@ -1601,7 +1652,13 @@ export function CampaignPage() {
                         <ChevronDown size={13} className={partyActionsOpen ? "is-open" : ""} />
                       </Button>
                       {partyActionsOpen ? (
-                        <div className="party-actions-menu" role="menu" aria-label="Party actions">
+                        <div
+                          className="party-actions-menu"
+                          role="menu"
+                          aria-label="Party actions"
+                          ref={partyActionsMenuRef}
+                          onKeyDown={handlePartyActionsMenuKeyDown}
+                        >
                           <button
                             type="button"
                             role="menuitem"
@@ -1872,17 +1929,31 @@ export function CampaignPage() {
                 <div>
                   <PageEyebrow>Chronicle</PageEyebrow>
                   <h2 style={{ marginTop: 5 }}>Journal</h2>
+                  <p className="tiny muted" style={{ marginTop: 4 }}>
+                    Session recaps, handouts, and quests. Private notes and shared lore are in Notes
+                    &amp; lore.
+                  </p>
                 </div>
-                {isGm ? (
+                <div className="row wrap" style={{ gap: 8 }}>
                   <Button
                     size="sm"
-                    variant="primary"
-                    icon={<FilePlus2 size={14} />}
-                    onClick={() => setJournalEditor("new")}
+                    variant="ghost"
+                    icon={<BookOpen size={14} />}
+                    onClick={() => setTab("notes")}
                   >
-                    New entry
+                    Notes &amp; lore
                   </Button>
-                ) : null}
+                  {isGm ? (
+                    <Button
+                      size="sm"
+                      variant="primary"
+                      icon={<FilePlus2 size={14} />}
+                      onClick={() => setJournalEditor("new")}
+                    >
+                      New entry
+                    </Button>
+                  ) : null}
+                </div>
               </div>
               <div className="segmented journal-filter">
                 <button

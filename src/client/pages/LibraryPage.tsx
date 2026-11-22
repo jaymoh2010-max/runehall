@@ -95,6 +95,12 @@ export function LibraryPage() {
   const [error, setError] = useState("");
   const [retryToken, setRetryToken] = useState(0);
   const queryKeyRef = useRef<string | null>(null);
+  const [searchText, setSearchText] = useState(query);
+  // React Router can defer the URL update from `setSearchParams`. Keep the
+  // values we asked it to apply so stale echoes of earlier keystrokes are not
+  // written back over the input while the router catches up.
+  const latestSearchRef = useRef(query);
+  const pendingSearchesRef = useRef<Set<string>>(new Set());
   const activeTab = TABS.find((entry) => entry.id === tab) ?? TABS[0];
   const selected = items.find((item) => item.id === selectedId) ?? items[0] ?? null;
   const returnTo = `/library${searchParams.toString() ? `?${searchParams.toString()}` : ""}`;
@@ -102,6 +108,22 @@ export function LibraryPage() {
   useEffect(() => {
     document.title = "Library · Runehall";
   }, []);
+
+  // Keep the input in sync with external URL changes (back/forward, links),
+  // without reverting characters typed ahead while the router catches up.
+  useEffect(() => {
+    const pending = pendingSearchesRef.current;
+    if (pending.has(query)) {
+      pending.delete(query);
+      // An earlier write from this typing burst is not the canonical value yet.
+      if (query !== latestSearchRef.current) return;
+      pending.clear();
+    } else if (pending.size) {
+      // The URL changed outside the search box; accept it and drop stale writes.
+      pending.clear();
+    }
+    setSearchText(query);
+  }, [query]);
 
   useEffect(() => {
     setItems([]);
@@ -168,7 +190,16 @@ export function LibraryPage() {
   };
 
   const setQuery = (value: string) => {
+    if (value !== query) {
+      latestSearchRef.current = value;
+      pendingSearchesRef.current.add(value);
+    }
     updateParams({ q: value, entry: null, offset: null });
+  };
+
+  const onSearchChange = (value: string) => {
+    setSearchText(value);
+    setQuery(value);
   };
 
   const setLegacy = (value: boolean) => {
@@ -284,8 +315,8 @@ export function LibraryPage() {
         <div className="search-box library-search">
           <Search size={16} aria-hidden="true" />
           <Input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
+            value={searchText}
+            onChange={(event) => onSearchChange(event.target.value)}
             placeholder={`Search ${activeTab.label.toLowerCase()}…`}
             aria-label={`Search ${activeTab.label.toLowerCase()}`}
             autoComplete="off"
