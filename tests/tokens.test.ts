@@ -7,10 +7,35 @@ import {
   normalizeTokenConditions,
   parseConditionEntry,
   sheetConditionsFromToken,
+  suggestedTokenPosition,
   syncLifeConditions,
   tickTokenConditions,
   tokenConditionLabel,
 } from "../src/shared/tokens";
+
+describe("suggested token position", () => {
+  const scene = { id: "scene_1", width: 1000, height: 800, gridSize: 70 };
+
+  it("uses the scene center when it is free", () => {
+    expect(suggestedTokenPosition(scene, [])).toEqual({ x: 500, y: 400 });
+  });
+
+  it("moves to the nearest free square when the center is occupied", () => {
+    expect(
+      suggestedTokenPosition(scene, [
+        { sceneId: "scene_1", x: 500, y: 400 },
+        { sceneId: "scene_1", x: 570, y: 400 },
+      ])
+    ).toEqual({ x: 430, y: 400 });
+  });
+
+  it("ignores tokens on other scenes", () => {
+    expect(suggestedTokenPosition(scene, [{ sceneId: "scene_2", x: 500, y: 400 }])).toEqual({
+      x: 500,
+      y: 400,
+    });
+  });
+});
 
 describe("token group HP", () => {
   it("sums current and maximum HP across members", () => {

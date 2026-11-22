@@ -774,13 +774,24 @@ test("lazy library, compendium entry, rules, and account routes load", async ({ 
   await page.goto("/rules");
   await expect(page.getByRole("heading", { name: "Rules at the table" })).toBeVisible();
   await page.getByRole("tab", { name: "Actions" }).click();
+  await expect(page).toHaveURL(/tab=actions/);
   await page.getByRole("button", { name: /^Aid/ }).click();
   await expect(page.getByRole("heading", { name: "Aid", level: 2 })).toBeVisible();
   await page.getByRole("textbox", { name: "Search actions" }).fill("Stride");
+  await expect(page).toHaveURL(/[?&]q=Stride/);
   await expect(page.getByRole("heading", { name: "Stride", level: 2 })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Aid", level: 2 })).toHaveCount(0);
   await page.getByRole("button", { name: "Clear search input" }).click();
   await expect(page.getByRole("textbox", { name: "Search actions" })).toHaveValue("");
+  await expect(page).not.toHaveURL(/[?&]q=/);
+
+  await page.goto("/rules?tab=conditions&q=Blinded");
+  await expect(page.getByRole("tab", { name: "Conditions" })).toHaveAttribute(
+    "aria-selected",
+    "true"
+  );
+  await expect(page.getByRole("textbox", { name: "Search conditions" })).toHaveValue("Blinded");
+  await expect(page.getByRole("heading", { name: "Blinded", level: 2 })).toBeVisible();
 
   await page.goto("/account");
   await expect(page.getByRole("heading", { name: "Account and security" })).toBeVisible();

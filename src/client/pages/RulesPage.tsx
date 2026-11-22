@@ -1,10 +1,12 @@
 import {
   useEffect,
   useMemo,
+  useRef,
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
   type ReactNode,
 } from "react";
+import { useSearchParams } from "react-router-dom";
 import { BookOpen, Dices, Search, Shield, Sword, X } from "lucide-react";
 import type { ActionRef, ConditionRef } from "../../shared/types";
 import { titleCase } from "../../shared/rules";
@@ -27,8 +29,13 @@ import {
 type Tab = "basics" | "actions" | "conditions";
 
 export function RulesPage() {
-  const [tab, setTab] = useState<Tab>("basics");
-  const [query, setQuery] = useState("");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabParam = searchParams.get("tab");
+  const tab: Tab = tabParam === "actions" || tabParam === "conditions" ? tabParam : "basics";
+  const urlQuery = searchParams.get("q") ?? "";
+  const [query, setQueryText] = useState(urlQuery);
+  const latestQueryRef = useRef(urlQuery);
+  const pendingQueriesRef = useRef<Set<string>>(new Set());
   const [actions, setActions] = useState<ActionRef[]>([]);
   const [conditions, setConditions] = useState<ConditionRef[]>([]);
   const [activeActionId, setActiveActionId] = useState<string | null>(null);
@@ -66,6 +73,47 @@ export function RulesPage() {
       }
     })();
   }, [retryToken]);
+
+  // Keep the search input in sync with URL navigation without reverting
+  // characters typed ahead while React Router catches up.
+  useEffect(() => {
+    const pending = pendingQueriesRef.current;
+    if (pending.has(urlQuery)) {
+      pending.delete(urlQuery);
+      if (urlQuery !== latestQueryRef.current) return;
+      pending.clear();
+    } else if (pending.size) {
+      pending.clear();
+    }
+    setQueryText(urlQuery);
+  }, [urlQuery]);
+
+  const updateParams = (updates: Record<string, string | null>) => {
+    setSearchParams(
+      (current) => {
+        const next = new URLSearchParams(current);
+        for (const [key, value] of Object.entries(updates)) {
+          if (value === null || value === "") next.delete(key);
+          else next.set(key, value);
+        }
+        return next;
+      },
+      { replace: true }
+    );
+  };
+
+  const setTab = (next: Tab) => {
+    updateParams({ tab: next === "basics" ? null : next });
+  };
+
+  const setQuery = (value: string) => {
+    if (value !== urlQuery) {
+      latestQueryRef.current = value;
+      pendingQueriesRef.current.add(value);
+    }
+    setQueryText(value);
+    updateParams({ q: value });
+  };
 
   const filteredActions = useMemo(() => {
     const q = query.trim().toLowerCase();
