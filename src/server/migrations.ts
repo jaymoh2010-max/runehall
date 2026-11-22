@@ -936,6 +936,13 @@ export const migrations: Migration[] = [
   },
   {
     version: 55,
+    name: "travel_day_history",
+    sql: `
+      ALTER TABLE campaign_travel ADD COLUMN history TEXT NOT NULL DEFAULT '[]';
+    `,
+  },
+  {
+    version: 56,
     name: "campaign_player_item_grant",
     sql: `
       ALTER TABLE campaigns ADD COLUMN player_item_grant INTEGER NOT NULL DEFAULT 0;

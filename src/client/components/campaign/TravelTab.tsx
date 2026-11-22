@@ -260,6 +260,7 @@ export function TravelTab({
           distanceMiles,
           progressMiles: 0,
           daysTravelled: 0,
+          clearHistory: true,
           partySpeed: normalizeTravelSpeed(Number(partySpeed) || suggestedSpeed),
           weather,
           notes,
@@ -423,6 +424,60 @@ export function TravelTab({
                   travel.daysTravelled === 1 ? "" : "s"
                 } travelled`}
               />
+              <div
+                className="travel-pointcrawl"
+                role="img"
+                aria-label={`Pointcrawl route from ${travel.origin || "the origin"} to ${
+                  travel.destination || "the destination"
+                }`}
+              >
+                <div className="travel-pointcrawl-track">
+                  <span
+                    className="travel-pointcrawl-fill"
+                    style={{
+                      width: `${
+                        travel.distanceMiles > 0
+                          ? Math.min(100, (travel.progressMiles / travel.distanceMiles) * 100)
+                          : 0
+                      }%`,
+                    }}
+                  />
+                  {travel.waypoints.map((waypoint) => (
+                    <span
+                      key={waypoint.id}
+                      className={`travel-pointcrawl-node ${waypoint.reached ? "is-reached" : ""}`}
+                      style={{
+                        left: `${
+                          travel.distanceMiles > 0
+                            ? Math.max(
+                                0,
+                                Math.min(100, (waypoint.miles / travel.distanceMiles) * 100)
+                              )
+                            : 0
+                        }%`,
+                      }}
+                      title={`${waypoint.name} · ${waypoint.miles} mi`}
+                    />
+                  ))}
+                  <span
+                    className="travel-pointcrawl-party"
+                    style={{
+                      left: `${
+                        travel.distanceMiles > 0
+                          ? Math.min(100, (travel.progressMiles / travel.distanceMiles) * 100)
+                          : 0
+                      }%`,
+                    }}
+                    title={`${travel.progressMiles} miles travelled`}
+                  >
+                    <Footprints size={13} />
+                  </span>
+                </div>
+                <div className="travel-pointcrawl-labels">
+                  <span>{travel.origin || "Origin"}</span>
+                  <span>{travel.destination || "Destination"}</span>
+                </div>
+              </div>
               <div className="travel-stats">
                 <div>
                   <span>Daily progress</span>
@@ -452,6 +507,37 @@ export function TravelTab({
                 </div>
               </div>
               {travel.notes ? <p className="small muted">{travel.notes}</p> : null}
+              {travel.history.length ? (
+                <details className="travel-history">
+                  <summary>
+                    Travel log · {travel.history.length} day
+                    {travel.history.length === 1 ? "" : "s"}
+                  </summary>
+                  <div className="travel-history-list">
+                    {travel.history
+                      .slice(-14)
+                      .reverse()
+                      .map((entry) => (
+                        <div key={entry.id} className="travel-history-row">
+                          <span className="tiny muted">Day {entry.day}</span>
+                          <span>
+                            {formatGolarionDate({
+                              year: entry.worldYear,
+                              month: entry.worldMonth,
+                              day: entry.worldDay,
+                            })}
+                          </span>
+                          <strong>{entry.miles} mi</strong>
+                          <span className="tiny muted">
+                            {TRAVEL_TERRAIN_OPTIONS.find((option) => option.id === entry.terrain)
+                              ?.label ?? entry.terrain}{" "}
+                            · {travelWeatherOption(entry.weather).label}
+                          </span>
+                        </div>
+                      ))}
+                  </div>
+                </details>
+              ) : null}
             </Card>
           ) : null}
 

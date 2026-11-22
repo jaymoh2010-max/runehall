@@ -1272,6 +1272,20 @@ export interface TravelEncounterCheck {
   createdAt: number;
 }
 
+export interface TravelDayLog {
+  id: string;
+  /** Cumulative travel day after this entry. */
+  day: number;
+  miles: number;
+  terrain: TravelTerrain;
+  weather: TravelWeather;
+  worldYear: number;
+  worldMonth: number;
+  worldDay: number;
+  note: string;
+  createdAt: number;
+}
+
 export interface CampaignTravel {
   campaignId: string;
   origin: string;
@@ -1286,6 +1300,8 @@ export interface CampaignTravel {
   /** Character id to exploration activity id. */
   activities: Record<string, string>;
   waypoints: TravelWaypoint[];
+  /** One entry per elapsed travel day, shared with the party. */
+  history: TravelDayLog[];
   /** GM-only encounter check history; omitted from player responses. */
   encounterChecks?: TravelEncounterCheck[];
   daysTravelled: number;

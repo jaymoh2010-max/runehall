@@ -178,6 +178,7 @@ export interface CampaignTravelRow {
   activities: string;
   waypoints: string;
   encounter_checks: string;
+  history: string;
   days_travelled: number;
   created_at: number;
   updated_at: number;

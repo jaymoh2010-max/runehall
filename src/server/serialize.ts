@@ -98,6 +98,7 @@ import { normalizeGolarionDate } from "../shared/calendar";
 import {
   normalizeTravelActivities,
   normalizeTravelEncounterChecks,
+  normalizeTravelHistory,
   normalizeTravelMiles,
   normalizeTravelTerrain,
   normalizeTravelWatches,
@@ -177,6 +178,7 @@ export function serializeCampaignTravel(
     waypoints: normalizeTravelWaypoints(parseJson(row.waypoints, []))
       .filter((waypoint) => privateView || waypoint.visible)
       .map((waypoint) => ({ ...waypoint, reached: waypoint.miles <= progressMiles })),
+    history: normalizeTravelHistory(parseJson(row.history, [])),
     daysTravelled: Math.max(0, Math.round(row.days_travelled)),
     dailyMiles: travelMilesPerDay(partySpeed, terrain),
     status: travelStatus(distanceMiles, progressMiles),

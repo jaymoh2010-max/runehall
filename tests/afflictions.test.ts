@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  AFFLICTION_PRESETS,
+  AFFLICTION_TYPES,
   advanceAfflictionDuration,
   afflictionDurationSeconds,
   afflictionOnsetPassed,
@@ -15,6 +17,28 @@ import {
 } from "../src/shared/afflictions";
 import { emptyCharacterDraft } from "../src/shared/rules";
 import type { CharacterAffliction, CharacterDraft } from "../src/shared/types";
+
+describe("affliction templates", () => {
+  it("bundles unique, valid recovery frames", () => {
+    expect(new Set(AFFLICTION_PRESETS.map((preset) => preset.id)).size).toBe(
+      AFFLICTION_PRESETS.length
+    );
+    for (const preset of AFFLICTION_PRESETS) {
+      expect(AFFLICTION_TYPES).toContain(preset.type);
+      expect(preset.dc).toBeGreaterThanOrEqual(1);
+      expect(preset.dc).toBeLessThanOrEqual(60);
+      expect(preset.stageMax).toBeGreaterThanOrEqual(1);
+      expect(preset.stageMax).toBeLessThanOrEqual(10);
+      expect(afflictionDurationSeconds(preset.duration)).not.toBeNull();
+      if (/rounds?$/i.test(preset.interval)) {
+        expect(initialIntervalRemaining(preset.interval)).not.toBeNull();
+      }
+      if (/rounds?$/i.test(preset.onset)) {
+        expect(initialOnsetRemaining(preset.onset)).not.toBeNull();
+      }
+    }
+  });
+});
 
 function affliction(overrides: Partial<CharacterAffliction> = {}): CharacterAffliction {
   return {

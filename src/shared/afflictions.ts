@@ -10,6 +10,105 @@ import type {
 
 export const AFFLICTION_TYPES: AfflictionType[] = ["poison", "disease", "curse"];
 
+export interface AfflictionPreset {
+  id: string;
+  label: string;
+  type: AfflictionType;
+  dc: number;
+  save: "fortitude" | "reflex" | "will";
+  stageMax: number;
+  interval: string;
+  duration: string;
+  onset: string;
+  virulent: boolean;
+  notes: string;
+}
+
+/**
+ * Recovery-frame templates, not published statblocks. They fill the DC, save,
+ * onset, interval, and maximum duration so the GM can adjudicate the stages.
+ */
+export const AFFLICTION_PRESETS: ReadonlyArray<AfflictionPreset> = [
+  {
+    id: "poison-mild",
+    label: "Mild poison template",
+    type: "poison",
+    dc: 16,
+    save: "fortitude",
+    stageMax: 3,
+    interval: "1 round",
+    duration: "1 minute",
+    onset: "",
+    virulent: false,
+    notes: "Stage effects are adjudicated by the GM.",
+  },
+  {
+    id: "poison-virulent",
+    label: "Virulent poison template",
+    type: "poison",
+    dc: 20,
+    save: "fortitude",
+    stageMax: 3,
+    interval: "1 round",
+    duration: "1 minute",
+    onset: "",
+    virulent: true,
+    notes: "Two consecutive successes are needed to reduce the stage.",
+  },
+  {
+    id: "poison-contact",
+    label: "Contact poison template",
+    type: "poison",
+    dc: 22,
+    save: "fortitude",
+    stageMax: 3,
+    interval: "1 minute",
+    duration: "1 hour",
+    onset: "1 minute",
+    virulent: false,
+    notes: "Exposure usually comes from contact with a coated object.",
+  },
+  {
+    id: "disease-common",
+    label: "Disease template",
+    type: "disease",
+    dc: 18,
+    save: "fortitude",
+    stageMax: 3,
+    interval: "1 day",
+    duration: "7 days",
+    onset: "1 day",
+    virulent: false,
+    notes: "Daily saves; stage effects are adjudicated by the GM.",
+  },
+  {
+    id: "curse-common",
+    label: "Curse template",
+    type: "curse",
+    dc: 20,
+    save: "will",
+    stageMax: 3,
+    interval: "1 day",
+    duration: "30 days",
+    onset: "1 day",
+    virulent: false,
+    notes: "Curses often have a specific removal condition in addition to saves.",
+  },
+  {
+    id: "curse-virulent",
+    label: "Virulent curse template",
+    type: "curse",
+    dc: 24,
+    save: "will",
+    stageMax: 3,
+    interval: "1 day",
+    duration: "30 days",
+    onset: "1 day",
+    virulent: true,
+    notes: "Two consecutive successes are needed to reduce the stage.",
+  },
+];
+
 export type AfflictionSaveOutcome = "ended" | "reduced" | "pending" | "worsened";
 
 export interface AfflictionSaveResult {

@@ -590,6 +590,9 @@ test.skip("GM plans a journey and advances a travel day", async ({ page }) => {
   await page.getByRole("button", { name: "Save journey" }).click();
   await expect(page.getByText("Journey saved.")).toBeVisible({ timeout: 15_000 });
   await expect(page.getByText(/0 of 20 miles/)).toBeVisible();
+  await expect(page.locator(".travel-pointcrawl")).toBeVisible();
+  await expect(page.locator(".travel-pointcrawl").getByText("E2E Start")).toBeVisible();
+  await expect(page.locator(".travel-pointcrawl").getByText("E2E End")).toBeVisible();
   await expect(
     page.locator(".travel-player-grid").getByText("E2E Hero", { exact: true }).first()
   ).toBeVisible();
@@ -626,7 +629,10 @@ test.skip("GM plans a journey and advances a travel day", async ({ page }) => {
     page
       .locator(".travel-page")
       .getByText(`${travelDayBefore + 1} Abadius, 4726 AR`, { exact: true })
+      .first()
   ).toBeVisible();
+  await page.getByText("Travel log · 1 day").click();
+  await expect(page.locator(".travel-history-row").getByText("20 mi")).toBeVisible();
 
   page.once("dialog", (dialog) => dialog.accept());
   await page.getByRole("button", { name: "Clear journey" }).click();
@@ -2052,6 +2058,18 @@ test.skip("sheet tracks afflictions with stages and stage saves", async ({ page 
   await expect(row).toContainText("DC 20");
 
   await row.getByRole("button", { name: "End Giant Spider Venom" }).click();
+  await expect(page.locator(".affliction-row")).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Add affliction" }).click();
+  const presetDialog = page.getByRole("dialog", { name: "Add affliction" });
+  await presetDialog.getByLabel("Start from a template").selectOption("poison-virulent");
+  await expect(presetDialog.getByLabel("DC")).toHaveValue("20");
+  await expect(presetDialog.getByLabel("Affliction stage interval")).toHaveValue("1 round");
+  await presetDialog.getByRole("button", { name: "Save affliction" }).click();
+  const presetRow = page.locator(".affliction-row").filter({ hasText: "Virulent poison template" });
+  await expect(presetRow).toContainText("Virulent");
+  await expect(presetRow).toContainText("0 / 2 consecutive successes");
+  await presetRow.getByRole("button", { name: "End Virulent poison template" }).click();
   await expect(page.locator(".affliction-row")).toHaveCount(0);
 });
 

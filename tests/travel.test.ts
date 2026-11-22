@@ -11,7 +11,9 @@ import {
   normalizeTravelWatches,
   normalizeTravelWaypoints,
   normalizeTravelEncounterChecks,
+  normalizeTravelHistory,
   normalizeTravelWeather,
+  travelDayMiles,
   travelDaysRemaining,
   travelEncounterDc,
   travelMilesPerDay,
@@ -41,6 +43,41 @@ describe("Player Core travel speed", () => {
     expect(normalizeTravelMiles(12.345)).toBe(12.35);
     expect(normalizeTravelMiles(-5)).toBe(0);
     expect(normalizeTravelMiles("80")).toBe(80);
+  });
+});
+
+describe("travel day history", () => {
+  it("splits a journey into full days plus the final remainder", () => {
+    expect(travelDayMiles(20, 20)).toEqual([20]);
+    expect(travelDayMiles(30, 20)).toEqual([20, 10]);
+    expect(travelDayMiles(45, 20)).toEqual([20, 20, 5]);
+    expect(travelDayMiles(0, 20)).toEqual([]);
+  });
+
+  it("normalizes day entries, clamps dates, and sorts by day", () => {
+    const history = normalizeTravelHistory([
+      {
+        id: "day_2",
+        day: 2,
+        miles: "10.5",
+        terrain: "difficult",
+        weather: "storm",
+        worldYear: 4726,
+        worldMonth: 2,
+        worldDay: 2,
+        note: "  Rain all day.  ",
+        createdAt: 20,
+      },
+      { id: "day_1", day: 1, miles: 20, worldMonth: 99, worldDay: 99, createdAt: 10 },
+      "garbage",
+    ]);
+    expect(history.map((entry) => entry.id)).toEqual(["day_1", "day_2"]);
+    expect(history[0].worldMonth).toBe(12);
+    expect(history[0].worldDay).toBe(31);
+    expect(history[1].miles).toBe(10.5);
+    expect(history[1].terrain).toBe("difficult");
+    expect(history[1].weather).toBe("storm");
+    expect(history[1].note).toBe("Rain all day.");
   });
 });
 
