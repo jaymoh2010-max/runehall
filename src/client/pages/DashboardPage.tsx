@@ -34,6 +34,7 @@ import {
   Avatar,
   Badge,
   Button,
+  Checkbox,
   EmptyState,
   ErrorState,
   Field,
@@ -85,6 +86,8 @@ export function DashboardPage() {
   const [campaignXpMode, setCampaignXpMode] = useState<XpMode>("milestone");
   const [campaignAdvancementSpeed, setCampaignAdvancementSpeed] =
     useState<AdvancementSpeed>("medium");
+  const [campaignFreeArchetype, setCampaignFreeArchetype] = useState(false);
+  const [campaignAutomaticBonusProgression, setCampaignAutomaticBonusProgression] = useState(false);
   const [invite, setInvite] = useState("");
   const [newCharacterName, setNewCharacterName] = useState("");
   const [newCharacterCampaign, setNewCharacterCampaign] = useState("");
@@ -213,6 +216,8 @@ export function DashboardPage() {
           ruleset: campaignRuleset,
           xpMode: campaignXpMode,
           advancementSpeed: campaignAdvancementSpeed,
+          freeArchetype: campaignFreeArchetype,
+          automaticBonusProgression: campaignAutomaticBonusProgression,
         },
       });
       setCreateOpen(false);
@@ -221,6 +226,8 @@ export function DashboardPage() {
       setCampaignRuleset("core");
       setCampaignXpMode("milestone");
       setCampaignAdvancementSpeed("medium");
+      setCampaignFreeArchetype(false);
+      setCampaignAutomaticBonusProgression(false);
       toast("Campaign created. Invite your players when you're ready.", "success");
       navigate(`/campaigns/${result.campaign.id}`, { state: { invite: true } });
     } catch (err) {
@@ -720,9 +727,29 @@ export function DashboardPage() {
               ))}
             </Select>
           </Field>
+          <div>
+            <Checkbox
+              label="Free Archetype variant"
+              checked={campaignFreeArchetype}
+              onChange={setCampaignFreeArchetype}
+            />
+            <p className="tiny muted">
+              Grants every character an extra archetype feat slot at each even level.
+            </p>
+          </div>
+          <div>
+            <Checkbox
+              label="Automatic Bonus Progression"
+              checked={campaignAutomaticBonusProgression}
+              onChange={setCampaignAutomaticBonusProgression}
+            />
+            <p className="tiny muted">
+              Replaces fundamental weapon and armor runes with level-based potency.
+            </p>
+          </div>
           <p className="tiny muted">
-            Players inherit this ruleset for their characters. Advancement stays GM-controlled and
-            can be changed later in Campaign Settings.
+            Players inherit this ruleset for their characters. These variants and advancement are
+            GM-controlled and can be changed later in Campaign Settings.
           </p>
         </form>
       </Modal>

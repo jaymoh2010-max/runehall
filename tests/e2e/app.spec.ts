@@ -955,6 +955,15 @@ test("player registers, joins with the invite code, and sees a player-safe table
   await expect(page.locator(".arc-active-card").getByText("E2E Beneath the City")).toBeVisible();
   await expect(page.getByRole("button", { name: "Add chapter" })).toHaveCount(0);
 
+  await page.goto(`${campaignPath}?tab=settings`);
+  await expect(page.getByLabel("Free Archetype variant")).toBeDisabled();
+  await expect(page.getByLabel("Automatic Bonus Progression")).toBeDisabled();
+  const forbiddenVariant = await page.request.patch(
+    `/api/campaigns/${campaignPath.split("/").pop()}`,
+    { data: { freeArchetype: true, automaticBonusProgression: true } }
+  );
+  expect(forbiddenVariant.status()).toBe(403);
+
   const adminContext = await browser.newContext();
   const adminPage = await adminContext.newPage();
   await signIn(adminPage, admin);
