@@ -390,6 +390,12 @@ test("GM awards XP in XP tracking mode without automatic level-up", async ({ pag
   await expect(page.getByText(/Level 2/).first()).toBeVisible();
   await expect(page.locator(".xp-ledger").getByText("Recent awards")).toBeVisible();
   await expect(page.locator(".xp-ledger").getByText("800 XP")).toBeVisible();
+
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.getByRole("button", { name: "Catch up party" }).click();
+  await expect(page.getByText("The whole party is already caught up.")).toBeVisible({
+    timeout: 15_000,
+  });
 });
 
 test("GM awards Hero Points and resets them for a new session", async ({ page }) => {
