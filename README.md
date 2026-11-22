@@ -26,8 +26,11 @@ Four campaign sections:
 - A compact token panel for HP, AC, conditions, visibility, locks, and sheet access.
 - **Manual initiative order**: roll the scene or add combatants by hand, type a total, reorder, set the active combatant, and step next/previous. Nothing ticks or resolves automatically.
 - Shared dice roller and persistent chat. Secret GM rolls and roll requests remain available.
-- A **Pathbuilder-style character sheet** that opens over the table from **My sheet**, a party avatar, or a linked token. It uses a compact three-column layout: build summary on the left, stats and skills in the center, and tabbed Weapons / Defense / Gear / Spells / Feats / Details / Status panels on the right.
+- Compact Pathbuilder-inspired dark/orange interface: slim top bar, dense panels, and orange action accents.
+- A **Pathbuilder-style character sheet** that opens over the table from **My sheet**, a party avatar, or a linked token. It uses a compact three-column layout: build summary and a level-by-level character plan on the left, stats and skills in the center, and tabbed Weapons / Defense / Gear / Spells / Feats / Details / Status panels on the right.
+- The plan rail shows the current level by default and expands to all 20 levels, including feats, skill increases, ability boosts, and class features.
 - Click a skill, attack, spell, feat, or item **name** to open its compendium page. Click the **dice icon** to roll it into table chat.
+- Spellcasting tracks ordinary slots, divine font, and focus points by hand. **Cast** spends the selected slot and posts the spell to table chat.
 - **Minimize** returns to the map without losing table state. Rolls from the sheet post to the same chat as the manual dice tray.
 - The bestiary palette for dragging monsters onto the map.
 - A shared soundtrack player with GM uploads and a bundled music library.

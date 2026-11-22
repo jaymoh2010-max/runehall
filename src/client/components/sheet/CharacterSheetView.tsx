@@ -30,6 +30,7 @@ import type {
   DerivedCharacter,
   Equipment,
   SaveKey,
+  Spell,
 } from "../../../shared/types";
 import {
   computeCharacter,
@@ -40,6 +41,7 @@ import {
 import { currencyToCp } from "../../../shared/inventory";
 import { applyHpEditToDraft } from "../../../shared/damage";
 import { rollFormula } from "../../../shared/dice";
+import { castSpell, spellCastOptions, type SpellCastChoice } from "../../../shared/spellcasting";
 import { api, formatCp } from "../../api";
 import { errorMessage, useToasts } from "../../stores";
 import { getSocket, joinCampaign } from "../../socket";
@@ -98,6 +100,8 @@ export function CharacterSheetView({
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [tab, setTab] = useState<SheetTab>("weapons");
+  const [showFullPlan, setShowFullPlan] = useState(false);
+  const [castChoices, setCastChoices] = useState<Record<string, string>>({});
   const [lastRoll, setLastRoll] = useState<LastRoll | null>(null);
   const [hpInput, setHpInput] = useState("");
   const [trayOpen, setTrayOpen] = useState(false);
@@ -345,23 +349,135 @@ export function CharacterSheetView({
     if (!draft || !context) return [];
     const groups: { label: string; ids: string[] }[] = [
       { label: "Cantrips", ids: draft.spells.cantrips },
-      { label: "Spells", ids: draft.spells.known },
       { label: "Prepared", ids: draft.spells.prepared },
+      { label: "Spells", ids: draft.spells.known },
       { label: "Focus", ids: draft.spells.focus },
       { label: "Innate", ids: draft.spells.innate },
       { label: "Rituals", ids: draft.spells.rituals },
     ];
+    const seen = new Set<string>();
     return groups.flatMap((group) =>
-      [...new Set(group.ids)].map((id) => ({
-        group: group.label,
-        spell: context.spells[id] ?? null,
-        id,
-      }))
+      [...new Set(group.ids)]
+        .filter((id) => {
+          // Prepared casters often list the same spell in both their book and
+          // today's preparations. Show the prepared entry once.
+          if (group.label === "Spells" && seen.has(id)) return false;
+          seen.add(id);
+          return true;
+        })
+        .map((id) => ({
+          group: group.label,
+          spell: context.spells[id] ?? null,
+          id,
+        }))
     );
   }, [context, draft]);
 
+  const featName = useCallback(
+    (id: string | null | undefined) => (id ? (context?.feats[id]?.name ?? id) : ""),
+    [context]
+  );
+
+  const levelPlan = useMemo(() => {
+    if (!draft || !context || !derived) return [];
+    const maxLevel = showFullPlan ? 20 : Math.max(1, draft.level);
+    return Array.from({ length: maxLevel }, (_entry, index) => {
+      const level = index + 1;
+      const key = String(level);
+      const items: { key: string; label: string; detail: string; href?: string }[] = [];
+      const addFeat = (
+        featId: string | undefined,
+        detail: string,
+        href: (id: string) => string
+      ) => {
+        if (!featId) return;
+        items.push({
+          key: `${level}-${detail}-${featId}`,
+          label: featName(featId),
+          detail,
+          href: href(featId),
+        });
+      };
+      addFeat(draft.feats.ancestry[key], "Ancestry feat", (id) => `/library/feat/${id}`);
+      addFeat(draft.feats.class[key], "Class feat", (id) => `/library/feat/${id}`);
+      addFeat(draft.feats.skill[key], "Skill feat", (id) => `/library/feat/${id}`);
+      addFeat(draft.feats.general[key], "General feat", (id) => `/library/feat/${id}`);
+      addFeat(draft.feats.freeArchetype[key], "Free archetype feat", (id) => `/library/feat/${id}`);
+      const increase = draft.skills.increases[key];
+      if (increase) {
+        items.push({
+          key: `${level}-skill-increase`,
+          label: titleCase(increase),
+          detail: "Skill increase",
+        });
+      }
+      const boosts = (draft.boosts.levels[key] ?? []).filter((ability): ability is AbilityKey =>
+        Boolean(ability)
+      );
+      if (boosts.length) {
+        items.push({
+          key: `${level}-boosts`,
+          label: boosts.map((ability) => ABILITY_LABELS[ability]).join(", "),
+          detail: "Ability boosts",
+        });
+      }
+      for (const feature of derived.features.filter((entry) => entry.level === level)) {
+        items.push({
+          key: `${level}-feature-${feature.id}`,
+          label: feature.name,
+          detail: "Class feature",
+        });
+      }
+      return { level, items };
+    });
+  }, [context, derived, draft, featName, showFullPlan]);
+
   const canGrant =
     Boolean(character?.permissions?.canAdvance) || Boolean(character?.campaignPlayerItemGrant);
+
+  const optionsForSpell = useCallback(
+    (spell: Spell, group: string) =>
+      spellCastOptions(spell, draft as CharacterDraft, context as CharacterContext, {
+        focus: group === "Focus",
+        focusPointsMax: derived?.focusPointsMax ?? 0,
+        innate: group === "Innate",
+      }),
+    [context, derived?.focusPointsMax, draft]
+  );
+
+  const cast = (spell: Spell, group: string) => {
+    if (!draft || !context) return;
+    const options = optionsForSpell(spell, group);
+    const key = `${group}:${spell.id}`;
+    const selected =
+      castChoices[key] ?? (options[0] ? `${options[0].rank}:${options[0].resource}` : "");
+    const [rankText, resource] = selected.split(":");
+    const choice: SpellCastChoice | null = resource
+      ? { rank: Number(rankText), resource: resource as SpellCastChoice["resource"] }
+      : null;
+    if (!choice) {
+      toast("No spell resource is available for that spell.", "error");
+      return;
+    }
+    const result = castSpell(draft, spell, context, choice, {
+      focus: group === "Focus",
+      focusPointsMax: derived?.focusPointsMax ?? 0,
+      innate: group === "Innate",
+    });
+    if (!result) {
+      toast("That spell has no uses left at the selected rank.", "error");
+      return;
+    }
+    void persist(result.draft);
+    toast(`Cast ${spell.name} at rank ${result.option.rank}.`, "success");
+    if (character?.campaignId) {
+      getSocket().emit("chat:send", {
+        campaignId: character.campaignId,
+        content: `${draft.name} casts ${spell.name} at rank ${result.option.rank} (${result.option.label}).`,
+        visibility: "all",
+      });
+    }
+  };
 
   const weaponNameHref = (attackId: string | null, name: string) =>
     attackId ? `/library/item/${attackId}` : `/rules?tab=actions&q=${encodeURIComponent(name)}`;
@@ -509,26 +625,43 @@ export function CharacterSheetView({
           </div>
 
           <div className="pb-build-heading">
-            <span>Level {draft.level}</span>
+            <span>Character plan</span>
             <Link to={`/characters/${character.id}/edit`}>Open planner</Link>
           </div>
-          <div className="pb-build-feats">
-            {derived.features.slice(0, 8).map((feature) => (
-              <div key={feature.name} className="pb-build-feat">
-                <Sparkles size={13} />
-                <span>{feature.name}</span>
+          <div className="pb-plan">
+            {levelPlan.map((entry) => (
+              <div className="pb-plan-level" key={entry.level}>
+                <div className="pb-plan-level-head">
+                  <span>Level {entry.level}</span>
+                  {entry.level === draft.level ? <em>Current</em> : null}
+                </div>
+                {entry.items.length ? (
+                  entry.items.map((item) => (
+                    <div className={`pb-plan-item ${item.href ? "is-link" : ""}`} key={item.key}>
+                      <Sparkles size={11} />
+                      <div>
+                        {item.href ? (
+                          <Link to={item.href}>{item.label}</Link>
+                        ) : (
+                          <span>{item.label}</span>
+                        )}
+                        <em>{item.detail}</em>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <p className="pb-plan-empty">No choices recorded at this level.</p>
+                )}
               </div>
             ))}
-            {derived.grantedFeats.slice(0, 8).map((feat) => (
-              <div key={`granted-${feat.name}`} className="pb-build-feat is-granted">
-                <Sparkles size={13} />
-                <span>{feat.name}</span>
-              </div>
-            ))}
-            {!derived.features.length && !derived.grantedFeats.length ? (
-              <p className="pb-empty">No class features yet.</p>
-            ) : null}
           </div>
+          <button
+            type="button"
+            className="pb-plan-toggle"
+            onClick={() => setShowFullPlan((current) => !current)}
+          >
+            {showFullPlan ? "Show current level only" : "Show all 20 levels"}
+          </button>
         </aside>
 
         <section className="pb-center">
@@ -1052,36 +1185,183 @@ export function CharacterSheetView({
                     ) : null}
                   </div>
                 </div>
-                {spellEntries.length ? (
-                  spellEntries.map(({ group, spell, id }, index) => (
-                    <div className="pb-spell-row" key={`${group}-${id}-${index}`}>
-                      <Link to={`/library/spell/${id}`}>
-                        <strong>{spell?.name ?? id}</strong>
-                        <span>
-                          {group} ·{" "}
-                          {spell
-                            ? spell.rank === 0
-                              ? "Cantrip"
-                              : `Rank ${spell.rank}`
-                            : "Unknown rank"}
-                        </span>
-                      </Link>
-                      {spell?.traits.includes("attack") && derived.spellAttack !== null ? (
-                        <button
-                          type="button"
-                          className="pb-small-button"
-                          onClick={() =>
-                            postRoll(
-                              `1d20${signed(derived.spellAttack ?? 0)}`,
-                              `${spell.name} spell attack`
-                            )
-                          }
-                        >
-                          <Dices size={12} /> Attack
-                        </button>
-                      ) : null}
+                <div className="pb-slot-list">
+                  {(derived.spellSlots ?? []).map((slotTotal, index) => {
+                    if (slotTotal <= 0) return null;
+                    const rank = index + 1;
+                    const fontAtRank =
+                      derived.divineFontRank === rank ? (derived.divineFontSlots ?? 0) : 0;
+                    const total = Math.max(0, slotTotal - fontAtRank);
+                    if (total <= 0) return null;
+                    const used = Math.max(
+                      0,
+                      Math.min(total, Math.round(Number(draft.spells.slotsUsed[String(rank)]) || 0))
+                    );
+                    return (
+                      <div className="pb-slot-row" key={`rank-${rank}`}>
+                        <span>Rank {rank}</span>
+                        <div className="pb-slot-pips">
+                          {Array.from({ length: total }).map((_pip, pip) => (
+                            <button
+                              key={pip}
+                              type="button"
+                              className={used > pip ? "is-used" : ""}
+                              aria-label={`Set rank ${rank} slots used to ${pip + 1}`}
+                              onClick={() =>
+                                void persist({
+                                  ...draft,
+                                  spells: {
+                                    ...draft.spells,
+                                    slotsUsed: {
+                                      ...draft.spells.slotsUsed,
+                                      [String(rank)]: used === pip + 1 ? pip : pip + 1,
+                                    },
+                                  },
+                                })
+                              }
+                            />
+                          ))}
+                        </div>
+                        <em>
+                          {total - used} / {total}
+                        </em>
+                      </div>
+                    );
+                  })}
+                  {(derived.divineFontSlots ?? 0) > 0 ? (
+                    <div className="pb-slot-row">
+                      <span>Divine font</span>
+                      <div className="pb-slot-pips">
+                        {Array.from({ length: derived.divineFontSlots ?? 0 }).map((_pip, pip) => {
+                          const used = Math.max(0, Math.round(draft.spells.divineFontUsed));
+                          return (
+                            <button
+                              key={pip}
+                              type="button"
+                              className={used > pip ? "is-used" : ""}
+                              aria-label={`Set divine font slots used to ${pip + 1}`}
+                              onClick={() =>
+                                void persist({
+                                  ...draft,
+                                  spells: {
+                                    ...draft.spells,
+                                    divineFontUsed: used === pip + 1 ? pip : pip + 1,
+                                  },
+                                })
+                              }
+                            />
+                          );
+                        })}
+                      </div>
+                      <em>
+                        {(derived.divineFontSlots ?? 0) -
+                          Math.max(0, Math.round(draft.spells.divineFontUsed))}{" "}
+                        / {derived.divineFontSlots}
+                      </em>
                     </div>
-                  ))
+                  ) : null}
+                  {derived.focusPointsMax > 0 ? (
+                    <div className="pb-slot-row">
+                      <span>Focus</span>
+                      <div className="pb-slot-pips is-focus">
+                        {Array.from({ length: derived.focusPointsMax }).map((_pip, pip) => (
+                          <button
+                            key={pip}
+                            type="button"
+                            className={draft.play.focusPoints > pip ? "is-used" : ""}
+                            aria-label={`Set focus points to ${pip + 1}`}
+                            onClick={() =>
+                              void persist({
+                                ...draft,
+                                play: {
+                                  ...draft.play,
+                                  focusPoints: draft.play.focusPoints === pip + 1 ? pip : pip + 1,
+                                },
+                              })
+                            }
+                          />
+                        ))}
+                      </div>
+                      <em>
+                        {draft.play.focusPoints} / {derived.focusPointsMax}
+                      </em>
+                    </div>
+                  ) : null}
+                </div>
+
+                {spellEntries.length ? (
+                  spellEntries.map(({ group, spell, id }, index) => {
+                    const options = spell ? optionsForSpell(spell, group) : [];
+                    const available = options.filter(
+                      (option) => option.remaining === null || option.remaining > 0
+                    );
+                    const key = `${group}:${id}`;
+                    const selected =
+                      castChoices[key] ??
+                      (available[0] ? `${available[0].rank}:${available[0].resource}` : "");
+                    return (
+                      <div className="pb-spell-row" key={`${group}-${id}-${index}`}>
+                        <Link to={`/library/spell/${id}`}>
+                          <strong>{spell?.name ?? id}</strong>
+                          <span>
+                            {group} ·{" "}
+                            {spell
+                              ? spell.rank === 0
+                                ? "Cantrip"
+                                : `Rank ${spell.rank}`
+                              : "Unknown rank"}
+                          </span>
+                        </Link>
+                        <div className="pb-row-actions">
+                          {spell?.traits.includes("attack") && derived.spellAttack !== null ? (
+                            <button
+                              type="button"
+                              className="pb-small-button"
+                              onClick={() =>
+                                postRoll(
+                                  `1d20${signed(derived.spellAttack ?? 0)}`,
+                                  `${spell.name} spell attack`
+                                )
+                              }
+                            >
+                              <Dices size={12} /> Attack
+                            </button>
+                          ) : null}
+                          {options.length > 1 ? (
+                            <select
+                              className="pb-cast-select"
+                              aria-label={`Cast rank for ${spell?.name ?? id}`}
+                              value={selected}
+                              onChange={(event) =>
+                                setCastChoices((current) => ({
+                                  ...current,
+                                  [key]: event.target.value,
+                                }))
+                              }
+                            >
+                              {options.map((option) => (
+                                <option
+                                  key={`${option.rank}-${option.resource}`}
+                                  value={`${option.rank}:${option.resource}`}
+                                >
+                                  Rank {option.rank} · {option.resource}
+                                </option>
+                              ))}
+                            </select>
+                          ) : null}
+                          {spell && group !== "Rituals" && available.length ? (
+                            <button
+                              type="button"
+                              className="pb-small-button is-primary"
+                              onClick={() => cast(spell, group)}
+                            >
+                              Cast
+                            </button>
+                          ) : null}
+                        </div>
+                      </div>
+                    );
+                  })
                 ) : (
                   <p className="pb-empty">No spells recorded.</p>
                 )}

@@ -279,6 +279,10 @@ test("GM creates a campaign and builds a character through the lazy routes", asy
   await expect(page.getByText("Initiative").first()).toBeVisible();
 
   await expect(page.locator(".pb-sheet-page")).toBeVisible();
+  await expect(page.getByText("Character plan")).toBeVisible();
+  await expect(page.locator(".pb-plan-level-head").filter({ hasText: "Level 1" })).toBeVisible();
+  await page.getByRole("button", { name: "Show all 20 levels" }).click();
+  await expect(page.locator(".pb-plan-level-head").filter({ hasText: "Level 20" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Weapons", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Gear", exact: true })).toBeVisible();
   const athleticsRow = page.locator(".pb-skill-row").filter({ hasText: "Athletics" });
@@ -1533,6 +1537,19 @@ test("builder completes a level-1 Cleric with split divine-font preparation", as
   await expect(page.getByRole("link", { name: /Bless/ }).first()).toBeVisible();
   await expect(page.getByRole("link", { name: /Heal/ }).first()).toBeVisible();
   await expect(page.locator(".pb-stat-grid").getByText("Spell DC")).toBeVisible();
+  const fontRow = page.locator(".pb-slot-row").filter({ hasText: "Divine font" });
+  await expect(fontRow).toContainText("/ 4");
+  await expect(page.locator(".pb-slot-row").filter({ hasText: "Rank 1" }).first()).toContainText(
+    "/ 2"
+  );
+  const preparedHeal = page
+    .locator(".pb-spell-row")
+    .filter({ hasText: "Prepared" })
+    .filter({ hasText: "Heal" })
+    .first();
+  await preparedHeal.getByRole("button", { name: "Cast" }).click();
+  await expect(page.getByText(/Cast Heal at rank 1/)).toBeVisible({ timeout: 15_000 });
+  await expect(fontRow).toContainText("3 / 4");
   await expect(page.locator(".pb-save")).toHaveText("Saved");
 });
 
