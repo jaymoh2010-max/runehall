@@ -489,6 +489,7 @@ export function VttTable({ initial, campaignId, user, isGm, active }: VttTablePr
         hpCurrent: monster.hp,
         hpMax: monster.hp,
         ac: monster.ac,
+        monsterId: monster.id,
         initiativeBonus: monster.perception,
         groupId,
         groupName: groupId ? monster.name : null,
@@ -1049,6 +1050,8 @@ export function VttTable({ initial, campaignId, user, isGm, active }: VttTablePr
             setAddTokenOpen={setAddTokenOpen}
             setEditingScene={setEditingScene}
             user={user}
+            onRoll={roll}
+            onSend={sendChat}
             onGroupHp={updateGroupHp}
             onBulkHp={bulkHp}
             onBulkCondition={bulkCondition}

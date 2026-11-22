@@ -39,6 +39,11 @@ import {
   type BuiltinMapCategory,
 } from "../../../shared/builtinMaps";
 import { tokenTurnEffectsFromMonster } from "../../../shared/tokenTurnEffects";
+import {
+  MONSTER_TEMPLATE_LABELS,
+  applyMonsterTemplate,
+  type MonsterTemplate,
+} from "../../../shared/monsterTemplates";
 import { AMBIENT_LIGHT_OPTIONS, PARTY_VISION_OPTIONS } from "../../../shared/lighting";
 import { stripHtml } from "../../../shared/compendium";
 import { HoverCard } from "../HoverCard";
@@ -89,6 +94,7 @@ export function AddTokenModal({
   const [monsters, setMonsters] = useState<Monster[]>([]);
   const [selectedMonster, setSelectedMonster] = useState<Monster | null>(null);
   const [monsterCount, setMonsterCount] = useState("1");
+  const [monsterTemplate, setMonsterTemplate] = useState<MonsterTemplate>("standard");
   const [monsterLoading, setMonsterLoading] = useState(false);
   const [customName, setCustomName] = useState("");
   const [customHp, setCustomHp] = useState("10");
@@ -103,6 +109,7 @@ export function AddTokenModal({
     setMonsterQuery("");
     setSelectedMonster(null);
     setMonsterCount("1");
+    setMonsterTemplate("standard");
     setError("");
   }, [open, characters.length]);
 
@@ -132,6 +139,10 @@ export function AddTokenModal({
       window.clearTimeout(timer);
     };
   }, [open, tab, monsterQuery]);
+
+  const previewMonster = selectedMonster
+    ? applyMonsterTemplate(selectedMonster, monsterTemplate)
+    : null;
 
   const custom = () => {
     const hp = Number(customHp) || 0;
@@ -288,53 +299,67 @@ export function AddTokenModal({
             </div>
           </div>
           <div className="token-monster-detail">
-            {selectedMonster ? (
+            {previewMonster ? (
               <>
                 <div className="row-between">
                   <div>
-                    <h3>{selectedMonster.name}</h3>
+                    <h3>{previewMonster.name}</h3>
                     <p className="tiny muted">
-                      Level {selectedMonster.level} · {selectedMonster.source}
+                      Level {previewMonster.level} · {previewMonster.source}
                     </p>
                   </div>
-                  <RarityTag rarity={selectedMonster.rarity} />
+                  <RarityTag rarity={previewMonster.rarity} />
                 </div>
                 <div className="chip-row" style={{ marginTop: 9 }}>
-                  {selectedMonster.traits.map((trait) => (
+                  {previewMonster.traits.map((trait) => (
                     <Tag key={trait}>{trait}</Tag>
                   ))}
                 </div>
                 <div className="spell-meta-grid" style={{ marginTop: 12 }}>
                   <div>
                     <span>HP</span>
-                    <strong>{selectedMonster.hp}</strong>
+                    <strong>{previewMonster.hp}</strong>
                   </div>
                   <div>
                     <span>AC</span>
-                    <strong>{selectedMonster.ac}</strong>
+                    <strong>{previewMonster.ac}</strong>
                   </div>
                   <div>
                     <span>Fort</span>
-                    <strong>{selectedMonster.fortitude}</strong>
+                    <strong>{previewMonster.fortitude}</strong>
                   </div>
                   <div>
                     <span>Ref</span>
-                    <strong>{selectedMonster.reflex}</strong>
+                    <strong>{previewMonster.reflex}</strong>
                   </div>
                   <div>
                     <span>Will</span>
-                    <strong>{selectedMonster.will}</strong>
+                    <strong>{previewMonster.will}</strong>
                   </div>
                   <div>
                     <span>Perception</span>
-                    <strong>{selectedMonster.perception}</strong>
+                    <strong>{previewMonster.perception}</strong>
                   </div>
                 </div>
                 <RichText
-                  html={selectedMonster.description || selectedMonster.blurb}
+                  html={previewMonster.description || previewMonster.blurb}
                   className="monster-blurb"
                 />
                 <div className="token-monster-add">
+                  <Field label="Template">
+                    <Select
+                      value={monsterTemplate}
+                      onChange={(event) =>
+                        setMonsterTemplate(event.target.value as MonsterTemplate)
+                      }
+                    >
+                      {(Object.keys(MONSTER_TEMPLATE_LABELS) as MonsterTemplate[]).map((value) => (
+                        <option key={value} value={value}>
+                          {MONSTER_TEMPLATE_LABELS[value]}
+                        </option>
+                      ))}
+                    </Select>
+                  </Field>
                   <Field label="Count" hint="Groups move and roll initiative together.">
                     <Input
                       type="number"
@@ -362,21 +387,21 @@ export function AddTokenModal({
                         return {
                           name:
                             count > 1
-                              ? `${selectedMonster.name} ${index + 1}`.slice(0, 80)
-                              : selectedMonster.name,
+                              ? `${previewMonster.name} ${index + 1}`.slice(0, 80)
+                              : previewMonster.name,
                           x: defaultPosition.x + (column - (columns - 1) / 2) * spacing,
                           y: defaultPosition.y + (row - (rows - 1) / 2) * spacing,
-                          size: selectedMonster.sizeCells,
+                          size: previewMonster.sizeCells,
                           color: "#b06767",
-                          hpCurrent: selectedMonster.hp,
-                          hpMax: selectedMonster.hp,
-                          ac: selectedMonster.ac,
-                          monsterId: selectedMonster.id,
-                          initiativeBonus: selectedMonster.perception,
+                          hpCurrent: previewMonster.hp,
+                          hpMax: previewMonster.hp,
+                          ac: previewMonster.ac,
+                          monsterId: previewMonster.id,
+                          initiativeBonus: previewMonster.perception,
                           groupId,
-                          groupName: groupId ? selectedMonster.name : null,
+                          groupName: groupId ? previewMonster.name : null,
                           conditions: [],
-                          turnEffects: tokenTurnEffectsFromMonster(selectedMonster),
+                          turnEffects: tokenTurnEffectsFromMonster(previewMonster),
                           hidden: false,
                           locked: false,
                         };
@@ -388,8 +413,8 @@ export function AddTokenModal({
                   >
                     Add{" "}
                     {Number(monsterCount) > 1
-                      ? `${Math.max(1, Math.min(20, Number(monsterCount) || 1))} × ${selectedMonster.name}`
-                      : selectedMonster.name}
+                      ? `${Math.max(1, Math.min(20, Number(monsterCount) || 1))} × ${previewMonster.name}`
+                      : previewMonster.name}
                   </Button>
                 </div>
               </>

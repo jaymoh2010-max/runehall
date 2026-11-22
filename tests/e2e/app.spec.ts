@@ -1147,6 +1147,7 @@ test("sheet recovery performs Treat Wounds and tracks immunity", async ({ page }
     character: { id: string; data: Record<string, unknown> };
   };
   const draft = structuredClone(record.character.data) as {
+    level: number;
     skills: { trained: string[] };
     play: {
       hp: number;
@@ -1155,7 +1156,8 @@ test("sheet recovery performs Treat Wounds and tracks immunity", async ({ page }
     };
   };
   draft.skills.trained = [...new Set([...draft.skills.trained, "medicine"])];
-  draft.play.hp = 10;
+  draft.level = 20;
+  draft.play.hp = 20;
   draft.play.treatWoundsImmune = false;
   draft.play.battleMedicineImmuneBy = [];
   const saved = await page.request.put(`/api/characters/${record.character.id}`, {
@@ -1516,6 +1518,33 @@ test("GM places a token, chats, rolls, and opens the scenes manager", async ({ p
   await expect(scenes).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(scenes).toBeHidden();
+});
+
+test("GM applies an elite template and rolls monster attacks", async ({ page }) => {
+  test.setTimeout(60_000);
+  await signIn(page, admin);
+  await page.goto(campaignPath);
+  await expect(page.locator(".vtt-connection")).toHaveClass(/is-online/, { timeout: 15_000 });
+  await page.getByRole("button", { name: "Bestiary", exact: true }).click();
+  await expect(page.getByPlaceholder(/Search creatures/)).toBeVisible();
+  await page.getByPlaceholder(/Search creatures/).fill("Goblin Warrior");
+  await page.locator('select:has(option[value="elite"])').selectOption("elite");
+  const row = page.locator(".vtt-bestiary-row").filter({ hasText: "Goblin Warrior (Elite)" });
+  await expect(row).toBeVisible({ timeout: 15_000 });
+  await expect(row).toContainText("L0");
+  await row.getByRole("button", { name: "Add" }).click();
+
+  const monsterToken = page.locator('.scene-token[aria-label*="Goblin Warrior (Elite)"]');
+  await expect(monsterToken).toBeVisible({ timeout: 15_000 });
+  await monsterToken.click();
+  const statblock = page.locator(".monster-statblock");
+  await expect(statblock).toBeVisible({ timeout: 15_000 });
+  await expect(statblock).toContainText("Dogslicer");
+  const attackRow = statblock.locator(".monster-action-row").filter({ hasText: "Dogslicer" });
+  await attackRow.getByRole("button", { name: "Attack" }).click();
+  await expect(page.getByText(/Goblin Warrior \(Elite\): Dogslicer attack/).first()).toBeVisible({
+    timeout: 15_000,
+  });
 });
 
 test("GM configures fast healing, regeneration, and persistent damage on a token", async ({

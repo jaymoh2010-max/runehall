@@ -6608,6 +6608,43 @@
   font-size: 0.76rem;
   line-height: 1.45;
 }
+.monster-statblock {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.monster-statblock h3 {
+  font-size: 0.92rem;
+}
+.monster-statblock h4 {
+  margin: 5px 0 1px;
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+}
+.monster-action-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+.monster-ability {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 6px 8px;
+  background: rgba(255, 255, 255, 0.012);
+}
+.monster-ability summary {
+  cursor: pointer;
+}
+.monster-ability p {
+  margin: 6px 0;
+}
 .token-editor {
   border-top: 1px solid var(--line);
   padding-top: 11px;

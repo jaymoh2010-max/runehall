@@ -1,10 +1,15 @@
 import { useEffect, useState } from "react";
 import { BookOpen, GripVertical, Plus, Search, X } from "lucide-react";
 import type { Monster } from "../../../shared/types";
+import {
+  MONSTER_TEMPLATE_LABELS,
+  applyMonsterTemplate,
+  type MonsterTemplate,
+} from "../../../shared/monsterTemplates";
 import { api } from "../../api";
 import { errorMessage } from "../../stores";
 import { stripHtml } from "../../../shared/compendium";
-import { Button, Field, IconButton, Input, Spinner } from "../ui";
+import { Button, Field, IconButton, Input, Select, Spinner } from "../ui";
 import { HoverCard } from "../HoverCard";
 import { BESTIARY_DRAG_TYPE, type BestiaryDragPayload } from "./bestiaryDrag";
 
@@ -18,6 +23,7 @@ export function BestiaryPalette({
   const [query, setQuery] = useState("");
   const [level, setLevel] = useState("");
   const [count, setCount] = useState("1");
+  const [template, setTemplate] = useState<MonsterTemplate>("standard");
   const [monsters, setMonsters] = useState<Monster[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -101,6 +107,18 @@ export function BestiaryPalette({
             onChange={(event) => setCount(event.target.value)}
           />
         </Field>
+        <Field label="Template">
+          <Select
+            value={template}
+            onChange={(event) => setTemplate(event.target.value as MonsterTemplate)}
+          >
+            {(Object.keys(MONSTER_TEMPLATE_LABELS) as MonsterTemplate[]).map((value) => (
+              <option key={value} value={value}>
+                {MONSTER_TEMPLATE_LABELS[value]}
+              </option>
+            ))}
+          </Select>
+        </Field>
         <span className="tiny muted">
           {loading ? "Searching…" : `${monsters.length} of ${total}`}
         </span>
@@ -116,48 +134,54 @@ export function BestiaryPalette({
         <Spinner label="Searching the bestiary…" />
       ) : (
         <div className="vtt-bestiary-list">
-          {monsters.map((monster) => (
-            <HoverCard
-              key={monster.id}
-              title={monster.name}
-              subtitle={`Level ${monster.level} · ${monster.size} · ${monster.source}`}
-              meta={
-                <span>
-                  HP {monster.hp} · AC {monster.ac} · Fort {monster.fortitude} · Ref{" "}
-                  {monster.reflex} · Will {monster.will}
-                </span>
-              }
-              body={stripHtml(monster.description || monster.blurb, 240) || undefined}
-              footer="Drag onto the map or press Add"
-            >
-              <div
-                className="vtt-bestiary-row"
-                draggable
-                onDragStart={(event) => {
-                  const payload: BestiaryDragPayload = { monster, count: groupCount };
-                  event.dataTransfer.setData(BESTIARY_DRAG_TYPE, JSON.stringify(payload));
-                  event.dataTransfer.effectAllowed = "copy";
-                }}
-              >
-                <GripVertical size={13} className="muted" />
-                <span className="vtt-bestiary-mark">L{monster.level}</span>
-                <span className="grow">
-                  <strong>{monster.name}</strong>
-                  <span className="tiny muted">
-                    {monster.hp} HP · AC {monster.ac}
+          {monsters.map((monster) => {
+            const adjusted = applyMonsterTemplate(monster, template);
+            return (
+              <HoverCard
+                key={monster.id}
+                title={adjusted.name}
+                subtitle={`Level ${adjusted.level} · ${adjusted.size} · ${adjusted.source}`}
+                meta={
+                  <span>
+                    HP {adjusted.hp} · AC {adjusted.ac} · Fort {adjusted.fortitude} · Ref{" "}
+                    {adjusted.reflex} · Will {adjusted.will}
                   </span>
-                </span>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  icon={<Plus size={12} />}
-                  onClick={() => onAdd(monster, groupCount)}
+                }
+                body={stripHtml(adjusted.description || adjusted.blurb, 240) || undefined}
+                footer="Drag onto the map or press Add"
+              >
+                <div
+                  className="vtt-bestiary-row"
+                  draggable
+                  onDragStart={(event) => {
+                    const payload: BestiaryDragPayload = {
+                      monster: adjusted,
+                      count: groupCount,
+                    };
+                    event.dataTransfer.setData(BESTIARY_DRAG_TYPE, JSON.stringify(payload));
+                    event.dataTransfer.effectAllowed = "copy";
+                  }}
                 >
-                  Add
-                </Button>
-              </div>
-            </HoverCard>
-          ))}
+                  <GripVertical size={13} className="muted" />
+                  <span className="vtt-bestiary-mark">L{adjusted.level}</span>
+                  <span className="grow">
+                    <strong>{adjusted.name}</strong>
+                    <span className="tiny muted">
+                      {adjusted.hp} HP · AC {adjusted.ac}
+                    </span>
+                  </span>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    icon={<Plus size={12} />}
+                    onClick={() => onAdd(adjusted, groupCount)}
+                  >
+                    Add
+                  </Button>
+                </div>
+              </HoverCard>
+            );
+          })}
           {!monsters.length ? <p className="muted small">No creatures match that search.</p> : null}
         </div>
       )}

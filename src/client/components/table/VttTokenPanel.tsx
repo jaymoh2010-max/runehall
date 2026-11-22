@@ -12,7 +12,15 @@ import {
   Unlock,
   X,
 } from "lucide-react";
-import type { CharacterRecord, PublicUser, Scene, Token } from "../../../shared/types";
+import type { CharacterRecord, Monster, PublicUser, Scene, Token } from "../../../shared/types";
+import {
+  applyMonsterTemplate,
+  monsterDamageFormula,
+  monsterTemplateFromName,
+} from "../../../shared/monsterTemplates";
+import { signed } from "../../../shared/rules";
+import { stripHtml } from "../../../shared/compendium";
+import { api } from "../../api";
 import { groupHp, tokenConditionLabel, tokenConditionSummary } from "../../../shared/tokens";
 import {
   DAMAGE_TYPE_GROUPS,
@@ -52,6 +60,8 @@ export function VttTokenPanel({
   setAddTokenOpen,
   setEditingScene,
   user,
+  onRoll,
+  onSend,
   onGroupHp,
   onBulkHp,
   onBulkCondition,
@@ -81,6 +91,8 @@ export function VttTokenPanel({
   setAddTokenOpen: (open: boolean) => void;
   setEditingScene: (scene: Scene) => void;
   user: PublicUser;
+  onRoll: (formula: string, label: string, dc: number | null, gmOnly: boolean) => void;
+  onSend: (content: string, gmOnly: boolean) => void;
   onGroupHp: (groupId: string, delta: number) => void;
   onBulkHp: (delta: number, full?: boolean) => void;
   onBulkCondition: (name: string, value: number | null, duration: number | null) => void;
@@ -95,8 +107,15 @@ export function VttTokenPanel({
   const [bulkCondition, setBulkCondition] = useState("");
   const [bulkValue, setBulkValue] = useState("");
   const [bulkDuration, setBulkDuration] = useState("");
+  const [rawMonsterDetails, setRawMonsterDetails] = useState<Monster | null>(null);
+  const [monsterBusy, setMonsterBusy] = useState(false);
   const tokenScrollRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<HTMLDivElement>(null);
+  const displayedMonster =
+    rawMonsterDetails && selectedToken
+      ? applyMonsterTemplate(rawMonsterDetails, monsterTemplateFromName(selectedToken.name))
+      : null;
+  const monsterDetails = displayedMonster;
   const selectedTokens = sceneTokens.filter((token) => selectedTokenIds.includes(token.id));
   const groupTokens = selectedToken?.groupId
     ? sceneTokens.filter((token) => token.groupId === selectedToken.groupId)
@@ -111,6 +130,29 @@ export function VttTokenPanel({
       ?.scrollIntoView({ block: "nearest" });
     editorRef.current?.scrollTo({ top: 0 });
   }, [selectedTokenId]);
+
+  useEffect(() => {
+    const monsterId = selectedToken?.monsterId;
+    if (!monsterId || selectedToken?.characterId) {
+      setRawMonsterDetails(null);
+      return;
+    }
+    let cancelled = false;
+    setMonsterBusy(true);
+    api<{ item: Monster }>(`/api/compendium/monsters/${encodeURIComponent(monsterId)}`)
+      .then((result) => {
+        if (!cancelled) setRawMonsterDetails(result.item);
+      })
+      .catch(() => {
+        if (!cancelled) setRawMonsterDetails(null);
+      })
+      .finally(() => {
+        if (!cancelled) setMonsterBusy(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedToken?.monsterId, selectedToken?.characterId]);
 
   const applyBulkCondition = () => {
     const name = bulkCondition.trim();
@@ -666,6 +708,101 @@ export function VttTokenPanel({
                 </Tag>
               ))}
             </div>
+          ) : null}
+          {monsterDetails && (isGm || selectedToken.ownerId === user.id) ? (
+            <div className="monster-statblock">
+              <div className="row-between">
+                <div>
+                  <h3>{monsterDetails.name}</h3>
+                  <span className="tiny muted">{monsterDetails.source}</span>
+                </div>
+                <Badge tone="red">Level {monsterDetails.level}</Badge>
+              </div>
+              <p className="tiny muted">
+                HP {monsterDetails.hp} · AC {monsterDetails.ac} · Fort{" "}
+                {signed(monsterDetails.fortitude)} · Ref {signed(monsterDetails.reflex)} · Will{" "}
+                {signed(monsterDetails.will)} · Per {signed(monsterDetails.perception)}
+              </p>
+              <div className="chip-row">
+                {monsterDetails.traits.map((trait) => (
+                  <Tag key={trait}>{trait}</Tag>
+                ))}
+              </div>
+              <h4>Attacks</h4>
+              {monsterDetails.attacks.map((attack) => (
+                <div key={`${attack.name}-${attack.bonus}`} className="monster-action-row">
+                  <span className="grow">
+                    <strong>{attack.name}</strong>
+                    <span className="tiny muted">
+                      {" "}
+                      {signed(attack.bonus)} · {attack.damage}
+                      {attack.range ? ` · range ${attack.range} ft.` : ""}
+                    </span>
+                  </span>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    icon={<Dices size={12} />}
+                    onClick={() =>
+                      onRoll(
+                        `1d20${signed(attack.bonus)}`,
+                        `${monsterDetails.name}: ${attack.name} attack`,
+                        null,
+                        false
+                      )
+                    }
+                  >
+                    Attack
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    icon={<Swords size={12} />}
+                    onClick={() =>
+                      onRoll(
+                        monsterDamageFormula(attack.damage),
+                        `${monsterDetails.name}: ${attack.name} damage`,
+                        null,
+                        false
+                      )
+                    }
+                  >
+                    Damage
+                  </Button>
+                </div>
+              ))}
+              {monsterDetails.abilities.length ? (
+                <>
+                  <h4>Abilities</h4>
+                  {monsterDetails.abilities.map((ability) => (
+                    <details key={ability.name} className="monster-ability">
+                      <summary>
+                        <strong>{ability.name}</strong>
+                        <span className="tiny muted">
+                          {ability.actionType ? ` · ${ability.actionType}` : ""}
+                          {ability.actions ? ` · ${ability.actions}` : ""}
+                        </span>
+                      </summary>
+                      <p className="tiny muted">{stripHtml(ability.description, 600)}</p>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() =>
+                          onSend(
+                            `${monsterDetails.name} — ${ability.name}: ${stripHtml(ability.description, 1000)}`,
+                            false
+                          )
+                        }
+                      >
+                        Share
+                      </Button>
+                    </details>
+                  ))}
+                </>
+              ) : null}
+            </div>
+          ) : monsterBusy ? (
+            <p className="tiny muted">Loading monster actions.</p>
           ) : null}
         </div>
       ) : (
