@@ -1391,6 +1391,33 @@ export interface CampaignPeople {
   npcs: CampaignNpc[];
 }
 
+export interface CampaignPlayerNote {
+  id: string;
+  campaignId: string;
+  title: string;
+  content: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface CampaignKnowledgeEntry {
+  id: string;
+  campaignId: string;
+  title: string;
+  content: string;
+  visible: boolean;
+  sortOrder: number;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface CampaignNotesView {
+  /** Only the signed-in member's private notes; never another member's. */
+  notes: CampaignPlayerNote[];
+  /** Shared lore entries; hidden entries are GM-only. */
+  knowledge: CampaignKnowledgeEntry[];
+}
+
 export interface CampaignDashboard {
   campaignId: string;
   lastSessionSummary: string;

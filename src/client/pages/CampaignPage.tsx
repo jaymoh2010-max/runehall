@@ -77,6 +77,7 @@ import { connectSocket, joinCampaign } from "../socket";
 import { TravelTab } from "../components/campaign/TravelTab";
 import { SessionZeroTab } from "../components/campaign/SessionZeroTab";
 import { PeopleTab } from "../components/campaign/PeopleTab";
+import { NotesTab } from "../components/campaign/NotesTab";
 import { errorMessage } from "../stores";
 import { useSession, useToasts } from "../stores";
 import {
@@ -137,6 +138,7 @@ type Tab =
   | "npcs"
   | "assets"
   | "journal"
+  | "notes"
   | "gm-screen"
   | "settings";
 
@@ -155,6 +157,7 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode; gmOnly?: boolean }[
   { id: "people", label: "People", icon: <Shield size={15} /> },
   { id: "travel", label: "Travel", icon: <Compass size={15} /> },
   { id: "journal", label: "Journal", icon: <ScrollText size={15} /> },
+  { id: "notes", label: "Notes", icon: <BookOpen size={15} /> },
   { id: "sessions", label: "Sessions", icon: <CalendarClock size={15} /> },
   { id: "encounters", label: "Encounters", icon: <Skull size={15} />, gmOnly: true },
   { id: "loot", label: "Loot", icon: <Coins size={15} />, gmOnly: true },
@@ -164,7 +167,7 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode; gmOnly?: boolean }[
   { id: "settings", label: "Settings", icon: <Settings size={15} /> },
 ];
 
-const PRIMARY_TAB_IDS = new Set<Tab>(["table", "overview", "party", "journal", "sessions"]);
+const PRIMARY_TAB_IDS = new Set<Tab>(["table", "overview", "party", "people", "journal"]);
 
 export function CampaignPage() {
   const { id } = useParams<{ id: string }>();
@@ -186,6 +189,7 @@ export function CampaignPage() {
     rawTab === "npcs" ||
     rawTab === "assets" ||
     rawTab === "journal" ||
+    rawTab === "notes" ||
     rawTab === "gm-screen" ||
     rawTab === "settings"
       ? rawTab
@@ -1743,6 +1747,15 @@ export function CampaignPage() {
         ) : null}
 
         {tab === "assets" ? <AssetLibrary campaignId={campaign.id} toast={toast} /> : null}
+
+        {tab === "notes" ? (
+          <NotesTab
+            campaignId={campaign.id}
+            isGm={Boolean(isGm)}
+            refreshKey={campaign.updatedAt}
+            toast={toast}
+          />
+        ) : null}
 
         {tab === "journal" ? (
           <div className="page-inner journal-layout">

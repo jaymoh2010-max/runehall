@@ -142,6 +142,8 @@ describe("migrations", () => {
         "campaign_session_zero",
         "campaign_safety_preferences",
         "campaign_factions",
+        "campaign_player_notes",
+        "campaign_knowledge",
       ])
     );
 

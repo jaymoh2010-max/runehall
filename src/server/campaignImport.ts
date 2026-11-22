@@ -96,6 +96,7 @@ export interface CampaignImportStats {
   shopStock: number;
   travel: number;
   npcs: number;
+  knowledge: number;
   sessions: number;
   audioTracks: number;
 }
@@ -180,6 +181,7 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
     shopStock: 0,
     travel: 0,
     npcs: 0,
+    knowledge: 0,
     sessions: 0,
     audioTracks: 0,
   };
@@ -702,6 +704,24 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
         ts,
         ts
       );
+    }
+
+    for (const entry of records(payload.knowledge, 500, "knowledge entries")) {
+      db.prepare(
+        `INSERT INTO campaign_knowledge
+           (id, campaign_id, title, content, visible, sort_order, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+      ).run(
+        newId("knowledge"),
+        campaignId,
+        text(entry.title, "Imported knowledge", 160),
+        longText(entry.content, "", 50_000),
+        entry.visible === true ? 1 : 0,
+        numberValue(entry.sortOrder, 0),
+        ts,
+        ts
+      );
+      stats.knowledge += 1;
     }
 
     for (const npc of records(payload.npcs, 300, "NPCs")) {

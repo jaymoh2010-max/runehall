@@ -18,6 +18,7 @@ import {
   type AudioTrackRow,
   type CampaignDashboardRow,
   type CampaignFactionRow,
+  type CampaignKnowledgeRow,
   type CampaignNpcRow,
   type CampaignRow,
   type CampaignSessionZeroRow,
@@ -35,6 +36,7 @@ import {
   serializeAudioTrack,
   serializeCampaignDashboard,
   serializeCampaignFaction,
+  serializeCampaignKnowledge,
   serializeCampaignNpc,
   serializeCampaignSummary,
   serializeCampaignTravel,
@@ -676,6 +678,13 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
         )
         .all(id) as CampaignFactionRow[]
     ).map((row) => serializeCampaignFaction(row));
+    const knowledge = (
+      db
+        .prepare(
+          "SELECT * FROM campaign_knowledge WHERE campaign_id = ? ORDER BY sort_order ASC, created_at ASC"
+        )
+        .all(id) as CampaignKnowledgeRow[]
+    ).map(serializeCampaignKnowledge);
     const sessions = campaignSessionsFor(id, "gm", request.user.id);
     const audioTracks = (
       db
@@ -716,6 +725,7 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
       dashboard,
       npcs,
       factions,
+      knowledge,
       sessions,
       messages,
       journal,
@@ -727,7 +737,7 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
         turnIndex: state?.turn_index ?? 0,
       },
       assets: [...assets],
-      note: "Image and audio files are referenced by URL. Use `npm run backup` to archive the database and data/uploads together.",
+      note: "Image and audio files are referenced by URL. Use `npm run backup` to archive the database and data/uploads together. Private player notes are never included in campaign exports.",
     };
     const safeName = row.name.replace(/[^a-z0-9-_]+/gi, "-").replace(/^-+|-+$/g, "") || "campaign";
     return reply

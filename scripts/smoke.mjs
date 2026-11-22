@@ -1447,6 +1447,91 @@ async function main() {
   });
   log("faction ledger stayed GM-only while public people stayed player-safe");
 
+  const visibleKnowledge = await api(`/api/campaigns/${campaign.id}/knowledge`, {
+    method: "POST",
+    cookie: gmCookie,
+    body: {
+      title: "Smoke: The Sunken Gate",
+      content: "The gate opens at low tide.",
+      visible: true,
+    },
+  });
+  const hiddenKnowledge = await api(`/api/campaigns/${campaign.id}/knowledge`, {
+    method: "POST",
+    cookie: gmCookie,
+    body: {
+      title: "Smoke: The Traitor",
+      content: "The harbor master works for the cult.",
+      visible: false,
+    },
+  });
+  const privateNote = await api(`/api/campaigns/${campaign.id}/notes`, {
+    method: "POST",
+    cookie: playerCookie,
+    body: {
+      title: "Smoke: My suspicions",
+      content: "The ferryman knows more than he says.",
+    },
+  });
+  if (!privateNote.payload.note?.id) throw new Error("Private player note was not saved");
+  const gmNotesView = await api(`/api/campaigns/${campaign.id}/notes`, { cookie: gmCookie });
+  if (gmNotesView.payload.notes.length !== 0) {
+    throw new Error("GM could read a player's private notes");
+  }
+  if (gmNotesView.payload.knowledge.length !== 2) {
+    throw new Error("GM notes view did not include hidden knowledge");
+  }
+  const playerNotesView = await api(`/api/campaigns/${campaign.id}/notes`, {
+    cookie: playerCookie,
+  });
+  if (playerNotesView.payload.notes.length !== 1) {
+    throw new Error("Player could not read their own private note");
+  }
+  if (playerNotesView.payload.notes[0].content !== "The ferryman knows more than he says.") {
+    throw new Error("Private note content did not round-trip");
+  }
+  if (
+    playerNotesView.payload.knowledge.length !== 1 ||
+    playerNotesView.payload.knowledge[0].id !== visibleKnowledge.payload.entry.id
+  ) {
+    throw new Error("Player saw hidden knowledge or missed shared knowledge");
+  }
+  const playerKnowledgeWrite = await fetch(`${base}/api/campaigns/${campaign.id}/knowledge`, {
+    method: "POST",
+    headers: { cookie: playerCookie, "content-type": "application/json" },
+    body: JSON.stringify({ title: "Player lore", visible: true }),
+  });
+  if (playerKnowledgeWrite.status !== 403) {
+    throw new Error("Player should not be able to edit campaign knowledge");
+  }
+  const otherNoteWrite = await fetch(
+    `${base}/api/campaigns/${campaign.id}/notes/${privateNote.payload.note.id}`,
+    {
+      method: "PATCH",
+      headers: { cookie: gmCookie, "content-type": "application/json" },
+      body: JSON.stringify({ content: "GM overwrite" }),
+    }
+  );
+  if (otherNoteWrite.status !== 404) {
+    throw new Error("Another member could overwrite a private note");
+  }
+  const notesExport = await api(`/api/campaigns/${campaign.id}/export`, { cookie: gmCookie });
+  if (notesExport.payload.knowledge.length !== 2) {
+    throw new Error("Campaign export did not include knowledge entries");
+  }
+  if (JSON.stringify(notesExport.payload).includes("The ferryman knows more than he says.")) {
+    throw new Error("Campaign export leaked a private player note");
+  }
+  await api(`/api/campaigns/${campaign.id}/knowledge/${hiddenKnowledge.payload.entry.id}`, {
+    method: "DELETE",
+    cookie: gmCookie,
+  });
+  await api(`/api/campaigns/${campaign.id}/notes/${privateNote.payload.note.id}`, {
+    method: "DELETE",
+    cookie: playerCookie,
+  });
+  log("private player notes stayed private and shared knowledge respected visibility");
+
   const gmSocket = await connectSocket(gmCookie);
   const playerSocket = await connectSocket(playerCookie);
   await emitAck(gmSocket, "campaign:join", { campaignId: campaign.id });

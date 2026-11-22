@@ -435,6 +435,27 @@ export interface CampaignFactionRow {
   updated_at: number;
 }
 
+export interface CampaignPlayerNoteRow {
+  id: string;
+  campaign_id: string;
+  user_id: string;
+  title: string;
+  content: string;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface CampaignKnowledgeRow {
+  id: string;
+  campaign_id: string;
+  title: string;
+  content: string;
+  visible: number;
+  sort_order: number;
+  created_at: number;
+  updated_at: number;
+}
+
 export interface CampaignDashboardRow {
   campaign_id: string;
   last_session_summary: string;

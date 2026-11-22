@@ -2717,6 +2717,30 @@ async function runCampaignA(gm: Account, players: Account[]): Promise<void> {
         cookie: gm.cookie,
         body: { mode: "stocked", items: [{ itemId: daggerId, quantity: 3 }] },
       });
+      const visibleKnowledge = await api(`/api/campaigns/${campaignId}/knowledge`, {
+        method: "POST",
+        cookie: gm.cookie,
+        body: {
+          title: "The Sunken Gate",
+          content: "The gate opens at low tide.",
+          visible: true,
+        },
+      });
+      await api(`/api/campaigns/${campaignId}/knowledge`, {
+        method: "POST",
+        cookie: gm.cookie,
+        body: {
+          title: "The Traitor",
+          content: "The harbor master works for the court.",
+          visible: false,
+        },
+      });
+      const privateNoteText = "Only the player should ever read this clue.";
+      await api(`/api/campaigns/${campaignId}/notes`, {
+        method: "POST",
+        cookie: players[0].cookie,
+        body: { title: "Private suspicions", content: privateNoteText },
+      });
       const exported = await api(`/api/campaigns/${campaignId}/export`, { cookie: gm.cookie });
       const payload = exported.payload;
       assertEqual(payload.format, "runehall-campaign", "Export format");
@@ -2749,6 +2773,18 @@ async function runCampaignA(gm: Account, players: Account[]): Promise<void> {
         "Export faction GM notes"
       );
       assertEqual(payload.factions[0].reputation, -70, "Export faction reputation");
+      assertEqual(payload.knowledge.length, 2, "Export knowledge count");
+      assertEqual(payload.knowledge[0].visible, true, "Export visible knowledge");
+      assertEqual(payload.knowledge[1].visible, false, "Export hidden knowledge");
+      assert(
+        !JSON.stringify(payload).includes(privateNoteText),
+        "Export leaked a private player note"
+      );
+      assertEqual(
+        visibleKnowledge.payload.entry.title,
+        "The Sunken Gate",
+        "Created knowledge title"
+      );
       assertEqual(payload.npcs[0].factionId, factionId, "Export did not keep the NPC faction link");
       assertEqual(wardenResult.payload.npc.role, "Warden of the Crown", "NPC social role");
       assertEqual(
@@ -2807,6 +2843,18 @@ async function runCampaignA(gm: Account, players: Account[]): Promise<void> {
       const importedFactions = await api(`/api/campaigns/${importedCampaign.id}/factions`, {
         cookie: gm.cookie,
       });
+      const importedNotes = await api(`/api/campaigns/${importedCampaign.id}/notes`, {
+        cookie: gm.cookie,
+      });
+      assertEqual(importedNotes.payload.knowledge.length, 2, "Imported knowledge count");
+      assertEqual(
+        importedNotes.payload.knowledge[0].title,
+        "The Sunken Gate",
+        "Imported knowledge title"
+      );
+      assertEqual(importedNotes.payload.knowledge[0].visible, true, "Imported visible knowledge");
+      assertEqual(importedNotes.payload.knowledge[1].visible, false, "Imported hidden knowledge");
+      assertEqual(importedNotes.payload.notes.length, 0, "Import invented private notes");
       const importedNpcs = await api(`/api/campaigns/${importedCampaign.id}/npcs`, {
         cookie: gm.cookie,
       });

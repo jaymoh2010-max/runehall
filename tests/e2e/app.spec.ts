@@ -625,8 +625,7 @@ test("lazy library, compendium entry, rules, and account routes load", async ({ 
 
 test("GM publishes a faction and a player-safe NPC to People", async ({ page }) => {
   await signIn(page, admin);
-  await page.goto(campaignPath);
-  await page.locator(".campaign-tabs").getByRole("button", { name: /^NPCs/ }).click();
+  await page.goto(`${campaignPath}?tab=npcs`);
   await expect(page.getByRole("heading", { name: "NPCs", exact: true })).toBeVisible();
 
   await page.getByRole("button", { name: "New faction" }).click();
@@ -657,16 +656,45 @@ test("GM publishes a faction and a player-safe NPC to People", async ({ page }) 
   await npcDialog.getByRole("button", { name: "Create NPC" }).click();
   await expect(page.getByText("NPC created.")).toBeVisible({ timeout: 15_000 });
 
-  await page
-    .locator(".campaign-tabs")
-    .getByRole("button", { name: /^People/ })
-    .click();
+  await page.goto(`${campaignPath}?tab=people`);
   await expect(page.getByRole("heading", { name: "People & factions" })).toBeVisible();
   await expect(page.getByText("E2E Harbor Guild")).toBeVisible();
   await expect(page.getByText("E2E Ferryman")).toBeVisible();
   await expect(page.getByText("A ferryman who knows every tide.")).toBeVisible();
   await expect(page.getByText("E2E secret doppelganger.")).toHaveCount(0);
   await expect(page.getByText("E2E secret guild vault.")).toHaveCount(0);
+});
+
+test("GM shares campaign knowledge and keeps hidden lore GM-only", async ({ page }) => {
+  await signIn(page, admin);
+  await page.goto(`${campaignPath}?tab=notes`);
+  await expect(page.getByRole("heading", { name: "Notes & knowledge" })).toBeVisible();
+
+  await page.getByRole("button", { name: "Add knowledge" }).click();
+  const sharedDialog = page.getByRole("dialog", { name: "New knowledge" });
+  await expect(sharedDialog).toBeVisible();
+  await sharedDialog.getByLabel("Title").fill("E2E Sunken Gate");
+  await sharedDialog
+    .getByPlaceholder("What the party has learned.")
+    .fill("# The Sunken Gate\nThe gate opens at low tide.");
+  await sharedDialog.getByRole("checkbox", { name: "Show this knowledge to players" }).check();
+  await sharedDialog.getByRole("button", { name: "Create entry" }).click();
+  await expect(page.getByText("Knowledge entry created.")).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText("E2E Sunken Gate")).toBeVisible();
+  await expect(page.locator(".notes-knowledge .tag").filter({ hasText: "Shared" })).toBeVisible();
+
+  await page.getByRole("button", { name: "Add knowledge" }).click();
+  const hiddenDialog = page.getByRole("dialog", { name: "New knowledge" });
+  await hiddenDialog.getByLabel("Title").fill("E2E Hidden Traitor");
+  await hiddenDialog
+    .getByPlaceholder("What the party has learned.")
+    .fill("The harbor master serves the Ashen Court.");
+  await hiddenDialog.getByRole("button", { name: "Create entry" }).click();
+  await expect(page.getByText("Knowledge entry created.").last()).toBeVisible({
+    timeout: 15_000,
+  });
+  await expect(page.getByText("E2E Hidden Traitor")).toBeVisible();
+  await expect(page.locator(".notes-knowledge .tag").filter({ hasText: "Hidden" })).toBeVisible();
 });
 
 test("player registers, joins with the invite code, and sees a player-safe table", async ({
@@ -690,16 +718,31 @@ test("player registers, joins with the invite code, and sees a player-safe table
     await expect(page.getByRole("button", { name: gmTab })).toHaveCount(0);
   }
 
-  await page
-    .locator(".campaign-tabs")
-    .getByRole("button", { name: /^People/ })
-    .click();
+  await page.goto(`${campaignPath}?tab=people`);
   await expect(page.getByRole("heading", { name: "People & factions" })).toBeVisible();
   await expect(page.getByText("E2E Harbor Guild")).toBeVisible();
   await expect(page.getByText("E2E Ferryman")).toBeVisible();
   await expect(page.getByText("A ferryman who knows every tide.")).toBeVisible();
   await expect(page.getByText("E2E secret doppelganger.")).toHaveCount(0);
   await expect(page.getByText("E2E secret guild vault.")).toHaveCount(0);
+
+  await page.goto(`${campaignPath}?tab=notes`);
+  await expect(page.getByRole("heading", { name: "Notes & knowledge" })).toBeVisible();
+  await expect(page.getByText("E2E Sunken Gate")).toBeVisible();
+  await expect(page.getByText("The gate opens at low tide.")).toBeVisible();
+  await expect(page.getByText("E2E Hidden Traitor")).toHaveCount(0);
+  await expect(page.getByText("The harbor master serves the Ashen Court.")).toHaveCount(0);
+
+  await page.getByRole("button", { name: "New note" }).click();
+  const noteDialog = page.getByRole("dialog", { name: "New private note" });
+  await expect(noteDialog).toBeVisible();
+  await noteDialog.getByLabel("Note title").fill("E2E private suspicion");
+  await noteDialog.getByPlaceholder("What do you want to remember?").fill("The ferryman is lying.");
+  await noteDialog.getByRole("button", { name: "Create note" }).click();
+  await expect(page.getByText("Private note saved.")).toBeVisible({ timeout: 15_000 });
+  await expect(
+    page.locator(".notes-private").getByText("E2E private suspicion", { exact: true })
+  ).toBeVisible();
 
   const adminContext = await browser.newContext();
   const adminPage = await adminContext.newPage();
@@ -756,6 +799,17 @@ test("player registers, joins with the invite code, and sees a player-safe table
   await expect(adminPage.getByText("Spiders")).toBeVisible();
 
   await adminContext.close();
+});
+
+test("GM can read hidden lore but never a player's private notes", async ({ page }) => {
+  await signIn(page, admin);
+  await page.goto(`${campaignPath}?tab=notes`);
+  await expect(page.getByRole("heading", { name: "Notes & knowledge" })).toBeVisible();
+  await expect(page.getByText("E2E Sunken Gate")).toBeVisible();
+  await expect(page.getByText("E2E Hidden Traitor")).toBeVisible();
+  await expect(page.getByText("E2E private suspicion")).toHaveCount(0);
+  await expect(page.getByText("The ferryman is lying.")).toHaveCount(0);
+  await expect(page.locator(".notes-private").getByText("No private notes yet")).toBeVisible();
 });
 
 test("player imports a Pathbuilder character and joins after GM approval", async ({
