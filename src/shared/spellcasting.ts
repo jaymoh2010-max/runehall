@@ -187,8 +187,14 @@ export function spellCastOptions(
     );
   }
 
-  const ranks: number[] = [];
-  for (let rank = spell.rank; rank <= maxRank; rank += 1) ranks.push(rank);
+  // A spontaneous caster can only heighten a spell freely when it is one of
+  // their signature spells. A heightened copy learned at a higher rank is not
+  // modelled separately, so non-signature spells stay at their printed rank.
+  const signature = new Set(draft.spells.signature ?? []);
+  const ranks: number[] = [spell.rank];
+  if (signature.has(spell.id)) {
+    for (let rank = spell.rank + 1; rank <= maxRank; rank += 1) ranks.push(rank);
+  }
 
   const options: SpellCastOption[] = [];
   for (const rank of ranks) {

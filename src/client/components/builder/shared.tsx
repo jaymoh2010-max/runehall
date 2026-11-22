@@ -43,7 +43,13 @@ export type StepId =
   | "review";
 
 export type Picker =
-  | { kind: "feat"; category: "ancestry" | "class" | "skill" | "general"; level: number }
+  | {
+      kind: "feat";
+      category: "ancestry" | "class" | "skill" | "general";
+      level: number;
+      /** Bonus feats granted outside the normal slot grid. */
+      target?: "extras";
+    }
   | { kind: "spell"; rank: number | null; focus?: boolean; target: "cantrips" | "known" | "focus" }
   | { kind: "equipment" }
   | { kind: "deity" }

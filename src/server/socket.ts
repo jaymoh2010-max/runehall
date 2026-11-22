@@ -240,13 +240,13 @@ export function broadcastCampaignInitiative(io: TypedServer, campaignId: string)
   broadcastInitiative(io, campaignId, ensureState(campaignId));
 }
 
-function perceptionForToken(row: TokenRow): number {
+function initiativeBonusForToken(row: TokenRow): number {
   if (!row.character_id) return 0;
   const character = getCharacter(row.character_id);
   if (!character) return 0;
   try {
     const draft = normalizeCharacterDraft(JSON.parse(character.data), character.name);
-    return computeCharacter(draft, contextForDraft(draft)).perception;
+    return computeCharacter(draft, contextForDraft(draft)).initiative;
   } catch {
     return 0;
   }
@@ -263,7 +263,7 @@ function speedForToken(row: TokenRow): number | null {
 
 function initiativeEntryForToken(row: TokenRow, value?: number): InitiativeEntry {
   const rolled = value ?? rollFormula("1d20", {}).d20 ?? 10;
-  const bonus = row.initiative_bonus ?? perceptionForToken(row);
+  const bonus = row.initiative_bonus ?? initiativeBonusForToken(row);
   const total = value ?? rolled + bonus;
   return {
     id: newId("init"),
@@ -283,7 +283,7 @@ function initiativeEntryForToken(row: TokenRow, value?: number): InitiativeEntry
 function initiativeEntryForGroup(rows: TokenRow[]): InitiativeEntry {
   const anchor = rows[0];
   const rolled = rollFormula("1d20", {}).d20 ?? 10;
-  const bonus = anchor.initiative_bonus ?? perceptionForToken(anchor);
+  const bonus = anchor.initiative_bonus ?? initiativeBonusForToken(anchor);
   const baseName = anchor.group_name || anchor.name;
   return {
     id: newId("init"),

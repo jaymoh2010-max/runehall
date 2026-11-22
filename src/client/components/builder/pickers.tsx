@@ -483,7 +483,10 @@ export function SpellPicker({
 }) {
   const [query, setQuery] = useState("");
   const [legacy, setLegacy] = useState(Boolean(legacyDefault));
-  const [recommended, setRecommended] = useState(true);
+  const psychicCantrips = classTrait === "psychic" && rank === 0 && !focus;
+  // Psi cantrips are uncommon and have no tradition; do not hide them behind
+  // the default "recommended only" filter.
+  const [recommended, setRecommended] = useState(!psychicCantrips);
   const [selected, setSelected] = useState<Spell | null>(null);
 
   useEffect(() => {
@@ -504,12 +507,14 @@ export function SpellPicker({
   const params = new URLSearchParams();
   if (rank !== null) params.set("rank", String(rank));
   if (maxRank !== null && maxRank !== undefined) params.set("rankMax", String(maxRank));
-  if (tradition) params.set("tradition", tradition);
+  if (tradition && !psychicCantrips) params.set("tradition", tradition);
   if (!legacy) params.set("legacy", "0");
   if (!expanded) params.set("core", "1");
   if (recommended) params.set("recommended", "1");
   if (query.trim()) params.set("q", query.trim());
-  if (focus) {
+  if (psychicCantrips) {
+    params.set("traitAll", "psychic");
+  } else if (focus) {
     params.set("traitAll", [classTrait, "focus"].filter(Boolean).join(","));
   }
 

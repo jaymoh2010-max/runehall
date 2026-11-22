@@ -59,12 +59,13 @@ export interface TreasureItemFacts {
 export function treasureItemKind(item: TreasureItemFacts | null | undefined): TreasureItemKind {
   if (!item) return "other";
   const traits = item.traits ?? [];
+  // Wands are reusable once-per-day items, not consumables.
+  if (traits.includes("wand")) return "permanent";
   if (
     item.consumable ||
     item.type === "consumable" ||
     item.type === "ammo" ||
-    traits.includes("consumable") ||
-    traits.includes("wand")
+    traits.includes("consumable")
   ) {
     return "consumable";
   }

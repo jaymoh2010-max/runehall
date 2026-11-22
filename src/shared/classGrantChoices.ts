@@ -48,6 +48,8 @@ export const GRANT_CHOICE_KEYS = {
   championDevotion: "grant:champion-devotion",
   sorcererElement: "grant:sorcerer-element",
   runelordSin: "grant:runelord-sin",
+  witchHex: "grant:witch-hex",
+  oracleMystery: "grant:oracle-mystery",
 } as const;
 
 const DOMAIN_NAMES: Record<string, string> = {
@@ -414,6 +416,40 @@ const DEVOTION_OPTIONS: GrantChoiceOption[] = [
   },
 ];
 
+const WITCH_HEX_OPTIONS: GrantChoiceOption[] = [
+  {
+    id: "patrons-puppet",
+    name: "Patron's Puppet",
+    grant: { spells: [focus("spell:aq1yonHeYpbaj3XI", "Patron's Puppet")], focusPoints: 1 },
+    hint: "Command your familiar.",
+  },
+  {
+    id: "phase-familiar",
+    name: "Phase Familiar",
+    grant: { spells: [focus("spell:rMOI8JFJ0nT2mrCF", "Phase Familiar")], focusPoints: 1 },
+    hint: "Protect your familiar from harm.",
+  },
+];
+
+const ORACLE_REVELATION_OPTIONS: GrantChoiceOption[] = [
+  ["Ancestors", "Ancestral Touch", "spell:d2pi7laQkzlr3wrS"],
+  ["Ashes", "Ashen Wind", "spell:NtzNCW32UlPdY2xS"],
+  ["Battle", "Weapon Trance", "spell:RpGB961b8FjXbGHi"],
+  ["Blight", "Ulcerous Canker", "spell:DnVTBGCsai6zqMwL"],
+  ["Bones", "Soul Siphon", "spell:D6T17BdazhNy3KPm"],
+  ["Cosmos", "Spray of Stars", "spell:mlNYROcFrUF8nFgk"],
+  ["Flames", "Incendiary Aura", "spell:AspA30tzKCHFWRf0"],
+  ["Life", "Life Link", "spell:2gQYrCPwBmwau26O"],
+  ["Lore", "Brain Drain", "spell:k2QrUk7jWMAWozMh"],
+  ["Tempest", "Tempest Touch", "spell:EzB9i7R6aBRAtJCh"],
+  ["Time", "Temporal Distortion", "spell:UbHK19RYbxRXWgWX"],
+].map(([name, spellName, spellId]) => ({
+  id: name.toLowerCase(),
+  name,
+  grant: { spells: [focus(spellId, spellName)], focusPoints: 1 },
+  hint: spellName,
+}));
+
 export const GRANT_CHOICE_GROUPS: GrantChoiceGroup[] = [
   {
     key: GRANT_CHOICE_KEYS.clericDomain,
@@ -454,6 +490,26 @@ export const GRANT_CHOICE_GROUPS: GrantChoiceGroup[] = [
     minLevel: 1,
     source: { kind: "class-option", optionId: "cf:HYTaibaCGE85rhbZ" },
     options: ["envy", "gluttony", "greed", "lust", "pride", "sloth", "wrath"].map(sinOption),
+  },
+  {
+    key: GRANT_CHOICE_KEYS.witchHex,
+    prompt: "Hexes: choose your first hex.",
+    chooseLabel: "hex",
+    count: 1,
+    minLevel: 1,
+    source: { kind: "class-choice-tag", tag: "witch-patron" },
+    baseGrant: { focusPoints: 1 },
+    options: WITCH_HEX_OPTIONS,
+  },
+  {
+    key: GRANT_CHOICE_KEYS.oracleMystery,
+    prompt: "Revelation Spells: choose your initial revelation.",
+    chooseLabel: "revelation",
+    count: 1,
+    minLevel: 1,
+    source: { kind: "class-choice-tag", tag: "oracle-mystery" },
+    baseGrant: { focusPoints: 1 },
+    options: ORACLE_REVELATION_OPTIONS,
   },
 ];
 
