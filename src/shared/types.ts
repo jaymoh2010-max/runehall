@@ -1268,6 +1268,8 @@ export interface LootParcel {
   name: string;
   description: string;
   items: LootItem[];
+  /** Party level this parcel was budgeted for. */
+  level: number;
   gp: number;
   sp: number;
   cp: number;
@@ -1290,6 +1292,7 @@ export interface TreasureBudget {
 export interface TreasureAuditParcel {
   id: string;
   name: string;
+  level: number;
   status: LootParcelStatus;
   valueCp: number;
   permanentItems: number;
@@ -1334,6 +1337,13 @@ export interface TreasureAudit {
   distributedCp: number;
   mix: TreasureItemMix;
   parcels: TreasureAuditParcel[];
+  byLevel: Array<{
+    level: number;
+    parcelCount: number;
+    preparedCp: number;
+    distributedCp: number;
+    budgetGp: number;
+  }>;
   characters: TreasureAuditCharacter[];
 }
 

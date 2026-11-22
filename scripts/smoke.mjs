@@ -738,9 +738,10 @@ async function main() {
     await api(`/api/campaigns/${campaign.id}/loot`, {
       method: "POST",
       cookie: gmCookie,
-      body: { name: "Smoke Loot", description: "Temporary parcel." },
+      body: { name: "Smoke Loot", description: "Temporary parcel.", level: 5 },
     })
   ).payload.parcel;
+  if (lootParcel.level !== 5) throw new Error("Loot parcel level was not saved");
   const parcelWithItem = (
     await api(`/api/campaigns/${campaign.id}/loot/${lootParcel.id}/items`, {
       method: "POST",
@@ -749,11 +750,14 @@ async function main() {
     })
   ).payload.parcel;
   if (parcelWithItem.items[0]?.quantity !== 2) throw new Error("Loot item was not added");
-  await api(`/api/campaigns/${campaign.id}/loot/${lootParcel.id}`, {
+  const patchedLoot = await api(`/api/campaigns/${campaign.id}/loot/${lootParcel.id}`, {
     method: "PATCH",
     cookie: gmCookie,
-    body: { gp: 5, sp: 3, cp: 2 },
+    body: { gp: 5, sp: 3, cp: 2, level: 6 },
   });
+  if (patchedLoot.payload.parcel.level !== 6) {
+    throw new Error("Loot parcel level was not updated");
+  }
   const distributedLoot = await api(
     `/api/campaigns/${campaign.id}/loot/${lootParcel.id}/distribute`,
     {
@@ -780,7 +784,12 @@ async function main() {
     headers: { cookie: playerCookie },
   });
   if (playerLoot.status !== 403) throw new Error("Player should not be able to read GM loot prep");
-  log("loot parcel distributed to the player's sheet");
+  const lootAudit = await api(`/api/campaigns/${campaign.id}/loot/audit`, { cookie: gmCookie });
+  const levelSix = lootAudit.payload.audit.byLevel.find((row) => row.level === 6);
+  if (!levelSix || levelSix.parcelCount < 1 || levelSix.distributedCp < 1) {
+    throw new Error("Loot audit did not group the parcel by level");
+  }
+  log("loot parcel distributed to the player's sheet with level coverage");
 
   const quartermaster = (
     await api("/api/characters", {

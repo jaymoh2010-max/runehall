@@ -823,4 +823,11 @@ export const migrations: Migration[] = [
         ON campaign_merchants(campaign_id, sort_order);
     `,
   },
+  {
+    version: 45,
+    name: "loot_parcel_levels",
+    sql: `
+      ALTER TABLE loot_parcels ADD COLUMN level INTEGER NOT NULL DEFAULT 1;
+    `,
+  },
 ];

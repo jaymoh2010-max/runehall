@@ -9563,3 +9563,12 @@
 .shop-merchant-bar select {
   min-width: 180px;
 }
+
+/* Treasure parcels by level */
+.treasure-level-coverage {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}

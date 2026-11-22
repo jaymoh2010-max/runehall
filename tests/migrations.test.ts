@@ -162,6 +162,11 @@ describe("migrations", () => {
     expect(sessionZeroColumns.map((column) => column.name)).toContain("party_goal");
     expect(sessionZeroColumns.map((column) => column.name)).toContain("party_hooks");
 
+    const lootColumns = db.prepare("PRAGMA table_info(loot_parcels)").all() as {
+      name: string;
+    }[];
+    expect(lootColumns.map((column) => column.name)).toContain("level");
+
     db.close();
   });
 });

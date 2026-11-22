@@ -608,14 +608,16 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
       const oldRecipient = text(parcel.distributedTo, "", 120);
       db.prepare(
         `INSERT INTO loot_parcels
-          (id, campaign_id, name, description, items, gp, sp, cp, status, distributed_to, distributed_to_name, distributed_at, sort_order, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          (id, campaign_id, name, description, items, level, gp, sp, cp, status,
+           distributed_to, distributed_to_name, distributed_at, sort_order, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).run(
         newId("loot"),
         campaignId,
         text(parcel.name, "Imported loot", 120),
         longText(parcel.description, "", 4000),
         JSON.stringify(normalizeLootItems(parcel.items)),
+        numberValue(parcel.level, 1, 1, 20),
         numberValue(parcel.gp, 0, 0, 1_000_000_000),
         numberValue(parcel.sp, 0, 0, 1_000_000_000),
         numberValue(parcel.cp, 0, 0, 1_000_000_000),

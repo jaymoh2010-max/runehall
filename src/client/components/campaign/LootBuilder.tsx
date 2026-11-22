@@ -47,6 +47,7 @@ export function LootBuilder({
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [nameDraft, setNameDraft] = useState("");
+  const [levelDraft, setLevelDraft] = useState("1");
   const [descriptionDraft, setDescriptionDraft] = useState("");
   const [gpDraft, setGpDraft] = useState("0");
   const [spDraft, setSpDraft] = useState("0");
@@ -122,6 +123,7 @@ export function LootBuilder({
   useEffect(() => {
     if (!selected) {
       setNameDraft("");
+      setLevelDraft("1");
       setDescriptionDraft("");
       setGpDraft("0");
       setSpDraft("0");
@@ -129,6 +131,7 @@ export function LootBuilder({
       return;
     }
     setNameDraft(selected.name);
+    setLevelDraft(String(selected.level));
     setDescriptionDraft(selected.description);
     setGpDraft(String(selected.gp));
     setSpDraft(String(selected.sp));
@@ -197,6 +200,7 @@ export function LootBuilder({
           body: {
             name: nameDraft,
             description: descriptionDraft,
+            level: Number(levelDraft) || 1,
             gp: Number(gpDraft) || 0,
             sp: Number(spDraft) || 0,
             cp: Number(cpDraft) || 0,
@@ -286,6 +290,7 @@ export function LootBuilder({
           body: {
             name: nameDraft,
             description: descriptionDraft,
+            level: Number(levelDraft) || 1,
             gp: Number(gpDraft) || 0,
             sp: Number(spDraft) || 0,
             cp: Number(cpDraft) || 0,
@@ -376,6 +381,32 @@ export function LootBuilder({
               </div>
             </div>
           </div>
+          {audit.byLevel.length ? (
+            <div className="treasure-level-coverage">
+              <div className="row-between">
+                <strong>Parcels by level</strong>
+                <span className="tiny muted">
+                  Prepared and distributed value against each level's budget
+                </span>
+              </div>
+              <div className="treasure-audit-character-list">
+                {audit.byLevel.map((row) => (
+                  <div key={row.level} className="treasure-audit-character">
+                    <span>
+                      <strong>Level {row.level}</strong>{" "}
+                      <span className="tiny muted">
+                        {row.parcelCount} parcel{row.parcelCount === 1 ? "" : "s"}
+                      </span>
+                    </span>
+                    <span className="tiny muted">
+                      {formatCp(row.distributedCp)} distributed · {formatCp(row.preparedCp)} open ·{" "}
+                      {formatCp(row.budgetGp * 100)} budget
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
           <div className="treasure-audit-characters">
             <div className="row-between">
               <strong>Item mix</strong>
@@ -505,13 +536,26 @@ export function LootBuilder({
               <>
                 <Card className="loot-header">
                   <div className="loot-header-main">
-                    <Field label="Parcel name">
-                      <Input
-                        value={nameDraft}
-                        onChange={(event) => setNameDraft(event.target.value)}
-                        disabled={selected.status === "distributed"}
-                      />
-                    </Field>
+                    <div className="row" style={{ gap: 8, alignItems: "flex-end" }}>
+                      <Field label="Parcel name" className="grow">
+                        <Input
+                          value={nameDraft}
+                          onChange={(event) => setNameDraft(event.target.value)}
+                          disabled={selected.status === "distributed"}
+                        />
+                      </Field>
+                      <Field label="Parcel level">
+                        <Input
+                          type="number"
+                          min={1}
+                          max={20}
+                          style={{ maxWidth: 88 }}
+                          value={levelDraft}
+                          onChange={(event) => setLevelDraft(event.target.value)}
+                          disabled={selected.status === "distributed"}
+                        />
+                      </Field>
+                    </div>
                     <div className="loot-coins">
                       <Field label="Gold">
                         <Input
