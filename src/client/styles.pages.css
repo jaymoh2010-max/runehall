@@ -11488,6 +11488,16 @@
   padding: 24px;
   color: var(--pb-muted);
 }
+.pb-builder-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1300;
+  overflow-y: auto;
+  background: var(--pb-bg);
+}
+.pb-builder-overlay .builder-page {
+  min-height: 100vh;
+}
 
 .pb-plan {
   display: flex;

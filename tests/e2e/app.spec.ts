@@ -306,6 +306,11 @@ test("GM creates a campaign and builds a character through the lazy routes", asy
   await page.getByLabel("Notes").fill("E2E sheet notes");
   await page.getByRole("button", { name: "Save details" }).click();
   await expect(page.getByText("Saved.")).toBeVisible({ timeout: 15_000 });
+
+  await page.getByRole("button", { name: "Edit build" }).click();
+  await expect(page.getByLabel("Character name")).toBeVisible({ timeout: 15_000 });
+  await page.getByRole("button", { name: "Back to sheet" }).click();
+  await expect(page.locator(".pb-sheet-page")).toBeVisible({ timeout: 15_000 });
 });
 
 test.skip("GM controls advancement and milestone mode hides XP awards", async ({ page }) => {

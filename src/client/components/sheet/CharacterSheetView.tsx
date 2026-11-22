@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   ArrowLeft,
@@ -45,6 +45,12 @@ import { rollFormula } from "../../../shared/dice";
 import { castSpell, spellCastOptions, type SpellCastChoice } from "../../../shared/spellcasting";
 import { api, formatCp } from "../../api";
 import { errorMessage, useToasts } from "../../stores";
+
+const CharacterBuilderPage = lazy(() =>
+  import("../../pages/CharacterBuilderPage").then((module) => ({
+    default: module.CharacterBuilderPage,
+  }))
+);
 import { getSocket, joinCampaign } from "../../socket";
 import { Avatar, Badge, Spinner, Tag } from "../ui";
 
@@ -104,6 +110,7 @@ export function CharacterSheetView({
   const [saving, setSaving] = useState(false);
   const [tab, setTab] = useState<SheetTab>("weapons");
   const [showFullPlan, setShowFullPlan] = useState(false);
+  const [builderOpen, setBuilderOpen] = useState(false);
   const [castChoices, setCastChoices] = useState<Record<string, string>>({});
   const [lastRoll, setLastRoll] = useState<LastRoll | null>(null);
   const [hpInput, setHpInput] = useState("");
@@ -651,14 +658,13 @@ export function CharacterSheetView({
           <button type="button" className="pb-button" onClick={() => window.print()}>
             <Printer size={14} /> Print
           </button>
-          <a
+          <button
+            type="button"
             className="pb-button is-primary"
-            href={`/characters/${character.id}/edit`}
-            target={mode === "overlay" ? "_blank" : undefined}
-            rel="noreferrer"
+            onClick={() => setBuilderOpen(true)}
           >
             <Pencil size={14} /> Edit build
-          </a>
+          </button>
           {mode === "overlay" && onClose ? (
             <button
               type="button"
@@ -1856,6 +1862,19 @@ export function CharacterSheetView({
           <Dices size={24} />
         </button>
       </div>
+      {builderOpen ? (
+        <div className="pb-builder-overlay">
+          <Suspense fallback={<Spinner label="Opening the planner…" />}>
+            <CharacterBuilderPage
+              characterId={character.id}
+              onClose={() => {
+                setBuilderOpen(false);
+                void load();
+              }}
+            />
+          </Suspense>
+        </div>
+      ) : null}
     </div>
   );
 }

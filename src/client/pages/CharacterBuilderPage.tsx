@@ -158,8 +158,15 @@ type LevelUpTask = Omit<LevelUpChoice, "step"> & {
   target?: "freeArchetype";
 };
 
-export function CharacterBuilderPage() {
-  const { id } = useParams<{ id: string }>();
+export function CharacterBuilderPage({
+  characterId,
+  onClose,
+}: {
+  characterId?: string;
+  onClose?: () => void;
+} = {}) {
+  const params = useParams<{ id: string }>();
+  const id = characterId ?? params.id;
   const navigate = useNavigate();
   const toast = useToasts((state) => state.push);
   const [character, setCharacter] = useState<CharacterRecord | null>(null);
@@ -378,11 +385,12 @@ export function CharacterBuilderPage() {
     if (!pendingSheet) return;
     if (saveState === "saved" && !dirtyRef.current && id) {
       setPendingSheet(false);
-      navigate(`/characters/${id}`);
+      if (onClose) onClose();
+      else navigate(`/characters/${id}`);
     } else if (saveState === "error") {
       setPendingSheet(false);
     }
-  }, [pendingSheet, saveState, id, navigate]);
+  }, [pendingSheet, saveState, id, navigate, onClose]);
 
   const openSheet = (event: MouseEvent<HTMLAnchorElement>) => {
     if (saveState === "saved" && !dirtyRef.current) return;
@@ -746,14 +754,29 @@ export function CharacterBuilderPage() {
     <div className="builder-page">
       <header className="builder-header">
         <div className="builder-header-left">
-          <Link
-            to={character?.campaignId ? `/campaigns/${character.campaignId}` : "/campaigns"}
-            className="icon-btn"
-            title="Back to campaigns"
-            aria-label="Back to campaigns"
-          >
-            <ArrowLeft size={18} />
-          </Link>
+          {onClose ? (
+            <button
+              type="button"
+              className="icon-btn"
+              title="Back to sheet"
+              aria-label="Back to sheet"
+              onClick={() => {
+                if (saveState === "saved" && !dirtyRef.current) onClose();
+                else setPendingSheet(true);
+              }}
+            >
+              <ArrowLeft size={18} />
+            </button>
+          ) : (
+            <Link
+              to={character?.campaignId ? `/campaigns/${character.campaignId}` : "/campaigns"}
+              className="icon-btn"
+              title="Back to campaigns"
+              aria-label="Back to campaigns"
+            >
+              <ArrowLeft size={18} />
+            </Link>
+          )}
           <div className="builder-title">
             <Input
               className="builder-name-input"
@@ -996,14 +1019,25 @@ export function CharacterBuilderPage() {
                 </span>
               ) : null}
             </div>
-            <Link
-              to={`/characters/${id}`}
-              className="btn btn-gold btn-sm btn-block"
-              style={{ marginTop: 11 }}
-              onClick={openSheet}
-            >
-              <ScrollText size={14} /> Open character sheet
-            </Link>
+            {onClose ? (
+              <button
+                type="button"
+                className="btn btn-gold btn-sm btn-block"
+                style={{ marginTop: 11 }}
+                onClick={() => setPendingSheet(true)}
+              >
+                <ScrollText size={14} /> Back to character sheet
+              </button>
+            ) : (
+              <Link
+                to={`/characters/${id}`}
+                className="btn btn-gold btn-sm btn-block"
+                style={{ marginTop: 11 }}
+                onClick={openSheet}
+              >
+                <ScrollText size={14} /> Open character sheet
+              </Link>
+            )}
           </Card>
           <Card className="summary-wealth">
             {derived.wealth.budget !== null ? (
