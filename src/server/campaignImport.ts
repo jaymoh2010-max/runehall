@@ -22,6 +22,7 @@ import {
   normalizeTravelWeather,
 } from "../shared/travel";
 import { normalizeSessionZeroChecklist } from "../shared/sessionZero";
+import { normalizeNpcAttitude, normalizeReputation } from "../shared/people";
 import {
   MAX_SHOP_STOCK_ROWS,
   normalizeSettlementLevel,
@@ -676,11 +677,40 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
       );
     }
 
+    const factionMap = new Map<string, string>();
+    for (const faction of records(payload.factions, 200, "factions")) {
+      const oldId = text(faction.id, "", 120);
+      const factionId = newId("faction");
+      if (oldId) factionMap.set(oldId, factionId);
+      db.prepare(
+        `INSERT INTO campaign_factions
+           (id, campaign_id, name, description, goals, assets, attitude, reputation, visible,
+            gm_notes, sort_order, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).run(
+        factionId,
+        campaignId,
+        text(faction.name, "Imported faction", 120),
+        longText(faction.description, "", 4_000),
+        longText(faction.goals, "", 4_000),
+        longText(faction.assets, "", 4_000),
+        normalizeNpcAttitude(faction.attitude),
+        normalizeReputation(faction.reputation),
+        faction.visible === true ? 1 : 0,
+        longText(faction.gmNotes, "", 8_000),
+        numberValue(faction.sortOrder, 0),
+        ts,
+        ts
+      );
+    }
+
     for (const npc of records(payload.npcs, 300, "NPCs")) {
       db.prepare(
         `INSERT INTO campaign_npcs
-          (id, campaign_id, name, level, hp, ac, perception, size, color, image_url, description, sort_order, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          (id, campaign_id, name, level, hp, ac, perception, size, color, image_url, description,
+           faction_id, role, location, attitude, public_description, secrets, visible, sort_order,
+           created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).run(
         newId("npc"),
         campaignId,
@@ -695,6 +725,15 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
         text(npc.color, "#b06767", 30),
         npc.imageUrl ? text(npc.imageUrl, "", 500) : null,
         longText(npc.description, "", 20_000),
+        text(npc.factionId, "", 120)
+          ? (factionMap.get(text(npc.factionId, "", 120)) ?? null)
+          : null,
+        text(npc.role, "", 120),
+        text(npc.location, "", 120),
+        normalizeNpcAttitude(npc.attitude),
+        longText(npc.publicDescription, "", 4_000),
+        longText(npc.secrets, "", 8_000),
+        npc.visible === true ? 1 : 0,
         numberValue(npc.sortOrder, 0),
         ts,
         ts

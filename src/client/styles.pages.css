@@ -9043,3 +9043,69 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* People and factions */
+.npc-faction-library {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+.npc-faction-library .npc-grid {
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+}
+.people-faction-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  color: var(--gold-bright);
+  background: var(--panel-3);
+}
+.people-faction {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.people-faction-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+.people-faction-details {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel-2);
+}
+.people-faction-details p {
+  margin: 0;
+}
+.people-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+}
+.people-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel-2);
+}
+.people-card p {
+  margin: 0;
+}
+@media (max-width: 640px) {
+  .people-grid {
+    grid-template-columns: 1fr;
+  }
+}

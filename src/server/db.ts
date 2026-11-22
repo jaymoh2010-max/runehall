@@ -407,6 +407,29 @@ export interface CampaignNpcRow {
   color: string;
   image_url: string | null;
   description: string;
+  faction_id: string | null;
+  role: string;
+  location: string;
+  attitude: string;
+  public_description: string;
+  secrets: string;
+  visible: number;
+  sort_order: number;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface CampaignFactionRow {
+  id: string;
+  campaign_id: string;
+  name: string;
+  description: string;
+  goals: string;
+  assets: string;
+  attitude: string;
+  reputation: number;
+  visible: number;
+  gm_notes: string;
   sort_order: number;
   created_at: number;
   updated_at: number;

@@ -75,6 +75,7 @@ import { api, copyText, formatCp, formatDate, uploadImage } from "../api";
 import { connectSocket, joinCampaign } from "../socket";
 import { TravelTab } from "../components/campaign/TravelTab";
 import { SessionZeroTab } from "../components/campaign/SessionZeroTab";
+import { PeopleTab } from "../components/campaign/PeopleTab";
 import { errorMessage } from "../stores";
 import { useSession, useToasts } from "../stores";
 import {
@@ -127,6 +128,7 @@ type Tab =
   | "overview"
   | "session-zero"
   | "party"
+  | "people"
   | "travel"
   | "sessions"
   | "encounters"
@@ -149,6 +151,7 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode; gmOnly?: boolean }[
   { id: "overview", label: "Overview", icon: <CalendarDays size={15} /> },
   { id: "session-zero", label: "Session zero", icon: <HeartHandshake size={15} /> },
   { id: "party", label: "Party", icon: <Users size={15} /> },
+  { id: "people", label: "People", icon: <Shield size={15} /> },
   { id: "travel", label: "Travel", icon: <Compass size={15} /> },
   { id: "sessions", label: "Sessions", icon: <CalendarClock size={15} /> },
   { id: "encounters", label: "Encounters", icon: <Skull size={15} />, gmOnly: true },
@@ -172,6 +175,7 @@ export function CampaignPage() {
     rawTab === "overview" ||
     rawTab === "session-zero" ||
     rawTab === "party" ||
+    rawTab === "people" ||
     rawTab === "travel" ||
     rawTab === "sessions" ||
     rawTab === "encounters" ||
@@ -1394,6 +1398,10 @@ export function CampaignPage() {
             refreshKey={campaign.updatedAt}
             toast={toast}
           />
+        ) : null}
+
+        {tab === "people" ? (
+          <PeopleTab campaignId={campaign.id} refreshKey={campaign.updatedAt} />
         ) : null}
 
         {tab === "travel" ? (

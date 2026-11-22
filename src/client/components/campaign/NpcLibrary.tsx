@@ -1,6 +1,18 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { ImagePlus, MapPin, Pencil, Plus, Search, Trash2, UserRound } from "lucide-react";
-import type { CampaignNpc, Scene, Token } from "../../../shared/types";
+import { ImagePlus, MapPin, Pencil, Plus, Search, Shield, Trash2, UserRound } from "lucide-react";
+import type {
+  CampaignFaction,
+  CampaignNpc,
+  NpcAttitude,
+  Scene,
+  Token,
+} from "../../../shared/types";
+import {
+  NPC_ATTITUDES,
+  npcAttitudeLabel,
+  normalizeNpcAttitude,
+  reputationLabel,
+} from "../../../shared/people";
 import { api, uploadImage } from "../../api";
 import { errorMessage } from "../../stores";
 import {
@@ -8,6 +20,7 @@ import {
   Badge,
   Button,
   Card,
+  Checkbox,
   EmptyState,
   Field,
   IconButton,
@@ -17,6 +30,7 @@ import {
   PageEyebrow,
   Select,
   Spinner,
+  Tag,
   Textarea,
 } from "../ui";
 
@@ -36,20 +50,27 @@ export function NpcLibrary({
   toast: (message: string, kind?: "info" | "success" | "error") => void;
 }) {
   const [npcs, setNpcs] = useState<CampaignNpc[]>([]);
+  const [factions, setFactions] = useState<CampaignFaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [query, setQuery] = useState("");
   const [sceneId, setSceneId] = useState(activeSceneId ?? scenes[0]?.id ?? "");
   const [editor, setEditor] = useState<CampaignNpc | "new" | null>(null);
+  const [factionEditor, setFactionEditor] = useState<CampaignFaction | "new" | null>(null);
 
   useEffect(() => {
     if (!isGm) return;
     let cancelled = false;
     setLoading(true);
-    api<{ npcs: CampaignNpc[] }>(`/api/campaigns/${campaignId}/npcs`)
-      .then((result) => {
-        if (!cancelled) setNpcs(result.npcs);
+    Promise.all([
+      api<{ npcs: CampaignNpc[] }>(`/api/campaigns/${campaignId}/npcs`),
+      api<{ factions: CampaignFaction[] }>(`/api/campaigns/${campaignId}/factions`),
+    ])
+      .then(([npcResult, factionResult]) => {
+        if (cancelled) return;
+        setNpcs(npcResult.npcs);
+        setFactions(factionResult.factions);
       })
       .catch((err) => {
         if (!cancelled) setError(errorMessage(err));
@@ -86,6 +107,15 @@ export function NpcLibrary({
     });
   };
 
+  const replaceFaction = (faction: CampaignFaction) => {
+    setFactions((current) => {
+      const exists = current.some((entry) => entry.id === faction.id);
+      return exists
+        ? current.map((entry) => (entry.id === faction.id ? faction : entry))
+        : [...current, faction];
+    });
+  };
+
   const placeToken = async (npc: CampaignNpc) => {
     if (!sceneId) {
       toast("Create a scene before placing an NPC token.", "error");
@@ -114,6 +144,23 @@ export function NpcLibrary({
       await api(`/api/campaigns/${campaignId}/npcs/${npc.id}`, { method: "DELETE" });
       setNpcs((current) => current.filter((entry) => entry.id !== npc.id));
       toast("NPC deleted.", "success");
+    } catch (err) {
+      toast(errorMessage(err), "error");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const deleteFaction = async (faction: CampaignFaction) => {
+    if (!window.confirm(`Delete “${faction.name}” and unlink its NPCs?`)) return;
+    setBusy(true);
+    try {
+      await api(`/api/campaigns/${campaignId}/factions/${faction.id}`, { method: "DELETE" });
+      setFactions((current) => current.filter((entry) => entry.id !== faction.id));
+      setNpcs((current) =>
+        current.map((npc) => (npc.factionId === faction.id ? { ...npc, factionId: null } : npc))
+      );
+      toast("Faction deleted.", "success");
     } catch (err) {
       toast(errorMessage(err), "error");
     } finally {
@@ -153,6 +200,74 @@ export function NpcLibrary({
           {error}
         </div>
       ) : null}
+
+      <div className="npc-faction-library">
+        <div className="row-between">
+          <div>
+            <PageEyebrow>Factions</PageEyebrow>
+            <p className="tiny muted">
+              Public factions appear on the shared People tab; GM notes and hidden factions stay
+              private.
+            </p>
+          </div>
+          <Button
+            size="sm"
+            variant="secondary"
+            icon={<Plus size={14} />}
+            onClick={() => setFactionEditor("new")}
+          >
+            New faction
+          </Button>
+        </div>
+        {factions.length ? (
+          <div className="npc-grid">
+            {factions.map((faction) => (
+              <Card key={faction.id} className="npc-card">
+                <div className="npc-card-head">
+                  <span className="people-faction-mark">
+                    <Shield size={18} />
+                  </span>
+                  <div className="grow">
+                    <div className="row wrap" style={{ gap: 7 }}>
+                      <h3>{faction.name}</h3>
+                      <Tag tone={faction.visible ? "green" : "gold"}>
+                        {faction.visible ? "Public" : "Hidden"}
+                      </Tag>
+                    </div>
+                    <p className="tiny muted">
+                      {npcAttitudeLabel(faction.attitude)} · {reputationLabel(faction.reputation)} (
+                      {faction.reputation})
+                    </p>
+                  </div>
+                </div>
+                {faction.description ? (
+                  <p className="npc-description">{faction.description}</p>
+                ) : null}
+                <div className="npc-card-actions">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    icon={<Pencil size={13} />}
+                    onClick={() => setFactionEditor(faction)}
+                  >
+                    Edit
+                  </Button>
+                  <IconButton
+                    label={`Delete ${faction.name}`}
+                    onClick={() => void deleteFaction(faction)}
+                  >
+                    <Trash2 size={13} />
+                  </IconButton>
+                </div>
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <p className="muted small">
+            No factions yet. Create one to group NPCs and track standing.
+          </p>
+        )}
+      </div>
 
       <div className="npc-toolbar">
         <div className="search-box">
@@ -204,7 +319,17 @@ export function NpcLibrary({
                   <div className="row wrap" style={{ gap: 7 }}>
                     <h3>{npc.name}</h3>
                     <Badge tone="gold">Level {npc.level}</Badge>
+                    <Tag tone={npc.visible ? "green" : "gold"}>
+                      {npc.visible ? "Public" : "Hidden"}
+                    </Tag>
                   </div>
+                  <p className="tiny muted">
+                    {[npc.role, npc.location].filter(Boolean).join(" · ") || "No role or location"}{" "}
+                    · {npcAttitudeLabel(npc.attitude)}
+                    {npc.factionId
+                      ? ` · ${factions.find((faction) => faction.id === npc.factionId)?.name ?? "Faction"}`
+                      : ""}
+                  </p>
                   <p className="tiny muted">
                     {npc.hp !== null ? `${npc.hp} HP` : "No HP"} ·{" "}
                     {npc.ac !== null ? `AC ${npc.ac}` : "No AC"}
@@ -245,11 +370,25 @@ export function NpcLibrary({
         open={Boolean(editor)}
         npc={editor}
         campaignId={campaignId}
+        factions={factions}
         onClose={() => setEditor(null)}
         onSaved={(npc) => {
           replaceNpc(npc);
           setEditor(null);
           toast(editor === "new" ? "NPC created." : "NPC saved.", "success");
+        }}
+        onError={(message) => toast(message, "error")}
+      />
+
+      <FactionEditor
+        open={Boolean(factionEditor)}
+        faction={factionEditor}
+        campaignId={campaignId}
+        onClose={() => setFactionEditor(null)}
+        onSaved={(faction) => {
+          replaceFaction(faction);
+          setFactionEditor(null);
+          toast(factionEditor === "new" ? "Faction created." : "Faction saved.", "success");
         }}
         onError={(message) => toast(message, "error")}
       />
@@ -261,6 +400,7 @@ function NpcEditor({
   open,
   npc,
   campaignId,
+  factions,
   onClose,
   onSaved,
   onError,
@@ -268,6 +408,7 @@ function NpcEditor({
   open: boolean;
   npc: CampaignNpc | "new" | null;
   campaignId: string;
+  factions: CampaignFaction[];
   onClose: () => void;
   onSaved: (npc: CampaignNpc) => void;
   onError: (message: string) => void;
@@ -283,6 +424,13 @@ function NpcEditor({
   const [color, setColor] = useState("#b06767");
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [description, setDescription] = useState("");
+  const [role, setRole] = useState("");
+  const [location, setLocation] = useState("");
+  const [factionId, setFactionId] = useState("");
+  const [attitude, setAttitude] = useState<NpcAttitude>("indifferent");
+  const [publicDescription, setPublicDescription] = useState("");
+  const [secrets, setSecrets] = useState("");
+  const [visible, setVisible] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -302,6 +450,13 @@ function NpcEditor({
     setColor(editing?.color ?? "#b06767");
     setImageUrl(editing?.imageUrl ?? null);
     setDescription(editing?.description ?? "");
+    setRole(editing?.role ?? "");
+    setLocation(editing?.location ?? "");
+    setFactionId(editing?.factionId ?? "");
+    setAttitude(editing?.attitude ?? "indifferent");
+    setPublicDescription(editing?.publicDescription ?? "");
+    setSecrets(editing?.secrets ?? "");
+    setVisible(Boolean(editing?.visible));
     setError("");
   }, [open, editing?.id]);
 
@@ -337,6 +492,13 @@ function NpcEditor({
         color,
         imageUrl,
         description,
+        role,
+        location,
+        factionId: factionId || null,
+        attitude,
+        publicDescription,
+        secrets,
+        visible,
       };
       const result = editing
         ? await api<{ npc: CampaignNpc }>(`/api/campaigns/${campaignId}/npcs/${editing.id}`, {
@@ -425,6 +587,65 @@ function NpcEditor({
                 placeholder="e.g. The Ferryman"
               />
             </Field>
+            <div className="form-grid two">
+              <Field label="Role or title">
+                <Input
+                  value={role}
+                  onChange={(event) => setRole(event.target.value)}
+                  placeholder="Harbor master, cultist, informant…"
+                />
+              </Field>
+              <Field label="Location">
+                <Input
+                  value={location}
+                  onChange={(event) => setLocation(event.target.value)}
+                  placeholder="Where the party can find them"
+                />
+              </Field>
+              <Field label="Faction">
+                <Select value={factionId} onChange={(event) => setFactionId(event.target.value)}>
+                  <option value="">No faction</option>
+                  {factions.map((faction) => (
+                    <option key={faction.id} value={faction.id}>
+                      {faction.name}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+              <Field label="Attitude">
+                <Select
+                  value={attitude}
+                  onChange={(event) => setAttitude(normalizeNpcAttitude(event.target.value))}
+                >
+                  {NPC_ATTITUDES.map((entry) => (
+                    <option key={entry.id} value={entry.id}>
+                      {entry.label}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+            </div>
+            <Checkbox
+              label="Show this NPC on the shared People tab"
+              checked={visible}
+              onChange={setVisible}
+            />
+            <Field label="Public description" hint="What players can read on the People tab.">
+              <Textarea
+                rows={3}
+                value={publicDescription}
+                onChange={(event) => setPublicDescription(event.target.value)}
+                placeholder="The party knows them as…"
+              />
+            </Field>
+            <Field label="GM secrets" hint="Never shown to players; kept for your eyes only.">
+              <Textarea
+                rows={4}
+                value={secrets}
+                onChange={(event) => setSecrets(event.target.value)}
+                placeholder="True motives, hidden loyalties, and what they know."
+              />
+            </Field>
             <div className="form-grid three">
               <Field label="Level">
                 <Input
@@ -489,6 +710,177 @@ function NpcEditor({
             </Field>
           </div>
         </div>
+      </form>
+    </Modal>
+  );
+}
+
+function FactionEditor({
+  open,
+  faction,
+  campaignId,
+  onClose,
+  onSaved,
+  onError,
+}: {
+  open: boolean;
+  faction: CampaignFaction | "new" | null;
+  campaignId: string;
+  onClose: () => void;
+  onSaved: (faction: CampaignFaction) => void;
+  onError: (message: string) => void;
+}) {
+  const editing = faction && faction !== "new" ? faction : null;
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [goals, setGoals] = useState("");
+  const [assets, setAssets] = useState("");
+  const [attitude, setAttitude] = useState<NpcAttitude>("indifferent");
+  const [reputation, setReputation] = useState("0");
+  const [visible, setVisible] = useState(false);
+  const [gmNotes, setGmNotes] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!open) return;
+    setName(editing?.name ?? "");
+    setDescription(editing?.description ?? "");
+    setGoals(editing?.goals ?? "");
+    setAssets(editing?.assets ?? "");
+    setAttitude(editing?.attitude ?? "indifferent");
+    setReputation(String(editing?.reputation ?? 0));
+    setVisible(Boolean(editing?.visible));
+    setGmNotes(editing?.gmNotes ?? "");
+    setError("");
+  }, [open, editing?.id]);
+
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!name.trim()) {
+      setError("Give the faction a name.");
+      return;
+    }
+    setBusy(true);
+    setError("");
+    try {
+      const payload = {
+        name: name.trim(),
+        description,
+        goals,
+        assets,
+        attitude,
+        reputation: Number(reputation) || 0,
+        visible,
+        gmNotes,
+      };
+      const result = editing
+        ? await api<{ faction: CampaignFaction }>(
+            `/api/campaigns/${campaignId}/factions/${editing.id}`,
+            { method: "PATCH", body: payload }
+          )
+        : await api<{ faction: CampaignFaction }>(`/api/campaigns/${campaignId}/factions`, {
+            method: "POST",
+            body: payload,
+          });
+      onSaved(result.faction);
+    } catch (err) {
+      const message = errorMessage(err);
+      setError(message);
+      onError(message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={editing ? `Edit ${editing.name}` : "New faction"}
+      subtitle="Public goals and standing for the shared People tab, plus private GM notes."
+      wide
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button variant="primary" loading={busy} onClick={submit}>
+            {editing ? "Save faction" : "Create faction"}
+          </Button>
+        </>
+      }
+    >
+      <form className="stack" onSubmit={submit}>
+        {error ? <div className="auth-error">{error}</div> : null}
+        <Field label="Name">
+          <Input
+            autoFocus
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            placeholder="e.g. The Ashen Court"
+          />
+        </Field>
+        <Field label="Public description" hint="What players can read on the People tab.">
+          <Textarea
+            rows={3}
+            value={description}
+            onChange={(event) => setDescription(event.target.value)}
+            placeholder="Who they are and what they are known for."
+          />
+        </Field>
+        <div className="form-grid two">
+          <Field label="Goals" hint="Public objectives and plans.">
+            <Textarea
+              rows={3}
+              value={goals}
+              onChange={(event) => setGoals(event.target.value)}
+              placeholder="What the faction wants."
+            />
+          </Field>
+          <Field label="Assets" hint="Public resources, territory, and leverage.">
+            <Textarea
+              rows={3}
+              value={assets}
+              onChange={(event) => setAssets(event.target.value)}
+              placeholder="What the faction can bring to bear."
+            />
+          </Field>
+          <Field label="Attitude">
+            <Select
+              value={attitude}
+              onChange={(event) => setAttitude(normalizeNpcAttitude(event.target.value))}
+            >
+              {NPC_ATTITUDES.map((entry) => (
+                <option key={entry.id} value={entry.id}>
+                  {entry.label}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Field label="Reputation (-100 to 100)">
+            <Input
+              type="number"
+              min={-100}
+              max={100}
+              value={reputation}
+              onChange={(event) => setReputation(event.target.value)}
+            />
+          </Field>
+        </div>
+        <Checkbox
+          label="Show this faction on the shared People tab"
+          checked={visible}
+          onChange={setVisible}
+        />
+        <Field label="GM notes" hint="Never shown to players.">
+          <Textarea
+            rows={4}
+            value={gmNotes}
+            onChange={(event) => setGmNotes(event.target.value)}
+            placeholder="Secrets, hidden alliances, and plans."
+          />
+        </Field>
       </form>
     </Modal>
   );
