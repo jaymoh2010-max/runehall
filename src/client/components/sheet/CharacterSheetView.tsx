@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import type {
   AbilityKey,
+  ActionRef,
   CharacterCondition,
   CharacterContext,
   CharacterDraft,
@@ -47,7 +48,8 @@ import { errorMessage, useToasts } from "../../stores";
 import { getSocket, joinCampaign } from "../../socket";
 import { Avatar, Badge, Spinner, Tag } from "../ui";
 
-type SheetTab = "weapons" | "defense" | "gear" | "spells" | "feats" | "details" | "status";
+type SheetTab =
+  "weapons" | "defense" | "gear" | "spells" | "feats" | "actions" | "details" | "status";
 
 const TABS: { id: SheetTab; label: string }[] = [
   { id: "weapons", label: "Weapons" },
@@ -55,6 +57,7 @@ const TABS: { id: SheetTab; label: string }[] = [
   { id: "gear", label: "Gear" },
   { id: "spells", label: "Spells" },
   { id: "feats", label: "Feats" },
+  { id: "actions", label: "Actions" },
   { id: "details", label: "Details" },
   { id: "status", label: "Status" },
 ];
@@ -110,6 +113,23 @@ export function CharacterSheetView({
   const [conditionValue, setConditionValue] = useState("");
   const [conditionDuration, setConditionDuration] = useState("");
   const [conditions, setConditions] = useState<ConditionRef[]>([]);
+  const [actions, setActions] = useState<ActionRef[]>([]);
+  const [actionQuery, setActionQuery] = useState("");
+  const [actionCategory, setActionCategory] = useState("all");
+  const [actionsLoading, setActionsLoading] = useState(false);
+  const [detailsForm, setDetailsForm] = useState({
+    name: "",
+    age: "",
+    gender: "",
+    pronouns: "",
+    height: "",
+    weight: "",
+    appearance: "",
+    personality: "",
+    beliefs: "",
+    notes: "",
+  });
+  const [detailsSaving, setDetailsSaving] = useState(false);
   const [itemQuery, setItemQuery] = useState("");
   const [itemResults, setItemResults] = useState<Equipment[]>([]);
   const [itemQuantities, setItemQuantities] = useState<Record<string, string>>({});
@@ -150,6 +170,41 @@ export function CharacterSheetView({
   useEffect(() => {
     if (derived) setHpInput(String(derived.currentHp));
   }, [derived?.currentHp, derived]);
+
+  useEffect(() => {
+    if (!character || !draft) return;
+    setDetailsForm({
+      name: draft.name,
+      age: draft.details.age,
+      gender: draft.details.gender,
+      pronouns: draft.details.pronouns,
+      height: draft.details.height,
+      weight: draft.details.weight,
+      appearance: draft.details.appearance,
+      personality: draft.details.personality,
+      beliefs: draft.details.beliefs,
+      notes: draft.details.notes,
+    });
+  }, [character?.revision, draft]);
+
+  useEffect(() => {
+    if (tab !== "actions" || actions.length) return;
+    let cancelled = false;
+    setActionsLoading(true);
+    api<{ items: ActionRef[] }>("/api/compendium/actions")
+      .then((result) => {
+        if (!cancelled) setActions(result.items);
+      })
+      .catch(() => {
+        if (!cancelled) setActions([]);
+      })
+      .finally(() => {
+        if (!cancelled) setActionsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [actions.length, tab]);
 
   useEffect(() => {
     void api<{ items: ConditionRef[] }>("/api/compendium/conditions")
@@ -271,6 +326,34 @@ export function CharacterSheetView({
     const hp = Math.max(0, Math.min(derived.maxHp, Math.round(value)));
     const result = applyHpEditToDraft(draft, derived.maxHp, { type: "set", hp });
     void persist(result.draft);
+  };
+
+  const updateDetails = (key: keyof typeof detailsForm, value: string) =>
+    setDetailsForm((current) => ({ ...current, [key]: value }));
+
+  const saveDetails = async () => {
+    if (!draft) return;
+    setDetailsSaving(true);
+    try {
+      await persist({
+        ...draft,
+        name: detailsForm.name.trim() || draft.name,
+        details: {
+          ...draft.details,
+          age: detailsForm.age,
+          gender: detailsForm.gender,
+          pronouns: detailsForm.pronouns,
+          height: detailsForm.height,
+          weight: detailsForm.weight,
+          appearance: detailsForm.appearance,
+          personality: detailsForm.personality,
+          beliefs: detailsForm.beliefs,
+          notes: detailsForm.notes,
+        },
+      });
+    } finally {
+      setDetailsSaving(false);
+    }
   };
 
   const addCondition = () => {
@@ -431,6 +514,22 @@ export function CharacterSheetView({
       return { level, items };
     });
   }, [context, derived, draft, featName, showFullPlan]);
+
+  const visibleActions = useMemo(() => {
+    const query = actionQuery.trim().toLowerCase();
+    return actions.filter((action) => {
+      if (actionCategory !== "all" && action.category !== actionCategory) return false;
+      if (!query) return true;
+      return `${action.name} ${action.category} ${action.traits.join(" ")} ${action.description}`
+        .toLowerCase()
+        .includes(query);
+    });
+  }, [actionCategory, actionQuery, actions]);
+
+  const actionCategories = useMemo(
+    () => [...new Set(actions.map((action) => action.category).filter(Boolean))].sort(),
+    [actions]
+  );
 
   const canGrant =
     Boolean(character?.permissions?.canAdvance) || Boolean(character?.campaignPlayerItemGrant);
@@ -1408,6 +1507,68 @@ export function CharacterSheetView({
               </div>
             ) : null}
 
+            {tab === "actions" ? (
+              <div className="pb-stack">
+                <div className="pb-action-search">
+                  <div className="pb-search-row">
+                    <Search size={14} />
+                    <input
+                      value={actionQuery}
+                      placeholder="Search actions"
+                      aria-label="Search actions"
+                      onChange={(event) => setActionQuery(event.target.value)}
+                    />
+                  </div>
+                  <div className="pb-filter-row">
+                    <button
+                      type="button"
+                      className={actionCategory === "all" ? "is-active" : ""}
+                      onClick={() => setActionCategory("all")}
+                    >
+                      All
+                    </button>
+                    {actionCategories.map((category) => (
+                      <button
+                        key={category}
+                        type="button"
+                        className={actionCategory === category ? "is-active" : ""}
+                        onClick={() => setActionCategory(category)}
+                      >
+                        {titleCase(category)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {actionsLoading ? (
+                  <p className="pb-empty">Loading actions…</p>
+                ) : visibleActions.length ? (
+                  <div className="pb-action-list">
+                    {visibleActions.slice(0, 120).map((action) => (
+                      <Link
+                        className="pb-action-row"
+                        key={action.id}
+                        to={`/library/action/${action.id}`}
+                      >
+                        <span className="pb-action-cost">
+                          {action.actions !== null
+                            ? "◆".repeat(Math.max(0, Math.min(3, action.actions)))
+                            : (action.actionType ?? "—")}
+                        </span>
+                        <span className="pb-action-copy">
+                          <strong>{action.name}</strong>
+                          <em>
+                            {[titleCase(action.category), ...action.traits.slice(0, 3)].join(" · ")}
+                          </em>
+                        </span>
+                      </Link>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="pb-empty">No actions match that search.</p>
+                )}
+              </div>
+            ) : null}
+
             {tab === "details" ? (
               <div className="pb-stack">
                 <div className="pb-detail-grid">
@@ -1468,9 +1629,95 @@ export function CharacterSheetView({
                     </ul>
                   </div>
                 ) : null}
-                <div>
-                  <h3>Notes</h3>
-                  <p className="pb-preline">{draft.details.notes || "No notes yet."}</p>
+                <div className="pb-detail-edit">
+                  <div className="pb-status-head">
+                    <h3>Edit details</h3>
+                    <span>Saved to the character sheet</span>
+                  </div>
+                  <div className="pb-edit-grid">
+                    <label className="pb-edit-field">
+                      <span>Name</span>
+                      <input
+                        value={detailsForm.name}
+                        onChange={(event) => updateDetails("name", event.target.value)}
+                      />
+                    </label>
+                    <label className="pb-edit-field">
+                      <span>Age</span>
+                      <input
+                        value={detailsForm.age}
+                        onChange={(event) => updateDetails("age", event.target.value)}
+                      />
+                    </label>
+                    <label className="pb-edit-field">
+                      <span>Gender</span>
+                      <input
+                        value={detailsForm.gender}
+                        onChange={(event) => updateDetails("gender", event.target.value)}
+                      />
+                    </label>
+                    <label className="pb-edit-field">
+                      <span>Pronouns</span>
+                      <input
+                        value={detailsForm.pronouns}
+                        onChange={(event) => updateDetails("pronouns", event.target.value)}
+                      />
+                    </label>
+                    <label className="pb-edit-field">
+                      <span>Height</span>
+                      <input
+                        value={detailsForm.height}
+                        onChange={(event) => updateDetails("height", event.target.value)}
+                      />
+                    </label>
+                    <label className="pb-edit-field">
+                      <span>Weight</span>
+                      <input
+                        value={detailsForm.weight}
+                        onChange={(event) => updateDetails("weight", event.target.value)}
+                      />
+                    </label>
+                  </div>
+                  <label className="pb-edit-field is-full">
+                    <span>Appearance</span>
+                    <textarea
+                      value={detailsForm.appearance}
+                      onChange={(event) => updateDetails("appearance", event.target.value)}
+                    />
+                  </label>
+                  <label className="pb-edit-field is-full">
+                    <span>Personality</span>
+                    <textarea
+                      value={detailsForm.personality}
+                      onChange={(event) => updateDetails("personality", event.target.value)}
+                    />
+                  </label>
+                  <label className="pb-edit-field is-full">
+                    <span>Beliefs</span>
+                    <textarea
+                      value={detailsForm.beliefs}
+                      onChange={(event) => updateDetails("beliefs", event.target.value)}
+                    />
+                  </label>
+                  <label className="pb-edit-field is-full">
+                    <span>Notes</span>
+                    <textarea
+                      className="is-tall"
+                      value={detailsForm.notes}
+                      onChange={(event) => updateDetails("notes", event.target.value)}
+                    />
+                  </label>
+                  <div className="pb-edit-actions">
+                    <span className="pb-hint">Changes save to the shared character record.</span>
+                    <button
+                      type="button"
+                      className="pb-small-button is-primary"
+                      disabled={detailsSaving || saving}
+                      onClick={() => void saveDetails()}
+                    >
+                      {detailsSaving || saving ? "Saving…" : "Save details"}
+                    </button>
+                  </div>
                 </div>
               </div>
             ) : null}

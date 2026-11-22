@@ -23,5 +23,6 @@
     "playwright.config.ts",
     "vite.config.ts",
     "vitest.config.ts"
-  ]
+  ],
+  "exclude": ["scripts/_*.ts"]
 }

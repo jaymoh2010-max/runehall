@@ -11624,6 +11624,128 @@
   padding: 0 4px;
 }
 
+.pb-action-search {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.pb-filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+.pb-filter-row button {
+  border: 1px solid var(--pb-line);
+  border-radius: 3px;
+  background: var(--pb-panel);
+  color: var(--pb-muted);
+  font-size: 0.65rem;
+  padding: 3px 7px;
+  cursor: pointer;
+}
+.pb-filter-row button:hover {
+  color: var(--pb-text);
+  border-color: var(--pb-orange);
+}
+.pb-filter-row button.is-active {
+  border-color: var(--pb-orange);
+  background: rgba(232, 93, 22, 0.12);
+  color: var(--pb-orange-bright);
+}
+.pb-action-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.pb-action-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 6px 8px;
+  border: 1px solid var(--pb-line-soft);
+  border-radius: 4px;
+  background: var(--pb-panel);
+  color: var(--pb-text);
+  text-decoration: none;
+}
+.pb-action-row:hover {
+  border-color: var(--pb-orange);
+}
+.pb-action-cost {
+  min-width: 28px;
+  color: var(--pb-orange-bright);
+  font-size: 0.72rem;
+  text-align: center;
+}
+.pb-action-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.pb-action-copy strong {
+  font-size: 0.77rem;
+  font-weight: 600;
+}
+.pb-action-copy em {
+  color: var(--pb-muted);
+  font-size: 0.64rem;
+  font-style: normal;
+}
+.pb-detail-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding-top: 9px;
+  border-top: 1px solid var(--pb-line-soft);
+}
+.pb-edit-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+.pb-edit-field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.pb-edit-field > span {
+  color: var(--pb-muted);
+  font-size: 0.64rem;
+  text-transform: uppercase;
+}
+.pb-edit-field input,
+.pb-edit-field textarea {
+  width: 100%;
+  min-height: 27px;
+  border: 1px solid var(--pb-line);
+  border-radius: 3px;
+  background: #10151d;
+  color: var(--pb-text);
+  font: inherit;
+  font-size: 0.75rem;
+  padding: 4px 7px;
+}
+.pb-edit-field textarea {
+  min-height: 58px;
+  resize: vertical;
+}
+.pb-edit-field textarea.is-tall {
+  min-height: 100px;
+}
+.pb-edit-field.is-full {
+  width: 100%;
+}
+.pb-edit-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.pb-edit-actions .pb-hint {
+  max-width: 70%;
+}
+
 @media (max-width: 1200px) {
   .pb-layout {
     grid-template-columns: 200px 290px minmax(0, 1fr);
