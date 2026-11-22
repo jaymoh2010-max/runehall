@@ -1769,7 +1769,11 @@ export function CampaignPage() {
                     </div>
                     {character.summary ? (
                       <div className="party-stats">
-                        <Stat label="HP" value={character.summary.hp} tone="red" />
+                        <Stat
+                          label="HP"
+                          value={`${character.summary.currentHp ?? character.summary.hp} / ${character.summary.hp}`}
+                          tone="red"
+                        />
                         <Stat label="AC" value={character.summary.ac} tone="gold" />
                         <Stat label="Speed" value={`${character.summary.speed} ft.`} />
                         <Stat label="Hero" value={`${character.summary.heroPoints ?? 0} / 3`} />
@@ -2086,8 +2090,10 @@ export function CampaignPage() {
                           Duplicate
                         </Button>
                         <button
+                          type="button"
                           className="icon-btn"
                           title="Delete entry"
+                          aria-label={`Delete ${selectedJournal.title}`}
                           onClick={() => deleteJournal(selectedJournal)}
                         >
                           <Trash2 size={14} />
@@ -2283,10 +2289,131 @@ export function CampaignPage() {
                   </p>
                 </div>
               ) : null}
+            </Card>
+
+            <div className="settings-side">
               {isGm ? (
-                <>
-                  <div className="divider" />
-                  <h3>Invite code</h3>
+                <Card className="settings-card">
+                  <div className="row-between">
+                    <div>
+                      <PageEyebrow>Approval queue</PageEyebrow>
+                      <h2 style={{ marginTop: 6 }}>Join requests</h2>
+                      <p className="muted small">
+                        Pathbuilder imports waiting for your review before they join the party.
+                      </p>
+                    </div>
+                    <Badge tone={joinRequests.length ? "gold" : "neutral"}>
+                      {joinRequests.length} pending
+                    </Badge>
+                  </div>
+                  {joinRequests.length ? (
+                    <div className="join-request-list">
+                      {joinRequests.map((request) => {
+                        const errors = request.validation.filter(
+                          (issue) => issue.severity === "error"
+                        ).length;
+                        return (
+                          <div key={request.id} className="join-request-row">
+                            <Avatar
+                              name={request.characterName}
+                              src={request.summary?.portraitUrl}
+                              size={40}
+                            />
+                            <div className="grow">
+                              <div className="row wrap" style={{ gap: 7 }}>
+                                <strong>{request.characterName}</strong>
+                                {request.summary ? (
+                                  <Badge tone="blue">Level {request.summary.level}</Badge>
+                                ) : (
+                                  <Badge tone="gold">Draft</Badge>
+                                )}
+                              </div>
+                              <p className="tiny muted">
+                                Imported by {request.playerName}
+                                {request.summary
+                                  ? ` · ${request.summary.className || "No class"} · ${request.summary.ancestry || "No ancestry"}`
+                                  : " · Unfinished character"}
+                              </p>
+                              {request.validation.length ? (
+                                <details className="join-request-details" open={errors > 0}>
+                                  <summary className="tiny" style={{ color: "#e7b1b1" }}>
+                                    {errors
+                                      ? `${errors} build ${errors === 1 ? "error" : "errors"}`
+                                      : `${request.validation.length} review ${request.validation.length === 1 ? "item" : "items"}`}
+                                  </summary>
+                                  <ul className="join-request-issues tiny">
+                                    {[...request.validation]
+                                      .sort((a, b) =>
+                                        a.severity === b.severity
+                                          ? 0
+                                          : a.severity === "error"
+                                            ? -1
+                                            : 1
+                                      )
+                                      .slice(0, 10)
+                                      .map((issue, index) => (
+                                        <li
+                                          key={`${issue.message}-${index}`}
+                                          className={
+                                            issue.severity === "error" ? "is-error" : "is-warning"
+                                          }
+                                        >
+                                          {issue.message}
+                                        </li>
+                                      ))}
+                                  </ul>
+                                </details>
+                              ) : null}
+                              {request.report ? (
+                                <details className="join-request-details">
+                                  <summary className="tiny muted">View import report</summary>
+                                  <ImportReport report={request.report} limit={12} />
+                                </details>
+                              ) : null}
+                            </div>
+                            <div className="join-request-actions">
+                              {request.characterId ? (
+                                <Link
+                                  to={`/characters/${request.characterId}`}
+                                  className="btn btn-ghost btn-sm"
+                                >
+                                  Review sheet
+                                </Link>
+                              ) : null}
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                disabled={joinRequestBusy === request.id}
+                                onClick={() => void decideJoinRequest(request, "decline")}
+                              >
+                                Decline
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="primary"
+                                loading={joinRequestBusy === request.id}
+                                onClick={() => void decideJoinRequest(request, "approve")}
+                              >
+                                Approve
+                              </Button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <p className="muted small" style={{ marginTop: 12 }}>
+                      No pending requests. When a player imports a Pathbuilder character from the
+                      invite page, it appears here for review.
+                    </p>
+                  )}
+                </Card>
+              ) : null}
+
+              {isGm ? (
+                <Card className="settings-card">
+                  <PageEyebrow>Players</PageEyebrow>
+                  <h2 style={{ marginTop: 6 }}>Invite code</h2>
                   <p className="muted small">
                     Share this seven-character code with your players. Regenerating it invalidates
                     the old one.
@@ -2323,223 +2450,109 @@ export function CampaignPage() {
                       Regenerate
                     </Button>
                   </div>
-                </>
+                </Card>
               ) : null}
-            </Card>
 
-            {isGm ? (
               <Card className="settings-card">
                 <div className="row-between">
                   <div>
-                    <PageEyebrow>Approval queue</PageEyebrow>
-                    <h2 style={{ marginTop: 6 }}>Join requests</h2>
-                    <p className="muted small">
-                      Pathbuilder imports waiting for your review before they join the party.
-                    </p>
+                    <PageEyebrow>Party</PageEyebrow>
+                    <h2 style={{ marginTop: 6 }}>Members</h2>
                   </div>
-                  <Badge tone={joinRequests.length ? "gold" : "neutral"}>
-                    {joinRequests.length} pending
+                  <Badge tone="gold">
+                    {members.length} {members.length === 1 ? "seat" : "seats"}
                   </Badge>
                 </div>
-                {joinRequests.length ? (
-                  <div className="join-request-list">
-                    {joinRequests.map((request) => {
-                      const errors = request.validation.filter(
-                        (issue) => issue.severity === "error"
-                      ).length;
-                      return (
-                        <div key={request.id} className="join-request-row">
-                          <Avatar
-                            name={request.characterName}
-                            src={request.summary?.portraitUrl}
-                            size={40}
-                          />
-                          <div className="grow">
-                            <div className="row wrap" style={{ gap: 7 }}>
-                              <strong>{request.characterName}</strong>
-                              {request.summary ? (
-                                <Badge tone="blue">Level {request.summary.level}</Badge>
-                              ) : (
-                                <Badge tone="gold">Draft</Badge>
-                              )}
-                            </div>
-                            <p className="tiny muted">
-                              Imported by {request.playerName}
-                              {request.summary
-                                ? ` · ${request.summary.className || "No class"} · ${request.summary.ancestry || "No ancestry"}`
-                                : " · Unfinished character"}
-                            </p>
-                            {request.validation.length ? (
-                              <details className="join-request-details" open={errors > 0}>
-                                <summary className="tiny" style={{ color: "#e7b1b1" }}>
-                                  {errors
-                                    ? `${errors} build ${errors === 1 ? "error" : "errors"}`
-                                    : `${request.validation.length} review ${request.validation.length === 1 ? "item" : "items"}`}
-                                </summary>
-                                <ul className="join-request-issues tiny">
-                                  {[...request.validation]
-                                    .sort((a, b) =>
-                                      a.severity === b.severity
-                                        ? 0
-                                        : a.severity === "error"
-                                          ? -1
-                                          : 1
-                                    )
-                                    .slice(0, 10)
-                                    .map((issue, index) => (
-                                      <li
-                                        key={`${issue.message}-${index}`}
-                                        className={
-                                          issue.severity === "error" ? "is-error" : "is-warning"
-                                        }
-                                      >
-                                        {issue.message}
-                                      </li>
-                                    ))}
-                                </ul>
-                              </details>
-                            ) : null}
-                            {request.report ? (
-                              <details className="join-request-details">
-                                <summary className="tiny muted">View import report</summary>
-                                <ImportReport report={request.report} limit={12} />
-                              </details>
-                            ) : null}
-                          </div>
-                          <div className="join-request-actions">
-                            {request.characterId ? (
-                              <Link
-                                to={`/characters/${request.characterId}`}
-                                className="btn btn-ghost btn-sm"
-                              >
-                                Review sheet
-                              </Link>
-                            ) : null}
-                            <Button
-                              size="sm"
-                              variant="secondary"
-                              disabled={joinRequestBusy === request.id}
-                              onClick={() => void decideJoinRequest(request, "decline")}
-                            >
-                              Decline
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="primary"
-                              loading={joinRequestBusy === request.id}
-                              onClick={() => void decideJoinRequest(request, "approve")}
-                            >
-                              Approve
-                            </Button>
-                          </div>
+                <div className="member-list">
+                  {members.map((member) => (
+                    <div key={member.id} className="member-row">
+                      <Avatar name={member.displayName} src={member.avatarUrl} size={38} />
+                      <div className="grow">
+                        <div className="row" style={{ gap: 7 }}>
+                          <strong>{member.displayName}</strong>
+                          {member.role === "gm" ? (
+                            <Badge tone="gold">
+                              <Crown size={10} /> GM
+                            </Badge>
+                          ) : null}
+                          {member.id === user?.id ? <Badge tone="blue">You</Badge> : null}
                         </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <p className="muted small" style={{ marginTop: 12 }}>
-                    No pending requests. When a player imports a Pathbuilder character from the
-                    invite page, it appears here for review.
-                  </p>
-                )}
-              </Card>
-            ) : null}
-
-            <Card className="settings-card">
-              <div className="row-between">
-                <div>
-                  <PageEyebrow>Party</PageEyebrow>
-                  <h2 style={{ marginTop: 6 }}>Members</h2>
-                </div>
-                <Badge tone="gold">{members.length} seats</Badge>
-              </div>
-              <div className="member-list">
-                {members.map((member) => (
-                  <div key={member.id} className="member-row">
-                    <Avatar name={member.displayName} src={member.avatarUrl} size={38} />
-                    <div className="grow">
-                      <div className="row" style={{ gap: 7 }}>
-                        <strong>{member.displayName}</strong>
-                        {member.role === "gm" ? (
-                          <Badge tone="gold">
-                            <Crown size={10} /> GM
-                          </Badge>
-                        ) : null}
-                        {member.id === user?.id ? <Badge tone="blue">You</Badge> : null}
+                        <p className="tiny muted">
+                          @{member.username} · joined {formatDate(member.joinedAt)}
+                        </p>
                       </div>
-                      <p className="tiny muted">
-                        @{member.username} · joined {formatDate(member.joinedAt)}
+                      {isGm && member.role !== "gm" ? (
+                        <button
+                          type="button"
+                          className="icon-btn"
+                          title="Remove from campaign"
+                          aria-label={`Remove ${member.displayName} from the campaign`}
+                          onClick={() => removeMember(member)}
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+                <div className="divider" />
+                {isGm ? (
+                  <div className="settings-action-row">
+                    <div>
+                      <h3>Campaign archive</h3>
+                      <p className="muted small">
+                        Export characters, scenes, tokens, chat, journal, and state as portable
+                        JSON. Choose <strong>with files</strong> to embed uploaded images and audio
+                        in the archive. Private player notes are never included.
                       </p>
                     </div>
-                    {isGm && member.role !== "gm" ? (
-                      <button
-                        className="icon-btn"
-                        title="Remove from campaign"
-                        onClick={() => removeMember(member)}
+                    <div className="row wrap" style={{ gap: 8 }}>
+                      <Button
+                        variant="secondary"
+                        icon={<Download size={14} />}
+                        onClick={() => void exportCampaign()}
                       >
-                        <Trash2 size={14} />
-                      </button>
-                    ) : null}
+                        Export campaign
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        icon={<Download size={14} />}
+                        onClick={() => void exportCampaign(true)}
+                      >
+                        Export with files
+                      </Button>
+                    </div>
                   </div>
-                ))}
-              </div>
-              <div className="divider" />
-              {isGm ? (
-                <div className="settings-action-row">
-                  <div>
-                    <h3>Campaign archive</h3>
-                    <p className="muted small">
-                      Export characters, scenes, tokens, chat, journal, and state as portable JSON.
-                      Choose <strong>with files</strong> to embed uploaded images and audio in the
-                      archive. Private player notes are never included.
-                    </p>
-                  </div>
-                  <div className="row wrap" style={{ gap: 8 }}>
-                    <Button
-                      variant="secondary"
-                      icon={<Download size={14} />}
-                      onClick={() => void exportCampaign()}
-                    >
-                      Export campaign
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      icon={<Download size={14} />}
-                      onClick={() => void exportCampaign(true)}
-                    >
-                      Export with files
+                ) : null}
+                <div className="divider" />
+                {isGm ? (
+                  <div className="danger-zone">
+                    <div>
+                      <h3>Delete campaign</h3>
+                      <p className="muted small">
+                        This removes the campaign, scenes, journal, and character links permanently.
+                      </p>
+                    </div>
+                    <Button variant="danger" icon={<Trash2 size={14} />} onClick={deleteCampaign}>
+                      Delete campaign
                     </Button>
                   </div>
-                </div>
-              ) : null}
-              <div className="divider" />
-              {isGm ? (
-                <div className="danger-zone">
-                  <div>
-                    <h3>Delete campaign</h3>
-                    <p className="muted small">
-                      This removes the campaign, scenes, journal, and character links permanently.
-                    </p>
+                ) : (
+                  <div className="danger-zone">
+                    <div>
+                      <h3>Leave campaign</h3>
+                      <p className="muted small">
+                        Your characters will remain, but they'll no longer be assigned to this
+                        campaign.
+                      </p>
+                    </div>
+                    <Button variant="danger" icon={<LogOut size={14} />} onClick={leaveCampaign}>
+                      Leave campaign
+                    </Button>
                   </div>
-                  <Button variant="danger" icon={<Trash2 size={14} />} onClick={deleteCampaign}>
-                    Delete campaign
-                  </Button>
-                </div>
-              ) : (
-                <div className="danger-zone">
-                  <div>
-                    <h3>Leave campaign</h3>
-                    <p className="muted small">
-                      Your characters will remain, but they'll no longer be assigned to this
-                      campaign.
-                    </p>
-                  </div>
-                  <Button variant="danger" icon={<LogOut size={14} />} onClick={leaveCampaign}>
-                    Leave campaign
-                  </Button>
-                </div>
-              )}
-            </Card>
+                )}
+              </Card>
+            </div>
           </div>
         ) : null}
       </div>
@@ -2721,6 +2734,7 @@ export function CampaignPage() {
                       type="button"
                       className="icon-btn"
                       title="Remove image"
+                      aria-label={`Remove ${attachment.name}`}
                       onClick={() =>
                         setJournalAttachments((current) =>
                           current.filter((item) => item.id !== attachment.id)
@@ -2853,7 +2867,9 @@ export function CampaignPage() {
             {characters.map((entry) => (
               <Checkbox
                 key={entry.id}
-                label={`${entry.name} (${entry.summary?.downtimeDays ?? 0} days)`}
+                label={`${entry.name} (${entry.summary?.downtimeDays ?? 0} ${
+                  entry.summary?.downtimeDays === 1 ? "day" : "days"
+                })`}
                 checked={downtimeTargetIds.includes(entry.id)}
                 onChange={(checked) => toggleDowntimeTarget(entry.id, checked)}
               />

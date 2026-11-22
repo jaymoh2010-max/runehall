@@ -26,6 +26,10 @@ export function AccountPage() {
   const [savingPassword, setSavingPassword] = useState(false);
 
   useEffect(() => {
+    document.title = "Account · Runehall";
+  }, []);
+
+  useEffect(() => {
     setDisplayName(user?.displayName ?? "");
   }, [user?.displayName]);
 

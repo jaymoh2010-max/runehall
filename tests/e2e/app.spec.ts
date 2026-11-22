@@ -123,6 +123,7 @@ test("administrator updates audit retention, exports CSV, and filters the log", 
   await signIn(page, admin);
   await page.goto("/admin");
   await expect(page.getByRole("heading", { name: "Hall controls" })).toBeVisible();
+  await expect(page).toHaveTitle("Admin · Runehall");
 
   await page.getByLabel("Keep entries for (days)").fill("30");
   await page.getByRole("button", { name: "Save retention" }).click();
@@ -372,6 +373,14 @@ test("GM controls advancement and milestone mode hides XP awards", async ({ page
 test("Party actions menu supports keyboard navigation and restores focus", async ({ page }) => {
   await signIn(page, admin);
   await page.goto(`${campaignPath}?tab=party`);
+  await expect(
+    page
+      .locator(".party-card")
+      .first()
+      .locator(".stat")
+      .filter({ hasText: "HP" })
+      .locator(".stat-value")
+  ).toContainText("/");
 
   const trigger = page.getByRole("button", { name: /Party actions/ });
   await trigger.focus();
@@ -770,9 +779,12 @@ test("lazy library, compendium entry, rules, and account routes load", async ({ 
   await page.getByRole("textbox", { name: "Search actions" }).fill("Stride");
   await expect(page.getByRole("heading", { name: "Stride", level: 2 })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Aid", level: 2 })).toHaveCount(0);
+  await page.getByRole("button", { name: "Clear search input" }).click();
+  await expect(page.getByRole("textbox", { name: "Search actions" })).toHaveValue("");
 
   await page.goto("/account");
   await expect(page.getByRole("heading", { name: "Account and security" })).toBeVisible();
+  await expect(page).toHaveTitle("Account · Runehall");
 });
 
 test("Library search keeps fast typing in sync with the URL", async ({ page }) => {
@@ -795,7 +807,7 @@ test("Library clear search resets the local input and URL", async ({ page }) => 
 
   const search = page.getByPlaceholder(/Search spells/);
   await expect(search).toHaveValue("NoSuchSpell");
-  await page.getByRole("button", { name: "Clear search" }).click();
+  await page.getByRole("button", { name: "Clear search input" }).click();
   await expect(search).toHaveValue("");
   await expect(page).not.toHaveURL(/[?&]q=/);
 });
@@ -1060,6 +1072,10 @@ test("sheet HP corrections and GM conditions stay live", async ({ page, browser 
   const conditionList = page.locator(".conditions-list");
   await expect(conditionList.getByText("Dying", { exact: false })).toBeVisible();
   await expect(conditionList.getByText("Unconscious", { exact: false })).toBeVisible();
+
+  await page.getByPlaceholder(/or type one/).fill("Frightened 2");
+  await page.getByRole("button", { name: "Add condition" }).click();
+  await expect(conditionList.getByText("Frightened 2", { exact: false })).toBeVisible();
 
   await hpInput.fill("1");
   await hpInput.press("Enter");

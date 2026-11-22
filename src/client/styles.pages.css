@@ -4337,6 +4337,12 @@
   gap: 16px;
   align-items: start;
 }
+.settings-side {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
 .settings-card {
   padding: 20px;
 }
