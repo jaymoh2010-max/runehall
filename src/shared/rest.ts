@@ -158,6 +158,7 @@ export function applyLongRest(
         slotsUsed: {},
         preparedUsed: {},
         fontUsed: {},
+        innateUsed: {},
         preparationsPending: options.preparedCaster === true,
       },
       play: {

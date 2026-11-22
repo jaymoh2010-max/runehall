@@ -1095,8 +1095,13 @@ export function CharacterBuilderPage() {
           onClose={() => setPicker(null)}
           rank={Number.isFinite(picker.rank) ? picker.rank : null}
           maxRank={picker.focus ? Math.max(1, Math.ceil(draft.level / 2)) : null}
-          tradition={derived.casterTradition}
+          tradition={
+            picker.target === "rituals" || picker.target === "innate"
+              ? null
+              : derived.casterTradition
+          }
           focus={picker.focus}
+          ritual={picker.target === "rituals"}
           classTrait={context.classData?.name.toLowerCase()}
           expanded={contentMode === "expanded"}
           onExpandedChange={(mode) => update((current) => ({ ...current, contentMode: mode }))}
@@ -1111,7 +1116,11 @@ export function CharacterBuilderPage() {
                 ? draft.spells.cantrips
                 : picker.target === "focus"
                   ? draft.spells.focus
-                  : draft.spells.known),
+                  : picker.target === "rituals"
+                    ? draft.spells.rituals
+                    : picker.target === "innate"
+                      ? draft.spells.innate
+                      : draft.spells.known),
             ])
           )}
           onSelect={(spell) => {
@@ -1121,12 +1130,22 @@ export function CharacterBuilderPage() {
             }));
             update((current) => {
               if (picker.target === "cantrips" && spell.rank !== 0) return current;
-              if (current.spells[picker.target].includes(spell.id)) return current;
+              const target =
+                picker.target === "rituals"
+                  ? current.spells.rituals
+                  : picker.target === "innate"
+                    ? current.spells.innate
+                    : current.spells[picker.target];
+              if (target.includes(spell.id)) return current;
               return {
                 ...current,
                 spells: {
                   ...current.spells,
-                  [picker.target]: [...current.spells[picker.target], spell.id],
+                  ...(picker.target === "rituals"
+                    ? { rituals: [...current.spells.rituals, spell.id] }
+                    : picker.target === "innate"
+                      ? { innate: [...current.spells.innate, spell.id] }
+                      : { [picker.target]: [...target, spell.id] }),
                 },
               };
             });

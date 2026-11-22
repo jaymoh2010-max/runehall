@@ -1817,6 +1817,51 @@ test("builder completes a level-1 Cleric with split divine-font preparation", as
   await expect(dailyPrep).toHaveCount(0);
 });
 
+test("sheet tracks rituals and innate spells", async ({ page }) => {
+  test.setTimeout(60_000);
+  await signIn(page, admin);
+  const campaignId = campaignPath.split("/").pop();
+  const list = await page.request.get(`/api/characters?campaignId=${campaignId}`);
+  expect(list.ok()).toBe(true);
+  const characters = (await list.json()) as {
+    characters: { id: string; name: string }[];
+  };
+  const cleric = characters.characters.find((entry) => entry.name === "E2E Cleric");
+  expect(cleric).toBeTruthy();
+  const full = await page.request.get(`/api/characters/${cleric!.id}`);
+  expect(full.ok()).toBe(true);
+  const record = (await full.json()) as { character: { data: Record<string, unknown> } };
+  const draft = structuredClone(record.character.data) as {
+    spells: { rituals: string[]; innate: string[]; innateUsed: Record<string, number> };
+  };
+  draft.spells.rituals = ["spell:joEruBVz31Uxczzq"];
+  draft.spells.innate = ["spell:gpzpAAAJ1Lza2JVl"];
+  draft.spells.innateUsed = {};
+  const saved = await page.request.put(`/api/characters/${cleric!.id}`, {
+    data: { data: draft, force: true },
+  });
+  expect(saved.ok()).toBe(true);
+
+  await page.goto(`/characters/${cleric!.id}`);
+  await expect(page.getByRole("heading", { name: "E2E Cleric" })).toBeVisible({
+    timeout: 15_000,
+  });
+  await expect(page.getByText("Rituals", { exact: true })).toBeVisible();
+  await expect(page.getByText("Innate spells", { exact: true })).toBeVisible();
+  const ritualRow = page.locator(".sheet-spell-row").filter({ hasText: "Angelic Messenger" });
+  await ritualRow.getByRole("button", { name: "Cast ritual" }).click();
+  const ritualDialog = page.getByRole("dialog", { name: "Cast Angelic Messenger" });
+  await expect(ritualDialog).toBeVisible();
+  await ritualDialog.getByLabel("Ritual DC").fill("15");
+  await ritualDialog.getByRole("button", { name: "Roll ritual check" }).click();
+  await expect(ritualDialog.getByText(/vs DC 15/)).toBeVisible({ timeout: 15_000 });
+  await ritualDialog.locator(".modal-foot").getByRole("button", { name: "Close" }).click();
+
+  const innateGroup = page.locator(".spell-group").filter({ hasText: "Innate spells" });
+  const innateRow = innateGroup.locator(".sheet-spell-row").filter({ hasText: "Detect Magic" });
+  await expect(innateRow).toContainText(/innate.*at will/);
+});
+
 test("builder completes a level-1 Wizard using granted curriculum spells", async ({ page }) => {
   test.setTimeout(60_000);
   await signIn(page, admin);

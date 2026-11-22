@@ -457,6 +457,7 @@ export function SpellPicker({
   maxRank,
   tradition,
   focus,
+  ritual,
   classTrait,
   expanded,
   onExpandedChange,
@@ -471,6 +472,7 @@ export function SpellPicker({
   maxRank?: number | null;
   tradition: string | null;
   focus?: boolean;
+  ritual?: boolean;
   classTrait?: string;
   expanded: boolean;
   onExpandedChange: (mode: ContentMode) => void;
@@ -486,7 +488,7 @@ export function SpellPicker({
   const psychicCantrips = classTrait === "psychic" && rank === 0 && !focus;
   // Psi cantrips are uncommon and have no tradition; do not hide them behind
   // the default "recommended only" filter.
-  const [recommended, setRecommended] = useState(!psychicCantrips);
+  const [recommended, setRecommended] = useState(!psychicCantrips && !ritual);
   const [selected, setSelected] = useState<Spell | null>(null);
 
   useEffect(() => {
@@ -494,7 +496,7 @@ export function SpellPicker({
       setQuery("");
       setSelected(null);
     }
-  }, [open, rank, tradition, focus]);
+  }, [open, rank, tradition, focus, ritual]);
 
   useEffect(() => {
     setLegacy(Boolean(legacyDefault));
@@ -507,10 +509,11 @@ export function SpellPicker({
   const params = new URLSearchParams();
   if (rank !== null) params.set("rank", String(rank));
   if (maxRank !== null && maxRank !== undefined) params.set("rankMax", String(maxRank));
-  if (tradition && !psychicCantrips) params.set("tradition", tradition);
+  if (tradition && !psychicCantrips && !ritual) params.set("tradition", tradition);
   if (!legacy) params.set("legacy", "0");
   if (!expanded) params.set("core", "1");
   if (recommended) params.set("recommended", "1");
+  if (ritual) params.set("ritual", "1");
   if (query.trim()) params.set("q", query.trim());
   if (psychicCantrips) {
     params.set("traitAll", "psychic");
@@ -521,7 +524,7 @@ export function SpellPicker({
   const { items, total, next, loading, error, offset, setOffset } = useSearch<Spell>(
     open,
     `/api/compendium/spells?${params.toString()}`,
-    [query, legacy, expanded, recommended, rank, maxRank, tradition, focus, classTrait]
+    [query, legacy, expanded, recommended, rank, maxRank, tradition, focus, ritual, classTrait]
   );
 
   const excluded = new Set(excludeIds ?? []);
@@ -531,13 +534,15 @@ export function SpellPicker({
   return (
     <PickerShell
       title={
-        rank === 0
-          ? "Choose a cantrip"
-          : focus
-            ? "Choose a focus spell"
-            : rank
-              ? `Choose a rank ${rank} spell`
-              : "Choose a spell"
+        ritual
+          ? "Choose a ritual"
+          : rank === 0
+            ? "Choose a cantrip"
+            : focus
+              ? "Choose a focus spell"
+              : rank
+                ? `Choose a rank ${rank} spell`
+                : "Choose a spell"
       }
       subtitle={`${total} options${tradition ? ` · ${tradition}` : ""}`}
       onClose={onClose}

@@ -6,9 +6,10 @@ import {
   preparedEntries,
   preparedUsedKey,
 } from "./rules";
+import { consumeInnateUse } from "./innate";
 import type { CharacterContext, CharacterDraft, Spell } from "./types";
 
-export type SpellCastResource = "cantrip" | "focus" | "font" | "slot";
+export type SpellCastResource = "cantrip" | "focus" | "font" | "slot" | "innate";
 
 export interface SpellCastOption {
   rank: number;
@@ -89,10 +90,27 @@ export function spellCastOptions(
   spell: Spell,
   draft: CharacterDraft,
   context: CharacterContext,
-  opts: { focus?: boolean; focusPointsMax?: number } = {}
+  opts: {
+    focus?: boolean;
+    focusPointsMax?: number;
+    innate?: boolean;
+    innateRemaining?: number | null;
+  } = {}
 ): SpellCastOption[] {
   if (spell.ritual) return [];
   const level = clampInt(draft.level, 1, 20);
+
+  if (opts.innate) {
+    const remaining = opts.innateRemaining === undefined ? 1 : opts.innateRemaining;
+    return [
+      {
+        rank: spell.rank === 0 ? cantripCastRank(level) : Math.max(1, spell.rank),
+        resource: "innate",
+        remaining,
+        label: remaining === null ? "Innate (at will)" : "Innate use",
+      },
+    ];
+  }
 
   if (opts.focus) {
     const max = clampInt(opts.focusPointsMax ?? 0, 0, 3);
@@ -216,7 +234,12 @@ export function castSpell(
   spell: Spell,
   context: CharacterContext,
   choice: SpellCastChoice,
-  opts: { focus?: boolean; focusPointsMax?: number } = {}
+  opts: {
+    focus?: boolean;
+    focusPointsMax?: number;
+    innate?: boolean;
+    innateRemaining?: number | null;
+  } = {}
 ): SpellCastResult | null {
   const option = spellCastOptions(spell, draft, context, opts).find(
     (entry) => entry.rank === choice.rank && entry.resource === choice.resource
@@ -224,6 +247,18 @@ export function castSpell(
   if (!spellCastOptionAvailable(option) || !option) return null;
 
   if (option.resource === "cantrip") return { draft, option };
+
+  if (option.resource === "innate") {
+    if (option.remaining !== null && option.remaining <= 0) return null;
+    const next = option.remaining === null ? draft : consumeInnateUse(draft, spell.id);
+    return {
+      draft: next,
+      option: {
+        ...option,
+        remaining: option.remaining === null ? null : Math.max(0, option.remaining - 1),
+      },
+    };
+  }
 
   if (option.resource === "focus") {
     const max = clampInt(opts.focusPointsMax ?? 0, 0, 3);

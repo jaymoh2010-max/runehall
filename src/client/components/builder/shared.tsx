@@ -50,7 +50,12 @@ export type Picker =
       /** Bonus feats granted outside the normal slot grid. */
       target?: "extras";
     }
-  | { kind: "spell"; rank: number | null; focus?: boolean; target: "cantrips" | "known" | "focus" }
+  | {
+      kind: "spell";
+      rank: number | null;
+      focus?: boolean;
+      target: "cantrips" | "known" | "focus" | "rituals" | "innate";
+    }
   | { kind: "equipment" }
   | { kind: "deity" }
   | null;

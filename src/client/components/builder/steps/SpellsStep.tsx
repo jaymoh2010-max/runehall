@@ -153,6 +153,12 @@ export function SpellsStep({ draft, update, derived, context, setStep, openPicke
   const focus = draft.spells.focus
     .map((id) => context.spells[id])
     .filter((spell): spell is Spell => Boolean(spell));
+  const rituals = draft.spells.rituals
+    .map((id) => context.spells[id])
+    .filter((spell): spell is Spell => Boolean(spell));
+  const innate = draft.spells.innate
+    .map((id) => context.spells[id])
+    .filter((spell): spell is Spell => Boolean(spell));
   const grantedSpellIds = new Set(derived.grantedSpells.map((spell) => spell.id));
   const grantedFocus = derived.grantedSpells.filter((spell) => spell.kind === "focus");
   const grantedFocusIds = new Set(grantedFocus.map((spell) => spell.id));
@@ -236,7 +242,7 @@ export function SpellsStep({ draft, update, derived, context, setStep, openPicke
         spells: { ...current.spells, [key]: [...current.spells[key], spell.id] },
       };
     });
-  const removeSpell = (id: string, target: "cantrips" | "known" | "focus") =>
+  const removeSpell = (id: string, target: "cantrips" | "known" | "focus" | "rituals" | "innate") =>
     update((current) => {
       const cleared = removePreparedSpellEverywhere(current, id);
       return {
@@ -247,6 +253,86 @@ export function SpellsStep({ draft, update, derived, context, setStep, openPicke
         },
       };
     });
+
+  const extraSpells = (
+    <Card className="spell-section">
+      <div className="row-between">
+        <div>
+          <h3>Rituals</h3>
+          <p className="muted small">
+            Rituals are downtime magic. They do not use spell slots; the sheet rolls the primary
+            check and leaves the ritual's cost and consequences to the table.
+          </p>
+        </div>
+        <Button
+          size="sm"
+          variant="secondary"
+          icon={<Plus size={14} />}
+          onClick={() => openPicker({ kind: "spell", rank: null, target: "rituals" })}
+        >
+          Add ritual
+        </Button>
+      </div>
+      <div className="spell-chip-grid">
+        {rituals.map((spell) => (
+          <div key={spell.id} className="spell-chip">
+            <span>
+              <strong>{spell.name}</strong>
+              <span className="tiny muted"> · rank {spell.rank}</span>
+            </span>
+            <button
+              type="button"
+              className="icon-btn"
+              aria-label={`Remove ${spell.name}`}
+              onClick={() => removeSpell(spell.id, "rituals")}
+            >
+              <Minus size={13} />
+            </button>
+          </div>
+        ))}
+        {!rituals.length ? <p className="muted small">No rituals selected.</p> : null}
+      </div>
+      <div className="row-between" style={{ marginTop: 14 }}>
+        <div>
+          <h3>Innate spells</h3>
+          <p className="muted small">
+            Innate spells are granted by ancestry, heritage, feats, or items. Their uses reset
+            during daily preparations; cantrips are at will.
+          </p>
+        </div>
+        <Button
+          size="sm"
+          variant="secondary"
+          icon={<Plus size={14} />}
+          onClick={() => openPicker({ kind: "spell", rank: null, target: "innate" })}
+        >
+          Add innate spell
+        </Button>
+      </div>
+      <div className="spell-chip-grid">
+        {innate.map((spell) => (
+          <div key={spell.id} className="spell-chip">
+            <span>
+              <strong>{spell.name}</strong>
+              <span className="tiny muted">
+                {" "}
+                · {spell.rank === 0 ? "cantrip" : `rank ${spell.rank}`}
+              </span>
+            </span>
+            <button
+              type="button"
+              className="icon-btn"
+              aria-label={`Remove ${spell.name}`}
+              onClick={() => removeSpell(spell.id, "innate")}
+            >
+              <Minus size={13} />
+            </button>
+          </div>
+        ))}
+        {!innate.length ? <p className="muted small">No innate spells selected.</p> : null}
+      </div>
+    </Card>
+  );
 
   const ordinaryLimitAt = (rank: number) =>
     ordinaryPreparedLimitAt(draft, derived, classData, rank);
@@ -383,6 +469,7 @@ export function SpellsStep({ draft, update, derived, context, setStep, openPicke
           </p>
         </div>
         {focusCard}
+        {extraSpells}
         <div className="step-actions">
           <Button variant="primary" onClick={() => setStep("gear")}>
             Continue to equipment
@@ -1040,6 +1127,7 @@ export function SpellsStep({ draft, update, derived, context, setStep, openPicke
           ) : null}
         </div>
       </Card>
+      {extraSpells}
       <div className="info-box">
         <BookOpen size={16} />
         <p>

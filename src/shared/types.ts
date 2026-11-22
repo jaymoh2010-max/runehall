@@ -837,6 +837,12 @@ export interface CharacterDraft {
     fontUsed: Record<string, number>;
     /** Spontaneous caster signature spells, which may be heightened freely. */
     signature: string[];
+    /** Rituals known or prepared for downtime play. */
+    rituals: string[];
+    /** Innate spells granted by ancestry, heritage, feats, or items. */
+    innate: string[];
+    /** Innate spell uses spent today, keyed by spell id. */
+    innateUsed: Record<string, number>;
     /** True after a long rest until a prepared caster confirms today's spells. */
     preparationsPending: boolean;
   };

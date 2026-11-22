@@ -104,6 +104,7 @@ export interface SearchOptions {
   recommended?: boolean;
   type?: string[];
   usage?: string[];
+  ritual?: boolean;
 }
 
 function matchesText(text: string, q: string | undefined): boolean {
@@ -178,6 +179,7 @@ export function searchSpells(
     if (!opts.includeLegacy && !spell.remaster) return false;
     if (opts.coreOnly && !isCoreSource(spell.source)) return false;
     if (opts.recommended && (spell.rarity !== "common" || spell.playtest)) return false;
+    if (opts.ritual !== undefined && Boolean(spell.ritual) !== opts.ritual) return false;
     // Focus spells belong in the focus picker, not the ordinary spell list.
     if (opts.rank !== undefined && !wantsFocus && spell.traits.includes("focus")) return false;
     if (opts.rank !== undefined && spell.rank !== opts.rank) return false;
@@ -495,6 +497,8 @@ export function contextForDraft(draft: CharacterDraft): CharacterContext {
     ...draft.spells.prepared,
     ...Object.values(draft.spells.preparedByRank ?? {}).flat(),
     ...draft.spells.focus,
+    ...draft.spells.rituals,
+    ...draft.spells.innate,
   ]) {
     const spell = maps.spell.get(id);
     if (spell) spellMap[id] = spell;

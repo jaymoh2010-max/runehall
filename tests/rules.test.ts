@@ -285,6 +285,20 @@ describe("PF2e character rules", () => {
     expect(draft.play.conditions[0]).toEqual({ name: "Frightened", value: 2, duration: 3 });
   });
 
+  it("normalizes ritual, innate, and innate-use fields", () => {
+    const draft = normalizeCharacterDraft({
+      name: "Ritualist",
+      spells: {
+        rituals: ["spell:a", "spell:a", 7],
+        innate: ["spell:b", "spell:b"],
+        innateUsed: { "spell:b": 2.9, "spell:c": -1, bad: "x" },
+      },
+    });
+    expect(draft.spells.rituals).toEqual(["spell:a"]);
+    expect(draft.spells.innate).toEqual(["spell:b"]);
+    expect(draft.spells.innateUsed).toEqual({ "spell:b": 2, "spell:c": 0 });
+  });
+
   it("normalizes the daily-preparation pending flag", () => {
     expect(emptyCharacterDraft("Defaults").spells.preparationsPending).toBe(false);
     const draft = normalizeCharacterDraft(

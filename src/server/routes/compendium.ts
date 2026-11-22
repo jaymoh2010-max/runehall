@@ -60,6 +60,7 @@ function parseSearch(query: Record<string, unknown>): SearchOptions {
     recommended: bool(query.recommended, false),
     type: csv(query.type),
     usage: csv(query.usage),
+    ritual: query.ritual === undefined ? undefined : bool(query.ritual, false),
   };
 }
 

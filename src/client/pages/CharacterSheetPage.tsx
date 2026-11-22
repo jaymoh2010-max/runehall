@@ -74,6 +74,8 @@ import {
   type SpellCastResource,
 } from "../../shared/spellcasting";
 import { beginSustainedSpell, endSustainedSpell, spellNeedsSustain } from "../../shared/sustain";
+import { innateUsesRemaining } from "../../shared/innate";
+import { ritualPrimarySkillName } from "../../shared/ritual";
 import {
   adjustDegreeForIncapacitation,
   incapacitationNote,
@@ -281,7 +283,7 @@ export function CharacterSheetPage() {
   const [downtimeOpen, setDowntimeOpen] = useState(false);
   const [castState, setCastState] = useState<{
     spellId: string;
-    kind: "known" | "cantrip" | "focus";
+    kind: "known" | "cantrip" | "focus" | "innate";
     rank: number;
     resource: SpellCastResource;
     actions: 1 | 2 | 3;
@@ -306,6 +308,12 @@ export function CharacterSheetPage() {
     note: string;
     counteract?: CounteractResolution;
   } | null>(null);
+  const [ritualSpell, setRitualSpell] = useState<NonNullable<
+    CharacterContext["spells"][string]
+  > | null>(null);
+  const [ritualDc, setRitualDc] = useState("20");
+  const [ritualSkillId, setRitualSkillId] = useState("arcana");
+  const [ritualResult, setRitualResult] = useState<RollResult | null>(null);
   const [hpInput, setHpInput] = useState("");
   const [damageType, setDamageType] = useState("");
   const [conflict, setConflict] = useState<CharacterRecord | null>(null);
@@ -740,12 +748,14 @@ export function CharacterSheetPage() {
 
   const openCast = (
     spell: NonNullable<CharacterContext["spells"][string]>,
-    kind: "known" | "cantrip" | "focus"
+    kind: "known" | "cantrip" | "focus" | "innate"
   ) => {
     if (!draft || !derived || !canEdit) return;
     const options = spellCastOptions(spell, draft, context, {
       focus: kind === "focus",
       focusPointsMax: derived.focusPointsMax,
+      innate: kind === "innate",
+      innateRemaining: kind === "innate" ? innateUsesRemaining(draft, spell) : undefined,
     });
     if (!options.length) return;
     const option = options.find(spellCastOptionAvailable) ?? options[0];
@@ -768,7 +778,15 @@ export function CharacterSheetPage() {
         castSpellEntry,
         context,
         { rank: selectedCastOption.rank, resource: selectedCastOption.resource },
-        { focus: castState?.kind === "focus", focusPointsMax: derived.focusPointsMax }
+        {
+          focus: castState?.kind === "focus",
+          focusPointsMax: derived.focusPointsMax,
+          innate: castState?.kind === "innate",
+          innateRemaining:
+            castState?.kind === "innate"
+              ? innateUsesRemaining(draftRef.current ?? draft, castSpellEntry)
+              : undefined,
+        }
       );
       if (!result) {
         toast("That spell cannot be cast right now.", "error");
@@ -799,7 +817,11 @@ export function CharacterSheetPage() {
             ? "focus point"
             : selectedCastOption.resource === "slot"
               ? `rank ${selectedCastOption.rank} slot`
-              : null;
+              : selectedCastOption.resource === "innate"
+                ? selectedCastOption.remaining === null
+                  ? "innate at-will casting"
+                  : "innate use"
+                : null;
       toast(
         `Cast ${castSpellEntry.name} at rank ${selectedCastOption.rank}${cost ? ` using a ${cost}` : ""}.${sustained ? " Sustaining it; each Sustain costs 1 action." : ""}`,
         "success"
@@ -895,6 +917,63 @@ export function CharacterSheetPage() {
   const endActiveSpell = (spellId: string) => {
     update((current) => endSustainedSpell(current, spellId));
     toast("Sustained spell ended.", "success");
+  };
+
+  const openRitual = (spell: NonNullable<CharacterContext["spells"][string]>) => {
+    if (!derived) return;
+    const hint = ritualPrimarySkillName(spell.description);
+    const hintedSkill = hint
+      ? derived.skills.find((skill) => skill.name.toLowerCase() === hint)?.id
+      : null;
+    const hintedLore = hint
+      ? derived.lore.find((lore) => lore.name.toLowerCase() === hint)?.name
+      : null;
+    setRitualSpell(spell);
+    setRitualDc(String(derived.spellDc ?? 20));
+    setRitualSkillId(
+      hintedSkill ??
+        hintedLore ??
+        derived.skills.find((skill) => skill.id === "arcana")?.id ??
+        derived.skills[0]?.id ??
+        "arcana"
+    );
+    setRitualResult(null);
+  };
+
+  const runRitual = () => {
+    if (!ritualSpell || !derived) return;
+    const skill =
+      derived.skills.find((entry) => entry.id === ritualSkillId) ??
+      derived.lore.find((entry) => entry.name === ritualSkillId) ??
+      null;
+    if (!skill) {
+      toast("Choose a skill for the ritual's primary check.", "error");
+      return;
+    }
+    const dc = Math.max(1, Math.round(Number(ritualDc) || 20));
+    roll(
+      `1d20${signed(skill.mod)}`,
+      `${ritualSpell.name} ritual check (${skill.name})`,
+      dc,
+      (result) => {
+        setRitualResult(result);
+        if (!result.degree) return;
+        toast(
+          `${ritualSpell.name}: ${DEGREE_LABELS[result.degree]}. Apply the ritual's cost and consequences manually.`,
+          result.degree === "critical-failure" || result.degree === "failure" ? "error" : "success"
+        );
+      }
+    );
+  };
+
+  const removeRitual = (spellId: string) => {
+    update((current) => ({
+      ...current,
+      spells: {
+        ...current.spells,
+        rituals: current.spells.rituals.filter((id) => id !== spellId),
+      },
+    }));
   };
 
   const takeLongRest = () => {
@@ -1595,7 +1674,12 @@ export function CharacterSheetPage() {
     { id: "sheet-status", label: "Effects" },
     { id: "sheet-skills", label: "Skills" },
     { id: "sheet-attacks", label: "Attacks" },
-    ...(derived.spellDc !== null ? [{ id: "sheet-spells", label: "Spells" }] : []),
+    ...(derived.spellDc !== null ||
+    draft?.spells.rituals.length ||
+    draft?.spells.innate.length ||
+    draft?.spells.focus.length
+      ? [{ id: "sheet-spells", label: "Spells" }]
+      : []),
     { id: "sheet-feats", label: "Feats" },
     { id: "sheet-inventory", label: "Inventory" },
     { id: "sheet-notes", label: "Notes" },
@@ -2520,15 +2604,25 @@ export function CharacterSheetPage() {
             </div>
           </Card>
 
-          {derived.spellDc !== null ? (
+          {derived.spellDc !== null ||
+          draft.spells.rituals.length ||
+          draft.spells.innate.length ||
+          draft.spells.focus.length ? (
             <Card className="sheet-section" id="sheet-spells">
               <div className="sheet-section-head">
                 <h2>Spells</h2>
                 <div className="row" style={{ gap: 8, flexWrap: "wrap", alignItems: "center" }}>
                   <span className="tiny muted">
-                    Spell attack {derived.spellAttack === null ? "—" : signed(derived.spellAttack)}{" "}
-                    · DC {derived.spellDc}
-                    {derived.casterTradition ? ` · ${titleCase(derived.casterTradition)}` : ""}
+                    {derived.spellDc === null ? (
+                      "Innate and ritual magic"
+                    ) : (
+                      <>
+                        Spell attack{" "}
+                        {derived.spellAttack === null ? "—" : signed(derived.spellAttack)} · DC{" "}
+                        {derived.spellDc}
+                        {derived.casterTradition ? ` · ${titleCase(derived.casterTradition)}` : ""}
+                      </>
+                    )}
                   </span>
                   <Button
                     size="sm"
@@ -2675,6 +2769,8 @@ export function CharacterSheetPage() {
                 onSustain={sustainActiveSpell}
                 onEndSustain={endActiveSpell}
                 onResolveSave={openSaveTool}
+                onCastRitual={openRitual}
+                onRemoveRitual={removeRitual}
               />
             </Card>
           ) : null}
@@ -3925,6 +4021,95 @@ export function CharacterSheetPage() {
         </div>
       </Modal>
 
+      <Modal
+        open={Boolean(ritualSpell)}
+        onClose={() => setRitualSpell(null)}
+        title={ritualSpell ? `Cast ${ritualSpell.name}` : "Cast ritual"}
+        subtitle="Rituals are downtime magic. Roll the primary check; apply costs and consequences manually."
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setRitualSpell(null)}>
+              Close
+            </Button>
+            <Button
+              variant="primary"
+              icon={<Sparkles size={14} />}
+              disabled={!ritualSpell || !derived}
+              onClick={runRitual}
+            >
+              Roll ritual check
+            </Button>
+          </>
+        }
+      >
+        {ritualSpell ? (
+          <div className="stack">
+            <div className="form-grid two">
+              <Field label="Primary check">
+                <Select
+                  value={ritualSkillId}
+                  onChange={(event) => setRitualSkillId(event.target.value)}
+                >
+                  {derived?.skills.map((skill) => (
+                    <option key={skill.id} value={skill.id}>
+                      {skill.name} {signed(skill.mod)} ({PROFICIENCY_NAMES[skill.rank]})
+                    </option>
+                  ))}
+                  {derived?.lore.map((lore) => (
+                    <option key={lore.name} value={lore.name}>
+                      {lore.name} {signed(lore.mod)} (Lore)
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+              <Field
+                label="Ritual DC"
+                hint="The GM sets the DC from the ritual's rank and circumstances."
+              >
+                <Input
+                  type="number"
+                  min={1}
+                  value={ritualDc}
+                  onChange={(event) => setRitualDc(event.target.value)}
+                />
+              </Field>
+            </div>
+            <p className="tiny muted">
+              Rank {ritualSpell.rank} · {ritualSpell.actions || "ritual"}
+              {ritualSpell.cost ? ` · cost ${stripHtml(ritualSpell.cost, 160)}` : ""}
+              {ritualSpell.requirements
+                ? ` · requirements ${stripHtml(ritualSpell.requirements, 160)}`
+                : ""}
+            </p>
+            <p className="tiny muted">
+              {stripHtml(ritualSpell.description, 360) ||
+                "Read the ritual's primary check, secondary casters, and outcome."}
+            </p>
+            {ritualResult ? (
+              <div className="settings-note">
+                <div className="row-between">
+                  <strong>
+                    {ritualResult.total} vs DC {ritualResult.dc}
+                  </strong>
+                  {ritualResult.degree ? (
+                    <Badge
+                      tone={
+                        ritualResult.degree === "critical-success" ||
+                        ritualResult.degree === "success"
+                          ? "green"
+                          : "red"
+                      }
+                    >
+                      {DEGREE_LABELS[ritualResult.degree]}
+                    </Badge>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+      </Modal>
+
       <DailyPreparationsModal
         open={prepOpen}
         onClose={() => setPrepOpen(false)}
@@ -4505,12 +4690,17 @@ function castCostLabel(option: SpellCastOption | null): string {
 
 function castHint(
   options: SpellCastOption[],
-  kind: "known" | "cantrip" | "focus",
+  kind: "known" | "cantrip" | "focus" | "innate",
   preparedCaster: boolean
 ): string {
   const available = options.find(spellCastOptionAvailable);
   if (available) {
     if (available.resource === "cantrip") return `rank ${available.rank} · no slot`;
+    if (available.resource === "innate") {
+      return available.remaining === null
+        ? "innate · at will"
+        : `innate · ${available.remaining} use${available.remaining === 1 ? "" : "s"} left`;
+    }
     if (available.resource === "focus") {
       return `${available.remaining ?? 0} focus point${available.remaining === 1 ? "" : "s"}`;
     }
@@ -4524,6 +4714,8 @@ function castHint(
   if (font) return "no font casts left";
   const focus = options.find((option) => option.resource === "focus");
   if (focus) return "no focus points";
+  const innate = options.find((option) => option.resource === "innate");
+  if (innate) return "no innate uses left";
   const slot = options.find((option) => option.resource === "slot");
   if (slot) {
     return preparedCaster
@@ -4547,6 +4739,8 @@ function SpellGroups({
   onSustain,
   onEndSustain,
   onResolveSave,
+  onCastRitual,
+  onRemoveRitual,
 }: {
   draft: CharacterDraft;
   context: CharacterContext;
@@ -4557,13 +4751,15 @@ function SpellGroups({
   focusPointsMax: number;
   onCast: (
     spell: NonNullable<CharacterContext["spells"][string]>,
-    kind: "known" | "cantrip" | "focus"
+    kind: "known" | "cantrip" | "focus" | "innate"
   ) => void;
   castRanks: Record<string, number>;
   sustainedSpells: SustainedSpell[];
   onSustain: (name: string) => void;
   onEndSustain: (spellId: string) => void;
   onResolveSave: (spell: NonNullable<CharacterContext["spells"][string]>) => void;
+  onCastRitual: (spell: NonNullable<CharacterContext["spells"][string]>) => void;
+  onRemoveRitual: (spellId: string) => void;
 }) {
   const unique = (spells: NonNullable<CharacterContext["spells"][string]>[]) => {
     const seen = new Set<string>();
@@ -4606,6 +4802,16 @@ function SpellGroups({
       .filter((spell): spell is NonNullable<typeof spell> => Boolean(spell)),
     ...granted.filter((spell) => grantedKind.get(spell.id) === "focus"),
   ]);
+  const innate = unique(
+    draft.spells.innate
+      .map((id) => context.spells[id])
+      .filter((spell): spell is NonNullable<typeof spell> => Boolean(spell))
+  );
+  const rituals = unique(
+    draft.spells.rituals
+      .map((id) => context.spells[id])
+      .filter((spell): spell is NonNullable<typeof spell> => Boolean(spell))
+  );
   const prepared = new Map<
     string,
     { count: number; ranks: { rank: number; font: number; ordinary: number }[] }
@@ -4636,11 +4842,13 @@ function SpellGroups({
   }
   const renderRow = (
     spell: NonNullable<CharacterContext["spells"][string]>,
-    castKind: "known" | "cantrip" | "focus"
+    castKind: "known" | "cantrip" | "focus" | "innate"
   ) => {
     const options = spellCastOptions(spell, draft, context, {
       focus: castKind === "focus",
       focusPointsMax,
+      innate: castKind === "innate",
+      innateRemaining: castKind === "innate" ? innateUsesRemaining(draft, spell) : undefined,
     });
     return (
       <SpellRow
@@ -4687,6 +4895,53 @@ function SpellGroups({
           {focus.map((spell) => renderRow(spell, "focus"))}
         </div>
       ) : null}
+      {innate.length ? (
+        <div className="spell-group">
+          <h4>Innate spells</h4>
+          {innate.map((spell) => renderRow(spell, "innate"))}
+        </div>
+      ) : null}
+      {rituals.length ? (
+        <div className="spell-group">
+          <h4>Rituals</h4>
+          <p className="tiny muted">
+            Rituals use downtime and a primary skill check. The GM sets the DC and adjudicates
+            costs, secondary casters, and consequences.
+          </p>
+          {rituals.map((spell) => (
+            <div key={spell.id} className="sheet-spell-row">
+              <div className="grow">
+                <strong>{spell.name}</strong>
+                <span className="tiny muted">
+                  {" "}
+                  · rank {spell.rank}
+                  {spell.actions ? ` · ${spell.actions}` : ""}
+                  {spell.cost ? ` · cost ${stripHtml(spell.cost, 80)}` : ""}
+                </span>
+              </div>
+              <div className="row" style={{ gap: 5 }}>
+                <Button
+                  size="sm"
+                  variant="primary"
+                  icon={<Sparkles size={13} />}
+                  onClick={() => onCastRitual(spell)}
+                >
+                  Cast ritual
+                </Button>
+                <button
+                  type="button"
+                  className="icon-btn"
+                  aria-label={`Remove ritual ${spell.name}`}
+                  disabled={!canEdit}
+                  onClick={() => onRemoveRitual(spell.id)}
+                >
+                  <Trash2 size={13} />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : null}
       {sustainedSpells.length ? (
         <div className="spell-group">
           <h4>Sustained</h4>
@@ -4721,7 +4976,7 @@ function SpellGroups({
           ))}
         </div>
       ) : null}
-      {!cantrips.length && !known.length && !focus.length ? (
+      {!cantrips.length && !known.length && !focus.length && !innate.length && !rituals.length ? (
         <p className="muted small">No spells selected yet.</p>
       ) : null}
     </div>
@@ -4752,10 +5007,10 @@ function SpellRow({
   castOptions: SpellCastOption[];
   castable: boolean;
   castHint: string;
-  castKind: "known" | "cantrip" | "focus";
+  castKind: "known" | "cantrip" | "focus" | "innate";
   onCast: (
     spell: NonNullable<CharacterContext["spells"][string]>,
-    kind: "known" | "cantrip" | "focus"
+    kind: "known" | "cantrip" | "focus" | "innate"
   ) => void;
   castRank?: number;
   canEdit: boolean;

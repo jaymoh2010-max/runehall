@@ -973,6 +973,9 @@ export function emptyCharacterDraft(name = "New Hero"): CharacterDraft {
       preparedUsed: {},
       fontUsed: {},
       signature: [],
+      rituals: [],
+      innate: [],
+      innateUsed: {},
       preparationsPending: false,
     },
     equipment: [],
@@ -1207,6 +1210,19 @@ export function normalizeCharacterDraft(input: unknown, fallbackName = "New Hero
       preparedByRank,
       focus: arr<string>(spells.focus).filter((x) => typeof x === "string"),
       signature: arr<string>(spells.signature).filter((x) => typeof x === "string"),
+      rituals: [...new Set(arr<string>(spells.rituals).filter((x) => typeof x === "string"))].slice(
+        0,
+        80
+      ),
+      innate: [...new Set(arr<string>(spells.innate).filter((x) => typeof x === "string"))].slice(
+        0,
+        80
+      ),
+      innateUsed: Object.fromEntries(
+        Object.entries(obj(spells.innateUsed))
+          .filter(([, value]) => typeof value === "number" && Number.isFinite(value))
+          .map(([key, value]) => [key, Math.max(0, Math.min(20, Math.floor(value as number)))])
+      ) as Record<string, number>,
       divineFontUsed: Math.max(0, Math.min(10, Math.round(num(spells.divineFontUsed, 0)))),
       fontChoice:
         typeof spells.fontChoice === "string" &&

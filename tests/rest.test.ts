@@ -196,6 +196,15 @@ describe("PF2e long rest", () => {
     expect(result.draft.play.xp).toBe(450);
   });
 
+  it("resets innate spell uses during daily preparations", () => {
+    const draft = hero(5);
+    draft.spells.innate = ["spell:innate"];
+    draft.spells.innateUsed = { "spell:innate": 1 };
+    const result = applyLongRest(draft, derived);
+    expect(result.draft.spells.innateUsed).toEqual({});
+    expect(result.draft.spells.innate).toEqual(["spell:innate"]);
+  });
+
   it("clears sustained spells when the character rests", () => {
     const draft = hero(5);
     draft.play.sustainedSpells = [
