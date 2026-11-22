@@ -625,6 +625,8 @@ export interface CharacterDetails {
   languages: string[];
 }
 
+export type Lifestyle = "subsistence" | "comfortable" | "fine" | "extravagant";
+
 export interface CharacterPlay {
   hp: number | null;
   tempHp: number;
@@ -632,6 +634,8 @@ export interface CharacterPlay {
   focusPoints: number;
   /** Downtime days granted by the GM and spent between adventures. */
   downtimeDays: number;
+  /** Standard of living paid for each downtime day. */
+  lifestyle: Lifestyle;
   conditions: CharacterCondition[];
   afflictions: CharacterAffliction[];
   persistentDamage: PersistentDamageInstance[];
@@ -1115,6 +1119,9 @@ export interface TreasureAuditParcel {
   name: string;
   status: LootParcelStatus;
   valueCp: number;
+  permanentItems: number;
+  consumableItems: number;
+  otherItems: number;
 }
 
 export interface TreasureAuditCharacter {
@@ -1126,12 +1133,33 @@ export interface TreasureAuditCharacter {
   deltaCp: number;
 }
 
+/** Counts of permanent, consumable, and other items against table 10-9. */
+export interface TreasureItemMixRow {
+  level: number;
+  permanent: number;
+  permanentTarget: number;
+  consumable: number;
+  consumableTarget: number;
+}
+
+export interface TreasureItemMix {
+  permanent: number;
+  consumable: number;
+  other: number;
+  permanentValueCp: number;
+  consumableValueCp: number;
+  otherValueCp: number;
+  levels: TreasureItemMixRow[];
+  warnings: string[];
+}
+
 export interface TreasureAudit {
   partyLevel: number;
   partySize: number;
   budget: TreasureBudget;
   preparedCp: number;
   distributedCp: number;
+  mix: TreasureItemMix;
   parcels: TreasureAuditParcel[];
   characters: TreasureAuditCharacter[];
 }

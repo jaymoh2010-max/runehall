@@ -99,6 +99,7 @@ import {
   persistentDamageLabel,
 } from "../../shared/persistentDamage";
 import { conditionBaseName, conditionLabel, parseConditionEntry } from "../../shared/tokens";
+import { LIFESTYLE_OPTIONS, lifestyleRate, normalizeLifestyle } from "../../shared/upkeep";
 import {
   REGENERATION_SUPPRESSED_CONDITION,
   normalizeDamageTypeList,
@@ -226,6 +227,7 @@ export function CharacterSheetPage() {
   const [restRough, setRestRough] = useState(false);
   const [prepOpen, setPrepOpen] = useState(false);
   const [heroicRecoveryBusy, setHeroicRecoveryBusy] = useState(false);
+  const [downtimeBusy, setDowntimeBusy] = useState(false);
   const [castState, setCastState] = useState<{
     spellId: string;
     kind: "known" | "cantrip" | "focus";
@@ -243,6 +245,7 @@ export function CharacterSheetPage() {
   const draftRef = useRef<CharacterDraft | null>(null);
   const saveInFlight = useRef(false);
   const saveQueued = useRef(false);
+  const saveWaiters = useRef<Array<() => void>>([]);
   const conflictRef = useRef(false);
   const dirtyRef = useRef(false);
   const castLock = useRef(false);
@@ -425,12 +428,15 @@ export function CharacterSheetPage() {
       ),
     [draft?.equipment, context.equipment]
   );
+  const upkeepRate = lifestyleRate(draft?.play.lifestyle);
+  const upkeepAffordable = draft ? currencyToCp(draft.currency) >= upkeepRate.dailyCp : false;
 
   const saveDraft = useCallback(
     async (force = false) => {
       if (!id || !canEdit) return;
       if (saveInFlight.current) {
         saveQueued.current = true;
+        await new Promise<void>((resolve) => saveWaiters.current.push(resolve));
         return;
       }
       saveInFlight.current = true;
@@ -474,6 +480,8 @@ export function CharacterSheetPage() {
         } while (saveQueued.current || draftRef.current !== currentDraft);
       } finally {
         saveInFlight.current = false;
+        const waiters = saveWaiters.current.splice(0);
+        for (const resolve of waiters) resolve();
       }
     },
     [id, canEdit, toast]
@@ -748,6 +756,8 @@ export function CharacterSheetPage() {
       setDraft(normalized);
       draftRef.current = normalized;
       dirtyRef.current = false;
+      conflictRef.current = false;
+      setConflict(null);
       setSaveState("saved");
       if (!id) return;
       // Newly bought items need their compendium context on the sheet.
@@ -762,6 +772,38 @@ export function CharacterSheetPage() {
     },
     [id]
   );
+
+  const spendDowntime = async () => {
+    if (!character || !draft || !canEdit || downtimeBusy) return;
+    if (draft.play.downtimeDays < 1) return;
+    if (dirtyRef.current) {
+      await saveDraft();
+      if (dirtyRef.current || conflictRef.current) return;
+    }
+    setDowntimeBusy(true);
+    try {
+      const result = await api<{
+        character: CharacterRecord;
+        days: number;
+        paidCp: number;
+        label: string;
+      }>(`/api/characters/${character.id}/downtime/spend`, {
+        method: "POST",
+        body: { days: 1 },
+      });
+      applyUpdatedCharacter(result.character);
+      toast(
+        `Spent ${result.days} downtime day${result.days === 1 ? "" : "s"} and ${formatCp(
+          result.paidCp
+        )} on ${result.label.toLowerCase()} living.`,
+        "success"
+      );
+    } catch (err) {
+      toast(errorMessage(err), "error");
+    } finally {
+      setDowntimeBusy(false);
+    }
+  };
 
   const openShop = async () => {
     if (!character || !character.campaignId || !canEdit) return;
@@ -2398,25 +2440,50 @@ export function CharacterSheetPage() {
               ) : null}
               <div
                 className="point-row"
-                title="The GM grants downtime days. Spend one when you take a downtime activity."
+                title="Cost of living from Player Core table 6-16, prorated to a downtime day."
+              >
+                <span>Lifestyle</span>
+                <Select
+                  value={draft.play.lifestyle}
+                  aria-label="Cost of living"
+                  disabled={!canEdit}
+                  style={{ maxWidth: 180 }}
+                  onChange={(event) =>
+                    update((current) => ({
+                      ...current,
+                      play: { ...current.play, lifestyle: normalizeLifestyle(event.target.value) },
+                    }))
+                  }
+                >
+                  {LIFESTYLE_OPTIONS.map((option) => (
+                    <option key={option.id} value={option.id}>
+                      {option.label} · {formatCp(option.weeklyCp)}/week
+                    </option>
+                  ))}
+                </Select>
+              </div>
+              <div
+                className="point-row"
+                title="The GM grants downtime days. Spending one pays that day's cost of living."
               >
                 <span>Downtime</span>
                 <div className="row" style={{ gap: 7, alignItems: "center" }}>
                   <strong>
                     {draft.play.downtimeDays} day{draft.play.downtimeDays === 1 ? "" : "s"}
                   </strong>
+                  <span className="tiny muted">{formatCp(upkeepRate.dailyCp)}/day</span>
                   <Button
                     size="sm"
                     variant="secondary"
-                    disabled={!canEdit || draft.play.downtimeDays <= 0}
-                    onClick={() =>
-                      update((current) => ({
-                        ...current,
-                        play: {
-                          ...current.play,
-                          downtimeDays: Math.max(0, current.play.downtimeDays - 1),
-                        },
-                      }))
+                    disabled={
+                      !canEdit || draft.play.downtimeDays <= 0 || !upkeepAffordable || downtimeBusy
+                    }
+                    loading={downtimeBusy}
+                    onClick={() => void spendDowntime()}
+                    title={
+                      upkeepAffordable
+                        ? `Spend 1 downtime day and ${formatCp(upkeepRate.dailyCp)} on ${upkeepRate.label.toLowerCase()} living.`
+                        : `Not enough coins for ${upkeepRate.label.toLowerCase()} living (${formatCp(upkeepRate.dailyCp)} per day).`
                     }
                   >
                     Spend

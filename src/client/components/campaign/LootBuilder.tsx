@@ -70,6 +70,10 @@ export function LootBuilder({
     () => new Map((audit?.parcels ?? []).map((parcel) => [parcel.id, parcel.valueCp])),
     [audit]
   );
+  const selectedAudit = useMemo(
+    () => audit?.parcels.find((parcel) => parcel.id === selectedId) ?? null,
+    [audit, selectedId]
+  );
   const selectedItemValueCp = selected
     ? Math.max(0, (parcelValueById.get(selected.id) ?? 0) - lootCopper(selected))
     : 0;
@@ -374,6 +378,46 @@ export function LootBuilder({
           </div>
           <div className="treasure-audit-characters">
             <div className="row-between">
+              <strong>Item mix</strong>
+              <span className="tiny muted">
+                GM Core table 10-9 · permanent and consumable counts
+              </span>
+            </div>
+            <div className="treasure-audit-character-list">
+              {audit.mix.levels.map((row) => (
+                <div key={row.level} className="treasure-audit-character">
+                  <span>
+                    <strong>Level {row.level}</strong> <span className="tiny muted">items</span>
+                  </span>
+                  {row.permanentTarget > 0 ? (
+                    <Tag tone={row.permanent >= row.permanentTarget ? "green" : "gold"}>
+                      {row.permanent}/{row.permanentTarget} permanent
+                    </Tag>
+                  ) : null}
+                  <Tag tone={row.consumable >= row.consumableTarget ? "green" : "gold"}>
+                    {row.consumable}/{row.consumableTarget} consumable
+                  </Tag>
+                </div>
+              ))}
+              <div className="treasure-audit-character">
+                <span>
+                  <strong>Other treasure</strong>{" "}
+                  <span className="tiny muted">gems, goods, unmatched</span>
+                </span>
+                <span className="tiny muted">
+                  {audit.mix.other} {audit.mix.other === 1 ? "item" : "items"} ·{" "}
+                  {formatCp(audit.mix.otherValueCp)}
+                </span>
+              </div>
+            </div>
+            {audit.mix.warnings.length ? (
+              <p className="tiny muted">{audit.mix.warnings.join(" ")}</p>
+            ) : (
+              <p className="tiny muted">Permanent and consumable counts match the table's bands.</p>
+            )}
+          </div>
+          <div className="treasure-audit-characters">
+            <div className="row-between">
               <strong>Character wealth</strong>
               <span className="tiny muted">New-character lump sum · GM Core table 10-10</span>
             </div>
@@ -535,6 +579,15 @@ export function LootBuilder({
                       <div className="row" style={{ gap: 6 }}>
                         <Badge tone="gold">{formatCp(draftCopper)} coins</Badge>
                         <Badge tone="violet">{formatCp(draftValueCp)} value</Badge>
+                        {selectedAudit && selectedAudit.permanentItems > 0 ? (
+                          <Badge tone="green">{selectedAudit.permanentItems} permanent</Badge>
+                        ) : null}
+                        {selectedAudit && selectedAudit.consumableItems > 0 ? (
+                          <Badge tone="gold">{selectedAudit.consumableItems} consumable</Badge>
+                        ) : null}
+                        {selectedAudit && selectedAudit.otherItems > 0 ? (
+                          <Badge>{selectedAudit.otherItems} other</Badge>
+                        ) : null}
                       </div>
                     </div>
                     {!selected.items.length ? (

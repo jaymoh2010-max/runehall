@@ -37,8 +37,9 @@ import {
 import { conditionsFromSheet } from "../../shared/tokens";
 import { characterTokenTurnEffects } from "../../shared/characterTurnEffects";
 import { applyHeroicRecovery } from "../../shared/damage";
+import { lifestyleRate, upkeepCostCp } from "../../shared/upkeep";
 import { logAudit } from "../audit";
-import { newId, now, parseJson, safeString } from "../util";
+import { newId, now, parseJson, safeInt, safeString } from "../util";
 
 function parseDraft(raw: unknown, fallbackName = "New Hero"): CharacterDraft {
   const draft = normalizeCharacterDraft(raw, fallbackName);
@@ -342,6 +343,11 @@ export async function registerCharacterRoutes(app: FastifyInstance): Promise<voi
     }
     const existingDraft = parseDraft(parseJson(row.data, {}), row.name);
     const draft = parseDraft(body.data, row.name);
+    if (draft.play.downtimeDays < existingDraft.play.downtimeDays) {
+      return reply.code(400).send({
+        error: "Spend downtime days from the sheet's Downtime action so upkeep is paid.",
+      });
+    }
     if (draft.level !== existingDraft.level && !canAdvanceCharacter(row, request.user.id)) {
       return reply
         .code(403)
@@ -451,6 +457,77 @@ export async function registerCharacterRoutes(app: FastifyInstance): Promise<voi
       }),
       spent: result.spent,
       notes: result.notes,
+    });
+  });
+
+  app.post("/api/characters/:id/downtime/spend", async (request, reply) => {
+    if (!request.user) return reply.code(401).send({ error: "Sign in to continue." });
+    const { id } = request.params as { id: string };
+    const character = getCharacter(id);
+    if (!character) return reply.code(404).send({ error: "Character not found." });
+    if (!canEditCharacter(character, request.user.id)) {
+      return reply.code(403).send({ error: "You can't spend downtime for that character." });
+    }
+    let draft: CharacterDraft;
+    try {
+      draft = normalizeCharacterDraft(JSON.parse(character.data), character.name);
+    } catch {
+      return reply.code(400).send({ error: "That character's draft could not be read." });
+    }
+    const body = (request.body ?? {}) as Record<string, unknown>;
+    const days = safeInt(body.days, 1, 1, 3650);
+    if (draft.play.downtimeDays < days) {
+      return reply.code(400).send({
+        error: `That character only has ${draft.play.downtimeDays} downtime day${
+          draft.play.downtimeDays === 1 ? "" : "s"
+        } left.`,
+      });
+    }
+    const rate = lifestyleRate(draft.play.lifestyle);
+    const paidCp = upkeepCostCp(rate.id, days);
+    const currency = spendCurrency(draft.currency, paidCp);
+    if (!currency) {
+      return reply.code(400).send({
+        error: `You need ${paidCp} cp for ${days} day${days === 1 ? "" : "s"} of ${rate.label.toLowerCase()} living, but your purse holds ${currencyToCp(draft.currency)} cp.`,
+      });
+    }
+    draft.currency = currency;
+    draft.play.downtimeDays -= days;
+    const summary = characterSummary(draft, contextForDraft(draft));
+    db.prepare(
+      "UPDATE characters SET data = ?, summary = ?, updated_at = ?, revision = revision + 1 WHERE id = ?"
+    ).run(JSON.stringify(draft), JSON.stringify(summary), now(), character.id);
+    syncCharacterDraft(app, character, draft, summary);
+    if (character.campaign_id) {
+      touchCampaign(character.campaign_id);
+      app.broadcastCampaign(character.campaign_id, "character:updated", {
+        characterId: character.id,
+        summary,
+        name: draft.name,
+      });
+    }
+    logAudit({
+      action: "character.downtime_spend",
+      actor: request.user,
+      targetType: "character",
+      targetId: character.id,
+      detail: `${draft.name}: spent ${days} downtime day${
+        days === 1 ? "" : "s"
+      } and ${paidCp} cp on ${rate.label.toLowerCase()} living`,
+      request,
+    });
+    const updated = getCharacter(character.id)!;
+    const owner = getUser(updated.user_id);
+    return reply.send({
+      character: serializeCharacter(updated, owner?.display_name ?? "", {
+        canEdit: true,
+        canView: true,
+        canAdvance: canAdvanceCharacter(updated, request.user.id),
+      }),
+      days,
+      paidCp,
+      lifestyle: rate.id,
+      label: rate.label,
     });
   });
 
