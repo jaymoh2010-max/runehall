@@ -636,4 +636,21 @@ export const migrations: Migration[] = [
       ALTER TABLE tokens ADD COLUMN turn_effects TEXT NOT NULL DEFAULT '{}';
     `,
   },
+  {
+    version: 36,
+    name: "campaign_shop_stock",
+    sql: `
+      ALTER TABLE campaigns ADD COLUMN shop_mode TEXT NOT NULL DEFAULT 'open';
+      CREATE TABLE IF NOT EXISTS campaign_shop_stock (
+        campaign_id TEXT NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+        item_id TEXT NOT NULL,
+        quantity INTEGER NOT NULL DEFAULT 0,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        PRIMARY KEY (campaign_id, item_id)
+      );
+      CREATE INDEX IF NOT EXISTS idx_campaign_shop_stock_campaign
+        ON campaign_shop_stock(campaign_id, quantity);
+    `,
+  },
 ];

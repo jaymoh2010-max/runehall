@@ -3,11 +3,18 @@ import {
   canAdvanceCharacter,
   canEditCharacter,
   getCampaign,
+  getCampaignRole,
   getCharacter,
   getUser,
 } from "../access";
 import { contextForDraft, equipment } from "../compendium";
-import { db, type CharacterRow } from "../db";
+import {
+  db,
+  transaction,
+  type CampaignRow,
+  type CampaignShopStockRow,
+  type CharacterRow,
+} from "../db";
 import { serializeCharacter, touchCampaign } from "../serialize";
 import { syncCharacterDraft } from "./characters";
 import {
@@ -18,13 +25,17 @@ import {
 } from "../../shared/inventory";
 import { characterSummary, normalizeCharacterDraft } from "../../shared/rules";
 import {
+  MAX_SHOP_STOCK_ROWS,
+  isShopStockMode,
   normalizeSettlementLevel,
+  normalizeShopStockMode,
   shopAvailabilityError,
   shopBuyCostCp,
   shopQuantity,
   shopSellValueCp,
+  shopStockCount,
 } from "../../shared/shop";
-import type { CharacterDraft } from "../../shared/types";
+import type { CharacterDraft, ShopState, ShopStockEntry } from "../../shared/types";
 import { logAudit } from "../audit";
 import { now, parseJson, safeString } from "../util";
 
@@ -59,6 +70,50 @@ function findItem(itemId: string) {
   return equipment.find((item) => item.id === itemId) ?? null;
 }
 
+class StockUnavailableError extends Error {}
+
+function stockEntry(row: CampaignShopStockRow): ShopStockEntry | null {
+  const item = findItem(row.item_id);
+  if (!item) return null;
+  return {
+    itemId: item.id,
+    name: item.name,
+    level: item.level,
+    priceCp: item.price.cpTotal,
+    bulk: item.bulk,
+    rarity: item.rarity,
+    type: item.type,
+    quantity: shopStockCount(row.quantity),
+    updatedAt: row.updated_at,
+  };
+}
+
+function stockEntries(campaignId: string): ShopStockEntry[] {
+  return (
+    db
+      .prepare("SELECT * FROM campaign_shop_stock WHERE campaign_id = ? ORDER BY item_id ASC")
+      .all(campaignId) as CampaignShopStockRow[]
+  )
+    .map(stockEntry)
+    .filter((entry): entry is ShopStockEntry => Boolean(entry))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function shopStateFor(campaign: CampaignRow): ShopState {
+  return {
+    mode: normalizeShopStockMode(campaign.shop_mode),
+    settlementLevel: normalizeSettlementLevel(campaign.settlement_level),
+    stock: stockEntries(campaign.id),
+  };
+}
+
+function stockQuantity(campaignId: string, itemId: string): number {
+  const row = db
+    .prepare("SELECT quantity FROM campaign_shop_stock WHERE campaign_id = ? AND item_id = ?")
+    .get(campaignId, itemId) as { quantity: number } | undefined;
+  return shopStockCount(row?.quantity);
+}
+
 function saveShopDraft(
   character: CharacterRow,
   draft: CharacterDraft
@@ -80,6 +135,91 @@ function saveShopDraft(
 }
 
 export async function registerShopRoutes(app: FastifyInstance): Promise<void> {
+  app.get("/api/campaigns/:id/shop", async (request, reply) => {
+    if (!request.user) return reply.code(401).send({ error: "Sign in to continue." });
+    const { id } = request.params as { id: string };
+    const campaign = getCampaign(id);
+    if (!campaign) return reply.code(404).send({ error: "Campaign not found." });
+    if (!getCampaignRole(id, request.user.id)) {
+      return reply.code(403).send({ error: "You are not a member of this campaign." });
+    }
+    return reply.send({ shop: shopStateFor(campaign) });
+  });
+
+  app.put("/api/campaigns/:id/shop/stock", async (request, reply) => {
+    if (!request.user) return reply.code(401).send({ error: "Sign in to continue." });
+    const { id } = request.params as { id: string };
+    const campaign = getCampaign(id);
+    if (!campaign) return reply.code(404).send({ error: "Campaign not found." });
+    if (getCampaignRole(id, request.user.id) !== "gm") {
+      return reply.code(403).send({ error: "Only the GM can manage merchant stock." });
+    }
+    const body = (request.body ?? {}) as Record<string, unknown>;
+    if (body.mode !== undefined && !isShopStockMode(body.mode)) {
+      return reply.code(400).send({ error: "Choose open market or tracked merchant stock." });
+    }
+    const mode = body.mode === undefined ? normalizeShopStockMode(campaign.shop_mode) : body.mode;
+    const items = body.items;
+    if (items !== undefined && !Array.isArray(items)) {
+      return reply.code(400).send({ error: "Shop stock must be a list of items." });
+    }
+    const rawItems = Array.isArray(items) ? items : null;
+    if (rawItems && rawItems.length > MAX_SHOP_STOCK_ROWS) {
+      return reply
+        .code(400)
+        .send({ error: `A merchant can stock at most ${MAX_SHOP_STOCK_ROWS} item rows.` });
+    }
+    const stock = new Map<string, number>();
+    if (rawItems) {
+      for (const raw of rawItems) {
+        if (!raw || typeof raw !== "object") continue;
+        const entry = raw as Record<string, unknown>;
+        const itemId = safeString(entry.itemId, "", 200);
+        const item = findItem(itemId);
+        if (!item) {
+          return reply.code(400).send({ error: "One of those items is not in the compendium." });
+        }
+        if (item.price.cpTotal <= 0) {
+          return reply.code(400).send({ error: `${item.name} has no purchase price.` });
+        }
+        stock.set(item.id, shopStockCount(entry.quantity));
+      }
+    }
+
+    const ts = now();
+    transaction(() => {
+      db.prepare("UPDATE campaigns SET shop_mode = ?, updated_at = ? WHERE id = ?").run(
+        mode,
+        ts,
+        id
+      );
+      if (rawItems) {
+        db.prepare("DELETE FROM campaign_shop_stock WHERE campaign_id = ?").run(id);
+        const insert = db.prepare(
+          `INSERT INTO campaign_shop_stock
+             (campaign_id, item_id, quantity, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?)`
+        );
+        for (const [itemId, quantity] of stock) {
+          insert.run(id, itemId, quantity, ts, ts);
+        }
+      }
+    });
+    touchCampaign(id);
+    logAudit({
+      action: "campaign.shop_stock",
+      actor: request.user,
+      targetType: "campaign",
+      targetId: id,
+      detail: `${mode} merchant stock${
+        rawItems ? ` (${stock.size} item row${stock.size === 1 ? "" : "s"})` : ""
+      }`,
+      request,
+    });
+    const updated = getCampaign(id)!;
+    return reply.send({ shop: shopStateFor(updated) });
+  });
+
   app.post("/api/campaigns/:id/shop/buy", async (request, reply) => {
     if (!request.user) return reply.code(401).send({ error: "Sign in to continue." });
     const { id } = request.params as { id: string };
@@ -105,9 +245,26 @@ export async function registerShopRoutes(app: FastifyInstance): Promise<void> {
     const itemId = safeString(body.itemId, "", 200);
     const item = findItem(itemId);
     if (!item) return reply.code(404).send({ error: "That item is not in the compendium." });
+    const mode = normalizeShopStockMode(campaign.shop_mode);
     const settlementLevel = normalizeSettlementLevel(campaign.settlement_level);
-    const unavailable = shopAvailabilityError(item, settlementLevel);
-    if (unavailable) return reply.code(400).send({ error: unavailable });
+    if (mode === "stocked") {
+      if (item.price.cpTotal <= 0) {
+        return reply.code(400).send({ error: "That item has no purchase price." });
+      }
+      const available = stockQuantity(id, item.id);
+      if (available < 1) {
+        return reply.code(400).send({ error: `${item.name} is out of stock.` });
+      }
+      const requested = shopQuantity(body.quantity);
+      if (available < requested) {
+        return reply
+          .code(400)
+          .send({ error: `The merchant only has ${available}× ${item.name} in stock.` });
+      }
+    } else {
+      const unavailable = shopAvailabilityError(item, settlementLevel);
+      if (unavailable) return reply.code(400).send({ error: unavailable });
+    }
     const quantity = shopQuantity(body.quantity);
     const totalCp = shopBuyCostCp(item, quantity);
     if (totalCp < 1) return reply.code(400).send({ error: "That item has no purchase price." });
@@ -126,7 +283,31 @@ export async function registerShopRoutes(app: FastifyInstance): Promise<void> {
       { ...draft, currency: remaining, wealthBudgetCp: null },
       { itemId: item.id, quantity, equipped: false, invested: false, runes: [] }
     );
-    const saved = saveShopDraft(character, draft);
+    let saved;
+    try {
+      saved = transaction(() => {
+        const result = saveShopDraft(character, draft);
+        if (!result.moved) return { moved: false as const, summary: result.summary };
+        if (mode === "stocked") {
+          const update = db
+            .prepare(
+              `UPDATE campaign_shop_stock
+               SET quantity = quantity - ?, updated_at = ?
+               WHERE campaign_id = ? AND item_id = ? AND quantity >= ?`
+            )
+            .run(quantity, now(), id, item.id, quantity);
+          if (Number(update.changes) === 0) throw new StockUnavailableError();
+        }
+        return { moved: true as const, summary: result.summary };
+      });
+    } catch (error) {
+      if (error instanceof StockUnavailableError) {
+        return reply
+          .code(400)
+          .send({ error: `The merchant no longer has ${quantity}× ${item.name} in stock.` });
+      }
+      throw error;
+    }
     if (!saved.moved) {
       const current = getCharacter(character.id)!;
       return conflict(
@@ -152,6 +333,7 @@ export async function registerShopRoutes(app: FastifyInstance): Promise<void> {
       item: { id: item.id, name: item.name, level: item.level },
       quantity,
       totalCp,
+      stockQuantity: mode === "stocked" ? stockQuantity(id, item.id) : null,
     });
   });
 
@@ -214,7 +396,23 @@ export async function registerShopRoutes(app: FastifyInstance): Promise<void> {
       currency: addCurrency(removed.draft.currency, totalCp),
       wealthBudgetCp: null,
     };
-    const saved = saveShopDraft(character, draft);
+    const mode = normalizeShopStockMode(campaign.shop_mode);
+    const saved = transaction(() => {
+      const result = saveShopDraft(character, draft);
+      if (!result.moved) return { moved: false as const, summary: result.summary };
+      if (mode === "stocked") {
+        const ts = now();
+        db.prepare(
+          `INSERT INTO campaign_shop_stock
+             (campaign_id, item_id, quantity, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?)
+           ON CONFLICT(campaign_id, item_id) DO UPDATE SET
+             quantity = MIN(9999, campaign_shop_stock.quantity + excluded.quantity),
+             updated_at = excluded.updated_at`
+        ).run(id, item.id, quantity, ts, ts);
+      }
+      return { moved: true as const, summary: result.summary };
+    });
     if (!saved.moved) {
       const current = getCharacter(character.id)!;
       return conflict(
@@ -240,6 +438,7 @@ export async function registerShopRoutes(app: FastifyInstance): Promise<void> {
       item: { id: item.id, name: item.name, level: item.level },
       quantity,
       totalCp,
+      stockQuantity: mode === "stocked" ? stockQuantity(id, item.id) : null,
     });
   });
 }

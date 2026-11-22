@@ -501,7 +501,7 @@ async function runCampaignA(gm: Account, players: Account[]): Promise<void> {
     metric("campaignA.partySize", 4);
   });
 
-  await check(campaignName, "settlement shop buys and sells with server-side prices", async () => {
+  await check(campaignName, "settlement shop uses server prices and tracked stock", async () => {
     const updated = await api(`/api/campaigns/${campaignId}`, {
       method: "PATCH",
       cookie: gm.cookie,
@@ -558,6 +558,63 @@ async function runCampaignA(gm: Account, players: Account[]): Promise<void> {
       expect: null,
     });
     assertEqual(aboveLevel.status, 400, "Above-level shop purchase");
+    const playerStockEdit = await api(`/api/campaigns/${campaignId}/shop/stock`, {
+      method: "PUT",
+      cookie: players[0].cookie,
+      body: { mode: "stocked", items: [{ itemId: daggerId, quantity: 2 }] },
+      expect: null,
+    });
+    assertEqual(playerStockEdit.status, 403, "Player stock edit");
+    const stocked = await api(`/api/campaigns/${campaignId}/shop/stock`, {
+      method: "PUT",
+      cookie: gm.cookie,
+      body: { mode: "stocked", items: [{ itemId: daggerId, quantity: 1 }] },
+    });
+    assertEqual(stocked.payload.shop.mode, "stocked", "Tracked shop mode");
+    assertEqual(
+      stocked.payload.shop.stock.find((entry: Json) => entry.itemId === daggerId)?.quantity,
+      1,
+      "Tracked stock quantity"
+    );
+    const stockBuy = await api(`/api/campaigns/${campaignId}/shop/buy`, {
+      method: "POST",
+      cookie: players[0].cookie,
+      body: {
+        characterId: heroes[0].id,
+        itemId: daggerId,
+        quantity: 1,
+        expectedRevision: soldCharacter.revision,
+      },
+    });
+    assertEqual(stockBuy.payload.stockQuantity, 0, "Stock after purchase");
+    const emptyBuy = await api(`/api/campaigns/${campaignId}/shop/buy`, {
+      method: "POST",
+      cookie: players[0].cookie,
+      body: {
+        characterId: heroes[0].id,
+        itemId: daggerId,
+        quantity: 1,
+        expectedRevision: stockBuy.payload.character.revision,
+      },
+      expect: null,
+    });
+    assertEqual(emptyBuy.status, 400, "Out-of-stock purchase rejected");
+    const stockSell = await api(`/api/campaigns/${campaignId}/shop/sell`, {
+      method: "POST",
+      cookie: players[0].cookie,
+      body: {
+        characterId: heroes[0].id,
+        itemId: daggerId,
+        quantity: 1,
+        expectedRevision: stockBuy.payload.character.revision,
+      },
+    });
+    assertEqual(stockSell.payload.stockQuantity, 1, "Stock after sale");
+    await api(`/api/campaigns/${campaignId}/shop/stock`, {
+      method: "PUT",
+      cookie: gm.cookie,
+      body: { mode: "open", items: [] },
+    });
     await api(`/api/campaigns/${campaignId}`, {
       method: "PATCH",
       cookie: gm.cookie,
@@ -2416,6 +2473,7 @@ async function runCampaignA(gm: Account, players: Account[]): Promise<void> {
         ["POST", `/api/campaigns/${campaignId}/level-up`, {}],
         ["POST", `/api/campaigns/${campaignId}/long-rest`, {}],
         ["POST", `/api/campaigns/${campaignId}/downtime`, { days: 1 }],
+        ["PUT", `/api/campaigns/${campaignId}/shop/stock`, { mode: "stocked", items: [] }],
         ["GET", `/api/campaigns/${campaignId}/export`, undefined],
         ["GET", `/api/campaigns/${campaignId}/loot`, undefined],
         ["GET", `/api/campaigns/${campaignId}/npcs`, undefined],
@@ -2448,9 +2506,18 @@ async function runCampaignA(gm: Account, players: Account[]): Promise<void> {
           description: "Final antagonist.",
         },
       });
+      const daggerId = "item:rQWaJhI5Bko5x14Z";
+      await api(`/api/campaigns/${campaignId}/shop/stock`, {
+        method: "PUT",
+        cookie: gm.cookie,
+        body: { mode: "stocked", items: [{ itemId: daggerId, quantity: 3 }] },
+      });
       const exported = await api(`/api/campaigns/${campaignId}/export`, { cookie: gm.cookie });
       const payload = exported.payload;
       assertEqual(payload.format, "runehall-campaign", "Export format");
+      assertEqual(payload.campaign.shopMode, "stocked", "Export shop mode");
+      assertEqual(payload.shopStock.length, 1, "Export shop stock rows");
+      assertEqual(payload.shopStock[0].quantity, 3, "Export shop stock quantity");
       assertEqual(payload.characters.length, 4, "Export character count");
       assert(
         payload.characters.every((character: Json) => character.data.level === 20),
@@ -2481,7 +2548,22 @@ async function runCampaignA(gm: Account, players: Account[]): Promise<void> {
       );
       assertEqual(importedCampaign.worldDate.year, 4726, "Imported world year");
       assertEqual(importedCampaign.xpMode, "xp", "Imported XP mode");
+      assertEqual(importedCampaign.shopMode, "stocked", "Imported shop mode");
+      const importedShop = await api(`/api/campaigns/${importedCampaign.id}/shop`, {
+        cookie: gm.cookie,
+      });
+      assertEqual(importedShop.payload.shop.mode, "stocked", "Imported shop state mode");
+      assertEqual(
+        importedShop.payload.shop.stock.find((entry: Json) => entry.itemId === daggerId)?.quantity,
+        3,
+        "Imported shop stock quantity"
+      );
       metric("campaignA.importedCampaignId", importedCampaign.id);
+      await api(`/api/campaigns/${campaignId}/shop/stock`, {
+        method: "PUT",
+        cookie: gm.cookie,
+        body: { mode: "open", items: [] },
+      });
 
       // Clean up the copy so the simulation leaves one campaign behind.
       await api(`/api/campaigns/${importedCampaign.id}`, { method: "DELETE", cookie: gm.cookie });

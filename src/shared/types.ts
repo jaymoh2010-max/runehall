@@ -1064,6 +1064,8 @@ export interface CampaignSummary {
   xpMode: XpMode;
   advancementSpeed: AdvancementSpeed;
   settlementLevel: number;
+  /** Open market (infinite common stock) or a GM-curated finite merchant list. */
+  shopMode: ShopStockMode;
   /** Current in-world date for this campaign. */
   worldDate: GolarionDate;
   memberCount: number;
@@ -1073,6 +1075,26 @@ export interface CampaignSummary {
   createdAt: number;
   updatedAt: number;
   lastPlayedAt: number | null;
+}
+
+export type ShopStockMode = "open" | "stocked";
+
+export interface ShopStockEntry {
+  itemId: string;
+  name: string;
+  level: number;
+  priceCp: number;
+  bulk: number;
+  rarity: string;
+  type: string;
+  quantity: number;
+  updatedAt: number;
+}
+
+export interface ShopState {
+  mode: ShopStockMode;
+  settlementLevel: number;
+  stock: ShopStockEntry[];
 }
 
 export interface EncounterCombatant {

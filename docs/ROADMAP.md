@@ -412,7 +412,8 @@ Acceptance: a GM can prepare a full session in Runehall and start it with one â€
   - A Shop action on the character sheet opens buy and sell tabs with compendium search, quantity controls, and the characterâ€™s current purse.
   - Sales pay half price for gear and magic items, full price for treasure, and include attached runes when the whole stack is sold.
   - The server validates item level, rarity, quantity, price, ownership, and revision; players cannot shop for characters they do not control.
-  - Shopping is abstract rather than downtime-gated, and top-end stock scarcity is not simulated.
+  - The GM can switch to tracked merchant stock, curate finite quantities from the compendium (including uncommon or above-level items), and restock by editing quantities. Purchases decrement stock and sales add items back; open-market mode remains the default.
+  - Shopping is abstract rather than downtime-gated; automatic restock schedules and multiple merchants per settlement are not simulated.
 - [x] **Area templates**
   - Burst, emanation, cone, and line templates with size in feet.
   - Click-drag placement on the map, with a live preview and a size label.

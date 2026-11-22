@@ -1,7 +1,7 @@
 import { getUserByUsername } from "./access";
 import fs from "node:fs";
 import path from "node:path";
-import { contextForDraft } from "./compendium";
+import { contextForDraft, equipment } from "./compendium";
 import { db, transaction } from "./db";
 import { characterSummary, normalizeCharacterDraft } from "../shared/rules";
 import {
@@ -13,7 +13,12 @@ import {
 import { normalizeCampaignThreads } from "../shared/dashboard";
 import { normalizeGolarionDate } from "../shared/calendar";
 import { normalizeAdvancementSpeed } from "../shared/xp";
-import { normalizeSettlementLevel } from "../shared/shop";
+import {
+  MAX_SHOP_STOCK_ROWS,
+  normalizeSettlementLevel,
+  normalizeShopStockMode,
+  shopStockCount,
+} from "../shared/shop";
 import { normalizeTokenTurnEffects } from "../shared/tokenTurnEffects";
 import {
   normalizeAmbientLight,
@@ -78,6 +83,7 @@ export interface CampaignImportStats {
   journal: number;
   encounters: number;
   loot: number;
+  shopStock: number;
   npcs: number;
   sessions: number;
   audioTracks: number;
@@ -147,6 +153,7 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
   const xpMode = normalizeXpMode(campaignData.xpMode);
   const advancementSpeed = normalizeAdvancementSpeed(campaignData.advancementSpeed);
   const settlementLevel = normalizeSettlementLevel(campaignData.settlementLevel);
+  const shopMode = normalizeShopStockMode(campaignData.shopMode);
   const worldDate = normalizeGolarionDate(campaignData.worldDate);
 
   const stats: CampaignImportStats = {
@@ -159,6 +166,7 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
     journal: 0,
     encounters: 0,
     loot: 0,
+    shopStock: 0,
     npcs: 0,
     sessions: 0,
     audioTracks: 0,
@@ -168,7 +176,7 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
     const campaignId = newId("camp");
     const ts = now();
     db.prepare(
-      "INSERT INTO campaigns (id, name, description, gm_id, invite_code, ruleset, xp_mode, advancement_speed, settlement_level, world_year, world_month, world_day, created_at, updated_at, last_played_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+      "INSERT INTO campaigns (id, name, description, gm_id, invite_code, ruleset, xp_mode, advancement_speed, settlement_level, shop_mode, world_year, world_month, world_day, created_at, updated_at, last_played_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
     ).run(
       campaignId,
       name,
@@ -179,6 +187,7 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
       xpMode,
       advancementSpeed,
       settlementLevel,
+      shopMode,
       worldDate.year,
       worldDate.month,
       worldDate.day,
@@ -555,6 +564,24 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
         ts
       );
       stats.loot += 1;
+    }
+
+    const importedStock = new Map<string, number>();
+    for (const entry of records(payload.shopStock, MAX_SHOP_STOCK_ROWS, "shop stock")) {
+      const itemId = text(entry.itemId, "", 200);
+      if (!itemId || !equipment.some((item) => item.id === itemId)) continue;
+      importedStock.set(itemId, shopStockCount(entry.quantity));
+    }
+    for (const [itemId, quantity] of importedStock) {
+      db.prepare(
+        `INSERT INTO campaign_shop_stock
+           (campaign_id, item_id, quantity, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?)
+         ON CONFLICT(campaign_id, item_id) DO UPDATE SET
+           quantity = excluded.quantity,
+           updated_at = excluded.updated_at`
+      ).run(campaignId, itemId, quantity, ts, ts);
+      stats.shopStock += 1;
     }
 
     const dashboard = record(payload.dashboard);
