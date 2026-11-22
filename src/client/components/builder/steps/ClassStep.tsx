@@ -245,6 +245,7 @@ export function ClassStep({
                     fontChoice: null,
                     preparedUsed: {},
                     fontUsed: {},
+                    preparationsPending: false,
                   },
                   feats: { ...current.feats, class: {} },
                 };

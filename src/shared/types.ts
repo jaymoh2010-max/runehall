@@ -782,6 +782,8 @@ export interface CharacterDraft {
     preparedUsed: Record<string, number>;
     /** Divine font copies spent today, keyed by spell id. */
     fontUsed: Record<string, number>;
+    /** True after a long rest until a prepared caster confirms today's spells. */
+    preparationsPending: boolean;
   };
   equipment: CharacterEquipment[];
   companions: CharacterCompanion[];

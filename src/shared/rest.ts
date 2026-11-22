@@ -4,6 +4,8 @@ import type { CharacterCondition, CharacterDraft, DerivedCharacter } from "./typ
 export interface LongRestOptions {
   /** An uncomfortable or interrupted night halves natural healing (minimum 1). */
   rough?: boolean;
+  /** Mark today's spell preparations as still needing confirmation. */
+  preparedCaster?: boolean;
 }
 
 export interface LongRestSummary {
@@ -100,7 +102,8 @@ function restoreConditions(
  *   lowers the shield.
  * - Removes fatigued; reduces doomed and drained by 1; removes wounded when
  *   the character is at full HP; clears dying and unconscious once above 0 HP.
- * - Leaves prepared spells, hero points, XP, and unrelated conditions alone.
+ * - Leaves the prepared list, hero points, XP, and unrelated conditions alone;
+ *   prepared casters are marked as needing to confirm today's preparations.
  */
 export function applyLongRest(
   draft: CharacterDraft,
@@ -154,6 +157,7 @@ export function applyLongRest(
         slotsUsed: {},
         preparedUsed: {},
         fontUsed: {},
+        preparationsPending: options.preparedCaster === true,
       },
       play: {
         ...draft.play,

@@ -59,8 +59,9 @@ import {
 } from "../../../../shared/types";
 import {
   abilityMod,
-  addPreparedCopy,
+  addPreparedSpellCopy,
   applicableChoiceGroups,
+  canPrepareSpellAtRank,
   casterInfo,
   cantripLimitFor,
   classKeyOptions,
@@ -76,7 +77,7 @@ import {
   isFontSpell,
   isPreparedCasterClass,
   normalizeCharacterDraft,
-  ordinarySpellSlotsFor,
+  ordinaryPreparedLimitAt,
   preparedEntries,
   preparedRankSummaries,
   removePreparedCopy,
@@ -189,7 +190,6 @@ export function SpellsStep({ draft, update, derived, context, setStep, openPicke
   const cantripCap = cantripLimitFor(classData) ?? repertoire?.cantrips ?? null;
   const isPreparedCaster = isPreparedCasterClass(classData?.name);
   const traditionMissing = Boolean(caster.traditionOptions) && !tradition;
-  const ordinarySlots = ordinarySpellSlotsFor(draft.level, caster.progression, classData?.name);
   const preparedRows = preparedEntries(draft, {
     spells: context.spells,
     deity: context.deity,
@@ -249,8 +249,7 @@ export function SpellsStep({ draft, update, derived, context, setStep, openPicke
     });
 
   const ordinaryLimitAt = (rank: number) =>
-    ordinarySlots?.[rank - 1] ??
-    Math.max(0, (derived.spellSlots?.[rank - 1] ?? 0) - (fontRank === rank ? (fontSlots ?? 0) : 0));
+    ordinaryPreparedLimitAt(draft, derived, classData, rank);
 
   const selectedRankFor = (spell: Spell) => {
     const maxRank = derived.maxSpellRank || Math.max(1, spell.rank);
@@ -258,50 +257,25 @@ export function SpellsStep({ draft, update, derived, context, setStep, openPicke
     return chosen && chosen >= spell.rank && chosen <= maxRank ? chosen : Math.max(1, spell.rank);
   };
 
-  const nonCurriculumCountAt = (rank: number) =>
-    preparedRows.filter((row) => row.rank === rank && !curriculumIds.has(row.id)).length;
-
-  const rankHasRoom = (spell: Spell, rank: number) => {
-    const summary = preparedSplits.get(rank);
-    const totalCount = summary?.total ?? 0;
-    const ordinaryCount = summary?.ordinary ?? 0;
-    const fontCount = summary?.font ?? 0;
-    if (wizardCurriculum && curriculumRanks.has(rank)) {
-      const totalLimit = ordinaryLimitAt(rank);
-      if (curriculumIds.has(spell.id)) return totalCount < totalLimit;
-      return totalCount < totalLimit && nonCurriculumCountAt(rank) < Math.max(0, totalLimit - 1);
-    }
-    const fontRoom =
-      fontRank === rank &&
-      isFontSpell(spell, context.deity) &&
-      (fontChoice === null || isChosenFontSpell(spell, context.deity, fontChoice))
-        ? fontCount < (fontSlots ?? 0)
-        : false;
-    return fontRoom || ordinaryCount < ordinaryLimitAt(rank);
-  };
+  const rankHasRoom = (spell: Spell, rank: number) =>
+    canPrepareSpellAtRank(
+      draft,
+      derived,
+      { spells: context.spells, deity: context.deity, classData },
+      spell,
+      rank
+    );
 
   const prepareSpell = (spell: Spell, rank: number) => {
     if (!rankHasRoom(spell, rank)) return;
-    const chosenFont =
-      fontRank === rank && fontSlots && isFontSpell(spell, context.deity)
-        ? (fontChoice ??
-          (fontChoices.length > 1
-            ? (spell.name.trim().toLowerCase() as DivineFontChoice)
-            : fontChoices[0]!))
-        : null;
-    update((current) => {
-      const next = addPreparedCopy(
+    update((current) =>
+      addPreparedSpellCopy(
         current,
         { spells: context.spells, deity: context.deity, classData },
-        spell.id,
+        spell,
         rank
-      );
-      if (!chosenFont || current.spells.fontChoice) return next;
-      return {
-        ...next,
-        spells: { ...next.spells, fontChoice: chosenFont },
-      };
-    });
+      )
+    );
   };
 
   const removePrepared = (spellId: string, rank: number) =>

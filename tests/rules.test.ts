@@ -220,6 +220,20 @@ describe("PF2e character rules", () => {
     expect(draft.play.conditions[0]).toEqual({ name: "Frightened", value: 2, duration: 3 });
   });
 
+  it("normalizes the daily-preparation pending flag", () => {
+    expect(emptyCharacterDraft("Defaults").spells.preparationsPending).toBe(false);
+    const draft = normalizeCharacterDraft(
+      { name: "Prepared", spells: { preparationsPending: true } },
+      "Fallback"
+    );
+    expect(draft.spells.preparationsPending).toBe(true);
+    const cleared = normalizeCharacterDraft(
+      { name: "Prepared", spells: { preparationsPending: "yes" } },
+      "Fallback"
+    );
+    expect(cleared.spells.preparationsPending).toBe(false);
+  });
+
   it("normalizes fast healing and regeneration play fields", () => {
     const defaults = emptyCharacterDraft("Defaults");
     expect(defaults.play.fastHealing).toBe(0);

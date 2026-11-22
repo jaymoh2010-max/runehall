@@ -1771,6 +1771,35 @@ async function runCampaignA(gm: Account, players: Account[]): Promise<void> {
             1,
             "Long rest drained reduction"
           );
+          const restedWizard = (rested.payload.characters as Json[]).find(
+            (entry) => entry.id === heroes[1].id
+          );
+          const restedCleric = (rested.payload.characters as Json[]).find(
+            (entry) => entry.id === heroes[2].id
+          );
+          const restedRogue = (rested.payload.characters as Json[]).find(
+            (entry) => entry.id === heroes[3].id
+          );
+          assertEqual(
+            restedFighter.data.spells.preparationsPending,
+            false,
+            "Non-caster daily preparations"
+          );
+          assertEqual(
+            restedWizard?.data.spells.preparationsPending,
+            true,
+            "Wizard daily preparations"
+          );
+          assertEqual(
+            restedCleric?.data.spells.preparationsPending,
+            true,
+            "Cleric daily preparations"
+          );
+          assertEqual(
+            restedRogue?.data.spells.preparationsPending,
+            false,
+            "Rogue daily preparations"
+          );
         }
       );
 

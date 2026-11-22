@@ -58,6 +58,7 @@ import {
 import {
   characterSummary,
   computeCharacter,
+  isPreparedCasterClass,
   normalizeCharacterDraft,
   replacementWealthGrantCp,
   startingWealthCp,
@@ -1475,7 +1476,10 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
       let result: LongRestResult;
       try {
         const draft = normalizeCharacterDraft(JSON.parse(character.data), character.name);
-        result = applyLongRest(draft, computeCharacter(draft, contextForDraft(draft)));
+        const context = contextForDraft(draft);
+        result = applyLongRest(draft, computeCharacter(draft, context), {
+          preparedCaster: isPreparedCasterClass(context.classData?.name),
+        });
       } catch {
         skipped += 1;
         continue;
