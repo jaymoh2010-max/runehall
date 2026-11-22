@@ -239,12 +239,15 @@ export async function registerShopRoutes(app: FastifyInstance): Promise<void> {
     const { id } = request.params as { id: string };
     const campaign = getCampaign(id);
     if (!campaign) return reply.code(404).send({ error: "Campaign not found." });
-    if (!getCampaignRole(id, request.user.id)) {
+    const role = getCampaignRole(id, request.user.id);
+    if (!role) {
       return reply.code(403).send({ error: "You are not a member of this campaign." });
     }
     const active = ensureActiveMerchant(campaign);
+    const visibleMerchants =
+      role === "gm" ? merchantsFor(id) : merchantsFor(id).filter((merchant) => merchant.active);
     return reply.send({
-      merchants: merchantsFor(id).map((merchant) => ({
+      merchants: visibleMerchants.map((merchant) => ({
         id: merchant.id,
         name: merchant.name,
         description: merchant.description,

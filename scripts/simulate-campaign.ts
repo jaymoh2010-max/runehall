@@ -3020,7 +3020,11 @@ async function runCampaignA(gm: Account, players: Account[]): Promise<void> {
       });
 
       // Clean up the copy so the simulation leaves one campaign behind.
-      await api(`/api/campaigns/${importedCampaign.id}`, { method: "DELETE", cookie: gm.cookie });
+      await api(`/api/campaigns/${importedCampaign.id}`, {
+        method: "DELETE",
+        cookie: gm.cookie,
+        body: { confirmName: importedCampaign.name },
+      });
     }
   );
 
@@ -3436,7 +3440,11 @@ async function main(): Promise<void> {
     await check("cleanup", "campaigns delete cleanly", async () => {
       const campaigns = await api("/api/campaigns", { cookie: gm.cookie });
       for (const campaign of campaigns.payload.campaigns as Json[]) {
-        await api(`/api/campaigns/${campaign.id}`, { method: "DELETE", cookie: gm.cookie });
+        await api(`/api/campaigns/${campaign.id}`, {
+          method: "DELETE",
+          cookie: gm.cookie,
+          body: { confirmName: String(campaign.name ?? "") },
+        });
       }
       const after = await api("/api/campaigns", { cookie: gm.cookie });
       assertEqual((after.payload.campaigns as Json[]).length, 0, "Campaigns after cleanup");

@@ -244,6 +244,7 @@ export interface SceneRow {
   vision_scope: string;
   props: string;
   prop_collision: number;
+  visible: number;
   sort_order: number;
   created_at: number;
   updated_at: number;
@@ -469,6 +470,8 @@ export interface CampaignChapterRow {
   level_start: number;
   level_end: number;
   status: string;
+  visible: number;
+  gm_notes: string;
   sort_order: number;
   created_at: number;
   updated_at: number;

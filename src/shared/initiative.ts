@@ -59,9 +59,14 @@ export function renameInitiativeEntries(
 export function filterInitiativeForPlayers(
   entries: InitiativeEntry[],
   hiddenTokenIds: ReadonlySet<string>,
-  turnIndex: number
+  turnIndex: number,
+  hiddenSceneIds: ReadonlySet<string> = new Set()
 ): { entries: InitiativeEntry[]; turnIndex: number } {
-  const visible = entries.filter((entry) => !entry.tokenId || !hiddenTokenIds.has(entry.tokenId));
+  const visible = entries.filter(
+    (entry) =>
+      (!entry.tokenId || !hiddenTokenIds.has(entry.tokenId)) &&
+      (!entry.sceneId || !hiddenSceneIds.has(entry.sceneId))
+  );
   const activeEntryId = entries[turnIndex]?.id;
   const visibleTurnIndex = Math.max(
     0,

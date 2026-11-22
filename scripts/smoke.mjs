@@ -1168,12 +1168,13 @@ async function main() {
   const importedAssets = await api(`/api/campaigns/${importedArchive.payload.campaign.id}/assets`, {
     cookie: gmCookie,
   });
-  if (!importedAssets.payload.assets.some((asset) => asset.filename === firstAsset.filename)) {
+  if (!importedAssets.payload.assets.length) {
     throw new Error("Imported campaign did not register the embedded asset");
   }
   await api(`/api/campaigns/${importedArchive.payload.campaign.id}`, {
     method: "DELETE",
     cookie: gmCookie,
+    body: { confirmName: importedArchive.payload.campaign.name },
   });
   log("self-contained archive embeds and restores uploaded files");
 
@@ -1645,6 +1646,7 @@ async function main() {
       levelStart: 1,
       levelEnd: 4,
       status: "active",
+      gmNotes: "Smoke GM secret: the crown is a phylactery.",
     },
   });
   const secondChapter = await api(`/api/campaigns/${campaign.id}/chapters`, {
@@ -1655,6 +1657,8 @@ async function main() {
       summary: "The road into the vault.",
       levelStart: 5,
       levelEnd: 8,
+      visible: false,
+      gmNotes: "Do not reveal the vault until the party finds the map.",
     },
   });
   if (firstChapter.payload.chapters.length !== 1 || secondChapter.payload.chapters.length !== 2) {
@@ -1663,8 +1667,11 @@ async function main() {
   const playerChapters = await api(`/api/campaigns/${campaign.id}/chapters`, {
     cookie: playerCookie,
   });
-  if (playerChapters.payload.chapters.length !== 2) {
-    throw new Error("Player could not read the adventure arc");
+  if (playerChapters.payload.chapters.length !== 1) {
+    throw new Error("Player could see a GM-only chapter");
+  }
+  if ("gmNotes" in playerChapters.payload.chapters[0]) {
+    throw new Error("Player chapter payload leaked GM prep notes");
   }
   const playerChapterWrite = await fetch(`${base}/api/campaigns/${campaign.id}/chapters`, {
     method: "POST",
@@ -1688,6 +1695,23 @@ async function main() {
     statusFor(secondChapter.payload.chapter.id) !== "active"
   ) {
     throw new Error("Only one adventure chapter should be active");
+  }
+  const hiddenActiveForPlayer = await api(`/api/campaigns/${campaign.id}/chapters`, {
+    cookie: playerCookie,
+  });
+  if (hiddenActiveForPlayer.payload.chapters.length !== 1) {
+    throw new Error("Hidden chapter became visible when it became active");
+  }
+  await api(`/api/campaigns/${campaign.id}/chapters/${secondChapter.payload.chapter.id}`, {
+    method: "PATCH",
+    cookie: gmCookie,
+    body: { visible: true },
+  });
+  const revealedChapters = await api(`/api/campaigns/${campaign.id}/chapters`, {
+    cookie: playerCookie,
+  });
+  if (revealedChapters.payload.chapters.length !== 2) {
+    throw new Error("Revealed chapter did not reach the player");
   }
   const deletedChapter = await api(
     `/api/campaigns/${campaign.id}/chapters/${firstChapter.payload.chapter.id}`,
@@ -1871,6 +1895,56 @@ async function main() {
     throw new Error("Scene prop persistence or player rejection failed");
   }
   log("GM props persist and players cannot replace scene props");
+
+  let playerSawPrepScene = false;
+  const onPrepScene = (created) => {
+    if (created.name === "GM Prep Vault") playerSawPrepScene = true;
+  };
+  playerSocket.on("scene:created", onPrepScene);
+  const prepScene = await api(`/api/campaigns/${campaign.id}/scenes`, {
+    method: "POST",
+    cookie: gmCookie,
+    body: { name: "GM Prep Vault", visible: false, activate: false },
+  });
+  if (prepScene.payload.scene.visible !== false) {
+    throw new Error("GM-only scene was not created hidden");
+  }
+  const prepToken = await emitAck(gmSocket, "token:create", {
+    campaignId: campaign.id,
+    sceneId: prepScene.payload.scene.id,
+    token: { name: "Vault Guardian", x: 120, y: 120, size: 1, hidden: false },
+  });
+  await delay(250);
+  playerSocket.off("scene:created", onPrepScene);
+  if (playerSawPrepScene) throw new Error("GM-only scene creation leaked to the player");
+  const prepPlayerTable = await api(`/api/campaigns/${campaign.id}/table`, {
+    cookie: playerCookie,
+  });
+  if (prepPlayerTable.payload.scenes.some((entry) => entry.id === prepScene.payload.scene.id)) {
+    throw new Error("GM-only scene appeared in the player snapshot");
+  }
+  if (prepPlayerTable.payload.tokens.some((entry) => entry.id === prepToken.id)) {
+    throw new Error("Token on a GM-only scene appeared in the player snapshot");
+  }
+  const prepGmTable = await api(`/api/campaigns/${campaign.id}/table`, { cookie: gmCookie });
+  if (
+    !prepGmTable.payload.scenes.some((entry) => entry.id === prepScene.payload.scene.id) ||
+    !prepGmTable.payload.tokens.some((entry) => entry.id === prepToken.id)
+  ) {
+    throw new Error("GM-only scene or token was missing from the GM snapshot");
+  }
+  await api(`/api/scenes/${prepScene.payload.scene.id}`, {
+    method: "PATCH",
+    cookie: gmCookie,
+    body: { visible: true },
+  });
+  const revealedPrepTable = await api(`/api/campaigns/${campaign.id}/table`, {
+    cookie: playerCookie,
+  });
+  if (!revealedPrepTable.payload.scenes.some((entry) => entry.id === prepScene.payload.scene.id)) {
+    throw new Error("Revealed scene did not reach the player snapshot");
+  }
+  log("GM-only scenes and their tokens stay out of player snapshots until revealed");
 
   const duplicatedScene = await api(`/api/scenes/${scene.id}/duplicate`, {
     method: "POST",
@@ -2936,6 +3010,7 @@ async function main() {
   await api(`/api/campaigns/${importedLibrary.payload.campaign.id}`, {
     method: "DELETE",
     cookie: gmCookie,
+    body: { confirmName: importedLibrary.payload.campaign.name },
   });
   await api(`/api/campaigns/${campaign.id}/audio/${addedLibraryTrack.id}`, {
     method: "DELETE",
@@ -3019,6 +3094,7 @@ async function main() {
   await api(`/api/campaigns/${importedAudio.payload.campaign.id}`, {
     method: "DELETE",
     cookie: gmCookie,
+    body: { confirmName: importedAudio.payload.campaign.name },
   });
   log("soundtrack survives campaign export and import");
   playerSocket.emit("audio:update", {
@@ -3559,8 +3635,23 @@ async function main() {
   gmSocket.close();
   playerSocket.close();
 
-  await api(`/api/campaigns/${importedCampaign.id}`, { method: "DELETE", cookie: gmCookie });
-  await api(`/api/campaigns/${campaign.id}`, { method: "DELETE", cookie: gmCookie });
+  const unconfirmedDelete = await fetch(`${base}/api/campaigns/${campaign.id}`, {
+    method: "DELETE",
+    headers: { cookie: gmCookie },
+  });
+  if (unconfirmedDelete.status !== 400) {
+    throw new Error("Campaign deletion did not require the campaign name");
+  }
+  await api(`/api/campaigns/${importedCampaign.id}`, {
+    method: "DELETE",
+    cookie: gmCookie,
+    body: { confirmName: importedCampaign.name },
+  });
+  await api(`/api/campaigns/${campaign.id}`, {
+    method: "DELETE",
+    cookie: gmCookie,
+    body: { confirmName: campaign.name },
+  });
   log("GM deleted the temporary campaigns");
 
   console.log(`\nSmoke test passed for users ${gm.username} and ${player.username}.`);

@@ -55,10 +55,15 @@ export async function registerChapterRoutes(app: FastifyInstance): Promise<void>
     if (!request.user) return reply.code(401).send({ error: "Sign in to continue." });
     const { id } = request.params as { id: string };
     if (!getCampaign(id)) return reply.code(404).send({ error: "Campaign not found." });
-    if (!getCampaignRole(id, request.user.id)) {
+    const role = getCampaignRole(id, request.user.id);
+    if (!role) {
       return reply.code(403).send({ error: "You are not a member of this campaign." });
     }
-    return reply.send({ chapters: chaptersFor(id).map(serializeCampaignChapter) });
+    const rows =
+      role === "gm" ? chaptersFor(id) : chaptersFor(id).filter((row) => row.visible !== 0);
+    return reply.send({
+      chapters: rows.map((row) => serializeCampaignChapter(row, role === "gm")),
+    });
   });
 
   app.post("/api/campaigns/:id/chapters", async (request, reply) => {
@@ -73,13 +78,14 @@ export async function registerChapterRoutes(app: FastifyInstance): Promise<void>
     if (!title) return reply.code(400).send({ error: "Give the chapter a title." });
     const { levelStart, levelEnd } = levelRange(body);
     const status = normalizeChapterStatus(body.status);
+    const visible = body.visible === undefined ? true : body.visible !== false;
     const chapterId = newId("chapter");
     const ts = now();
     db.prepare(
       `INSERT INTO campaign_chapters
-         (id, campaign_id, title, summary, level_start, level_end, status, sort_order,
-          created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         (id, campaign_id, title, summary, level_start, level_end, status, visible, gm_notes,
+          sort_order, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       chapterId,
       id,
@@ -88,6 +94,8 @@ export async function registerChapterRoutes(app: FastifyInstance): Promise<void>
       levelStart,
       levelEnd,
       status,
+      visible ? 1 : 0,
+      sanitizeUserText(body.gmNotes, 8_000),
       nextSortOrder(id),
       ts,
       ts
@@ -109,7 +117,7 @@ export async function registerChapterRoutes(app: FastifyInstance): Promise<void>
     broadcastCampaignSummary(app, getCampaign(id)!);
     return reply.code(201).send({
       chapter: serializeCampaignChapter(chapterRow(id, chapterId)!),
-      chapters: chaptersFor(id).map(serializeCampaignChapter),
+      chapters: chaptersFor(id).map((chapter) => serializeCampaignChapter(chapter)),
     });
   });
 
@@ -129,10 +137,12 @@ export async function registerChapterRoutes(app: FastifyInstance): Promise<void>
     const { levelStart, levelEnd } = levelRange(body, existing);
     const status =
       body.status === undefined ? existing.status : normalizeChapterStatus(body.status);
+    const visible = body.visible === undefined ? existing.visible : body.visible === false ? 0 : 1;
     const ts = now();
     db.prepare(
       `UPDATE campaign_chapters
-       SET title = ?, summary = ?, level_start = ?, level_end = ?, status = ?, updated_at = ?
+       SET title = ?, summary = ?, level_start = ?, level_end = ?, status = ?, visible = ?,
+           gm_notes = ?, updated_at = ?
        WHERE id = ?`
     ).run(
       title,
@@ -140,6 +150,8 @@ export async function registerChapterRoutes(app: FastifyInstance): Promise<void>
       levelStart,
       levelEnd,
       status,
+      visible,
+      body.gmNotes === undefined ? existing.gm_notes : sanitizeUserText(body.gmNotes, 8_000),
       ts,
       chapterId
     );
@@ -160,7 +172,7 @@ export async function registerChapterRoutes(app: FastifyInstance): Promise<void>
     broadcastCampaignSummary(app, getCampaign(id)!);
     return reply.send({
       chapter: serializeCampaignChapter(chapterRow(id, chapterId)!),
-      chapters: chaptersFor(id).map(serializeCampaignChapter),
+      chapters: chaptersFor(id).map((chapter) => serializeCampaignChapter(chapter)),
     });
   });
 
@@ -184,6 +196,8 @@ export async function registerChapterRoutes(app: FastifyInstance): Promise<void>
       request,
     });
     broadcastCampaignSummary(app, getCampaign(id)!);
-    return reply.send({ chapters: chaptersFor(id).map(serializeCampaignChapter) });
+    return reply.send({
+      chapters: chaptersFor(id).map((chapter) => serializeCampaignChapter(chapter)),
+    });
   });
 }

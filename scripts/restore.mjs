@@ -27,6 +27,7 @@ const databasePath = process.env.DATABASE_PATH
   ? path.resolve(process.env.DATABASE_PATH)
   : path.join(dataDir, "runehall.db");
 const uploadsDir = path.join(dataDir, "uploads");
+const compendiumDir = path.resolve(process.env.COMPENDIUM_DIR || path.join(dataDir, "compendium"));
 const port = Number(process.env.PORT || 3001);
 
 if (!fromArg) {
@@ -110,6 +111,9 @@ if (fs.existsSync(databasePath)) {
 if (fs.existsSync(uploadsDir)) {
   fs.cpSync(uploadsDir, path.join(safetyDir, "uploads"), { recursive: true });
 }
+if (fs.existsSync(compendiumDir)) {
+  fs.cpSync(compendiumDir, path.join(safetyDir, "compendium"), { recursive: true });
+}
 
 for (const suffix of ["", "-wal", "-shm"]) {
   const file = `${databasePath}${suffix}`;
@@ -125,8 +129,22 @@ if (fs.existsSync(backupUploads)) {
   fs.cpSync(backupUploads, uploadsDir, { recursive: true });
 }
 
+const backupCompendium = path.join(backupDir, "compendium");
+let restoredCompendium = false;
+if (fs.existsSync(backupCompendium)) {
+  if (fs.existsSync(compendiumDir)) fs.rmSync(compendiumDir, { recursive: true, force: true });
+  fs.mkdirSync(path.dirname(compendiumDir), { recursive: true });
+  fs.cpSync(backupCompendium, compendiumDir, { recursive: true });
+  restoredCompendium = true;
+} else {
+  console.warn(
+    `WARNING: this backup has no compendium at ${backupCompendium}. Keep the existing rules data in ${compendiumDir}.`
+  );
+}
+
 console.log(`Restored ${backupDir}`);
 console.log(`  Database: ${databasePath}`);
 console.log(`  Uploads:  ${uploadsDir}`);
+console.log(`  Compendium: ${restoredCompendium ? compendiumDir : "left unchanged"}`);
 console.log(`  Safety copy of previous data: ${safetyDir}`);
 console.log("Start Runehall again with: npm run dev");

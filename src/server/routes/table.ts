@@ -84,7 +84,9 @@ function broadcastScene(
   event: string,
   row: SceneRow
 ): void {
-  app.broadcastCampaign(campaignId, event, serializeSceneForPlayers(row), "players");
+  if (row.visible !== 0) {
+    app.broadcastCampaign(campaignId, event, serializeSceneForPlayers(row), "players");
+  }
   app.broadcastCampaign(campaignId, event, serializeScene(row), "gm");
 }
 
@@ -98,9 +100,12 @@ export async function registerTableRoutes(app: FastifyInstance): Promise<void> {
     if (!role) return reply.code(403).send({ error: "You're not a member of that campaign." });
 
     const state = ensureState(id);
-    const scenes = db
+    const allScenes = db
       .prepare("SELECT * FROM scenes WHERE campaign_id = ? ORDER BY sort_order ASC, created_at ASC")
       .all(id) as SceneRow[];
+    // Hidden scenes are GM prep. Players must not receive the scene row or any
+    // of its tokens, even if they never open the table tab.
+    const scenes = role === "player" ? allScenes.filter((scene) => scene.visible !== 0) : allScenes;
     const sceneIds = new Set(scenes.map((scene) => scene.id));
     const tokenRows = scenes.length
       ? (db
@@ -158,10 +163,15 @@ export async function registerTableRoutes(app: FastifyInstance): Promise<void> {
           )
         : new Set<string>();
     const fullInitiative = serializeInitiative(JSON.parse(state.initiative || "[]"));
+    const hiddenSceneIds =
+      role === "player"
+        ? new Set(allScenes.filter((scene) => scene.visible === 0).map((scene) => scene.id))
+        : new Set<string>();
     const playerInitiative = filterInitiativeForPlayers(
       fullInitiative,
       hiddenTokenIds,
-      state.turn_index
+      state.turn_index,
+      hiddenSceneIds
     );
     const visibleInitiative = role === "player" ? playerInitiative.entries : fullInitiative;
     const visibleTurnIndex = role === "player" ? playerInitiative.turnIndex : state.turn_index;
@@ -207,14 +217,15 @@ export async function registerTableRoutes(app: FastifyInstance): Promise<void> {
     const gridSize = clamp(safeInt(body.gridSize, 70, 20, 300), 20, 300);
     const gridOffsetX = clamp(Number(body.gridOffsetX) || 0, -gridSize, gridSize);
     const gridOffsetY = clamp(Number(body.gridOffsetY) || 0, -gridSize, gridSize);
+    const visible = body.visible === undefined ? true : body.visible !== false;
     const order = db
       .prepare("SELECT COALESCE(MAX(sort_order), 0) + 1 AS next FROM scenes WHERE campaign_id = ?")
       .get(id) as { next: number };
     const sceneId = `scene_${Math.random().toString(16).slice(2, 14)}${Date.now().toString(16)}`;
     const ts = now();
     db.prepare(
-      `INSERT INTO scenes (id, campaign_id, name, image_url, thumbnail_url, width, height, grid_size, grid_offset_x, grid_offset_y, fog_enabled, fog_revealed, sort_order, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, '[]', ?, ?, ?)`
+      `INSERT INTO scenes (id, campaign_id, name, image_url, thumbnail_url, width, height, grid_size, grid_offset_x, grid_offset_y, fog_enabled, fog_revealed, visible, sort_order, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, '[]', ?, ?, ?, ?)`
     ).run(
       sceneId,
       id,
@@ -226,6 +237,7 @@ export async function registerTableRoutes(app: FastifyInstance): Promise<void> {
       gridSize,
       gridOffsetX,
       gridOffsetY,
+      visible ? 1 : 0,
       order.next,
       ts,
       ts
@@ -233,7 +245,7 @@ export async function registerTableRoutes(app: FastifyInstance): Promise<void> {
     const row = db.prepare("SELECT * FROM scenes WHERE id = ?").get(sceneId) as SceneRow;
     const scene = serializeScene(row);
     broadcastScene(app, id, "scene:created", row);
-    if (body.activate === true) {
+    if (body.activate === true && visible) {
       ensureState(id);
       db.prepare(
         "UPDATE campaign_state SET active_scene_id = ?, updated_at = ? WHERE campaign_id = ?"
@@ -259,8 +271,8 @@ export async function registerTableRoutes(app: FastifyInstance): Promise<void> {
     const ts = now();
     const name = `${source.name} (copy)`.slice(0, 80);
     db.prepare(
-      `INSERT INTO scenes (id, campaign_id, name, image_url, thumbnail_url, width, height, grid_size, grid_offset_x, grid_offset_y, fog_enabled, fog_revealed, templates, walls, los_enabled, wall_collision, ambient_light, vision_scope, props, prop_collision, sort_order, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO scenes (id, campaign_id, name, image_url, thumbnail_url, width, height, grid_size, grid_offset_x, grid_offset_y, fog_enabled, fog_revealed, templates, walls, los_enabled, wall_collision, ambient_light, vision_scope, props, prop_collision, visible, sort_order, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       sceneId,
       source.campaign_id,
@@ -282,6 +294,7 @@ export async function registerTableRoutes(app: FastifyInstance): Promise<void> {
       source.vision_scope,
       source.props,
       source.prop_collision,
+      source.visible,
       order.next,
       ts,
       ts
@@ -386,8 +399,9 @@ export async function registerTableRoutes(app: FastifyInstance): Promise<void> {
         : normalizePartyVisionScope(body.visionScope);
     const propCollision =
       body.propCollision === undefined ? row.prop_collision : body.propCollision ? 1 : 0;
+    const visible = body.visible === undefined ? row.visible : body.visible ? 1 : 0;
     db.prepare(
-      `UPDATE scenes SET name = ?, image_url = ?, thumbnail_url = ?, width = ?, height = ?, grid_size = ?, grid_offset_x = ?, grid_offset_y = ?, fog_enabled = ?, los_enabled = ?, wall_collision = ?, ambient_light = ?, vision_scope = ?, prop_collision = ?, updated_at = ? WHERE id = ?`
+      `UPDATE scenes SET name = ?, image_url = ?, thumbnail_url = ?, width = ?, height = ?, grid_size = ?, grid_offset_x = ?, grid_offset_y = ?, fog_enabled = ?, los_enabled = ?, wall_collision = ?, ambient_light = ?, vision_scope = ?, prop_collision = ?, visible = ?, updated_at = ? WHERE id = ?`
     ).run(
       name,
       imageUrl,
@@ -403,12 +417,42 @@ export async function registerTableRoutes(app: FastifyInstance): Promise<void> {
       ambientLight,
       visionScope,
       propCollision,
+      visible,
       now(),
       id
     );
     const updated = db.prepare("SELECT * FROM scenes WHERE id = ?").get(id) as SceneRow;
     const scene = serializeScene(updated);
-    broadcastScene(app, row.campaign_id, "scene:updated", updated);
+    const wasVisible = row.visible !== 0;
+    const isVisible = updated.visible !== 0;
+    if (wasVisible && !isVisible) {
+      const state = ensureState(row.campaign_id);
+      if (state.active_scene_id === id) {
+        const next = db
+          .prepare(
+            "SELECT id FROM scenes WHERE campaign_id = ? AND visible = 1 AND id <> ? ORDER BY sort_order ASC, created_at ASC LIMIT 1"
+          )
+          .get(row.campaign_id, id) as { id: string } | undefined;
+        db.prepare(
+          "UPDATE campaign_state SET active_scene_id = ?, updated_at = ? WHERE campaign_id = ?"
+        ).run(next?.id ?? null, now(), row.campaign_id);
+        if (next) {
+          app.broadcastCampaign(row.campaign_id, "scene:activated", { sceneId: next.id });
+        }
+      }
+      app.broadcastCampaign(row.campaign_id, "scene:deleted", { sceneId: id }, "players");
+      app.broadcastCampaign(row.campaign_id, "scene:updated", serializeScene(updated), "gm");
+    } else if (!wasVisible && isVisible) {
+      app.broadcastCampaign(
+        row.campaign_id,
+        "scene:created",
+        serializeSceneForPlayers(updated),
+        "players"
+      );
+      app.broadcastCampaign(row.campaign_id, "scene:updated", serializeScene(updated), "gm");
+    } else {
+      broadcastScene(app, row.campaign_id, "scene:updated", updated);
+    }
     touchCampaign(row.campaign_id);
     return reply.send({ scene });
   });
@@ -420,6 +464,11 @@ export async function registerTableRoutes(app: FastifyInstance): Promise<void> {
     if (!row) return reply.code(404).send({ error: "Scene not found." });
     if (getCampaignRole(row.campaign_id, request.user.id) !== "gm") {
       return reply.code(403).send({ error: "Only the GM can change scenes." });
+    }
+    if (row.visible === 0) {
+      return reply
+        .code(400)
+        .send({ error: "Make the scene visible to players before activating it." });
     }
     ensureState(row.campaign_id);
     db.prepare(
@@ -440,7 +489,9 @@ export async function registerTableRoutes(app: FastifyInstance): Promise<void> {
     }
     db.prepare("DELETE FROM scenes WHERE id = ?").run(id);
     const remaining = db
-      .prepare("SELECT id FROM scenes WHERE campaign_id = ? ORDER BY sort_order ASC LIMIT 1")
+      .prepare(
+        "SELECT id FROM scenes WHERE campaign_id = ? AND visible = 1 ORDER BY sort_order ASC LIMIT 1"
+      )
       .get(row.campaign_id) as { id: string } | undefined;
     const state = ensureState(row.campaign_id);
     if (state.active_scene_id === id) {
@@ -450,6 +501,58 @@ export async function registerTableRoutes(app: FastifyInstance): Promise<void> {
       if (remaining)
         app.broadcastCampaign(row.campaign_id, "scene:activated", { sceneId: remaining.id });
     }
+    // Remove initiative entries for the deleted scene and its cascaded tokens.
+    const remainingTokenIds = new Set(
+      (
+        db
+          .prepare(
+            "SELECT id FROM tokens WHERE scene_id IN (SELECT id FROM scenes WHERE campaign_id = ?)"
+          )
+          .all(row.campaign_id) as { id: string }[]
+      ).map((token) => token.id)
+    );
+    const entries = serializeInitiative(JSON.parse(state.initiative || "[]")).filter(
+      (entry) => entry.sceneId !== id && (!entry.tokenId || remainingTokenIds.has(entry.tokenId))
+    );
+    const turnIndex = Math.max(0, Math.min(state.turn_index, Math.max(0, entries.length - 1)));
+    db.prepare(
+      "UPDATE campaign_state SET initiative = ?, turn_index = ?, updated_at = ? WHERE campaign_id = ?"
+    ).run(JSON.stringify(entries), turnIndex, now(), row.campaign_id);
+    const hiddenTokenIds = new Set(
+      (
+        db
+          .prepare(
+            `SELECT t.id FROM tokens t JOIN scenes s ON s.id = t.scene_id
+             WHERE s.campaign_id = ? AND (t.hidden = 1 OR s.visible = 0)`
+          )
+          .all(row.campaign_id) as { id: string }[]
+      ).map((token) => token.id)
+    );
+    const hiddenSceneIds = new Set(
+      (
+        db
+          .prepare("SELECT id FROM scenes WHERE campaign_id = ? AND visible = 0")
+          .all(row.campaign_id) as { id: string }[]
+      ).map((scene) => scene.id)
+    );
+    const playerOrder = filterInitiativeForPlayers(
+      entries,
+      hiddenTokenIds,
+      turnIndex,
+      hiddenSceneIds
+    );
+    app.broadcastCampaign(
+      row.campaign_id,
+      "initiative:updated",
+      { entries: playerOrder.entries, round: state.round, turnIndex: playerOrder.turnIndex },
+      "players"
+    );
+    app.broadcastCampaign(
+      row.campaign_id,
+      "initiative:updated",
+      { entries, round: state.round, turnIndex },
+      "gm"
+    );
     app.broadcastCampaign(row.campaign_id, "scene:deleted", { sceneId: id });
     touchCampaign(row.campaign_id);
     return reply.send({ ok: true });

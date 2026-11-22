@@ -29,7 +29,11 @@ describe("audio upload signatures", () => {
 
   it("is counted by the standalone orphan-cleanup scan", () => {
     const cleanup = fs.readFileSync(path.resolve("scripts", "cleanup-assets.mjs"), "utf8");
-    expect(cleanup).toContain('"campaign_audio_tracks"');
+    // The scan discovers every user table dynamically and always keeps files
+    // listed in the uploaded-assets library.
+    expect(cleanup).toContain("FROM sqlite_master");
+    expect(cleanup).toContain("SELECT * FROM");
+    expect(cleanup).toContain("uploaded_assets");
   });
 });
 

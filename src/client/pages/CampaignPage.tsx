@@ -240,6 +240,9 @@ export function CampaignPage() {
   const journalFileInputRef = useRef<HTMLInputElement>(null);
   const [settingsBusy, setSettingsBusy] = useState(false);
   const [settingsName, setSettingsName] = useState("");
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState("");
+  const [deleteBusy, setDeleteBusy] = useState(false);
   const [settingsDescription, setSettingsDescription] = useState("");
   const [settingsRuleset, setSettingsRuleset] = useState<CampaignRuleset>("core");
   const [settingsXpMode, setSettingsXpMode] = useState<XpMode>("milestone");
@@ -1416,17 +1419,21 @@ export function CampaignPage() {
 
   const deleteCampaign = async () => {
     if (!id || !campaign) return;
-    if (
-      !window.confirm(
-        `Delete “${campaign.name}” permanently? This removes every scene, character link, and journal entry.`
-      )
-    )
+    if (deleteConfirm.trim() !== campaign.name) {
+      toast("Type the campaign name exactly to confirm deletion.", "error");
       return;
+    }
+    setDeleteBusy(true);
     try {
-      await api(`/api/campaigns/${id}`, { method: "DELETE" });
+      await api(`/api/campaigns/${id}`, {
+        method: "DELETE",
+        body: { confirmName: deleteConfirm.trim() },
+      });
       navigate("/campaigns");
     } catch (err) {
       toast(errorMessage(err), "error");
+    } finally {
+      setDeleteBusy(false);
     }
   };
 
@@ -2533,7 +2540,14 @@ export function CampaignPage() {
                         This removes the campaign, scenes, journal, and character links permanently.
                       </p>
                     </div>
-                    <Button variant="danger" icon={<Trash2 size={14} />} onClick={deleteCampaign}>
+                    <Button
+                      variant="danger"
+                      icon={<Trash2 size={14} />}
+                      onClick={() => {
+                        setDeleteConfirm("");
+                        setDeleteOpen(true);
+                      }}
+                    >
                       Delete campaign
                     </Button>
                   </div>
@@ -2556,6 +2570,49 @@ export function CampaignPage() {
           </div>
         ) : null}
       </div>
+
+      <Modal
+        open={deleteOpen}
+        onClose={() => setDeleteOpen(false)}
+        title="Delete this campaign permanently?"
+        subtitle="There is no undo. Export a copy first if you might want any of it later."
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => void exportCampaign(true)}>
+              Export with files
+            </Button>
+            <Button variant="ghost" onClick={() => setDeleteOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              loading={deleteBusy}
+              disabled={!campaign || deleteConfirm.trim() !== campaign.name}
+              onClick={() => void deleteCampaign()}
+            >
+              Delete permanently
+            </Button>
+          </>
+        }
+      >
+        <div className="stack">
+          <p className="small muted">
+            This removes the campaign, every scene and token, journal entries, sessions, loot, NPCs,
+            and character links. Characters themselves are kept but unassigned.
+          </p>
+          <Field
+            label="Type the campaign name to confirm"
+            hint={campaign ? `Type "${campaign.name}" exactly.` : undefined}
+          >
+            <Input
+              autoFocus
+              value={deleteConfirm}
+              onChange={(event) => setDeleteConfirm(event.target.value)}
+              placeholder={campaign?.name ?? ""}
+            />
+          </Field>
+        </div>
+      </Modal>
 
       <InviteModal
         open={inviteOpen}

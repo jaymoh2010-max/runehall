@@ -57,7 +57,7 @@ async function freePort() {
   });
 }
 
-function startServer(dataDir, port) {
+function startServer(dataDir, port, rulesDir = compendiumDir) {
   const child = spawn(process.execPath, [tsxCli, "src/server/index.ts"], {
     cwd: projectRoot,
     env: {
@@ -66,7 +66,7 @@ function startServer(dataDir, port) {
       HOST: "127.0.0.1",
       DATA_DIR: dataDir,
       DATABASE_PATH: path.join(dataDir, "runehall.db"),
-      COMPENDIUM_DIR: compendiumDir,
+      COMPENDIUM_DIR: rulesDir,
       LOG_LEVEL: "error",
       NODE_ENV: "production",
       ENABLE_CSP: "0",
@@ -248,6 +248,7 @@ async function main() {
     ...backupEnv,
     DATA_DIR: restoredData,
     DATABASE_PATH: path.join(restoredData, "runehall.db"),
+    COMPENDIUM_DIR: path.join(restoredData, "compendium"),
     PORT: String(port),
   };
   runScript("scripts/restore.mjs", ["--from", shipped, "--yes"], restoreEnv);
@@ -257,9 +258,13 @@ async function main() {
   if (!fs.existsSync(path.join(restoredData, "uploads", upload.filename))) {
     throw new Error("Restore did not copy uploaded assets.");
   }
-  log("restored the database and uploads into a fresh data directory");
+  const restoredCompendium = path.join(restoredData, "compendium");
+  if (!fs.existsSync(path.join(restoredCompendium, "manifest.json"))) {
+    throw new Error("Restore did not copy the compendium.");
+  }
+  log("restored the database, uploads, and compendium into a fresh data directory");
 
-  activeServer = startServer(restoredData, port);
+  activeServer = startServer(restoredData, port, restoredCompendium);
   await waitForServer(activeServer);
   const login = await api("/api/auth/login", {
     method: "POST",

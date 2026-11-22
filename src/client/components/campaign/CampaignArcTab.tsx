@@ -21,6 +21,7 @@ import {
   Select,
   Tag,
   Textarea,
+  Toggle,
 } from "../ui";
 
 function statusTone(status: ChapterStatus): "gold" | "blue" | "green" {
@@ -162,10 +163,18 @@ export function CampaignArcTab({
                       {CHAPTER_STATUSES.find((entry) => entry.id === chapter.status)?.label}
                     </Tag>
                     <Badge tone="neutral">
-                      Levels {chapter.levelStart}–{chapter.levelEnd}
+                      Levels {chapter.levelStart}-{chapter.levelEnd}
                     </Badge>
+                    {isGm && chapter.visible === false ? (
+                      <Badge tone="neutral">GM only</Badge>
+                    ) : null}
                   </div>
                   {chapter.summary ? <p className="small muted">{chapter.summary}</p> : null}
+                  {isGm && chapter.gmNotes ? (
+                    <p className="small muted">
+                      <strong>Prep:</strong> {chapter.gmNotes}
+                    </p>
+                  ) : null}
                 </div>
                 {isGm ? (
                   <div className="row wrap" style={{ gap: 4 }}>
@@ -244,6 +253,8 @@ function ChapterEditor({
   const [levelStart, setLevelStart] = useState("1");
   const [levelEnd, setLevelEnd] = useState("1");
   const [status, setStatus] = useState<ChapterStatus>("planned");
+  const [visible, setVisible] = useState(true);
+  const [gmNotes, setGmNotes] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -254,6 +265,8 @@ function ChapterEditor({
     setLevelStart(String(editing?.levelStart ?? 1));
     setLevelEnd(String(editing?.levelEnd ?? 1));
     setStatus(editing?.status ?? "planned");
+    setVisible(editing ? editing.visible !== false : true);
+    setGmNotes(editing?.gmNotes ?? "");
     setError("");
   }, [open, editing?.id]);
 
@@ -272,6 +285,8 @@ function ChapterEditor({
         levelStart: normalizeChapterLevel(levelStart),
         levelEnd: normalizeChapterLevel(levelEnd, normalizeChapterLevel(levelStart)),
         status: normalizeChapterStatus(status),
+        visible,
+        gmNotes,
       };
       const result = editing
         ? await api<{ chapters: CampaignChapter[] }>(
@@ -354,13 +369,31 @@ function ChapterEditor({
         </div>
         <Field
           label="Chapter summary"
-          hint="Spoiler-light enough to show the party where they are."
+          hint="Shown to players when the chapter is visible. Keep it spoiler-light."
         >
           <Textarea
             rows={4}
             value={summary}
             onChange={(event) => setSummary(event.target.value)}
             placeholder="What this chapter is about and what the party is trying to do."
+          />
+        </Field>
+        <Field label="Player visibility">
+          <Toggle
+            checked={visible}
+            onChange={setVisible}
+            label={visible ? "Visible to players" : "GM only - planned chapters stay private"}
+          />
+        </Field>
+        <Field
+          label="GM prep notes"
+          hint="Encounter plans, level gates, and spoilers. Never shown to players."
+        >
+          <Textarea
+            rows={5}
+            value={gmNotes}
+            onChange={(event) => setGmNotes(event.target.value)}
+            placeholder="What has to happen before the party moves to the next chapter."
           />
         </Field>
       </form>

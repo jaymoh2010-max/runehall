@@ -830,4 +830,13 @@ export const migrations: Migration[] = [
       ALTER TABLE loot_parcels ADD COLUMN level INTEGER NOT NULL DEFAULT 1;
     `,
   },
+  {
+    version: 46,
+    name: "scene_and_chapter_visibility",
+    sql: `
+      ALTER TABLE scenes ADD COLUMN visible INTEGER NOT NULL DEFAULT 1;
+      ALTER TABLE campaign_chapters ADD COLUMN visible INTEGER NOT NULL DEFAULT 1;
+      ALTER TABLE campaign_chapters ADD COLUMN gm_notes TEXT NOT NULL DEFAULT '';
+    `,
+  },
 ];

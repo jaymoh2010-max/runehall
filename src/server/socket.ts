@@ -203,13 +203,25 @@ function broadcastInitiative(
     (
       db
         .prepare(
-          `SELECT id FROM tokens WHERE hidden = 1 AND scene_id IN
-           (SELECT id FROM scenes WHERE campaign_id = ?)`
+          `SELECT t.id FROM tokens t JOIN scenes s ON s.id = t.scene_id
+           WHERE s.campaign_id = ? AND (t.hidden = 1 OR s.visible = 0)`
         )
         .all(campaignId) as { id: string }[]
     ).map((row) => row.id)
   );
-  const playerOrder = filterInitiativeForPlayers(fullEntries, hiddenTokenIds, state.turn_index);
+  const hiddenSceneIds = new Set(
+    (
+      db.prepare("SELECT id FROM scenes WHERE campaign_id = ? AND visible = 0").all(campaignId) as {
+        id: string;
+      }[]
+    ).map((row) => row.id)
+  );
+  const playerOrder = filterInitiativeForPlayers(
+    fullEntries,
+    hiddenTokenIds,
+    state.turn_index,
+    hiddenSceneIds
+  );
   // Players never see a hidden combatant, even if it was rolled before being
   // hidden. The GM still receives the authoritative full order.
   io.to(room(campaignId)).except(gmRoom(campaignId)).emit("initiative:updated", {
@@ -1071,7 +1083,7 @@ export function registerSocketServer(io: TypedServer): void {
     on("scene:activate", ({ campaignId, sceneId }) => {
       if (!requireGm(socket, campaignId)) return;
       const scene = sceneBelongs(sceneId, campaignId);
-      if (!scene) return;
+      if (!scene || scene.visible === 0) return;
       ensureState(campaignId);
       db.prepare(
         "UPDATE campaign_state SET active_scene_id = ?, updated_at = ? WHERE campaign_id = ?"
@@ -1097,9 +1109,11 @@ export function registerSocketServer(io: TypedServer): void {
         "UPDATE scenes SET name = ?, fog_enabled = ?, grid_size = ?, updated_at = ? WHERE id = ?"
       ).run(name, fogEnabled, gridSize, now(), scene.id);
       const updated = db.prepare("SELECT * FROM scenes WHERE id = ?").get(scene.id) as SceneRow;
-      io.to(room(campaignId))
-        .except(gmRoom(campaignId))
-        .emit("scene:updated", serializeSceneForPlayers(updated));
+      if (updated.visible !== 0) {
+        io.to(room(campaignId))
+          .except(gmRoom(campaignId))
+          .emit("scene:updated", serializeSceneForPlayers(updated));
+      }
       io.to(gmRoom(campaignId)).emit("scene:updated", serializeScene(updated));
       touchCampaign(campaignId);
     });
@@ -1150,7 +1164,9 @@ export function registerSocketServer(io: TypedServer): void {
       if (!scene) return;
       db.prepare("DELETE FROM scenes WHERE id = ?").run(sceneId);
       const remaining = db
-        .prepare("SELECT id FROM scenes WHERE campaign_id = ? ORDER BY sort_order ASC LIMIT 1")
+        .prepare(
+          "SELECT id FROM scenes WHERE campaign_id = ? AND visible = 1 ORDER BY sort_order ASC LIMIT 1"
+        )
         .get(campaignId) as { id: string } | undefined;
       const state = ensureState(campaignId);
       if (state.active_scene_id === sceneId) {
@@ -1159,7 +1175,27 @@ export function registerSocketServer(io: TypedServer): void {
         ).run(remaining?.id ?? null, now(), campaignId);
         if (remaining) io.to(room(campaignId)).emit("scene:activated", { sceneId: remaining.id });
       }
+      // Scenes cascade to their tokens, so any initiative entry for that scene
+      // or for a now-deleted token is a ghost. Remove it before broadcasting.
+      const remainingTokenIds = new Set(
+        (
+          db
+            .prepare(
+              "SELECT id FROM tokens WHERE scene_id IN (SELECT id FROM scenes WHERE campaign_id = ?)"
+            )
+            .all(campaignId) as { id: string }[]
+        ).map((row) => row.id)
+      );
+      const entries = serializeInitiative(JSON.parse(state.initiative || "[]")).filter(
+        (entry) =>
+          entry.sceneId !== sceneId && (!entry.tokenId || remainingTokenIds.has(entry.tokenId))
+      );
+      const turnIndex = Math.max(0, Math.min(state.turn_index, Math.max(0, entries.length - 1)));
+      db.prepare(
+        "UPDATE campaign_state SET initiative = ?, turn_index = ?, updated_at = ? WHERE campaign_id = ?"
+      ).run(JSON.stringify(entries), turnIndex, now(), campaignId);
       io.to(room(campaignId)).emit("scene:deleted", { sceneId });
+      broadcastInitiative(io, campaignId, ensureState(campaignId));
       touchCampaign(campaignId);
     });
 
@@ -1189,7 +1225,10 @@ export function registerSocketServer(io: TypedServer): void {
       io.to(gmRoom(campaignId)).emit("scenes:reordered", scenes.map(serializeScene));
       io.to(room(campaignId))
         .except(gmRoom(campaignId))
-        .emit("scenes:reordered", scenes.map(serializeSceneForPlayers));
+        .emit(
+          "scenes:reordered",
+          scenes.filter((scene) => scene.visible !== 0).map(serializeSceneForPlayers)
+        );
       touchCampaign(campaignId);
     });
 
