@@ -11,7 +11,7 @@ import { currencyToCp } from "../../../shared/inventory";
 import { shopBuyCostCp, shopSellValueCp, shopQuantity } from "../../../shared/shop";
 import { ApiError, api, formatCp } from "../../api";
 import { errorMessage } from "../../stores";
-import { Badge, Button, Field, Input, Modal, PageEyebrow, Select } from "../ui";
+import { Badge, Button, Field, Input, Modal, PageEyebrow, Select, Tag } from "../ui";
 
 interface StockDraftRow {
   itemId: string;
@@ -52,6 +52,7 @@ export function ShopModal({
   const [stockTotal, setStockTotal] = useState(0);
   const [stockLoading, setStockLoading] = useState(false);
   const [stockSaving, setStockSaving] = useState(false);
+  const [merchantBusy, setMerchantBusy] = useState(false);
 
   const settlementLevel = character?.campaignSettlementLevel ?? 1;
   const ruleset = character?.campaignRuleset ?? "core";
@@ -377,6 +378,113 @@ export function ShopModal({
     }
   };
 
+  const activateMerchant = async (merchantId: string) => {
+    setMerchantBusy(true);
+    setError("");
+    try {
+      const result = await api<{ shop: ShopState }>(
+        `/api/campaigns/${character.campaignId}/shop/merchants/${merchantId}/activate`,
+        { method: "POST" }
+      );
+      applyShopState(result.shop);
+      toast(`Now shopping at ${result.shop.merchantName}.`, "success");
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setMerchantBusy(false);
+    }
+  };
+
+  const addMerchant = async () => {
+    const name = window.prompt("Name the new merchant:", "Traveling trader");
+    if (!name?.trim()) return;
+    setMerchantBusy(true);
+    setError("");
+    try {
+      const result = await api<{ shop: ShopState }>(
+        `/api/campaigns/${character.campaignId}/shop/merchants`,
+        {
+          method: "POST",
+          body: {
+            name: name.trim(),
+            description: "",
+            mode: stockMode,
+          },
+        }
+      );
+      applyShopState(result.shop);
+      toast(`Merchant “${name.trim()}” added.`, "success");
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setMerchantBusy(false);
+    }
+  };
+
+  const renameMerchant = async () => {
+    if (!shop) return;
+    const name = window.prompt("Merchant name:", shop.merchantName);
+    if (!name?.trim()) return;
+    const description = window.prompt("Short merchant description:", shop.merchantDescription);
+    if (description === null) return;
+    setMerchantBusy(true);
+    setError("");
+    try {
+      const result = await api<{ shop: ShopState }>(
+        `/api/campaigns/${character.campaignId}/shop/merchants/${shop.merchantId}`,
+        {
+          method: "PATCH",
+          body: { name: name.trim(), description },
+        }
+      );
+      applyShopState(result.shop);
+      toast("Merchant details saved.", "success");
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setMerchantBusy(false);
+    }
+  };
+
+  const deleteMerchant = async () => {
+    if (!shop || !window.confirm(`Delete “${shop.merchantName}”?`)) return;
+    setMerchantBusy(true);
+    setError("");
+    try {
+      const result = await api<{ shop: ShopState }>(
+        `/api/campaigns/${character.campaignId}/shop/merchants/${shop.merchantId}`,
+        { method: "DELETE" }
+      );
+      applyShopState(result.shop);
+      toast("Merchant deleted.", "success");
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setMerchantBusy(false);
+    }
+  };
+
+  const restockMerchant = async () => {
+    if (!shop) return;
+    const raw = window.prompt("Set every stock row to how many?", "5");
+    if (raw === null) return;
+    const quantity = Math.max(0, Math.min(9_999, Math.floor(Number(raw) || 0)));
+    setMerchantBusy(true);
+    setError("");
+    try {
+      const result = await api<{ shop: ShopState }>(
+        `/api/campaigns/${character.campaignId}/shop/merchants/${shop.merchantId}/restock`,
+        { method: "POST", body: { quantity } }
+      );
+      applyShopState(result.shop);
+      toast(`Restocked ${result.shop.merchantName} to ${quantity}.`, "success");
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setMerchantBusy(false);
+    }
+  };
+
   return (
     <Modal
       open={open}
@@ -422,6 +530,75 @@ export function ShopModal({
           <Coins size={12} /> {formatCp(currencyCp)}
         </Badge>
       </div>
+
+      {shop ? (
+        <div className="shop-merchant-bar">
+          <div>
+            <PageEyebrow>Merchant</PageEyebrow>
+            <strong>{shop.merchantName}</strong>
+            {shop.merchantDescription ? (
+              <p className="tiny muted">{shop.merchantDescription}</p>
+            ) : null}
+          </div>
+          <div className="row wrap" style={{ gap: 8 }}>
+            {isGm ? (
+              <Select
+                aria-label="Active merchant"
+                value={shop.merchantId}
+                disabled={merchantBusy}
+                onChange={(event) => void activateMerchant(event.target.value)}
+              >
+                {shop.merchants.map((merchant) => (
+                  <option key={merchant.id} value={merchant.id}>
+                    {merchant.name} (
+                    {merchant.mode === "stocked" ? `${merchant.stockCount} items` : "open"})
+                  </option>
+                ))}
+              </Select>
+            ) : (
+              <Tag tone={shop.mode === "stocked" ? "violet" : "gold"}>
+                {shop.mode === "stocked" ? "Tracked stock" : "Open market"}
+              </Tag>
+            )}
+            {isGm && tab === "stock" ? (
+              <>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  loading={merchantBusy}
+                  onClick={() => void addMerchant()}
+                >
+                  New merchant
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  loading={merchantBusy}
+                  onClick={() => void renameMerchant()}
+                >
+                  Rename
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  loading={merchantBusy}
+                  onClick={() => void restockMerchant()}
+                >
+                  Restock
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  disabled={merchantBusy || shop.merchants.length <= 1}
+                  onClick={() => void deleteMerchant()}
+                >
+                  Delete
+                </Button>
+              </>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
 
       {error ? <div className="auth-error">{error}</div> : null}
 

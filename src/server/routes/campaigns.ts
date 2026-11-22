@@ -22,6 +22,7 @@ import {
   type CampaignFactionRow,
   type CampaignKnowledgeRow,
   type CampaignChapterRow,
+  type CampaignMerchantRow,
   type CampaignNpcRow,
   type CampaignRow,
   type CampaignSessionZeroRow,
@@ -99,7 +100,12 @@ import {
   type AdvancementSpeed,
   type AccomplishmentTier,
 } from "../../shared/xp";
-import { isSettlementLevel, normalizeSettlementLevel, shopStockCount } from "../../shared/shop";
+import {
+  isSettlementLevel,
+  normalizeSettlementLevel,
+  normalizeShopStockMode,
+  shopStockCount,
+} from "../../shared/shop";
 import { grantHeroPoints, resetHeroPoints } from "../../shared/heroPoints";
 import { normalizeGolarionDate, shiftGolarionDate } from "../../shared/calendar";
 import { contextForDraft } from "../compendium";
@@ -657,13 +663,40 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
         )
         .all(id) as LootParcelRow[]
     ).map(serializeLootParcel);
-    const shopStock = (
+    const legacyShopStock = (
       db
         .prepare(
           "SELECT item_id, quantity FROM campaign_shop_stock WHERE campaign_id = ? ORDER BY item_id ASC"
         )
         .all(id) as { item_id: string; quantity: number }[]
     ).map((entry) => ({ itemId: entry.item_id, quantity: shopStockCount(entry.quantity) }));
+    const merchants = (
+      db
+        .prepare(
+          "SELECT * FROM campaign_merchants WHERE campaign_id = ? ORDER BY sort_order ASC, name ASC"
+        )
+        .all(id) as CampaignMerchantRow[]
+    ).map((merchant) => ({
+      id: merchant.id,
+      name: merchant.name,
+      description: merchant.description,
+      mode: normalizeShopStockMode(merchant.mode),
+      active: Boolean(merchant.active),
+      sortOrder: merchant.sort_order,
+      stock: (parseJson<unknown>(merchant.stock, []) as unknown[])
+        .filter((entry): entry is Record<string, unknown> =>
+          Boolean(entry && typeof entry === "object")
+        )
+        .map((entry) => ({
+          itemId: typeof entry.itemId === "string" ? entry.itemId : "",
+          quantity: shopStockCount(entry.quantity),
+        }))
+        .filter((entry) => entry.itemId),
+      createdAt: merchant.created_at,
+      updatedAt: merchant.updated_at,
+    }));
+    const activeMerchant = merchants.find((merchant) => merchant.active) ?? merchants[0];
+    const shopStock = activeMerchant?.stock.length ? activeMerchant.stock : legacyShopStock;
     const travelRow = db.prepare("SELECT * FROM campaign_travel WHERE campaign_id = ?").get(id) as
       CampaignTravelRow | undefined;
     const travel = travelRow
@@ -740,6 +773,7 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
       encounters,
       loot,
       shopStock,
+      merchants,
       travel,
       sessionZero,
       dashboard,

@@ -985,12 +985,58 @@ async function main() {
   if (stockSell.payload.stockQuantity !== 2) {
     throw new Error("Selling to tracked stock did not add the item back");
   }
+  const originalMerchantId = stocked.payload.shop.merchantId;
+  const secondMerchant = await api(`/api/campaigns/${campaign.id}/shop/merchants`, {
+    method: "POST",
+    cookie: gmCookie,
+    body: {
+      name: "Smoke Traveling Trader",
+      description: "A wagon full of oddments.",
+      mode: "stocked",
+      copyFromMerchantId: originalMerchantId,
+    },
+  });
+  if (secondMerchant.payload.shop.merchants.length !== 2) {
+    throw new Error("Second merchant was not created");
+  }
+  const playerMerchantEdit = await fetch(`${base}/api/campaigns/${campaign.id}/shop/merchants`, {
+    method: "POST",
+    headers: { "content-type": "application/json", cookie: playerCookie },
+    body: JSON.stringify({ name: "Player merchant" }),
+  });
+  if (playerMerchantEdit.status !== 403) {
+    throw new Error("Player could add a merchant");
+  }
+  const travelingMerchant = secondMerchant.payload.shop.merchants.find(
+    (merchant) => merchant.name === "Smoke Traveling Trader"
+  );
+  const activated = await api(
+    `/api/campaigns/${campaign.id}/shop/merchants/${travelingMerchant.id}/activate`,
+    { method: "POST", cookie: gmCookie }
+  );
+  if (
+    activated.payload.shop.merchantName !== "Smoke Traveling Trader" ||
+    activated.payload.shop.stock.find((entry) => entry.itemId === daggerId)?.quantity !== 2
+  ) {
+    throw new Error("Merchant activation did not switch stock");
+  }
+  const restocked = await api(
+    `/api/campaigns/${campaign.id}/shop/merchants/${travelingMerchant.id}/restock`,
+    { method: "POST", cookie: gmCookie, body: { quantity: 6 } }
+  );
+  if (restocked.payload.shop.stock.find((entry) => entry.itemId === daggerId)?.quantity !== 6) {
+    throw new Error("Merchant restock did not raise the quantity");
+  }
+  await api(`/api/campaigns/${campaign.id}/shop/merchants/${originalMerchantId}/activate`, {
+    method: "POST",
+    cookie: gmCookie,
+  });
   await api(`/api/campaigns/${campaign.id}/shop/stock`, {
     method: "PUT",
     cookie: gmCookie,
     body: { mode: "open", items: [] },
   });
-  log("settlement shop buys and sells at the correct prices without crossing permissions");
+  log("settlement shop buys and sells at the correct prices and supports multiple merchants");
 
   await api(`/api/campaigns/${campaign.id}/journal`, {
     method: "POST",

@@ -9515,3 +9515,23 @@
   color: var(--gold-bright);
   font-weight: 700;
 }
+
+/* Merchant management */
+.shop-merchant-bar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel-2);
+}
+.shop-merchant-bar p {
+  margin: 2px 0 0;
+}
+.shop-merchant-bar select {
+  min-width: 180px;
+}
