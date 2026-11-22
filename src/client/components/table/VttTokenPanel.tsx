@@ -92,11 +92,12 @@ export function VttTokenPanel({
   const groupName = selectedToken?.groupName || groupTokens[0]?.name || "Group";
 
   useEffect(() => {
+    if (!selectedTokenId) return;
     tokenScrollRef.current
-      ?.querySelector<HTMLElement>(".vtt-token-row.is-selected")
+      ?.querySelector<HTMLElement>(`[data-token-id="${selectedTokenId}"]`)
       ?.scrollIntoView({ block: "nearest" });
     editorRef.current?.scrollTo({ top: 0 });
-  }, [selectedTokenId, selectedTokenIds.length, sceneTokens.length]);
+  }, [selectedTokenId]);
 
   const applyBulkCondition = () => {
     const name = bulkCondition.trim();
@@ -251,6 +252,7 @@ export function VttTokenPanel({
               >
                 <button
                   type="button"
+                  data-token-id={token.id}
                   className={`vtt-token-row ${selectedTokenIds.includes(token.id) || selectedTokenId === token.id ? "is-selected" : ""} ${token.hidden ? "is-hidden" : ""}`}
                   onClick={() => setSelectedTokenId(token.id)}
                   onDoubleClick={() =>

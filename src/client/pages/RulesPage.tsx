@@ -167,7 +167,7 @@ export function RulesPage() {
         ) : null}
       </div>
 
-      {error ? (
+      {error && tab !== "basics" ? (
         <ErrorState message={error} onRetry={() => setRetryToken((current) => current + 1)} />
       ) : (
         <div id="rules-panel" role="tabpanel" aria-labelledby={`rules-tab-${tab}`}>

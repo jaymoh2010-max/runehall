@@ -47,7 +47,6 @@ import {
   type RollResult,
 } from "../../shared/types";
 import {
-  casterInfo,
   computeCharacter,
   effectiveFontChoice,
   isPreparedCasterClass,
@@ -1227,7 +1226,6 @@ export function CharacterSheetPage() {
   }
 
   const classData = context.classData;
-  const caster = casterInfo(classData);
   const selectedOptions = selectedChoiceOptions(draft, classData);
   const hp = derived.currentHp;
   const fortune = draft.play;
@@ -1588,6 +1586,7 @@ export function CharacterSheetPage() {
                   <span className="tiny muted">
                     Spell attack {derived.spellAttack === null ? "—" : signed(derived.spellAttack)}{" "}
                     · DC {derived.spellDc}
+                    {derived.casterTradition ? ` · ${titleCase(derived.casterTradition)}` : ""}
                   </span>
                   {canEdit && isPreparedCasterClass(classData?.name) ? (
                     <Button

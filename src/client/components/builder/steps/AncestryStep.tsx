@@ -178,8 +178,11 @@ export function AncestryStep({
                 heritage?.versatile ||
                 heritage?.ancestry === ancestry.name ||
                 heritage?.ancestrySlug === ancestry.name.toLowerCase();
+              const heritageLost = sameAncestry
+                ? Boolean(draft.heritageId)
+                : Boolean(draft.heritageId && !heritageSurvives);
               const clears = [
-                !sameAncestry && draft.heritageId && !heritageSurvives ? "heritage" : null,
+                heritageLost ? "heritage" : null,
                 draft.boosts.ancestry.some(Boolean) ? "ancestry ability boosts" : null,
               ].filter(Boolean);
               if (
