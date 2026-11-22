@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Coins, Search } from "lucide-react";
 import type {
   CharacterRecord,
@@ -46,6 +46,7 @@ export function ShopModal({
   const [shop, setShop] = useState<ShopState | null>(null);
   const [shopLoading, setShopLoading] = useState(false);
   const [stockMode, setStockMode] = useState<ShopStockMode>("open");
+  const stockModeRef = useRef<ShopStockMode>("open");
   const [stockRows, setStockRows] = useState<StockDraftRow[]>([]);
   const [stockQuery, setStockQuery] = useState("");
   const [stockResults, setStockResults] = useState<Equipment[]>([]);
@@ -80,6 +81,7 @@ export function ShopModal({
 
   const applyShopState = (state: ShopState) => {
     setShop(state);
+    stockModeRef.current = state.mode;
     setStockMode(state.mode);
     setStockRows(
       state.stock.map((entry) => ({
@@ -348,13 +350,14 @@ export function ShopModal({
   const saveStock = async () => {
     setStockSaving(true);
     setError("");
+    const modeToSave = stockModeRef.current;
     try {
       const result = await api<{ shop: ShopState }>(
         `/api/campaigns/${character.campaignId}/shop/stock`,
         {
           method: "PUT",
           body: {
-            mode: stockMode,
+            mode: modeToSave,
             items: stockRows.map((row) => ({
               itemId: row.itemId,
               quantity: Math.max(0, Math.min(9_999, Math.floor(Number(row.quantity) || 0))),
@@ -364,7 +367,7 @@ export function ShopModal({
       );
       applyShopState(result.shop);
       toast(
-        stockMode === "stocked"
+        modeToSave === "stocked"
           ? `Merchant stock saved: ${result.shop.stock.length} item row${
               result.shop.stock.length === 1 ? "" : "s"
             }.`
@@ -408,7 +411,7 @@ export function ShopModal({
           body: {
             name: name.trim(),
             description: "",
-            mode: stockMode,
+            mode: stockModeRef.current,
           },
         }
       );
@@ -791,7 +794,10 @@ export function ShopModal({
             <Select
               value={stockMode}
               aria-label="Shop mode"
-              onChange={(event) => setStockMode(event.target.value as ShopStockMode)}
+              onChange={(event) => {
+                stockModeRef.current = event.target.value as ShopStockMode;
+                setStockMode(event.target.value as ShopStockMode);
+              }}
             >
               <option value="open">Open market (infinite common stock)</option>
               <option value="stocked">Tracked merchant stock</option>
