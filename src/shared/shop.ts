@@ -1,8 +1,23 @@
-import type { Equipment } from "./types";
+import type { Equipment, ShopStockMode } from "./types";
 
 export const MIN_SETTLEMENT_LEVEL = 0;
 export const MAX_SETTLEMENT_LEVEL = 25;
 export const DEFAULT_SETTLEMENT_LEVEL = 1;
+export const MAX_SHOP_STOCK_ROWS = 500;
+
+export function isShopStockMode(value: unknown): value is ShopStockMode {
+  return value === "open" || value === "stocked";
+}
+
+export function normalizeShopStockMode(value: unknown): ShopStockMode {
+  return value === "stocked" ? "stocked" : "open";
+}
+
+export function shopStockCount(value: unknown, max = 9_999): number {
+  const number = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(number)) return 0;
+  return Math.max(0, Math.min(max, Math.floor(number)));
+}
 
 export function isSettlementLevel(value: unknown): boolean {
   const number = typeof value === "number" ? value : Number(value);

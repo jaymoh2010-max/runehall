@@ -127,6 +127,7 @@ export interface CampaignRow {
   xp_mode: string;
   advancement_speed: string;
   settlement_level: number;
+  shop_mode: string;
   world_year: number;
   world_month: number;
   world_day: number;
@@ -138,6 +139,14 @@ export interface CampaignRow {
   created_at: number;
   updated_at: number;
   last_played_at: number | null;
+}
+
+export interface CampaignShopStockRow {
+  campaign_id: string;
+  item_id: string;
+  quantity: number;
+  created_at: number;
+  updated_at: number;
 }
 
 export interface CharacterRow {

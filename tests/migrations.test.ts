@@ -104,6 +104,7 @@ describe("migrations", () => {
     }[];
     expect(campaignColumns.map((column) => column.name)).toContain("advancement_speed");
     expect(campaignColumns.map((column) => column.name)).toContain("settlement_level");
+    expect(campaignColumns.map((column) => column.name)).toContain("shop_mode");
 
     const columns = db.prepare("PRAGMA table_info(users)").all() as { name: string }[];
     expect(columns.map((column) => column.name)).toContain("is_admin");
@@ -130,6 +131,7 @@ describe("migrations", () => {
         "audio_library_tracks",
         "xp_awards",
         "campaign_turn_marks",
+        "campaign_shop_stock",
       ])
     );
 

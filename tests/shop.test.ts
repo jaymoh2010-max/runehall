@@ -1,13 +1,17 @@
 import { describe, expect, it } from "vitest";
 import {
+  MAX_SHOP_STOCK_ROWS,
   isSettlementLevel,
+  isShopStockMode,
   normalizeSettlementLevel,
+  normalizeShopStockMode,
   shopAvailabilityError,
   shopBuyCostCp,
   shopItemAvailable,
   shopQuantity,
   shopSellRate,
   shopSellValueCp,
+  shopStockCount,
 } from "../src/shared/shop";
 import type { Equipment } from "../src/shared/types";
 
@@ -46,6 +50,27 @@ describe("settlement levels", () => {
     expect(isSettlementLevel(25)).toBe(true);
     expect(isSettlementLevel(26)).toBe(false);
     expect(isSettlementLevel(1.5)).toBe(false);
+  });
+});
+
+describe("merchant stock", () => {
+  it("normalizes the open-versus-stocked shop mode", () => {
+    expect(isShopStockMode("open")).toBe(true);
+    expect(isShopStockMode("stocked")).toBe(true);
+    expect(isShopStockMode("other")).toBe(false);
+    expect(normalizeShopStockMode("stocked")).toBe("stocked");
+    expect(normalizeShopStockMode("other")).toBe("open");
+    expect(normalizeShopStockMode(undefined)).toBe("open");
+  });
+
+  it("allows zero stock without changing purchase quantities", () => {
+    expect(shopStockCount(0)).toBe(0);
+    expect(shopStockCount(-3)).toBe(0);
+    expect(shopStockCount("7")).toBe(7);
+    expect(shopStockCount(99_999)).toBe(9_999);
+    expect(shopStockCount(undefined)).toBe(0);
+    expect(shopQuantity(0)).toBe(1);
+    expect(MAX_SHOP_STOCK_ROWS).toBe(500);
   });
 });
 

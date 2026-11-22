@@ -86,7 +86,7 @@ import {
   type AdvancementSpeed,
   type AccomplishmentTier,
 } from "../../shared/xp";
-import { isSettlementLevel, normalizeSettlementLevel } from "../../shared/shop";
+import { isSettlementLevel, normalizeSettlementLevel, shopStockCount } from "../../shared/shop";
 import { grantHeroPoints, resetHeroPoints } from "../../shared/heroPoints";
 import { normalizeGolarionDate, shiftGolarionDate } from "../../shared/calendar";
 import { contextForDraft } from "../compendium";
@@ -653,6 +653,13 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
         )
         .all(id) as LootParcelRow[]
     ).map(serializeLootParcel);
+    const shopStock = (
+      db
+        .prepare(
+          "SELECT item_id, quantity FROM campaign_shop_stock WHERE campaign_id = ? ORDER BY item_id ASC"
+        )
+        .all(id) as { item_id: string; quantity: number }[]
+    ).map((entry) => ({ itemId: entry.item_id, quantity: shopStockCount(entry.quantity) }));
     const dashboardRow = db
       .prepare("SELECT * FROM campaign_dashboard WHERE campaign_id = ?")
       .get(id) as CampaignDashboardRow | undefined;
@@ -698,6 +705,7 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
       tokens,
       encounters,
       loot,
+      shopStock,
       dashboard,
       npcs,
       sessions,

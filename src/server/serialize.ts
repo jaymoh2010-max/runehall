@@ -25,7 +25,7 @@ import type {
 } from "../shared/types";
 import { normalizeCampaignRuleset, normalizeXpMode } from "../shared/content";
 import { normalizeAdvancementSpeed, normalizeXpAwardKind } from "../shared/xp";
-import { normalizeSettlementLevel } from "../shared/shop";
+import { normalizeSettlementLevel, normalizeShopStockMode } from "../shared/shop";
 import { normalizeTokenTurnEffects } from "../shared/tokenTurnEffects";
 import { isAudioMood } from "../shared/audio";
 import {
@@ -96,6 +96,7 @@ export function serializeCampaignSummary(
     xpMode: normalizeXpMode(campaign.xp_mode),
     advancementSpeed: normalizeAdvancementSpeed(campaign.advancement_speed),
     settlementLevel: normalizeSettlementLevel(campaign.settlement_level),
+    shopMode: normalizeShopStockMode(campaign.shop_mode),
     worldDate: normalizeGolarionDate({
       year: campaign.world_year,
       month: campaign.world_month,

@@ -449,6 +449,46 @@ test("character sheet shop buys and sells common gear", async ({ page }) => {
   await expect(sellRow).toBeVisible();
   await sellRow.getByRole("button", { name: "Sell", exact: true }).click();
   await expect(page.getByText(/Sold 1× Dagger/)).toBeVisible({ timeout: 15_000 });
+
+  await shop.locator(".shop-tabs").getByRole("button", { name: "Stock", exact: true }).click();
+  await shop.getByRole("combobox", { name: "Shop mode" }).selectOption("stocked");
+  await shop.getByPlaceholder("Search the compendium to stock…").fill("Dagger");
+  const stockSearchRow = shop.locator(".shop-row").filter({ hasText: "Dagger" }).first();
+  await expect(stockSearchRow.getByRole("button", { name: "Add", exact: true })).toBeVisible();
+  await stockSearchRow.getByRole("button", { name: "Add", exact: true }).click();
+  await expect(shop.getByLabel("Dagger stock")).toHaveValue("1");
+  await shop.getByRole("button", { name: "Save merchant stock" }).click();
+  await expect(page.getByText(/Merchant stock saved: 1 item row/)).toBeVisible({
+    timeout: 15_000,
+  });
+
+  await shop.locator(".shop-tabs").getByRole("button", { name: "Buy", exact: true }).click();
+  await expect(shop.getByText(/1 in stock/)).toBeVisible();
+  const stockRow = shop.locator(".shop-row").filter({ hasText: "Dagger" }).first();
+  await stockRow.getByRole("button", { name: "Buy", exact: true }).click();
+  await expect(page.getByText(/Bought 1× Dagger/)).toBeVisible({ timeout: 15_000 });
+
+  await shop.locator(".shop-tabs").getByRole("button", { name: "Stock", exact: true }).click();
+  await shop.getByLabel("Dagger stock").fill("0");
+  await shop.getByRole("button", { name: "Save merchant stock" }).click();
+  await expect(page.getByText(/Merchant stock saved: 1 item row/)).toBeVisible({
+    timeout: 15_000,
+  });
+  await shop.locator(".shop-tabs").getByRole("button", { name: "Buy", exact: true }).click();
+  await expect(shop.getByText(/out of stock/)).toBeVisible();
+  await expect(
+    shop.locator(".shop-row").filter({ hasText: "Dagger" }).first().getByRole("button", {
+      name: "Out",
+      exact: true,
+    })
+  ).toBeDisabled();
+
+  await shop.locator(".shop-tabs").getByRole("button", { name: "Stock", exact: true }).click();
+  await shop.getByRole("combobox", { name: "Shop mode" }).selectOption("open");
+  await shop.getByRole("button", { name: "Save merchant stock" }).click();
+  await expect(page.getByText("Shop changed to an open market.")).toBeVisible({
+    timeout: 15_000,
+  });
 });
 
 test("GM schedules from Sessions and overdue sessions stay current", async ({ page }) => {

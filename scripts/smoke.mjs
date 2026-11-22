@@ -900,6 +900,74 @@ async function main() {
   if (foreignShop.status !== 403) {
     throw new Error("Player could shop for a character they do not control");
   }
+
+  const initialShop = await api(`/api/campaigns/${campaign.id}/shop`, { cookie: playerCookie });
+  if (initialShop.payload.shop.mode !== "open") {
+    throw new Error("The campaign did not start with an open shop");
+  }
+  const playerStockEdit = await fetch(`${base}/api/campaigns/${campaign.id}/shop/stock`, {
+    method: "PUT",
+    headers: { "content-type": "application/json", cookie: playerCookie },
+    body: JSON.stringify({ mode: "stocked", items: [] }),
+  });
+  if (playerStockEdit.status !== 403) {
+    throw new Error("Player changed the merchant stock");
+  }
+  const stocked = await api(`/api/campaigns/${campaign.id}/shop/stock`, {
+    method: "PUT",
+    cookie: gmCookie,
+    body: { mode: "stocked", items: [{ itemId: daggerId, quantity: 2 }] },
+  });
+  if (
+    stocked.payload.shop.mode !== "stocked" ||
+    stocked.payload.shop.stock.find((entry) => entry.itemId === daggerId)?.quantity !== 2
+  ) {
+    throw new Error("GM could not set tracked merchant stock");
+  }
+  const stockBuy = await api(`/api/campaigns/${campaign.id}/shop/buy`, {
+    method: "POST",
+    cookie: playerCookie,
+    body: {
+      characterId: character.id,
+      itemId: daggerId,
+      quantity: 1,
+      expectedRevision: soldCharacter.revision,
+    },
+  });
+  if (stockBuy.payload.stockQuantity !== 1) {
+    throw new Error("Buying from tracked stock did not decrement the quantity");
+  }
+  const overStock = await fetch(`${base}/api/campaigns/${campaign.id}/shop/buy`, {
+    method: "POST",
+    headers: { "content-type": "application/json", cookie: playerCookie },
+    body: JSON.stringify({
+      characterId: character.id,
+      itemId: daggerId,
+      quantity: 3,
+      expectedRevision: stockBuy.payload.character.revision,
+    }),
+  });
+  if (overStock.status !== 400) {
+    throw new Error("Shop sold more items than the merchant stocked");
+  }
+  const stockSell = await api(`/api/campaigns/${campaign.id}/shop/sell`, {
+    method: "POST",
+    cookie: playerCookie,
+    body: {
+      characterId: character.id,
+      itemId: daggerId,
+      quantity: 1,
+      expectedRevision: stockBuy.payload.character.revision,
+    },
+  });
+  if (stockSell.payload.stockQuantity !== 2) {
+    throw new Error("Selling to tracked stock did not add the item back");
+  }
+  await api(`/api/campaigns/${campaign.id}/shop/stock`, {
+    method: "PUT",
+    cookie: gmCookie,
+    body: { mode: "open", items: [] },
+  });
   log("settlement shop buys and sells at the correct prices without crossing permissions");
 
   await api(`/api/campaigns/${campaign.id}/journal`, {
