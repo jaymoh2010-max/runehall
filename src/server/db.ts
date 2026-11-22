@@ -514,6 +514,7 @@ export interface LootParcelRow {
   name: string;
   description: string;
   items: string;
+  level: number;
   gp: number;
   sp: number;
   cp: number;

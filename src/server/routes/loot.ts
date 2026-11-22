@@ -74,6 +74,21 @@ function nextSortOrder(campaignId: string): number {
   return row.next;
 }
 
+function partyLevelFor(campaignId: string): number {
+  const rows = db.prepare("SELECT data FROM characters WHERE campaign_id = ?").all(campaignId) as {
+    data: string;
+  }[];
+  const levels: number[] = [];
+  for (const row of rows) {
+    try {
+      levels.push(normalizeCharacterDraft(parseJson(row.data, {}), "Character").level);
+    } catch {
+      // Ignore unreadable drafts when choosing a default parcel level.
+    }
+  }
+  return partyDefaults(levels).partyLevel;
+}
+
 export async function registerLootRoutes(app: FastifyInstance): Promise<void> {
   app.get("/api/campaigns/:id/loot", async (request, reply) => {
     const { id } = request.params as { id: string };
@@ -104,6 +119,7 @@ export async function registerLootRoutes(app: FastifyInstance): Promise<void> {
       return {
         id: parcel.id,
         name: parcel.name,
+        level: parcel.level,
         status: parcel.status,
         valueCp: lootParcelValueCp(parcel, priceCpById),
         permanentItems: kinds.permanent,
@@ -147,6 +163,22 @@ export async function registerLootRoutes(app: FastifyInstance): Promise<void> {
       factsById,
       priceCpById
     );
+    const byLevel = [...new Set(parcels.map((parcel) => parcel.level))]
+      .sort((a, b) => a - b)
+      .map((level) => {
+        const atLevel = parcels.filter((parcel) => parcel.level === level);
+        return {
+          level,
+          parcelCount: atLevel.length,
+          preparedCp: atLevel
+            .filter((parcel) => parcel.status === "open")
+            .reduce((sum, parcel) => sum + parcel.valueCp, 0),
+          distributedCp: atLevel
+            .filter((parcel) => parcel.status === "distributed")
+            .reduce((sum, parcel) => sum + parcel.valueCp, 0),
+          budgetGp: treasureBudgetGp(level).totalGp,
+        };
+      });
     return reply.send({
       audit: {
         partyLevel: party.partyLevel,
@@ -156,6 +188,7 @@ export async function registerLootRoutes(app: FastifyInstance): Promise<void> {
         distributedCp,
         mix,
         parcels,
+        byLevel,
         characters,
       },
     });
@@ -170,13 +203,14 @@ export async function registerLootRoutes(app: FastifyInstance): Promise<void> {
     const ts = now();
     db.prepare(
       `INSERT INTO loot_parcels
-        (id, campaign_id, name, description, items, gp, sp, cp, status, sort_order, created_at, updated_at)
-       VALUES (?, ?, ?, ?, '[]', 0, 0, 0, 'open', ?, ?, ?)`
+        (id, campaign_id, name, description, items, level, gp, sp, cp, status, sort_order, created_at, updated_at)
+       VALUES (?, ?, ?, ?, '[]', ?, 0, 0, 0, 'open', ?, ?, ?)`
     ).run(
       parcelId,
       id,
       safeString(body.name, "New loot parcel", 120),
       sanitizeUserText(body.description, 4000),
+      safeInt(body.level, partyLevelFor(id), 1, 20),
       nextSortOrder(id),
       ts,
       ts
@@ -201,6 +235,10 @@ export async function registerLootRoutes(app: FastifyInstance): Promise<void> {
       body.description === undefined
         ? existing.description
         : sanitizeUserText(body.description, 4000);
+    const level =
+      body.level === undefined
+        ? Math.max(1, Math.min(20, Math.round(existing.level)))
+        : safeInt(body.level, existing.level, 1, 20);
     const gp =
       body.gp === undefined ? existing.gp : safeInt(body.gp, existing.gp, 0, 1_000_000_000);
     const sp =
@@ -208,8 +246,8 @@ export async function registerLootRoutes(app: FastifyInstance): Promise<void> {
     const cp =
       body.cp === undefined ? existing.cp : safeInt(body.cp, existing.cp, 0, 1_000_000_000);
     db.prepare(
-      "UPDATE loot_parcels SET name = ?, description = ?, gp = ?, sp = ?, cp = ?, updated_at = ? WHERE id = ?"
-    ).run(name, description, gp, sp, cp, now(), parcelId);
+      "UPDATE loot_parcels SET name = ?, description = ?, level = ?, gp = ?, sp = ?, cp = ?, updated_at = ? WHERE id = ?"
+    ).run(name, description, level, gp, sp, cp, now(), parcelId);
     touchCampaign(id);
     return reply.send({ parcel: serializeLootParcel(getParcel(id, parcelId)!) });
   });

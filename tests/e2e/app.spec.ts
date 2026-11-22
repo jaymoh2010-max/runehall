@@ -471,6 +471,14 @@ test("loot audit and replacement wealth top-up are available", async ({ page }) 
   await expect(page.getByText("Open parcels")).toBeVisible();
   await expect(page.getByText("Level budget")).toBeVisible();
 
+  await page.getByRole("button", { name: "New parcel" }).click();
+  await expect(page.getByLabel("Parcel level")).toHaveValue(/\d+/);
+  await page.getByLabel("Parcel level").fill("5");
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(
+    page.locator(".treasure-level-coverage").getByText("Level 5", { exact: true })
+  ).toBeVisible({ timeout: 15_000 });
+
   await page
     .locator(".campaign-tabs")
     .getByRole("button", { name: /^Party/ })

@@ -3048,6 +3048,15 @@ async function runCampaignA(gm: Account, players: Account[]): Promise<void> {
     assertEqual(audit.partyLevel, 20, "Audit party level");
     assertEqual(audit.budget.totalGp, treasureBudgetGp(20).totalGp, "Level 20 treasure budget");
     assertEqual(audit.parcels.length, parcelCount, "Audited parcel count");
+    assert(
+      audit.parcels.every((parcel: Json) => parcel.level >= 1 && parcel.level <= 20),
+      "Audited parcels were not tagged by level"
+    );
+    assert(
+      audit.byLevel.length >= 1 &&
+        audit.byLevel.every((row: Json) => row.level >= 1 && row.level <= 20),
+      "Audit level coverage missing"
+    );
     assertEqual(audit.preparedCp, 0, "All simulated parcels were distributed");
     assert(audit.distributedCp > 0, "Distributed treasure was not valued");
     assertEqual(audit.characters.length, 4, "Audited character count");
@@ -3143,13 +3152,6 @@ async function runCampaignA(gm: Account, players: Account[]): Promise<void> {
         "Accomplishment ledger label"
       );
     }
-  );
-
-  // --- Observations --------------------------------------------------------
-  observe(
-    campaignName,
-    "Treasure audit is advisory",
-    `Valued ${parcelCount} distributed parcels (${TREASURE_CURRENCY_GP[0]} gp at level 1 to ${TREASURE_CURRENCY_GP[19]} gp at level 20) and each character's gear and coins, and audited permanent/consumable item counts against GM Core table 10-9. The mix is advisory and does not block distribution, and parcels are not tagged by level.`
   );
 
   gmSocket.close();

@@ -649,6 +649,7 @@ export function serializeLootParcel(row: LootParcelRow): LootParcel {
     name: row.name,
     description: row.description,
     items: normalizeLootItems(parseJson(row.items, [])),
+    level: normalizeChapterLevel(row.level, 1),
     gp: Math.max(0, row.gp),
     sp: Math.max(0, row.sp),
     cp: Math.max(0, row.cp),
