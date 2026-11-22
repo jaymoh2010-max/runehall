@@ -2677,7 +2677,22 @@ async function runCampaignA(gm: Account, players: Account[]): Promise<void> {
     campaignName,
     "campaign export preserves levels, calendar, and content counts",
     async () => {
-      await api(`/api/campaigns/${campaignId}/npcs`, {
+      const factionResult = await api(`/api/campaigns/${campaignId}/factions`, {
+        method: "POST",
+        cookie: gm.cookie,
+        body: {
+          name: "The Ashen Court",
+          description: "The cult that serves the Crown.",
+          goals: "Wake the Ashen Crown.",
+          assets: "Catacombs beneath the city.",
+          attitude: "hostile",
+          reputation: -70,
+          visible: true,
+          gmNotes: "The chancellor leads it.",
+        },
+      });
+      const factionId = factionResult.payload.faction.id;
+      const wardenResult = await api(`/api/campaigns/${campaignId}/npcs`, {
         method: "POST",
         cookie: gm.cookie,
         body: {
@@ -2687,6 +2702,13 @@ async function runCampaignA(gm: Account, players: Account[]): Promise<void> {
           ac: 42,
           perception: 30,
           description: "Final antagonist.",
+          factionId,
+          role: "Warden of the Crown",
+          location: "The Ashen Vault",
+          attitude: "hostile",
+          publicDescription: "A smoke-crowned figure seen in the cult's processions.",
+          secrets: "Bound to the Crown by a stolen name.",
+          visible: true,
         },
       });
       const daggerId = "item:rQWaJhI5Bko5x14Z";
@@ -2720,6 +2742,20 @@ async function runCampaignA(gm: Account, players: Account[]): Promise<void> {
       assert(payload.loot.length >= parcelCount, "Export did not include loot parcels");
       assert(payload.sessions.length >= 1, "Export did not include sessions");
       assert(payload.npcs.length >= 1, "Export did not include NPCs");
+      assertEqual(payload.factions.length, 1, "Export faction count");
+      assertEqual(
+        payload.factions[0].gmNotes,
+        "The chancellor leads it.",
+        "Export faction GM notes"
+      );
+      assertEqual(payload.factions[0].reputation, -70, "Export faction reputation");
+      assertEqual(payload.npcs[0].factionId, factionId, "Export did not keep the NPC faction link");
+      assertEqual(wardenResult.payload.npc.role, "Warden of the Crown", "NPC social role");
+      assertEqual(
+        wardenResult.payload.npc.secrets,
+        "Bound to the Crown by a stolen name.",
+        "NPC secret persisted for the GM"
+      );
       metric("campaignA.exportBytes", JSON.stringify(payload).length);
 
       const imported = await api("/api/campaigns/import", {
@@ -2768,6 +2804,28 @@ async function runCampaignA(gm: Account, players: Account[]): Promise<void> {
       const importedSessionZero = await api(`/api/campaigns/${importedCampaign.id}/session-zero`, {
         cookie: gm.cookie,
       });
+      const importedFactions = await api(`/api/campaigns/${importedCampaign.id}/factions`, {
+        cookie: gm.cookie,
+      });
+      const importedNpcs = await api(`/api/campaigns/${importedCampaign.id}/npcs`, {
+        cookie: gm.cookie,
+      });
+      const importedFaction = importedFactions.payload.factions[0];
+      assertEqual(importedFactions.payload.factions.length, 1, "Imported faction count");
+      assertEqual(importedFaction.name, "The Ashen Court", "Imported faction name");
+      assertEqual(importedFaction.reputation, -70, "Imported faction reputation");
+      assertEqual(importedFaction.gmNotes, "The chancellor leads it.", "Imported faction GM notes");
+      assert(importedFaction.id !== factionId, "Import reused the source faction id");
+      const importedWarden = importedNpcs.payload.npcs.find(
+        (entry: Json) => entry.name === "The Ash Warden"
+      );
+      assert(importedWarden, "Imported NPC missing");
+      assertEqual(importedWarden.factionId, importedFaction.id, "Imported NPC faction remap");
+      assertEqual(
+        importedWarden.secrets,
+        "Bound to the Crown by a stolen name.",
+        "Imported NPC secret"
+      );
       assertEqual(
         importedSessionZero.payload.profile.pitch,
         "The Ashen Crown wakes beneath the city.",

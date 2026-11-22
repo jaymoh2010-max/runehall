@@ -17,6 +17,7 @@ import {
   createDefaultScene,
   type AudioTrackRow,
   type CampaignDashboardRow,
+  type CampaignFactionRow,
   type CampaignNpcRow,
   type CampaignRow,
   type CampaignSessionZeroRow,
@@ -33,6 +34,7 @@ import {
 import {
   serializeAudioTrack,
   serializeCampaignDashboard,
+  serializeCampaignFaction,
   serializeCampaignNpc,
   serializeCampaignSummary,
   serializeCampaignTravel,
@@ -666,7 +668,14 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
           "SELECT * FROM campaign_npcs WHERE campaign_id = ? ORDER BY sort_order ASC, name ASC"
         )
         .all(id) as CampaignNpcRow[]
-    ).map(serializeCampaignNpc);
+    ).map((row) => serializeCampaignNpc(row));
+    const factions = (
+      db
+        .prepare(
+          "SELECT * FROM campaign_factions WHERE campaign_id = ? ORDER BY sort_order ASC, name ASC"
+        )
+        .all(id) as CampaignFactionRow[]
+    ).map((row) => serializeCampaignFaction(row));
     const sessions = campaignSessionsFor(id, "gm", request.user.id);
     const audioTracks = (
       db
@@ -706,6 +715,7 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
       sessionZero,
       dashboard,
       npcs,
+      factions,
       sessions,
       messages,
       journal,

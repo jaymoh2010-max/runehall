@@ -707,4 +707,34 @@ export const migrations: Migration[] = [
       );
     `,
   },
+  {
+    version: 39,
+    name: "campaign_factions_and_npc_social",
+    sql: `
+      CREATE TABLE IF NOT EXISTS campaign_factions (
+        id TEXT PRIMARY KEY,
+        campaign_id TEXT NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        description TEXT NOT NULL DEFAULT '',
+        goals TEXT NOT NULL DEFAULT '',
+        assets TEXT NOT NULL DEFAULT '',
+        attitude TEXT NOT NULL DEFAULT 'indifferent',
+        reputation INTEGER NOT NULL DEFAULT 0,
+        visible INTEGER NOT NULL DEFAULT 0,
+        gm_notes TEXT NOT NULL DEFAULT '',
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_campaign_factions_campaign
+        ON campaign_factions(campaign_id);
+      ALTER TABLE campaign_npcs ADD COLUMN faction_id TEXT;
+      ALTER TABLE campaign_npcs ADD COLUMN role TEXT NOT NULL DEFAULT '';
+      ALTER TABLE campaign_npcs ADD COLUMN location TEXT NOT NULL DEFAULT '';
+      ALTER TABLE campaign_npcs ADD COLUMN attitude TEXT NOT NULL DEFAULT 'indifferent';
+      ALTER TABLE campaign_npcs ADD COLUMN public_description TEXT NOT NULL DEFAULT '';
+      ALTER TABLE campaign_npcs ADD COLUMN secrets TEXT NOT NULL DEFAULT '';
+      ALTER TABLE campaign_npcs ADD COLUMN visible INTEGER NOT NULL DEFAULT 0;
+    `,
+  },
 ];

@@ -1357,6 +1357,96 @@ async function main() {
     throw new Error("Player should not be able to read the NPC library");
   log("NPC statblock placed a token and stayed GM-only");
 
+  const factionResult = await api(`/api/campaigns/${campaign.id}/factions`, {
+    method: "POST",
+    cookie: gmCookie,
+    body: {
+      name: "Smoke Harbor Guild",
+      description: "The guild that controls the docks.",
+      goals: "Keep the harbor open.",
+      assets: "Two cranes and a lot of favors.",
+      attitude: "friendly",
+      reputation: 35,
+      visible: true,
+      gmNotes: "The guildmaster is secretly a doppelganger.",
+    },
+  });
+  const faction = factionResult.payload.faction;
+  if (!faction || faction.reputation !== 35 || !faction.visible) {
+    throw new Error("Faction was not saved");
+  }
+  const linkedNpcResult = await api(`/api/campaigns/${campaign.id}/npcs/${npc.id}`, {
+    method: "PATCH",
+    cookie: gmCookie,
+    body: {
+      factionId: faction.id,
+      role: "Harbor master",
+      location: "The Salt Dock",
+      attitude: "helpful",
+      publicDescription: "A weathered ferryman who knows every tide.",
+      secrets: "He is the guildmaster's brother.",
+      visible: true,
+    },
+  });
+  const linkedNpc = linkedNpcResult.payload.npc;
+  if (
+    !linkedNpc ||
+    linkedNpc.factionId !== faction.id ||
+    linkedNpc.role !== "Harbor master" ||
+    linkedNpc.secrets !== "He is the guildmaster's brother."
+  ) {
+    throw new Error("NPC social fields were not saved");
+  }
+  const hiddenNpcResult = await api(`/api/campaigns/${campaign.id}/npcs`, {
+    method: "POST",
+    cookie: gmCookie,
+    body: { name: "Smoke Hidden Villain", level: 9, visible: false },
+  });
+  const hiddenNpc = hiddenNpcResult.payload.npc;
+  const peopleResult = await api(`/api/campaigns/${campaign.id}/people`, {
+    cookie: playerCookie,
+  });
+  const publicFactions = peopleResult.payload.factions;
+  const publicNpcs = peopleResult.payload.npcs;
+  if (publicFactions.length !== 1 || publicFactions[0].id !== faction.id) {
+    throw new Error("Player People view did not include the visible faction");
+  }
+  if (publicFactions[0].gmNotes !== undefined) {
+    throw new Error("Player People view leaked faction GM notes");
+  }
+  if (publicNpcs.length !== 1 || publicNpcs[0].id !== npc.id) {
+    throw new Error("Player People view did not filter hidden NPCs");
+  }
+  if (publicNpcs[0].secrets !== undefined || publicNpcs[0].description !== "") {
+    throw new Error("Player People view leaked NPC secrets or GM description");
+  }
+  if (publicNpcs[0].publicDescription !== "A weathered ferryman who knows every tide.") {
+    throw new Error("Player People view did not include the public NPC description");
+  }
+  const playerFactions = await fetch(`${base}/api/campaigns/${campaign.id}/factions`, {
+    headers: { cookie: playerCookie },
+  });
+  if (playerFactions.status !== 403) {
+    throw new Error("Player should not be able to read the faction ledger");
+  }
+  const campaignExport = await api(`/api/campaigns/${campaign.id}/export`, { cookie: gmCookie });
+  if (!campaignExport.payload.factions?.some((entry) => entry.id === faction.id)) {
+    throw new Error("Campaign export did not include the faction ledger");
+  }
+  await api(`/api/campaigns/${campaign.id}/factions/${faction.id}`, {
+    method: "DELETE",
+    cookie: gmCookie,
+  });
+  const unlinkedNpc = await api(`/api/campaigns/${campaign.id}/npcs`, { cookie: gmCookie });
+  if (unlinkedNpc.payload.npcs.find((entry) => entry.id === npc.id)?.factionId !== null) {
+    throw new Error("Deleting a faction did not unlink its NPCs");
+  }
+  await api(`/api/campaigns/${campaign.id}/npcs/${hiddenNpc.id}`, {
+    method: "DELETE",
+    cookie: gmCookie,
+  });
+  log("faction ledger stayed GM-only while public people stayed player-safe");
+
   const gmSocket = await connectSocket(gmCookie);
   const playerSocket = await connectSocket(playerCookie);
   await emitAck(gmSocket, "campaign:join", { campaignId: campaign.id });

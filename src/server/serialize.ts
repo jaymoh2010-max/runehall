@@ -6,6 +6,7 @@ import type {
   CampaignJoinRequest,
   CampaignMember,
   CampaignNpc,
+  CampaignFaction,
   CampaignSession,
   CampaignSummary,
   CampaignTravel,
@@ -60,6 +61,7 @@ import {
   type CampaignDashboardRow,
   type AudioTrackRow,
   type CampaignNpcRow,
+  type CampaignFactionRow,
   type CampaignRow,
   type CampaignSessionRow,
   type CampaignSessionZeroRow,
@@ -95,6 +97,7 @@ import {
   travelStatus,
 } from "../shared/travel";
 import { normalizeSessionZeroChecklist } from "../shared/sessionZero";
+import { normalizeNpcAttitude, normalizeReputation } from "../shared/people";
 
 export function serializeCampaignSummary(
   campaign: CampaignRow,
@@ -515,8 +518,8 @@ export function serializeCampaignSession(
   };
 }
 
-export function serializeCampaignNpc(row: CampaignNpcRow): CampaignNpc {
-  return {
+export function serializeCampaignNpc(row: CampaignNpcRow, privateView = true): CampaignNpc {
+  const npc: CampaignNpc = {
     id: row.id,
     campaignId: row.campaign_id,
     name: row.name,
@@ -527,11 +530,41 @@ export function serializeCampaignNpc(row: CampaignNpcRow): CampaignNpc {
     size: row.size,
     color: row.color,
     imageUrl: row.image_url,
-    description: row.description,
+    description: privateView ? row.description : "",
+    factionId: row.faction_id,
+    role: row.role,
+    location: row.location,
+    attitude: normalizeNpcAttitude(row.attitude),
+    publicDescription: row.public_description,
+    visible: Boolean(row.visible),
     sortOrder: row.sort_order,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
+  if (privateView) npc.secrets = row.secrets;
+  return npc;
+}
+
+export function serializeCampaignFaction(
+  row: CampaignFactionRow,
+  privateView = true
+): CampaignFaction {
+  const faction: CampaignFaction = {
+    id: row.id,
+    campaignId: row.campaign_id,
+    name: row.name,
+    description: row.description,
+    goals: row.goals,
+    assets: row.assets,
+    attitude: normalizeNpcAttitude(row.attitude),
+    reputation: normalizeReputation(row.reputation),
+    visible: Boolean(row.visible),
+    sortOrder: row.sort_order,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+  if (privateView) faction.gmNotes = row.gm_notes;
+  return faction;
 }
 
 export function serializeCampaignDashboard(

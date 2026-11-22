@@ -1342,6 +1342,25 @@ export interface CampaignSession {
   updatedAt: number;
 }
 
+export type NpcAttitude = "hostile" | "unfriendly" | "indifferent" | "friendly" | "helpful";
+
+export interface CampaignFaction {
+  id: string;
+  campaignId: string;
+  name: string;
+  description: string;
+  goals: string;
+  assets: string;
+  attitude: NpcAttitude;
+  reputation: number;
+  visible: boolean;
+  /** GM-only notes; omitted from player responses. */
+  gmNotes?: string;
+  sortOrder: number;
+  createdAt: number;
+  updatedAt: number;
+}
+
 export interface CampaignNpc {
   id: string;
   campaignId: string;
@@ -1354,9 +1373,22 @@ export interface CampaignNpc {
   color: string;
   imageUrl: string | null;
   description: string;
+  factionId: string | null;
+  role: string;
+  location: string;
+  attitude: NpcAttitude;
+  publicDescription: string;
+  visible: boolean;
+  /** GM-only secrets; omitted from player responses. */
+  secrets?: string;
   sortOrder: number;
   createdAt: number;
   updatedAt: number;
+}
+
+export interface CampaignPeople {
+  factions: CampaignFaction[];
+  npcs: CampaignNpc[];
 }
 
 export interface CampaignDashboard {

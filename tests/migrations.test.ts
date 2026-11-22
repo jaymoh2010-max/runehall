@@ -99,6 +99,12 @@ describe("migrations", () => {
     }[];
     expect(tokenColumns.map((column) => column.name)).toContain("encounter_id");
     expect(tokenColumns.map((column) => column.name)).toContain("turn_effects");
+    const npcColumns = db.prepare("PRAGMA table_info(campaign_npcs)").all() as {
+      name: string;
+    }[];
+    expect(npcColumns.map((column) => column.name)).toContain("faction_id");
+    expect(npcColumns.map((column) => column.name)).toContain("visible");
+    expect(npcColumns.map((column) => column.name)).toContain("secrets");
     const campaignColumns = db.prepare("PRAGMA table_info(campaigns)").all() as {
       name: string;
     }[];
@@ -135,6 +141,7 @@ describe("migrations", () => {
         "campaign_travel",
         "campaign_session_zero",
         "campaign_safety_preferences",
+        "campaign_factions",
       ])
     );
 

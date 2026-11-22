@@ -617,6 +617,52 @@ test("lazy library, compendium entry, rules, and account routes load", async ({ 
   await expect(page.getByRole("heading", { name: "Account and security" })).toBeVisible();
 });
 
+test("GM publishes a faction and a player-safe NPC to People", async ({ page }) => {
+  await signIn(page, admin);
+  await page.goto(campaignPath);
+  await page.locator(".campaign-tabs").getByRole("button", { name: /^NPCs/ }).click();
+  await expect(page.getByRole("heading", { name: "NPCs", exact: true })).toBeVisible();
+
+  await page.getByRole("button", { name: "New faction" }).click();
+  const factionDialog = page.getByRole("dialog", { name: "New faction" });
+  await expect(factionDialog).toBeVisible();
+  await factionDialog.getByLabel("Name").fill("E2E Harbor Guild");
+  await factionDialog.getByLabel("Public description").fill("Masters of the E2E docks.");
+  await factionDialog.getByLabel("Goals").fill("Keep the harbor open.");
+  await factionDialog.getByLabel("Reputation (-100 to 100)").fill("40");
+  await factionDialog
+    .getByRole("checkbox", { name: "Show this faction on the shared People tab" })
+    .check();
+  await factionDialog.getByLabel("GM notes").fill("E2E secret guild vault.");
+  await factionDialog.getByRole("button", { name: "Create faction" }).click();
+  await expect(page.getByText("Faction created.")).toBeVisible({ timeout: 15_000 });
+
+  await page.getByRole("button", { name: "New NPC" }).click();
+  const npcDialog = page.getByRole("dialog", { name: "New NPC" });
+  await expect(npcDialog).toBeVisible();
+  await npcDialog.getByLabel("Name").fill("E2E Ferryman");
+  await npcDialog.getByLabel("Role or title").fill("Harbor master");
+  await npcDialog.getByLabel("Location").fill("The Salt Dock");
+  await npcDialog.getByLabel("Faction").selectOption({ label: "E2E Harbor Guild" });
+  await npcDialog.getByLabel("Attitude").selectOption("friendly");
+  await npcDialog.getByRole("checkbox", { name: "Show this NPC on the shared People tab" }).check();
+  await npcDialog.getByLabel("Public description").fill("A ferryman who knows every tide.");
+  await npcDialog.getByLabel("GM secrets").fill("E2E secret doppelganger.");
+  await npcDialog.getByRole("button", { name: "Create NPC" }).click();
+  await expect(page.getByText("NPC created.")).toBeVisible({ timeout: 15_000 });
+
+  await page
+    .locator(".campaign-tabs")
+    .getByRole("button", { name: /^People/ })
+    .click();
+  await expect(page.getByRole("heading", { name: "People & factions" })).toBeVisible();
+  await expect(page.getByText("E2E Harbor Guild")).toBeVisible();
+  await expect(page.getByText("E2E Ferryman")).toBeVisible();
+  await expect(page.getByText("A ferryman who knows every tide.")).toBeVisible();
+  await expect(page.getByText("E2E secret doppelganger.")).toHaveCount(0);
+  await expect(page.getByText("E2E secret guild vault.")).toHaveCount(0);
+});
+
 test("player registers, joins with the invite code, and sees a player-safe table", async ({
   page,
   browser,
@@ -637,6 +683,17 @@ test("player registers, joins with the invite code, and sees a player-safe table
   for (const gmTab of ["Encounters", "Loot", "NPCs", "Assets", "GM Screen"]) {
     await expect(page.getByRole("button", { name: gmTab })).toHaveCount(0);
   }
+
+  await page
+    .locator(".campaign-tabs")
+    .getByRole("button", { name: /^People/ })
+    .click();
+  await expect(page.getByRole("heading", { name: "People & factions" })).toBeVisible();
+  await expect(page.getByText("E2E Harbor Guild")).toBeVisible();
+  await expect(page.getByText("E2E Ferryman")).toBeVisible();
+  await expect(page.getByText("A ferryman who knows every tide.")).toBeVisible();
+  await expect(page.getByText("E2E secret doppelganger.")).toHaveCount(0);
+  await expect(page.getByText("E2E secret guild vault.")).toHaveCount(0);
 
   const adminContext = await browser.newContext();
   const adminPage = await adminContext.newPage();
