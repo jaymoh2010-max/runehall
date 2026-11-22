@@ -563,8 +563,20 @@ export function registerSocketServer(io: TypedServer): void {
       const entries = serializeInitiative(JSON.parse(state.initiative || "[]"));
       const active = entries[state.turn_index];
       const activeMatch = Boolean(
-        active && active.sceneId === sceneId && active.tokenId === tokenId
+        active &&
+        active.sceneId === sceneId &&
+        (active.tokenId === tokenId ||
+          (active.groupId && row.group_id && active.groupId === row.group_id))
       );
+      const speed = speedForToken(row);
+      if (role !== "gm" && entries.length > 0 && !activeMatch) {
+        sendError(socket, "It isn't this token's turn. The GM can move it if needed.");
+        socketTokenEvents(io, campaignId).moved(
+          { tokenId, sceneId, x: row.x, y: row.y },
+          Boolean(row.hidden)
+        );
+        return;
+      }
       let targetX = nx;
       let targetY = ny;
       let pathPoints: Array<{ x: number; y: number }> | null = null;
@@ -584,7 +596,6 @@ export function registerSocketServer(io: TypedServer): void {
         ? blockingWallForMove(walls, { x: row.x, y: row.y }, { x: nx, y: ny })
         : null;
       if (blockedProp || blockedWall) {
-        const speed = speedForToken(row);
         const budget =
           role !== "gm" && activeMatch && speed !== null
             ? Math.max(0, speed - Math.max(0, active.movementUsed ?? 0))
@@ -637,9 +648,24 @@ export function registerSocketServer(io: TypedServer): void {
             },
             { x: row.x, y: row.y },
             pathPoints ?? [{ x: targetX, y: targetY }],
-            scene.grid_size
+            scene.grid_size,
+            speed
           )
         : null;
+      if (role !== "gm" && activeMatch && movement?.overSpeed) {
+        const remaining = Math.max(0, (speed ?? 0) - Math.max(0, active.movementUsed ?? 0));
+        sendError(
+          socket,
+          remaining > 0
+            ? `Only ${remaining} ft. of movement left this turn.`
+            : "No movement left this turn."
+        );
+        socketTokenEvents(io, campaignId).moved(
+          { tokenId, sceneId, x: row.x, y: row.y },
+          Boolean(row.hidden)
+        );
+        return;
+      }
       db.prepare("UPDATE tokens SET x = ?, y = ?, updated_at = ? WHERE id = ?").run(
         targetX,
         targetY,
