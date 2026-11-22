@@ -24,7 +24,12 @@ import {
   normalizeTravelWeather,
 } from "../shared/travel";
 import { normalizeSessionZeroChecklist } from "../shared/sessionZero";
-import { normalizeNpcAttitude, normalizeReputation } from "../shared/people";
+import {
+  normalizeHazardComplexity,
+  normalizeNpcAttitude,
+  normalizeNpcKind,
+  normalizeReputation,
+} from "../shared/people";
 import { normalizeChapterLevel, normalizeChapterStatus } from "../shared/chapters";
 import {
   MAX_SHOP_STOCK_ROWS,
@@ -921,15 +926,18 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
     }
 
     for (const npc of records(payload.npcs, 20_000, "NPCs")) {
+      const kind = normalizeNpcKind(npc.kind);
       db.prepare(
         `INSERT INTO campaign_npcs
-          (id, campaign_id, name, level, hp, ac, perception, size, color, image_url, description,
-           faction_id, role, location, attitude, public_description, secrets, visible, sort_order,
-           created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          (id, campaign_id, kind, complexity, name, level, hp, ac, perception, size, color,
+           image_url, description, faction_id, role, location, attitude, public_description,
+           trigger, disable_text, routine, secrets, visible, sort_order, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).run(
         newId("npc"),
         campaignId,
+        kind,
+        normalizeHazardComplexity(npc.complexity),
         text(npc.name, "Imported NPC", 120),
         numberValue(npc.level, 1, -1, 30),
         npc.hp === null || npc.hp === undefined ? null : numberValue(npc.hp, 0),
@@ -948,8 +956,11 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
         text(npc.location, "", 120),
         normalizeNpcAttitude(npc.attitude),
         longText(npc.publicDescription, "", 4_000),
+        longText(npc.trigger, "", 4_000),
+        longText(npc.disable, "", 4_000),
+        longText(npc.routine, "", 8_000),
         longText(npc.secrets, "", 8_000),
-        npc.visible === true ? 1 : 0,
+        kind === "npc" && npc.visible === true ? 1 : 0,
         numberValue(npc.sortOrder, 0),
         ts,
         ts

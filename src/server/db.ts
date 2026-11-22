@@ -450,6 +450,8 @@ export interface SessionAttendanceRow {
 export interface CampaignNpcRow {
   id: string;
   campaign_id: string;
+  kind: string;
+  complexity: string;
   name: string;
   level: number;
   hp: number | null;
@@ -464,6 +466,9 @@ export interface CampaignNpcRow {
   location: string;
   attitude: string;
   public_description: string;
+  trigger: string;
+  disable_text: string;
+  routine: string;
   secrets: string;
   visible: number;
   sort_order: number;

@@ -106,6 +106,11 @@ describe("migrations", () => {
     expect(npcColumns.map((column) => column.name)).toContain("faction_id");
     expect(npcColumns.map((column) => column.name)).toContain("visible");
     expect(npcColumns.map((column) => column.name)).toContain("secrets");
+    expect(npcColumns.map((column) => column.name)).toContain("kind");
+    expect(npcColumns.map((column) => column.name)).toContain("complexity");
+    expect(npcColumns.map((column) => column.name)).toContain("trigger");
+    expect(npcColumns.map((column) => column.name)).toContain("disable_text");
+    expect(npcColumns.map((column) => column.name)).toContain("routine");
     const campaignColumns = db.prepare("PRAGMA table_info(campaigns)").all() as {
       name: string;
     }[];

@@ -107,7 +107,12 @@ import {
   travelStatus,
 } from "../shared/travel";
 import { normalizeSessionZeroChecklist } from "../shared/sessionZero";
-import { normalizeNpcAttitude, normalizeReputation } from "../shared/people";
+import {
+  normalizeHazardComplexity,
+  normalizeNpcAttitude,
+  normalizeNpcKind,
+  normalizeReputation,
+} from "../shared/people";
 import { normalizeChapterLevel, normalizeChapterStatus } from "../shared/chapters";
 import { isCampaignRequestKind, isCampaignRequestStatus } from "../shared/requests";
 
@@ -590,6 +595,8 @@ export function serializeCampaignNpc(row: CampaignNpcRow, privateView = true): C
   const npc: CampaignNpc = {
     id: row.id,
     campaignId: row.campaign_id,
+    kind: normalizeNpcKind(row.kind),
+    complexity: normalizeHazardComplexity(row.complexity),
     name: row.name,
     level: row.level,
     hp: row.hp,
@@ -604,6 +611,9 @@ export function serializeCampaignNpc(row: CampaignNpcRow, privateView = true): C
     location: row.location,
     attitude: normalizeNpcAttitude(row.attitude),
     publicDescription: row.public_description,
+    trigger: privateView ? row.trigger : "",
+    disable: privateView ? row.disable_text : "",
+    routine: privateView ? row.routine : "",
     visible: Boolean(row.visible),
     sortOrder: row.sort_order,
     createdAt: row.created_at,

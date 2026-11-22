@@ -5509,6 +5509,23 @@
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+.npc-hazard-details {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 0.84rem;
+  color: var(--text-2);
+}
+.npc-hazard-details summary {
+  cursor: pointer;
+  color: var(--text);
+  font-weight: 600;
+}
+.npc-hazard-details p {
+  margin-top: 6px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
 .npc-card-actions {
   display: flex;
   align-items: center;

@@ -8,9 +8,13 @@ import type {
   Token,
 } from "../../../shared/types";
 import {
+  HAZARD_COMPLEXITIES,
   NPC_ATTITUDES,
+  NPC_KINDS,
   npcAttitudeLabel,
+  normalizeHazardComplexity,
   normalizeNpcAttitude,
+  normalizeNpcKind,
   reputationLabel,
 } from "../../../shared/people";
 import { api, uploadImage } from "../../api";
@@ -57,6 +61,7 @@ export function NpcLibrary({
   const [query, setQuery] = useState("");
   const [sceneId, setSceneId] = useState(activeSceneId ?? scenes[0]?.id ?? "");
   const [editor, setEditor] = useState<CampaignNpc | "new" | null>(null);
+  const [newKind, setNewKind] = useState<"npc" | "hazard">("npc");
   const [factionEditor, setFactionEditor] = useState<CampaignFaction | "new" | null>(null);
 
   useEffect(() => {
@@ -94,7 +99,10 @@ export function NpcLibrary({
     if (!value) return npcs;
     return npcs.filter(
       (npc) =>
-        npc.name.toLowerCase().includes(value) || npc.description.toLowerCase().includes(value)
+        npc.name.toLowerCase().includes(value) ||
+        npc.description.toLowerCase().includes(value) ||
+        npc.trigger.toLowerCase().includes(value) ||
+        npc.disable.toLowerCase().includes(value)
     );
   }, [npcs, query]);
 
@@ -138,12 +146,12 @@ export function NpcLibrary({
   };
 
   const deleteNpc = async (npc: CampaignNpc) => {
-    if (!window.confirm(`Delete “${npc.name}” from the NPC library?`)) return;
+    if (!window.confirm(`Delete "${npc.name}" from the library?`)) return;
     setBusy(true);
     try {
       await api(`/api/campaigns/${campaignId}/npcs/${npc.id}`, { method: "DELETE" });
       setNpcs((current) => current.filter((entry) => entry.id !== npc.id));
-      toast("NPC deleted.", "success");
+      toast(npc.kind === "hazard" ? "Hazard deleted." : "NPC deleted.", "success");
     } catch (err) {
       toast(errorMessage(err), "error");
     } finally {
@@ -185,14 +193,34 @@ export function NpcLibrary({
       <div className="section-title">
         <div>
           <PageEyebrow>GM preparation</PageEyebrow>
-          <h2>NPCs</h2>
+          <h2>NPCs &amp; hazards</h2>
           <p>
-            Save recurring allies, villains, and monsters, then place their tokens on any scene.
+            Save recurring allies, villains, monsters, and custom hazards, then place their tokens
+            on any scene.
           </p>
         </div>
-        <Button variant="primary" icon={<Plus size={15} />} onClick={() => setEditor("new")}>
-          New NPC
-        </Button>
+        <div className="row wrap" style={{ gap: 8 }}>
+          <Button
+            variant="secondary"
+            icon={<Shield size={15} />}
+            onClick={() => {
+              setNewKind("hazard");
+              setEditor("new");
+            }}
+          >
+            New hazard
+          </Button>
+          <Button
+            variant="primary"
+            icon={<Plus size={15} />}
+            onClick={() => {
+              setNewKind("npc");
+              setEditor("new");
+            }}
+          >
+            New NPC
+          </Button>
+        </div>
       </div>
 
       {error ? (
@@ -275,7 +303,7 @@ export function NpcLibrary({
           <Input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search NPCs…"
+            placeholder="Search NPCs and hazards…"
           />
         </div>
         <Field label="Place tokens on">
@@ -295,8 +323,8 @@ export function NpcLibrary({
       ) : !npcs.length ? (
         <EmptyState
           icon={<UserRound size={30} />}
-          title="No NPCs saved"
-          description="Create a statblock for a recurring NPC, villain, or custom creature."
+          title="Nothing saved yet"
+          description="Create a statblock for a recurring NPC, villain, custom creature, or hazard."
         />
       ) : !filtered.length ? (
         <EmptyState
@@ -313,26 +341,61 @@ export function NpcLibrary({
                 <div className="grow">
                   <div className="row wrap" style={{ gap: 7 }}>
                     <h3>{npc.name}</h3>
+                    {npc.kind === "hazard" ? <Tag tone="violet">Hazard</Tag> : null}
                     <Badge tone="gold">Level {npc.level}</Badge>
-                    <Tag tone={npc.visible ? "green" : "gold"}>
-                      {npc.visible ? "Public" : "Hidden"}
-                    </Tag>
+                    {npc.kind === "npc" ? (
+                      <Tag tone={npc.visible ? "green" : "gold"}>
+                        {npc.visible ? "Public" : "Hidden"}
+                      </Tag>
+                    ) : null}
                   </div>
-                  <p className="tiny muted">
-                    {[npc.role, npc.location].filter(Boolean).join(" · ") || "No role or location"}{" "}
-                    · {npcAttitudeLabel(npc.attitude)}
-                    {npc.factionId
-                      ? ` · ${factions.find((faction) => faction.id === npc.factionId)?.name ?? "Faction"}`
-                      : ""}
-                  </p>
+                  {npc.kind === "hazard" ? (
+                    <p className="tiny muted">
+                      {HAZARD_COMPLEXITIES.find((entry) => entry.id === npc.complexity)?.label ??
+                        "Complex hazard"}
+                      {npc.trigger ? ` · ${npc.trigger}` : ""}
+                    </p>
+                  ) : (
+                    <p className="tiny muted">
+                      {[npc.role, npc.location].filter(Boolean).join(" · ") ||
+                        "No role or location"}{" "}
+                      · {npcAttitudeLabel(npc.attitude)}
+                      {npc.factionId
+                        ? ` · ${factions.find((faction) => faction.id === npc.factionId)?.name ?? "Faction"}`
+                        : ""}
+                    </p>
+                  )}
                   <p className="tiny muted">
                     {npc.hp !== null ? `${npc.hp} HP` : "No HP"} ·{" "}
                     {npc.ac !== null ? `AC ${npc.ac}` : "No AC"}
                     {npc.perception !== null ? ` · Perception ${npc.perception}` : ""}
+                    {npc.kind === "hazard"
+                      ? ` · ${npc.disable ? "Has disable" : "No disable"}`
+                      : ""}
                   </p>
                 </div>
               </div>
               {npc.description ? <p className="npc-description">{npc.description}</p> : null}
+              {npc.kind === "hazard" && (npc.trigger || npc.disable || npc.routine) ? (
+                <details className="npc-hazard-details">
+                  <summary>Trigger, disable, and routine</summary>
+                  {npc.trigger ? (
+                    <p>
+                      <strong>Trigger</strong> {npc.trigger}
+                    </p>
+                  ) : null}
+                  {npc.disable ? (
+                    <p>
+                      <strong>Disable</strong> {npc.disable}
+                    </p>
+                  ) : null}
+                  {npc.routine ? (
+                    <p>
+                      <strong>Routine</strong> {npc.routine}
+                    </p>
+                  ) : null}
+                </details>
+              ) : null}
               <div className="npc-card-actions">
                 <Button
                   size="sm"
@@ -364,13 +427,23 @@ export function NpcLibrary({
       <NpcEditor
         open={Boolean(editor)}
         npc={editor}
+        defaultKind={newKind}
         campaignId={campaignId}
         factions={factions}
         onClose={() => setEditor(null)}
         onSaved={(npc) => {
           replaceNpc(npc);
           setEditor(null);
-          toast(editor === "new" ? "NPC created." : "NPC saved.", "success");
+          toast(
+            npc.kind === "hazard"
+              ? editor === "new"
+                ? "Hazard created."
+                : "Hazard saved."
+              : editor === "new"
+                ? "NPC created."
+                : "NPC saved.",
+            "success"
+          );
         }}
         onError={(message) => toast(message, "error")}
       />
@@ -394,6 +467,7 @@ export function NpcLibrary({
 function NpcEditor({
   open,
   npc,
+  defaultKind,
   campaignId,
   factions,
   onClose,
@@ -402,6 +476,7 @@ function NpcEditor({
 }: {
   open: boolean;
   npc: CampaignNpc | "new" | null;
+  defaultKind: "npc" | "hazard";
   campaignId: string;
   factions: CampaignFaction[];
   onClose: () => void;
@@ -410,6 +485,11 @@ function NpcEditor({
 }) {
   const editing = npc && npc !== "new" ? npc : null;
   const fileRef = useRef<HTMLInputElement>(null);
+  const [kind, setKind] = useState<"npc" | "hazard">("npc");
+  const [complexity, setComplexity] = useState<"simple" | "complex">("complex");
+  const [trigger, setTrigger] = useState("");
+  const [disableText, setDisableText] = useState("");
+  const [routine, setRoutine] = useState("");
   const [name, setName] = useState("");
   const [level, setLevel] = useState("1");
   const [hp, setHp] = useState("");
@@ -432,6 +512,11 @@ function NpcEditor({
 
   useEffect(() => {
     if (!open) return;
+    setKind(editing?.kind ?? defaultKind);
+    setComplexity(editing?.complexity ?? "complex");
+    setTrigger(editing?.trigger ?? "");
+    setDisableText(editing?.disable ?? "");
+    setRoutine(editing?.routine ?? "");
     setName(editing?.name ?? "");
     setLevel(String(editing?.level ?? 1));
     setHp(editing?.hp === null || editing?.hp === undefined ? "" : String(editing.hp));
@@ -453,7 +538,7 @@ function NpcEditor({
     setSecrets(editing?.secrets ?? "");
     setVisible(Boolean(editing?.visible));
     setError("");
-  }, [open, editing?.id]);
+  }, [open, editing?.id, defaultKind]);
 
   const upload = async (file: File) => {
     setUploading(true);
@@ -471,13 +556,18 @@ function NpcEditor({
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     if (!name.trim()) {
-      setError("Give the NPC a name.");
+      setError(`Give the ${kind === "hazard" ? "hazard" : "NPC"} a name.`);
       return;
     }
     setBusy(true);
     setError("");
     try {
       const payload = {
+        kind,
+        complexity,
+        trigger,
+        disable: disableText,
+        routine,
         name: name.trim(),
         level: Number(level) || 1,
         hp: hp === "" ? null : Number(hp),
@@ -518,7 +608,7 @@ function NpcEditor({
     <Modal
       open={open}
       onClose={onClose}
-      title={editing ? `Edit ${editing.name}` : "New NPC"}
+      title={editing ? `Edit ${editing.name}` : kind === "hazard" ? "New hazard" : "New NPC"}
       subtitle="A saved statblock with token art and combat basics."
       wide
       footer={
@@ -527,7 +617,9 @@ function NpcEditor({
             Cancel
           </Button>
           <Button variant="primary" loading={busy} onClick={submit}>
-            {editing ? "Save NPC" : "Create NPC"}
+            {editing
+              ? `Save ${kind === "hazard" ? "hazard" : "NPC"}`
+              : `Create ${kind === "hazard" ? "hazard" : "NPC"}`}
           </Button>
         </>
       }
@@ -574,65 +666,128 @@ function NpcEditor({
             </p>
           </div>
           <div className="npc-editor-fields">
-            <Field label="Name">
-              <Input
-                autoFocus
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-                placeholder="e.g. The Ferryman"
-              />
-            </Field>
             <div className="form-grid two">
-              <Field label="Role or title">
-                <Input
-                  value={role}
-                  onChange={(event) => setRole(event.target.value)}
-                  placeholder="Harbor master, cultist, informant…"
-                />
-              </Field>
-              <Field label="Location">
-                <Input
-                  value={location}
-                  onChange={(event) => setLocation(event.target.value)}
-                  placeholder="Where the party can find them"
-                />
-              </Field>
-              <Field label="Faction">
-                <Select value={factionId} onChange={(event) => setFactionId(event.target.value)}>
-                  <option value="">No faction</option>
-                  {factions.map((faction) => (
-                    <option key={faction.id} value={faction.id}>
-                      {faction.name}
-                    </option>
-                  ))}
-                </Select>
-              </Field>
-              <Field label="Attitude">
+              <Field label="Type">
                 <Select
-                  value={attitude}
-                  onChange={(event) => setAttitude(normalizeNpcAttitude(event.target.value))}
+                  value={kind}
+                  onChange={(event) => setKind(normalizeNpcKind(event.target.value))}
                 >
-                  {NPC_ATTITUDES.map((entry) => (
+                  {NPC_KINDS.map((entry) => (
                     <option key={entry.id} value={entry.id}>
                       {entry.label}
                     </option>
                   ))}
                 </Select>
               </Field>
+              {kind === "hazard" ? (
+                <Field label="Complexity">
+                  <Select
+                    value={complexity}
+                    onChange={(event) =>
+                      setComplexity(normalizeHazardComplexity(event.target.value))
+                    }
+                  >
+                    {HAZARD_COMPLEXITIES.map((entry) => (
+                      <option key={entry.id} value={entry.id}>
+                        {entry.label}
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
+              ) : null}
             </div>
-            <Checkbox
-              label="Show this NPC on the shared People tab"
-              checked={visible}
-              onChange={setVisible}
-            />
-            <Field label="Public description" hint="What players can read on the People tab.">
-              <Textarea
-                rows={3}
-                value={publicDescription}
-                onChange={(event) => setPublicDescription(event.target.value)}
-                placeholder="The party knows them as…"
+            <Field label="Name">
+              <Input
+                autoFocus
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                placeholder={kind === "hazard" ? "e.g. The Crushing Ceiling" : "e.g. The Ferryman"}
               />
             </Field>
+            {kind === "npc" ? (
+              <div className="form-grid two">
+                <Field label="Role or title">
+                  <Input
+                    value={role}
+                    onChange={(event) => setRole(event.target.value)}
+                    placeholder="Harbor master, cultist, informant…"
+                  />
+                </Field>
+                <Field label="Location">
+                  <Input
+                    value={location}
+                    onChange={(event) => setLocation(event.target.value)}
+                    placeholder="Where the party can find them"
+                  />
+                </Field>
+                <Field label="Faction">
+                  <Select value={factionId} onChange={(event) => setFactionId(event.target.value)}>
+                    <option value="">No faction</option>
+                    {factions.map((faction) => (
+                      <option key={faction.id} value={faction.id}>
+                        {faction.name}
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
+                <Field label="Attitude">
+                  <Select
+                    value={attitude}
+                    onChange={(event) => setAttitude(normalizeNpcAttitude(event.target.value))}
+                  >
+                    {NPC_ATTITUDES.map((entry) => (
+                      <option key={entry.id} value={entry.id}>
+                        {entry.label}
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
+              </div>
+            ) : null}
+            {kind === "npc" ? (
+              <Checkbox
+                label="Show this NPC on the shared People tab"
+                checked={visible}
+                onChange={setVisible}
+              />
+            ) : null}
+            {kind === "hazard" ? (
+              <>
+                <Field label="Trigger" hint="When the hazard activates.">
+                  <Textarea
+                    rows={3}
+                    value={trigger}
+                    onChange={(event) => setTrigger(event.target.value)}
+                    placeholder="A creature steps on the pressure plate."
+                  />
+                </Field>
+                <Field label="Disable" hint="How the party can disarm or bypass it.">
+                  <Textarea
+                    rows={3}
+                    value={disableText}
+                    onChange={(event) => setDisableText(event.target.value)}
+                    placeholder="Thievery DC 20 to jam the gears, or disable the winch."
+                  />
+                </Field>
+                <Field label="Routine" hint="Repeating effects, actions, and timing.">
+                  <Textarea
+                    rows={4}
+                    value={routine}
+                    onChange={(event) => setRoutine(event.target.value)}
+                    placeholder="Each round, the ceiling lowers 5 feet."
+                  />
+                </Field>
+              </>
+            ) : (
+              <Field label="Public description" hint="What players can read on the People tab.">
+                <Textarea
+                  rows={3}
+                  value={publicDescription}
+                  onChange={(event) => setPublicDescription(event.target.value)}
+                  placeholder="The party knows them as…"
+                />
+              </Field>
+            )}
             <Field label="GM secrets" hint="Never shown to players; kept for your eyes only.">
               <Textarea
                 rows={4}

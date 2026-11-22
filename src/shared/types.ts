@@ -1541,9 +1541,14 @@ export interface CampaignFaction {
   updatedAt: number;
 }
 
+export type CampaignNpcKind = "npc" | "hazard";
+export type HazardComplexity = "simple" | "complex";
+
 export interface CampaignNpc {
   id: string;
   campaignId: string;
+  kind: CampaignNpcKind;
+  complexity: HazardComplexity;
   name: string;
   level: number;
   hp: number | null;
@@ -1559,6 +1564,12 @@ export interface CampaignNpc {
   attitude: NpcAttitude;
   publicDescription: string;
   visible: boolean;
+  /** Hazard trigger and timing. Empty for ordinary NPCs. */
+  trigger: string;
+  /** How the hazard can be disabled or avoided. */
+  disable: string;
+  /** Hazard routine or repeating effect. */
+  routine: string;
   /** GM-only secrets; omitted from player responses. */
   secrets?: string;
   sortOrder: number;

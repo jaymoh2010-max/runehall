@@ -244,12 +244,12 @@ Then immediately add **guided level-up**: a dedicated “Level up” flow that e
   - Grouped monsters roll one initiative entry (for example, “Goblin Warrior ×3”).
   - Encounter launches now create grouped tokens automatically.
   - A persistent, non-modal **Bestiary** palette supports search, level filtering, group counts, and drag-to-map placement.
-- [x] **NPC/statblock library (core)**
-  - GM-only library of recurring allies, villains, and custom creatures.
-  - Each NPC stores level, HP, AC, perception, size, token color, optional token art, and statblock notes.
+- [x] **NPC and hazard library (core)**
+  - GM-only library of recurring allies, villains, custom creatures, and custom hazards.
+  - Each entry stores level, HP, AC, perception, size, token color, optional token art, and statblock notes; hazards add complexity, trigger, disable, and routine text.
   - **Place token** creates a token on the active or chosen scene with the saved combat basics.
-  - NPCs are included in campaign export and never exposed to players.
-  - Remaining: import/duplicate an NPC from the bestiary in one step.
+  - Hidden entries never reach players; visible NPCs are shared through the People tab, while hazards stay GM-only.
+  - Remaining: import/duplicate an NPC from the bestiary in one step, and bundle compendium hazard presets.
 - [x] **Session scheduling and attendance**
   - Shared **Sessions** tab with upcoming and past sessions, dates, duration, and status.
   - GM can schedule, edit, delete, and mark sessions played.

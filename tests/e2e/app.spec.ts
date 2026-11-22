@@ -832,7 +832,7 @@ test("Library clear search resets the local input and URL", async ({ page }) => 
 test("GM publishes a faction and a player-safe NPC to People", async ({ page }) => {
   await signIn(page, admin);
   await page.goto(`${campaignPath}?tab=npcs`);
-  await expect(page.getByRole("heading", { name: "NPCs", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "NPCs & hazards", exact: true })).toBeVisible();
 
   await page.getByRole("button", { name: "New faction" }).click();
   const factionDialog = page.getByRole("dialog", { name: "New faction" });
@@ -862,6 +862,21 @@ test("GM publishes a faction and a player-safe NPC to People", async ({ page }) 
   await npcDialog.getByRole("button", { name: "Create NPC" }).click();
   await expect(page.getByText("NPC created.")).toBeVisible({ timeout: 15_000 });
 
+  await page.getByRole("button", { name: "New hazard" }).click();
+  const hazardDialog = page.getByRole("dialog", { name: "New hazard" });
+  await expect(hazardDialog).toBeVisible();
+  await hazardDialog.getByLabel("Name").fill("E2E Crushing Ceiling");
+  await hazardDialog.getByLabel("Complexity").selectOption("simple");
+  await hazardDialog.getByLabel("Trigger").fill("A creature enters the flooded hall.");
+  await hazardDialog.getByLabel("Disable").fill("Thievery DC 20 to jam the winch.");
+  await hazardDialog.getByLabel("Routine").fill("The ceiling lowers five feet each round.");
+  await expect(
+    hazardDialog.getByRole("checkbox", { name: /Show this hazard on the shared People tab/ })
+  ).toHaveCount(0);
+  await hazardDialog.getByRole("button", { name: "Create hazard" }).click();
+  await expect(page.getByText("Hazard created.")).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText("E2E Crushing Ceiling")).toBeVisible();
+
   await page.goto(`${campaignPath}?tab=people`);
   await expect(page.getByRole("heading", { name: "People & factions" })).toBeVisible();
   await expect(page.getByText("E2E Harbor Guild")).toBeVisible();
@@ -869,6 +884,7 @@ test("GM publishes a faction and a player-safe NPC to People", async ({ page }) 
   await expect(page.getByText("A ferryman who knows every tide.")).toBeVisible();
   await expect(page.getByText("E2E secret doppelganger.")).toHaveCount(0);
   await expect(page.getByText("E2E secret guild vault.")).toHaveCount(0);
+  await expect(page.getByText("E2E Crushing Ceiling")).toHaveCount(0);
 });
 
 test("GM shares campaign knowledge and keeps hidden lore GM-only", async ({ page }) => {

@@ -13,7 +13,7 @@
 Runehall is a complete **campaign table**, with a few deliberate boundaries:
 
 - **Ready:** accounts and invites, campaign membership, 1–20 character building, live sheets, server-rolled combat, HP/dying/wounded, conditions, afflictions, item activation, prepared/spontaneous/focus/innate casting, loot and shops, downtime, travel, sessions, safety tools, journal/handouts, victory-point clocks, export/import, backup/restore, and administrator moderation.
-- **GM-facing preparation:** encounters, waves, hazards-as-XP, NPCs, factions, merchants, scenes, chapter/arc scaffolding, optional tracked stock, and a live GM screen.
+- **GM-facing preparation:** encounters, waves, hazards-as-XP, custom hazards, NPCs, factions, merchants, scenes, chapter/arc scaffolding, optional tracked stock, and a live GM screen.
 - **Manual by design:** optional variant rules, unusual feat/item effects, published-adventure conversion, hexcrawl mapping, and long-running project bookkeeping.
 
 The rest of this document records what is verified and what remains manual, so a GM can decide before session zero.
@@ -118,7 +118,7 @@ These are optional campaign variants; the base Remastered rules do not require t
 ### Rules automation
 
 - Unusual feat, item, heritage, and class effects may remain prose-only. Automation badges are conservative.
-- Compendium hazard statblocks and hazard actors are not implemented; hazards can be awarded as XP and run as custom statblocks/notes.
+- Compendium hazard statblocks and ready-made hazard presets are not bundled. GMs can save custom hazards in the NPC & hazard library with trigger, disable, and routine text, then award hazard XP separately.
 - Compendium affliction presets are not bundled; afflictions are entered manually.
 - Some action-count spell variants, fixed-rank heightening, and data conflicts stay manual.
 - Difficult terrain, elevation/flying, squeezing, forced movement, flanking automation, and token-to-token collision are not automated.

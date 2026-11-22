@@ -14,7 +14,12 @@ import {
   touchCampaign,
 } from "../serialize";
 import { tokenEventsFor } from "../tokenEvents";
-import { normalizeNpcAttitude, normalizeReputation } from "../../shared/people";
+import {
+  normalizeHazardComplexity,
+  normalizeNpcAttitude,
+  normalizeNpcKind,
+  normalizeReputation,
+} from "../../shared/people";
 import { clamp, newId, now, safeInt, safeString, sanitizeUserText } from "../util";
 
 function gmCampaign(
@@ -122,7 +127,7 @@ export async function registerNpcRoutes(app: FastifyInstance): Promise<void> {
     const npcs = (
       db
         .prepare(
-          "SELECT * FROM campaign_npcs WHERE campaign_id = ? AND visible = 1 ORDER BY sort_order ASC, name ASC"
+          "SELECT * FROM campaign_npcs WHERE campaign_id = ? AND visible = 1 AND kind = 'npc' ORDER BY sort_order ASC, name ASC"
         )
         .all(id) as CampaignNpcRow[]
     ).map((row) => serializeCampaignNpc(row, false));
@@ -236,18 +241,22 @@ export async function registerNpcRoutes(app: FastifyInstance): Promise<void> {
     if (!access.row) return reply.code(access.code ?? 403).send({ error: access.error });
     const body = (request.body ?? {}) as Record<string, unknown>;
     const name = safeString(body.name, "", 120);
-    if (!name) return reply.code(400).send({ error: "Give the NPC a name." });
+    if (!name) return reply.code(400).send({ error: "Give the NPC or hazard a name." });
     const npcId = newId("npc");
     const ts = now();
+    const kind = normalizeNpcKind(body.kind);
+    const complexity = normalizeHazardComplexity(body.complexity);
     db.prepare(
       `INSERT INTO campaign_npcs
-        (id, campaign_id, name, level, hp, ac, perception, size, color, image_url, description,
-         faction_id, role, location, attitude, public_description, secrets, visible, sort_order,
-         created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        (id, campaign_id, kind, complexity, name, level, hp, ac, perception, size, color, image_url, description,
+         faction_id, role, location, attitude, public_description, trigger, disable_text, routine,
+         secrets, visible, sort_order, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       npcId,
       id,
+      kind,
+      complexity,
       name,
       clamp(safeInt(body.level, 1, -1, 30), -1, 30),
       body.hp === undefined || body.hp === null ? null : safeInt(body.hp, 0, 0, 1_000_000),
@@ -264,8 +273,11 @@ export async function registerNpcRoutes(app: FastifyInstance): Promise<void> {
       safeString(body.location, "", 120),
       normalizeNpcAttitude(body.attitude),
       sanitizeUserText(body.publicDescription, 4_000),
+      sanitizeUserText(body.trigger, 4_000),
+      sanitizeUserText(body.disable, 4_000),
+      sanitizeUserText(body.routine, 8_000),
       sanitizeUserText(body.secrets, 8_000),
-      body.visible === true ? 1 : 0,
+      kind === "npc" && body.visible === true ? 1 : 0,
       nextSortOrder(id),
       ts,
       ts
@@ -283,15 +295,20 @@ export async function registerNpcRoutes(app: FastifyInstance): Promise<void> {
     const body = (request.body ?? {}) as Record<string, unknown>;
     const name =
       body.name === undefined ? existing.name : safeString(body.name, existing.name, 120);
-    if (!name) return reply.code(400).send({ error: "Give the NPC a name." });
+    if (!name) return reply.code(400).send({ error: "Give the NPC or hazard a name." });
     const nextImage = imageUrl(body.imageUrl);
+    const nextKind = normalizeNpcKind(body.kind === undefined ? existing.kind : body.kind);
     db.prepare(
       `UPDATE campaign_npcs
-       SET name = ?, level = ?, hp = ?, ac = ?, perception = ?, size = ?, color = ?,
+       SET kind = ?, complexity = ?, name = ?, level = ?, hp = ?, ac = ?, perception = ?, size = ?, color = ?,
            image_url = ?, description = ?, faction_id = ?, role = ?, location = ?, attitude = ?,
-           public_description = ?, secrets = ?, visible = ?, updated_at = ?
+           public_description = ?, trigger = ?, disable_text = ?, routine = ?, secrets = ?, visible = ?, updated_at = ?
        WHERE id = ?`
     ).run(
+      nextKind,
+      body.complexity === undefined
+        ? existing.complexity
+        : normalizeHazardComplexity(body.complexity),
       name,
       body.level === undefined
         ? existing.level
@@ -328,8 +345,17 @@ export async function registerNpcRoutes(app: FastifyInstance): Promise<void> {
       body.publicDescription === undefined
         ? existing.public_description
         : sanitizeUserText(body.publicDescription, 4_000),
+      body.trigger === undefined ? existing.trigger : sanitizeUserText(body.trigger, 4_000),
+      body.disable === undefined ? existing.disable_text : sanitizeUserText(body.disable, 4_000),
+      body.routine === undefined ? existing.routine : sanitizeUserText(body.routine, 8_000),
       body.secrets === undefined ? existing.secrets : sanitizeUserText(body.secrets, 8_000),
-      body.visible === undefined ? existing.visible : body.visible === true ? 1 : 0,
+      nextKind === "hazard"
+        ? 0
+        : body.visible === undefined
+          ? existing.visible
+          : body.visible === true
+            ? 1
+            : 0,
       now(),
       npcId
     );

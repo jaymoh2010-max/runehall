@@ -1,4 +1,22 @@
-import type { NpcAttitude } from "./types";
+import type { CampaignNpcKind, HazardComplexity, NpcAttitude } from "./types";
+
+export const NPC_KINDS: ReadonlyArray<{ id: CampaignNpcKind; label: string }> = [
+  { id: "npc", label: "NPC or monster" },
+  { id: "hazard", label: "Hazard" },
+];
+
+export const HAZARD_COMPLEXITIES: ReadonlyArray<{ id: HazardComplexity; label: string }> = [
+  { id: "complex", label: "Complex hazard" },
+  { id: "simple", label: "Simple hazard" },
+];
+
+export function normalizeNpcKind(value: unknown): CampaignNpcKind {
+  return value === "hazard" ? "hazard" : "npc";
+}
+
+export function normalizeHazardComplexity(value: unknown): HazardComplexity {
+  return value === "simple" ? "simple" : "complex";
+}
 
 export const NPC_ATTITUDES: ReadonlyArray<{ id: NpcAttitude; label: string; note: string }> = [
   { id: "hostile", label: "Hostile", note: "Actively opposed; will harm or betray the party." },

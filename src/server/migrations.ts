@@ -916,4 +916,15 @@ export const migrations: Migration[] = [
       ALTER TABLE campaigns ADD COLUMN automatic_bonus_progression INTEGER NOT NULL DEFAULT 0;
     `,
   },
+  {
+    version: 53,
+    name: "campaign_hazards",
+    sql: `
+      ALTER TABLE campaign_npcs ADD COLUMN kind TEXT NOT NULL DEFAULT 'npc';
+      ALTER TABLE campaign_npcs ADD COLUMN complexity TEXT NOT NULL DEFAULT 'complex';
+      ALTER TABLE campaign_npcs ADD COLUMN trigger TEXT NOT NULL DEFAULT '';
+      ALTER TABLE campaign_npcs ADD COLUMN disable_text TEXT NOT NULL DEFAULT '';
+      ALTER TABLE campaign_npcs ADD COLUMN routine TEXT NOT NULL DEFAULT '';
+    `,
+  },
 ];
