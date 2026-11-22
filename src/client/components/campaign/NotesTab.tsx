@@ -102,10 +102,11 @@ export function NotesTab({
     <div className="page-inner notes-page">
       <div className="section-title">
         <div>
-          <PageEyebrow>Session journal</PageEyebrow>
+          <PageEyebrow>Table notes</PageEyebrow>
           <h2>Notes &amp; knowledge</h2>
           <p>
-            Keep private session notes, and read the lore the GM has shared with the whole table.
+            Private notes for your eyes and lore the GM has shared with the table. Session recaps,
+            handouts, and quests live in Journal.
           </p>
         </div>
         <Button variant="primary" icon={<Plus size={15} />} onClick={() => setNoteEditor("new")}>

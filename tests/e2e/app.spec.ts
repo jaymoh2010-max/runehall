@@ -369,6 +369,37 @@ test("GM controls advancement and milestone mode hides XP awards", async ({ page
   await expect(page.locator(".point-row").filter({ hasText: "Downtime" })).toContainText("0 days");
 });
 
+test("Party actions menu supports keyboard navigation and restores focus", async ({ page }) => {
+  await signIn(page, admin);
+  await page.goto(`${campaignPath}?tab=party`);
+
+  const trigger = page.getByRole("button", { name: /Party actions/ });
+  await trigger.focus();
+  await page.keyboard.press("Enter");
+
+  const menu = page.getByRole("menu", { name: "Party actions" });
+  await expect(menu).toBeVisible();
+  const longRest = menu.getByRole("menuitem", { name: "Long rest party" });
+  await expect(longRest).toBeFocused();
+
+  await page.keyboard.press("ArrowDown");
+  await expect(menu.getByRole("menuitem", { name: "Level up party" })).toBeFocused();
+  await page.keyboard.press("End");
+  await expect(menu.getByRole("menuitem", { name: "Grant downtime" })).toBeFocused();
+  await page.keyboard.press("Home");
+  await expect(longRest).toBeFocused();
+
+  await page.keyboard.press("Escape");
+  await expect(menu).toBeHidden();
+  await expect(trigger).toBeFocused();
+
+  await page.keyboard.press("Enter");
+  await expect(menu).toBeVisible();
+  await page.keyboard.press("Tab");
+  await expect(menu).toBeHidden();
+  await expect(page.getByRole("button", { name: "New character" })).toBeFocused();
+});
+
 test("GM awards XP in XP tracking mode without automatic level-up", async ({ page }) => {
   await signIn(page, admin);
   await page.goto(`${campaignPath}?tab=settings`);
@@ -720,6 +751,31 @@ test("lazy library, compendium entry, rules, and account routes load", async ({ 
   await expect(page.getByRole("heading", { name: "Account and security" })).toBeVisible();
 });
 
+test("Library search keeps fast typing in sync with the URL", async ({ page }) => {
+  await signIn(page, admin);
+  await page.goto("/library?tab=spells");
+
+  const search = page.getByPlaceholder(/Search spells/);
+  await search.pressSequentially("Magic Missile", { delay: 5 });
+  await expect(search).toHaveValue("Magic Missile");
+  await expect(page).toHaveURL(/[?&]q=Magic/);
+
+  await search.fill("");
+  await expect(search).toHaveValue("");
+  await expect(page).not.toHaveURL(/[?&]q=/);
+});
+
+test("Library clear search resets the local input and URL", async ({ page }) => {
+  await signIn(page, admin);
+  await page.goto("/library?tab=spells&q=NoSuchSpell");
+
+  const search = page.getByPlaceholder(/Search spells/);
+  await expect(search).toHaveValue("NoSuchSpell");
+  await page.getByRole("button", { name: "Clear search" }).click();
+  await expect(search).toHaveValue("");
+  await expect(page).not.toHaveURL(/[?&]q=/);
+});
+
 test("GM publishes a faction and a player-safe NPC to People", async ({ page }) => {
   await signIn(page, admin);
   await page.goto(`${campaignPath}?tab=npcs`);
@@ -912,6 +968,14 @@ test("GM can read hidden lore but never a player's private notes", async ({ page
   await expect(page.getByText("E2E private suspicion")).toHaveCount(0);
   await expect(page.getByText("The ferryman is lying.")).toHaveCount(0);
   await expect(page.locator(".notes-private").getByText("No private notes yet")).toBeVisible();
+
+  await page.goto(`${campaignPath}?tab=journal`);
+  await expect(page.getByText(/Private notes and shared lore are in Notes & lore/)).toBeVisible();
+  await page.getByRole("button", { name: "Notes & lore" }).click();
+  await expect(page.getByRole("heading", { name: "Notes & knowledge" })).toBeVisible();
+  await expect(
+    page.getByText(/Session recaps, handouts, and quests live in Journal/)
+  ).toBeVisible();
 });
 
 test("player imports a Pathbuilder character and joins after GM approval", async ({

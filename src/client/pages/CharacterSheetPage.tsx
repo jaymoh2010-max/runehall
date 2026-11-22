@@ -1238,6 +1238,7 @@ export function CharacterSheetPage() {
   const sheetSections = [
     { id: "sheet-abilities", label: "Abilities" },
     { id: "sheet-defenses", label: "Defenses" },
+    { id: "sheet-status", label: "Effects" },
     { id: "sheet-skills", label: "Skills" },
     { id: "sheet-attacks", label: "Attacks" },
     ...(derived.spellDc !== null ? [{ id: "sheet-spells", label: "Spells" }] : []),
@@ -1440,6 +1441,550 @@ export function CharacterSheetPage() {
                 {derived.shield.raised ? " · raised" : ""}
               </p>
             ) : null}
+          </Card>
+
+          <Card className="sheet-section sheet-status" id="sheet-status">
+            <div className="sheet-section-head">
+              <h2>Conditions &amp; effects</h2>
+              <span className="tiny muted">Recovery, ongoing damage, and afflictions</span>
+            </div>
+            <div className="sheet-status-grid">
+              <div className="sheet-status-column">
+                <div className="persistent-damage-editor">
+                  <div className="row-between">
+                    <h3>Fast healing &amp; regeneration</h3>
+                    <span className="tiny muted">Applied at the start of your turn</span>
+                  </div>
+                  <p className="tiny muted">
+                    Both restore HP when initiative advances. While active, regeneration also keeps
+                    dying below the death threshold.
+                  </p>
+                  <div className="form-grid two">
+                    <Field
+                      label="Fast healing"
+                      hint={draft.play.fastHealingNote || "HP regained at the start of each turn."}
+                    >
+                      <Input
+                        aria-label="Fast healing"
+                        type="number"
+                        min={0}
+                        max={1000}
+                        value={draft.play.fastHealing}
+                        disabled={!canEdit}
+                        onChange={(event) =>
+                          update((current) => ({
+                            ...current,
+                            play: {
+                              ...current.play,
+                              fastHealing: Math.max(
+                                0,
+                                Math.min(1000, Math.floor(Number(event.target.value) || 0))
+                              ),
+                            },
+                          }))
+                        }
+                      />
+                    </Field>
+                    <Field
+                      label="Regeneration"
+                      hint={draft.play.regenerationNote || "Skipped while suppressed."}
+                    >
+                      <Input
+                        aria-label="Regeneration"
+                        type="number"
+                        min={0}
+                        max={1000}
+                        value={draft.play.regeneration}
+                        disabled={!canEdit}
+                        onChange={(event) =>
+                          update((current) => ({
+                            ...current,
+                            play: {
+                              ...current.play,
+                              regeneration: Math.max(
+                                0,
+                                Math.min(1000, Math.floor(Number(event.target.value) || 0))
+                              ),
+                            },
+                          }))
+                        }
+                      />
+                    </Field>
+                  </div>
+                  <div className="token-toggles token-edit-toggles">
+                    <Toggle
+                      checked={draft.play.fastHealingActive}
+                      onChange={(checked) =>
+                        update((current) => ({
+                          ...current,
+                          play: { ...current.play, fastHealingActive: checked },
+                        }))
+                      }
+                      label="Fast healing active"
+                      disabled={!canEdit}
+                    />
+                    <Toggle
+                      checked={draft.play.regenerationActive}
+                      onChange={(checked) =>
+                        update((current) => ({
+                          ...current,
+                          play: { ...current.play, regenerationActive: checked },
+                        }))
+                      }
+                      label="Regeneration active"
+                      disabled={!canEdit}
+                    />
+                    <Toggle
+                      checked={draft.play.conditions.some(
+                        (condition) =>
+                          conditionBaseName(condition.name) === "regeneration suppressed"
+                      )}
+                      onChange={setRegenerationSuppressed}
+                      label="Regeneration suppressed"
+                      disabled={!canEdit}
+                    />
+                  </div>
+                  <Field
+                    label="Suppressed by"
+                    hint="Comma-separated damage types, e.g. acid, fire. Matching typed damage suppresses regeneration automatically."
+                  >
+                    <Input
+                      aria-label="Regeneration suppressed by"
+                      value={draft.play.regenerationDeactivatedBy.join(", ")}
+                      disabled={!canEdit}
+                      onChange={(event) =>
+                        update((current) => ({
+                          ...current,
+                          play: {
+                            ...current.play,
+                            regenerationDeactivatedBy: normalizeDamageTypeList(event.target.value),
+                          },
+                        }))
+                      }
+                      placeholder="acid, fire"
+                    />
+                  </Field>
+                  <div className="form-grid two">
+                    <Field label="Fast healing note">
+                      <Input
+                        aria-label="Fast healing note"
+                        value={draft.play.fastHealingNote}
+                        disabled={!canEdit}
+                        onChange={(event) =>
+                          update((current) => ({
+                            ...current,
+                            play: { ...current.play, fastHealingNote: event.target.value },
+                          }))
+                        }
+                        placeholder="e.g. while below half HP"
+                      />
+                    </Field>
+                    <Field label="Regeneration note">
+                      <Input
+                        aria-label="Regeneration note"
+                        value={draft.play.regenerationNote}
+                        disabled={!canEdit}
+                        onChange={(event) =>
+                          update((current) => ({
+                            ...current,
+                            play: { ...current.play, regenerationNote: event.target.value },
+                          }))
+                        }
+                        placeholder="e.g. from the regenerate spell"
+                      />
+                    </Field>
+                  </div>
+                </div>
+                <div className="conditions-editor">
+                  <div className="row-between">
+                    <h3>Conditions</h3>
+                    <span className="tiny muted">{draft.play.conditions.length}</span>
+                  </div>
+                  <div className="conditions-list">
+                    {draft.play.conditions.map((condition, index) => (
+                      <Tag key={`${condition.name}-${index}`} tone="red">
+                        {conditionLabel(condition)}
+                        {canEdit && condition.duration ? (
+                          <button
+                            type="button"
+                            className="tag-remove"
+                            title="Reduce duration by one round"
+                            onClick={() =>
+                              update((current) => ({
+                                ...current,
+                                play: {
+                                  ...current.play,
+                                  conditions: current.play.conditions.flatMap((entry, i) => {
+                                    if (i !== index) return [entry];
+                                    if (!entry.duration || entry.duration <= 1) return [];
+                                    return [{ ...entry, duration: entry.duration - 1 }];
+                                  }),
+                                },
+                              }))
+                            }
+                          >
+                            −1
+                          </button>
+                        ) : null}
+                        {canEdit ? (
+                          <button
+                            type="button"
+                            className="tag-remove"
+                            onClick={() =>
+                              update((current) => ({
+                                ...current,
+                                play: {
+                                  ...current.play,
+                                  conditions: current.play.conditions.filter((_, i) => i !== index),
+                                },
+                              }))
+                            }
+                          >
+                            ×
+                          </button>
+                        ) : null}
+                      </Tag>
+                    ))}
+                    {!draft.play.conditions.length ? (
+                      <span className="muted tiny">No active conditions.</span>
+                    ) : null}
+                  </div>
+                  {derived.conditionEffects.notes.length ? (
+                    <ul className="condition-effects tiny muted">
+                      {derived.conditionEffects.notes.map((note) => (
+                        <li key={note}>{note}</li>
+                      ))}
+                    </ul>
+                  ) : null}
+                  {canEdit ? (
+                    <div className="condition-add">
+                      <Select
+                        value=""
+                        aria-label="Add a condition"
+                        onChange={(event) => {
+                          if (event.target.value) addCondition(event.target.value);
+                        }}
+                      >
+                        <option value="">Add condition…</option>
+                        {COMMON_CONDITIONS.map((condition) => (
+                          <option key={condition} value={condition}>
+                            {condition}
+                          </option>
+                        ))}
+                        {conditions
+                          .filter((condition) => !COMMON_CONDITIONS.includes(condition.name))
+                          .map((condition) => (
+                            <option key={condition.id} value={condition.name}>
+                              {condition.name}
+                            </option>
+                          ))}
+                      </Select>
+                      <Input
+                        placeholder="or type one, e.g. Frightened 2"
+                        value={conditionName}
+                        onChange={(event) => setConditionName(event.target.value)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter") {
+                            event.preventDefault();
+                            addCondition(conditionName);
+                          }
+                        }}
+                      />
+                      <Input
+                        type="number"
+                        min={0}
+                        value={conditionValue}
+                        onChange={(event) => setConditionValue(event.target.value)}
+                        placeholder="Value"
+                        style={{ maxWidth: 74 }}
+                        title="Condition value, e.g. 2 for Frightened 2"
+                      />
+                      <Input
+                        type="number"
+                        min={0}
+                        value={conditionDuration}
+                        onChange={(event) => setConditionDuration(event.target.value)}
+                        placeholder="Rounds"
+                        style={{ maxWidth: 82 }}
+                        title="Remaining duration in rounds"
+                      />
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+              <div className="sheet-status-column">
+                <div className="persistent-damage-editor">
+                  <div className="row-between">
+                    <h3>Persistent damage</h3>
+                    <div className="row" style={{ gap: 6 }}>
+                      <span className="tiny muted">{draft.play.persistentDamage.length}</span>
+                      {canEdit && draft.play.persistentDamage.length ? (
+                        <Button
+                          size="sm"
+                          variant="primary"
+                          aria-label="End turn for all persistent damage"
+                          onClick={endTurnPersistentDamage}
+                        >
+                          End turn
+                        </Button>
+                      ) : null}
+                    </div>
+                  </div>
+                  <p className="tiny muted">
+                    During combat, the GM's initiative advance applies the damage and flat checks at
+                    the end of your turn.
+                  </p>
+                  <div className="persistent-damage-list">
+                    {draft.play.persistentDamage.map((instance) => (
+                      <div className="persistent-damage-row" key={instance.id}>
+                        <div className="grow">
+                          <Tag tone="red">{persistentDamageLabel(instance)}</Tag>
+                          <span className="tiny muted"> · DC {instance.dc}</span>
+                          {instance.notes ? (
+                            <span className="tiny muted"> · {instance.notes}</span>
+                          ) : null}
+                        </div>
+                        {canEdit ? (
+                          <div className="row" style={{ gap: 4 }}>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              aria-label={`Remove ${persistentDamageLabel(instance)}`}
+                              onClick={() => removePersistentDamage(instance.id)}
+                            >
+                              <Trash2 size={13} />
+                            </Button>
+                          </div>
+                        ) : null}
+                      </div>
+                    ))}
+                    {!draft.play.persistentDamage.length ? (
+                      <span className="muted tiny">No persistent damage.</span>
+                    ) : null}
+                  </div>
+                  {canEdit ? (
+                    <div className="persistent-damage-add">
+                      <Input
+                        aria-label="Persistent damage formula"
+                        value={persistentFormula}
+                        onChange={(event) => setPersistentFormula(event.target.value)}
+                        placeholder="1d6"
+                        style={{ maxWidth: 90 }}
+                      />
+                      <Input
+                        aria-label="Persistent damage type"
+                        value={persistentType}
+                        onChange={(event) => setPersistentType(event.target.value)}
+                        placeholder="fire"
+                        style={{ maxWidth: 110 }}
+                      />
+                      <Input
+                        aria-label="Persistent damage DC"
+                        type="number"
+                        min={1}
+                        max={30}
+                        value={persistentDc}
+                        onChange={(event) => setPersistentDc(event.target.value)}
+                        placeholder="15"
+                        style={{ maxWidth: 70 }}
+                      />
+                      <Input
+                        aria-label="Persistent damage notes"
+                        value={persistentNotes}
+                        onChange={(event) => setPersistentNotes(event.target.value)}
+                        placeholder="Source (optional)"
+                      />
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        icon={<Plus size={13} />}
+                        onClick={addPersistentDamage}
+                      >
+                        Add persistent
+                      </Button>
+                    </div>
+                  ) : null}
+                  <p className="tiny muted">
+                    At the end of the turn, take all listed damage at once, then attempt each
+                    entry&apos;s flat check. Adding the same damage type replaces the existing
+                    entry.
+                  </p>
+                </div>
+                <div className="afflictions-editor">
+                  <div className="row-between">
+                    <h3>Afflictions</h3>
+                    <div className="row" style={{ gap: 6 }}>
+                      <span className="tiny muted">{draft.play.afflictions.length}</span>
+                      {canEdit ? (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          icon={<Plus size={13} />}
+                          onClick={() => openAfflictionEditor()}
+                        >
+                          Add affliction
+                        </Button>
+                      ) : null}
+                    </div>
+                  </div>
+                  <div className="affliction-list">
+                    {draft.play.afflictions.map((affliction) => (
+                      <div
+                        className="affliction-row"
+                        key={affliction.id}
+                        data-testid={`affliction-${affliction.id}`}
+                      >
+                        <div className="affliction-copy">
+                          <div
+                            className="row"
+                            style={{ gap: 6, flexWrap: "wrap", alignItems: "center" }}
+                          >
+                            <strong>{affliction.name}</strong>
+                            <Tag
+                              tone={
+                                affliction.type === "poison"
+                                  ? "green"
+                                  : affliction.type === "disease"
+                                    ? "violet"
+                                    : "red"
+                              }
+                            >
+                              {afflictionTypeLabel(affliction.type)}
+                            </Tag>
+                            <Tag tone="gold">
+                              Stage {affliction.stage} / {affliction.stageMax}
+                            </Tag>
+                            {affliction.virulent ? <Tag tone="red">Virulent</Tag> : null}
+                          </div>
+                          <span className="tiny muted">
+                            DC {affliction.dc} · {titleCase(affliction.save)} ·{" "}
+                            {affliction.interval
+                              ? `every ${affliction.interval}`
+                              : "no interval save"}
+                            {affliction.duration ? ` · max ${affliction.duration}` : ""}
+                            {affliction.onset ? ` · onset ${affliction.onset}` : ""}
+                            {affliction.onsetRemaining !== null && affliction.onsetRemaining > 0
+                              ? ` · onset in ${affliction.onsetRemaining} round${
+                                  affliction.onsetRemaining === 1 ? "" : "s"
+                                }`
+                              : affliction.onsetRemaining === null && affliction.onset
+                                ? " · onset manual"
+                                : ""}
+                            {affliction.intervalRemaining !== null &&
+                            affliction.intervalRemaining > 0
+                              ? ` · next save in ${affliction.intervalRemaining} round${
+                                  affliction.intervalRemaining === 1 ? "" : "s"
+                                }`
+                              : affliction.interval &&
+                                  affliction.intervalRemaining === null &&
+                                  affliction.onsetRemaining !== null
+                                ? " · interval manual"
+                                : ""}
+                            {affliction.virulent
+                              ? ` · ${affliction.virulentSuccesses} / 2 consecutive successes`
+                              : ""}
+                          </span>
+                          {affliction.notes ? (
+                            <p className="tiny muted affliction-notes">{affliction.notes}</p>
+                          ) : null}
+                        </div>
+                        {canEdit ? (
+                          <div className="row" style={{ gap: 4, flexWrap: "wrap" }}>
+                            {affliction.interval ? (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                aria-label={`Roll stage save for ${affliction.name}`}
+                                onClick={() => rollAfflictionSave(affliction)}
+                              >
+                                Stage save
+                              </Button>
+                            ) : null}
+                            {affliction.onsetRemaining === null && affliction.onset.trim() ? (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                aria-label={`Mark onset passed for ${affliction.name}`}
+                                onClick={() =>
+                                  updateAffliction(affliction.id, (current) =>
+                                    afflictionOnsetPassed(current)
+                                  )
+                                }
+                              >
+                                Onset passed
+                              </Button>
+                            ) : null}
+                            {affliction.onset.trim() || affliction.interval.trim() ? (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                aria-label={`Reset timers for ${affliction.name}`}
+                                onClick={() =>
+                                  updateAffliction(affliction.id, (current) =>
+                                    resetAfflictionTimers(current)
+                                  )
+                                }
+                              >
+                                <RotateCcw size={13} />
+                              </Button>
+                            ) : null}
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              disabled={affliction.stage <= 1}
+                              aria-label={`Reduce stage of ${affliction.name}`}
+                              onClick={() =>
+                                updateAffliction(affliction.id, (current) => ({
+                                  ...current,
+                                  stage: Math.max(1, current.stage - 1),
+                                  virulentSuccesses: 0,
+                                }))
+                              }
+                            >
+                              − Stage
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              disabled={affliction.stage >= affliction.stageMax}
+                              aria-label={`Increase stage of ${affliction.name}`}
+                              onClick={() =>
+                                updateAffliction(affliction.id, (current) => ({
+                                  ...current,
+                                  stage: Math.min(current.stageMax, current.stage + 1),
+                                  virulentSuccesses: 0,
+                                }))
+                              }
+                            >
+                              + Stage
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              aria-label={`Edit ${affliction.name}`}
+                              onClick={() => openAfflictionEditor(affliction)}
+                            >
+                              <Pencil size={13} />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              aria-label={`End ${affliction.name}`}
+                              onClick={() => removeAffliction(affliction.id)}
+                            >
+                              <Trash2 size={13} />
+                            </Button>
+                          </div>
+                        ) : null}
+                      </div>
+                    ))}
+                    {!draft.play.afflictions.length ? (
+                      <span className="muted tiny">No active afflictions.</span>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+            </div>
           </Card>
 
           <Card className="sheet-section" id="sheet-skills">
@@ -2183,151 +2728,6 @@ export function CharacterSheetPage() {
               </Field>
             </div>
 
-            <div className="persistent-damage-editor">
-              <div className="row-between">
-                <h3>Fast healing &amp; regeneration</h3>
-                <span className="tiny muted">Applied at the start of your turn</span>
-              </div>
-              <p className="tiny muted">
-                Both restore HP when initiative advances. While active, regeneration also keeps
-                dying below the death threshold.
-              </p>
-              <div className="form-grid two">
-                <Field
-                  label="Fast healing"
-                  hint={draft.play.fastHealingNote || "HP regained at the start of each turn."}
-                >
-                  <Input
-                    aria-label="Fast healing"
-                    type="number"
-                    min={0}
-                    max={1000}
-                    value={draft.play.fastHealing}
-                    disabled={!canEdit}
-                    onChange={(event) =>
-                      update((current) => ({
-                        ...current,
-                        play: {
-                          ...current.play,
-                          fastHealing: Math.max(
-                            0,
-                            Math.min(1000, Math.floor(Number(event.target.value) || 0))
-                          ),
-                        },
-                      }))
-                    }
-                  />
-                </Field>
-                <Field
-                  label="Regeneration"
-                  hint={draft.play.regenerationNote || "Skipped while suppressed."}
-                >
-                  <Input
-                    aria-label="Regeneration"
-                    type="number"
-                    min={0}
-                    max={1000}
-                    value={draft.play.regeneration}
-                    disabled={!canEdit}
-                    onChange={(event) =>
-                      update((current) => ({
-                        ...current,
-                        play: {
-                          ...current.play,
-                          regeneration: Math.max(
-                            0,
-                            Math.min(1000, Math.floor(Number(event.target.value) || 0))
-                          ),
-                        },
-                      }))
-                    }
-                  />
-                </Field>
-              </div>
-              <div className="token-toggles token-edit-toggles">
-                <Toggle
-                  checked={draft.play.fastHealingActive}
-                  onChange={(checked) =>
-                    update((current) => ({
-                      ...current,
-                      play: { ...current.play, fastHealingActive: checked },
-                    }))
-                  }
-                  label="Fast healing active"
-                  disabled={!canEdit}
-                />
-                <Toggle
-                  checked={draft.play.regenerationActive}
-                  onChange={(checked) =>
-                    update((current) => ({
-                      ...current,
-                      play: { ...current.play, regenerationActive: checked },
-                    }))
-                  }
-                  label="Regeneration active"
-                  disabled={!canEdit}
-                />
-                <Toggle
-                  checked={draft.play.conditions.some(
-                    (condition) => conditionBaseName(condition.name) === "regeneration suppressed"
-                  )}
-                  onChange={setRegenerationSuppressed}
-                  label="Regeneration suppressed"
-                  disabled={!canEdit}
-                />
-              </div>
-              <Field
-                label="Suppressed by"
-                hint="Comma-separated damage types, e.g. acid, fire. Matching typed damage suppresses regeneration automatically."
-              >
-                <Input
-                  aria-label="Regeneration suppressed by"
-                  value={draft.play.regenerationDeactivatedBy.join(", ")}
-                  disabled={!canEdit}
-                  onChange={(event) =>
-                    update((current) => ({
-                      ...current,
-                      play: {
-                        ...current.play,
-                        regenerationDeactivatedBy: normalizeDamageTypeList(event.target.value),
-                      },
-                    }))
-                  }
-                  placeholder="acid, fire"
-                />
-              </Field>
-              <div className="form-grid two">
-                <Field label="Fast healing note">
-                  <Input
-                    aria-label="Fast healing note"
-                    value={draft.play.fastHealingNote}
-                    disabled={!canEdit}
-                    onChange={(event) =>
-                      update((current) => ({
-                        ...current,
-                        play: { ...current.play, fastHealingNote: event.target.value },
-                      }))
-                    }
-                    placeholder="e.g. while below half HP"
-                  />
-                </Field>
-                <Field label="Regeneration note">
-                  <Input
-                    aria-label="Regeneration note"
-                    value={draft.play.regenerationNote}
-                    disabled={!canEdit}
-                    onChange={(event) =>
-                      update((current) => ({
-                        ...current,
-                        play: { ...current.play, regenerationNote: event.target.value },
-                      }))
-                    }
-                    placeholder="e.g. from the regenerate spell"
-                  />
-                </Field>
-              </div>
-            </div>
-
             {derived.conditionEffects.dying > 0 ? (
               <div className="dying-recovery">
                 <div className="row-between" style={{ gap: 10, alignItems: "flex-start" }}>
@@ -2547,391 +2947,6 @@ export function CharacterSheetPage() {
                   }
                   disabled={!canEdit}
                 />
-              </div>
-            </div>
-
-            <div className="conditions-editor">
-              <div className="row-between">
-                <h3>Conditions</h3>
-                <span className="tiny muted">{draft.play.conditions.length}</span>
-              </div>
-              <div className="conditions-list">
-                {draft.play.conditions.map((condition, index) => (
-                  <Tag key={`${condition.name}-${index}`} tone="red">
-                    {conditionLabel(condition)}
-                    {canEdit && condition.duration ? (
-                      <button
-                        type="button"
-                        className="tag-remove"
-                        title="Reduce duration by one round"
-                        onClick={() =>
-                          update((current) => ({
-                            ...current,
-                            play: {
-                              ...current.play,
-                              conditions: current.play.conditions.flatMap((entry, i) => {
-                                if (i !== index) return [entry];
-                                if (!entry.duration || entry.duration <= 1) return [];
-                                return [{ ...entry, duration: entry.duration - 1 }];
-                              }),
-                            },
-                          }))
-                        }
-                      >
-                        −1
-                      </button>
-                    ) : null}
-                    {canEdit ? (
-                      <button
-                        type="button"
-                        className="tag-remove"
-                        onClick={() =>
-                          update((current) => ({
-                            ...current,
-                            play: {
-                              ...current.play,
-                              conditions: current.play.conditions.filter((_, i) => i !== index),
-                            },
-                          }))
-                        }
-                      >
-                        ×
-                      </button>
-                    ) : null}
-                  </Tag>
-                ))}
-                {!draft.play.conditions.length ? (
-                  <span className="muted tiny">No active conditions.</span>
-                ) : null}
-              </div>
-              {derived.conditionEffects.notes.length ? (
-                <ul className="condition-effects tiny muted">
-                  {derived.conditionEffects.notes.map((note) => (
-                    <li key={note}>{note}</li>
-                  ))}
-                </ul>
-              ) : null}
-              {canEdit ? (
-                <div className="condition-add">
-                  <Select
-                    value=""
-                    aria-label="Add a condition"
-                    onChange={(event) => {
-                      if (event.target.value) addCondition(event.target.value);
-                    }}
-                  >
-                    <option value="">Add condition…</option>
-                    {COMMON_CONDITIONS.map((condition) => (
-                      <option key={condition} value={condition}>
-                        {condition}
-                      </option>
-                    ))}
-                    {conditions
-                      .filter((condition) => !COMMON_CONDITIONS.includes(condition.name))
-                      .map((condition) => (
-                        <option key={condition.id} value={condition.name}>
-                          {condition.name}
-                        </option>
-                      ))}
-                  </Select>
-                  <Input
-                    placeholder="or type one, e.g. Frightened 2"
-                    value={conditionName}
-                    onChange={(event) => setConditionName(event.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter") {
-                        event.preventDefault();
-                        addCondition(conditionName);
-                      }
-                    }}
-                  />
-                  <Input
-                    type="number"
-                    min={0}
-                    value={conditionValue}
-                    onChange={(event) => setConditionValue(event.target.value)}
-                    placeholder="Value"
-                    style={{ maxWidth: 74 }}
-                    title="Condition value, e.g. 2 for Frightened 2"
-                  />
-                  <Input
-                    type="number"
-                    min={0}
-                    value={conditionDuration}
-                    onChange={(event) => setConditionDuration(event.target.value)}
-                    placeholder="Rounds"
-                    style={{ maxWidth: 82 }}
-                    title="Remaining duration in rounds"
-                  />
-                </div>
-              ) : null}
-            </div>
-
-            <div className="persistent-damage-editor">
-              <div className="row-between">
-                <h3>Persistent damage</h3>
-                <div className="row" style={{ gap: 6 }}>
-                  <span className="tiny muted">{draft.play.persistentDamage.length}</span>
-                  {canEdit && draft.play.persistentDamage.length ? (
-                    <Button
-                      size="sm"
-                      variant="primary"
-                      aria-label="End turn for all persistent damage"
-                      onClick={endTurnPersistentDamage}
-                    >
-                      End turn
-                    </Button>
-                  ) : null}
-                </div>
-              </div>
-              <p className="tiny muted">
-                During combat, the GM's initiative advance applies the damage and flat checks at the
-                end of your turn.
-              </p>
-              <div className="persistent-damage-list">
-                {draft.play.persistentDamage.map((instance) => (
-                  <div className="persistent-damage-row" key={instance.id}>
-                    <div className="grow">
-                      <Tag tone="red">{persistentDamageLabel(instance)}</Tag>
-                      <span className="tiny muted"> · DC {instance.dc}</span>
-                      {instance.notes ? (
-                        <span className="tiny muted"> · {instance.notes}</span>
-                      ) : null}
-                    </div>
-                    {canEdit ? (
-                      <div className="row" style={{ gap: 4 }}>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          aria-label={`Remove ${persistentDamageLabel(instance)}`}
-                          onClick={() => removePersistentDamage(instance.id)}
-                        >
-                          <Trash2 size={13} />
-                        </Button>
-                      </div>
-                    ) : null}
-                  </div>
-                ))}
-                {!draft.play.persistentDamage.length ? (
-                  <span className="muted tiny">No persistent damage.</span>
-                ) : null}
-              </div>
-              {canEdit ? (
-                <div className="persistent-damage-add">
-                  <Input
-                    aria-label="Persistent damage formula"
-                    value={persistentFormula}
-                    onChange={(event) => setPersistentFormula(event.target.value)}
-                    placeholder="1d6"
-                    style={{ maxWidth: 90 }}
-                  />
-                  <Input
-                    aria-label="Persistent damage type"
-                    value={persistentType}
-                    onChange={(event) => setPersistentType(event.target.value)}
-                    placeholder="fire"
-                    style={{ maxWidth: 110 }}
-                  />
-                  <Input
-                    aria-label="Persistent damage DC"
-                    type="number"
-                    min={1}
-                    max={30}
-                    value={persistentDc}
-                    onChange={(event) => setPersistentDc(event.target.value)}
-                    placeholder="15"
-                    style={{ maxWidth: 70 }}
-                  />
-                  <Input
-                    aria-label="Persistent damage notes"
-                    value={persistentNotes}
-                    onChange={(event) => setPersistentNotes(event.target.value)}
-                    placeholder="Source (optional)"
-                  />
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    icon={<Plus size={13} />}
-                    onClick={addPersistentDamage}
-                  >
-                    Add persistent
-                  </Button>
-                </div>
-              ) : null}
-              <p className="tiny muted">
-                At the end of the turn, take all listed damage at once, then attempt each
-                entry&apos;s flat check. Adding the same damage type replaces the existing entry.
-              </p>
-            </div>
-
-            <div className="afflictions-editor">
-              <div className="row-between">
-                <h3>Afflictions</h3>
-                <div className="row" style={{ gap: 6 }}>
-                  <span className="tiny muted">{draft.play.afflictions.length}</span>
-                  {canEdit ? (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      icon={<Plus size={13} />}
-                      onClick={() => openAfflictionEditor()}
-                    >
-                      Add affliction
-                    </Button>
-                  ) : null}
-                </div>
-              </div>
-              <div className="affliction-list">
-                {draft.play.afflictions.map((affliction) => (
-                  <div
-                    className="affliction-row"
-                    key={affliction.id}
-                    data-testid={`affliction-${affliction.id}`}
-                  >
-                    <div className="affliction-copy">
-                      <div
-                        className="row"
-                        style={{ gap: 6, flexWrap: "wrap", alignItems: "center" }}
-                      >
-                        <strong>{affliction.name}</strong>
-                        <Tag
-                          tone={
-                            affliction.type === "poison"
-                              ? "green"
-                              : affliction.type === "disease"
-                                ? "violet"
-                                : "red"
-                          }
-                        >
-                          {afflictionTypeLabel(affliction.type)}
-                        </Tag>
-                        <Tag tone="gold">
-                          Stage {affliction.stage} / {affliction.stageMax}
-                        </Tag>
-                        {affliction.virulent ? <Tag tone="red">Virulent</Tag> : null}
-                      </div>
-                      <span className="tiny muted">
-                        DC {affliction.dc} · {titleCase(affliction.save)} ·{" "}
-                        {affliction.interval ? `every ${affliction.interval}` : "no interval save"}
-                        {affliction.duration ? ` · max ${affliction.duration}` : ""}
-                        {affliction.onset ? ` · onset ${affliction.onset}` : ""}
-                        {affliction.onsetRemaining !== null && affliction.onsetRemaining > 0
-                          ? ` · onset in ${affliction.onsetRemaining} round${
-                              affliction.onsetRemaining === 1 ? "" : "s"
-                            }`
-                          : affliction.onsetRemaining === null && affliction.onset
-                            ? " · onset manual"
-                            : ""}
-                        {affliction.intervalRemaining !== null && affliction.intervalRemaining > 0
-                          ? ` · next save in ${affliction.intervalRemaining} round${
-                              affliction.intervalRemaining === 1 ? "" : "s"
-                            }`
-                          : affliction.interval &&
-                              affliction.intervalRemaining === null &&
-                              affliction.onsetRemaining !== null
-                            ? " · interval manual"
-                            : ""}
-                        {affliction.virulent
-                          ? ` · ${affliction.virulentSuccesses} / 2 consecutive successes`
-                          : ""}
-                      </span>
-                      {affliction.notes ? (
-                        <p className="tiny muted affliction-notes">{affliction.notes}</p>
-                      ) : null}
-                    </div>
-                    {canEdit ? (
-                      <div className="row" style={{ gap: 4, flexWrap: "wrap" }}>
-                        {affliction.interval ? (
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            aria-label={`Roll stage save for ${affliction.name}`}
-                            onClick={() => rollAfflictionSave(affliction)}
-                          >
-                            Stage save
-                          </Button>
-                        ) : null}
-                        {affliction.onsetRemaining === null && affliction.onset.trim() ? (
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            aria-label={`Mark onset passed for ${affliction.name}`}
-                            onClick={() =>
-                              updateAffliction(affliction.id, (current) =>
-                                afflictionOnsetPassed(current)
-                              )
-                            }
-                          >
-                            Onset passed
-                          </Button>
-                        ) : null}
-                        {affliction.onset.trim() || affliction.interval.trim() ? (
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            aria-label={`Reset timers for ${affliction.name}`}
-                            onClick={() =>
-                              updateAffliction(affliction.id, (current) =>
-                                resetAfflictionTimers(current)
-                              )
-                            }
-                          >
-                            <RotateCcw size={13} />
-                          </Button>
-                        ) : null}
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          disabled={affliction.stage <= 1}
-                          aria-label={`Reduce stage of ${affliction.name}`}
-                          onClick={() =>
-                            updateAffliction(affliction.id, (current) => ({
-                              ...current,
-                              stage: Math.max(1, current.stage - 1),
-                              virulentSuccesses: 0,
-                            }))
-                          }
-                        >
-                          − Stage
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          disabled={affliction.stage >= affliction.stageMax}
-                          aria-label={`Increase stage of ${affliction.name}`}
-                          onClick={() =>
-                            updateAffliction(affliction.id, (current) => ({
-                              ...current,
-                              stage: Math.min(current.stageMax, current.stage + 1),
-                              virulentSuccesses: 0,
-                            }))
-                          }
-                        >
-                          + Stage
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          aria-label={`Edit ${affliction.name}`}
-                          onClick={() => openAfflictionEditor(affliction)}
-                        >
-                          <Pencil size={13} />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          aria-label={`End ${affliction.name}`}
-                          onClick={() => removeAffliction(affliction.id)}
-                        >
-                          <Trash2 size={13} />
-                        </Button>
-                      </div>
-                    ) : null}
-                  </div>
-                ))}
-                {!draft.play.afflictions.length ? (
-                  <span className="muted tiny">No active afflictions.</span>
-                ) : null}
               </div>
             </div>
           </Card>
