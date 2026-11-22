@@ -155,6 +155,7 @@ type LevelUpTask = Omit<LevelUpChoice, "step"> & {
   step: StepId;
   kind: "abilities" | "skills" | "feat" | "spells" | "class";
   category?: "ancestry" | "class" | "skill" | "general";
+  target?: "freeArchetype";
 };
 
 export function CharacterBuilderPage() {
@@ -568,17 +569,22 @@ export function CharacterBuilderPage() {
         });
       }
     }
-    const newFeatSlots = featSlotsFor(context.classData, nextLevel).filter(
-      (slot) => slot.level === nextLevel
-    );
+    const newFeatSlots = featSlotsFor(
+      context.classData,
+      nextLevel,
+      Boolean(context.freeArchetype)
+    ).filter((slot) => slot.level === nextLevel);
     for (const slot of newFeatSlots) {
       levelUpItems.push({
-        id: `feat-${slot.category}-${slot.level}`,
-        label: `${slot.category === "class" ? "Class" : slot.category === "ancestry" ? "Ancestry" : slot.category === "skill" ? "Skill" : "General"} feat`,
+        id: `feat-${slot.freeArchetype ? "free" : slot.category}-${slot.level}`,
+        label: slot.freeArchetype
+          ? "Free archetype feat"
+          : `${slot.category === "class" ? "Class" : slot.category === "ancestry" ? "Ancestry" : slot.category === "skill" ? "Skill" : "General"} feat`,
         detail: `Choose a level ${slot.level} feat for this slot.`,
         step: "feats",
         kind: "feat",
         category: slot.category,
+        target: slot.freeArchetype ? "freeArchetype" : undefined,
       });
     }
     const currentCaster = casterInfo(context.classData);
@@ -1053,6 +1059,7 @@ export function CharacterBuilderPage() {
           onClose={() => setPicker(null)}
           category={picker.category}
           slotLevel={picker.level}
+          target={picker.target === "freeArchetype" ? "freeArchetype" : undefined}
           ancestryTrait={heritageFeatTraits(context.heritage, context.ancestry).join(",")}
           classTrait={context.classData?.name.toLowerCase()}
           draft={draft}
@@ -1078,13 +1085,21 @@ export function CharacterBuilderPage() {
                         ? [feat.id]
                         : [...current.feats.extras, feat.id],
                     }
-                  : {
-                      ...current.feats,
-                      [picker.category]: {
-                        ...current.feats[picker.category],
-                        [String(picker.level)]: feat.id,
+                  : picker.target === "freeArchetype"
+                    ? {
+                        ...current.feats,
+                        freeArchetype: {
+                          ...current.feats.freeArchetype,
+                          [String(picker.level)]: feat.id,
+                        },
+                      }
+                    : {
+                        ...current.feats,
+                        [picker.category]: {
+                          ...current.feats[picker.category],
+                          [String(picker.level)]: feat.id,
+                        },
                       },
-                    },
             }));
           }}
         />

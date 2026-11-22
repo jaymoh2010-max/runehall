@@ -129,6 +129,7 @@ export function serializeCampaignSummary(
     xpMode: normalizeXpMode(campaign.xp_mode),
     advancementSpeed: normalizeAdvancementSpeed(campaign.advancement_speed),
     settlementLevel: normalizeSettlementLevel(campaign.settlement_level),
+    freeArchetype: Boolean(campaign.free_archetype),
     shopMode: normalizeShopStockMode(campaign.shop_mode),
     worldDate: normalizeGolarionDate({
       year: campaign.world_year,
@@ -349,9 +350,17 @@ export function serializeCharacter(
   const summary = parseJson(row.summary, null);
   const campaignRow = row.campaign_id
     ? (db
-        .prepare("SELECT ruleset, advancement_speed, settlement_level FROM campaigns WHERE id = ?")
+        .prepare(
+          "SELECT ruleset, advancement_speed, settlement_level, free_archetype FROM campaigns WHERE id = ?"
+        )
         .get(row.campaign_id) as
-        { ruleset: string; advancement_speed: string; settlement_level: number } | undefined)
+        | {
+            ruleset: string;
+            advancement_speed: string;
+            settlement_level: number;
+            free_archetype: number;
+          }
+        | undefined)
     : undefined;
   const campaignRuleset = campaignRow ? normalizeCampaignRuleset(campaignRow.ruleset) : null;
   const campaignAdvancementSpeed = campaignRow
@@ -370,6 +379,7 @@ export function serializeCharacter(
     campaignRuleset,
     campaignAdvancementSpeed,
     campaignSettlementLevel,
+    campaignFreeArchetype: campaignRow ? Boolean(campaignRow.free_archetype) : null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     revision: Number(row.revision ?? 1),

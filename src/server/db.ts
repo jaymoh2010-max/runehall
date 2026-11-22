@@ -139,6 +139,7 @@ export interface CampaignRow {
   xp_mode: string;
   advancement_speed: string;
   settlement_level: number;
+  free_archetype: number;
   shop_mode: string;
   world_year: number;
   world_month: number;

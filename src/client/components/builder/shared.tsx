@@ -48,7 +48,7 @@ export type Picker =
       category: "ancestry" | "class" | "skill" | "general";
       level: number;
       /** Bonus feats granted outside the normal slot grid. */
-      target?: "extras";
+      target?: "extras" | "freeArchetype";
     }
   | {
       kind: "spell";

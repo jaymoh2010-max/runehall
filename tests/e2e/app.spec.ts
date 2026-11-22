@@ -2722,3 +2722,38 @@ test("GM creates victory-point clocks and players see shared progress", async ({
 
   await playerContext.close();
 });
+
+test("GM enables Free Archetype and a character fills an extra archetype slot", async ({
+  page,
+}) => {
+  test.setTimeout(60_000);
+  await signIn(page, admin);
+  await page.goto(`${campaignPath}?tab=settings`);
+  await page.getByLabel("Free Archetype variant").check();
+  await page.getByRole("button", { name: "Save changes" }).click();
+  await expect(page.getByText("Campaign settings saved.")).toBeVisible({ timeout: 15_000 });
+
+  const campaignId = campaignPath.split("/").pop();
+  const detailsResponse = await page.request.get(`/api/campaigns/${campaignId}`);
+  expect(detailsResponse.ok()).toBe(true);
+  const details = (await detailsResponse.json()) as {
+    characters: { id: string; name: string }[];
+  };
+  const hero = details.characters.find((character) => character.name === "E2E Hero");
+  expect(hero).toBeTruthy();
+
+  await page.goto(`/characters/${hero!.id}/edit`);
+  await expect(page.getByRole("heading", { name: "E2E Hero" })).toBeVisible({ timeout: 15_000 });
+  await goToStep(page, "Feats");
+  const slot = page.locator(".feat-slot").filter({ hasText: "Free archetype feat" }).first();
+  await expect(slot).toBeVisible();
+  await slot.getByRole("button", { name: "Choose" }).click();
+  await expect(page.getByRole("heading", { name: "Choose a free archetype feat" })).toBeVisible();
+  await page.getByPlaceholder(/Search feats/).fill("Archer Dedication");
+  await page
+    .locator(".picker-item-name", { hasText: /^Archer Dedication$/ })
+    .first()
+    .click();
+  await page.getByRole("button", { name: "Take Archer Dedication" }).click();
+  await expect(slot).toContainText("Archer Dedication");
+});

@@ -133,6 +133,7 @@ export function FeatPicker({
   onClose,
   category,
   slotLevel,
+  target,
   ancestryTrait,
   classTrait,
   draft,
@@ -147,6 +148,7 @@ export function FeatPicker({
 }: PickerBase & {
   category: "ancestry" | "class" | "skill" | "general";
   slotLevel: number;
+  target?: "freeArchetype";
   ancestryTrait?: string;
   classTrait?: string;
   draft: CharacterDraft;
@@ -160,7 +162,9 @@ export function FeatPicker({
   onSelect: (feat: Feat) => void;
 }) {
   const [query, setQuery] = useState("");
-  const [onlyMine, setOnlyMine] = useState(category === "ancestry" || category === "class");
+  const [onlyMine, setOnlyMine] = useState(
+    category === "ancestry" || (category === "class" && target !== "freeArchetype")
+  );
   const [legacy, setLegacy] = useState(Boolean(legacyDefault));
   const [recommended, setRecommended] = useState(true);
   const [selected, setSelected] = useState<Feat | null>(null);
@@ -184,7 +188,7 @@ export function FeatPicker({
   params.set("category", category === "class" ? "class,archetype" : category);
   params.set("levelMax", String(slotLevel));
   params.set("levelMin", "1");
-  if (onlyMine) {
+  if (onlyMine && target !== "freeArchetype") {
     if (category === "ancestry" && ancestryTrait) params.set("trait", ancestryTrait);
     if (category === "class" && classTrait) params.set("trait", classTrait);
   }
@@ -196,41 +200,59 @@ export function FeatPicker({
   const { items, total, next, loading, error, offset, setOffset } = useSearch<Feat>(
     open,
     `/api/compendium/feats?${params.toString()}`,
-    [query, onlyMine, legacy, expanded, recommended, category, slotLevel, ancestryTrait, classTrait]
+    [
+      query,
+      onlyMine,
+      legacy,
+      expanded,
+      recommended,
+      category,
+      slotLevel,
+      target,
+      ancestryTrait,
+      classTrait,
+    ]
   );
 
   // Evaluate prerequisites as if this slot were empty, so replacing a feat
   // cannot use the feat being replaced to satisfy its own prerequisites.
   const selectionDraft = useMemo(() => {
-    const bucket = { ...draft.feats[category] };
+    const key = target === "freeArchetype" ? "freeArchetype" : category;
+    const bucket = { ...draft.feats[key] };
     delete bucket[String(slotLevel)];
-    return { ...draft, feats: { ...draft.feats, [category]: bucket } };
-  }, [draft, category, slotLevel]);
+    return { ...draft, feats: { ...draft.feats, [key]: bucket } };
+  }, [draft, category, slotLevel, target]);
   const selectionDerived = useMemo(
     () => computeCharacter(selectionDraft, context),
     [selectionDraft, context]
   );
 
+  const pool =
+    target === "freeArchetype" ? items.filter((feat) => feat.traits.includes("archetype")) : items;
   const statusById = useMemo(
     () =>
       Object.fromEntries(
-        items.map((feat) => [
+        pool.map((feat) => [
           feat.id,
           featPrerequisiteStatus(feat, selectionDraft, context, selectionDerived),
         ])
       ),
-    [items, selectionDraft, context, selectionDerived]
+    [pool, selectionDraft, context, selectionDerived]
   );
   const grantedFeatIds = selectedClassGrantFeatIds(draft, context.classData);
-  const eligible = items.filter(
+  const eligible = pool.filter(
     (feat) => statusById[feat.id]?.status !== "unmet" && !grantedFeatIds.has(feat.id)
   );
-  const hiddenCount = items.length - eligible.length;
+  const hiddenCount = pool.length - eligible.length;
   const selectedStatus = selected ? statusById[selected.id] : undefined;
 
   return (
     <PickerShell
-      title={`Choose ${category === "ancestry" ? "an" : "a"} ${category} feat`}
+      title={
+        target === "freeArchetype"
+          ? "Choose a free archetype feat"
+          : `Choose ${category === "ancestry" ? "an" : "a"} ${category} feat`
+      }
       subtitle={`Level ${slotLevel} slot · ${eligible.length} available${hiddenCount ? ` · ${hiddenCount} blocked` : ""}`}
       onClose={onClose}
     >
@@ -250,7 +272,8 @@ export function FeatPicker({
               />
             </div>
             <div className="row wrap" style={{ gap: 14 }}>
-              {(category === "ancestry" || category === "class") && (
+              {(category === "ancestry" ||
+                (category === "class" && target !== "freeArchetype")) && (
                 <Toggle
                   checked={onlyMine}
                   onChange={(value) => {

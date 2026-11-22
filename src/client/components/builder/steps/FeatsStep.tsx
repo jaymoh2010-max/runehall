@@ -136,7 +136,7 @@ export function FeatsStep({
 }: BuilderProps) {
   const classData = context.classData;
   const ancestry = context.ancestry;
-  const slots = featSlotsFor(classData, draft.level);
+  const slots = featSlotsFor(classData, draft.level, Boolean(context.freeArchetype));
   const ancestryTrait = heritageFeatTraits(context.heritage, ancestry).join(",");
   const classTrait = classData?.name.toLowerCase();
   const issues = derived.validation.filter((issue) => issue.step === "feats");
@@ -145,6 +145,7 @@ export function FeatsStep({
     ...Object.values(draft.feats.class),
     ...Object.values(draft.feats.skill),
     ...Object.values(draft.feats.general),
+    ...Object.values(draft.feats.freeArchetype),
     ...draft.feats.extras,
   ]
     .map((id) => context.feats[id])
@@ -368,15 +369,20 @@ export function FeatsStep({
       ) : null}
       <div className="feat-slots">
         {slots.map((slot) => {
-          const featId = draft.feats[slot.category]?.[String(slot.level)];
+          const bucket = slot.freeArchetype
+            ? draft.feats.freeArchetype
+            : draft.feats[slot.category];
+          const featId = bucket?.[String(slot.level)];
           const feat = featId ? context.feats[featId] : null;
           const choice = feat ? featChoice(feat.id) : undefined;
           const needsWeaponChoice =
             feat?.id === WEAPON_PROFICIENCY_ID && Number(classData?.attacks.martial ?? 0) >= 1;
-          const label = `${slot.category === "class" ? "Class" : slot.category === "ancestry" ? "Ancestry" : slot.category === "skill" ? "Skill" : "General"} feat`;
+          const label = slot.freeArchetype
+            ? "Free archetype feat"
+            : `${slot.category === "class" ? "Class" : slot.category === "ancestry" ? "Ancestry" : slot.category === "skill" ? "Skill" : "General"} feat`;
           return (
             <Card
-              key={`${slot.category}-${slot.level}`}
+              key={`${slot.freeArchetype ? "free" : slot.category}-${slot.level}`}
               className={`feat-slot ${feat ? "is-filled" : ""}`}
             >
               <div className="feat-slot-head">
@@ -399,7 +405,12 @@ export function FeatsStep({
                     size="sm"
                     variant={feat ? "ghost" : "primary"}
                     onClick={() =>
-                      openPicker({ kind: "feat", category: slot.category, level: slot.level })
+                      openPicker({
+                        kind: "feat",
+                        category: slot.category,
+                        level: slot.level,
+                        target: slot.freeArchetype ? "freeArchetype" : undefined,
+                      })
                     }
                   >
                     {feat ? "Change" : "Choose"}
@@ -409,11 +420,12 @@ export function FeatsStep({
                       label="Remove feat"
                       onClick={() =>
                         update((current) => {
-                          const bucket = { ...current.feats[slot.category] };
+                          const key = slot.freeArchetype ? "freeArchetype" : slot.category;
+                          const bucket = { ...current.feats[key] };
                           delete bucket[String(slot.level)];
                           return {
                             ...current,
-                            feats: { ...current.feats, [slot.category]: bucket },
+                            feats: { ...current.feats, [key]: bucket },
                             featChoices: Object.fromEntries(
                               Object.entries(current.featChoices).filter(([id]) => id !== feat.id)
                             ),

@@ -804,6 +804,8 @@ export interface CharacterDraft {
     class: Record<string, string>;
     skill: Record<string, string>;
     general: Record<string, string>;
+    /** Free Archetype variant feats, keyed by even character level. */
+    freeArchetype: Record<string, string>;
     extras: string[];
   };
   classChoices: Record<string, string[]>;
@@ -912,6 +914,8 @@ export interface CharacterRecord {
   campaignAdvancementSpeed?: AdvancementSpeed | null;
   /** Set when the character belongs to a campaign; controls shop stock. */
   campaignSettlementLevel?: number | null;
+  /** Set when the campaign uses the Free Archetype variant. */
+  campaignFreeArchetype?: boolean | null;
   createdAt: number;
   updatedAt: number;
   /** Optimistic-lock version, incremented on every save. */
@@ -958,6 +962,8 @@ export interface CharacterContext {
   monsters?: Record<string, Monster>;
   /** Lowercased names of every feat in the compendium, used for prerequisite checks. */
   featNames?: string[];
+  /** Campaign variant: grant an extra archetype feat at every even level. */
+  freeArchetype?: boolean;
 }
 
 export interface DerivedSkill {
@@ -1170,6 +1176,8 @@ export interface CampaignSummary {
   xpMode: XpMode;
   advancementSpeed: AdvancementSpeed;
   settlementLevel: number;
+  /** Campaign variant: grant an extra archetype feat at every even level. */
+  freeArchetype: boolean;
   /** Open market (infinite common stock) or a GM-curated finite merchant list. */
   shopMode: ShopStockMode;
   /** Current in-world date for this campaign. */

@@ -69,6 +69,11 @@ function summarize(draft: CharacterDraft): CharacterSummary {
   return characterSummary(draft, contextForDraft(draft));
 }
 
+function contextForCharacter(row: CharacterRow, draft: CharacterDraft) {
+  const campaign = row.campaign_id ? getCampaign(row.campaign_id) : null;
+  return contextForDraft(draft, Boolean(campaign?.free_archetype));
+}
+
 /** Downtime and long rests consume in-world days, not just character resources. */
 function advanceCampaignDate(app: FastifyInstance, campaignId: string, days: number): void {
   if (days <= 0) return;
@@ -987,7 +992,7 @@ export async function registerCharacterRoutes(app: FastifyInstance): Promise<voi
     const draft = body.draft
       ? parseDraft(body.draft, row.name)
       : parseDraft(parseJson(row.data, {}), row.name);
-    const context = contextForDraft(draft);
+    const context = contextForCharacter(row, draft);
     return reply.send({ context });
   });
 
@@ -1078,7 +1083,7 @@ export async function registerCharacterRoutes(app: FastifyInstance): Promise<voi
     const draft = body.draft
       ? parseDraft(body.draft, row.name)
       : parseDraft(parseJson(row.data, {}), row.name);
-    const context = contextForDraft(draft);
+    const context = contextForCharacter(row, draft);
     return reply.send({ derived: computeCharacter(draft, context) });
   });
 }

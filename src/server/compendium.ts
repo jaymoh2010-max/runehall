@@ -452,6 +452,7 @@ function featIdsFromDraft(draft: CharacterDraft): string[] {
     draft.feats.class,
     draft.feats.skill,
     draft.feats.general,
+    draft.feats.freeArchetype,
   ]) {
     for (const id of Object.values(bucket)) if (id) ids.add(id);
   }
@@ -460,7 +461,7 @@ function featIdsFromDraft(draft: CharacterDraft): string[] {
   return [...ids];
 }
 
-export function contextForDraft(draft: CharacterDraft): CharacterContext {
+export function contextForDraft(draft: CharacterDraft, freeArchetype = false): CharacterContext {
   const ancestry = draft.ancestryId ? (maps.ancestry.get(draft.ancestryId) ?? null) : null;
   const heritage = draft.heritageId ? (maps.heritage.get(draft.heritageId) ?? null) : null;
   const background = draft.backgroundId ? (maps.background.get(draft.backgroundId) ?? null) : null;
@@ -554,6 +555,7 @@ export function contextForDraft(draft: CharacterDraft): CharacterContext {
     equipment: equipmentMap,
     monsters: monsterMap,
     featNames,
+    freeArchetype,
   };
 }
 

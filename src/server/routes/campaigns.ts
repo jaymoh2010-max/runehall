@@ -413,6 +413,10 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
       ts,
       ts
     );
+    db.prepare("UPDATE campaigns SET free_archetype = ? WHERE id = ?").run(
+      body.freeArchetype === true ? 1 : 0,
+      id
+    );
     db.prepare(
       "INSERT INTO campaign_members (campaign_id, user_id, role, joined_at) VALUES (?, ?, 'gm', ?)"
     ).run(id, request.user.id, ts);
@@ -1301,9 +1305,21 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
       body.settlementLevel === undefined
         ? normalizeSettlementLevel(row.settlement_level)
         : body.settlementLevel;
+    const freeArchetype =
+      body.freeArchetype === undefined ? Boolean(row.free_archetype) : body.freeArchetype === true;
     db.prepare(
-      "UPDATE campaigns SET name = ?, description = ?, ruleset = ?, xp_mode = ?, advancement_speed = ?, settlement_level = ?, updated_at = ? WHERE id = ?"
-    ).run(name, description, ruleset, xpMode, advancementSpeed, settlementLevel, now(), id);
+      "UPDATE campaigns SET name = ?, description = ?, ruleset = ?, xp_mode = ?, advancement_speed = ?, settlement_level = ?, free_archetype = ?, updated_at = ? WHERE id = ?"
+    ).run(
+      name,
+      description,
+      ruleset,
+      xpMode,
+      advancementSpeed,
+      settlementLevel,
+      freeArchetype ? 1 : 0,
+      now(),
+      id
+    );
     if (ruleset !== normalizeCampaignRuleset(row.ruleset)) {
       const contentMode = rulesetContentMode(ruleset);
       const legacyAllowed = rulesetIncludesLegacy(ruleset);

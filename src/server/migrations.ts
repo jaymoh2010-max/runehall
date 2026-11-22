@@ -902,4 +902,11 @@ export const migrations: Migration[] = [
         ON campaign_clocks(campaign_id, sort_order);
     `,
   },
+  {
+    version: 51,
+    name: "campaign_free_archetype",
+    sql: `
+      ALTER TABLE campaigns ADD COLUMN free_archetype INTEGER NOT NULL DEFAULT 0;
+    `,
+  },
 ];

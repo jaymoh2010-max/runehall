@@ -15,6 +15,7 @@ import {
   featAvailability,
   featClassAccess,
   featPrerequisiteStatus,
+  featSlotsFor,
   fullCasterSlots,
   grantedTrainedSkills,
   isFontSpell,
@@ -153,6 +154,56 @@ describe("PF2e character rules", () => {
     const derived = computeCharacter(draft, context);
     expect(
       derived.validation.some((issue) => issue.message.includes("not available to Fighter"))
+    ).toBe(true);
+  });
+
+  it("grants free archetype feat slots and applies the chosen archetype feat", () => {
+    const fighter = classes.find((entry) => entry.name === "Fighter")!;
+    const acrobat = feats.find((entry) => entry.name === "Acrobat Dedication")!;
+    const powerAttack = feats.find(
+      (entry) => entry.name === "Agile Shield Grip" && entry.category === "class"
+    )!;
+    expect(acrobat.traits).toContain("archetype");
+
+    const slots = featSlotsFor(fighter, 4, true).filter((slot) => slot.freeArchetype);
+    expect(slots).toEqual([
+      { category: "class", level: 2, freeArchetype: true },
+      { category: "class", level: 4, freeArchetype: true },
+    ]);
+
+    const draft = emptyCharacterDraft("Free Archetype Hero");
+    draft.classId = fighter.id;
+    draft.level = 2;
+    draft.feats.freeArchetype["2"] = acrobat.id;
+    const context: CharacterContext = {
+      classData: fighter,
+      feats: { [acrobat.id]: acrobat, [powerAttack.id]: powerAttack },
+      spells: {},
+      equipment: {},
+      freeArchetype: true,
+    };
+    const selected = computeCharacter(draft, context);
+    expect(selected.selectedFeats.some((feat) => feat.id === acrobat.id)).toBe(true);
+    expect(
+      selected.validation.some((issue) => issue.message.includes("not an archetype feat"))
+    ).toBe(false);
+
+    const missing = structuredClone(draft);
+    delete missing.feats.freeArchetype["2"];
+    const missingDerived = computeCharacter(missing, context);
+    expect(
+      missingDerived.validation.some(
+        (issue) =>
+          issue.message === "Choose a free archetype feat for level 2." &&
+          issue.severity === "warning"
+      )
+    ).toBe(true);
+
+    const invalid = structuredClone(draft);
+    invalid.feats.freeArchetype["2"] = powerAttack.id;
+    const invalidDerived = computeCharacter(invalid, context);
+    expect(
+      invalidDerived.validation.some((issue) => issue.message.includes("is not an archetype feat"))
     ).toBe(true);
   });
 

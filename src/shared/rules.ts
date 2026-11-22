@@ -955,6 +955,7 @@ export function emptyCharacterDraft(name = "New Hero"): CharacterDraft {
       class: {},
       skill: {},
       general: {},
+      freeArchetype: {},
       extras: [],
     },
     classChoices: {},
@@ -1195,6 +1196,7 @@ export function normalizeCharacterDraft(input: unknown, fallbackName = "New Hero
       class: featRecord(feats.class),
       skill: featRecord(feats.skill),
       general: featRecord(feats.general),
+      freeArchetype: featRecord(feats.freeArchetype),
       extras: arr<string>(feats.extras).filter((x) => typeof x === "string"),
     },
     classChoices,
@@ -1480,18 +1482,36 @@ export function requiredExtraSkills(draft: CharacterDraft, context: CharacterCon
   return Math.max(0, classData.trainedSkills.additional + Math.max(0, baseMod));
 }
 
-export function featSlotsFor(classData: ClassData | null | undefined, level: number) {
-  const out: {
-    category: "ancestry" | "class" | "skill" | "general";
-    level: number;
-  }[] = [];
+export interface FeatSlot {
+  category: "ancestry" | "class" | "skill" | "general";
+  level: number;
+  /** Free Archetype slots use the separate even-level bucket. */
+  freeArchetype?: boolean;
+}
+
+export function featSlotsFor(
+  classData: ClassData | null | undefined,
+  level: number,
+  freeArchetype = false
+) {
+  const out: FeatSlot[] = [];
   if (!classData) return out;
   for (const category of ["ancestry", "class", "skill", "general"] as const) {
     for (const slotLevel of classData.featLevels[category]) {
       if (slotLevel <= level) out.push({ category, level: slotLevel });
     }
   }
-  return out.sort((a, b) => a.level - b.level || a.category.localeCompare(b.category));
+  if (freeArchetype) {
+    for (let slotLevel = 2; slotLevel <= level; slotLevel += 2) {
+      out.push({ category: "class", level: slotLevel, freeArchetype: true });
+    }
+  }
+  return out.sort(
+    (a, b) =>
+      a.level - b.level ||
+      Number(Boolean(a.freeArchetype)) - Number(Boolean(b.freeArchetype)) ||
+      a.category.localeCompare(b.category)
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -3389,13 +3409,17 @@ export function computeCharacter(
 
   // --- Feats ---------------------------------------------------------------
   const selectedFeatIds: string[] = [];
-  const slotsForFeats = featSlotsFor(classData, draft.level);
+  const slotsForFeats = featSlotsFor(classData, draft.level, Boolean(context.freeArchetype));
   for (const slot of slotsForFeats) {
-    const featId = draft.feats[slot.category]?.[String(slot.level)];
+    const featId = (slot.freeArchetype ? draft.feats.freeArchetype : draft.feats[slot.category])?.[
+      String(slot.level)
+    ];
     if (!featId) {
       issue(
-        "error",
-        `Choose ${slot.category === "ancestry" ? "an" : "a"} ${slot.category} feat for level ${slot.level}.`,
+        slot.freeArchetype ? "warning" : "error",
+        slot.freeArchetype
+          ? `Choose a free archetype feat for level ${slot.level}.`
+          : `Choose ${slot.category === "ancestry" ? "an" : "a"} ${slot.category} feat for level ${slot.level}.`,
         "feats"
       );
       continue;
@@ -3410,13 +3434,23 @@ export function computeCharacter(
       issue("error", `${feat.name} is above the level ${slot.level} slot.`, "feats");
     const access = featClassAccess(feat, context);
     if (!access.allowed) issue("error", access.reason!, "feats");
-    const expected = slot.category === "class" ? ["class", "archetype"] : [slot.category];
-    if (!expected.includes(feat.category)) {
-      issue(
-        "error",
-        `${feat.name} is a ${feat.category} feat and cannot fill a ${slot.category} feat slot.`,
-        "feats"
-      );
+    if (slot.freeArchetype) {
+      if (feat.category !== "class" || !feat.traits.includes("archetype")) {
+        issue(
+          "error",
+          `${feat.name} is not an archetype feat and cannot fill a free archetype slot.`,
+          "feats"
+        );
+      }
+    } else {
+      const expected = slot.category === "class" ? ["class", "archetype"] : [slot.category];
+      if (!expected.includes(feat.category)) {
+        issue(
+          "error",
+          `${feat.name} is a ${feat.category} feat and cannot fill a ${slot.category} feat slot.`,
+          "feats"
+        );
+      }
     }
   }
   for (const category of ["ancestry", "class", "skill", "general"] as const) {
@@ -3430,7 +3464,17 @@ export function computeCharacter(
       }
     }
   }
+  for (const key of Object.keys(draft.feats.freeArchetype)) {
+    if (!slotsForFeats.some((slot) => slot.freeArchetype && String(slot.level) === key)) {
+      issue(
+        "warning",
+        `A free archetype feat is stored at level ${key}, but that variant is not enabled for this campaign.`,
+        "feats"
+      );
+    }
+  }
   for (const id of draft.feats.extras) selectedFeatIds.push(id);
+  for (const id of Object.values(draft.feats.freeArchetype)) selectedFeatIds.push(id);
   const selectedFeats = [...new Set(selectedFeatIds)]
     .map((id) => context.feats[id])
     .filter((feat): feat is Feat => Boolean(feat));

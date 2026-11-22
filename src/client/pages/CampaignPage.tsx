@@ -279,6 +279,7 @@ export function CampaignPage() {
   const [settingsAdvancementSpeed, setSettingsAdvancementSpeed] =
     useState<AdvancementSpeed>("medium");
   const [settingsSettlementLevel, setSettingsSettlementLevel] = useState("1");
+  const [settingsFreeArchetype, setSettingsFreeArchetype] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [levelUpBusy, setLevelUpBusy] = useState(false);
   const [catchUpBusy, setCatchUpBusy] = useState(false);
@@ -433,6 +434,7 @@ export function CampaignPage() {
       setSettingsXpMode(details.campaign.xpMode);
       setSettingsAdvancementSpeed(details.campaign.advancementSpeed);
       setSettingsSettlementLevel(String(details.campaign.settlementLevel));
+      setSettingsFreeArchetype(details.campaign.freeArchetype);
       if (details.campaign.role === "gm") {
         try {
           const ledger = await api<{ awards: XpAward[] }>(`/api/campaigns/${id}/xp-awards`);
@@ -896,6 +898,7 @@ export function CampaignPage() {
           xpMode: settingsXpMode,
           advancementSpeed: settingsAdvancementSpeed,
           settlementLevel: Number(settingsSettlementLevel) || 0,
+          freeArchetype: settingsFreeArchetype,
         },
       });
       setCampaign(result.campaign);
@@ -911,6 +914,7 @@ export function CampaignPage() {
                 xpMode: result.campaign.xpMode,
                 advancementSpeed: result.campaign.advancementSpeed,
                 settlementLevel: result.campaign.settlementLevel,
+                freeArchetype: result.campaign.freeArchetype,
               },
             }
           : current
@@ -2525,6 +2529,18 @@ export function CampaignPage() {
                     ))}
                   </Select>
                 </Field>
+                <div>
+                  <Checkbox
+                    label="Free Archetype variant"
+                    checked={settingsFreeArchetype}
+                    onChange={setSettingsFreeArchetype}
+                    disabled={!isGm}
+                  />
+                  <p className="tiny muted">
+                    Adds an extra archetype feat slot at every even level. Existing characters gain
+                    the slots the next time their builder or sheet loads.
+                  </p>
+                </div>
                 <Field
                   label="Settlement level"
                   hint={
