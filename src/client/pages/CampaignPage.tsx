@@ -233,6 +233,7 @@ export function CampaignPage() {
   const [settingsSettlementLevel, setSettingsSettlementLevel] = useState("1");
   const [inviteOpen, setInviteOpen] = useState(false);
   const [levelUpBusy, setLevelUpBusy] = useState(false);
+  const [catchUpBusy, setCatchUpBusy] = useState(false);
   const [levelingId, setLevelingId] = useState<string | null>(null);
   const [wealthBusyId, setWealthBusyId] = useState<string | null>(null);
   const [restBusy, setRestBusy] = useState(false);
@@ -935,6 +936,43 @@ export function CampaignPage() {
     }
   };
 
+  const catchUpParty = async () => {
+    if (!id || !isGm) return;
+    const confirmed = window.confirm(
+      "Raise every character below the party's highest level up to that level and match its XP? Use this for new or returning characters; review their new feats and spells afterward."
+    );
+    if (!confirmed) return;
+    setCatchUpBusy(true);
+    try {
+      const result = await api<{
+        caughtUp: number;
+        alreadyCurrent: number;
+        skipped: number;
+        targetLevel: number;
+        targetXp: number;
+        characters: CharacterRecord[];
+      }>(`/api/campaigns/${id}/catch-up`, { method: "POST" });
+      setCharacters(result.characters);
+      setTableData((current) =>
+        current ? { ...current, characters: result.characters } : current
+      );
+      if (result.caughtUp > 0) {
+        toast(
+          `Caught up ${result.caughtUp} ${
+            result.caughtUp === 1 ? "character" : "characters"
+          } to level ${result.targetLevel}. Review new class choices.`,
+          "success"
+        );
+      } else {
+        toast("The whole party is already caught up.", "info");
+      }
+    } catch (err) {
+      toast(errorMessage(err), "error");
+    } finally {
+      setCatchUpBusy(false);
+    }
+  };
+
   const topUpWealth = async (character: CharacterRecord) => {
     if (!id || !isGm || !character.summary) return;
     const level = character.summary.level;
@@ -1536,6 +1574,14 @@ export function CampaignPage() {
                       onClick={() => void levelUpCharacters()}
                     >
                       Level up party
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      icon={<Users size={15} />}
+                      loading={catchUpBusy}
+                      onClick={() => void catchUpParty()}
+                    >
+                      Catch up party
                     </Button>
                     <Button
                       variant="secondary"

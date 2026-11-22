@@ -554,6 +554,28 @@ async function main() {
     throw new Error("Individual level-up did not spend 800 XP at fast advancement");
   }
   log("XP awards are GM-only and fast individual level-ups spend 800 XP");
+
+  const playerCatchUp = await fetch(`${base}/api/campaigns/${campaign.id}/catch-up`, {
+    method: "POST",
+    headers: { cookie: playerCookie, "content-type": "application/json" },
+    body: JSON.stringify({ characterId: character.id }),
+  });
+  if (playerCatchUp.status !== 403) {
+    throw new Error("Player was able to run party catch-up");
+  }
+  const evenCatchUp = await api(`/api/campaigns/${campaign.id}/catch-up`, {
+    method: "POST",
+    cookie: gmCookie,
+    body: {},
+  });
+  if (
+    evenCatchUp.payload.caughtUp !== 0 ||
+    evenCatchUp.payload.alreadyCurrent < 1 ||
+    evenCatchUp.payload.targetLevel !== 2
+  ) {
+    throw new Error("Catch-up changed an already even party");
+  }
+  log("party catch-up stayed GM-only and left an even party unchanged");
   await api(`/api/campaigns/${campaign.id}`, {
     method: "PATCH",
     cookie: gmCookie,

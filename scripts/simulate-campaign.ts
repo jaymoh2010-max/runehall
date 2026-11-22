@@ -3136,45 +3136,62 @@ async function runCampaignB(gm: Account, players: Account[]): Promise<void> {
     playerSocket.close();
   });
 
-  await check(
-    campaignName,
-    "replacement character can join and be advanced to the party level",
-    async () => {
-      const replacement = await createHero(players[2], {
-        name: "Tobin Ash",
-        className: "Rogue",
-        backgroundName: "Criminal",
-        heritageName: "Skilled Human",
-      });
-      await joinCampaign(players[2], campaignId, inviteCode, replacement.id);
-      for (let level = 1; level < 10; level++) {
-        await api(`/api/campaigns/${campaignId}/level-up`, {
-          method: "POST",
-          cookie: gm.cookie,
-          body: { characterId: replacement.id },
-        });
-      }
-      const table = await getTable(campaignId, gm.cookie);
-      assertEqual(summaryFor(table, replacement.id).level, 10, "Replacement character level");
-      const grant = await api(`/api/campaigns/${campaignId}/characters/${replacement.id}/wealth`, {
-        method: "POST",
-        cookie: gm.cookie,
-      });
-      assert(grant.payload.grantCp > 0, "Replacement wealth grant was empty");
-      assertEqual(grant.payload.targetCp, startingWealthCp(10), "Replacement wealth benchmark");
-      const sheet = await api(`/api/characters/${replacement.id}`, { cookie: gm.cookie });
-      const committed = computeCharacter(
-        sheet.payload.character.data as CharacterDraft,
-        contextForDraft(sheet.payload.character.data)
-      ).wealth.committed;
-      assertEqual(committed, startingWealthCp(10), "Replacement wealth after grant");
-      const secondGrant = await api(
-        `/api/campaigns/${campaignId}/characters/${replacement.id}/wealth`,
-        { method: "POST", cookie: gm.cookie }
-      );
-      assertEqual(secondGrant.payload.grantCp, 0, "Repeated replacement wealth grant");
-    }
-  );
+  await check(campaignName, "replacement character catches up to the party level", async () => {
+    const replacement = await createHero(players[2], {
+      name: "Tobin Ash",
+      className: "Rogue",
+      backgroundName: "Criminal",
+      heritageName: "Skilled Human",
+    });
+    await joinCampaign(players[2], campaignId, inviteCode, replacement.id);
+    const catchUp = await api(`/api/campaigns/${campaignId}/catch-up`, {
+      method: "POST",
+      cookie: gm.cookie,
+      body: { characterId: replacement.id },
+    });
+    assertEqual(catchUp.payload.caughtUp, 1, "Caught-up character count");
+    const targetLevel = catchUp.payload.targetLevel as number;
+    assert(targetLevel >= 1, "Catch-up target level was not resolved");
+    const table = await getTable(campaignId, gm.cookie);
+    assertEqual(
+      summaryFor(table, replacement.id).level,
+      targetLevel,
+      "Replacement character level"
+    );
+    assertEqual(
+      summaryFor(table, replacement.id).xp,
+      catchUp.payload.targetXp,
+      "Replacement character XP"
+    );
+    const repeat = await api(`/api/campaigns/${campaignId}/catch-up`, {
+      method: "POST",
+      cookie: gm.cookie,
+      body: { characterId: replacement.id },
+    });
+    assertEqual(repeat.payload.caughtUp, 0, "Repeated catch-up count");
+    assertEqual(repeat.payload.alreadyCurrent, 1, "Repeated catch-up current count");
+    const grant = await api(`/api/campaigns/${campaignId}/characters/${replacement.id}/wealth`, {
+      method: "POST",
+      cookie: gm.cookie,
+    });
+    assert(grant.payload.grantCp > 0, "Replacement wealth grant was empty");
+    assertEqual(
+      grant.payload.targetCp,
+      startingWealthCp(targetLevel),
+      "Replacement wealth benchmark"
+    );
+    const sheet = await api(`/api/characters/${replacement.id}`, { cookie: gm.cookie });
+    const committed = computeCharacter(
+      sheet.payload.character.data as CharacterDraft,
+      contextForDraft(sheet.payload.character.data)
+    ).wealth.committed;
+    assertEqual(committed, startingWealthCp(targetLevel), "Replacement wealth after grant");
+    const secondGrant = await api(
+      `/api/campaigns/${campaignId}/characters/${replacement.id}/wealth`,
+      { method: "POST", cookie: gm.cookie }
+    );
+    assertEqual(secondGrant.payload.grantCp, 0, "Repeated replacement wealth grant");
+  });
 
   await check(
     campaignName,

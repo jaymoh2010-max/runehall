@@ -1089,6 +1089,118 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
     return reply.send({ leveled, atMaxLevel, skipped, characters });
   });
 
+  app.post("/api/campaigns/:id/catch-up", async (request, reply) => {
+    if (!request.user) return reply.code(401).send({ error: "Sign in to continue." });
+    const { id } = request.params as { id: string };
+    const row = getCampaign(id);
+    if (!row) return reply.code(404).send({ error: "Campaign not found." });
+    if (roleFor(row, request.user.id) !== "gm") {
+      return reply.code(403).send({ error: "Only the GM can catch characters up." });
+    }
+    const body = (request.body ?? {}) as Record<string, unknown>;
+    const characterId = typeof body.characterId === "string" ? body.characterId : null;
+    const characterRows = db
+      .prepare("SELECT * FROM characters WHERE campaign_id = ?")
+      .all(id) as CharacterRow[];
+    if (!characterRows.length) {
+      return reply.code(400).send({ error: "There are no characters in this campaign yet." });
+    }
+
+    const parsed: { character: CharacterRow; draft: ReturnType<typeof normalizeCharacterDraft> }[] =
+      [];
+    let skipped = 0;
+    for (const character of characterRows) {
+      try {
+        const draft = normalizeCharacterDraft(JSON.parse(character.data), character.name);
+        parsed.push({ character, draft });
+      } catch {
+        skipped += 1;
+      }
+    }
+    if (!parsed.length) {
+      return reply.code(400).send({ error: "No character drafts in this campaign could be read." });
+    }
+    if (characterId && !parsed.some((entry) => entry.character.id === characterId)) {
+      return reply.code(404).send({ error: "That character is not in this campaign." });
+    }
+
+    const targetLevel = Math.max(...parsed.map((entry) => entry.draft.level));
+    const xpMode = normalizeXpMode(row.xp_mode) === "xp";
+    const targetXp = xpMode ? Math.max(...parsed.map((entry) => entry.draft.play.xp)) : 0;
+    const selected = characterId
+      ? parsed.filter((entry) => entry.character.id === characterId)
+      : parsed;
+
+    let caughtUp = 0;
+    let alreadyCurrent = 0;
+    for (const { character, draft } of selected) {
+      const levelChanged = draft.level < targetLevel;
+      const xpChanged = xpMode && draft.play.xp < targetXp;
+      if (!levelChanged && !xpChanged) {
+        alreadyCurrent += 1;
+        continue;
+      }
+      const before = characterSummary(draft, contextForDraft(draft));
+      if (levelChanged) draft.level = targetLevel;
+      if (xpMode) draft.play.xp = Math.max(draft.play.xp, targetXp);
+      const after = characterSummary(draft, contextForDraft(draft));
+      if (levelChanged) {
+        draft.play.hp = levelUpCurrentHp(draft.play.hp, before.hp, after.hp);
+      }
+      const summary = characterSummary(draft, contextForDraft(draft));
+      db.prepare(
+        "UPDATE characters SET data = ?, summary = ?, updated_at = ?, revision = revision + 1 WHERE id = ?"
+      ).run(JSON.stringify(draft), JSON.stringify(summary), now(), character.id);
+
+      const linkedTokens = db
+        .prepare("SELECT * FROM tokens WHERE character_id = ?")
+        .all(character.id) as TokenRow[];
+      for (const token of linkedTokens) {
+        const nextHp = Math.min(draft.play.hp ?? summary.hp, summary.hp);
+        db.prepare(
+          "UPDATE tokens SET name = ?, hp_max = ?, hp_current = ?, ac = ?, updated_at = ? WHERE id = ?"
+        ).run(draft.name, summary.hp, nextHp, summary.ac, now(), token.id);
+        const updatedToken = db
+          .prepare("SELECT * FROM tokens WHERE id = ?")
+          .get(token.id) as TokenRow;
+        tokenEventsFor(app, id).updated(serializeToken(updatedToken), Boolean(token.hidden));
+      }
+
+      app.broadcastCampaign(id, "character:updated", {
+        characterId: character.id,
+        summary,
+        name: draft.name,
+      });
+      caughtUp += 1;
+    }
+
+    touchCampaign(id);
+    const characters = campaignCharacters(id).map((character) =>
+      serializeCharacter(character, character.owner_name, {
+        canEdit: true,
+        canView: true,
+      })
+    );
+    logAudit({
+      action: "campaign.catch_up",
+      actor: request.user,
+      targetType: "campaign",
+      targetId: id,
+      detail: characterId
+        ? `${selected[0]?.character.name ?? "Character"}: ${caughtUp ? `caught up to level ${targetLevel}` : "already current"}`
+        : `${caughtUp} caught up to level ${targetLevel}, ${alreadyCurrent} already current, ${skipped} skipped`,
+      request,
+    });
+    return reply.send({
+      caughtUp,
+      alreadyCurrent,
+      skipped,
+      targetLevel,
+      targetXp,
+      characters,
+    });
+  });
+
   app.post("/api/campaigns/:id/characters/:characterId/wealth", async (request, reply) => {
     if (!request.user) return reply.code(401).send({ error: "Sign in to continue." });
     const { id, characterId } = request.params as { id: string; characterId: string };
