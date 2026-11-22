@@ -1334,6 +1334,7 @@ async function main() {
     x2: 200,
     y2: 0,
     kind: "wall",
+    hidden: false,
   };
   const wallsPromise = waitForEvent(
     gmSocket,
@@ -1376,7 +1377,52 @@ async function main() {
   ) {
     throw new Error("Wall persistence or lighting/vision/collision settings were not saved");
   }
-  log("GM walls persist, players cannot replace them, and scene settings are saved");
+
+  const hiddenWall = {
+    ...smokeWall,
+    id: "wall_smoke_hidden",
+    y1: 40,
+    y2: 40,
+    hidden: true,
+  };
+  const playerVisibleWalls = waitForEvent(
+    playerSocket,
+    "scene:walls",
+    (payload) => payload.sceneId === scene.id && payload.walls?.length === 1
+  );
+  const gmVisibleWalls = waitForEvent(
+    gmSocket,
+    "scene:walls",
+    (payload) => payload.sceneId === scene.id && payload.walls?.length === 2
+  );
+  gmSocket.emit("scene:walls", {
+    campaignId: campaign.id,
+    sceneId: scene.id,
+    walls: [smokeWall, hiddenWall],
+  });
+  const [playerVisibleWallsPayload, gmVisibleWallsPayload] = await Promise.all([
+    playerVisibleWalls,
+    gmVisibleWalls,
+  ]);
+  if (
+    playerVisibleWallsPayload.walls[0]?.id !== "wall_smoke" ||
+    gmVisibleWallsPayload.walls.length !== 2
+  ) {
+    throw new Error("Hidden wall visibility was not filtered for players");
+  }
+  const playerWallsTable = await api(`/api/campaigns/${campaign.id}/table`, {
+    cookie: playerCookie,
+  });
+  const playerWallsScene = playerWallsTable.payload.scenes.find((entry) => entry.id === scene.id);
+  if (playerWallsScene?.walls?.length !== 1) {
+    throw new Error("Hidden wall was included in the player table snapshot");
+  }
+  gmSocket.emit("scene:walls", {
+    campaignId: campaign.id,
+    sceneId: scene.id,
+    walls: [smokeWall],
+  });
+  log("GM walls persist, hidden walls stay GM-only, and scene settings are saved");
 
   const smokeProp = {
     id: "prop_smoke",

@@ -26,9 +26,18 @@ const point = (col: number, row: number) => ({
 });
 
 const barrier = (doorOpen: boolean): Wall[] => [
-  { id: "wall_top", x1: 210, y1: 0, x2: 210, y2: 280, kind: "wall" },
-  { id: "door_mid", x1: 210, y1: 280, x2: 210, y2: 420, kind: "door", open: doorOpen },
-  { id: "wall_bottom", x1: 210, y1: 420, x2: 210, y2: 700, kind: "wall" },
+  { id: "wall_top", x1: 210, y1: 0, x2: 210, y2: 280, kind: "wall", hidden: false },
+  {
+    id: "door_mid",
+    x1: 210,
+    y1: 280,
+    x2: 210,
+    y2: 420,
+    kind: "door",
+    open: doorOpen,
+    hidden: false,
+  },
+  { id: "wall_bottom", x1: 210, y1: 420, x2: 210, y2: 700, kind: "wall", hidden: false },
 ];
 
 const base = (overrides: Partial<PathfindingInput> = {}): PathfindingInput => ({

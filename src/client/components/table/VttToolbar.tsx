@@ -37,6 +37,8 @@ export function VttToolbar({
   setWallMode,
   wallKind,
   setWallKind,
+  wallHidden,
+  setWallHidden,
   onClearWalls,
   propMode,
   setPropMode,
@@ -47,6 +49,8 @@ export function VttToolbar({
   setTemplateKind,
   templateSize,
   setTemplateSize,
+  templateHidden,
+  setTemplateHidden,
   hasTemplate,
   onClearTemplate,
   connectionStatus,
@@ -77,6 +81,8 @@ export function VttToolbar({
   setWallMode: (value: boolean) => void;
   wallKind: WallKind;
   setWallKind: (kind: WallKind) => void;
+  wallHidden: boolean;
+  setWallHidden: (hidden: boolean) => void;
   onClearWalls: () => void;
   propMode: boolean;
   setPropMode: (value: boolean) => void;
@@ -87,6 +93,8 @@ export function VttToolbar({
   setTemplateKind: (kind: TemplateKind | null) => void;
   templateSize: number;
   setTemplateSize: (size: number) => void;
+  templateHidden: boolean;
+  setTemplateHidden: (hidden: boolean) => void;
   hasTemplate: boolean;
   onClearTemplate: () => void;
   connectionStatus: "connecting" | "online" | "offline";
@@ -187,6 +195,17 @@ export function VttToolbar({
                 <Button
                   size="sm"
                   variant="ghost"
+                  className={wallHidden ? "is-active" : ""}
+                  icon={<EyeOff size={14} />}
+                  onClick={() => setWallHidden(!wallHidden)}
+                  title="New walls and doors are hidden from players"
+                  aria-label="Hide new walls from players"
+                >
+                  Hidden
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
                   icon={<X size={14} />}
                   onClick={onClearWalls}
                   title="Remove all walls and doors"
@@ -255,6 +274,19 @@ export function VttToolbar({
                   </option>
                 ))}
               </Select>
+            ) : null}
+            {templateKind ? (
+              <Button
+                size="sm"
+                variant="ghost"
+                className={templateHidden ? "is-active" : ""}
+                icon={<EyeOff size={14} />}
+                onClick={() => setTemplateHidden(!templateHidden)}
+                title="New area templates are hidden from players"
+                aria-label="Hide new templates from players"
+              >
+                Hidden
+              </Button>
             ) : null}
             {hasTemplate ? (
               <Button

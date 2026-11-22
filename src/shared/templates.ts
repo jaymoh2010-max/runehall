@@ -9,6 +9,8 @@ export interface AoeTemplate {
   y: number;
   /** Direction in radians for cones and lines. */
   direction: number;
+  /** GM-only template: excluded from player snapshots and live template events. */
+  hidden: boolean;
 }
 
 export const TEMPLATE_SIZES = [5, 10, 15, 20, 30, 40, 60];
@@ -42,6 +44,7 @@ export function normalizeAoeTemplate(value: unknown): AoeTemplate | null {
     x: number(record.x, 0),
     y: number(record.y, 0),
     direction: number(record.direction, 0),
+    hidden: record.hidden === true,
   };
 }
 

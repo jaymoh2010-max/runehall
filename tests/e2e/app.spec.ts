@@ -695,7 +695,45 @@ test("GM places a token, chats, rolls, and opens the scenes manager", async ({ p
     await page.mouse.up();
   }
   await expect(page.locator(".wall-layer .wall-line")).toHaveCount(1);
+  await page.getByRole("button", { name: "Hide new walls from players" }).click();
+  if (surfaceBox) {
+    await page.mouse.move(
+      surfaceBox.x + surfaceBox.width * 0.1,
+      surfaceBox.y + surfaceBox.height * 0.9
+    );
+    await page.mouse.down();
+    await page.mouse.move(
+      surfaceBox.x + surfaceBox.width * 0.3,
+      surfaceBox.y + surfaceBox.height * 0.9,
+      { steps: 4 }
+    );
+    await page.mouse.up();
+  }
+  await expect(page.locator(".wall-layer .wall-line")).toHaveCount(2);
+  await expect(page.locator(".wall-layer .wall-line.is-hidden")).toHaveCount(1);
+  await page.getByRole("button", { name: "Hide new walls from players" }).click();
   await page.getByRole("button", { name: "Walls", exact: true }).click();
+
+  await page.getByLabel("Area template").selectOption("burst");
+  await page.getByRole("button", { name: "Hide new templates from players" }).click();
+  if (surfaceBox) {
+    await page.mouse.move(
+      surfaceBox.x + surfaceBox.width * 0.55,
+      surfaceBox.y + surfaceBox.height * 0.55
+    );
+    await page.mouse.down();
+    await page.mouse.move(
+      surfaceBox.x + surfaceBox.width * 0.57,
+      surfaceBox.y + surfaceBox.height * 0.55,
+      { steps: 2 }
+    );
+    await page.mouse.up();
+  }
+  const hiddenTemplate = page.locator(".template-layer circle").first();
+  await expect(hiddenTemplate).toBeVisible();
+  await expect(hiddenTemplate).toHaveAttribute("stroke-dasharray", /.+/);
+  await page.getByRole("button", { name: "Hide new templates from players" }).click();
+  await page.getByLabel("Area template").selectOption("");
 
   await page.getByRole("button", { name: "Props", exact: true }).click();
   const propPalette = page.locator(".vtt-prop-palette");

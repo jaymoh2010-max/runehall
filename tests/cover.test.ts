@@ -29,6 +29,7 @@ const wall = (overrides: Partial<Wall> = {}): Wall => ({
   x2: 280,
   y2: 700,
   kind: "wall",
+  hidden: false,
   ...overrides,
 });
 

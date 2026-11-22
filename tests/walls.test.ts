@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   blockingWallForMove,
+  normalizeWalls,
   segmentsIntersect,
   wallBlocksMovement,
   wallBlocksSight,
@@ -14,6 +15,7 @@ const wall = (overrides: Partial<Wall> = {}): Wall => ({
   x2: 210,
   y2: 700,
   kind: "wall",
+  hidden: false,
   ...overrides,
 });
 
@@ -21,6 +23,14 @@ const from = { x: 175, y: 315 };
 const to = { x: 245, y: 315 };
 
 describe("wall movement collision", () => {
+  it("preserves the hidden flag while still blocking movement", () => {
+    const hidden = normalizeWalls([
+      { id: "wall_hidden", x1: 0, y1: 0, x2: 100, y2: 0, kind: "wall", hidden: true },
+    ])[0];
+    expect(hidden.hidden).toBe(true);
+    expect(wallBlocksMovement(hidden)).toBe(true);
+  });
+
   it("blocks movement through walls and closed doors", () => {
     expect(wallBlocksMovement(wall())).toBe(true);
     expect(wallBlocksMovement(wall({ kind: "door", open: false }))).toBe(true);

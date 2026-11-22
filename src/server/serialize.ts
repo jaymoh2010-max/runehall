@@ -255,10 +255,18 @@ export function serializeScene(row: SceneRow): Scene {
   };
 }
 
-/** Scene payload for players: GM-only props are removed, walls remain for LOS. */
+/**
+ * Scene payload for players. GM-only props, walls, and templates are removed.
+ * Visible walls remain for player line of sight; hidden walls are GM-only.
+ */
 export function serializeSceneForPlayers(row: SceneRow): Scene {
   const scene = serializeScene(row);
-  return { ...scene, props: scene.props.filter((prop) => prop.visible) };
+  return {
+    ...scene,
+    props: scene.props.filter((prop) => prop.visible),
+    walls: scene.walls.filter((wall) => !wall.hidden),
+    templates: scene.templates.filter((template) => !template.hidden),
+  };
 }
 
 export function serializeToken(row: TokenRow, ownerName?: string): Token {
