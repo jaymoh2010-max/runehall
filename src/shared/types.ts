@@ -627,6 +627,33 @@ export interface CharacterDetails {
 
 export type Lifestyle = "subsistence" | "comfortable" | "fine" | "extravagant";
 
+export type DowntimeActivityKind = "earn-income" | "subsist" | "craft" | "retrain" | "other";
+export type DowntimeActivityStatus = "active" | "complete";
+
+/**
+ * A downtime job or project stored on the character. Earn Income keeps the
+ * first day's pay in `dailyEarnedCp` so later days do not need another roll.
+ */
+export interface DowntimeActivity {
+  id: string;
+  kind: DowntimeActivityKind;
+  label: string;
+  /** Skill id, or `lore:<name>` for a Lore skill. */
+  skill: string | null;
+  taskLevel: number | null;
+  dc: number | null;
+  daysRequired: number | null;
+  daysSpent: number;
+  earnedCp: number;
+  paidCp: number;
+  dailyEarnedCp: number | null;
+  status: DowntimeActivityStatus;
+  lastDegree: DegreeOfSuccess | null;
+  notes: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
 export interface CharacterPlay {
   hp: number | null;
   tempHp: number;
@@ -636,6 +663,8 @@ export interface CharacterPlay {
   downtimeDays: number;
   /** Standard of living paid for each downtime day. */
   lifestyle: Lifestyle;
+  /** Earn Income jobs and Craft/Retrain projects. */
+  downtimeActivities: DowntimeActivity[];
   conditions: CharacterCondition[];
   afflictions: CharacterAffliction[];
   persistentDamage: PersistentDamageInstance[];

@@ -131,6 +131,7 @@ import {
 } from "../components/ui";
 import { HoverCard } from "../components/HoverCard";
 import { DailyPreparationsModal } from "../components/DailyPreparationsModal";
+import { DowntimeModal } from "../components/DowntimeModal";
 import { ShopModal } from "../components/campaign/ShopModal";
 
 function emptyAfflictionForm(): CharacterAffliction {
@@ -228,6 +229,7 @@ export function CharacterSheetPage() {
   const [prepOpen, setPrepOpen] = useState(false);
   const [heroicRecoveryBusy, setHeroicRecoveryBusy] = useState(false);
   const [downtimeBusy, setDowntimeBusy] = useState(false);
+  const [downtimeOpen, setDowntimeOpen] = useState(false);
   const [castState, setCastState] = useState<{
     spellId: string;
     kind: "known" | "cantrip" | "focus";
@@ -2488,6 +2490,15 @@ export function CharacterSheetPage() {
                   >
                     Spend
                   </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    icon={<ScrollText size={13} />}
+                    disabled={!canEdit}
+                    onClick={() => setDowntimeOpen(true)}
+                  >
+                    Activities
+                  </Button>
                 </div>
               </div>
               {derived.focusPointsMax > 0 ? (
@@ -3168,6 +3179,17 @@ export function CharacterSheetPage() {
         context={context}
         derived={derived}
         onApply={applyDailyPreparations}
+      />
+
+      <DowntimeModal
+        open={downtimeOpen}
+        onClose={() => setDowntimeOpen(false)}
+        character={character}
+        draft={draft}
+        derived={derived}
+        canEdit={canEdit}
+        toast={toast}
+        onCharacterUpdated={applyUpdatedCharacter}
       />
 
       <ShopModal
