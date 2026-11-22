@@ -513,7 +513,7 @@ test("GM plans a journey and advances a travel day", async ({ page }) => {
   await page.getByRole("menuitem", { name: /^Travel/ }).click();
   await expect(page.getByRole("heading", { name: "Travel & watches" })).toBeVisible();
 
-  await page.getByLabel("Origin").fill("E2E Start");
+  await page.getByLabel("Origin", { exact: true }).fill("E2E Start");
   await page.getByLabel("Destination").fill("E2E End");
   await page.getByLabel("Distance (miles)").fill("20");
   await page.getByLabel("Party speed").fill("25");
@@ -532,10 +532,24 @@ test("GM plans a journey and advances a travel day", async ({ page }) => {
     page.locator(".travel-page").getByText("2 Abadius, 4726 AR", { exact: true })
   ).toBeVisible();
 
+  await page.getByLabel("Waypoint name").fill("E2E Broken Bridge");
+  await page.getByLabel("Miles from origin").fill("10");
+  await page.getByLabel("Waypoint notes").fill("A rope bridge over the gorge.");
+  await page.getByRole("checkbox", { name: "Share this waypoint with players" }).check();
+  await page.getByRole("button", { name: "Add waypoint" }).click();
+  await expect(page.getByText("Waypoint added to the route.")).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText("E2E Broken Bridge").first()).toBeVisible();
+
+  await page.getByRole("button", { name: "Check for encounter" }).click();
+  await expect(page.getByText(/Encounter!|No encounter:/)).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator(".travel-check").getByText(/d20 \d+ vs \d+\+/)).toBeVisible();
+
   await page.getByRole("button", { name: "Advance day" }).click();
   await expect(page.getByText(/The party arrives after 1 day/)).toBeVisible({ timeout: 15_000 });
   await expect(page.getByText(/20 of 20 miles/)).toBeVisible();
   await expect(page.getByText("Arrived", { exact: true })).toBeVisible();
+  await expect(page.locator(".travel-map-card").getByText("E2E Broken Bridge")).toBeVisible();
+  await expect(page.locator(".travel-map-card").getByText("Reached")).toBeVisible();
   await expect(
     page.locator(".travel-page").getByText("3 Abadius, 4726 AR", { exact: true })
   ).toBeVisible();

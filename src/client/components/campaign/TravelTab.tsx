@@ -2,9 +2,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   CalendarDays,
   Compass,
+  Dices,
   Footprints,
+  Map,
   MapPin,
   Moon,
+  Plus,
   RotateCcw,
   Sun,
   Trash2,
@@ -13,9 +16,11 @@ import {
 import type {
   CampaignTravel,
   CharacterRecord,
+  TravelEncounterCheck,
   TravelTerrain,
   TravelWatches,
   TravelWeather,
+  TravelWaypoint,
 } from "../../../shared/types";
 import type { GolarionDate } from "../../../shared/calendar";
 import {
@@ -29,6 +34,7 @@ import {
   normalizeTravelSpeed,
   normalizeTravelWatches,
   travelDaysRemaining,
+  travelEncounterDc,
   travelMilesPerDay,
   travelWeatherOption,
 } from "../../../shared/travel";
@@ -39,6 +45,7 @@ import {
   Badge,
   Button,
   Card,
+  Checkbox,
   EmptyState,
   Field,
   Input,
@@ -83,6 +90,12 @@ export function TravelTab({
   const [notes, setNotes] = useState("");
   const [watches, setWatches] = useState<TravelWatches>(emptyTravelWatches);
   const [activities, setActivities] = useState<Record<string, string>>({});
+  const [waypointName, setWaypointName] = useState("");
+  const [waypointMiles, setWaypointMiles] = useState("");
+  const [waypointDescription, setWaypointDescription] = useState("");
+  const [waypointVisible, setWaypointVisible] = useState(true);
+  const [checkWatch, setCheckWatch] = useState("1");
+  const [checkNote, setCheckNote] = useState("");
   const travelRef = useRef<CampaignTravel | null>(null);
 
   const characterIds = useMemo(() => new Set(characters.map((entry) => entry.id)), [characters]);
@@ -118,6 +131,12 @@ export function TravelTab({
     travelRef.current = result.travel;
     setSuggestedSpeed(result.suggestedSpeed);
     fillForm(result.travel, result.suggestedSpeed);
+  };
+
+  const applyTravelMeta = (result: TravelResponse) => {
+    setTravel(result.travel);
+    travelRef.current = result.travel;
+    setSuggestedSpeed(result.suggestedSpeed);
   };
 
   useEffect(() => {
@@ -267,6 +286,80 @@ export function TravelTab({
       });
       applyTravel(result);
       toast("Journey cleared.", "success");
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const addWaypoint = async () => {
+    if (!waypointName.trim()) {
+      toast("Give the waypoint a name.", "error");
+      return;
+    }
+    setBusy("waypoint");
+    setError("");
+    try {
+      const result = await api<TravelResponse>(`/api/campaigns/${campaignId}/travel/waypoints`, {
+        method: "POST",
+        body: {
+          name: waypointName.trim(),
+          miles: waypointMiles === "" ? undefined : Number(waypointMiles),
+          description: waypointDescription,
+          visible: waypointVisible,
+        },
+      });
+      applyTravelMeta(result);
+      setWaypointName("");
+      setWaypointMiles("");
+      setWaypointDescription("");
+      setWaypointVisible(true);
+      toast("Waypoint added to the route.", "success");
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const deleteWaypoint = async (waypoint: TravelWaypoint) => {
+    if (!window.confirm(`Remove “${waypoint.name}” from the route?`)) return;
+    setBusy(`waypoint-${waypoint.id}`);
+    setError("");
+    try {
+      const result = await api<TravelResponse>(
+        `/api/campaigns/${campaignId}/travel/waypoints/${waypoint.id}`,
+        { method: "DELETE" }
+      );
+      applyTravelMeta(result);
+      toast("Waypoint removed.", "success");
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const checkForEncounter = async () => {
+    setBusy("check");
+    setError("");
+    try {
+      const result = await api<{ check: TravelEncounterCheck; travel: CampaignTravel }>(
+        `/api/campaigns/${campaignId}/travel/check`,
+        {
+          method: "POST",
+          body: { watch: Number(checkWatch) || 1, note: checkNote.trim() },
+        }
+      );
+      applyTravelMeta({ travel: result.travel, suggestedSpeed });
+      setCheckNote("");
+      toast(
+        result.check.encounter
+          ? `Encounter! d20 ${result.check.roll} reached the ${result.check.dc}+ threshold.`
+          : `No encounter: d20 ${result.check.roll} stayed below ${result.check.dc}+.`,
+        result.check.encounter ? "info" : "success"
+      );
     } catch (err) {
       setError(errorMessage(err));
     } finally {
@@ -460,6 +553,161 @@ export function TravelTab({
                 />
               </Field>
 
+              <div className="travel-waypoint-editor">
+                <div className="row-between">
+                  <div>
+                    <PageEyebrow>Route map</PageEyebrow>
+                    <p className="tiny muted">
+                      Mark landmarks along the route. Players see shared waypoints and whether the
+                      party has reached them.
+                    </p>
+                  </div>
+                  <Badge>{travel?.waypoints.length ?? 0} landmarks</Badge>
+                </div>
+                {travel?.waypoints.length ? (
+                  <div className="travel-waypoint-list">
+                    {travel.waypoints.map((waypoint) => (
+                      <div
+                        key={waypoint.id}
+                        className={`travel-waypoint ${waypoint.reached ? "is-reached" : ""}`}
+                      >
+                        <span className="travel-waypoint-dot" />
+                        <div className="grow">
+                          <div className="row wrap" style={{ gap: 7 }}>
+                            <strong>{waypoint.name}</strong>
+                            <Tag tone={waypoint.reached ? "green" : "neutral"}>
+                              {waypoint.reached ? "Reached" : `${waypoint.miles} mi`}
+                            </Tag>
+                            <Tag tone={waypoint.visible ? "blue" : "gold"}>
+                              {waypoint.visible ? "Shared" : "Hidden"}
+                            </Tag>
+                          </div>
+                          {waypoint.description ? (
+                            <p className="tiny muted">{waypoint.description}</p>
+                          ) : null}
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          icon={<Trash2 size={13} />}
+                          loading={busy === `waypoint-${waypoint.id}`}
+                          onClick={() => void deleteWaypoint(waypoint)}
+                        >
+                          Remove
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="muted small">No landmarks on this route yet.</p>
+                )}
+                <div className="travel-waypoint-form">
+                  <Field label="Waypoint name">
+                    <Input
+                      value={waypointName}
+                      onChange={(event) => setWaypointName(event.target.value)}
+                      placeholder="The Broken Bridge"
+                    />
+                  </Field>
+                  <Field label="Miles from origin">
+                    <Input
+                      type="number"
+                      min={0}
+                      step={0.5}
+                      value={waypointMiles}
+                      onChange={(event) => setWaypointMiles(event.target.value)}
+                      placeholder={String(travel?.progressMiles ?? 0)}
+                    />
+                  </Field>
+                  <Field label="Waypoint notes">
+                    <Input
+                      value={waypointDescription}
+                      onChange={(event) => setWaypointDescription(event.target.value)}
+                      placeholder="What the party can see or learn here"
+                    />
+                  </Field>
+                  <div className="travel-waypoint-add">
+                    <Checkbox
+                      label="Share this waypoint with players"
+                      checked={waypointVisible}
+                      onChange={setWaypointVisible}
+                    />
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      icon={<Plus size={14} />}
+                      loading={busy === "waypoint"}
+                      disabled={!travel || busy !== null}
+                      onClick={() => void addWaypoint()}
+                    >
+                      Add waypoint
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="travel-encounter-editor">
+                <div>
+                  <PageEyebrow>Encounter check</PageEyebrow>
+                  <p className="tiny muted">
+                    Roll a d20 against the current threshold. Terrain and weather make encounters
+                    more likely; a result at or above the threshold is an encounter.
+                  </p>
+                </div>
+                <div className="row wrap" style={{ gap: 8 }}>
+                  <Select
+                    aria-label="Encounter watch"
+                    value={checkWatch}
+                    onChange={(event) => setCheckWatch(event.target.value)}
+                  >
+                    {TRAVEL_WATCH_KEYS.map((key, index) => (
+                      <option key={key} value={String(index + 1)}>
+                        {TRAVEL_WATCH_LABELS[key]}
+                      </option>
+                    ))}
+                  </Select>
+                  <Input
+                    aria-label="Encounter note"
+                    value={checkNote}
+                    onChange={(event) => setCheckNote(event.target.value)}
+                    placeholder="Optional context"
+                    style={{ maxWidth: 280 }}
+                  />
+                  <Badge tone="gold">
+                    Encounter on {travelEncounterDc(travel?.terrain, travel?.weather)}+
+                  </Badge>
+                  <Button
+                    variant="secondary"
+                    icon={<Dices size={15} />}
+                    loading={busy === "check"}
+                    disabled={!travel || busy !== null}
+                    onClick={() => void checkForEncounter()}
+                  >
+                    Check for encounter
+                  </Button>
+                </div>
+                {travel?.encounterChecks?.length ? (
+                  <div className="travel-check-list">
+                    {travel.encounterChecks.slice(0, 6).map((check) => (
+                      <div key={check.id} className="travel-check">
+                        <div className="row wrap" style={{ gap: 7 }}>
+                          <Tag tone={check.encounter ? "red" : "green"}>
+                            {check.encounter ? "Encounter" : "Clear"}
+                          </Tag>
+                          <strong>
+                            Day {check.day} · watch {check.watch}
+                          </strong>
+                          <span className="tiny muted">
+                            d20 {check.roll} vs {check.dc}+
+                          </span>
+                        </div>
+                        {check.note ? <p className="tiny muted">{check.note}</p> : null}
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+
               <div className="travel-watch-editor">
                 <div className="row-between">
                   <div>
@@ -623,6 +871,37 @@ export function TravelTab({
                     </div>
                   ))}
                 </div>
+              </Card>
+              <Card className="travel-map-card">
+                <PageEyebrow>Route map</PageEyebrow>
+                <h3>
+                  <Map size={17} /> Landmarks
+                </h3>
+                {travel.waypoints.length ? (
+                  <div className="travel-waypoint-list">
+                    {travel.waypoints.map((waypoint) => (
+                      <div
+                        key={waypoint.id}
+                        className={`travel-waypoint ${waypoint.reached ? "is-reached" : ""}`}
+                      >
+                        <span className="travel-waypoint-dot" />
+                        <div className="grow">
+                          <div className="row wrap" style={{ gap: 7 }}>
+                            <strong>{waypoint.name}</strong>
+                            <Tag tone={waypoint.reached ? "green" : "neutral"}>
+                              {waypoint.reached ? "Reached" : `${waypoint.miles} mi`}
+                            </Tag>
+                          </div>
+                          {waypoint.description ? (
+                            <p className="tiny muted">{waypoint.description}</p>
+                          ) : null}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="muted small">No landmarks have been shared yet.</p>
+                )}
               </Card>
             </div>
           ) : null}

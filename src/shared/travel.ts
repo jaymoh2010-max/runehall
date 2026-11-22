@@ -1,8 +1,10 @@
 import type {
   CampaignTravel,
+  TravelEncounterCheck,
   TravelTerrain,
   TravelStatus,
   TravelWatches,
+  TravelWaypoint,
   TravelWeather,
 } from "./types";
 
@@ -243,4 +245,79 @@ export function travelWatchMembers(
 
 export function travelIsActive(travel: CampaignTravel | null): boolean {
   return Boolean(travel && travel.status === "traveling");
+}
+
+function limitedText(value: unknown, max: number): string {
+  return typeof value === "string" ? value.trim().slice(0, max) : "";
+}
+
+export function normalizeTravelWaypoints(value: unknown): TravelWaypoint[] {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set<string>();
+  const waypoints: TravelWaypoint[] = [];
+  for (const raw of value.slice(0, 50)) {
+    if (!raw || typeof raw !== "object") continue;
+    const entry = raw as Record<string, unknown>;
+    const name = limitedText(entry.name, 120);
+    if (!name) continue;
+    const id = limitedText(entry.id, 80) || `waypoint_${waypoints.length + 1}`;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    waypoints.push({
+      id,
+      name,
+      miles: normalizeTravelMiles(entry.miles),
+      description: limitedText(entry.description, 2_000),
+      visible: entry.visible !== false,
+      reached: entry.reached === true,
+    });
+  }
+  return waypoints.sort((a, b) => a.miles - b.miles || a.name.localeCompare(b.name));
+}
+
+export function normalizeTravelEncounterChecks(value: unknown): TravelEncounterCheck[] {
+  if (!Array.isArray(value)) return [];
+  const checks: TravelEncounterCheck[] = [];
+  for (const raw of value.slice(0, 100)) {
+    if (!raw || typeof raw !== "object") continue;
+    const entry = raw as Record<string, unknown>;
+    const roll = Number(entry.roll);
+    const dc = Number(entry.dc);
+    if (!Number.isFinite(roll) || roll < 1 || roll > 20) continue;
+    if (!Number.isFinite(dc) || dc < 2 || dc > 20) continue;
+    checks.push({
+      id: limitedText(entry.id, 80) || `check_${checks.length + 1}`,
+      day: Math.round(clampNumber(entry.day, 0, 0, 100_000)),
+      watch: Math.round(clampNumber(entry.watch, 1, 1, 4)),
+      roll: Math.round(roll),
+      dc: Math.round(dc),
+      encounter: entry.encounter === true,
+      terrain: normalizeTravelTerrain(entry.terrain),
+      weather: normalizeTravelWeather(entry.weather),
+      note: limitedText(entry.note, 500),
+      createdAt: Math.round(clampNumber(entry.createdAt, 0, 0, 8_640_000_000_000_000)),
+    });
+  }
+  return checks;
+}
+
+/**
+ * The d20 threshold for a random travel encounter. Worse terrain and weather
+ * lower the threshold, so encounters become more likely. A result at or above
+ * the threshold is an encounter.
+ */
+export function travelEncounterDc(terrain: unknown, weather: unknown): number {
+  const base = { normal: 16, difficult: 14, "greater-difficult": 12 }[
+    normalizeTravelTerrain(terrain)
+  ];
+  const penalty = {
+    clear: 0,
+    rain: 1,
+    snow: 2,
+    storm: 3,
+    fog: 2,
+    heat: 1,
+    cold: 1,
+  }[normalizeTravelWeather(weather)];
+  return Math.max(5, Math.min(20, base - penalty));
 }

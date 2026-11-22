@@ -1,4 +1,5 @@
 import type { FastifyInstance } from "fastify";
+import { randomInt } from "node:crypto";
 import { getCampaign, getCampaignRole } from "../access";
 import { db, transaction, type CampaignTravelRow } from "../db";
 import { serializeCampaignTravel, touchCampaign } from "../serialize";
@@ -6,16 +7,19 @@ import { broadcastCampaignSummary } from "../campaignEvents";
 import { shiftGolarionDate } from "../../shared/calendar";
 import {
   normalizeTravelActivities,
+  normalizeTravelEncounterChecks,
   normalizeTravelMiles,
   normalizeTravelSpeed,
   normalizeTravelTerrain,
   normalizeTravelWatches,
+  normalizeTravelWaypoints,
   normalizeTravelWeather,
+  travelEncounterDc,
   travelMilesPerDay,
 } from "../../shared/travel";
-import type { CampaignTravelState } from "../../shared/types";
+import type { CampaignTravelState, TravelEncounterCheck } from "../../shared/types";
 import { logAudit } from "../audit";
-import { now, parseJson, safeInt, safeString, sanitizeUserText } from "../util";
+import { newId, now, parseJson, safeInt, safeString, sanitizeUserText } from "../util";
 
 function travelRow(campaignId: string): CampaignTravelRow | null {
   return (
@@ -47,10 +51,12 @@ function suggestedTravelSpeed(campaignId: string): number {
   return slowest ? normalizeTravelSpeed(slowest) : 25;
 }
 
-function travelState(campaignId: string): CampaignTravelState {
+function travelState(campaignId: string, privateView = false): CampaignTravelState {
   const row = travelRow(campaignId);
   return {
-    travel: row ? serializeCampaignTravel(row, campaignCharacterIds(campaignId)) : null,
+    travel: row
+      ? serializeCampaignTravel(row, campaignCharacterIds(campaignId), privateView)
+      : null,
     suggestedSpeed: suggestedTravelSpeed(campaignId),
   };
 }
@@ -64,7 +70,7 @@ export async function registerTravelRoutes(app: FastifyInstance): Promise<void> 
     if (!getCampaignRole(id, request.user.id)) {
       return reply.code(403).send({ error: "You are not a member of this campaign." });
     }
-    return reply.send(travelState(id));
+    return reply.send(travelState(id, getCampaignRole(id, request.user.id) === "gm"));
   });
 
   app.put("/api/campaigns/:id/travel", async (request, reply) => {
@@ -160,7 +166,7 @@ export async function registerTravelRoutes(app: FastifyInstance): Promise<void> 
     });
     const updated = getCampaign(id)!;
     broadcastCampaignSummary(app, updated);
-    return reply.send(travelState(id));
+    return reply.send(travelState(id, true));
   });
 
   app.post("/api/campaigns/:id/travel/advance", async (request, reply) => {
@@ -217,8 +223,120 @@ export async function registerTravelRoutes(app: FastifyInstance): Promise<void> 
     const updated = getCampaign(id)!;
     broadcastCampaignSummary(app, updated);
     return reply.send({
-      travel: serializeCampaignTravel(travelRow(id)!, campaignCharacterIds(id)),
+      travel: serializeCampaignTravel(travelRow(id)!, campaignCharacterIds(id), true),
       worldDate,
+    });
+  });
+
+  app.post("/api/campaigns/:id/travel/waypoints", async (request, reply) => {
+    if (!request.user) return reply.code(401).send({ error: "Sign in to continue." });
+    const { id } = request.params as { id: string };
+    const campaign = getCampaign(id);
+    if (!campaign) return reply.code(404).send({ error: "Campaign not found." });
+    if (getCampaignRole(id, request.user.id) !== "gm") {
+      return reply.code(403).send({ error: "Only the GM can edit the route map." });
+    }
+    const row = travelRow(id);
+    if (!row) return reply.code(400).send({ error: "Set up a journey first." });
+    const body = (request.body ?? {}) as Record<string, unknown>;
+    const name = safeString(body.name, "", 120);
+    if (!name) return reply.code(400).send({ error: "Give the waypoint a name." });
+    const waypoints = normalizeTravelWaypoints(parseJson(row.waypoints, []));
+    if (waypoints.length >= 50) {
+      return reply.code(400).send({ error: "A journey can hold at most 50 waypoints." });
+    }
+    waypoints.push({
+      id: newId("waypoint"),
+      name,
+      miles: normalizeTravelMiles(body.miles, normalizeTravelMiles(row.progress_miles)),
+      description: sanitizeUserText(body.description, 2_000),
+      visible: body.visible !== false,
+      reached: false,
+    });
+    db.prepare(
+      "UPDATE campaign_travel SET waypoints = ?, updated_at = ? WHERE campaign_id = ?"
+    ).run(
+      JSON.stringify(
+        normalizeTravelWaypoints(waypoints).map(({ reached: _reached, ...entry }) => entry)
+      ),
+      now(),
+      id
+    );
+    touchCampaign(id);
+    const updated = getCampaign(id)!;
+    broadcastCampaignSummary(app, updated);
+    return reply.code(201).send(travelState(id, true));
+  });
+
+  app.delete("/api/campaigns/:id/travel/waypoints/:waypointId", async (request, reply) => {
+    if (!request.user) return reply.code(401).send({ error: "Sign in to continue." });
+    const { id, waypointId } = request.params as { id: string; waypointId: string };
+    const campaign = getCampaign(id);
+    if (!campaign) return reply.code(404).send({ error: "Campaign not found." });
+    if (getCampaignRole(id, request.user.id) !== "gm") {
+      return reply.code(403).send({ error: "Only the GM can edit the route map." });
+    }
+    const row = travelRow(id);
+    if (!row) return reply.code(400).send({ error: "Set up a journey first." });
+    const waypoints = normalizeTravelWaypoints(parseJson(row.waypoints, []));
+    const next = waypoints.filter((waypoint) => waypoint.id !== waypointId);
+    if (next.length === waypoints.length) {
+      return reply.code(404).send({ error: "Waypoint not found." });
+    }
+    db.prepare(
+      "UPDATE campaign_travel SET waypoints = ?, updated_at = ? WHERE campaign_id = ?"
+    ).run(JSON.stringify(next.map(({ reached: _reached, ...entry }) => entry)), now(), id);
+    touchCampaign(id);
+    const updated = getCampaign(id)!;
+    broadcastCampaignSummary(app, updated);
+    return reply.send(travelState(id, true));
+  });
+
+  app.post("/api/campaigns/:id/travel/check", async (request, reply) => {
+    if (!request.user) return reply.code(401).send({ error: "Sign in to continue." });
+    const { id } = request.params as { id: string };
+    const campaign = getCampaign(id);
+    if (!campaign) return reply.code(404).send({ error: "Campaign not found." });
+    if (getCampaignRole(id, request.user.id) !== "gm") {
+      return reply.code(403).send({ error: "Only the GM can check for encounters." });
+    }
+    const row = travelRow(id);
+    if (!row) return reply.code(400).send({ error: "Set up a journey first." });
+    const body = (request.body ?? {}) as Record<string, unknown>;
+    const checks = normalizeTravelEncounterChecks(parseJson(row.encounter_checks, []));
+    const terrain = normalizeTravelTerrain(row.terrain);
+    const weather = normalizeTravelWeather(row.weather);
+    const dc = travelEncounterDc(terrain, weather);
+    const roll = randomInt(1, 21);
+    const check: TravelEncounterCheck = {
+      id: newId("travel-check"),
+      day: Math.max(1, Math.round(row.days_travelled) + 1),
+      watch: safeInt(body.watch, 1, 1, 4),
+      roll,
+      dc,
+      encounter: roll >= dc,
+      terrain,
+      weather,
+      note: sanitizeUserText(body.note, 500),
+      createdAt: now(),
+    };
+    db.prepare(
+      "UPDATE campaign_travel SET encounter_checks = ?, updated_at = ? WHERE campaign_id = ?"
+    ).run(JSON.stringify([check, ...checks].slice(0, 100)), now(), id);
+    touchCampaign(id);
+    logAudit({
+      action: "campaign.travel_check",
+      actor: request.user,
+      targetType: "campaign",
+      targetId: id,
+      detail: `Day ${check.day} watch ${check.watch}: ${roll} vs ${dc} (${check.encounter ? "encounter" : "clear"})`,
+      request,
+    });
+    const updated = getCampaign(id)!;
+    broadcastCampaignSummary(app, updated);
+    return reply.send({
+      check,
+      travel: serializeCampaignTravel(travelRow(id)!, campaignCharacterIds(id), true),
     });
   });
 
@@ -242,6 +360,6 @@ export async function registerTravelRoutes(app: FastifyInstance): Promise<void> 
     });
     const updated = getCampaign(id)!;
     broadcastCampaignSummary(app, updated);
-    return reply.send(travelState(id));
+    return reply.send(travelState(id, true));
   });
 }

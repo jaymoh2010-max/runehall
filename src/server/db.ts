@@ -161,6 +161,8 @@ export interface CampaignTravelRow {
   notes: string;
   watches: string;
   activities: string;
+  waypoints: string;
+  encounter_checks: string;
   days_travelled: number;
   created_at: number;
   updated_at: number;

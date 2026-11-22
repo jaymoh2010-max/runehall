@@ -9,8 +9,11 @@ import {
   normalizeTravelSpeed,
   normalizeTravelTerrain,
   normalizeTravelWatches,
+  normalizeTravelWaypoints,
+  normalizeTravelEncounterChecks,
   normalizeTravelWeather,
   travelDaysRemaining,
+  travelEncounterDc,
   travelMilesPerDay,
   travelStatus,
 } from "../src/shared/travel";
@@ -95,5 +98,58 @@ describe("travel normalization", () => {
     expect(explorationActivityLabel("track")).toBe("Track");
     expect(explorationActivityLabel("unknown")).toBe("None");
     expect(EXPLORATION_ACTIVITIES.map((entry) => entry.id)).toContain("search");
+  });
+});
+
+describe("travel waypoints and encounter checks", () => {
+  it("sorts waypoints by miles and drops nameless entries", () => {
+    const waypoints = normalizeTravelWaypoints([
+      { id: "b", name: "The Ford", miles: 12, visible: false },
+      { id: "a", name: "Old Milestone", miles: 3 },
+      { id: "bad", name: "", miles: 1 },
+      { name: "The Inn", miles: "7.5", description: "Warm beds." },
+    ]);
+    expect(waypoints.map((entry) => entry.name)).toEqual(["Old Milestone", "The Inn", "The Ford"]);
+    expect(waypoints[0].miles).toBe(3);
+    expect(waypoints[1].miles).toBe(7.5);
+    expect(waypoints[2].visible).toBe(false);
+    expect(normalizeTravelWaypoints("not-an-array")).toEqual([]);
+  });
+
+  it("normalizes encounter checks and keeps the d20 range", () => {
+    const checks = normalizeTravelEncounterChecks([
+      {
+        id: "check_1",
+        day: 2,
+        watch: 9,
+        roll: 17,
+        dc: 14,
+        encounter: true,
+        terrain: "difficult",
+        weather: "rain",
+        note: "A patrol blocks the road.",
+        createdAt: 1234,
+      },
+      { id: "bad", day: 1, watch: 1, roll: 0, dc: 10 },
+    ]);
+    expect(checks).toHaveLength(1);
+    expect(checks[0]).toMatchObject({
+      id: "check_1",
+      watch: 4,
+      roll: 17,
+      dc: 14,
+      encounter: true,
+      terrain: "difficult",
+      weather: "rain",
+    });
+    expect(normalizeTravelEncounterChecks(null)).toEqual([]);
+  });
+
+  it("lowers the encounter threshold for worse terrain and weather", () => {
+    expect(travelEncounterDc("normal", "clear")).toBe(16);
+    expect(travelEncounterDc("difficult", "rain")).toBe(13);
+    expect(travelEncounterDc("greater-difficult", "storm")).toBe(9);
+    expect(travelEncounterDc("normal", "fog")).toBe(14);
+    expect(travelEncounterDc("unknown", "unknown")).toBe(16);
   });
 });
