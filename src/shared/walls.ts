@@ -19,6 +19,7 @@ export function normalizeWall(value: unknown): Wall | null {
     x2: finite(record.x2),
     y2: finite(record.y2),
     kind,
+    hidden: record.hidden === true,
   };
   if (kind === "door") wall.open = record.open === true;
   return wall;

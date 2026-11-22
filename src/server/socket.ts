@@ -1182,7 +1182,13 @@ export function registerSocketServer(io: TypedServer): void {
         now(),
         sceneId
       );
-      io.to(room(campaignId)).emit("scene:templates", { sceneId, templates });
+      io.to(room(campaignId))
+        .except(gmRoom(campaignId))
+        .emit("scene:templates", {
+          sceneId,
+          templates: templates.filter((entry) => !entry.hidden),
+        });
+      io.to(gmRoom(campaignId)).emit("scene:templates", { sceneId, templates });
       touchCampaign(campaignId);
     });
 
@@ -1214,7 +1220,13 @@ export function registerSocketServer(io: TypedServer): void {
         now(),
         sceneId
       );
-      io.to(room(campaignId)).emit("scene:walls", { sceneId, walls: normalized });
+      io.to(room(campaignId))
+        .except(gmRoom(campaignId))
+        .emit("scene:walls", {
+          sceneId,
+          walls: normalized.filter((wall) => !wall.hidden),
+        });
+      io.to(gmRoom(campaignId)).emit("scene:walls", { sceneId, walls: normalized });
       touchCampaign(campaignId);
     });
 

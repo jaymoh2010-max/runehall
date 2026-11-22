@@ -1309,6 +1309,8 @@ export interface Wall {
   kind: WallKind;
   /** Only meaningful for doors. Open doors no longer block sight. */
   open?: boolean;
+  /** GM-only wall: excluded from player snapshots and player line of sight. */
+  hidden: boolean;
 }
 
 export type AmbientLight = "bright" | "dim" | "darkness";

@@ -20,6 +20,7 @@ const wall = (overrides: Partial<Wall> = {}): Wall => ({
   x2: 100,
   y2: 100,
   kind: "wall",
+  hidden: false,
   ...overrides,
 });
 
@@ -36,13 +37,13 @@ describe("walls", () => {
     expect(
       normalizeWalls([
         { id: "w1", x1: 0, y1: 0, x2: 70, y2: 0, kind: "wall" },
-        { id: "d1", x1: 70, y1: 0, x2: 140, y2: 0, kind: "door", open: true },
+        { id: "d1", x1: 70, y1: 0, x2: 140, y2: 0, kind: "door", open: true, hidden: true },
         { id: "d1", x1: 1, y1: 1, x2: 2, y2: 2, kind: "door" },
         { id: "", x1: 0, y1: 0, x2: 1, y2: 1, kind: "wall" },
       ])
     ).toEqual([
-      { id: "w1", x1: 0, y1: 0, x2: 70, y2: 0, kind: "wall" },
-      { id: "d1", x1: 70, y1: 0, x2: 140, y2: 0, kind: "door", open: true },
+      { id: "w1", x1: 0, y1: 0, x2: 70, y2: 0, kind: "wall", hidden: false },
+      { id: "d1", x1: 70, y1: 0, x2: 140, y2: 0, kind: "door", open: true, hidden: true },
     ]);
   });
 

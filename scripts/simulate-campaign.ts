@@ -1492,6 +1492,127 @@ async function runCampaignA(gm: Account, players: Account[]): Promise<void> {
 
   await check(
     campaignName,
+    "hidden walls and templates are filtered from player snapshots and live updates",
+    async () => {
+      const visibleWall = {
+        id: "wall_visible",
+        x1: 0,
+        y1: 0,
+        x2: 100,
+        y2: 0,
+        kind: "wall",
+        hidden: false,
+      };
+      const hiddenWall = {
+        id: "wall_hidden",
+        x1: 0,
+        y1: 40,
+        x2: 100,
+        y2: 40,
+        kind: "wall",
+        hidden: true,
+      };
+      const playerWallEvent = waitForEvent<Json>(
+        playerSocket,
+        "scene:walls",
+        (payload) => payload.sceneId === sceneId,
+        4_000
+      );
+      const gmWallEvent = waitForEvent<Json>(
+        gmSocket,
+        "scene:walls",
+        (payload) => payload.sceneId === sceneId,
+        4_000
+      );
+      gmSocket.emit("scene:walls", {
+        campaignId,
+        sceneId,
+        walls: [visibleWall, hiddenWall],
+      });
+      const [playerWalls, gmWalls] = await Promise.all([playerWallEvent, gmWallEvent]);
+      assertEqual(playerWalls.walls.length, 1, "Player visible wall count");
+      assertEqual(playerWalls.walls[0].id, "wall_visible", "Player visible wall");
+      assertEqual(gmWalls.walls.length, 2, "GM wall count");
+      const playerWallsTable = await getTable(campaignId, players[0].cookie);
+      assertEqual(
+        (playerWallsTable.scenes as Json[]).find((scene) => scene.id === sceneId)?.walls.length,
+        1,
+        "Player snapshot wall count"
+      );
+      const gmWallsTable = await getTable(campaignId, gm.cookie);
+      assertEqual(
+        (gmWallsTable.scenes as Json[]).find((scene) => scene.id === sceneId)?.walls.length,
+        2,
+        "GM snapshot wall count"
+      );
+
+      const clearedTemplates = waitForEvent<Json>(
+        gmSocket,
+        "scene:templates",
+        (payload) => payload.sceneId === sceneId && payload.templates.length === 0,
+        4_000
+      );
+      gmSocket.emit("template:clear", { campaignId, sceneId });
+      await clearedTemplates;
+
+      const visibleTemplate = {
+        kind: "burst",
+        size: 20,
+        x: 120,
+        y: 120,
+        direction: 0,
+        hidden: false,
+      };
+      const hiddenTemplate = {
+        kind: "cone",
+        size: 15,
+        x: 220,
+        y: 120,
+        direction: 0,
+        hidden: true,
+      };
+      const playerTemplateEvent = waitForEvent<Json>(
+        playerSocket,
+        "scene:templates",
+        (payload) => payload.sceneId === sceneId && payload.templates.length === 1,
+        4_000
+      );
+      const gmTemplateEvent = waitForEvent<Json>(
+        gmSocket,
+        "scene:templates",
+        (payload) => payload.sceneId === sceneId && payload.templates.length === 2,
+        4_000
+      );
+      gmSocket.emit("template:add", { campaignId, sceneId, template: hiddenTemplate });
+      gmSocket.emit("template:add", { campaignId, sceneId, template: visibleTemplate });
+      const [playerTemplates, gmTemplates] = await Promise.all([
+        playerTemplateEvent,
+        gmTemplateEvent,
+      ]);
+      assertEqual(playerTemplates.templates.length, 1, "Player visible template count");
+      assertEqual(playerTemplates.templates[0].hidden, false, "Player visible template");
+      assertEqual(gmTemplates.templates.length, 2, "GM template count");
+      const playerTemplatesTable = await getTable(campaignId, players[0].cookie);
+      assertEqual(
+        (playerTemplatesTable.scenes as Json[]).find((scene) => scene.id === sceneId)?.templates
+          .length,
+        1,
+        "Player snapshot template count"
+      );
+      const gmTemplatesTable = await getTable(campaignId, gm.cookie);
+      assertEqual(
+        (gmTemplatesTable.scenes as Json[]).find((scene) => scene.id === sceneId)?.templates.length,
+        2,
+        "GM snapshot template count"
+      );
+
+      gmSocket.emit("scene:walls", { campaignId, sceneId, walls: [] });
+      gmSocket.emit("template:clear", { campaignId, sceneId });
+    }
+  );
+
+  await check(
+    campaignName,
     "player can move an owned token but not another player's token",
     async () => {
       const owned = tokens.get(heroes[0].id)!;

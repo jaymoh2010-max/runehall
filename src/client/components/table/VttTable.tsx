@@ -108,6 +108,7 @@ export function VttTable({ initial, campaignId, user, isGm, active }: VttTablePr
   const [measureMode, setMeasureMode] = useState(false);
   const [wallMode, setWallMode] = useState(false);
   const [wallKind, setWallKind] = useState<WallKind>("wall");
+  const [wallHidden, setWallHidden] = useState(false);
   const [propMode, setPropMode] = useState(false);
   const [propPaletteOpen, setPropPaletteOpen] = useState(false);
   const [propLayer, setPropLayer] = useState<ScenePropLayer>("ground");
@@ -119,6 +120,7 @@ export function VttTable({ initial, campaignId, user, isGm, active }: VttTablePr
   const [bestiaryOpen, setBestiaryOpen] = useState(false);
   const [templateKind, setTemplateKind] = useState<TemplateKind | null>(null);
   const [templateSize, setTemplateSize] = useState(20);
+  const [templateHidden, setTemplateHidden] = useState(false);
   const [previewSceneId, setPreviewSceneId] = useState<string | null>(null);
   const [leftOpen, setLeftOpen] = useState(true);
   const [rightOpen, setRightOpen] = useState(true);
@@ -925,6 +927,8 @@ export function VttTable({ initial, campaignId, user, isGm, active }: VttTablePr
         setWallMode={enterWallMode}
         wallKind={wallKind}
         setWallKind={setWallKind}
+        wallHidden={wallHidden}
+        setWallHidden={setWallHidden}
         onClearWalls={clearWalls}
         propMode={propMode}
         setPropMode={enterPropMode}
@@ -937,6 +941,8 @@ export function VttTable({ initial, campaignId, user, isGm, active }: VttTablePr
           setSelectedPropId(null);
           setBestiaryOpen(next);
         }}
+        templateHidden={templateHidden}
+        setTemplateHidden={setTemplateHidden}
         templateKind={templateKind}
         setTemplateKind={(next) => {
           setWallMode(false);
@@ -1040,6 +1046,7 @@ export function VttTable({ initial, campaignId, user, isGm, active }: VttTablePr
             measureMode={measureMode}
             wallMode={previewing ? false : wallMode}
             wallKind={wallKind}
+            wallHidden={wallHidden}
             onWalls={saveWalls}
             previewMode={previewing}
             propMode={previewing ? false : propMode}
@@ -1055,6 +1062,7 @@ export function VttTable({ initial, campaignId, user, isGm, active }: VttTablePr
             onDropMonster={previewing ? undefined : placeMonster}
             templateKind={previewing ? null : templateKind}
             templateSize={templateSize}
+            templateHidden={templateHidden}
             onTemplate={placeTemplate}
           />
           {isGm && bestiaryOpen ? (

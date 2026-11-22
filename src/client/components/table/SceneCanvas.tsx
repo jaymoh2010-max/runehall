@@ -78,6 +78,7 @@ interface SceneCanvasProps {
   measureMode: boolean;
   wallMode: boolean;
   wallKind: WallKind;
+  wallHidden: boolean;
   onWalls: (walls: Wall[]) => void;
   previewMode?: boolean;
   propMode: boolean;
@@ -91,6 +92,7 @@ interface SceneCanvasProps {
   onDropMonster?: (monster: Monster, count: number, x: number, y: number) => void;
   templateKind: TemplateKind | null;
   templateSize: number;
+  templateHidden: boolean;
   onTemplate: (template: AoeTemplate) => void;
 }
 
@@ -119,6 +121,7 @@ export function SceneCanvas({
   measureMode,
   wallMode,
   wallKind,
+  wallHidden,
   onWalls,
   previewMode = false,
   propMode,
@@ -132,6 +135,7 @@ export function SceneCanvas({
   onDropMonster,
   templateKind,
   templateSize,
+  templateHidden,
   onTemplate,
 }: SceneCanvasProps) {
   const viewportRef = useRef<HTMLDivElement>(null);
@@ -654,9 +658,16 @@ export function SceneCanvas({
       if (screenDistance < 6) {
         const point = scenePoint(event.clientX, event.clientY);
         const hit = nearestWall(scene.walls, point.x, point.y, 10 / Math.max(zoom, 0.4));
-        if (hit?.kind === "door") {
+        if (hit) {
+          const toggleHidden = hit.kind !== "door" || event.shiftKey;
           onWalls(
-            scene.walls.map((wall) => (wall.id === hit.id ? { ...wall, open: !wall.open } : wall))
+            scene.walls.map((wall) =>
+              wall.id === hit.id
+                ? toggleHidden
+                  ? { ...wall, hidden: !wall.hidden }
+                  : { ...wall, open: !wall.open }
+                : wall
+            )
           );
         }
         return;
@@ -671,6 +682,7 @@ export function SceneCanvas({
         x2: end.x,
         y2: end.y,
         kind: wallKind,
+        hidden: wallHidden,
         ...(wallKind === "door" ? { open: false } : {}),
       };
       onWalls([...scene.walls, wall].slice(-500));
@@ -687,6 +699,7 @@ export function SceneCanvas({
           x: draft.x,
           y: draft.y,
           direction: draft.direction,
+          hidden: templateHidden,
         });
       }
       viewportRef.current?.releasePointerCapture(event.pointerId);
@@ -973,6 +986,9 @@ export function SceneCanvas({
   const renderTemplate = (value: AoeTemplate, draft = false): ReactElement => {
     const radius = templateRadiusPx(value.size, scene.gridSize);
     const fill = draft ? "rgba(240,217,168,0.2)" : "rgba(200,169,107,0.14)";
+    const hiddenDash = value.hidden
+      ? `${6 / Math.max(zoom, 0.4)} ${4 / Math.max(zoom, 0.4)}`
+      : undefined;
     if (value.kind === "burst" || value.kind === "emanation") {
       return (
         <circle
@@ -982,6 +998,8 @@ export function SceneCanvas({
           fill={fill}
           stroke="#e5ca91"
           strokeWidth={templateStroke}
+          strokeDasharray={hiddenDash}
+          opacity={value.hidden ? 0.55 : 1}
         />
       );
     }
@@ -999,6 +1017,8 @@ export function SceneCanvas({
           fill={fill}
           stroke="#e5ca91"
           strokeWidth={templateStroke}
+          strokeDasharray={hiddenDash}
+          opacity={value.hidden ? 0.55 : 1}
         />
       );
     }
@@ -1013,13 +1033,18 @@ export function SceneCanvas({
         fill={fill}
         stroke="#e5ca91"
         strokeWidth={templateStroke}
+        strokeDasharray={hiddenDash}
+        opacity={value.hidden ? 0.55 : 1}
       />
     );
   };
   const draftTemplate: AoeTemplate | null =
     templateDraft && templateKind
-      ? { kind: templateKind, size: templateSize, ...templateDraft }
+      ? { kind: templateKind, size: templateSize, hidden: templateHidden, ...templateDraft }
       : null;
+  const visibleTemplates = isGm
+    ? scene.templates
+    : scene.templates.filter((entry) => !entry.hidden);
   const coverObserver = selectedTokenId
     ? (tokens.find((token) => token.id === selectedTokenId) ?? null)
     : null;
@@ -1275,14 +1300,25 @@ export function SceneCanvas({
                   y1={wall.y1}
                   x2={wall.x2}
                   y2={wall.y2}
-                  className={`wall-line ${wall.kind} ${open ? "is-open" : ""}`}
-                  stroke={open ? "#7fbe95" : wall.kind === "door" ? "#d08a5a" : "#e5ca91"}
+                  className={`wall-line ${wall.kind} ${open ? "is-open" : ""} ${wall.hidden ? "is-hidden" : ""}`}
+                  stroke={
+                    wall.hidden
+                      ? "#b58ad6"
+                      : open
+                        ? "#7fbe95"
+                        : wall.kind === "door"
+                          ? "#d08a5a"
+                          : "#e5ca91"
+                  }
                   strokeWidth={3 / Math.max(zoom, 0.4)}
                   strokeDasharray={
-                    wall.kind === "door"
-                      ? `${8 / Math.max(zoom, 0.4)} ${5 / Math.max(zoom, 0.4)}`
-                      : undefined
+                    wall.hidden
+                      ? `${5 / Math.max(zoom, 0.4)} ${4 / Math.max(zoom, 0.4)}`
+                      : wall.kind === "door"
+                        ? `${8 / Math.max(zoom, 0.4)} ${5 / Math.max(zoom, 0.4)}`
+                        : undefined
                   }
+                  opacity={wall.hidden ? 0.65 : 1}
                   strokeLinecap="round"
                 />
               );
@@ -1293,18 +1329,19 @@ export function SceneCanvas({
                 y1={wallDraft.y1}
                 x2={wallDraft.x2}
                 y2={wallDraft.y2}
-                className="wall-line is-draft"
-                stroke="#f0d9a8"
+                className={`wall-line is-draft ${wallHidden ? "is-hidden" : ""}`}
+                stroke={wallHidden ? "#b58ad6" : "#f0d9a8"}
                 strokeWidth={2.5 / Math.max(zoom, 0.4)}
                 strokeDasharray={`${7 / Math.max(zoom, 0.4)} ${5 / Math.max(zoom, 0.4)}`}
+                opacity={wallHidden ? 0.7 : 1}
                 strokeLinecap="round"
               />
             ) : null}
           </svg>
         ) : null}
-        {scene.templates.length || draftTemplate ? (
+        {visibleTemplates.length || draftTemplate ? (
           <svg className="template-layer" width={scene.width} height={scene.height}>
-            {scene.templates.map((entry, index) => (
+            {visibleTemplates.map((entry, index) => (
               <g key={`${entry.kind}-${index}`}>{renderTemplate(entry)}</g>
             ))}
             {draftTemplate ? (
@@ -1404,13 +1441,15 @@ export function SceneCanvas({
         ) : null}
         {templateKind ? (
           <Tag tone="gold">
-            <Move size={11} /> {TEMPLATE_LABELS[templateKind]} template · click and drag
+            <Move size={11} /> {TEMPLATE_LABELS[templateKind]} template
+            {templateHidden ? " · hidden" : ""} · click and drag
           </Tag>
         ) : null}
         {wallMode ? (
           <Tag tone="gold">
-            <Move size={11} /> {wallKind === "door" ? "Door" : "Wall"} · drag to draw · click a door
-            to open · right-click to delete
+            <Move size={11} /> {wallKind === "door" ? "Door" : "Wall"}
+            {wallHidden ? " · hidden" : ""} · drag to draw · click a door to open · shift-click a
+            door to hide · click a wall to hide/reveal · right-click to delete
           </Tag>
         ) : null}
         {propMode ? (
