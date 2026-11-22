@@ -221,7 +221,31 @@ export function ClassStep({
             type="button"
             key={cls.id}
             className={`selection-card ${draft.classId === cls.id ? "is-selected" : ""}`}
-            onClick={() =>
+            onClick={() => {
+              if (draft.classId === cls.id) return;
+              const clears = [
+                draft.keyAbility ? "key ability" : null,
+                Object.keys(draft.classChoices).length ? "class choices" : null,
+                Object.keys(draft.grantChoices).length ? "class option choices" : null,
+                draft.deityId || draft.deitySkill ? "deity" : null,
+                Object.keys(draft.feats.class).length ? "class feats" : null,
+                draft.spells.tradition ||
+                draft.spells.cantrips.length ||
+                draft.spells.known.length ||
+                draft.spells.prepared.length ||
+                Object.keys(draft.spells.preparedByRank).length ||
+                draft.spells.focus.length
+                  ? "spellcasting"
+                  : null,
+              ].filter(Boolean);
+              if (
+                clears.length &&
+                !window.confirm(
+                  `Change to ${cls.name}? This will clear: ${clears.join(", ")}. Other choices are kept.`
+                )
+              ) {
+                return;
+              }
               update((current) => {
                 if (current.classId === cls.id) return current;
                 return {
@@ -249,8 +273,8 @@ export function ClassStep({
                   },
                   feats: { ...current.feats, class: {} },
                 };
-              })
-            }
+              });
+            }}
           >
             <span className="selection-emblem">
               <Swords size={19} />

@@ -1318,7 +1318,6 @@ export function CharacterSheetPage() {
                 {option.name}
               </Tag>
             ))}
-            {context.classData ? <Tag>{context.classData.name}</Tag> : null}
           </div>
         </div>
         <div className="sheet-hero-stats">
@@ -1328,9 +1327,6 @@ export function CharacterSheetPage() {
             <span>/ {derived.maxHp}</span>
           </div>
           <div className="sheet-quick-stats">
-            <Stat label="AC" value={derived.ac} tone="gold" />
-            <Stat label="Perception" value={signed(derived.perception)} />
-            <Stat label="Initiative" value={signed(derived.initiative)} />
             <Stat label="Class DC" value={derived.classDc} />
             <Stat label="Speed" value={`${derived.speed} ft.`} />
             {(derived.otherSpeeds ?? []).map((entry) => (
@@ -1437,16 +1433,6 @@ export function CharacterSheetPage() {
                   {draft.play.shieldRaised ? "Shield raised" : "Shield down"}
                 </span>
                 <Shield size={14} />
-              </div>
-              <div className="roll-card is-static">
-                <span>Spell DC</span>
-                <strong>{derived.spellDc ?? "—"}</strong>
-                <span className="tiny muted">
-                  {caster.progression === "none"
-                    ? "No spellcasting"
-                    : `${derived.casterTradition || ""} caster`}
-                </span>
-                <Sparkles size={14} />
               </div>
             </div>
             {derived.shield ? (
@@ -1816,7 +1802,8 @@ export function CharacterSheetPage() {
               <h2>Inventory &amp; purse</h2>
               <span className="tiny muted">
                 {draft.equipment.length} {draft.equipment.length === 1 ? "stack" : "stacks"} ·{" "}
-                {derived.bulk.total} bulk · {formatCp(inventoryValue)} gear value
+                {derived.bulk.total} / {derived.bulk.capacity} bulk · {formatCp(inventoryValue)}{" "}
+                gear value
               </span>
             </div>
             <div className="sheet-purse">
@@ -2951,38 +2938,8 @@ export function CharacterSheetPage() {
           </Card>
 
           <Card className="sheet-meta-card">
-            <h3>Details</h3>
+            <h3>Traits</h3>
             <dl>
-              {context.ancestry ? (
-                <div>
-                  <dt>Ancestry</dt>
-                  <dd>{context.ancestry.name}</dd>
-                </div>
-              ) : null}
-              {context.heritage ? (
-                <div>
-                  <dt>Heritage</dt>
-                  <dd>{context.heritage.name}</dd>
-                </div>
-              ) : null}
-              {context.background ? (
-                <div>
-                  <dt>Background</dt>
-                  <dd>{context.background.name}</dd>
-                </div>
-              ) : null}
-              {classData ? (
-                <div>
-                  <dt>Class</dt>
-                  <dd>{classData.name}</dd>
-                </div>
-              ) : null}
-              {context.deity ? (
-                <div>
-                  <dt>Deity</dt>
-                  <dd>{context.deity.name}</dd>
-                </div>
-              ) : null}
               <div>
                 <dt>Size</dt>
                 <dd>{SIZES[derived.size] || derived.size}</dd>
@@ -2996,18 +2953,6 @@ export function CharacterSheetPage() {
                 <dd>
                   {derived.senses.map((sense) => VISION_LABELS[sense] ?? sense).join(", ") ||
                     "Normal"}
-                </dd>
-              </div>
-              <div>
-                <dt>Bulk</dt>
-                <dd>
-                  {derived.bulk.total} / {derived.bulk.capacity}
-                </dd>
-              </div>
-              <div>
-                <dt>Purse</dt>
-                <dd>
-                  {formatCp(draft.currency.gp * 100 + draft.currency.sp * 10 + draft.currency.cp)}
                 </dd>
               </div>
             </dl>
@@ -3045,16 +2990,6 @@ export function CharacterSheetPage() {
           </Card>
         </aside>
       </div>
-
-      {!draft.play.conditions.length ? null : (
-        <div className="sheet-condition-ribbon">
-          {draft.play.conditions.map((condition) => (
-            <Badge key={condition.name} tone="red">
-              {conditionLabel(condition)}
-            </Badge>
-          ))}
-        </div>
-      )}
 
       <Modal
         open={restOpen}

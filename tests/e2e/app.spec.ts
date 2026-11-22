@@ -23,6 +23,7 @@ const campaignName = `E2E Campaign ${runId}`;
 
 let campaignPath = "";
 let inviteCode = "";
+let fighterSheetPath = "";
 
 async function register(page: Page, user: typeof admin): Promise<void> {
   await page.goto("/register");
@@ -41,6 +42,10 @@ async function signIn(page: Page, user: typeof admin): Promise<void> {
   await page.getByLabel("Password").fill(user.password);
   await page.getByRole("button", { name: /Sign in/ }).click();
   await expect(page).toHaveURL(/\/campaigns$/);
+}
+
+async function openPartyActions(page: Page): Promise<void> {
+  await page.getByRole("button", { name: /Party actions/ }).click();
 }
 
 async function openNewCharacter(page: Page, name: string): Promise<void> {
@@ -324,7 +329,8 @@ test("GM controls advancement and milestone mode hides XP awards", async ({ page
     .locator(".campaign-tabs")
     .getByRole("button", { name: /^Party/ })
     .click();
-  await page.getByRole("button", { name: "Grant downtime" }).click();
+  await openPartyActions(page);
+  await page.getByRole("menuitem", { name: "Grant downtime" }).click();
   const downtimeDialog = page.getByRole("dialog", { name: "Grant downtime" });
   await expect(downtimeDialog).toBeVisible();
   await downtimeDialog.getByLabel("Downtime days").fill("3");
@@ -392,7 +398,8 @@ test("GM awards XP in XP tracking mode without automatic level-up", async ({ pag
   await expect(page.locator(".xp-ledger").getByText("800 XP")).toBeVisible();
 
   page.once("dialog", (dialog) => dialog.accept());
-  await page.getByRole("button", { name: "Catch up party" }).click();
+  await openPartyActions(page);
+  await page.getByRole("menuitem", { name: "Catch up party" }).click();
   await expect(page.getByText("The whole party is already caught up.")).toBeVisible({
     timeout: 15_000,
   });
@@ -613,7 +620,7 @@ test("lazy library, compendium entry, rules, and account routes load", async ({ 
   await page.goto("/library");
   await expect(page.getByRole("heading", { name: "Library" })).toBeVisible();
 
-  await page.getByRole("button", { name: "Spells" }).click();
+  await page.getByRole("tab", { name: "Spells" }).click();
   await page.getByPlaceholder(/Search spells/).fill("Fireball");
   const spellRow = page.getByRole("button", { name: /Fireball/ }).first();
   await expect(spellRow).toBeVisible();
@@ -622,8 +629,20 @@ test("lazy library, compendium entry, rules, and account routes load", async ({ 
   await expect(page).toHaveURL(/\/library\/spell\//);
   await expect(page.getByRole("heading", { name: "Fireball", level: 1 })).toBeVisible();
 
+  await page.getByRole("link", { name: "Back to the library" }).click();
+  await expect(page).toHaveURL(/tab=spells/);
+  await expect(page).toHaveURL(/q=Fireball/);
+  await expect(page.getByRole("tab", { name: "Spells" })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByPlaceholder(/Search spells/)).toHaveValue("Fireball");
+  await expect(page.getByRole("heading", { name: "Fireball", level: 2 })).toBeVisible();
+
   await page.goto("/rules");
   await expect(page.getByRole("heading", { name: "Rules at the table" })).toBeVisible();
+  await page.getByRole("tab", { name: "Actions" }).click();
+  await page.getByRole("button", { name: /^Aid/ }).click();
+  await page.getByRole("textbox", { name: "Search actions" }).fill("Stride");
+  await expect(page.getByRole("heading", { name: "Stride", level: 2 })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Aid", level: 2 })).toHaveCount(0);
 
   await page.goto("/account");
   await expect(page.getByRole("heading", { name: "Account and security" })).toBeVisible();
@@ -1319,8 +1338,30 @@ test("builder completes a level-1 Fighter and reaches the sheet", async ({ page 
 
   await page.getByRole("link", { name: "Open character sheet" }).click();
   await expect(page).toHaveURL(/\/characters\/[^/]+$/, { timeout: 15_000 });
+  fighterSheetPath = new URL(page.url()).pathname;
   await expect(page.getByRole("heading", { name: "E2E Fighter" })).toBeVisible();
   await expect(page.getByText("Fighter").first()).toBeVisible();
+});
+
+test("builder warns before replacing a class with dependent choices", async ({ page }) => {
+  await signIn(page, admin);
+  await page.goto(`${fighterSheetPath}/edit`);
+  await page.waitForLoadState("networkidle");
+  await goToStep(page, "Class");
+
+  let dialogMessage = "";
+  page.once("dialog", async (dialog) => {
+    dialogMessage = dialog.message();
+    await dialog.dismiss();
+  });
+  await page
+    .locator(".class-grid")
+    .getByRole("button", { name: /Ranger/ })
+    .click();
+  expect(dialogMessage).toContain("Change to Ranger?");
+  expect(dialogMessage).toContain("class feats");
+
+  await expect(page.locator(".class-grid .selection-card.is-selected")).toContainText("Fighter");
 });
 
 test("builder completes a level-1 Cleric with split divine-font preparation", async ({ page }) => {
