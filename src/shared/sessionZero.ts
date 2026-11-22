@@ -14,6 +14,14 @@ export const SESSION_ZERO_CHECKLIST = [
     label: "Collect lines, veils, and content limits.",
   },
   {
+    id: "sources",
+    label: "Agree on allowed sources, supplements, and optional rules.",
+  },
+  {
+    id: "hooks",
+    label: "Connect every character to the party goal and to each other.",
+  },
+  {
     id: "safety",
     label: "Explain the safety tools and the pause signal.",
   },

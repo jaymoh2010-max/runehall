@@ -188,6 +188,9 @@ export function serializeCampaignSessionZero(
     houseRules: row?.house_rules ?? "",
     contentLimits: row?.content_limits ?? "",
     safetyTools: row?.safety_tools ?? "",
+    allowedSources: row?.allowed_sources ?? "",
+    partyGoal: row?.party_goal ?? "",
+    partyHooks: row?.party_hooks ?? "",
     checklist: normalizeSessionZeroChecklist(parseJson(row?.checklist, {})),
     updatedAt: row?.updated_at ?? 0,
   };

@@ -24,6 +24,9 @@ interface ProfileForm {
   houseRules: string;
   contentLimits: string;
   safetyTools: string;
+  allowedSources: string;
+  partyGoal: string;
+  partyHooks: string;
   gmNotes: string;
   checklist: Record<string, boolean>;
 }
@@ -38,6 +41,9 @@ function profileForm(profile: CampaignSessionZero): ProfileForm {
     houseRules: profile.houseRules,
     contentLimits: profile.contentLimits,
     safetyTools: profile.safetyTools,
+    allowedSources: profile.allowedSources,
+    partyGoal: profile.partyGoal,
+    partyHooks: profile.partyHooks,
     gmNotes: profile.gmNotes ?? "",
     checklist: { ...profile.checklist },
   };
@@ -77,6 +83,9 @@ export function SessionZeroTab({
       houseRules: "",
       contentLimits: "",
       safetyTools: "",
+      allowedSources: "",
+      partyGoal: "",
+      partyHooks: "",
       checklist: {},
       updatedAt: 0,
     })
@@ -204,7 +213,10 @@ export function SessionZeroTab({
       profile.expectations ||
       profile.houseRules ||
       profile.contentLimits ||
-      profile.safetyTools)
+      profile.safetyTools ||
+      profile.allowedSources ||
+      profile.partyGoal ||
+      profile.partyHooks)
   );
   const visibleResponses = responses.filter((response) => safetyPreferenceHasContent(response));
 
@@ -281,6 +293,24 @@ export function SessionZeroTab({
                 <section>
                   <h4>Safety tools</h4>
                   <p>{profile.safetyTools}</p>
+                </section>
+              ) : null}
+              {profile?.allowedSources ? (
+                <section>
+                  <h4>Allowed sources</h4>
+                  <p>{profile.allowedSources}</p>
+                </section>
+              ) : null}
+              {profile?.partyGoal ? (
+                <section>
+                  <h4>Party goal</h4>
+                  <p>{profile.partyGoal}</p>
+                </section>
+              ) : null}
+              {profile?.partyHooks ? (
+                <section>
+                  <h4>Party hooks</h4>
+                  <p>{profile.partyHooks}</p>
                 </section>
               ) : null}
             </div>
@@ -379,6 +409,36 @@ export function SessionZeroTab({
                   setForm((current) => ({ ...current, safetyTools: event.target.value }))
                 }
                 placeholder="Explain the X-card, pause signal, check-ins, and how players can reach you."
+              />
+            </Field>
+            <Field label="Allowed sources" className="session-zero-wide">
+              <Textarea
+                rows={2}
+                value={form.allowedSources}
+                onChange={(event) =>
+                  setForm((current) => ({ ...current, allowedSources: event.target.value }))
+                }
+                placeholder="Player Core, GM Core, Monster Core, specific AP volumes, optional rules…"
+              />
+            </Field>
+            <Field label="Party goal" className="session-zero-wide">
+              <Textarea
+                rows={2}
+                value={form.partyGoal}
+                onChange={(event) =>
+                  setForm((current) => ({ ...current, partyGoal: event.target.value }))
+                }
+                placeholder="The shared goal that keeps the party together."
+              />
+            </Field>
+            <Field label="Party hooks" className="session-zero-wide">
+              <Textarea
+                rows={3}
+                value={form.partyHooks}
+                onChange={(event) =>
+                  setForm((current) => ({ ...current, partyHooks: event.target.value }))
+                }
+                placeholder="Why each character cares, who they trust, and what ties them to the group."
               />
             </Field>
             <Field label="GM-only notes" className="session-zero-wide">

@@ -91,6 +91,9 @@ export async function registerSessionZeroRoutes(app: FastifyInstance): Promise<v
     const houseRules = text("houseRules", existing?.house_rules ?? "", 8_000);
     const contentLimits = text("contentLimits", existing?.content_limits ?? "", 8_000);
     const safetyTools = text("safetyTools", existing?.safety_tools ?? "", 8_000);
+    const allowedSources = text("allowedSources", existing?.allowed_sources ?? "", 4_000);
+    const partyGoal = text("partyGoal", existing?.party_goal ?? "", 4_000);
+    const partyHooks = text("partyHooks", existing?.party_hooks ?? "", 8_000);
     const gmNotes = text("gmNotes", existing?.gm_notes ?? "", 20_000);
     const checklist = normalizeSessionZeroChecklist(
       body.checklist === undefined ? parseJson(existing?.checklist, {}) : body.checklist
@@ -99,8 +102,9 @@ export async function registerSessionZeroRoutes(app: FastifyInstance): Promise<v
     db.prepare(
       `INSERT INTO campaign_session_zero
          (campaign_id, pitch, genre, tone, themes, expectations, house_rules,
-          content_limits, safety_tools, gm_notes, checklist, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          content_limits, safety_tools, allowed_sources, party_goal, party_hooks,
+          gm_notes, checklist, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(campaign_id) DO UPDATE SET
          pitch = excluded.pitch,
          genre = excluded.genre,
@@ -110,6 +114,9 @@ export async function registerSessionZeroRoutes(app: FastifyInstance): Promise<v
          house_rules = excluded.house_rules,
          content_limits = excluded.content_limits,
          safety_tools = excluded.safety_tools,
+         allowed_sources = excluded.allowed_sources,
+         party_goal = excluded.party_goal,
+         party_hooks = excluded.party_hooks,
          gm_notes = excluded.gm_notes,
          checklist = excluded.checklist,
          updated_at = excluded.updated_at`
@@ -123,6 +130,9 @@ export async function registerSessionZeroRoutes(app: FastifyInstance): Promise<v
       houseRules,
       contentLimits,
       safetyTools,
+      allowedSources,
+      partyGoal,
+      partyHooks,
       gmNotes,
       JSON.stringify(checklist),
       ts,

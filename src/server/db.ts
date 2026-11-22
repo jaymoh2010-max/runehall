@@ -178,6 +178,9 @@ export interface CampaignSessionZeroRow {
   house_rules: string;
   content_limits: string;
   safety_tools: string;
+  allowed_sources: string;
+  party_goal: string;
+  party_hooks: string;
   gm_notes: string;
   checklist: string;
   created_at: number;

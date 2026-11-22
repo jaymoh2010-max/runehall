@@ -1172,6 +1172,12 @@ export interface CampaignSessionZero {
   houseRules: string;
   contentLimits: string;
   safetyTools: string;
+  /** Books, supplements, and optional rules the table allows. */
+  allowedSources: string;
+  /** The shared reason the party is together. */
+  partyGoal: string;
+  /** Per-character or per-player ties to the party and its goal. */
+  partyHooks: string;
   checklist: Record<string, boolean>;
   /** GM-only notes; omitted from player responses. */
   gmNotes?: string;

@@ -774,4 +774,13 @@ export const migrations: Migration[] = [
       ALTER TABLE campaign_travel ADD COLUMN encounter_checks TEXT NOT NULL DEFAULT '[]';
     `,
   },
+  {
+    version: 42,
+    name: "campaign_session_zero_sources_and_party_hooks",
+    sql: `
+      ALTER TABLE campaign_session_zero ADD COLUMN allowed_sources TEXT NOT NULL DEFAULT '';
+      ALTER TABLE campaign_session_zero ADD COLUMN party_goal TEXT NOT NULL DEFAULT '';
+      ALTER TABLE campaign_session_zero ADD COLUMN party_hooks TEXT NOT NULL DEFAULT '';
+    `,
+  },
 ];

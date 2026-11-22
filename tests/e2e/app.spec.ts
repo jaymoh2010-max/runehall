@@ -578,6 +578,13 @@ test("GM writes the session zero charter and checklist", async ({ page }) => {
   await page
     .getByLabel("Safety tools", { exact: true })
     .fill("Use the pause signal or message the GM privately.");
+  await page
+    .getByLabel("Allowed sources", { exact: true })
+    .fill("Player Core, GM Core, Monster Core.");
+  await page
+    .getByLabel("Party goal", { exact: true })
+    .fill("Break the Ashen Crown before it wakes.");
+  await page.getByLabel("Party hooks", { exact: true }).fill("The ferryman owes the party a debt.");
   const editor = page.locator(".session-zero-editor");
   await editor
     .getByRole("checkbox", { name: "Share the campaign pitch, genre, and tone." })
@@ -585,13 +592,19 @@ test("GM writes the session zero charter and checklist", async ({ page }) => {
   await editor
     .getByRole("checkbox", { name: "Agree on themes, expectations, and house rules." })
     .check();
+  await editor
+    .getByRole("checkbox", { name: "Agree on allowed sources, supplements, and optional rules." })
+    .check();
+  await editor
+    .getByRole("checkbox", { name: "Connect every character to the party goal and to each other." })
+    .check();
   await page.getByRole("button", { name: "Save session zero" }).click();
   await expect(page.getByText("Session zero charter saved.")).toBeVisible({ timeout: 15_000 });
   await page.getByRole("button", { name: "Preview player-facing charter" }).click();
   await expect(
     page.locator(".session-zero-charter").getByText("A city of ash and old debts.")
   ).toBeVisible();
-  await expect(page.getByText("2/7 checklist")).toBeVisible();
+  await expect(page.getByText("4/9 checklist")).toBeVisible();
 });
 
 test("GM schedules from Sessions and overdue sessions stay current", async ({ page }) => {

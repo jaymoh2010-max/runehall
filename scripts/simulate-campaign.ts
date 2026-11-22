@@ -2496,6 +2496,9 @@ async function runCampaignA(gm: Account, players: Account[]): Promise<void> {
               houseRules: "Free archetype.",
               contentLimits: "No graphic torture.",
               safetyTools: "Pause signal and private GM messages.",
+              allowedSources: "Player Core, GM Core, Monster Core.",
+              partyGoal: "Break the Ashen Crown before it wakes.",
+              partyHooks: "The ferryman owes the party a debt.",
               gmNotes: "The Ash Warden is the final antagonist.",
               checklist: { pitch: true, themes: true, safety: true },
             },
@@ -2504,6 +2507,16 @@ async function runCampaignA(gm: Account, players: Account[]): Promise<void> {
             charter.payload.profile.pitch,
             "The Ashen Crown wakes beneath the city.",
             "Session zero pitch"
+          );
+          assertEqual(
+            charter.payload.profile.allowedSources,
+            "Player Core, GM Core, Monster Core.",
+            "Session zero allowed sources"
+          );
+          assertEqual(
+            charter.payload.profile.partyGoal,
+            "Break the Ashen Crown before it wakes.",
+            "Session zero party goal"
           );
           assertEqual(
             charter.payload.profile.gmNotes,
@@ -2954,6 +2967,16 @@ async function runCampaignA(gm: Account, players: Account[]): Promise<void> {
         importedSessionZero.payload.profile.checklist.pitch,
         true,
         "Imported session zero checklist"
+      );
+      assertEqual(
+        importedSessionZero.payload.profile.allowedSources,
+        "Player Core, GM Core, Monster Core.",
+        "Imported session zero allowed sources"
+      );
+      assertEqual(
+        importedSessionZero.payload.profile.partyGoal,
+        "Break the Ashen Crown before it wakes.",
+        "Imported session zero party goal"
       );
       metric("campaignA.importedCampaignId", importedCampaign.id);
       await api(`/api/campaigns/${campaignId}/shop/stock`, {

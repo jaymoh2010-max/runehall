@@ -153,6 +153,13 @@ describe("migrations", () => {
     expect(travelColumns.map((column) => column.name)).toContain("waypoints");
     expect(travelColumns.map((column) => column.name)).toContain("encounter_checks");
 
+    const sessionZeroColumns = db.prepare("PRAGMA table_info(campaign_session_zero)").all() as {
+      name: string;
+    }[];
+    expect(sessionZeroColumns.map((column) => column.name)).toContain("allowed_sources");
+    expect(sessionZeroColumns.map((column) => column.name)).toContain("party_goal");
+    expect(sessionZeroColumns.map((column) => column.name)).toContain("party_hooks");
+
     db.close();
   });
 });

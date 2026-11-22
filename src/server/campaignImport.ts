@@ -700,8 +700,9 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
       db.prepare(
         `INSERT INTO campaign_session_zero
            (campaign_id, pitch, genre, tone, themes, expectations, house_rules,
-            content_limits, safety_tools, gm_notes, checklist, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+            content_limits, safety_tools, allowed_sources, party_goal, party_hooks,
+            gm_notes, checklist, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).run(
         campaignId,
         longText(importedSessionZero.pitch, "", 20_000),
@@ -712,6 +713,9 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
         longText(importedSessionZero.houseRules, "", 8_000),
         longText(importedSessionZero.contentLimits, "", 8_000),
         longText(importedSessionZero.safetyTools, "", 8_000),
+        longText(importedSessionZero.allowedSources, "", 4_000),
+        longText(importedSessionZero.partyGoal, "", 4_000),
+        longText(importedSessionZero.partyHooks, "", 8_000),
         longText(importedSessionZero.gmNotes, "", 20_000),
         JSON.stringify(normalizeSessionZeroChecklist(importedSessionZero.checklist)),
         ts,

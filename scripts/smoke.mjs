@@ -2524,12 +2524,17 @@ async function main() {
       houseRules: "Free archetype.",
       contentLimits: "No graphic torture.",
       safetyTools: "Use the pause signal or message the GM privately.",
+      allowedSources: "Player Core, GM Core, Monster Core.",
+      partyGoal: "Break the Ashen Crown before it wakes.",
+      partyHooks: "The ferryman owes the party a debt.",
       gmNotes: "The Ash Warden is the final antagonist.",
-      checklist: { pitch: true, themes: true, safety: true },
+      checklist: { pitch: true, themes: true, safety: true, sources: true, hooks: true },
     },
   });
   if (
     charter.payload.profile.pitch !== "A city of ash and old debts." ||
+    charter.payload.profile.allowedSources !== "Player Core, GM Core, Monster Core." ||
+    charter.payload.profile.partyGoal !== "Break the Ashen Crown before it wakes." ||
     charter.payload.profile.gmNotes !== "The Ash Warden is the final antagonist."
   ) {
     throw new Error("GM session zero charter did not save");
@@ -2539,6 +2544,8 @@ async function main() {
   });
   if (
     playerCharterView.payload.profile.pitch !== "A city of ash and old debts." ||
+    playerCharterView.payload.profile.allowedSources !== "Player Core, GM Core, Monster Core." ||
+    playerCharterView.payload.profile.partyGoal !== "Break the Ashen Crown before it wakes." ||
     "gmNotes" in playerCharterView.payload.profile
   ) {
     throw new Error("Player session zero view leaked GM notes or missed the charter");
