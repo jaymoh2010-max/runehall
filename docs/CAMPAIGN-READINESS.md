@@ -95,7 +95,7 @@ The campaign simulation exercises two complete 1–20 campaigns, including XP an
 | Exploration | Travel pace, terrain, weather, watches, activities, waypoints, calendar | Partial; no hexcrawl map or automatic weather effects |
 | Social | NPCs, factions, attitude, reputation, secrets, public views, shops | Strong for a campaign ledger |
 | Downtime | Days, upkeep, Earn Income, Subsist, Craft/Retrain | Partial; rituals and full crafting costs manual |
-| Treasure | Parcels, audit, shops, tracked stock, transfers, wealth benchmarks | Strong; no Automatic Bonus Progression |
+| Treasure | Parcels, audit, shops, tracked stock, transfers, wealth benchmarks, ABP option | Strong; ABP replaces fundamental rune math |
 | Campaign log | Journal, handouts, quests, recap, knowledge, private notes | Strong |
 | World clock | Golarion date, leap day, downtime, travel, sessions | Strong |
 | Table | Maps, fog, walls, lighting, tokens, chat, dice, music, clocks | Strong |
