@@ -43,6 +43,7 @@ import {
   type CharacterAffliction,
   type CharacterEquipment,
   type Equipment,
+  type SustainedSpell,
   type AfflictionType,
   type PersistentDamageInstance,
   type ConditionRef,
@@ -72,6 +73,14 @@ import {
   type SpellCastOption,
   type SpellCastResource,
 } from "../../shared/spellcasting";
+import { beginSustainedSpell, endSustainedSpell, spellNeedsSustain } from "../../shared/sustain";
+import {
+  adjustDegreeForIncapacitation,
+  incapacitationNote,
+  resolveCounteract,
+  spellHasIncapacitation,
+  type CounteractResolution,
+} from "../../shared/spellChecks";
 import {
   DEGREE_LABELS,
   applyAttackPenalty,
@@ -278,6 +287,25 @@ export function CharacterSheetPage() {
     actions: 1 | 2 | 3;
   } | null>(null);
   const [castRanks, setCastRanks] = useState<Record<string, number>>({});
+  const [spellToolsOpen, setSpellToolsOpen] = useState(false);
+  const [spellToolsMode, setSpellToolsMode] = useState<"counteract" | "save">("counteract");
+  const [spellToolsModifier, setSpellToolsModifier] = useState("0");
+  const [spellToolsDc, setSpellToolsDc] = useState("20");
+  const [spellToolsCastRank, setSpellToolsCastRank] = useState("1");
+  const [spellToolsEffectRank, setSpellToolsEffectRank] = useState("1");
+  const [spellToolsTargetLevel, setSpellToolsTargetLevel] = useState("1");
+  const [spellToolsSaveBonus, setSpellToolsSaveBonus] = useState("0");
+  const [spellToolsLabel, setSpellToolsLabel] = useState("Spell");
+  const [spellToolsSaveType, setSpellToolsSaveType] = useState("save");
+  const [spellToolsIncapacitation, setSpellToolsIncapacitation] = useState(false);
+  const [spellToolsResult, setSpellToolsResult] = useState<{
+    kind: "counteract" | "save";
+    roll: RollResult;
+    degree: RollResult["degree"];
+    adjustedDegree: RollResult["degree"];
+    note: string;
+    counteract?: CounteractResolution;
+  } | null>(null);
   const [hpInput, setHpInput] = useState("");
   const [damageType, setDamageType] = useState("");
   const [conflict, setConflict] = useState<CharacterRecord | null>(null);
@@ -746,11 +774,18 @@ export function CharacterSheetPage() {
         toast("That spell cannot be cast right now.", "error");
         return;
       }
-      if (result.draft !== (draftRef.current ?? draft)) {
+      let nextDraft = result.draft;
+      let sustained = false;
+      if (spellNeedsSustain(castSpellEntry)) {
+        const begun = beginSustainedSpell(nextDraft, castSpellEntry, selectedCastOption.rank);
+        nextDraft = begun.draft;
+        sustained = begun.added;
+      }
+      if (nextDraft !== (draftRef.current ?? draft)) {
         skipInitialSave.current = false;
-        draftRef.current = result.draft;
+        draftRef.current = nextDraft;
         dirtyRef.current = true;
-        setDraft(result.draft);
+        setDraft(nextDraft);
         void saveDraft();
       }
       setCastRanks((current) => ({
@@ -766,13 +801,100 @@ export function CharacterSheetPage() {
               ? `rank ${selectedCastOption.rank} slot`
               : null;
       toast(
-        `Cast ${castSpellEntry.name} at rank ${selectedCastOption.rank}${cost ? ` using a ${cost}` : ""}.`,
+        `Cast ${castSpellEntry.name} at rank ${selectedCastOption.rank}${cost ? ` using a ${cost}` : ""}.${sustained ? " Sustaining it; each Sustain costs 1 action." : ""}`,
         "success"
       );
       setCastState(null);
     } finally {
       castLock.current = false;
     }
+  };
+
+  const openCounteractTool = () => {
+    if (!derived) return;
+    setSpellToolsMode("counteract");
+    setSpellToolsModifier(
+      String(derived.spellAttack ?? (derived.spellDc === null ? 0 : derived.spellDc - 10))
+    );
+    setSpellToolsDc(String(derived.spellDc ?? 20));
+    setSpellToolsCastRank(String(Math.max(1, derived.maxSpellRank || 1)));
+    setSpellToolsEffectRank("1");
+    setSpellToolsTargetLevel("1");
+    setSpellToolsSaveBonus("0");
+    setSpellToolsIncapacitation(false);
+    setSpellToolsLabel("Counteract");
+    setSpellToolsResult(null);
+    setSpellToolsOpen(true);
+  };
+
+  const openSaveTool = (spell: NonNullable<CharacterContext["spells"][string]>) => {
+    if (!derived) return;
+    setSpellToolsMode("save");
+    setSpellToolsDc(String(derived.spellDc ?? 20));
+    setSpellToolsCastRank(String(Math.max(1, spell.rank)));
+    setSpellToolsEffectRank(String(Math.max(1, spell.rank)));
+    setSpellToolsTargetLevel("1");
+    setSpellToolsSaveBonus("0");
+    setSpellToolsIncapacitation(spellHasIncapacitation(spell));
+    setSpellToolsSaveType(spell.defense?.save || "save");
+    setSpellToolsLabel(spell.name);
+    setSpellToolsResult(null);
+    setSpellToolsOpen(true);
+  };
+
+  const runCounteractTool = () => {
+    const modifier = Math.round(Number(spellToolsModifier) || 0);
+    const dc = Math.max(1, Math.round(Number(spellToolsDc) || 20));
+    const castRank = Math.max(1, Math.round(Number(spellToolsCastRank) || 1));
+    const effectRank = Math.max(0, Math.round(Number(spellToolsEffectRank) || 0));
+    roll(`1d20${signed(modifier)}`, `Counteract check (rank ${castRank})`, dc, (result) => {
+      if (!result.degree) return;
+      const resolution = resolveCounteract(result.degree, castRank, effectRank);
+      setSpellToolsResult({
+        kind: "counteract",
+        roll: result,
+        degree: result.degree,
+        adjustedDegree: result.degree,
+        note: resolution.note,
+        counteract: resolution,
+      });
+      toast(resolution.note, resolution.counteracted ? "success" : "error");
+    });
+  };
+
+  const runSaveTool = () => {
+    const bonus = Math.round(Number(spellToolsSaveBonus) || 0);
+    const dc = Math.max(1, Math.round(Number(spellToolsDc) || 20));
+    const effectRank = Math.max(1, Math.round(Number(spellToolsEffectRank) || 1));
+    const targetLevel = Math.max(1, Math.round(Number(spellToolsTargetLevel) || 1));
+    roll(`1d20${signed(bonus)}`, `${spellToolsLabel} ${spellToolsSaveType} save`, dc, (result) => {
+      if (!result.degree) return;
+      const adjusted = spellToolsIncapacitation
+        ? adjustDegreeForIncapacitation(result.degree, targetLevel, effectRank)
+        : { degree: result.degree, adjusted: false, threshold: effectRank * 2 };
+      const note = adjusted.adjusted
+        ? `Incapacitation: target level ${targetLevel} is above ${adjusted.threshold}, so the save improves from ${DEGREE_LABELS[result.degree]} to ${DEGREE_LABELS[adjusted.degree]}.`
+        : spellToolsIncapacitation
+          ? `Incapacitation: target level ${targetLevel} is not above ${adjusted.threshold}; use the rolled degree.`
+          : `Use the rolled degree: ${DEGREE_LABELS[result.degree]}.`;
+      setSpellToolsResult({
+        kind: "save",
+        roll: result,
+        degree: result.degree,
+        adjustedDegree: adjusted.degree,
+        note,
+      });
+      toast(note, adjusted.adjusted ? "success" : "info");
+    });
+  };
+
+  const sustainActiveSpell = (name: string) => {
+    toast(`Sustain ${name}: spend 1 action, then resolve the spell's Sustain entry.`, "info");
+  };
+
+  const endActiveSpell = (spellId: string) => {
+    update((current) => endSustainedSpell(current, spellId));
+    toast("Sustained spell ended.", "success");
   };
 
   const takeLongRest = () => {
@@ -2408,6 +2530,14 @@ export function CharacterSheetPage() {
                     · DC {derived.spellDc}
                     {derived.casterTradition ? ` · ${titleCase(derived.casterTradition)}` : ""}
                   </span>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    icon={<Sparkles size={14} />}
+                    onClick={openCounteractTool}
+                  >
+                    Counteract
+                  </Button>
                   {canEdit && isPreparedCasterClass(classData?.name) ? (
                     <Button
                       size="sm"
@@ -2541,6 +2671,10 @@ export function CharacterSheetPage() {
                 focusPointsMax={derived.focusPointsMax}
                 onCast={openCast}
                 castRanks={castRanks}
+                sustainedSpells={draft.play.sustainedSpells}
+                onSustain={sustainActiveSpell}
+                onEndSustain={endActiveSpell}
+                onResolveSave={openSaveTool}
               />
             </Card>
           ) : null}
@@ -3611,6 +3745,186 @@ export function CharacterSheetPage() {
         </div>
       </Modal>
 
+      <Modal
+        open={spellToolsOpen}
+        onClose={() => setSpellToolsOpen(false)}
+        title="Spell checks"
+        subtitle="Counteract checks and saving throws, including incapacitation."
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setSpellToolsOpen(false)}>
+              Close
+            </Button>
+            <Button
+              variant="primary"
+              icon={<Sparkles size={14} />}
+              onClick={spellToolsMode === "counteract" ? runCounteractTool : runSaveTool}
+            >
+              {spellToolsMode === "counteract" ? "Roll counteract" : "Roll save"}
+            </Button>
+          </>
+        }
+      >
+        <div className="stack">
+          <div className="row" style={{ gap: 8 }}>
+            <Button
+              size="sm"
+              variant={spellToolsMode === "counteract" ? "primary" : "ghost"}
+              onClick={() => {
+                setSpellToolsMode("counteract");
+                setSpellToolsResult(null);
+              }}
+            >
+              Counteract
+            </Button>
+            <Button
+              size="sm"
+              variant={spellToolsMode === "save" ? "primary" : "ghost"}
+              onClick={() => {
+                setSpellToolsMode("save");
+                setSpellToolsIncapacitation(false);
+                setSpellToolsLabel("Effect");
+                setSpellToolsSaveType("save");
+                setSpellToolsResult(null);
+              }}
+            >
+              Resolve save
+            </Button>
+          </div>
+          {spellToolsMode === "counteract" ? (
+            <div className="form-grid two">
+              <Field label="Counteract modifier" hint="Usually spell attack or spell DC - 10.">
+                <Input
+                  type="number"
+                  value={spellToolsModifier}
+                  onChange={(event) => setSpellToolsModifier(event.target.value)}
+                />
+              </Field>
+              <Field label="Effect DC">
+                <Input
+                  type="number"
+                  min={1}
+                  value={spellToolsDc}
+                  onChange={(event) => setSpellToolsDc(event.target.value)}
+                />
+              </Field>
+              <Field label="Your counteract rank" hint="Usually the spell rank you cast.">
+                <Input
+                  type="number"
+                  min={1}
+                  max={10}
+                  value={spellToolsCastRank}
+                  onChange={(event) => setSpellToolsCastRank(event.target.value)}
+                />
+              </Field>
+              <Field label="Effect rank">
+                <Input
+                  type="number"
+                  min={0}
+                  max={20}
+                  value={spellToolsEffectRank}
+                  onChange={(event) => setSpellToolsEffectRank(event.target.value)}
+                />
+              </Field>
+            </div>
+          ) : (
+            <div className="form-grid two">
+              <Field label="Effect">
+                <Input
+                  value={spellToolsLabel}
+                  onChange={(event) => setSpellToolsLabel(event.target.value)}
+                />
+              </Field>
+              <Field label="Save type">
+                <Input
+                  value={spellToolsSaveType}
+                  onChange={(event) => setSpellToolsSaveType(event.target.value)}
+                />
+              </Field>
+              <Field label="Save DC">
+                <Input
+                  type="number"
+                  min={1}
+                  value={spellToolsDc}
+                  onChange={(event) => setSpellToolsDc(event.target.value)}
+                />
+              </Field>
+              <Field label="Effect rank">
+                <Input
+                  type="number"
+                  min={1}
+                  max={10}
+                  value={spellToolsEffectRank}
+                  onChange={(event) => setSpellToolsEffectRank(event.target.value)}
+                />
+              </Field>
+              <Field label="Target level">
+                <Input
+                  type="number"
+                  min={1}
+                  max={30}
+                  value={spellToolsTargetLevel}
+                  onChange={(event) => setSpellToolsTargetLevel(event.target.value)}
+                />
+              </Field>
+              <Field label="Target save bonus">
+                <Input
+                  type="number"
+                  value={spellToolsSaveBonus}
+                  onChange={(event) => setSpellToolsSaveBonus(event.target.value)}
+                />
+              </Field>
+            </div>
+          )}
+          {spellToolsMode === "save" && spellToolsIncapacitation ? (
+            <div className="settings-note">
+              <CircleAlert size={16} />
+              <span>{incapacitationNote(Number(spellToolsEffectRank) || 1)}</span>
+            </div>
+          ) : null}
+          {spellToolsResult ? (
+            <div className="settings-note">
+              <div className="stack" style={{ width: "100%" }}>
+                <div className="row-between">
+                  <strong>
+                    {spellToolsResult.kind === "counteract" ? "Counteract" : "Save"}:{" "}
+                    {spellToolsResult.roll.total} vs DC {spellToolsResult.roll.dc}
+                  </strong>
+                  {spellToolsResult.degree ? (
+                    <Badge
+                      tone={
+                        spellToolsResult.degree === "critical-success" ||
+                        spellToolsResult.degree === "success"
+                          ? "green"
+                          : "red"
+                      }
+                    >
+                      {
+                        DEGREE_LABELS[
+                          spellToolsResult.adjustedDegree ?? spellToolsResult.degree ?? "failure"
+                        ]
+                      }
+                    </Badge>
+                  ) : null}
+                </div>
+                {spellToolsResult.adjustedDegree !== spellToolsResult.degree ? (
+                  <p className="tiny muted">
+                    Rolled {spellToolsResult.degree ? DEGREE_LABELS[spellToolsResult.degree] : "-"}.
+                  </p>
+                ) : null}
+                {spellToolsResult.counteract ? (
+                  <p className="tiny muted">
+                    Counteract rank {spellToolsResult.counteract.counteractRank ?? "-"} versus
+                    effect rank {spellToolsResult.counteract.effectRank}.
+                  </p>
+                ) : null}
+                <p className="tiny muted">{spellToolsResult.note}</p>
+              </div>
+            </div>
+          ) : null}
+        </div>
+      </Modal>
+
       <DailyPreparationsModal
         open={prepOpen}
         onClose={() => setPrepOpen(false)}
@@ -4229,6 +4543,10 @@ function SpellGroups({
   focusPointsMax,
   onCast,
   castRanks,
+  sustainedSpells,
+  onSustain,
+  onEndSustain,
+  onResolveSave,
 }: {
   draft: CharacterDraft;
   context: CharacterContext;
@@ -4242,6 +4560,10 @@ function SpellGroups({
     kind: "known" | "cantrip" | "focus"
   ) => void;
   castRanks: Record<string, number>;
+  sustainedSpells: SustainedSpell[];
+  onSustain: (name: string) => void;
+  onEndSustain: (spellId: string) => void;
+  onResolveSave: (spell: NonNullable<CharacterContext["spells"][string]>) => void;
 }) {
   const unique = (spells: NonNullable<CharacterContext["spells"][string]>[]) => {
     const seen = new Set<string>();
@@ -4334,6 +4656,10 @@ function SpellGroups({
         onCast={onCast}
         castRank={castRanks[spell.id]}
         canEdit={canEdit}
+        sustained={sustainedSpells.find((entry) => entry.spellId === spell.id) ?? null}
+        onSustain={onSustain}
+        onEndSustain={onEndSustain}
+        onResolveSave={onResolveSave}
       />
     );
   };
@@ -4361,6 +4687,40 @@ function SpellGroups({
           {focus.map((spell) => renderRow(spell, "focus"))}
         </div>
       ) : null}
+      {sustainedSpells.length ? (
+        <div className="spell-group">
+          <h4>Sustained</h4>
+          <p className="tiny muted">
+            Each Sustain costs 1 action. Spend it in the initiative tracker, then resolve the
+            spell&apos;s Sustain entry.
+          </p>
+          {sustainedSpells.map((entry) => (
+            <div key={entry.id} className="sheet-spell-row">
+              <div className="grow">
+                <strong>{entry.name}</strong>
+                <span className="tiny muted">
+                  {" "}
+                  · rank {entry.rank}
+                  {entry.duration ? ` · ${entry.duration}` : ""}
+                </span>
+              </div>
+              <div className="row" style={{ gap: 5 }}>
+                <Button size="sm" variant="ghost" onClick={() => onSustain(entry.name)}>
+                  Sustain
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => onEndSustain(entry.spellId)}
+                  disabled={!canEdit}
+                >
+                  End
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : null}
       {!cantrips.length && !known.length && !focus.length ? (
         <p className="muted small">No spells selected yet.</p>
       ) : null}
@@ -4380,6 +4740,10 @@ function SpellRow({
   onCast,
   castRank,
   canEdit,
+  sustained,
+  onSustain,
+  onEndSustain,
+  onResolveSave,
 }: {
   spell: NonNullable<CharacterContext["spells"][string]>;
   onRoll: (formula: string, label: string, dc?: number | null) => void;
@@ -4395,6 +4759,10 @@ function SpellRow({
   ) => void;
   castRank?: number;
   canEdit: boolean;
+  sustained: SustainedSpell | null;
+  onSustain: (name: string) => void;
+  onEndSustain: (spellId: string) => void;
+  onResolveSave: (spell: NonNullable<CharacterContext["spells"][string]>) => void;
 }) {
   const damageRank = castRank ?? castOptions[0]?.rank ?? Math.max(1, spell.rank);
   const damage = spellDamageAtRank(spell, damageRank);
@@ -4437,6 +4805,7 @@ function SpellRow({
       <div className="sheet-spell-row" data-testid={`sheet-spell-${spellTestId(spell.name)}`}>
         <div className="grow">
           <strong>{spell.name}</strong>
+          {sustained ? <Badge tone="blue">Sustained</Badge> : null}
           {prepared ? (
             <span
               className="tiny gold-text"
@@ -4475,6 +4844,9 @@ function SpellRow({
             </span>
           ) : null}
           <span className={`tiny ${castable ? "gold-text" : "muted"}`}> · {hint}</span>
+          {spellHasIncapacitation(spell) ? (
+            <span className="tiny muted"> · {incapacitationNote(spell.rank)}</span>
+          ) : null}
         </div>
         <div className="row" style={{ gap: 5 }}>
           {spellAttack !== null && spell.traits.includes("attack") ? (
@@ -4511,6 +4883,32 @@ function SpellRow({
                   {part.type && !healing ? ` ${part.type}` : ""}
                 </Button>
               ))}
+          {spell.defense?.save ? (
+            <Button
+              size="sm"
+              variant="ghost"
+              aria-label={`Resolve ${spell.name} save`}
+              title={`Resolve a ${spell.defense.save} save, including incapacitation when applicable`}
+              onClick={() => onResolveSave(spell)}
+            >
+              Save
+            </Button>
+          ) : null}
+          {sustained ? (
+            <>
+              <Button size="sm" variant="ghost" onClick={() => onSustain(spell.name)}>
+                Sustain
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => onEndSustain(spell.id)}
+                disabled={!canEdit}
+              >
+                End
+              </Button>
+            </>
+          ) : null}
           <Button
             size="sm"
             variant="primary"

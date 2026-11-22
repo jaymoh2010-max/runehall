@@ -38,6 +38,7 @@ import { normalizeDowntimeActivities } from "./downtime";
 import { clampHeroPoints } from "./heroPoints";
 import { normalizeCharacterTurnEffects } from "./characterTurnEffects";
 import { INVESTED_LIMIT, investedCount } from "./itemActivation";
+import { normalizeSustainedSpells } from "./sustain";
 import {
   FEAT_CHOICES,
   FEAT_GRANTS,
@@ -1008,6 +1009,7 @@ export function emptyCharacterDraft(name = "New Hero"): CharacterDraft {
       regenerationActive: true,
       regenerationNote: "",
       regenerationDeactivatedBy: [],
+      sustainedSpells: [],
       treatWoundsImmune: false,
       battleMedicineImmuneBy: [],
       xp: 0,
@@ -1299,6 +1301,7 @@ export function normalizeCharacterDraft(input: unknown, fallbackName = "New Hero
       afflictions: normalizeAfflictions(play.afflictions),
       persistentDamage: normalizePersistentDamageList(play.persistentDamage),
       ...normalizeCharacterTurnEffects(play),
+      sustainedSpells: normalizeSustainedSpells(play.sustainedSpells),
       treatWoundsImmune: play.treatWoundsImmune === true,
       battleMedicineImmuneBy: [
         ...new Set(

@@ -1786,6 +1786,14 @@ test("builder completes a level-1 Cleric with split divine-font preparation", as
   await expect(page.getByRole("heading", { name: "E2E Cleric" })).toBeVisible();
   await expect(page.locator(".sheet-slots .slot-row-font")).toContainText("3 / 4");
 
+  await page.getByRole("button", { name: "Counteract", exact: true }).click();
+  const spellChecks = page.getByRole("dialog", { name: "Spell checks" });
+  await expect(spellChecks).toBeVisible();
+  await spellChecks.getByLabel("Effect DC").fill("15");
+  await spellChecks.getByRole("button", { name: "Roll counteract" }).click();
+  await expect(spellChecks.getByText(/Counteract rank/)).toBeVisible();
+  await spellChecks.locator(".modal-foot").getByRole("button", { name: "Close" }).click();
+
   const sheetBlessRow = page.locator(".sheet-spell-row").filter({ hasText: "Bless" });
   await sheetBlessRow.getByRole("button", { name: "Cast Bless" }).click();
   const blessDialog = page.getByRole("dialog", { name: "Cast Bless" });

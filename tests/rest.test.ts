@@ -196,6 +196,21 @@ describe("PF2e long rest", () => {
     expect(result.draft.play.xp).toBe(450);
   });
 
+  it("clears sustained spells when the character rests", () => {
+    const draft = hero(5);
+    draft.play.sustainedSpells = [
+      {
+        id: "sustained:spell:flaming-sphere",
+        spellId: "spell:flaming-sphere",
+        name: "Flaming Sphere",
+        rank: 2,
+        duration: "sustained up to 1 minute",
+      },
+    ];
+    const result = applyLongRest(draft, derived);
+    expect(result.draft.play.sustainedSpells).toEqual([]);
+  });
+
   it("resets per-day item uses during daily preparations", () => {
     const draft = hero(5);
     draft.equipment = [

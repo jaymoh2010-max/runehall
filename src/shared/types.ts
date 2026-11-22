@@ -682,12 +682,24 @@ export interface CharacterPlay {
   regenerationNote: string;
   /** Damage types that deactivate regeneration until the end of the next turn. */
   regenerationDeactivatedBy: string[];
+  /** Spells currently sustained by this character. */
+  sustainedSpells: SustainedSpell[];
   /** The target has received Treat Wounds since their last daily reset. */
   treatWoundsImmune: boolean;
   /** Character IDs of healers whose Battle Medicine this target is immune to. */
   battleMedicineImmuneBy: string[];
   xp: number;
   shieldRaised: boolean;
+}
+
+export interface SustainedSpell {
+  id: string;
+  spellId: string;
+  name: string;
+  /** Rank at which the spell was cast. */
+  rank: number;
+  /** Printed duration, such as "sustained up to 1 minute". */
+  duration: string;
 }
 
 export interface PersistentDamageInstance {
