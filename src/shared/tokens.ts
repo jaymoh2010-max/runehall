@@ -1,4 +1,4 @@
-import type { CharacterCondition, Token, TokenCondition } from "./types";
+import type { CharacterCondition, Scene, Token, TokenCondition } from "./types";
 
 export interface GroupHp {
   count: number;
@@ -158,6 +158,49 @@ export function tickTokenConditions(conditions: TokenCondition[]): TokenConditio
     next.push(updated);
   }
   return next;
+}
+
+/** Put new tokens in the nearest free square around the scene center. */
+export function suggestedTokenPosition(
+  scene: Pick<Scene, "id" | "width" | "height" | "gridSize">,
+  tokens: Pick<Token, "sceneId" | "x" | "y">[]
+): { x: number; y: number } {
+  const step = Math.max(20, scene.gridSize || 70);
+  const centerX = scene.width / 2;
+  const centerY = scene.height / 2;
+  const margin = Math.max(step / 2, 16);
+  const occupied = tokens.filter((token) => token.sceneId === scene.id);
+  const slots: Array<[number, number]> = [
+    [0, 0],
+    [1, 0],
+    [-1, 0],
+    [0, 1],
+    [0, -1],
+    [1, 1],
+    [-1, -1],
+    [1, -1],
+    [-1, 1],
+    [2, 0],
+    [-2, 0],
+    [0, 2],
+    [0, -2],
+    [2, 2],
+    [-2, -2],
+    [2, -2],
+    [-2, 2],
+  ];
+  for (const [dx, dy] of slots) {
+    const x = Math.min(scene.width - margin, Math.max(margin, centerX + dx * step));
+    const y = Math.min(scene.height - margin, Math.max(margin, centerY + dy * step));
+    if (
+      !occupied.some(
+        (token) => Math.abs(token.x - x) < step * 0.6 && Math.abs(token.y - y) < step * 0.6
+      )
+    ) {
+      return { x, y };
+    }
+  }
+  return { x: centerX, y: centerY };
 }
 
 /**

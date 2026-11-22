@@ -447,13 +447,6 @@ export function SessionsPage({
               ? "Put the next session on the calendar."
               : "The GM hasn't scheduled the next session yet."
           }
-          action={
-            isGm ? (
-              <Button variant="primary" icon={<Plus size={15} />} onClick={() => setEditor("new")}>
-                Schedule the first session
-              </Button>
-            ) : undefined
-          }
         />
       ) : (
         <>

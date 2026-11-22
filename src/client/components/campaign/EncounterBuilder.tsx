@@ -487,16 +487,6 @@ export function EncounterBuilder({
           icon={<Swords size={30} />}
           title="No encounters prepared"
           description="Create an encounter, add monsters from the bestiary, and launch it when the party is ready."
-          action={
-            <Button
-              variant="secondary"
-              icon={<Plus size={15} />}
-              loading={busy}
-              onClick={createEncounter}
-            >
-              Create the first encounter
-            </Button>
-          }
         />
       ) : (
         <div className="encounter-layout">

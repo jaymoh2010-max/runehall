@@ -297,11 +297,6 @@ export function NpcLibrary({
           icon={<UserRound size={30} />}
           title="No NPCs saved"
           description="Create a statblock for a recurring NPC, villain, or custom creature."
-          action={
-            <Button variant="primary" icon={<Plus size={15} />} onClick={() => setEditor("new")}>
-              Create the first NPC
-            </Button>
-          }
         />
       ) : !filtered.length ? (
         <EmptyState

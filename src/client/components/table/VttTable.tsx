@@ -37,6 +37,7 @@ import type {
 } from "../../../shared/types";
 import type { PropPreset } from "../../../shared/props";
 import { tokenTurnEffectsFromMonster } from "../../../shared/tokenTurnEffects";
+import { suggestedTokenPosition } from "../../../shared/tokens";
 import { errorMessage, useToasts } from "../../stores";
 import { api } from "../../api";
 import { getSocket } from "../../socket";
@@ -861,7 +862,7 @@ export function VttTable({ initial, campaignId, user, isGm, active }: VttTablePr
       ? scenes[activeSceneIndex + 1]
       : null;
   const defaultPosition = activeScene
-    ? { x: activeScene.width / 2, y: activeScene.height / 2 }
+    ? suggestedTokenPosition(activeScene, tokens)
     : { x: 100, y: 100 };
 
   if (!activeScene) {

@@ -482,16 +482,6 @@ export function LootBuilder({
           icon={<Coins size={30} />}
           title="No loot prepared"
           description="Create a parcel for the next hoard, quest reward, or shop stock."
-          action={
-            <Button
-              variant="primary"
-              icon={<Plus size={15} />}
-              loading={busy}
-              onClick={createParcel}
-            >
-              Create the first parcel
-            </Button>
-          }
         />
       ) : (
         <div className="encounter-layout loot-layout">
