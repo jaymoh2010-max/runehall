@@ -14,7 +14,7 @@ Runehall is a complete **campaign table**, with a few deliberate boundaries:
 
 - **Ready:** accounts and invites, campaign membership, 1–20 character building, live sheets, server-rolled combat, HP/dying/wounded, conditions, afflictions, item activation, prepared/spontaneous/focus/innate casting, loot and shops, downtime, travel, sessions, safety tools, journal/handouts, victory-point clocks, export/import, backup/restore, and administrator moderation.
 - **GM-facing preparation:** encounters, waves, hazards-as-XP, custom hazards, NPCs, factions, merchants, scenes, chapter/arc scaffolding, optional tracked stock, and a live GM screen.
-- **Manual by design:** optional variant rules, unusual feat/item effects, published-adventure conversion, hexcrawl mapping, and long-running project bookkeeping.
+- **Manual by design:** optional variant rules, unusual feat/item effects, published-adventure conversion, hex-grid mapping, and long-running project bookkeeping.
 
 The rest of this document records what is verified and what remains manual, so a GM can decide before session zero.
 
@@ -25,8 +25,8 @@ The rest of this document records what is verified and what remains manual, so a
 | Check | Result |
 | --- | --- |
 | `npm run check` | Typecheck, lint, formatting, unit tests, production build, and bundle budget pass |
-| Unit tests | 665 passing |
-| `npm run e2e` | 48 passing browser scenarios |
+| Unit tests | 675 passing |
+| `npm run e2e` | 50 passing browser scenarios |
 | `npm run smoke` | End-to-end smoke suite passes |
 | `npm run simulate:campaign` | 85 passed, 0 failed, 0 observations |
 
