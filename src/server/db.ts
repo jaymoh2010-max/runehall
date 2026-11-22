@@ -461,6 +461,19 @@ export interface CampaignKnowledgeRow {
   updated_at: number;
 }
 
+export interface CampaignChapterRow {
+  id: string;
+  campaign_id: string;
+  title: string;
+  summary: string;
+  level_start: number;
+  level_end: number;
+  status: string;
+  sort_order: number;
+  created_at: number;
+  updated_at: number;
+}
+
 export interface CampaignDashboardRow {
   campaign_id: string;
   last_session_summary: string;

@@ -9468,3 +9468,50 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Adventure arc */
+.arc-page .arc-active-card {
+  border-color: color-mix(in srgb, var(--blue) 40%, var(--line));
+  background: linear-gradient(140deg, var(--panel-2), var(--panel-1));
+}
+.arc-page .arc-active-card h3 {
+  margin: 4px 0 8px;
+}
+.arc-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.arc-chapter {
+  padding: 14px;
+}
+.arc-chapter.arc-active {
+  border-color: color-mix(in srgb, var(--blue) 45%, var(--line));
+}
+.arc-chapter.arc-complete {
+  opacity: 0.85;
+}
+.arc-chapter-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.arc-chapter-head h3 {
+  margin: 0;
+}
+.arc-chapter-head p {
+  margin: 6px 0 0;
+}
+.arc-index {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: var(--panel-3);
+  color: var(--gold-bright);
+  font-weight: 700;
+}

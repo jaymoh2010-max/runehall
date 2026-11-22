@@ -25,6 +25,7 @@ import {
 } from "../shared/travel";
 import { normalizeSessionZeroChecklist } from "../shared/sessionZero";
 import { normalizeNpcAttitude, normalizeReputation } from "../shared/people";
+import { normalizeChapterLevel, normalizeChapterStatus } from "../shared/chapters";
 import {
   MAX_SHOP_STOCK_ROWS,
   normalizeSettlementLevel,
@@ -99,6 +100,7 @@ export interface CampaignImportStats {
   travel: number;
   npcs: number;
   knowledge: number;
+  chapters: number;
   sessions: number;
   audioTracks: number;
   embeddedAssets: number;
@@ -185,6 +187,7 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
     travel: 0,
     npcs: 0,
     knowledge: 0,
+    chapters: 0,
     sessions: 0,
     audioTracks: 0,
     embeddedAssets: 0,
@@ -781,6 +784,28 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
         ts
       );
       stats.knowledge += 1;
+    }
+
+    for (const chapter of records(payload.chapters, 100, "chapters")) {
+      const levelStart = normalizeChapterLevel(chapter.levelStart, 1);
+      db.prepare(
+        `INSERT INTO campaign_chapters
+           (id, campaign_id, title, summary, level_start, level_end, status, sort_order,
+            created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).run(
+        newId("chapter"),
+        campaignId,
+        text(chapter.title, "Imported chapter", 160),
+        longText(chapter.summary, "", 8_000),
+        levelStart,
+        Math.max(levelStart, normalizeChapterLevel(chapter.levelEnd, levelStart)),
+        normalizeChapterStatus(chapter.status),
+        numberValue(chapter.sortOrder, 0),
+        ts,
+        ts
+      );
+      stats.chapters += 1;
     }
 
     for (const npc of records(payload.npcs, 300, "NPCs")) {

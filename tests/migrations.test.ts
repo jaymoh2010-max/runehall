@@ -144,6 +144,7 @@ describe("migrations", () => {
         "campaign_factions",
         "campaign_player_notes",
         "campaign_knowledge",
+        "campaign_chapters",
       ])
     );
 

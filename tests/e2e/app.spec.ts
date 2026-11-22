@@ -653,6 +653,38 @@ test("GM downloads a self-contained campaign archive", async ({ page }) => {
   await expect(page.getByText("Self-contained campaign archive exported.")).toBeVisible();
 });
 
+test("GM outlines the adventure arc with chapters", async ({ page }) => {
+  await signIn(page, admin);
+  await page.goto(`${campaignPath}?tab=arc`);
+  await expect(page.getByRole("heading", { name: "Adventure arc" })).toBeVisible();
+
+  await page.getByRole("button", { name: "Add chapter" }).click();
+  const firstDialog = page.getByRole("dialog", { name: "New chapter" });
+  await expect(firstDialog).toBeVisible();
+  await firstDialog.getByLabel("Chapter title").fill("E2E The Ashen Crown");
+  await firstDialog.getByLabel("Starting level").fill("1");
+  await firstDialog.getByLabel("Ending level").fill("4");
+  await firstDialog.getByLabel("Status").selectOption("active");
+  await firstDialog.getByLabel("Chapter summary").fill("The party learns the crown is waking.");
+  await firstDialog.getByRole("button", { name: "Add chapter" }).click();
+  await expect(page.getByText("Chapter added.")).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator(".arc-active-card").getByText("E2E The Ashen Crown")).toBeVisible();
+  await expect(page.locator(".arc-active-card").getByText("Levels 1–4")).toBeVisible();
+
+  await page.getByRole("button", { name: "Add chapter" }).click();
+  const secondDialog = page.getByRole("dialog", { name: "New chapter" });
+  await secondDialog.getByLabel("Chapter title").fill("E2E Beneath the City");
+  await secondDialog.getByLabel("Starting level").fill("5");
+  await secondDialog.getByLabel("Ending level").fill("8");
+  await secondDialog.getByRole("button", { name: "Add chapter" }).click();
+  await expect(page.getByText("Chapter added.").last()).toBeVisible({ timeout: 15_000 });
+  await page.getByRole("button", { name: "Make active" }).click();
+  await expect(page.getByText(/“E2E Beneath the City” is now the active chapter/)).toBeVisible({
+    timeout: 15_000,
+  });
+  await expect(page.locator(".arc-active-card").getByText("E2E Beneath the City")).toBeVisible();
+});
+
 test("lazy library, compendium entry, rules, and account routes load", async ({ page }) => {
   await signIn(page, admin);
   await page.goto("/library");
@@ -808,6 +840,11 @@ test("player registers, joins with the invite code, and sees a player-safe table
   await expect(
     page.locator(".notes-private").getByText("E2E private suspicion", { exact: true })
   ).toBeVisible();
+
+  await page.goto(`${campaignPath}?tab=arc`);
+  await expect(page.getByRole("heading", { name: "Adventure arc" })).toBeVisible();
+  await expect(page.locator(".arc-active-card").getByText("E2E Beneath the City")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Add chapter" })).toHaveCount(0);
 
   const adminContext = await browser.newContext();
   const adminPage = await adminContext.newPage();
