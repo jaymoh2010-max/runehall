@@ -2470,7 +2470,28 @@ export function computeCharacter(
     );
   const spellAbility = caster.spellAbility ?? key;
   const spellMod = spellAbility ? abilityMods[spellAbility] : 0;
-  const conditionEffects = conditionModifiers(draft.play.conditions, { level: draft.level });
+  // Bulk is calculated before conditions so carrying too much automatically
+  // applies the Encumbered condition without making the player add it twice.
+  const ownedEquipment = draft.equipment
+    .map((entry) => ({ entry, item: context.equipment[entry.itemId] }))
+    .filter((x): x is { entry: (typeof draft.equipment)[number]; item: Equipment } =>
+      Boolean(x.item)
+    );
+  const bulkTotal = ownedEquipment.reduce(
+    (sum, { entry, item }) => sum + (item.bulk || 0) * entry.quantity,
+    0
+  );
+  const capacity = 5 + abilityMods.str;
+  const maxBulk = 10 + abilityMods.str;
+  const carriesEncumberedCondition = draft.play.conditions.some(
+    (condition) => condition.name.trim().toLowerCase() === "encumbered"
+  );
+  const isEncumbered = bulkTotal > capacity;
+  const effectiveConditions =
+    isEncumbered && !carriesEncumberedCondition
+      ? [...draft.play.conditions, { name: "Encumbered", value: null, duration: null }]
+      : draft.play.conditions;
+  const conditionEffects = conditionModifiers(effectiveConditions, { level: draft.level });
   const validation: ValidationIssue[] = [];
   const issue = (severity: Severity, message: string, step?: string) =>
     validation.push({ severity, message, step });
@@ -2937,17 +2958,13 @@ export function computeCharacter(
         (spellAbility ? conditionEffects.checks[spellAbility] : conditionEffects.allChecks);
 
   // --- Equipment -----------------------------------------------------------
-  const ownedEquipment = draft.equipment
-    .map((entry) => ({ entry, item: context.equipment[entry.itemId] }))
-    .filter((x): x is { entry: (typeof draft.equipment)[number]; item: Equipment } =>
-      Boolean(x.item)
+  if (bulkTotal > maxBulk) {
+    issue(
+      "warning",
+      `You carry ${Math.round(bulkTotal * 10) / 10} Bulk, above your maximum of ${maxBulk}. Drop or stow gear before moving.`,
+      "gear"
     );
-  const bulkTotal = ownedEquipment.reduce(
-    (sum, { entry, item }) => sum + (item.bulk || 0) * entry.quantity,
-    0
-  );
-  const capacity = 5 + abilityMods.str;
-  const maxBulk = 10 + abilityMods.str;
+  }
   const spent = ownedEquipment.reduce((sum, { entry, item }) => {
     const runeCost = (entry.runes ?? []).reduce(
       (runeSum, runeId) => runeSum + (context.equipment[runeId]?.price.cpTotal ?? 0),

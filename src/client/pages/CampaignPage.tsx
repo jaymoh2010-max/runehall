@@ -39,6 +39,7 @@ import {
   Sparkles,
   Star,
   Swords,
+  Timer,
   Trash2,
   UserPlus,
   UserRound,
@@ -87,6 +88,7 @@ import { startingWealthCp } from "../../shared/rules";
 import { api, copyText, formatCp, formatDate, uploadImage } from "../api";
 import { connectSocket, joinCampaign } from "../socket";
 import { TravelTab } from "../components/campaign/TravelTab";
+import { ClocksTab } from "../components/campaign/ClocksTab";
 import { SessionZeroTab } from "../components/campaign/SessionZeroTab";
 import { PeopleTab } from "../components/campaign/PeopleTab";
 import { PlayerRequestsCard } from "../components/campaign/PlayerRequestsCard";
@@ -147,6 +149,7 @@ type Tab =
   | "people"
   | "arc"
   | "travel"
+  | "clocks"
   | "sessions"
   | "encounters"
   | "loot"
@@ -173,6 +176,7 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode; gmOnly?: boolean }[
   { id: "people", label: "People", icon: <Shield size={15} /> },
   { id: "arc", label: "Adventure arc", icon: <Milestone size={15} /> },
   { id: "travel", label: "Travel", icon: <Compass size={15} /> },
+  { id: "clocks", label: "Clocks", icon: <Timer size={15} /> },
   { id: "journal", label: "Journal", icon: <ScrollText size={15} /> },
   { id: "notes", label: "Notes & lore", icon: <BookOpen size={15} /> },
   { id: "sessions", label: "Sessions", icon: <CalendarClock size={15} /> },
@@ -201,6 +205,7 @@ export function CampaignPage() {
     rawTab === "people" ||
     rawTab === "arc" ||
     rawTab === "travel" ||
+    rawTab === "clocks" ||
     rawTab === "sessions" ||
     rawTab === "encounters" ||
     rawTab === "loot" ||
@@ -1851,6 +1856,8 @@ export function CampaignPage() {
             toast={toast}
           />
         ) : null}
+
+        {tab === "clocks" ? <ClocksTab campaignId={campaign.id} isGm={isGm} /> : null}
 
         {tab === "party" ? (
           <div className="page-inner">

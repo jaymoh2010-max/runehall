@@ -881,4 +881,25 @@ export const migrations: Migration[] = [
       ALTER TABLE users ADD COLUMN disabled_reason TEXT NOT NULL DEFAULT '';
     `,
   },
+  {
+    version: 50,
+    name: "campaign_clocks",
+    sql: `
+      CREATE TABLE IF NOT EXISTS campaign_clocks (
+        id TEXT PRIMARY KEY,
+        campaign_id TEXT NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        description TEXT NOT NULL DEFAULT '',
+        segments INTEGER NOT NULL DEFAULT 4,
+        filled INTEGER NOT NULL DEFAULT 0,
+        visible INTEGER NOT NULL DEFAULT 1,
+        player_editable INTEGER NOT NULL DEFAULT 0,
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_campaign_clocks_campaign
+        ON campaign_clocks(campaign_id, sort_order);
+    `,
+  },
 ];

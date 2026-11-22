@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+  advanceAfflictionDuration,
+  afflictionDurationSeconds,
   afflictionOnsetPassed,
   afflictionRounds,
   applyAfflictionSave,
+  formatAfflictionDuration,
   initialIntervalRemaining,
   initialOnsetRemaining,
   normalizeAffliction,
@@ -23,7 +26,8 @@ function affliction(overrides: Partial<CharacterAffliction> = {}): CharacterAffl
     stage: 1,
     stageMax: 3,
     interval: "1 round",
-    duration: "1 minute",
+    duration: "",
+    durationRemaining: null,
     onset: "1 round",
     onsetRemaining: 1,
     intervalRemaining: 1,
@@ -76,6 +80,38 @@ describe("afflictions", () => {
     expect(normalized!.notes).toHaveLength(1_000);
     expect(normalizeAffliction({ type: "poison" })).toBeNull();
     expect(normalizeAffliction({ name: "X", type: "unknown" })?.type).toBe("poison");
+  });
+
+  it("tracks maximum durations in seconds and ends when they run out", () => {
+    expect(afflictionDurationSeconds("1 round")).toBe(6);
+    expect(afflictionDurationSeconds("2 minutes")).toBe(120);
+    expect(afflictionDurationSeconds("1 hour")).toBe(3_600);
+    expect(afflictionDurationSeconds("1 day")).toBe(86_400);
+    expect(afflictionDurationSeconds("until cured")).toBeNull();
+
+    const normalized = normalizeAffliction({ name: "Venom", duration: "1 minute" });
+    expect(normalized?.durationRemaining).toBe(60);
+    expect(advanceAfflictionDuration(normalized!, 54)?.durationRemaining).toBe(6);
+    expect(advanceAfflictionDuration(normalized!, 60)).toBeNull();
+    expect(formatAfflictionDuration(3_600)).toBe("1 hour left");
+    expect(formatAfflictionDuration(null)).toBe("no timed maximum");
+  });
+
+  it("ends an affliction at the end of the turn that exhausts its duration", () => {
+    const draft = withAffliction({
+      duration: "1 round",
+      durationRemaining: 6,
+      onsetRemaining: 0,
+      intervalRemaining: 10,
+    });
+    const result = resolveAfflictionTurnEnd(
+      draft,
+      { fortitude: 10, reflex: 0, will: 0 },
+      { rng: () => 0.5 }
+    );
+    expect(result.changed).toBe(true);
+    expect(result.draft.play.afflictions).toHaveLength(0);
+    expect(result.notes.join(" ")).toContain("maximum duration");
   });
 
   it("parses only round-based onset and interval timers", () => {

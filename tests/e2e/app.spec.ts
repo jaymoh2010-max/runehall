@@ -2673,3 +2673,52 @@ test("administrator suspends an account and revokes its sessions", async ({ page
   await expect(importerRow.getByText("Suspended", { exact: true })).toHaveCount(0);
   await expect(page.getByText("Reason: E2E moderation check")).toHaveCount(0);
 });
+
+test("GM creates victory-point clocks and players see shared progress", async ({
+  page,
+  browser,
+}) => {
+  await signIn(page, admin);
+  await page.goto(`${campaignPath}?tab=clocks`);
+  await expect(page.getByRole("heading", { name: "Clocks & progress tracks" })).toBeVisible();
+
+  await page.getByRole("button", { name: "Add clock" }).first().click();
+  const dialog = page.getByRole("dialog", { name: "Add clock" });
+  await dialog.getByLabel("Clock name").fill("E2E Ritual Clock");
+  await dialog
+    .getByLabel("Description (optional)")
+    .fill("Light the four braziers before the eclipse.");
+  await dialog.locator("select").selectOption("6");
+  await dialog.getByRole("button", { name: "Create clock" }).click();
+
+  const card = page.locator(".clock-card").filter({ hasText: "E2E Ritual Clock" });
+  await expect(card).toBeVisible({ timeout: 15_000 });
+  await card.getByRole("button", { name: "Add one segment to E2E Ritual Clock" }).click();
+  await card.getByRole("button", { name: "Add one segment to E2E Ritual Clock" }).click();
+  await expect(card.getByRole("img", { name: /2 of 6 segments filled/ })).toBeVisible();
+  await expect(card.getByText("2 / 6 filled")).toBeVisible();
+
+  await page.getByRole("button", { name: "Add clock" }).click();
+  const hiddenDialog = page.getByRole("dialog", { name: "Add clock" });
+  await hiddenDialog.getByLabel("Clock name").fill("E2E Hidden Clock");
+  await hiddenDialog.getByLabel("Show this clock to players").uncheck();
+  await hiddenDialog.getByRole("button", { name: "Create clock" }).click();
+  await expect(page.locator(".clock-card").filter({ hasText: "E2E Hidden Clock" })).toBeVisible({
+    timeout: 15_000,
+  });
+
+  const playerContext = await browser.newContext();
+  const playerPage = await playerContext.newPage();
+  await signIn(playerPage, importer);
+  await playerPage.goto(`${campaignPath}?tab=clocks`);
+  await expect(playerPage.getByRole("heading", { name: "Clocks & progress tracks" })).toBeVisible();
+  await expect(
+    playerPage.locator(".clock-card").filter({ hasText: "E2E Ritual Clock" })
+  ).toBeVisible({ timeout: 15_000 });
+  await expect(
+    playerPage.locator(".clock-card").filter({ hasText: "E2E Hidden Clock" })
+  ).toHaveCount(0);
+  await expect(playerPage.getByRole("button", { name: "Add clock" })).toHaveCount(0);
+
+  await playerContext.close();
+});

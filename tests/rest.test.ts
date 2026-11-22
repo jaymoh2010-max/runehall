@@ -28,6 +28,7 @@ function hero(level = 5): CharacterDraft {
       stageMax: 3,
       interval: "1 day",
       duration: "",
+      durationRemaining: null,
       onset: "1 hour",
       onsetRemaining: null,
       intervalRemaining: null,
@@ -233,6 +234,20 @@ describe("PF2e long rest", () => {
     ];
     const result = applyLongRest(draft, derived);
     expect(result.draft.equipment[0].usesUsed).toBe(0);
+  });
+
+  it("advances maximum affliction durations by the eight-hour rest", () => {
+    const draft = hero(5);
+    draft.play.afflictions = [
+      {
+        ...draft.play.afflictions[0],
+        duration: "1 hour",
+        durationRemaining: 3_600,
+      },
+    ];
+    const result = applyLongRest(draft, derived);
+    expect(result.draft.play.afflictions).toEqual([]);
+    expect(result.summary.afflictionsEnded).toEqual(["Grave Curse"]);
   });
 
   it("does not mutate the input draft", () => {

@@ -714,6 +714,26 @@ describe("PF2e character rules", () => {
     expect(derived.attacks.find((attack) => attack.name === "Longsword")?.attackBonus).toBe(5);
   });
 
+  it("applies the Encumbered condition when carried Bulk exceeds capacity", () => {
+    const { draft, context } = buildCleric();
+    const chainMail = equipment.find((entry) => entry.name === "Chain Mail")!;
+    draft.equipment = [{ itemId: chainMail.id, quantity: 10, equipped: false }];
+    const encumbered = computeCharacter(draft, {
+      ...context,
+      equipment: { [chainMail.id]: chainMail },
+    });
+    // Ten chain mails are 20 Bulk, beyond both capacity and the hard maximum.
+    expect(encumbered.bulk.total).toBe(20);
+    expect(encumbered.bulk.encumbered).toBe(true);
+    expect(encumbered.conditionEffects.notes.some((note) => note.startsWith("Encumbered:"))).toBe(
+      true
+    );
+    expect(encumbered.conditionEffects.speed).toBe(-10);
+    expect(
+      encumbered.validation.some((issue) => issue.message.includes("above your maximum"))
+    ).toBe(true);
+  });
+
   it("applies warpriest doctrine armor proficiency", () => {
     const { draft, context } = buildCleric();
     const chainMail = equipment.find((entry) => entry.name === "Chain Mail")!;

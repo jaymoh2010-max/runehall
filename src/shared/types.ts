@@ -742,6 +742,8 @@ export interface CharacterAffliction {
   interval: string;
   /** Maximum duration, e.g. "1 minute" or empty for until cured. */
   duration: string;
+  /** Remaining maximum duration in seconds; null means no timed maximum. */
+  durationRemaining: number | null;
   /** Onset text, e.g. "1 round" or "1 hour". */
   onset: string;
   /** Rounds until onset ends; 0 = passed, null = manual/non-round onset. */
@@ -1106,6 +1108,21 @@ export interface CampaignJoinRequest extends PendingJoinRequest {
   playerUsername: string;
   summary: CharacterSummary | null;
   validation: ValidationIssue[];
+}
+
+/** A victory-point clock or countdown shown to the table. */
+export interface CampaignClock {
+  id: string;
+  campaignId: string;
+  name: string;
+  description: string;
+  segments: number;
+  filled: number;
+  visible: boolean;
+  playerEditable: boolean;
+  sortOrder: number;
+  createdAt: number;
+  updatedAt: number;
 }
 
 /** Player-initiated actions that wait for the GM's approval. */
@@ -2127,6 +2144,7 @@ export interface ServerToClientEvents {
     requestId: string;
     status: CampaignRequestStatus;
   }) => void;
+  "clocks:changed": (payload: { campaignId: string }) => void;
   "campaign:revision": (payload: { revision: number }) => void;
   "campaign:updated": (campaign: CampaignSummary) => void;
   "safety:signal": (payload: { message: string; createdAt: number }) => void;

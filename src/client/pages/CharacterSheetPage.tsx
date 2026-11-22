@@ -115,8 +115,10 @@ import { spellTraditionLabel, stripHtml } from "../../shared/compendium";
 import {
   AFFLICTION_TYPES,
   afflictionOnsetPassed,
+  afflictionDurationSeconds,
   afflictionTypeLabel,
   applyAfflictionSave,
+  formatAfflictionDuration,
   initialIntervalRemaining,
   initialOnsetRemaining,
   newAfflictionId,
@@ -175,6 +177,7 @@ function emptyAfflictionForm(): CharacterAffliction {
     stageMax: 3,
     interval: "",
     duration: "",
+    durationRemaining: null,
     onset: "",
     onsetRemaining: 0,
     intervalRemaining: null,
@@ -1451,9 +1454,16 @@ export function CharacterSheetPage() {
   };
 
   const saveAffliction = () => {
+    const previous = afflictionEditingId
+      ? draft?.play.afflictions.find((entry) => entry.id === afflictionEditingId)
+      : null;
     const normalized = normalizeAffliction({
       ...afflictionForm,
       id: afflictionEditingId ?? afflictionForm.id,
+      durationRemaining:
+        previous && previous.duration === afflictionForm.duration
+          ? previous.durationRemaining
+          : afflictionDurationSeconds(afflictionForm.duration),
     });
     if (!normalized) {
       toast("Give the affliction a name.", "error");
@@ -2342,7 +2352,11 @@ export function CharacterSheetPage() {
                             {affliction.interval
                               ? `every ${affliction.interval}`
                               : "no interval save"}
-                            {affliction.duration ? ` · max ${affliction.duration}` : ""}
+                            {affliction.duration
+                              ? ` · max ${affliction.duration} (${formatAfflictionDuration(
+                                  affliction.durationRemaining
+                                )})`
+                              : ""}
                             {affliction.onset ? ` · onset ${affliction.onset}` : ""}
                             {affliction.onsetRemaining !== null && affliction.onsetRemaining > 0
                               ? ` · onset in ${affliction.onsetRemaining} round${

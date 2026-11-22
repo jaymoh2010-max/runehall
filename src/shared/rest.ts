@@ -1,5 +1,6 @@
 import { conditionBaseName, conditionNameWithoutValue, conditionNumericValue } from "./tokens";
 import { resetItemUses } from "./itemActivation";
+import { advanceAfflictionDuration } from "./afflictions";
 import type { CharacterCondition, CharacterDraft, DerivedCharacter } from "./types";
 
 export interface LongRestOptions {
@@ -25,6 +26,7 @@ export interface LongRestSummary {
   divineFontRestored: number;
   removedConditions: string[];
   reducedConditions: { name: string; from: number; to: number }[];
+  afflictionsEnded: string[];
   shieldLowered: boolean;
 }
 
@@ -136,6 +138,7 @@ export function applyLongRest(
         divineFontRestored: 0,
         removedConditions: [],
         reducedConditions: [],
+        afflictionsEnded: [],
         shieldLowered: false,
       },
     };
@@ -148,6 +151,14 @@ export function applyLongRest(
     (total, value) => total + Math.max(0, Math.round(Number(value) || 0)),
     0
   );
+  const afflictionsEnded: string[] = [];
+  const afflictions = draft.play.afflictions.flatMap((entry) => {
+    // An eight-hour rest counts against maximum durations such as "1 day".
+    const next = advanceAfflictionDuration(entry, 8 * 60 * 60);
+    if (next) return [next];
+    afflictionsEnded.push(entry.name);
+    return [];
+  });
 
   return {
     draft: resetItemUses({
@@ -167,6 +178,7 @@ export function applyLongRest(
         tempHp: 0,
         focusPoints: focusMax,
         conditions: conditionResult.conditions,
+        afflictions,
         sustainedSpells: [],
         treatWoundsImmune: false,
         battleMedicineImmuneBy: [],
@@ -187,6 +199,7 @@ export function applyLongRest(
       divineFontRestored: Math.max(0, Math.round(draft.spells.divineFontUsed)),
       removedConditions: conditionResult.removed,
       reducedConditions: conditionResult.reduced,
+      afflictionsEnded,
       shieldLowered: draft.play.shieldRaised,
     },
   };

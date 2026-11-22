@@ -358,6 +358,20 @@ export interface XpAwardRow {
   created_at: number;
 }
 
+export interface CampaignClockRow {
+  id: string;
+  campaign_id: string;
+  name: string;
+  description: string;
+  segments: number;
+  filled: number;
+  visible: number;
+  player_editable: number;
+  sort_order: number;
+  created_at: number;
+  updated_at: number;
+}
+
 export interface CampaignRequestRow {
   id: string;
   campaign_id: string;

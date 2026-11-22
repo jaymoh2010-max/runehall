@@ -59,10 +59,72 @@ export function initialIntervalRemaining(interval: string): number | null {
   return afflictionRounds(interval);
 }
 
+const DURATION_UNITS: Record<string, number> = {
+  round: 6,
+  rounds: 6,
+  minute: 60,
+  minutes: 60,
+  hour: 3_600,
+  hours: 3_600,
+  day: 86_400,
+  days: 86_400,
+};
+
+/** Parse a maximum duration such as "1 minute" or "2 days" into seconds. */
+export function afflictionDurationSeconds(text: string): number | null {
+  const match = String(text ?? "")
+    .trim()
+    .match(/^(\d+)\s*(rounds?|minutes?|hours?|days?)$/i);
+  if (!match) return null;
+  const amount = clampInt(match[1], 1, 3_650, 1);
+  return amount * DURATION_UNITS[match[2].toLowerCase()];
+}
+
+/** A compact remaining-time label for the sheet. */
+export function formatAfflictionDuration(seconds: number | null): string {
+  if (seconds === null) return "no timed maximum";
+  const value = Math.max(0, Math.round(seconds));
+  if (value >= 86_400) {
+    const days = Math.ceil(value / 86_400);
+    return `${days} ${days === 1 ? "day" : "days"} left`;
+  }
+  if (value >= 3_600) {
+    const hours = Math.ceil(value / 3_600);
+    return `${hours} ${hours === 1 ? "hour" : "hours"} left`;
+  }
+  if (value >= 60) {
+    const minutes = Math.ceil(value / 60);
+    return `${minutes} ${minutes === 1 ? "minute" : "minutes"} left`;
+  }
+  return `${Math.max(1, value)} ${value === 1 ? "second" : "seconds"} left`;
+}
+
+/**
+ * Advance a timed maximum duration. Returns null when the affliction has
+ * reached its maximum duration and should be removed.
+ */
+export function advanceAfflictionDuration(
+  affliction: CharacterAffliction,
+  seconds: number
+): CharacterAffliction | null {
+  if (affliction.durationRemaining === null) return affliction;
+  const remaining = affliction.durationRemaining - Math.max(0, Math.round(seconds));
+  if (remaining <= 0) return null;
+  return { ...affliction, durationRemaining: remaining };
+}
+
 function timerValue(value: unknown, fallback: number | null): number | null {
   if (value === null) return null;
   if (typeof value === "number" && Number.isFinite(value)) {
     return Math.max(0, Math.min(1_000, Math.round(value)));
+  }
+  return fallback;
+}
+
+function durationValue(value: unknown, fallback: number | null): number | null {
+  if (value === null) return null;
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return Math.max(0, Math.min(315_360_000, Math.round(value)));
   }
   return fallback;
 }
@@ -89,6 +151,10 @@ export function normalizeAffliction(input: unknown): CharacterAffliction | null 
     stageMax,
     interval,
     duration: typeof raw.duration === "string" ? raw.duration.trim().slice(0, 40) : "",
+    durationRemaining: durationValue(
+      raw.durationRemaining,
+      afflictionDurationSeconds(typeof raw.duration === "string" ? raw.duration : "")
+    ),
     onset,
     onsetRemaining: timerValue(raw.onsetRemaining, initialOnsetRemaining(onset)),
     intervalRemaining: timerValue(raw.intervalRemaining, initialIntervalRemaining(interval)),
@@ -190,6 +256,7 @@ export function afflictionTypeLabel(type: AfflictionType): string {
 export function resetAfflictionTimers(affliction: CharacterAffliction): CharacterAffliction {
   return {
     ...affliction,
+    durationRemaining: afflictionDurationSeconds(affliction.duration),
     onsetRemaining: initialOnsetRemaining(affliction.onset),
     intervalRemaining: initialIntervalRemaining(affliction.interval),
   };
@@ -257,6 +324,15 @@ export function resolveAfflictionTurnEnd(
 
   for (const affliction of draft.play.afflictions) {
     let entry = affliction;
+    if (entry.durationRemaining !== null) {
+      const remaining = entry.durationRemaining - 6;
+      changed = true;
+      if (remaining <= 0) {
+        notes.push(`${entry.name} reaches its maximum duration and ends.`);
+        continue;
+      }
+      entry = { ...entry, durationRemaining: remaining };
+    }
     if (entry.onsetRemaining === null) {
       next.push(entry);
       continue;
