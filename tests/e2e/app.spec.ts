@@ -593,6 +593,9 @@ test("GM plans a journey and advances a travel day", async ({ page }) => {
   await page.getByRole("button", { name: "Save journey" }).click();
   await expect(page.getByText("Journey saved.")).toBeVisible({ timeout: 15_000 });
   await expect(page.getByText(/0 of 20 miles/)).toBeVisible();
+  await expect(page.locator(".travel-pointcrawl")).toBeVisible();
+  await expect(page.locator(".travel-pointcrawl").getByText("E2E Start")).toBeVisible();
+  await expect(page.locator(".travel-pointcrawl").getByText("E2E End")).toBeVisible();
   await expect(
     page.locator(".travel-player-grid").getByText("E2E Hero", { exact: true }).first()
   ).toBeVisible();
@@ -629,7 +632,10 @@ test("GM plans a journey and advances a travel day", async ({ page }) => {
     page
       .locator(".travel-page")
       .getByText(`${travelDayBefore + 1} Abadius, 4726 AR`, { exact: true })
+      .first()
   ).toBeVisible();
+  await page.getByText("Travel log · 1 day").click();
+  await expect(page.locator(".travel-history-row").getByText("20 mi")).toBeVisible();
 
   page.once("dialog", (dialog) => dialog.accept());
   await page.getByRole("button", { name: "Clear journey" }).click();

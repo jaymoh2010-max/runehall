@@ -8,12 +8,14 @@ import { shiftGolarionDate } from "../../shared/calendar";
 import {
   normalizeTravelActivities,
   normalizeTravelEncounterChecks,
+  normalizeTravelHistory,
   normalizeTravelMiles,
   normalizeTravelSpeed,
   normalizeTravelTerrain,
   normalizeTravelWatches,
   normalizeTravelWaypoints,
   normalizeTravelWeather,
+  travelDayMiles,
   travelEncounterDc,
   travelMilesPerDay,
 } from "../../shared/travel";
@@ -119,13 +121,19 @@ export async function registerTravelRoutes(app: FastifyInstance): Promise<void> 
       body.activities === undefined ? parseJson(existing?.activities, {}) : body.activities,
       characterIds
     );
+    const history =
+      body.clearHistory === true
+        ? []
+        : normalizeTravelHistory(
+            body.history === undefined ? parseJson(existing?.history, []) : body.history
+          );
     const daysTravelled = safeInt(body.daysTravelled, existing?.days_travelled ?? 0, 0, 100_000);
     const ts = now();
     db.prepare(
       `INSERT INTO campaign_travel
         (campaign_id, origin, destination, terrain, distance_miles, progress_miles, party_speed,
-         weather, notes, watches, activities, days_travelled, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         weather, notes, watches, activities, history, days_travelled, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(campaign_id) DO UPDATE SET
          origin = excluded.origin,
          destination = excluded.destination,
@@ -137,6 +145,7 @@ export async function registerTravelRoutes(app: FastifyInstance): Promise<void> 
          notes = excluded.notes,
          watches = excluded.watches,
          activities = excluded.activities,
+         history = excluded.history,
          days_travelled = excluded.days_travelled,
          updated_at = excluded.updated_at`
     ).run(
@@ -151,6 +160,7 @@ export async function registerTravelRoutes(app: FastifyInstance): Promise<void> 
       notes,
       JSON.stringify(watches),
       JSON.stringify(activities),
+      JSON.stringify(history.slice(-3_650)),
       daysTravelled,
       ts,
       ts
@@ -189,11 +199,16 @@ export async function registerTravelRoutes(app: FastifyInstance): Promise<void> 
     }
     const body = (request.body ?? {}) as Record<string, unknown>;
     const dailyMiles = travelMilesPerDay(row.party_speed, row.terrain);
-    const miles = body.miles === undefined ? dailyMiles : normalizeTravelMiles(body.miles);
-    if (miles <= 0) return reply.code(400).send({ error: "Travel at least some distance." });
+    const requestedMiles = body.miles === undefined ? dailyMiles : normalizeTravelMiles(body.miles);
+    if (requestedMiles <= 0) {
+      return reply.code(400).send({ error: "Travel at least some distance." });
+    }
     // A custom distance that exceeds one day's travel consumes the matching
-    // number of calendar days instead of always advancing a single day.
-    const days = Math.max(1, Math.ceil(miles / Math.max(1, dailyMiles)));
+    // number of calendar days. Stop at the destination rather than spending
+    // days on miles the party never needed to walk.
+    const miles = Math.min(requestedMiles, distanceMiles - progressMiles);
+    const dayMiles = travelDayMiles(miles, dailyMiles);
+    const days = dayMiles.length;
     const nextProgress = Math.min(distanceMiles, progressMiles + miles);
     const currentDate = {
       year: campaign.world_year,
@@ -202,15 +217,31 @@ export async function registerTravelRoutes(app: FastifyInstance): Promise<void> 
     };
     const worldDate = shiftGolarionDate(currentDate, days);
     const ts = now();
+    const history = normalizeTravelHistory(parseJson(row.history, []));
+    for (let index = 0; index < dayMiles.length; index += 1) {
+      const date = shiftGolarionDate(currentDate, index + 1);
+      history.push({
+        id: newId("tday"),
+        day: row.days_travelled + index + 1,
+        miles: dayMiles[index],
+        terrain: normalizeTravelTerrain(row.terrain),
+        weather: normalizeTravelWeather(row.weather),
+        worldYear: date.year,
+        worldMonth: date.month,
+        worldDay: date.day,
+        note: "",
+        createdAt: ts,
+      });
+    }
     transaction(() => {
       db.prepare(
         "UPDATE campaigns SET world_year = ?, world_month = ?, world_day = ?, updated_at = ? WHERE id = ?"
       ).run(worldDate.year, worldDate.month, worldDate.day, ts, id);
       db.prepare(
         `UPDATE campaign_travel
-         SET progress_miles = ?, days_travelled = days_travelled + ?, updated_at = ?
+         SET progress_miles = ?, days_travelled = days_travelled + ?, history = ?, updated_at = ?
          WHERE campaign_id = ?`
-      ).run(nextProgress, days, ts, id);
+      ).run(nextProgress, days, JSON.stringify(history.slice(-3_650)), ts, id);
     });
     touchCampaign(id);
     logAudit({

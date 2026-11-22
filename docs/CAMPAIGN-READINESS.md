@@ -65,7 +65,7 @@ The campaign simulation exercises two complete 1–20 campaigns, including XP an
 - Party requests with GM approval: level-up, downtime, and player-written journal entries. Nothing changes until the GM approves or denies it; players can withdraw pending requests.
 - Victory-point clocks with 1–12 segments, GM-only or player-visible clocks, optional player ticks, and live updates.
 - Downtime days, cost of living, Earn Income, Subsist, Craft/Retrain trackers, and server-charged upkeep.
-- Travel planning with PF2e pace, terrain, weather metadata, four watches, exploration activities, waypoints, encounter checks, and calendar advancement.
+- Travel planning with PF2e pace, terrain, weather, four watches, exploration activities, a linear pointcrawl, per-day logs, encounter checks, and calendar advancement.
 - Sessions, attendance, check-ins, recap drafts, session zero/safety tools, private notes, shared knowledge, factions, NPCs, quests, handouts, and merchant stock.
 - Loot parcels, treasure-by-level audit, replacement wealth, shops, transfers, and campaign export/import.
 - Golarion calendar with leap day and GM time controls.
@@ -92,7 +92,7 @@ The campaign simulation exercises two complete 1–20 campaigns, including XP an
 | Character build | 1–20 builder, prerequisites, slots, runes, companions, budget, import, Free Archetype and ABP | Strong; uncommon effects remain manual |
 | Advancement | Milestone or XP, GM approval, player requests, catch-up, wealth top-up | Strong |
 | Combat | Budgets, waves, initiative, actions, conditions, typed damage, IWR, death/recovery, afflictions | Strong with manual edge cases |
-| Exploration | Travel pace, terrain, weather, watches, activities, waypoints, calendar | Partial; no hexcrawl map or automatic weather effects |
+| Exploration | Travel pace, terrain, weather, watches, activities, linear pointcrawl, per-day log, encounter checks, calendar | Strong; no hex grid or automatic weather damage |
 | Social | NPCs, factions, attitude, reputation, secrets, public views, shops | Strong for a campaign ledger |
 | Downtime | Days, upkeep, Earn Income, Subsist, Craft/Retrain | Partial; rituals and full crafting costs manual |
 | Treasure | Parcels, audit, shops, tracked stock, transfers, wealth benchmarks, ABP option | Strong; ABP replaces fundamental rune math |
@@ -126,7 +126,7 @@ These are optional campaign variants; the base Remastered rules do not require t
 
 ### Campaign depth
 
-- No hex/pointcrawl map, automatic weather effects, chase track, or foraging/tracking checks.
+- No hex-grid map, chase track, or automated foraging/tracking checks. A linear pointcrawl and per-day travel log are supported, and weather worsens encounter checks without applying automatic weather damage.
 - No email/push reminders, time-zone-specific scheduling, or third-party calendar sync. Recurring sessions and a downloadable .ics feed are supported.
 - No published-adventure importer, kingdom building, vehicles, mass combat, or automated companion advancement.
 - No third-party anonymous safety channel; the GM-only pause signal is the supported path.

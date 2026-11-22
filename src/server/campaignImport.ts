@@ -16,6 +16,7 @@ import { normalizeAdvancementSpeed, normalizeXpAwardKind } from "../shared/xp";
 import {
   normalizeTravelActivities,
   normalizeTravelEncounterChecks,
+  normalizeTravelHistory,
   normalizeTravelMiles,
   normalizeTravelSpeed,
   normalizeTravelTerrain,
@@ -782,12 +783,13 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
       const distanceMiles = normalizeTravelMiles(importedTravel.distanceMiles);
       const importedWaypoints = normalizeTravelWaypoints(importedTravel.waypoints);
       const importedChecks = normalizeTravelEncounterChecks(importedTravel.encounterChecks);
+      const importedHistory = normalizeTravelHistory(importedTravel.history);
       db.prepare(
         `INSERT INTO campaign_travel
            (campaign_id, origin, destination, terrain, distance_miles, progress_miles, party_speed,
-            weather, notes, watches, activities, waypoints, encounter_checks, days_travelled,
-            created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+            weather, notes, watches, activities, waypoints, encounter_checks, history,
+            days_travelled, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).run(
         campaignId,
         text(importedTravel.origin, "", 120),
@@ -807,6 +809,7 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
           }))
         ),
         JSON.stringify(importedChecks.map((check) => ({ ...check, id: newId("travel-check") }))),
+        JSON.stringify(importedHistory.map((day) => ({ ...day, id: newId("tday") }))),
         numberValue(importedTravel.daysTravelled, 0, 0, 100_000),
         ts,
         ts

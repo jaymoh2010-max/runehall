@@ -427,7 +427,9 @@ Acceptance: a GM can prepare a full session in Runehall and start it with one â€
   - Daily mileage follows PF2e Travel Speed (Speed Ã— 0.8), halved for difficult terrain and one-third for greater difficult terrain; the GM can override party speed.
   - Advancing a travel day adds progress, increments the day count, and moves the Golarion calendar forward one day.
   - Players see the route, progress, ETA, watches, and activities; only the GM can edit or advance the journey.
-  - No hex/pointcrawl map, automatic weather effects, encounter checks, or per-day history yet.
+  - A linear pointcrawl shows shared waypoints and the party marker; each elapsed day is recorded with mileage, terrain, weather, and Golarion date.
+  - Encounter checks roll against a terrain/weather threshold and keep a GM-only history.
+  - Remaining: hex-grid maps, chase tracks, and automatic weather damage.
 - [x] **Area templates**
   - Burst, emanation, cone, and line templates with size in feet.
   - Click-drag placement on the map, with a live preview and a size label.
@@ -743,4 +745,4 @@ A campaign-level review compared Runehall against PF2e GM Core/Player Core progr
 
 - Full report: [CAMPAIGN-READINESS.md](CAMPAIGN-READINESS.md)
 - Repeatable simulation: `npm run simulate:campaign`
-- Next priority: hex/pointcrawl travel and encounter checks, social/faction ledgers, private player notes, and AP scaffolding.
+- Next priority: hex-grid travel, AP scaffolding, and deeper rules automation.

@@ -171,6 +171,7 @@ describe("migrations", () => {
     }[];
     expect(travelColumns.map((column) => column.name)).toContain("waypoints");
     expect(travelColumns.map((column) => column.name)).toContain("encounter_checks");
+    expect(travelColumns.map((column) => column.name)).toContain("history");
 
     const sessionZeroColumns = db.prepare("PRAGMA table_info(campaign_session_zero)").all() as {
       name: string;

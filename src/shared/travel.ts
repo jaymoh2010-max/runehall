@@ -1,5 +1,6 @@
 import type {
   CampaignTravel,
+  TravelDayLog,
   TravelEncounterCheck,
   TravelTerrain,
   TravelStatus,
@@ -299,6 +300,48 @@ export function normalizeTravelEncounterChecks(value: unknown): TravelEncounterC
     });
   }
   return checks;
+}
+
+export function normalizeTravelHistory(value: unknown): TravelDayLog[] {
+  if (!Array.isArray(value)) return [];
+  const history: TravelDayLog[] = [];
+  for (const raw of value.slice(-3_650)) {
+    if (!raw || typeof raw !== "object") continue;
+    const entry = raw as Record<string, unknown>;
+    history.push({
+      id: limitedText(entry.id, 80) || `day_${history.length + 1}`,
+      day: Math.round(clampNumber(entry.day, 0, 0, 100_000)),
+      miles: normalizeTravelMiles(entry.miles),
+      terrain: normalizeTravelTerrain(entry.terrain),
+      weather: normalizeTravelWeather(entry.weather),
+      worldYear: Math.round(clampNumber(entry.worldYear, 4726, 1, 100_000)),
+      worldMonth: Math.round(clampNumber(entry.worldMonth, 1, 1, 12)),
+      worldDay: Math.round(clampNumber(entry.worldDay, 1, 1, 31)),
+      note: limitedText(entry.note, 500),
+      createdAt: Math.round(clampNumber(entry.createdAt, 0, 0, 8_640_000_000_000_000)),
+    });
+  }
+  return history.sort((a, b) => a.day - b.day || a.createdAt - b.createdAt);
+}
+
+/**
+ * Split a journey into daily mileage. Full travel days use the party's daily
+ * pace and the final day carries the remainder, so a 30-mile push at 20
+ * miles/day records 20 then 10 rather than two even 15-mile days.
+ */
+export function travelDayMiles(totalMiles: unknown, dailyMiles: unknown): number[] {
+  const total = normalizeTravelMiles(totalMiles);
+  const daily = Math.max(1, normalizeTravelMiles(dailyMiles));
+  if (total <= 0) return [];
+  const days = Math.max(1, Math.ceil(total / daily));
+  const result: number[] = [];
+  let left = total;
+  for (let index = 0; index < days; index += 1) {
+    const portion = roundMiles(Math.min(left, daily));
+    result.push(portion);
+    left = roundMiles(left - portion);
+  }
+  return result;
 }
 
 /**
