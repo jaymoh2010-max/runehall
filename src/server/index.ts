@@ -23,6 +23,7 @@ import { registerSessionRoutes } from "./routes/sessions";
 import { registerShopRoutes } from "./routes/shop";
 import { registerSystemRoutes } from "./routes/system";
 import { registerTableRoutes } from "./routes/table";
+import { registerTravelRoutes } from "./routes/travel";
 import { registerUploadRoutes } from "./routes/uploads";
 import { isTrustedOrigin, registerSecurity } from "./security";
 import { setRevisionBroadcaster } from "./revisions";
@@ -155,6 +156,7 @@ await registerSessionRoutes(app);
 await registerShopRoutes(app);
 await registerSystemRoutes(app);
 await registerTableRoutes(app);
+await registerTravelRoutes(app);
 await registerUploadRoutes(app);
 
 const auditRetentionDays = getAuditRetentionDays();

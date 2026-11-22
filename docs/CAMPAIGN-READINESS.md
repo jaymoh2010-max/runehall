@@ -16,7 +16,7 @@ It is **not yet a full adventure-path runner or a complete exploration/downtime 
 
 1. **Rules trust:** conditions, dying/wounded, and hero/focus points are automated; staged afflictions are tracked with stage saves, and round-based onset/interval timing is automatic, but compendium presets and non-round timers are manual. Spell heightening and most feat/item effects are still partly manual.
 2. **Campaign economy:** advancement speed, hazard/accomplishment XP, a treasure-by-level audit including permanent/consumable item mix, replacement-character wealth, a settlement-level shop with optional tracked merchant stock, cost-of-living upkeep, and a downtime activity planner for Earn Income, Subsist, and projects are now supported. Full Craft cost/task-discovery automation is still missing.
-3. **The other two-thirds of play:** exploration/travel/weather, social reputation/factions, and player knowledge need a first-class model. Downtime now has a planner for the common activities, but rituals and long-running projects remain manual.
+3. **The other two-thirds of play:** weather effects, hex/pointcrawl mapping, social reputation/factions, and player knowledge need a first-class model. Travel now has a campaign journey planner with mileage, terrain, watches, weather metadata, and exploration activities; downtime has a planner for the common activities, but rituals and long-running projects remain manual.
 4. **Campaign continuity:** no session-zero/safety tools, private player notes, AP chapter/level scaffolding, or self-contained archive.
 
 ---
@@ -49,7 +49,7 @@ Two simulated campaigns were run against an isolated server with real accounts a
   - Mid-campaign replacement character advanced to party level, then topped up to the level-10 lump-sum wealth benchmark.
   - Sessions/recap/handout in milestone play.
 
-**Result (current release pass):** 83 passing checks, 0 failing checks, 1 recorded gap. Encounter cleanup is now exercised after every simulated act, milestone XP awards are verified as blocked, the fast advancement threshold, hazard XP, accomplishment XP, and award ledger are exercised, the loot audit (including permanent/consumable item counts) plus replacement-wealth grant are verified at level 20 and level 10, downtime spending charges upkeep and exercises Earn Income repetition, Subsist waivers, and project completion, the settlement shop is exercised with purchase, sale, above-level, ownership, tracked-stock decrement/replenish, and export/import checks, initiative advance is verified to roll dying recovery and resolve persistent damage exactly once, and unlinked monsters are verified to heal, take persistent damage, and seed regeneration from a statblock. Two linked-token bugs were found and fixed:
+**Result (current release pass):** 84 passing checks, 0 failing checks, 1 recorded gap. Encounter cleanup is now exercised after every simulated act, milestone XP awards are verified as blocked, the fast advancement threshold, hazard XP, accomplishment XP, and award ledger are exercised, the loot audit (including permanent/consumable item counts) plus replacement-wealth grant are verified at level 20 and level 10, downtime spending charges upkeep and exercises Earn Income repetition, Subsist waivers, and project completion, the travel planner advances the calendar and persists watches/activities, the settlement shop is exercised with purchase, sale, above-level, ownership, tracked-stock decrement/replenish, and export/import checks, initiative advance is verified to roll dying recovery and resolve persistent damage exactly once, and unlinked monsters are verified to heal, take persistent damage, and seed regeneration from a statblock. Two linked-token bugs were found and fixed:
 
 - Hiding a token after initiative was rolled still exposed its name in the player's initiative order. The server now filters hidden combatants from player snapshots and live initiative broadcasts, with a shared helper and unit coverage (`src/shared/initiative.ts`, `src/server/routes/table.ts`, `src/server/socket.ts`, `tests/initiative.test.ts`).
 - Creating a token for a wounded character reset its current HP to full. New tokens now start at the sheet's current HP unless the GM explicitly supplies one (`src/server/socket.ts`).
@@ -77,7 +77,7 @@ npm run simulate:campaign -- --report campaign-simulation-report.json
 | Character build | 1–20 math, ancestry/heritage/background/class, feats/spells/gear/runes | Live math, prerequisites, slots, runes, companions roster, Pathbuilder import; common level-1 heritage mechanics, a gear-plus-coins starting budget, and curated fixed plus free class grants for Druid/Bard/Wizard/Sorcerer/Cleric/Champion | Strong with automation caveats |
 | Advancement | Fast/medium/slow XP, party pool, catch-up, milestones, hazards/accomplishments | Milestone or XP mode with fast/medium/slow thresholds (800/1,000/1,200), per-character XP, GM-only level-up, hazard/accomplishment awards, and a GM award ledger; no shared party pool or catch-up doubling | Partial |
 | Combat | Budgets, hazards, initiative, MAP/actions, conditions, dying, afflictions, cover, AoE | Budget/launch/waves/reinforcements, grouped initiative, conditions with durations, automatic dying recovery, fast healing/regeneration, and persistent damage for linked characters and unlinked monsters, regeneration suppression by typed damage, cover/concealment readout, lighting/vision, templates | Partial |
-| Exploration | Travel pace, terrain, weather, watches, foraging/tracking, hex/pointcrawl, discovery | Scenes, fog, walls, light, measurement; no travel/weather/hex/exploration activities | Missing |
+| Exploration | Travel pace, terrain, weather, watches, foraging/tracking, hex/pointcrawl, discovery | Scenes, fog, walls, light, measurement. A campaign Travel tab plans mileage from PF2e Travel Speed, tracks terrain and weather metadata, assigns four watches and exploration activities, and advances the calendar; no hex/pointcrawl map, automatic weather effects, foraging checks, or encounter checks | Partial |
 | Social | NPCs, attitude, factions, reputation, rumors, shops, negotiation | NPC statblock library, dashboard threads, quest handouts, and a settlement shop; no relationships/reputation/factions/persistent merchants | Partial |
 | Downtime | Day accounting, Earn Income, Craft, Retrain, rituals, cost of living, shopping | GM grants days; player spends days at a chosen cost of living with server-charged upkeep. Earn Income rolls and pays from table 4-2, Subsist can waive upkeep, and Craft/Retrain progress is tracked; rituals and full crafting costs remain manual | Partial |
 | Treasure | Party budget by level, item levels, parcels, gems/art, wealth audit, ABP | Loot parcels with compendium items/coins, one recipient, sheet updates, item-plus-coin valuation, GM Core party budget and permanent/consumable item-mix audit, character wealth audit, replacement top-up, a settlement shop with optional tracked merchant stock, and sales that replenish stock; no ABP | Partial |
@@ -121,7 +121,7 @@ These are the items most likely to make a sheet or combat state look right while
 | New/replacement character wealth | Level-1 creation budgets gear plus coins. A GM can top up a replacement or catch-up character to the GM Core table 10-10 lump-sum benchmark; only the difference is granted. | Done |
 | Shops and settlement levels | One shop per campaign with either open common stock up to the settlement level or a GM-curated finite merchant inventory. Buy/sell prices, quantity, ownership, and stock are server-validated; sales add items back to tracked stock. Multiple merchants per settlement, automatic restock schedules, and price overrides remain manual or missing. | Done — single merchant |
 | Downtime activities | The character sheet runs Earn Income (server-side trained-skill roll, table 4-2 payout, repeat days), Subsist (upkeep waiver or fatigue), and Craft/Retrain day trackers with cost-of-living charges. Rituals, task discovery, and full crafting material costs stay manual. | Partial |
-| Exploration/travel | Pace/terrain/weather, watches, foraging/tracking, hex/pointcrawl, ETA, encounter checks, discovered/rumored sites. | L |
+| Exploration/travel | The Travel tab covers origin/destination, PF2e speed and terrain mileage, weather metadata, four watches, per-character exploration activities, progress/ETA, and calendar-day advancement. Still missing: hex/pointcrawl mapping, automatic weather effects, foraging/tracking checks, encounter checks, and discovered/rumored sites. | Partial |
 | Victory Point clocks | One generic clock/VP primitive for research, influence, chase, infiltration, reputation, and projects. | M |
 | NPC/faction ledger | Attitude, location, faction, secrets, obligations, relationship history, rumors; ideally a graph. | L |
 | Player knowledge layer | Private player notes, known/rumored/secret/disproven clues, per-player reveals, absentee recap. | L |
@@ -153,7 +153,7 @@ The VTT is the strongest differentiator, but several PF2e combat expectations ar
 - **Hazards:** traps/hazards are custom combatants at best; simple/complex hazard XP can be awarded from the XP ledger, but the encounter builder has no hazard actor or hazard budget row.
 - **Monster actions:** bestiary stats are display-only; no attack/ability buttons or recharge tracking.
 - **Table hygiene:** scene deletion leaves ghost initiative entries. Hidden props, walls, and templates are server-filtered from players. Encounter relaunch and cleanup are handled for tokens launched after the provenance migration.
-- **Exploration layer:** no time-of-day/weather, hex/travel map, chase tracks, or VP clocks.
+- **Exploration layer:** the Travel tab tracks mileage, terrain, weather metadata, watches, exploration activities, and calendar days. There is no hex/pointcrawl map, time-of-day lighting automation, automatic weather effect, chase track, or VP clock.
 
 ---
 
@@ -177,7 +177,7 @@ Remaining:
 **Exit criteria:** a GM can run a level without guessing treasure, equip a replacement PC correctly, and resolve a full downtime phase in-app.
 
 ### Sprint C — exploration, social, and continuity
-1. Travel/weather/hex or pointcrawl layer + exploration activities + generic VP clocks.
+1. Travel/weather/hex or pointcrawl layer + exploration activities + generic VP clocks. (The journey planner, watches, weather metadata, and exploration activities are done; hex/pointcrawl, automatic weather, encounter checks, and VP clocks remain.)
 2. NPC/faction/reputation ledger and rumor/knowledge states.
 3. Player knowledge base, per-player reveals, absentee recap.
 4. Self-contained archive and ownership lifecycle.

@@ -653,4 +653,26 @@ export const migrations: Migration[] = [
         ON campaign_shop_stock(campaign_id, quantity);
     `,
   },
+  {
+    version: 37,
+    name: "campaign_travel",
+    sql: `
+      CREATE TABLE IF NOT EXISTS campaign_travel (
+        campaign_id TEXT PRIMARY KEY REFERENCES campaigns(id) ON DELETE CASCADE,
+        origin TEXT NOT NULL DEFAULT '',
+        destination TEXT NOT NULL DEFAULT '',
+        terrain TEXT NOT NULL DEFAULT 'normal',
+        distance_miles REAL NOT NULL DEFAULT 0,
+        progress_miles REAL NOT NULL DEFAULT 0,
+        party_speed INTEGER NOT NULL DEFAULT 25,
+        weather TEXT NOT NULL DEFAULT 'clear',
+        notes TEXT NOT NULL DEFAULT '',
+        watches TEXT NOT NULL DEFAULT '{}',
+        activities TEXT NOT NULL DEFAULT '{}',
+        days_travelled INTEGER NOT NULL DEFAULT 0,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      );
+    `,
+  },
 ];

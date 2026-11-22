@@ -1097,6 +1097,42 @@ export interface ShopState {
   stock: ShopStockEntry[];
 }
 
+export type TravelTerrain = "normal" | "difficult" | "greater-difficult";
+export type TravelWeather = "clear" | "rain" | "snow" | "storm" | "fog" | "heat" | "cold";
+export type TravelStatus = "planning" | "traveling" | "complete";
+
+export interface TravelWatches {
+  first: string[];
+  second: string[];
+  third: string[];
+  fourth: string[];
+}
+
+export interface CampaignTravel {
+  campaignId: string;
+  origin: string;
+  destination: string;
+  terrain: TravelTerrain;
+  distanceMiles: number;
+  progressMiles: number;
+  partySpeed: number;
+  weather: TravelWeather;
+  notes: string;
+  watches: TravelWatches;
+  /** Character id to exploration activity id. */
+  activities: Record<string, string>;
+  daysTravelled: number;
+  /** Miles the party covers on a normal travel day in the current terrain. */
+  dailyMiles: number;
+  status: TravelStatus;
+  updatedAt: number;
+}
+
+export interface CampaignTravelState {
+  travel: CampaignTravel | null;
+  suggestedSpeed: number;
+}
+
 export interface EncounterCombatant {
   id: string;
   encounterId: string;

@@ -19,6 +19,7 @@ import {
   type CampaignDashboardRow,
   type CampaignNpcRow,
   type CampaignRow,
+  type CampaignTravelRow,
   type CharacterRow,
   type EncounterRow,
   type JournalRow,
@@ -33,6 +34,7 @@ import {
   serializeCampaignDashboard,
   serializeCampaignNpc,
   serializeCampaignSummary,
+  serializeCampaignTravel,
   serializeCharacter,
   serializeEncounter,
   serializeInitiative,
@@ -47,6 +49,7 @@ import {
   touchCampaign,
 } from "../serialize";
 import { tokenEventsFor } from "../tokenEvents";
+import { broadcastCampaignSummary } from "../campaignEvents";
 import {
   isCampaignRuleset,
   isXpMode,
@@ -105,24 +108,6 @@ function campaignCounts(row: CampaignRow) {
 function roleFor(row: CampaignRow, userId: string): "gm" | "player" | null {
   if (row.gm_id === userId) return "gm";
   return getMembership(row.id, userId)?.role ?? null;
-}
-
-/** Push role-appropriate campaign metadata to anyone in the room. */
-function broadcastCampaignSummary(app: FastifyInstance, row: CampaignRow): void {
-  const counts = campaignCounts(row);
-  const gmName = getUser(row.gm_id)?.display_name ?? "";
-  app.broadcastCampaign(
-    row.id,
-    "campaign:updated",
-    serializeCampaignSummary(row, "gm", counts, gmName),
-    "gm"
-  );
-  app.broadcastCampaign(
-    row.id,
-    "campaign:updated",
-    serializeCampaignSummary(row, "player", counts, gmName),
-    "players"
-  );
 }
 
 function unassignCampaignCharacters(
@@ -660,6 +645,11 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
         )
         .all(id) as { item_id: string; quantity: number }[]
     ).map((entry) => ({ itemId: entry.item_id, quantity: shopStockCount(entry.quantity) }));
+    const travelRow = db.prepare("SELECT * FROM campaign_travel WHERE campaign_id = ?").get(id) as
+      CampaignTravelRow | undefined;
+    const travel = travelRow
+      ? serializeCampaignTravel(travelRow, new Set(characters.map((entry) => entry.id)))
+      : null;
     const dashboardRow = db
       .prepare("SELECT * FROM campaign_dashboard WHERE campaign_id = ?")
       .get(id) as CampaignDashboardRow | undefined;
@@ -706,6 +696,7 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
       encounters,
       loot,
       shopStock,
+      travel,
       dashboard,
       npcs,
       sessions,
