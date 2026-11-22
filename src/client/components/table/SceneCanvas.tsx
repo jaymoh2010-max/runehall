@@ -144,6 +144,8 @@ export function SceneCanvas({
   const lightCanvasRef = useRef<HTMLCanvasElement>(null);
   const [zoom, setZoom] = useState(0.5);
   const [pan, setPan] = useState<Pan>({ x: 40, y: 40 });
+  const zoomRef = useRef(zoom);
+  const panRef = useRef(pan);
   const [dragging, setDragging] = useState<{
     tokenId: string;
     positions: Record<string, { x: number; y: number }>;
@@ -299,18 +301,82 @@ export function SceneCanvas({
     setFogPreview(new Set(scene.revealed));
   }, [scene.revealed]);
 
+  useEffect(() => {
+    setMeasuring(null);
+  }, [scene.id, measureMode]);
+
+  useEffect(() => {
+    zoomRef.current = zoom;
+  }, [zoom]);
+  useEffect(() => {
+    panRef.current = pan;
+  }, [pan]);
+
   const fit = useCallback(() => {
     const viewport = viewportRef.current;
     if (!viewport) return;
     const rect = viewport.getBoundingClientRect();
     const scale = Math.min((rect.width - 40) / scene.width, (rect.height - 40) / scene.height);
     const nextZoom = Math.max(0.08, Math.min(2.5, scale));
-    setZoom(nextZoom);
-    setPan({
+    const nextPan = {
       x: (rect.width - scene.width * nextZoom) / 2,
       y: (rect.height - scene.height * nextZoom) / 2,
-    });
+    };
+    zoomRef.current = nextZoom;
+    panRef.current = nextPan;
+    setZoom(nextZoom);
+    setPan(nextPan);
   }, [scene.width, scene.height]);
+
+  const applyZoom = useCallback(
+    (factor: number, anchorX?: number, anchorY?: number) => {
+      const viewport = viewportRef.current;
+      if (!viewport) return;
+      const rect = viewport.getBoundingClientRect();
+      const currentZoom = zoomRef.current;
+      const currentPan = panRef.current;
+      const nextZoom = Math.max(0.08, Math.min(4, currentZoom * factor));
+      if (nextZoom === currentZoom) return;
+      const x = anchorX ?? rect.width / 2;
+      const y = anchorY ?? rect.height / 2;
+      const sceneX = (x - currentPan.x) / currentZoom;
+      const sceneY = (y - currentPan.y) / currentZoom;
+      const margin = 48;
+      const scaledWidth = scene.width * nextZoom;
+      const scaledHeight = scene.height * nextZoom;
+      const clampAxis = (value: number, viewportSize: number, contentSize: number) => {
+        if (contentSize <= viewportSize - margin * 2) {
+          return (viewportSize - contentSize) / 2;
+        }
+        return Math.max(viewportSize - contentSize - margin, Math.min(margin, value));
+      };
+      const nextPan = {
+        x: clampAxis(x - sceneX * nextZoom, rect.width, scaledWidth),
+        y: clampAxis(y - sceneY * nextZoom, rect.height, scaledHeight),
+      };
+      zoomRef.current = nextZoom;
+      panRef.current = nextPan;
+      setZoom(nextZoom);
+      setPan(nextPan);
+    },
+    [scene.width, scene.height]
+  );
+
+  useEffect(() => {
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+    const onNativeWheel = (event: WheelEvent) => {
+      event.preventDefault();
+      const rect = viewport.getBoundingClientRect();
+      applyZoom(
+        event.deltaY < 0 ? 1.12 : 0.89,
+        event.clientX - rect.left,
+        event.clientY - rect.top
+      );
+    };
+    viewport.addEventListener("wheel", onNativeWheel, { passive: false });
+    return () => viewport.removeEventListener("wheel", onNativeWheel);
+  }, [applyZoom]);
 
   useEffect(() => {
     if (fittedScene.current === scene.id) return;
@@ -486,21 +552,6 @@ export function SceneCanvas({
     } catch {
       // Ignore malformed drag payloads.
     }
-  };
-
-  const onWheel = (event: React.WheelEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    const viewport = viewportRef.current;
-    if (!viewport) return;
-    const rect = viewport.getBoundingClientRect();
-    const mx = event.clientX - rect.left;
-    const my = event.clientY - rect.top;
-    const sceneX = (mx - pan.x) / zoom;
-    const sceneY = (my - pan.y) / zoom;
-    const factor = event.deltaY < 0 ? 1.12 : 0.89;
-    const next = Math.max(0.08, Math.min(4, zoom * factor));
-    setZoom(next);
-    setPan({ x: mx - sceneX * next, y: my - sceneY * next });
   };
 
   const onViewportPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -729,6 +780,7 @@ export function SceneCanvas({
       viewportRef.current?.releasePointerCapture(event.pointerId);
     }
     if (measuring) {
+      setMeasuring(null);
       viewportRef.current?.releasePointerCapture(event.pointerId);
     }
   };
@@ -1058,7 +1110,6 @@ export function SceneCanvas({
     <div
       ref={viewportRef}
       className={`scene-viewport ${fogBrush ? "is-fogging" : ""} ${measureMode ? "is-measuring" : ""} ${wallMode ? "is-walling" : ""} ${propMode ? "is-propping" : ""} ${pendingProp ? "is-placing-prop" : ""} ${templateKind ? "is-templating" : ""}`}
-      onWheel={onWheel}
       onPointerDown={onViewportPointerDown}
       onPointerMove={onViewportPointerMove}
       onPointerUp={onViewportPointerUp}
@@ -1410,20 +1461,17 @@ export function SceneCanvas({
       <div className="scene-zoom" onPointerDown={(event) => event.stopPropagation()}>
         <button
           type="button"
-          onClick={() => setZoom((current) => Math.max(0.08, current - 0.1))}
+          onClick={() => applyZoom(0.89)}
           title="Zoom out"
+          aria-label="Zoom out"
         >
           <Minus size={14} />
         </button>
         <span>{Math.round(zoom * 100)}%</span>
-        <button
-          type="button"
-          onClick={() => setZoom((current) => Math.min(4, current + 0.1))}
-          title="Zoom in"
-        >
+        <button type="button" onClick={() => applyZoom(1.12)} title="Zoom in" aria-label="Zoom in">
           <Plus size={14} />
         </button>
-        <button type="button" onClick={fit} title="Fit scene">
+        <button type="button" onClick={fit} title="Fit scene" aria-label="Fit scene">
           <Maximize size={14} />
         </button>
       </div>

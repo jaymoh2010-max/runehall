@@ -6,6 +6,7 @@ import {
   CalendarClock,
   CalendarDays,
   Check,
+  ChevronDown,
   Coins,
   Compass,
   Copy,
@@ -150,15 +151,17 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode; gmOnly?: boolean }[
   { id: "session-zero", label: "Session zero", icon: <HeartHandshake size={15} /> },
   { id: "party", label: "Party", icon: <Users size={15} /> },
   { id: "travel", label: "Travel", icon: <Compass size={15} /> },
+  { id: "journal", label: "Journal", icon: <ScrollText size={15} /> },
   { id: "sessions", label: "Sessions", icon: <CalendarClock size={15} /> },
   { id: "encounters", label: "Encounters", icon: <Skull size={15} />, gmOnly: true },
   { id: "loot", label: "Loot", icon: <Coins size={15} />, gmOnly: true },
   { id: "npcs", label: "NPCs", icon: <UserRound size={15} />, gmOnly: true },
   { id: "assets", label: "Assets", icon: <Images size={15} />, gmOnly: true },
-  { id: "journal", label: "Journal", icon: <ScrollText size={15} /> },
   { id: "gm-screen", label: "GM Screen", icon: <Shield size={15} />, gmOnly: true },
   { id: "settings", label: "Settings", icon: <Settings size={15} /> },
 ];
+
+const PRIMARY_TAB_IDS = new Set<Tab>(["table", "overview", "party", "journal", "sessions"]);
 
 export function CampaignPage() {
   const { id } = useParams<{ id: string }>();
@@ -184,6 +187,8 @@ export function CampaignPage() {
       ? rawTab
       : "table";
   const [campaign, setCampaign] = useState<CampaignSummary | null>(null);
+  const [prepOpen, setPrepOpen] = useState(false);
+  const prepRef = useRef<HTMLDivElement>(null);
   const [members, setMembers] = useState<CampaignMember[]>([]);
   const [characters, setCharacters] = useState<CharacterRecord[]>([]);
   const [joinRequests, setJoinRequests] = useState<CampaignJoinRequest[]>([]);
@@ -264,6 +269,28 @@ export function CampaignPage() {
       ? "table"
       : requestedTab;
   const visibleTabs = isGm ? TABS : TABS.filter((entry) => !entry.gmOnly);
+  const primaryTabs = visibleTabs.filter((entry) => PRIMARY_TAB_IDS.has(entry.id));
+  const prepTabs = visibleTabs.filter(
+    (entry) => entry.id !== "settings" && !PRIMARY_TAB_IDS.has(entry.id)
+  );
+  const settingsTab = visibleTabs.find((entry) => entry.id === "settings");
+  const activePrepTab = prepTabs.find((entry) => entry.id === tab);
+
+  useEffect(() => {
+    if (!prepOpen) return;
+    const onPointerDown = (event: MouseEvent) => {
+      if (!prepRef.current?.contains(event.target as Node)) setPrepOpen(false);
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setPrepOpen(false);
+    };
+    window.addEventListener("mousedown", onPointerDown);
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("mousedown", onPointerDown);
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [prepOpen]);
 
   const load = async () => {
     if (!id) return;
@@ -1323,8 +1350,8 @@ export function CampaignPage() {
         </div>
       </div>
 
-      <nav className="campaign-tabs">
-        {visibleTabs.map((entry) => (
+      <nav className="campaign-tabs" aria-label="Campaign sections">
+        {primaryTabs.map((entry) => (
           <button
             key={entry.id}
             type="button"
@@ -1338,11 +1365,64 @@ export function CampaignPage() {
             {entry.id === "journal" ? (
               <span className="tab-count">{tableData.journal.length}</span>
             ) : null}
-            {entry.id === "settings" && isGm && joinRequests.length ? (
+          </button>
+        ))}
+
+        {prepTabs.length ? (
+          <div className="campaign-tab-group" ref={prepRef}>
+            <button
+              type="button"
+              className={`campaign-tab-prep ${activePrepTab ? "is-active" : ""}`}
+              aria-expanded={prepOpen}
+              aria-haspopup="menu"
+              onClick={() => setPrepOpen((current) => !current)}
+              title={activePrepTab ? `Prep tools · ${activePrepTab.label}` : "Prep tools"}
+            >
+              <BookOpen size={15} />
+              <span>Prep</span>
+              {activePrepTab ? (
+                <span className="campaign-tab-prep-current">{activePrepTab.label}</span>
+              ) : null}
+              <ChevronDown size={13} className={prepOpen ? "is-open" : ""} />
+            </button>
+            {prepOpen ? (
+              <div className="campaign-tab-menu" role="menu" aria-label="Prep tools">
+                {prepTabs.map((entry) => (
+                  <button
+                    key={entry.id}
+                    type="button"
+                    role="menuitem"
+                    className={tab === entry.id ? "is-active" : ""}
+                    aria-current={tab === entry.id ? "page" : undefined}
+                    onClick={() => {
+                      setTab(entry.id);
+                      setPrepOpen(false);
+                    }}
+                  >
+                    {entry.icon}
+                    <span>{entry.label}</span>
+                    {tab === entry.id ? <Check size={13} /> : null}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+
+        {settingsTab ? (
+          <button
+            type="button"
+            className={`campaign-tab-settings ${tab === settingsTab.id ? "is-active" : ""}`}
+            aria-current={tab === settingsTab.id ? "page" : undefined}
+            onClick={() => setTab(settingsTab.id)}
+          >
+            {settingsTab.icon}
+            <span>{settingsTab.label}</span>
+            {isGm && joinRequests.length ? (
               <span className="tab-count">{joinRequests.length}</span>
             ) : null}
           </button>
-        ))}
+        ) : null}
       </nav>
 
       <div className="campaign-table" style={{ display: tab === "table" ? undefined : "none" }}>

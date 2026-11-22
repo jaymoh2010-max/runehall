@@ -406,6 +406,10 @@ export function VttTable({ initial, campaignId, user, isGm, active }: VttTablePr
 
   const createToken = (partial: Partial<Token>) => {
     if (!activeSceneId) return;
+    if (previewSceneId) {
+      toast("Exit preview before placing tokens.", "info");
+      return;
+    }
     getSocket().emit(
       "token:create",
       { campaignId, sceneId: activeSceneId, token: partial },
@@ -425,6 +429,10 @@ export function VttTable({ initial, campaignId, user, isGm, active }: VttTablePr
 
   const createTokens = (partials: Partial<Token>[]) => {
     if (!activeSceneId || !partials.length) return;
+    if (previewSceneId) {
+      toast("Exit preview before placing tokens.", "info");
+      return;
+    }
     const socket = getSocket();
     Promise.all(
       partials.map(
@@ -456,6 +464,10 @@ export function VttTable({ initial, campaignId, user, isGm, active }: VttTablePr
 
   const placeMonster = (monster: Monster, count: number, x?: number, y?: number) => {
     if (!activeScene) return;
+    if (previewSceneId) {
+      toast("Exit preview before placing tokens.", "info");
+      return;
+    }
     const total = Math.max(1, Math.min(20, Math.round(count) || 1));
     const groupId =
       total > 1 ? `grp_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}` : null;

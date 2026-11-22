@@ -396,7 +396,7 @@ export function DashboardPage() {
                   <Swords size={20} />
                 </div>
                 <div className="campaign-meta">
-                  <div className="row" style={{ gap: 7 }}>
+                  <div className="campaign-card-badges">
                     <Badge tone={campaign.role === "gm" ? "gold" : "blue"}>
                       {campaign.role === "gm" ? <Crown size={10} /> : <Users size={10} />}
                       {campaign.role === "gm" ? "Game Master" : "Player"}
@@ -408,17 +408,14 @@ export function DashboardPage() {
                       </Badge>
                     ) : null}
                     <Badge tone="violet">{rulesetLabel(campaign.ruleset)}</Badge>
-                    <Badge tone={campaign.xpMode === "xp" ? "green" : "neutral"}>
-                      {campaign.xpMode === "xp"
-                        ? `XP tracking · ${campaign.advancementSpeed}`
-                        : "GM decides"}
-                    </Badge>
                     {campaign.lastPlayedAt ? (
                       <span className="tiny muted">Played {formatDate(campaign.lastPlayedAt)}</span>
                     ) : null}
                   </div>
-                  <h2>{campaign.name}</h2>
-                  <p>{campaign.description || "A new story waiting to be told."}</p>
+                  <Link to={`/campaigns/${campaign.id}`} className="campaign-card-copy">
+                    <h2>{campaign.name}</h2>
+                    <p>{campaign.description || "A new story waiting to be told."}</p>
+                  </Link>
                 </div>
               </div>
               <div className="campaign-card-stats">
@@ -427,9 +424,6 @@ export function DashboardPage() {
                 </span>
                 <span>
                   <BookUser size={14} /> {campaign.characterCount} characters
-                </span>
-                <span>
-                  <CalendarDays size={14} /> Created {formatDate(campaign.createdAt)}
                 </span>
               </div>
               <div className="campaign-card-foot">
