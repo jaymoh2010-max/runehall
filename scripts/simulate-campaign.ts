@@ -2381,6 +2381,60 @@ async function runCampaignA(gm: Account, players: Account[]): Promise<void> {
             "scout",
             "Travel exploration activity"
           );
+          const visibleWaypoint = await api(`/api/campaigns/${campaignId}/travel/waypoints`, {
+            method: "POST",
+            cookie: gm.cookie,
+            body: {
+              name: "The Broken Bridge",
+              miles: 10,
+              description: "A rope bridge over the gorge.",
+              visible: true,
+            },
+          });
+          const hiddenWaypoint = await api(`/api/campaigns/${campaignId}/travel/waypoints`, {
+            method: "POST",
+            cookie: gm.cookie,
+            body: {
+              name: "The Hidden Camp",
+              miles: 20,
+              description: "A cultist camp.",
+              visible: false,
+            },
+          });
+          assertEqual(hiddenWaypoint.payload.travel.waypoints.length, 2, "Waypoint count");
+          const playerMap = await api(`/api/campaigns/${campaignId}/travel`, {
+            cookie: players[0].cookie,
+          });
+          assertEqual(playerMap.payload.travel.waypoints.length, 1, "Player waypoint count");
+          assertEqual(
+            playerMap.payload.travel.waypoints[0].name,
+            "The Broken Bridge",
+            "Player waypoint name"
+          );
+          assert(
+            !playerMap.payload.travel.encounterChecks,
+            "Player saw GM encounter-check history"
+          );
+          const encounterCheck = await api(`/api/campaigns/${campaignId}/travel/check`, {
+            method: "POST",
+            cookie: gm.cookie,
+            body: { watch: 2, note: "A patrol sweeps the road." },
+          });
+          assert(
+            encounterCheck.payload.check.roll >= 1 && encounterCheck.payload.check.roll <= 20,
+            "Encounter check roll out of range"
+          );
+          assertEqual(encounterCheck.payload.check.watch, 2, "Encounter check watch");
+          assertEqual(encounterCheck.payload.travel.encounterChecks.length, 1, "Check history");
+          const hiddenCheck = await api(
+            `/api/campaigns/${campaignId}/travel/waypoints/${hiddenWaypoint.payload.travel.waypoints[1].id}`,
+            {
+              method: "DELETE",
+              cookie: players[0].cookie,
+              expect: null,
+            }
+          );
+          assertEqual(hiddenCheck.status, 403, "Player waypoint delete");
           const dayOne = await api(`/api/campaigns/${campaignId}/travel/advance`, {
             method: "POST",
             cookie: gm.cookie,
@@ -2405,6 +2459,10 @@ async function runCampaignA(gm: Account, players: Account[]): Promise<void> {
           });
           assertEqual(arrived.payload.travel.status, "complete", "Travel completion");
           assertEqual(arrived.payload.travel.progressMiles, 40, "Travel distance cap");
+          const bridge = (arrived.payload.travel.waypoints as Json[]).find(
+            (waypoint) => waypoint.name === "The Broken Bridge"
+          );
+          assert(bridge?.reached === true, "Reached waypoint was not marked");
           const playerAdvance = await api(`/api/campaigns/${campaignId}/travel/advance`, {
             method: "POST",
             cookie: players[0].cookie,
@@ -2749,6 +2807,8 @@ async function runCampaignA(gm: Account, players: Account[]): Promise<void> {
       assertEqual(payload.shopStock[0].quantity, 3, "Export shop stock quantity");
       assertEqual(payload.travel.origin, "Ashen Ford", "Export travel origin");
       assertEqual(payload.travel.status, "complete", "Export travel status");
+      assertEqual(payload.travel.waypoints.length, 2, "Export waypoint count");
+      assertEqual(payload.travel.encounterChecks.length, 1, "Export encounter-check count");
       assertEqual(
         payload.sessionZero.pitch,
         "The Ashen Crown wakes beneath the city.",
@@ -2836,6 +2896,17 @@ async function runCampaignA(gm: Account, players: Account[]): Promise<void> {
         importedTravel.payload.travel.activities[importedHero.id],
         "scout",
         "Imported travel activity was not remapped"
+      );
+      assertEqual(importedTravel.payload.travel.waypoints.length, 2, "Imported waypoint count");
+      assertEqual(
+        importedTravel.payload.travel.waypoints[1].visible,
+        false,
+        "Imported hidden waypoint"
+      );
+      assertEqual(
+        importedTravel.payload.travel.encounterChecks.length,
+        1,
+        "Imported encounter-check count"
       );
       const importedSessionZero = await api(`/api/campaigns/${importedCampaign.id}/session-zero`, {
         cookie: gm.cookie,

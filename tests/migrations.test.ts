@@ -147,6 +147,12 @@ describe("migrations", () => {
       ])
     );
 
+    const travelColumns = db.prepare("PRAGMA table_info(campaign_travel)").all() as {
+      name: string;
+    }[];
+    expect(travelColumns.map((column) => column.name)).toContain("waypoints");
+    expect(travelColumns.map((column) => column.name)).toContain("encounter_checks");
+
     db.close();
   });
 });

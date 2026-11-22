@@ -766,4 +766,12 @@ export const migrations: Migration[] = [
         ON campaign_knowledge(campaign_id, sort_order);
     `,
   },
+  {
+    version: 41,
+    name: "campaign_travel_waypoints_and_encounters",
+    sql: `
+      ALTER TABLE campaign_travel ADD COLUMN waypoints TEXT NOT NULL DEFAULT '[]';
+      ALTER TABLE campaign_travel ADD COLUMN encounter_checks TEXT NOT NULL DEFAULT '[]';
+    `,
+  },
 ];

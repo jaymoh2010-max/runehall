@@ -654,7 +654,7 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
     const travelRow = db.prepare("SELECT * FROM campaign_travel WHERE campaign_id = ?").get(id) as
       CampaignTravelRow | undefined;
     const travel = travelRow
-      ? serializeCampaignTravel(travelRow, new Set(characters.map((entry) => entry.id)))
+      ? serializeCampaignTravel(travelRow, new Set(characters.map((entry) => entry.id)), true)
       : null;
     const sessionZeroRow = db
       .prepare("SELECT * FROM campaign_session_zero WHERE campaign_id = ?")
