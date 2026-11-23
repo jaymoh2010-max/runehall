@@ -2,7 +2,7 @@
 
 Date: 2026-11-23
 
-Status: review complete. No code changes in this pass; this document records the rules baseline, the current implementation, the gaps, and a proposed sprint sequence.
+Status: review complete. Sprint 1 (the daily spellcasting loop) was implemented on 2026-11-23. The findings below describe the pre-Sprint-1 state; the Sprint 1 implementation status section records what changed, and the class-specific gaps remain for Sprint 2 and Sprint 3.
 
 > **Follow-up (2026-11-23):** `docs/RULES-AUDIT.md` corrected two table errors
 > this review did not catch: bards use the 2/3 full-caster slot table (not the
@@ -37,12 +37,12 @@ The foundation is good. Runehall already has:
 - Structured spell damage heightening for safe interval formulas
 - A single Cast action that spends the selected resource and posts to chat
 
-The largest correctness gap is the **daily preparation loop**. The data model records `spells.preparationsPending`, and the campaign long-rest route sets it for prepared casters, but no current UI reads it. The old `DailyPreparationsModal` was removed when the table was simplified in `f4d23aa`. A wizard can long-rest, see no reminder, keep casting the previous day's list, and never be prompted to prepare.
+The largest correctness gap at review time was the **daily preparation loop**. The data model recorded `spells.preparationsPending`, and the campaign long-rest route set it for prepared casters, but no UI read it. The old `DailyPreparationsModal` was removed when the table was simplified in `f4d23aa`. A wizard could long-rest, see no reminder, keep casting the previous day's list, and never be prompted to prepare. Sprint 1 restored the workflow.
 
-There are also several class-specific approximations:
+There were also several class-specific approximations. The first two are fixed; the rest remain open:
 
-- Prepared cantrips are not a daily choice; the builder treats all selected cantrips as always castable.
-- Wizard and magus cantrip caps conflate spellbook size with the number prepared per day.
+- Prepared cantrips are not a daily choice; the builder treats all selected cantrips as always castable. (Fixed in Sprint 1.)
+- Wizard and magus cantrip caps conflate spellbook size with the number prepared per day. (Fixed in Sprint 1.)
 - Psychic has no repertoire limit, no conscious-mind grants, no psi cantrips, and no Clarity of Focus increase.
 - Necromancer has no grave-spell grants.
 - Magus has no studious spell slots.
@@ -120,13 +120,13 @@ Legend: Yes = modeled and usable; Partial = some support with known gaps; No = n
 
 | Area | Status | Notes |
 | --- | --- | --- |
-| Full-caster slot tables | Yes | Wizard, cleric, druid, bard, oracle, sorcerer, witch, animist tables are present |
+| Full-caster slot tables | Yes | Wizard, cleric, druid, bard, witch, and animist use the full-caster table; sorcerer and oracle use the spontaneous table |
 | Spontaneous full-caster slots | Yes | Sorcerer and oracle use the correct table |
 | Bounded-caster slots | Yes | Magus, summoner, psychic, and necromancer; psychic/necromancer get the 10th-rank capstone |
 | Prepared copies by rank | Yes | Duplicates, upcasting, and rank-aware validation |
 | Divine font | Yes | Rank, slot count, dual-font choice, separate usage |
 | Wizard curriculum | Partial | Extra slot and rank-1 validation; higher-rank curriculum lists remain manual |
-| Prepared cantrips | No | All selected cantrips are treated as prepared and castable |
+| Prepared cantrips | Yes | Daily prepared list, class caps, and the wizard curriculum extra |
 | Spontaneous repertoire limits | Partial | Bard, oracle, sorcerer, summoner; psychic is missing |
 | Spontaneous heightening by learned rank | No | Only signature spells can heighten |
 | Signature spells | Yes | One per rank, level 3 gate, validation |
@@ -143,6 +143,8 @@ Legend: Yes = modeled and usable; Partial = some support with known gaps; No = n
 
 ### F1. The daily preparation reminder is not surfaced (P0)
 
+Status: fixed in Sprint 1.
+
 Evidence:
 
 - `CharacterDraft["spells"].preparationsPending` exists in `src/shared/types.ts`.
@@ -156,6 +158,8 @@ Fix: Restore a daily preparations workflow in the sheet and builder. The old `Da
 
 ### F2. There is no per-character long rest (P0)
 
+Status: fixed in Sprint 1.
+
 Evidence:
 
 - The only rest entry point is `POST /api/campaigns/:id/long-rest`, and it is GM-only (`src/server/routes/campaigns.ts`).
@@ -167,6 +171,8 @@ Impact: A player cannot run their own daily preparations, and a solo/offline cha
 Fix: Add a Long rest action to the sheet for editors. Preview the existing `applyLongRest` summary (HP, slots, font, focus, conditions), then persist. For prepared casters, open the daily preparations modal immediately after rest, or show a prominent pending banner.
 
 ### F3. Prepared cantrips are not modeled (P0/P1)
+
+Status: fixed in Sprint 1.
 
 Evidence:
 
@@ -182,6 +188,8 @@ Impact: A wizard with 10 spellbook cantrips can cast all 10. The "prepare spells
 Fix: Add `spells.preparedCantrips: string[]`. Keep `spells.cantrips` as the known list/spellbook/repertoire. For prepared casters, only `preparedCantrips` are castable; for spontaneous casters, `cantrips` remain the repertoire. Add a daily-preparation cantrip section with the correct class cap and the wizard's extra curriculum cantrip.
 
 ### F4. Cantrip caps conflate spellbook size and prepared count (P1)
+
+Status: fixed in Sprint 1 for known vs. prepared caps and the magus spellbook.
 
 Evidence: `CANTRIP_LIMITS` in `src/shared/rules.ts` uses:
 
@@ -201,6 +209,8 @@ Fix: Split `cantripKnownLimitFor(classData)` from `cantripPreparedLimitFor(class
 
 ### F5. Spellbook, known list, and repertoire are one data field (P1)
 
+Status: partly addressed in Sprint 1 (prepared cantrips and class-specific cap labels); the full spellbook/known split remains open.
+
 Evidence:
 
 - `draft.spells.known` is used for both a prepared caster's spellbook and a spontaneous caster's repertoire.
@@ -216,7 +226,7 @@ Fix: At minimum, introduce labels by class (`spellbook`, `familiar`, `dirge`, `s
 
 - **Psychic**: `spellRepertoireLimits` excludes psychic, so its repertoire is unlimited. The conscious mind does not grant its 1st-rank spell, two common psi cantrips, and unique psi cantrip. Psi amps, the focus pool increase at Clarity of Focus, and the amp UI are missing.
 - **Necromancer**: no `CLASS_GRANTS` entry for Necrotic Bomb, grim fascination grave spells, or their focus pool. `focusPointsMax` hard-codes 2 for necromancer.
-- **Magus**: no studious spell slots. The spellbook cantrip cap is 5 instead of 8.
+- **Magus**: no studious spell slots. The spellbook cantrip cap is now 8, but studious slots remain open.
 - **Summoner**: no `evolution surge` link spell or `boost eidolon` link cantrip. The link cantrip must not count toward the focus pool.
 - **Animist**: `animistSlots` is a combined total and every slot is treated as prepared. The apparition repertoire and spontaneous apparition slots are not separate.
 - **Wizard**: higher-rank curriculum spells are not granted, so the extra slot is effectively unrestricted at those ranks.
@@ -256,6 +266,8 @@ Impact: A sorcerer who learns Fireball at 3rd and 5th rank cannot represent both
 Fix: Add rank-aware known spells, analogous to `preparedByRank`, or a `knownByRank` map. Use it for repertoire limits and cast options. Keep the flat `known` list as a compatibility mirror during migration. Add the "cast at known rank using a higher slot" option later if the table needs it.
 
 ### F9. Slot pips and prepared usage can desynchronize (P1)
+
+Status: fixed in Sprint 1 with the Restore action.
 
 Evidence:
 
