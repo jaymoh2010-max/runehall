@@ -44,6 +44,8 @@ Audit date: 2026-11-23
   exercise the real rune math instead of level-1 gear.
 - **General Training is resolved per selection.** Each selected General Training instance stores its
   own granted 1st-level general feat, so repeatable picks apply independently.
+- **Companions are visible on the sheet.** The Details tab and print view now show the companion
+  roster with kind, level, HP, AC, linked bestiary saves/attacks/abilities, and notes.
 - **The character simulator is now reusable.** The deterministic level builder is exported,
   the CLI is entry-point guarded, and a focused unit test covers the previously failing
   classes.
@@ -78,4 +80,5 @@ Audit date: 2026-11-23
   compendium ships prose rather than structured rule elements.
 - The party simulator rebuilds each complete sheet at every level to exercise all class
   features and choices; it is not a narrative continuity test for a single saved build.
-- Companion edge cases remain candidates for future curated coverage.
+- Companion statistics, bestiary-linked companion tokens, and automatic companion advancement
+  remain manual.

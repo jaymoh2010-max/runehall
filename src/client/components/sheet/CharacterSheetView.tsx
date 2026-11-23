@@ -77,7 +77,18 @@ const CharacterBuilderPage = lazy(() =>
 );
 import { getSocket, joinCampaign } from "../../socket";
 import { CompendiumPreviewModal, parseCompendiumPreviewHref } from "../CompendiumPreview";
-import { Avatar, Badge, Button, Field, Input, Modal, Spinner, Tag, Textarea } from "../ui";
+import {
+  Avatar,
+  Badge,
+  Button,
+  Field,
+  Input,
+  Modal,
+  RichText,
+  Spinner,
+  Tag,
+  Textarea,
+} from "../ui";
 
 type SheetTab =
   "weapons" | "defense" | "gear" | "spells" | "feats" | "actions" | "details" | "status";
@@ -94,6 +105,13 @@ const TABS: { id: SheetTab; label: string }[] = [
 ];
 
 const RANK_LABELS = ["U", "T", "E", "M", "L"];
+
+const COMPANION_KIND_LABELS: Record<string, string> = {
+  animal: "Animal companion",
+  familiar: "Familiar",
+  eidolon: "Eidolon",
+  summon: "Summon",
+};
 
 function castOptionValue(option: { rank: number; resource: string; castRank?: number }): string {
   const suffix =
@@ -2777,6 +2795,69 @@ export function CharacterSheetView({
                   <h3>Senses</h3>
                   <p>{derived.senses.join(", ") || "Normal"}</p>
                 </div>
+                {draft.companions.length ? (
+                  <div>
+                    <h3>Companions &amp; summons</h3>
+                    <div className="stack" style={{ gap: 8 }}>
+                      {draft.companions.map((companion) => {
+                        const monster = companion.monsterId
+                          ? (context.monsters?.[companion.monsterId] ?? null)
+                          : null;
+                        const hpMax = companion.hpMax ?? monster?.hp ?? null;
+                        const ac = companion.ac ?? monster?.ac ?? null;
+                        return (
+                          <div key={companion.id} className="companion-row">
+                            <div className="companion-row-head">
+                              <strong>{companion.name || "Companion"}</strong>
+                              <span className="tiny muted">
+                                {COMPANION_KIND_LABELS[companion.kind] ?? companion.kind} · level{" "}
+                                {companion.level}
+                              </span>
+                            </div>
+                            <div className="tiny muted">
+                              HP {companion.hpCurrent ?? "—"} / {hpMax ?? "—"} · AC {ac ?? "—"}
+                            </div>
+                            {monster ? (
+                              <div className="companion-statblock">
+                                <div className="tiny muted">
+                                  Fort {signed(monster.fortitude)} · Ref {signed(monster.reflex)} ·
+                                  Will {signed(monster.will)} · Per {signed(monster.perception)}
+                                </div>
+                                {monster.attacks.length ? (
+                                  <div className="tiny">
+                                    {monster.attacks
+                                      .map(
+                                        (attack) =>
+                                          `${attack.name} ${signed(attack.bonus)} (${attack.damage})`
+                                      )
+                                      .join(" · ")}
+                                  </div>
+                                ) : null}
+                                {monster.abilities.length ? (
+                                  <details>
+                                    <summary className="tiny gold-text">
+                                      {monster.abilities.length} abilities
+                                    </summary>
+                                    {monster.abilities.map((ability) => (
+                                      <div key={ability.name} className="companion-ability">
+                                        <strong>{ability.name}</strong>
+                                        {ability.actions ? (
+                                          <span className="tiny muted"> · {ability.actions}</span>
+                                        ) : null}
+                                        <RichText html={ability.description} />
+                                      </div>
+                                    ))}
+                                  </details>
+                                ) : null}
+                              </div>
+                            ) : null}
+                            {companion.notes ? <p className="tiny">{companion.notes}</p> : null}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : null}
                 {derived.notes.length ? (
                   <div>
                     <h3>Manual tracking</h3>
