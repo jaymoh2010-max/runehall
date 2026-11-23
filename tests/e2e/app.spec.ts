@@ -22,6 +22,9 @@ const fireballId = compendiumSpells.find((entry) => entry.name === "Fireball")!.
 const scroll3Id = compendiumEquipment.find(
   (entry) => entry.name === "Scroll of 3rd-rank Spell"
 )!.id;
+const wand3Id = compendiumEquipment.find(
+  (entry) => entry.name === "Magic Wand (3rd-Rank Spell)"
+)!.id;
 const elementBloodlineId = "cf:RXRnJcG4XSabZ35a";
 const admin = {
   username: `e2e_gm_${runId}`,
@@ -1379,6 +1382,13 @@ test("builder learns a spontaneous spell at more than one rank", async ({ page }
     invested: false,
     runes: [],
   });
+  draft.equipment.push({
+    itemId: wand3Id,
+    quantity: 1,
+    equipped: true,
+    invested: false,
+    runes: [],
+  });
   const saved = await page.request.put(`/api/characters/${character.character.id}`, {
     data: { data: draft, force: true },
   });
@@ -1437,7 +1447,32 @@ test("builder learns a spontaneous spell at more than one rank", async ({ page }
     timeout: 15_000,
   });
   await expect(scrollRow).toBeHidden({ timeout: 15_000 });
+  const wandRow = page
+    .locator(".pb-inventory-row")
+    .filter({ hasText: "Magic Wand (3rd-Rank Spell)" });
+  await expect(wandRow).toBeVisible();
+  await wandRow.getByRole("button", { name: /Cast spell from/ }).click();
+  await page.getByPlaceholder(/Search spells/).fill("Fireball");
+  await page
+    .locator(".picker-item-name", { hasText: /^Fireball$/ })
+    .first()
+    .click();
+  await page.getByRole("button", { name: "Cast from wand" }).click();
+  await expect(page.getByText(/Cast Fireball from a magic wand at rank 3/)).toBeVisible({
+    timeout: 15_000,
+  });
+  await expect(wandRow.getByRole("button", { name: /used today/i })).toBeDisabled();
   await expect(page.locator(".pb-save")).toHaveText("Saved");
+
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "E2E Ranked Sorcerer" })).toBeVisible({
+    timeout: 15_000,
+  });
+  await page.getByRole("button", { name: "Gear", exact: true }).click();
+  const savedWandRow = page
+    .locator(".pb-inventory-row")
+    .filter({ hasText: "Magic Wand (3rd-Rank Spell)" });
+  await expect(savedWandRow.getByRole("button", { name: /used today/i })).toBeDisabled();
 });
 
 test("sheet casts psychic psi cantrip amps with focus", async ({ page }) => {

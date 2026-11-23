@@ -60,22 +60,24 @@ export function itemUseInfo(item: Equipment | null | undefined): ItemUseInfo | n
   const traits = (item.traits ?? []).map((trait) => trait.toLowerCase());
   const description = item.description ?? "";
   const healingFormula = itemHealingFormula(description);
-  if (item.consumable || item.type === "consumable" || traits.includes("consumable")) {
-    return {
-      kind: "consumable",
-      label: "Use",
-      usesMax: Math.max(1, Math.min(20, Math.round(item.consumable?.uses ?? 1))),
-      frequency: null,
-      healingFormula,
-    };
-  }
   const frequency = activationFrequency(description);
+  // Wands are permanent items even when the compendium types them as
+  // consumables, so they must not spend their inventory stack on activation.
   if (traits.includes("wand")) {
     return {
       kind: "charged",
       label: "Activate",
       usesMax: 1,
       frequency: frequency ?? "once per day",
+      healingFormula,
+    };
+  }
+  if (item.consumable || item.type === "consumable" || traits.includes("consumable")) {
+    return {
+      kind: "consumable",
+      label: "Use",
+      usesMax: Math.max(1, Math.min(20, Math.round(item.consumable?.uses ?? 1))),
+      frequency: null,
       healingFormula,
     };
   }

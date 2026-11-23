@@ -72,6 +72,20 @@ describe("item activation descriptions", () => {
       frequency: "once per day",
     });
 
+    const genericWand = item({
+      name: "Magic Wand (1st-Rank Spell)",
+      type: "consumable",
+      traits: ["magical", "wand"],
+      consumable: { category: "wand", uses: 1, duration: "" },
+      description:
+        "<p><strong>Activate</strong> Cast a Spell</p><p><strong>Frequency</strong> once per day</p>",
+    });
+    expect(itemUseInfo(genericWand)).toMatchObject({
+      kind: "charged",
+      usesMax: 1,
+      frequency: "once per day",
+    });
+
     const gloves = item({
       name: "Healer's Gloves",
       type: "equipment",
