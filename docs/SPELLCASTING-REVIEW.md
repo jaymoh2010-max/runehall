@@ -2,7 +2,7 @@
 
 Date: 2026-11-23
 
-Status: review complete. Sprint 1 (the daily spellcasting loop) was implemented on 2026-11-23. The findings below describe the pre-Sprint-1 state; the Sprint 1 implementation status section records what changed, and the class-specific gaps remain for Sprint 2 and Sprint 3.
+Status: review complete. Sprint 1 (the daily spellcasting loop) and the class-grant portion of Sprint 2 were implemented on 2026-11-23. The findings below describe the pre-Sprint state; the implementation status sections record what changed, and the remaining class and table gaps stay in the backlog.
 
 > **Follow-up (2026-11-23):** `docs/RULES-AUDIT.md` corrected two table errors
 > this review did not catch: bards use the 2/3 full-caster slot table (not the
@@ -67,6 +67,19 @@ Sprint 1 is implemented:
 
 Remaining work stays in Sprint 2 and Sprint 3 below.
 
+## Sprint 2 implementation status (2026-11-23)
+
+The class-specific grant pass is implemented:
+
+- Focus and innate spell attack/DC are derived separately from class spellcasting. Focus-only classes (champion, monk, ranger, and other focus sources) get their own spell DC/attack, and innate spells use their Charisma-based trained/expert profile. The sheet uses the correct attack modifier and shows focus/innate DC on the row.
+- The "spellcasting class feature" prerequisite now requires actual spell slots, so focus-only classes no longer qualify accidentally.
+- Psychic has a bounded spontaneous repertoire limit, conscious-mind 1st-rank grants, and granted psi cantrips. Clarity of Focus already raises the pool at 5th level. Psi amps remain manual.
+- Necromancer grants Necrotic Bomb and the grim fascination grave spell, with a focus pool of 2.
+- Summoner grants Evolution Surge and the at-will Boost Eidolon link cantrip. The link cantrip does not count toward the focus pool.
+- Cleric deity spells are included in the available cleric list and can be prepared through the normal daily-preparation workflow.
+
+Still open after this pass: magus studious slots, the animist prepared/spontaneous split, spontaneous known-at-rank copies, psi amp actions, item spellcasting, rituals, sustain, and multiclass archetype casting.
+
 ## Rules baseline
 
 ### Core spellcasting
@@ -127,12 +140,18 @@ Legend: Yes = modeled and usable; Partial = some support with known gaps; No = n
 | Divine font | Yes | Rank, slot count, dual-font choice, separate usage |
 | Wizard curriculum | Partial | Extra slot and rank-1 validation; higher-rank curriculum lists remain manual |
 | Prepared cantrips | Yes | Daily prepared list, class caps, and the wizard curriculum extra |
-| Spontaneous repertoire limits | Partial | Bard, oracle, sorcerer, summoner; psychic is missing |
+| Spontaneous repertoire limits | Partial | Bard, oracle, sorcerer, summoner, and psychic; spontaneous known-at-rank copies remain open |
 | Spontaneous heightening by learned rank | No | Only signature spells can heighten |
 | Signature spells | Yes | One per rank, level 3 gate, validation |
-| Focus points and focus casting | Partial | Pool and casting work; focus-only classes lack their own spell DC/attack |
+| Focus points and focus casting | Partial | Separate focus spell DC/attack now works; psi amps and some feat-granted pools remain manual |
 | Focus spells from feats/archetypes | Partial | Manual focus list; no automatic grants or pool changes |
-| Innate spells and uses | Partial | Uses and casting work; innate attack/DC is wrong |
+| Innate spells and uses | Partial | Uses and casting work; innate attack/DC is derived separately |
+| Cleric deity spells | Yes | Deity spells are offered to prepare; higher-rank deity spells appear as level permits |
+| Psychic conscious minds | Partial | 1st-rank spell and psi cantrips granted; amps and higher-level unique cantrips manual |
+| Necromancer grave spells | Partial | Necrotic Bomb and grim fascination spells granted; thralls and effects manual |
+| Summoner link spells | Yes | Evolution Surge and Boost Eidolon granted; eidolon actions remain manual |
+| Magus studious slots | No | Not tracked separately |
+| Animist prepared/spontaneous split | No | Combined slot total; manual split |
 | Rituals | No | List only; sheet explicitly disables Cast for rituals |
 | Sustained spells | No | Helpers exist; no UI starts or ends a sustained spell |
 | Spellbook capacity and learning | No | No starting-spellbook or Learn a Spell accounting |
@@ -224,20 +243,24 @@ Fix: At minimum, introduce labels by class (`spellbook`, `familiar`, `dirge`, `s
 
 ### F6. Several class resources are missing or hard-coded (P1)
 
-- **Psychic**: `spellRepertoireLimits` excludes psychic, so its repertoire is unlimited. The conscious mind does not grant its 1st-rank spell, two common psi cantrips, and unique psi cantrip. Psi amps, the focus pool increase at Clarity of Focus, and the amp UI are missing.
-- **Necromancer**: no `CLASS_GRANTS` entry for Necrotic Bomb, grim fascination grave spells, or their focus pool. `focusPointsMax` hard-codes 2 for necromancer.
+Status: partly fixed in Sprint 2. Psychic, necromancer, summoner, and cleric deity spells are now granted; magus studious slots and the animist split remain open.
+
+- **Psychic**: repertoire limits, conscious-mind 1st-rank spells, and psi cantrips are granted. Psi amps and higher-level unique psi cantrips remain manual.
+- **Necromancer**: Necrotic Bomb, grim fascination grave spells, and the focus pool are granted. Thralls and full grave-spell effects remain manual.
 - **Magus**: no studious spell slots. The spellbook cantrip cap is now 8, but studious slots remain open.
-- **Summoner**: no `evolution surge` link spell or `boost eidolon` link cantrip. The link cantrip must not count toward the focus pool.
+- **Summoner**: `evolution surge` and `boost eidolon` are granted; the link cantrip does not count toward the focus pool. Eidolon actions remain manual.
 - **Animist**: `animistSlots` is a combined total and every slot is treated as prepared. The apparition repertoire and spontaneous apparition slots are not separate.
 - **Wizard**: higher-rank curriculum spells are not granted, so the extra slot is effectively unrestricted at those ranks.
 - **Sorcerer/oracle**: higher-rank bloodline/mystery gifts remain manual.
-- **Cleric**: deity spells stored in `deity.spells` are not resolved or added to the cleric's spell list.
+- **Cleric**: deity spells are resolved and offered through the normal preparation workflow.
 
-Impact: These classes are usable only with manual bookkeeping. The most visible errors are psychic's missing repertoire limit and cantrips, and animist's prepared/spontaneous mix.
+Impact: These classes are usable only with manual bookkeeping. The most visible remaining errors are magus studious slots and animist's prepared/spontaneous mix.
 
 Fix: Treat class completeness as a separate sprint. Start with grants and caps that can be curated from existing class-choice descriptions; avoid a generic parser until the curated path is stable.
 
 ### F7. Focus and innate spell attack/DC are wrong (P1)
+
+Status: fixed in Sprint 2. Focus-only classes use a separate focus profile, and innate spells use their own Charisma-based trained/expert profile.
 
 Evidence:
 

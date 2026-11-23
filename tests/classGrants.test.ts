@@ -9,7 +9,15 @@ import {
   emptyCharacterDraft,
   spellRepertoireLimits,
 } from "../src/shared/rules";
-import type { Ancestry, Background, ClassData, Feat, Heritage, Spell } from "../src/shared/types";
+import type {
+  Ancestry,
+  Background,
+  ClassData,
+  Deity,
+  Feat,
+  Heritage,
+  Spell,
+} from "../src/shared/types";
 
 function read<T>(file: string): T[] {
   return JSON.parse(fs.readFileSync(path.resolve("data", "compendium", file), "utf8")) as T[];
@@ -25,6 +33,7 @@ const ancestries = read<Ancestry>("ancestries.json");
 const heritages = read<Heritage>("heritages.json");
 const backgrounds = read<Background>("backgrounds.json");
 const classes = read<ClassData>("classes.json");
+const deities = read<Deity>("deities.json");
 const feats = read<Feat>("feats.json");
 const spells = read<Spell>("spells.json");
 
@@ -37,6 +46,10 @@ const cleric = byName(classes, "Cleric");
 const sorcerer = byName(classes, "Sorcerer");
 const oracle = byName(classes, "Oracle");
 const witch = byName(classes, "Witch");
+const psychic = byName(classes, "Psychic");
+const necromancer = byName(classes, "Necromancer");
+const summoner = byName(classes, "Summoner");
+const abadar = byName(deities, "Abadar");
 
 function draftFor(classData: ClassData) {
   const draft = emptyCharacterDraft("Class Grant Test");
@@ -123,6 +136,69 @@ describe("class-choice grants", () => {
       "repertoire"
     );
     expect(derived.focusPointsMax).toBe(1);
+  });
+
+  it("grants a Psychic conscious mind's repertoire spell and psi cantrips", () => {
+    const draft = draftFor(psychic);
+    chooseOption(draft, psychic, "cf:1rlBo3LcwIuPDCvz");
+    const grants = selectedClassGrants(draft, psychic);
+    expect(grants.spells).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: "Kinetic Ram", kind: "repertoire", rank: 1 }),
+        expect.objectContaining({ name: "Telekinetic Hand", kind: "focusCantrip", rank: 0 }),
+        expect.objectContaining({ name: "Telekinetic Projectile", kind: "focusCantrip", rank: 0 }),
+        expect.objectContaining({ name: "Telekinetic Rend", kind: "focusCantrip", rank: 0 }),
+      ])
+    );
+    expect(spellRepertoireLimits(psychic, 1)).toEqual({
+      cantrips: 3,
+      ranks: [1],
+      subtractGranted: false,
+    });
+    const derived = computeCharacter(draft, contextForDraft(draft));
+    expect(derived.focusPointsMax).toBe(2);
+    expect(derived.grantedSpells.some((spell) => spell.name === "Telekinetic Rend")).toBe(true);
+  });
+
+  it("grants Necromancer grave spells and Summoner link spells", () => {
+    const necro = draftFor(necromancer);
+    chooseOption(necro, necromancer, "cf:gyN8OZZ3txxIAKLf");
+    const necroGrants = selectedClassGrants(necro, necromancer);
+    expect(necroGrants.spells).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: "Necrotic Bomb", kind: "focus", rank: 1 }),
+        expect.objectContaining({ name: "Blood Infusion", kind: "focus", rank: 1 }),
+      ])
+    );
+    expect(computeCharacter(necro, contextForDraft(necro)).focusPointsMax).toBe(2);
+
+    const summonerDraft = draftFor(summoner);
+    const summonerGrants = selectedClassGrants(summonerDraft, summoner);
+    expect(summonerGrants.spells).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: "Evolution Surge", kind: "focus", rank: 1 }),
+        expect.objectContaining({ name: "Boost Eidolon", kind: "focusCantrip", rank: 0 }),
+      ])
+    );
+    expect(computeCharacter(summonerDraft, contextForDraft(summonerDraft)).focusPointsMax).toBe(1);
+  });
+
+  it("makes a cleric's deity spells available to prepare", () => {
+    const draft = draftFor(cleric);
+    draft.deityId = abadar.id;
+    const grants = selectedClassGrants(draft, cleric, abadar);
+    expect(grants.spells).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: "Illusory Object",
+          kind: "repertoire",
+          rank: 1,
+          source: "Deity spells",
+        }),
+      ])
+    );
+    const derived = computeCharacter(draft, contextForDraft(draft));
+    expect(derived.grantedSpells.some((spell) => spell.name === "Illusory Object")).toBe(true);
   });
 
   it("grants a Wizard school's initial focus spell", () => {

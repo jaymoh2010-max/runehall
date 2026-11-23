@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { contextForDraft } from "../src/server/compendium";
 import {
   animistSlots,
   boundedCasterSlots,
@@ -139,6 +140,59 @@ describe("PF2e character rules", () => {
       context
     );
     expect(pendingSummary.spellPreparationsPending).toBe(true);
+  });
+
+  it("derives focus and innate spell attack profiles separately", () => {
+    const classes = read<ClassData>("classes.json");
+    const spellList = read<Spell>("spells.json");
+    const monk = classes.find((entry) => entry.name === "Monk")!;
+    const wizard = classes.find((entry) => entry.name === "Wizard")!;
+    const champion = classes.find((entry) => entry.name === "Champion")!;
+    const forceBolt = spellList.find((entry) => entry.name === "Force Bolt")!;
+    const light = spellList.find((entry) => entry.name === "Light")!;
+
+    const monkDraft = emptyCharacterDraft("Focus Monk");
+    monkDraft.classId = monk.id;
+    monkDraft.keyAbility = "wis";
+    monkDraft.spells.focus = [forceBolt.id];
+    const monkContext = contextForDraft(monkDraft);
+    const monkDerived = computeCharacter(monkDraft, monkContext);
+    expect(monkDerived.spellDc).toBeNull();
+    expect(monkDerived.focusSpellDc).toBe(13 + monkDerived.abilityMods.wis);
+    expect(monkDerived.focusSpellAttack).toBe(3 + monkDerived.abilityMods.wis);
+
+    const wizardDraft = emptyCharacterDraft("Innate Wizard");
+    wizardDraft.classId = wizard.id;
+    wizardDraft.keyAbility = "int";
+    wizardDraft.spells.innate = [light.id];
+    const wizardContext = contextForDraft(wizardDraft);
+    const wizardDerived = computeCharacter(wizardDraft, wizardContext);
+    expect(wizardDerived.innateSpellDc).toBe(13 + wizardDerived.abilityMods.cha);
+    expect(wizardDerived.innateSpellAttack).toBe(3 + wizardDerived.abilityMods.cha);
+    expect(wizardDerived.spellDc).not.toBe(wizardDerived.innateSpellDc);
+
+    const championDraft = emptyCharacterDraft("Focus Champion");
+    championDraft.classId = champion.id;
+    championDraft.keyAbility = "str";
+    const championContext = contextForDraft(championDraft);
+    const championDerived = computeCharacter(championDraft, championContext);
+    expect(championDerived.spellSlots).toBeNull();
+    expect(
+      checkFeatPrerequisite(
+        "You have a spellcasting class feature",
+        championDraft,
+        championContext,
+        championDerived
+      )
+    ).toBe("unmet");
+    expect(
+      checkFeatPrerequisite(
+        "You have a spellcasting class feature",
+        wizardDraft,
+        wizardContext,
+        wizardDerived
+      )
+    ).toBe("met");
   });
 
   it("blocks class feats that belong to another class", () => {
