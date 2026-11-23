@@ -51,7 +51,7 @@ Audit date: 2026-11-23
 | --- | --- |
 | `npm run check` | Pass |
 | `npm run smoke` | Pass |
-| `npm run e2e` | 31 passed, 0 skipped |
+| `npm run e2e` | 32 passed, 0 skipped |
 | `npm run simulate` | 1000 characters, 0 problems |
 | `npm run simulate:exhaustive` | 7,899 remaster + 10,529 all-content builds, 0 problems |
 | `npm run simulate:campaign` | 17 passed, 0 failed |
