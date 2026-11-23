@@ -4,6 +4,11 @@ Date: 2026-11-23
 
 Status: review complete. No code changes in this pass; this document records the rules baseline, the current implementation, the gaps, and a proposed sprint sequence.
 
+> **Follow-up (2026-11-23):** `docs/RULES-AUDIT.md` corrected two table errors
+> this review did not catch: bards use the 2/3 full-caster slot table (not the
+> sorcerer/oracle 3/4 table), and cleric divine font moves to 10th rank at
+> 19th-20th level. The broader spellcasting gaps below still apply.
+
 ## Scope
 
 This review covers every class that gains spellcasting, focus spells, or innate spells, plus the table-facing spell loop:

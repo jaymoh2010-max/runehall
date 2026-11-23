@@ -73,18 +73,38 @@ describe("condition modifiers", () => {
     expect(result.attackCircumstance).toBe(-2);
   });
 
-  it("applies blinded to Perception only", () => {
+  it("applies blinded as off-guard with a Perception penalty", () => {
     const result = conditionModifiers([condition("Blinded")], { level: 5 });
     expect(result.perception).toBe(-4);
+    expect(result.ac).toBe(-2);
     expect(result.saves.will).toBe(0);
+    expect(result.notes.some((note) => note.startsWith("Blinded:"))).toBe(true);
   });
 
   it("treats unconscious as AC/Reflex/Perception penalties plus incapacitation", () => {
     const result = conditionModifiers([condition("Unconscious")], { level: 5 });
     expect(result.ac).toBe(-6);
     expect(result.saves.reflex).toBe(-4);
+    expect(result.saves.fortitude).toBe(0);
+    expect(result.saves.will).toBe(0);
     expect(result.perception).toBe(-4);
     expect(result.incapacitated).toBe(true);
+  });
+
+  it("applies enfeebled to Strength damage and stupefied to Perception", () => {
+    const enfeebled = conditionModifiers([condition("Enfeebled", 2)], { level: 5 });
+    expect(enfeebled.checks.str).toBe(-2);
+    expect(enfeebled.damage).toBe(-2);
+
+    const stupefied = conditionModifiers([condition("Stupefied", 2)], { level: 5 });
+    expect(stupefied.saves.will).toBe(-2);
+    expect(stupefied.perception).toBe(-2);
+  });
+
+  it("makes confused characters off-guard", () => {
+    const result = conditionModifiers([condition("Confused")], { level: 5 });
+    expect(result.ac).toBe(-2);
+    expect(result.incapacitated).toBe(false);
   });
 
   it("treats encumbered as clumsy 1 with a Speed penalty", () => {

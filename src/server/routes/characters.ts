@@ -50,6 +50,7 @@ import {
   recoveryActivityLabel,
   recoveryDcsForRank,
   recoveryHealingFormula,
+  stabilizeDc,
   type RecoveryActivity,
 } from "../../shared/recovery";
 import { lifestyleRate, upkeepCostCp } from "../../shared/upkeep";
@@ -698,16 +699,6 @@ export async function registerCharacterRoutes(app: FastifyInstance): Promise<voi
       return reply.code(400).send({ error: "That character is dead and cannot be treated." });
     }
 
-    const allowedDcs = recoveryDcsForRank(medicine.rank, activity);
-    const requestedDc =
-      body.dc === undefined || body.dc === null
-        ? allowedDcs[0]
-        : safeInt(body.dc, allowedDcs[0], 1, 100);
-    if (!allowedDcs.includes(requestedDc)) {
-      return reply.code(400).send({
-        error: `${recoveryActivityLabel(activity)} at DC ${requestedDc} requires a higher Medicine rank. Choose ${allowedDcs.join(", ")}.`,
-      });
-    }
     const dying = targetDraft.play.conditions.reduce((value, entry) => {
       return entry.name.toLowerCase().replace(/\s+\d+$/, "") === "dying"
         ? Math.max(value, conditionNumericValue(entry) ?? 0)
@@ -715,6 +706,18 @@ export async function registerCharacterRoutes(app: FastifyInstance): Promise<voi
     }, 0);
     if (activity === "stabilize" && dying <= 0) {
       return reply.code(400).send({ error: "Stabilize requires a dying creature." });
+    }
+    // Stabilize is untrained and its DC is 5 + the recovery-roll DC.
+    const allowedDcs =
+      activity === "stabilize" ? [stabilizeDc(dying)] : recoveryDcsForRank(medicine.rank, activity);
+    const requestedDc =
+      body.dc === undefined || body.dc === null
+        ? allowedDcs[0]
+        : safeInt(body.dc, allowedDcs[0], 1, 100);
+    if (!allowedDcs.includes(requestedDc)) {
+      return reply.code(400).send({
+        error: `${recoveryActivityLabel(activity)} at DC ${requestedDc} is not valid here. Choose ${allowedDcs.join(", ")}.`,
+      });
     }
     if (activity === "treat-wounds" && targetDraft.play.treatWoundsImmune) {
       return reply.code(400).send({
@@ -739,7 +742,7 @@ export async function registerCharacterRoutes(app: FastifyInstance): Promise<voi
     const healingFormula =
       activity === "stabilize" || degree === "failure" || degree === "critical-failure"
         ? null
-        : recoveryHealingFormula(requestedDc);
+        : recoveryHealingFormula(requestedDc, degree === "critical-success");
     const healingRoll = healingFormula
       ? rollFormula(healingFormula, { label: `${label} healing` })
       : null;
@@ -747,13 +750,15 @@ export async function registerCharacterRoutes(app: FastifyInstance): Promise<voi
       activity === "treat-wounds" && degree === "critical-failure"
         ? rollFormula("1d8", { label: `${label} critical failure damage` })
         : null;
-    const robustHealth = hasRecoveryFeat(healerDerived, "Robust Health");
-    const continualRecovery = hasRecoveryFeat(healerDerived, "Continual Recovery");
     const targetDerived = computeCharacter(targetDraft, contextForDraft(targetDraft));
+    // Robust Health belongs to the target, not the healer, and grants HP
+    // equal to the target's level.
+    const robustHealth = hasRecoveryFeat(targetDerived, "Robust Health");
+    const continualRecovery = hasRecoveryFeat(healerDerived, "Continual Recovery");
     const applied = applyRecoveryToDraft({
       draft: targetDraft,
       maxHp: targetDerived.maxHp,
-      level: healerDraft.level,
+      level: targetDraft.level,
       activity,
       degree,
       healing: healingRoll?.total ?? 0,

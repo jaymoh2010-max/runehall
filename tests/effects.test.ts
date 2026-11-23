@@ -43,12 +43,17 @@ const cannyAcumen = byName(feats, "Canny Acumen");
 const additionalLore = byName(feats, "Additional Lore");
 const armorProficiency = byName(feats, "Armor Proficiency");
 const weaponProficiency = byName(feats, "Weapon Proficiency");
+const nimbleElf = byName(feats, "Nimble Elf");
+const elvenInstincts = byName(feats, "Elven Instincts");
+const incredibleInvestiture = byName(feats, "Incredible Investiture");
+const unburdenedIron = byName(feats, "Unburdened Iron");
 const human = byName(ancestries, "Human");
 const warrior = byName(backgrounds, "Warrior");
 const fighter = byName(classes, "Fighter");
 const wizard = byName(classes, "Wizard");
 const rogue = byName(classes, "Rogue");
 const aldori = byName(equipment, "Aldori Dueling Sword");
+const fullPlate = byName(equipment, "Full Plate");
 
 function fighterDraft() {
   const draft = emptyCharacterDraft("Effects Fighter");
@@ -139,6 +144,16 @@ describe("curated feat effects", () => {
   it("keeps the curated ids in sync with the current compendium", () => {
     expect(FEAT_EFFECTS[toughness.id]).toEqual({ hpPerLevel: 1 });
     expect(FEAT_EFFECTS[fleet.id]).toEqual({ speed: 5 });
+    expect(FEAT_EFFECTS[nimbleElf.id]).toEqual({ speed: 5 });
+    expect(FEAT_EFFECTS[elvenInstincts.id]).toEqual({
+      initiativeBonus: 2,
+      notes: ["Tie-breaking initiative against an opponent remains manual."],
+    });
+    expect(FEAT_EFFECTS[incredibleInvestiture.id]).toEqual({ investedLimit: 2 });
+    expect(FEAT_EFFECTS[unburdenedIron.id]).toEqual({
+      ignoreArmorSpeedPenalty: true,
+      speedPenaltyReduction: 5,
+    });
   });
 
   it("labels curated feats as fully automated", () => {
@@ -188,6 +203,71 @@ describe("curated feat effects", () => {
   it("labels the new curated feats as fully automated", () => {
     expect(automationForFeat(incredibleInitiative).level).toBe("full");
     expect(automationForFeat(untrainedImprovisation).level).toBe("full");
+    expect(automationForFeat(nimbleElf).level).toBe("full");
+    expect(automationForFeat(elvenInstincts).level).toBe("partial");
+    expect(automationForFeat(incredibleInvestiture).level).toBe("full");
+    expect(automationForFeat(unburdenedIron).level).toBe("full");
+  });
+
+  it("applies Nimble Elf speed and Elven Instincts initiative", () => {
+    const baseline = computeCharacter(fighterDraft(), context({}));
+    const applied = computeCharacter(
+      fighterDraft(),
+      context({ [nimbleElf.id]: nimbleElf, [elvenInstincts.id]: elvenInstincts })
+    );
+    expect(applied.speed).toBe(baseline.speed + 5);
+    expect(applied.initiative).toBe(baseline.initiative + 2);
+  });
+
+  it("raises the invested item limit with Incredible Investiture", () => {
+    const items = equipment.slice(0, 11);
+    const investedDraft = fighterDraft();
+    investedDraft.equipment = items.map((item) => ({
+      itemId: item.id,
+      quantity: 1,
+      equipped: false,
+      invested: true,
+    }));
+    const itemContext = {
+      ...context({ [incredibleInvestiture.id]: incredibleInvestiture }),
+      equipment: Object.fromEntries(items.map((item) => [item.id, item])),
+    };
+    const withoutFeat = computeCharacter(investedDraft, {
+      ...itemContext,
+      feats: {},
+    });
+    const withFeat = computeCharacter(investedDraft, itemContext);
+    expect(
+      withoutFeat.validation.some((validation) => validation.message.includes("Invested 11 items"))
+    ).toBe(true);
+    expect(
+      withFeat.validation.some((validation) => validation.message.includes("Invested 11 items"))
+    ).toBe(false);
+  });
+
+  it("ignores armor Speed penalties with Unburdened Iron", () => {
+    const draft = wizardDraft();
+    draft.equipment = [{ itemId: fullPlate.id, quantity: 1, equipped: true }];
+    const items = { [fullPlate.id]: fullPlate };
+    const withoutFeat = computeCharacter(draft, { ...wizardContext({}), equipment: items });
+    const withFeat = computeCharacter(draft, {
+      ...wizardContext({ [unburdenedIron.id]: unburdenedIron }),
+      equipment: items,
+    });
+    expect(withoutFeat.speed).toBeLessThan(25);
+    expect(withFeat.speed).toBe(25);
+  });
+
+  it("reduces one other Speed penalty with Unburdened Iron", () => {
+    const draft = wizardDraft();
+    draft.play.conditions = [{ name: "Encumbered", value: null, duration: null }];
+    const withoutFeat = computeCharacter(draft, wizardContext({}));
+    const withFeat = computeCharacter(
+      draft,
+      wizardContext({ [unburdenedIron.id]: unburdenedIron })
+    );
+    expect(withoutFeat.speed).toBe(15);
+    expect(withFeat.speed).toBe(20);
   });
 
   it("applies a choice-driven feat to the chosen proficiency", () => {

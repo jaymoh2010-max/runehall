@@ -26,7 +26,8 @@ describe("PF2e encounter XP", () => {
   });
 
   it("clamps creatures far outside the listed range", () => {
-    expect(creatureXp(1, 20)).toBe(10);
+    // A creature five or more levels below the party awards no XP.
+    expect(creatureXp(1, 20)).toBe(0);
     expect(creatureXp(20, 1)).toBe(160);
   });
 
@@ -58,14 +59,14 @@ describe("PF2e encounter budgets", () => {
   it("adjusts the budget for larger and smaller parties", () => {
     expect(encounterBudgetThresholds(6)).toEqual({
       trivial: 60,
-      low: 100,
+      low: 90,
       moderate: 120,
       severe: 180,
       extreme: 240,
     });
     expect(encounterBudgetThresholds(2)).toEqual({
       trivial: 20,
-      low: 20,
+      low: 30,
       moderate: 40,
       severe: 60,
       extreme: 80,

@@ -800,12 +800,8 @@ export function registerSocketServer(io: TypedServer): void {
             type: "damage",
             amount: damage,
             critical: Boolean(critical),
+            nonlethal: Boolean(nonlethal),
           });
-          if (nonlethal && result.droppedToZero) {
-            result.draft.play.conditions = result.draft.play.conditions.filter(
-              (condition) => condition.name.replace(/\s+\d+$/, "").toLowerCase() !== "dying"
-            );
-          }
           const summary = characterSummary(result.draft, contextForDraft(result.draft));
           db.prepare(
             "UPDATE characters SET data = ?, summary = ?, updated_at = ?, revision = revision + 1 WHERE id = ?"
@@ -867,13 +863,13 @@ export function registerSocketServer(io: TypedServer): void {
           conditions: normalizeTokenConditions(parseJson(row.conditions, [])),
         },
         maxHp,
-        { type: "damage", amount: defenses.amount, critical: Boolean(critical) }
+        {
+          type: "damage",
+          amount: defenses.amount,
+          critical: Boolean(critical),
+          nonlethal: Boolean(nonlethal),
+        }
       );
-      if (nonlethal && result.droppedToZero) {
-        result.draft.play.conditions = result.draft.play.conditions.filter(
-          (condition) => condition.name.replace(/\s+\d+$/, "").toLowerCase() !== "dying"
-        );
-      }
       db.prepare(
         "UPDATE tokens SET hp_current = ?, conditions = ?, updated_at = ? WHERE id = ?"
       ).run(result.draft.play.hp ?? 0, JSON.stringify(result.draft.play.conditions), ts, row.id);

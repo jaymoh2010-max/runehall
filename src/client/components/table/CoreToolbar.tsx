@@ -217,9 +217,18 @@ export function CoreToolbar({
         >
           <MessageSquare size={14} />
         </IconButton>
-        <IconButton label={expanded ? "Exit full screen" : "Full screen"} onClick={onFullscreen}>
-          {expanded ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
-        </IconButton>
+        <Button
+          size="sm"
+          variant="ghost"
+          className={`core-fullscreen-toggle ${expanded ? "is-active" : ""}`}
+          icon={expanded ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+          onClick={onFullscreen}
+          title={expanded ? "Exit table fullscreen (F)" : "Enter table fullscreen (F)"}
+          aria-pressed={expanded}
+          aria-keyshortcuts="F"
+        >
+          {expanded ? "Exit full screen" : "Full screen"}
+        </Button>
       </div>
     </div>
   );

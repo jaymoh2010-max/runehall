@@ -228,14 +228,14 @@ describe("PF2e character rules", () => {
       damageDice: 3,
       defense: 2,
       saves: 1,
-      perception: 2,
+      perception: 1,
       skill: 2,
     });
     expect(automaticBonusProgression(19)).toMatchObject({
       attack: 3,
       damageDice: 4,
       defense: 3,
-      saves: 3,
+      saves: 2,
       perception: 3,
       skill: 3,
     });
@@ -264,7 +264,7 @@ describe("PF2e character rules", () => {
     });
     expect(progressed.ac - base.ac).toBe(2);
     expect(progressed.saves.fortitude - base.saves.fortitude).toBe(1);
-    expect(progressed.perception - base.perception).toBe(2);
+    expect(progressed.perception - base.perception).toBe(1);
     expect(
       (progressed.attacks.find((attack) => attack.name === "Longsword")?.attackBonus ?? 0) -
         (base.attacks.find((attack) => attack.name === "Longsword")?.attackBonus ?? 0)
@@ -714,6 +714,8 @@ describe("PF2e character rules", () => {
     expect(spellSlotsFor(15, "full", "Cleric")).toEqual([3, 3, 3, 3, 3, 3, 3, 8]);
     expect(spellSlotsFor(1, "full", "Wizard")).toEqual([3]);
     expect(spellSlotsFor(5, "full", "Wizard")).toEqual([4, 4, 3]);
+    expect(spellSlotsFor(1, "full", "Bard")).toEqual([2]);
+    expect(spellSlotsFor(5, "full", "Bard")).toEqual([3, 3, 2]);
     expect(spellSlotsFor(1, "full", "Sorcerer")).toEqual([3]);
     expect(spellSlotsFor(1, "full", "Oracle")).toEqual([3]);
     expect(spellSlotsFor(3, "full", "Sorcerer")).toEqual([4, 3]);
@@ -723,7 +725,7 @@ describe("PF2e character rules", () => {
     expect(boundedCasterSlots(19)).toEqual([2, 2, 2, 2, 2, 2, 2, 2, 2]);
     expect(boundedCasterSlots(20)).toEqual([2, 2, 2, 2, 2, 2, 2, 2, 2]);
     expect(spellSlotsFor(19, "full", "Wizard")).toEqual([4, 4, 4, 4, 4, 4, 4, 4, 4, 1]);
-    expect(spellSlotsFor(19, "full", "Cleric")).toEqual([3, 3, 3, 3, 3, 3, 3, 3, 9, 1]);
+    expect(spellSlotsFor(19, "full", "Cleric")).toEqual([3, 3, 3, 3, 3, 3, 3, 3, 3, 7]);
     expect(spellSlotsFor(19, "bounded", "Psychic")).toEqual([2, 2, 2, 2, 2, 2, 2, 2, 2, 1]);
     expect(spellSlotsFor(19, "bounded", "Necromancer")).toEqual([2, 2, 2, 2, 2, 2, 2, 2, 2, 1]);
     expect(spellSlotsFor(19, "bounded", "Magus")).toEqual([2, 2, 2, 2, 2, 2, 2, 2, 2]);
@@ -733,6 +735,7 @@ describe("PF2e character rules", () => {
     expect(cantripLimitFor(classes.find((entry) => entry.name === "Wizard"))).toBe(10);
     expect(cantripLimitFor(classes.find((entry) => entry.name === "Cleric"))).toBe(5);
     expect(cantripLimitFor(classes.find((entry) => entry.name === "Oracle"))).toBe(5);
+    expect(cantripLimitFor(classes.find((entry) => entry.name === "Sorcerer"))).toBe(4);
     expect(cantripLimitFor(classes.find((entry) => entry.name === "Psychic"))).toBe(3);
     expect(cantripLimitFor(classes.find((entry) => entry.name === "Animist"))).toBe(4);
     expect(cantripLimitFor(classes.find((entry) => entry.name === "Magus"))).toBe(8);
@@ -750,7 +753,7 @@ describe("PF2e character rules", () => {
     expect(divineFontInfo(1, "Cleric")).toEqual({ slots: 4, rank: 1 });
     expect(divineFontInfo(5, "Cleric")).toEqual({ slots: 5, rank: 3 });
     expect(divineFontInfo(15, "Cleric")).toEqual({ slots: 6, rank: 8 });
-    expect(divineFontInfo(19, "Cleric")).toEqual({ slots: 6, rank: 9 });
+    expect(divineFontInfo(19, "Cleric")).toEqual({ slots: 6, rank: 10 });
     expect(divineFontInfo(10, "Wizard")).toBeNull();
   });
 
@@ -996,21 +999,30 @@ describe("PF2e character rules", () => {
     const rogue = classes.find((entry) => entry.name === "Rogue")!;
     const barbarian = classes.find((entry) => entry.name === "Barbarian")!;
     const swashbuckler = classes.find((entry) => entry.name === "Swashbuckler")!;
-    expect(classSituationalDamage(rogue, 17, false)).toContainEqual({
+    expect(classSituationalDamage(rogue, 17, false, { weaponTraits: ["finesse"] })).toContainEqual({
       formula: "4d6",
       type: "precision",
       label: "Sneak Attack",
     });
     expect(classSituationalDamage(barbarian, 11, false)).toContainEqual({
-      formula: "6",
+      formula: "2",
+      type: "untyped",
+      label: "Rage",
+    });
+    expect(
+      classSituationalDamage(barbarian, 11, false, { weaponTraits: ["agile"] })
+    ).toContainEqual({
+      formula: "1",
       type: "untyped",
       label: "Rage",
     });
     expect(classSituationalDamage(barbarian, 11, true)).toEqual([]);
-    expect(classSituationalDamage(swashbuckler, 5, false)).toContainEqual({
-      formula: "2d6",
+    expect(
+      classSituationalDamage(swashbuckler, 5, false, { weaponTraits: ["finesse"] })
+    ).toContainEqual({
+      formula: "3",
       type: "precision",
-      label: "Precise Strike",
+      label: "Precise Strike (+1)",
     });
     expect(monkUnarmedDamage(1)).toBe("1d6");
     expect(monkUnarmedDamage(10)).toBe("2d6");
@@ -1020,9 +1032,21 @@ describe("PF2e character rules", () => {
   it("enforces spontaneous spell repertoire limits", () => {
     const bard = classes.find((entry) => entry.name === "Bard")!;
     const summoner = classes.find((entry) => entry.name === "Summoner")!;
-    expect(spellRepertoireLimits(bard, 1)).toEqual({ cantrips: 5, ranks: [3] });
-    expect(spellRepertoireLimits(bard, 5)).toEqual({ cantrips: 5, ranks: [4, 4, 3] });
-    expect(spellRepertoireLimits(summoner, 3)).toEqual({ cantrips: 5, ranks: [2, 1] });
+    expect(spellRepertoireLimits(bard, 1)).toEqual({
+      cantrips: 5,
+      ranks: [2],
+      subtractGranted: false,
+    });
+    expect(spellRepertoireLimits(bard, 5)).toEqual({
+      cantrips: 5,
+      ranks: [3, 3, 2],
+      subtractGranted: false,
+    });
+    expect(spellRepertoireLimits(summoner, 3)).toEqual({
+      cantrips: 5,
+      ranks: [2, 1],
+      subtractGranted: false,
+    });
     expect(spellRepertoireLimits(bard, 20)?.ranks[9]).toBe(2);
     expect(
       spellRepertoireLimits(
@@ -1044,11 +1068,11 @@ describe("PF2e character rules", () => {
     const over = computeCharacter(draft, context);
     expect(
       over.validation.some((issue) =>
-        issue.message.includes("knows 4 rank 1 spells but the repertoire allows 3")
+        issue.message.includes("knows 4 rank 1 spells but the repertoire allows 2")
       )
     ).toBe(true);
 
-    draft.spells.known = rankOne.slice(0, 3).map((spell) => spell.id);
+    draft.spells.known = rankOne.slice(0, 2).map((spell) => spell.id);
     const legal = computeCharacter(draft, context);
     expect(
       legal.validation.some((issue) =>

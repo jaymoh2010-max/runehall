@@ -21,7 +21,7 @@ export const AUTOMATION_HINTS: Record<AutomationLevel, string> = {
 };
 
 const MECHANICAL_TEXT =
-  /\b(bonus|penalty|resistance|weakness|condition|damage|speed|strike|check|save|dc|hp|hit points|proficiency|trained|expert|master|legendary|grant|gain|increase|reduce|immunity|sense|darkvision|low-light|circumstance|status|item bonus|action|reaction|attack|move|spell|focus|hero point|fortune|reroll|recall knowledge|exploration|downtime|craft|earn income|identify|maneuver|grapple|trip|shove|disarm|ally|enemy)\b/i;
+  /\b(bonus|penalty|resistance|weakness|condition|damage|speed|strike|check|save|dc|hp|hit points|proficiency|trained|expert|master|legendary|grant|gain|increase|reduce|immunity|sense|darkvision|low-light|circumstance|status|item bonus|action|reaction|attack|move|spell|focus|hero point|fortune|reroll|recall knowledge|exploration|downtime|craft|earn income|identify|maneuver|grapple|trip|shove|disarm|climb|swim|fall|jump|escape|squeeze|balance|track|sense direction|hide|sneak|ally|enemy)\b/i;
 
 /**
  * Curated overrides can be added here as specific feats are verified. The
@@ -51,10 +51,21 @@ export function automationForFeat(feat: Feat): AutomationInfo {
       Boolean(effect.untrainedImprovisation) ||
       Boolean(effect.armorProficiency) ||
       Boolean(effect.weaponProficiency) ||
+      Boolean(effect.investedLimit) ||
+      Boolean(effect.ignoreArmorSpeedPenalty) ||
+      Boolean(effect.speedPenaltyReduction) ||
+      Boolean(effect.trainedSkills?.length) ||
+      Boolean(effect.skillRanks) ||
+      Boolean(effect.lore?.length) ||
       Boolean(effect.senses?.length) ||
       Boolean(effect.languages?.length);
     return numeric
-      ? { level: "full", reason: "Runehall applies this feat's mechanics to the sheet." }
+      ? effect.notes?.length
+        ? {
+            level: "partial",
+            reason: "Runehall applies the numeric effect; the remaining note needs table tracking.",
+          }
+        : { level: "full", reason: "Runehall applies this feat's mechanics to the sheet." }
       : { level: "partial", reason: "Runehall records the effect as a note for the table." };
   }
   if (featChoice(feat.id)) {
@@ -95,7 +106,7 @@ export function automationForEquipment(item: Equipment): AutomationInfo {
       ? {
           level: "partial",
           reason:
-            "Runehall applies the item bonus; activated or conditional effects may need tracking.",
+            "Runehall applies the item bonus when the item is equipped and invested; activated or conditional effects may need tracking.",
         }
       : {
           level: "manual",

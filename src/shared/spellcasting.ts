@@ -114,6 +114,9 @@ export function spellCastOptions(
   }
 
   if (opts.focus) {
+    // A focus spell can't be cast if its printed (minimum) rank is greater
+    // than half your level rounded up.
+    if (spell.rank > cantripCastRank(level)) return [];
     const max = clampInt(opts.focusPointsMax ?? 0, 0, 3);
     return [
       {

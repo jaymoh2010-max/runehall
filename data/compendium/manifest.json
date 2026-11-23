@@ -1,29 +1,29 @@
 {
-  "generatedAt": "2026-11-04T20:09:29.295Z",
+  "generatedAt": "2026-11-23T07:14:09.527Z",
   "source": "https://github.com/foundryvtt/pf2e (Apache-2.0)",
-  "sourceCommit": "be611895ec16d4672f53d014527d9007b06cb409",
-  "sourceRef": "be611895",
+  "sourceCommit": "a70593f7d52ba6357c3bdc05c09dcb9d4f2765dc",
+  "sourceRef": "a70593f7",
   "sourceDirty": false,
   "count": {
-    "ancestries": 51,
-    "heritages": 334,
-    "backgrounds": 540,
+    "ancestries": 54,
+    "heritages": 357,
+    "backgrounds": 547,
     "classes": 29,
-    "classFeatures": 880,
-    "feats": 6366,
-    "spells": 2018,
-    "equipment": 5956,
+    "classFeatures": 881,
+    "feats": 6486,
+    "spells": 2036,
+    "equipment": 6005,
     "deities": 483,
     "conditions": 43,
-    "actions": 583,
-    "monsters": 1207
+    "actions": 592,
+    "monsters": 2384
   },
   "remasterOnlyCount": {
-    "ancestries": 34,
-    "backgrounds": 262,
-    "feats": 4852,
-    "spells": 1610,
-    "equipment": 4379,
-    "monsters": 1207
+    "ancestries": 38,
+    "backgrounds": 269,
+    "feats": 4985,
+    "spells": 1628,
+    "equipment": 4430,
+    "monsters": 1736
   }
 }

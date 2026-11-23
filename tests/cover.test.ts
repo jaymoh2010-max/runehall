@@ -83,7 +83,7 @@ describe("cover and concealment", () => {
     expect(concealmentFor("normal", "dim")).toBe("concealed");
     expect(concealmentFor("normal", "darkness")).toBe("hidden");
     expect(concealmentFor("low-light", "dim")).toBe("none");
-    expect(concealmentFor("low-light", "darkness")).toBe("hidden");
+    expect(concealmentFor("low-light", "darkness")).toBe("concealed");
     expect(concealmentFor("darkvision", "darkness")).toBe("none");
   });
 

@@ -112,7 +112,14 @@ export function CharacterSheetView({
   characterId: string;
   mode?: "page" | "overlay";
   onClose?: () => void;
-  onRoll?: (formula: string, label: string, dc: number | null, gmOnly: boolean) => void;
+  onRoll?: (
+    formula: string,
+    label: string,
+    dc: number | null,
+    gmOnly: boolean,
+    requestId?: string | null,
+    upgradeSuccess?: boolean
+  ) => void;
 }) {
   const toast = useToasts((state) => state.push);
   const navigate = useNavigate();
@@ -299,9 +306,15 @@ export function CharacterSheetView({
   const parsedDc = Number(sheetDc);
   const targetDc = sheetDc.trim() !== "" && Number.isFinite(parsedDc) ? Math.round(parsedDc) : null;
   const postRoll = useCallback(
-    (formula: string, label: string, dc: number | null = targetDc, gmOnly = sheetSecret) => {
+    (
+      formula: string,
+      label: string,
+      dc: number | null = targetDc,
+      gmOnly = sheetSecret,
+      upgradeSuccess = false
+    ) => {
       if (onRoll) {
-        onRoll(formula, label, dc, gmOnly);
+        onRoll(formula, label, dc, gmOnly, null, upgradeSuccess);
         return;
       }
       if (!character?.campaignId) {
@@ -324,6 +337,7 @@ export function CharacterSheetView({
           dc,
           visibility: gmOnly ? "gm" : "all",
           requestId: null,
+          upgradeSuccess,
         },
         (message) => {
           if (!message) {
@@ -1113,7 +1127,13 @@ export function CharacterSheetView({
                     type="button"
                     aria-label={`Roll ${SAVE_LABELS[save]} save`}
                     onClick={() =>
-                      postRoll(`1d20${signed(derived.saves[save])}`, `${SAVE_LABELS[save]} save`)
+                      postRoll(
+                        `1d20${signed(derived.saves[save])}`,
+                        `${SAVE_LABELS[save]} save`,
+                        targetDc,
+                        sheetSecret,
+                        derived.saveUpgrades[save]
+                      )
                     }
                   >
                     <Dices size={13} />
@@ -1354,7 +1374,13 @@ export function CharacterSheetView({
                       type="button"
                       aria-label={`Roll ${SAVE_LABELS[save]} save`}
                       onClick={() =>
-                        postRoll(`1d20${signed(derived.saves[save])}`, `${SAVE_LABELS[save]} save`)
+                        postRoll(
+                          `1d20${signed(derived.saves[save])}`,
+                          `${SAVE_LABELS[save]} save`,
+                          targetDc,
+                          sheetSecret,
+                          derived.saveUpgrades[save]
+                        )
                       }
                     >
                       <Dices size={13} />

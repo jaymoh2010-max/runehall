@@ -98,7 +98,9 @@ export function coverBetween(input: {
 
 export function concealmentFor(mode: TokenVisionMode, level: LightLevel): ConcealmentLevel {
   if (mode === "darkvision") return "none";
-  if (mode === "low-light") return level === "darkness" ? "hidden" : "none";
+  // Low-light vision treats dim light as bright and darkness as dim light,
+  // so targets in darkness are concealed (DC 5), not hidden (DC 11).
+  if (mode === "low-light") return level === "darkness" ? "concealed" : "none";
   if (level === "darkness") return "hidden";
   return level === "dim" ? "concealed" : "none";
 }

@@ -109,6 +109,131 @@ function descriptionOf(system, includeGm = false) {
   return "";
 }
 
+/** Split a macro body on top-level delimiters, respecting nested [ ]. */
+function splitTopLevel(value, delimiter = ",") {
+  const parts = [];
+  let depth = 0;
+  let current = "";
+  for (const character of String(value)) {
+    if (character === "[") depth += 1;
+    else if (character === "]") depth = Math.max(0, depth - 1);
+    if (character === delimiter && depth === 0) {
+      parts.push(current);
+      current = "";
+    } else {
+      current += character;
+    }
+  }
+  parts.push(current);
+  return parts.map((part) => part.trim()).filter(Boolean);
+}
+
+/**
+ * Replace a Foundry macro whose body can contain nested square brackets, such
+ * as @Damage[4d6[fire]] or @Damage[(@actor.level)d6[bleed]]. The old regex
+ * stopped at the first closing bracket and left raw formula fragments behind.
+ */
+function replaceBalancedMacro(html, name, render) {
+  const open = `@${name}[`;
+  let out = "";
+  let index = 0;
+  while (index < html.length) {
+    const start = html.indexOf(open, index);
+    if (start < 0) {
+      out += html.slice(index);
+      break;
+    }
+    out += html.slice(index, start);
+    let cursor = start + open.length;
+    let depth = 1;
+    for (; cursor < html.length; cursor += 1) {
+      if (html[cursor] === "[") depth += 1;
+      else if (html[cursor] === "]") {
+        depth -= 1;
+        if (depth === 0) break;
+      }
+    }
+    if (depth !== 0) {
+      out += html.slice(start);
+      break;
+    }
+    const body = html.slice(start + open.length, cursor);
+    cursor += 1;
+    let label = "";
+    if (html[cursor] === "{") {
+      let braceDepth = 1;
+      let end = cursor + 1;
+      for (; end < html.length; end += 1) {
+        if (html[end] === "{") braceDepth += 1;
+        else if (html[end] === "}") {
+          braceDepth -= 1;
+          if (braceDepth === 0) break;
+        }
+      }
+      if (braceDepth === 0) {
+        label = html.slice(cursor + 1, end);
+        cursor = end + 1;
+      }
+    }
+    out += render(body, label);
+    index = cursor;
+  }
+  return out;
+}
+
+function checkMacroText(body, label) {
+  if (label.trim()) return label.trim();
+  const parts = splitTopLevel(body, "|");
+  const kind = (parts[0] ?? "").toLowerCase();
+  const rawDc =
+    parts
+      .find((part) => part.toLowerCase().startsWith("dc:"))
+      ?.slice(3)
+      .trim() ?? "";
+  // "dc:@self.level" and similar formulas cannot be resolved at ingest time;
+  // the surrounding sentence supplies the standard DC.
+  const dc = /^\d+$/.test(rawDc) ? rawDc : "";
+  const basic = parts.some((part) => part.toLowerCase() === "basic");
+  if (kind === "flat") return dc ? `DC ${dc} flat check` : "flat check";
+  if (!kind) return "check";
+  const name = kind === "perception" ? "Perception" : titleCase(kind.replace(/-/g, " "));
+  const saveName = basic ? `basic ${name}` : name;
+  return dc ? `DC ${dc} ${saveName}` : saveName;
+}
+
+function damageMacroText(body, label) {
+  if (label.trim()) return label.trim();
+  // Options live after a top-level pipe and may contain commas
+  // (for example "options:area-damage,damage:material:silver").
+  // Only the damage list before that pipe is comma-delimited.
+  const [damagePart = ""] = splitTopLevel(body, "|");
+  const rendered = splitTopLevel(damagePart).map((part) => {
+    const match = part.match(/^([\s\S]*?)\[([^\]]*)\]$/);
+    const formula = (match?.[1] ?? part).trim();
+    const types = (match?.[2] ?? "")
+      .split(",")
+      .map((type) => type.trim())
+      .filter(Boolean);
+    // Keep only simple dice/flat formulas. Level- and actor-dependent formulas
+    // are not resolvable at ingest time; the surrounding prose explains them.
+    const simpleFormula = /^\d+d\d+(?:[+-]\d+)?$/i.test(formula) || /^\d+$/.test(formula);
+    const displayFormula = simpleFormula ? formula : "";
+    if (displayFormula && types.length) return `${displayFormula} ${types.join(" ")}`;
+    if (displayFormula) return displayFormula;
+    if (types.length) return types.join(" ");
+    return "damage";
+  });
+  return rendered.filter(Boolean).join(", ") || "damage";
+}
+
+function templateMacroText(body, label) {
+  if (label.trim()) return label.trim();
+  const parts = splitTopLevel(body, "|");
+  const kind = (parts[0] ?? "").replace(/^type:/i, "") || "area";
+  const distance = parts.find((part) => part.startsWith("distance:"))?.slice(9);
+  return distance ? `${distance}-foot ${kind}` : kind;
+}
+
 function expandMacros(html) {
   let out = expandEmbeds(resolveLocalize(html));
 
@@ -124,6 +249,10 @@ function expandMacros(html) {
       if (["r", "gmr", "br", "dr"].includes(command.toLowerCase())) {
         const formula = (tokens[0] || "").replace(/^\{|\}$/g, "");
         const label = tokens.slice(1).join(" ").replace(/^#/, "");
+        const simple = /^\d+d\d+(?:[+-]\d+)?$/i.test(formula) || /^\d+$/.test(formula);
+        // Actor- and level-dependent inline rolls cannot be resolved during
+        // ingest. Prefer the authored display label over raw @actor syntax.
+        if (!simple && display && display.trim()) return display.trim();
         // Inline rolls often repeat the modifier in a trailing display label,
         // e.g. [[/r 1d20+17]]{+17}; the formula already contains it.
         return [formula, label].filter(Boolean).join(" ");
@@ -150,20 +279,25 @@ function expandMacros(html) {
   out = out.replace(/@Item\[([^\]]+)\](?:\{([^}]*)\})?/g, (m, body, label) =>
     stripUuid(m, body, label)
   );
-  out = out.replace(/@Damage\[([^\]]+)\](?:\{([^}]*)\})?/g, (m, body, label) => {
-    if (label) return label;
-    const type = body.match(/\[([a-z-]+)\]$/)?.[1];
-    const formula = body.replace(/\[[^\]]*\]/g, "");
-    return `${formula}${type ? ` ${type}` : ""}`;
-  });
-  out = out.replace(/@Check\[([^\]]+)\](?:\{([^}]*)\})?/g, (m, body, label) => label || "check");
-  out = out.replace(/@Save\[([^\]]+)\](?:\{([^}]*)\})?/g, (m, body, label) => label || "save");
-  out = out.replace(/@Template\[[^\]]*\](?:\{([^}]*)\})?/g, (m, label) => label || "");
+  out = replaceBalancedMacro(out, "Damage", damageMacroText);
+  out = replaceBalancedMacro(out, "Check", checkMacroText);
+  out = replaceBalancedMacro(out, "Save", checkMacroText);
+  out = replaceBalancedMacro(out, "Template", templateMacroText);
   out = out.replace(/@Embed\[[^\]]*\](?:\{([^}]*)\})?/g, (m, label) => label || "");
   out = out.replace(/@Localize\[([^\]]+)\]/g, (_, key) => localizeKey(key));
   out = out.replace(/@[A-Za-z]+\[[^\]]*\](?:\{([^}]*)\})?/g, (m, label) => label || "");
   out = out.replace(/\{@[A-Za-z]+ ([^}]+)\}/g, (_, body) => body.split("|")[0]);
   out = out.replace(/@[A-Za-z]+/g, "");
+  // Macro-aware replacements can leave doubled words such as "save save"
+  // when the source prose already names the check.
+  out = out
+    .replace(/\b(save|check|damage)\s+\1\b/gi, "$1")
+    .replace(/\bHit Points\s+Hit Points\b/gi, "Hit Points")
+    .replace(/\b(a|an)\s+\1\b/gi, "$1");
+  // Any remaining damage-type annotation should keep its label, not the
+  // raw bracketed form.
+  out = out.replace(/\[([a-z-]+(?:,[a-z-]+)*)\]\{([^}]*)\}/gi, "$2");
+  out = out.replace(/\[([a-z-]+(?:,[a-z-]+)*)\]/gi, "");
 
   return out;
 }
@@ -637,6 +771,18 @@ for (const pack of [
   "pathfinder-monster-core",
   "pathfinder-monster-core-2",
   "pathfinder-npc-core",
+  // Legacy and expansion bestiaries make the "Legacy + Remastered" ruleset
+  // meaningful for creatures as well as character options.
+  "pathfinder-bestiary",
+  "pathfinder-bestiary-2",
+  "pathfinder-bestiary-3",
+  "lost-omens-bestiary",
+  "npc-gallery",
+  "battlecry-bestiary",
+  "howl-of-the-wild-bestiary",
+  "book-of-the-dead-bestiary",
+  "rage-of-elements-bestiary",
+  "war-of-immortals-bestiary",
 ]) {
   for (const file of walkJson(path.join(PACKS, pack))) {
     const j = readJson(file);
@@ -659,6 +805,12 @@ console.log(
 // ---------------------------------------------------------------------------
 // Normalize
 // ---------------------------------------------------------------------------
+// A few remaster classes express their key ability through a choice rather
+// than the class item's keyAbility value. Keep the public class data explicit.
+const CLASS_KEY_ABILITY_OVERRIDES = {
+  Psychic: ["int", "cha"],
+};
+
 function baseItem(j, idPrefix, type) {
   const pub = publication(j.system);
   const tr = traits(j.system);
@@ -1196,9 +1348,11 @@ const classes = raw.classes
       name: j.name,
       type: "class",
       hp: Number(s.hp ?? 0),
-      keyAbility: Array.isArray(s.keyAbility?.value)
-        ? s.keyAbility.value.filter((a) => ABILITY_SET.has(a))
-        : [],
+      keyAbility:
+        CLASS_KEY_ABILITY_OVERRIDES[j.name] ??
+        (Array.isArray(s.keyAbility?.value)
+          ? s.keyAbility.value.filter((a) => ABILITY_SET.has(a))
+          : []),
       perception: Number(s.perception ?? 1),
       savingThrows: {
         fortitude: Number(s.savingThrows?.fortitude ?? 1),
@@ -1460,6 +1614,32 @@ const equipment = raw.equipment
   .sort((a, b) => a.type.localeCompare(b.type) || a.name.localeCompare(b.name));
 
 // --- Deities ---------------------------------------------------------------
+// Deity spell lists are stored as Foundry UUIDs that end with the spell name.
+// Resolve them against the local spell pack so the compendium never exposes
+// raw "Compendium.pf2e.spells-srd.Item..." strings.
+const deitySpellMap = indexByName(
+  raw.spells.map((j) => ({
+    name: j.name,
+    id: `spell:${j._id}`,
+    remaster: publication(j.system).remaster,
+  }))
+);
+function resolveDeitySpell(value) {
+  const rawName = nameFromUuid(String(value ?? ""));
+  return {
+    id: pickByName(deitySpellMap, rawName)?.id ?? null,
+    name: rawName,
+  };
+}
+
+// Foundry's deity items omit the cleric spell lists for these three deities
+// even though the published stat blocks include them.
+const DEITY_SPELL_OVERRIDES = {
+  Dammar: { 1: "Ill Omen", 3: "Insect Form", 5: "Flammable Fumes" },
+  Inna: { 1: "Fold Metal", 3: "Fireball", 4: "Creation" },
+  "Tolte Coatl": { 1: "Tailwind", 3: "Hypercognition", 8: "Quandary" },
+};
+
 const deities = raw.deities
   .map((j) => {
     const s = j.system;
@@ -1480,7 +1660,11 @@ const deities = raw.deities
           ? [s.skill]
           : [],
       weapons: Array.isArray(s.weapons) ? s.weapons : [],
-      spells: s.spells ?? {},
+      spells: Object.fromEntries(
+        Object.entries(
+          Object.keys(s.spells ?? {}).length ? s.spells : (DEITY_SPELL_OVERRIDES[j.name] ?? {})
+        ).map(([rank, uuid]) => [rank, resolveDeitySpell(uuid)])
+      ),
       sanctification: s.sanctification ?? {},
       rarity: tr.rarity,
       traits: tr.traits,

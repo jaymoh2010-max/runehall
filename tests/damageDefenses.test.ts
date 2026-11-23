@@ -42,14 +42,35 @@ describe("monster damage defenses", () => {
     ).toBe(17);
   });
 
-  it("ignores typed defenses for untyped damage", () => {
+  it("applies all-damage resistance to untyped damage", () => {
     expect(
       applyDamageDefenses({
         amount: 10,
         damageType: "untyped",
         resistances: [{ type: "all", value: 5 }],
       })
-    ).toEqual({ amount: 10, notes: [] });
+    ).toEqual({ amount: 5, notes: ["Resistance 5 to all"] });
+  });
+
+  it("applies physical resistance to physical damage types", () => {
+    expect(
+      applyDamageDefenses({
+        amount: 12,
+        damageType: "slashing",
+        resistances: [{ type: "physical", value: 5 }],
+      })
+    ).toEqual({ amount: 7, notes: ["Resistance 5 to physical"] });
+  });
+
+  it("applies weakness before resistance", () => {
+    expect(
+      applyDamageDefenses({
+        amount: 3,
+        damageType: "fire",
+        resistances: [{ type: "all", value: 10 }],
+        weaknesses: [{ type: "fire", value: 5 }],
+      }).amount
+    ).toBe(0);
   });
 
   it("treats nonlethal immunity as a damage immunity", () => {
@@ -58,8 +79,8 @@ describe("monster damage defenses", () => {
         amount: 8,
         damageType: "bludgeoning",
         nonlethal: true,
-        immunities: ["nonlethal"],
+        immunities: ["nonlethal-attacks"],
       })
-    ).toEqual({ amount: 0, notes: ["Immune to bludgeoning"] });
+    ).toEqual({ amount: 0, notes: ["Immune to nonlethal-attacks"] });
   });
 });

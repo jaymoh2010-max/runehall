@@ -6496,16 +6496,21 @@
   min-height: 0;
   background: #070a0f;
 }
-.vtt:fullscreen {
-  width: 100vw;
-  height: 100vh;
+body.table-fullscreen-active {
+  overflow: hidden;
+  overscroll-behavior: none;
 }
-.vtt.is-theater {
+.vtt.is-fullscreen {
   position: fixed;
   inset: 0;
-  z-index: 900;
+  z-index: 80;
   width: 100vw;
   height: 100vh;
+  height: 100dvh;
+  overscroll-behavior: contain;
+}
+.core-fullscreen-toggle {
+  white-space: nowrap;
 }
 .table-empty {
   height: 100%;

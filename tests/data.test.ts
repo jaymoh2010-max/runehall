@@ -106,6 +106,15 @@ describe("compendium data", () => {
     expect(abadar.skill).toEqual(["society"]);
     expect(abadar.weapons).toEqual(["crossbow"]);
     expect(abadar.font.sort()).toEqual(["harm", "heal"]);
+    // Deity spell lists are resolved to local spell ids and names.
+    expect(abadar.spells["1"]).toMatchObject({
+      id: expect.stringMatching(/^spell:/),
+      name: "Illusory Object",
+    });
+    expect(JSON.stringify(abadar.spells)).not.toContain("Compendium.pf2e");
+    expect(byName(deities, "Dammar").spells["5"]?.name).toBe("Flammable Fumes");
+    expect(byName(deities, "Inna").spells["4"]?.name).toBe("Creation");
+    expect(byName(deities, "Tolte Coatl").spells["8"]?.name).toBe("Quandary");
 
     const shelyn = byName(deities, "Shelyn");
     expect(shelyn.skill).toEqual(["crafting", "performance"]);
@@ -237,6 +246,9 @@ describe("compendium data", () => {
       "Cloistered Cleric",
       "Warpriest",
     ]);
+
+    const psychic = byName(classes, "Psychic");
+    expect(psychic.keyAbility).toEqual(["int", "cha"]);
 
     const inventor = byName(classes, "Inventor");
     expect(
@@ -371,7 +383,21 @@ describe("compendium data", () => {
       const description = "description" in item ? String(item.description ?? "") : "";
       expect(description, `${item.name} inline macro`).not.toContain("[[/");
       expect(description, `${item.name} UUID macro`).not.toContain("@UUID");
+      expect(description, `${item.name} @Damage macro`).not.toContain("@Damage[");
+      expect(description, `${item.name} @Check macro`).not.toContain("@Check[");
+      expect(description, `${item.name} level macro`).not.toMatch(/\.(level|rank)\b/);
+      expect(description, `${item.name} doubled check`).not.toMatch(/\bcheck\s+check\b/i);
     }
+
+    const venom = byName(feats, "Disorienting Venom");
+    expect(venom.description).toContain("Fortitude save");
+    const party = byName(feats, "Keep the Party Going");
+    expect(party.description).toContain("Performance check");
+    expect(party.description).not.toContain("@self.level");
+    const meltdown = byName(classFeatures, "Energetic Meltdown");
+    expect(meltdown.description).toContain("damage equal to your level");
+    const stimulator = byName(equipment, "Electromuscular Stimulator");
+    expect(stimulator.description).toContain("Crafting check");
   });
 
   it("uses official bestiary values", () => {

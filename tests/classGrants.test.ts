@@ -113,7 +113,11 @@ describe("class-choice grants", () => {
     expect(grants.spells).toEqual(
       expect.arrayContaining([expect.objectContaining({ name: "Sure Strike", kind: "repertoire" })])
     );
-    expect(spellRepertoireLimits(bard, 1)).toEqual({ cantrips: 5, ranks: [3] });
+    expect(spellRepertoireLimits(bard, 1)).toEqual({
+      cantrips: 5,
+      ranks: [2],
+      subtractGranted: false,
+    });
     const derived = computeCharacter(draft, contextForDraft(draft));
     expect(derived.grantedSpells.find((spell) => spell.name === "Sure Strike")?.kind).toBe(
       "repertoire"
@@ -217,7 +221,6 @@ describe("class-choice grants", () => {
       "spell:gpzpAAAJ1Lza2JVl",
       "spell:0zU8CPejjQFnhZFI",
       "spell:vLzFcIaSXs7YTIqJ",
-      "spell:WBmvzNDfpwka3qT4",
     ];
     draft.spells.known = [
       "spell:R8bqnYiThB6MYTxD", // Phantom Pain, also granted

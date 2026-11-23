@@ -550,6 +550,12 @@ function renderBody(kind: CompendiumEntryKind, entry: CompendiumEntry): ReactNod
             <Meta label="Domains">{deity.domains.join(", ")}</Meta>
             <Meta label="Alternate domains">{deity.alternateDomains.join(", ")}</Meta>
             <Meta label="Favored weapon">{deity.weapons.map(titleCase).join(", ")}</Meta>
+            <Meta label="Deity spells">
+              {Object.entries(deity.spells)
+                .sort(([a], [b]) => Number(a) - Number(b))
+                .map(([rank, spell]) => `${rank}: ${spell.name}`)
+                .join(" · ") || "None listed"}
+            </Meta>
           </MetaGrid>
           <Description html={deity.description} />
         </>

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Map, Plus, Volume2 } from "lucide-react";
 import type {
   CampaignTable,
@@ -71,41 +71,36 @@ export function VttTable({ initial, campaignId, user, isGm, active }: VttTablePr
   const [rightOpen, setRightOpen] = useState(true);
   const [sheetCharacterId, setSheetCharacterId] = useState<string | null>(null);
   const [myCharacterChoice, setMyCharacterChoice] = useState<string | null>(null);
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  const [theaterMode, setTheaterMode] = useState(false);
-  const rootRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const onFullscreenChange = () => setIsFullscreen(Boolean(document.fullscreenElement));
-    document.addEventListener("fullscreenchange", onFullscreenChange);
-    return () => document.removeEventListener("fullscreenchange", onFullscreenChange);
-  }, []);
+  const [fullscreenMode, setFullscreenMode] = useState(false);
 
   useEffect(() => {
     if (window.innerWidth < 1160) setRightOpen(false);
     if (window.innerWidth < 900) setPartyOpen(false);
   }, []);
 
+  useEffect(() => {
+    if (!fullscreenMode) return;
+    document.body.classList.add("table-fullscreen-active");
+    const background = Array.from(
+      document.querySelectorAll<HTMLElement>(".topbar, .campaign-top, .campaign-tabs")
+    );
+    const previousInert = background.map((element) => element.inert);
+    for (const element of background) element.inert = true;
+    return () => {
+      document.body.classList.remove("table-fullscreen-active");
+      background.forEach((element, index) => {
+        element.inert = previousInert[index];
+      });
+    };
+  }, [fullscreenMode]);
+
+  useEffect(() => {
+    if (!active) setFullscreenMode(false);
+  }, [active]);
+
   const toggleFullscreen = useCallback(() => {
-    if (document.fullscreenElement) {
-      void document.exitFullscreen().catch(() => undefined);
-      setTheaterMode(false);
-      return;
-    }
-    if (theaterMode) {
-      setTheaterMode(false);
-      return;
-    }
-    setTheaterMode(true);
-    if (document.fullscreenEnabled && rootRef.current?.requestFullscreen) {
-      rootRef.current
-        .requestFullscreen()
-        .then(() => {
-          if (document.fullscreenElement) setTheaterMode(false);
-        })
-        .catch(() => undefined);
-    }
-  }, [theaterMode]);
+    setFullscreenMode((current) => !current);
+  }, []);
 
   const activeScene = scenes.find((scene) => scene.id === activeSceneId) ?? null;
   const sceneTokens = useMemo(
@@ -308,7 +303,8 @@ export function VttTable({ initial, campaignId, user, isGm, active }: VttTablePr
     label: string,
     dc: number | null,
     gmOnly: boolean,
-    requestId?: string | null
+    requestId?: string | null,
+    upgradeSuccess?: boolean
   ) => {
     getSocket().emit(
       "dice:roll",
@@ -319,6 +315,7 @@ export function VttTable({ initial, campaignId, user, isGm, active }: VttTablePr
         dc,
         visibility: gmOnly ? "gm" : "all",
         requestId: requestId ?? null,
+        upgradeSuccess: upgradeSuccess === true,
       },
       (message) => {
         if (!message) toast("That roll could not be made. Check the formula.", "error");
@@ -427,7 +424,7 @@ export function VttTable({ initial, campaignId, user, isGm, active }: VttTablePr
         setMeasureMode(false);
         setSelectedTokenId(null);
         setSheetCharacterId(null);
-        setTheaterMode(false);
+        setFullscreenMode(false);
         return;
       }
       if (key === "f") {
@@ -497,7 +494,7 @@ export function VttTable({ initial, campaignId, user, isGm, active }: VttTablePr
     toggleFullscreen,
   ]);
 
-  const expanded = isFullscreen || theaterMode;
+  const expanded = fullscreenMode;
   const activeSceneIndex = scenes.findIndex((scene) => scene.id === activeSceneId);
   const previousScene = activeSceneIndex > 0 ? scenes[activeSceneIndex - 1] : null;
   const nextScene =
@@ -550,8 +547,7 @@ export function VttTable({ initial, campaignId, user, isGm, active }: VttTablePr
 
   return (
     <div
-      ref={rootRef}
-      className={`vtt core-table-vtt ${partyOpen ? "" : "party-collapsed"} ${rightOpen ? "" : "right-collapsed"} ${theaterMode ? "is-theater" : ""}`}
+      className={`vtt core-table-vtt ${partyOpen ? "" : "party-collapsed"} ${rightOpen ? "" : "right-collapsed"} ${fullscreenMode ? "is-fullscreen" : ""}`}
     >
       <CoreToolbar
         isGm={isGm}
