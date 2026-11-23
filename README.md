@@ -37,6 +37,7 @@ Four campaign sections:
 - The bestiary palette for dragging monsters onto the map.
 - A shared soundtrack player with GM uploads and a bundled music library.
 - Global compendium search (`Ctrl+K`) for feats, spells, items, creatures, ancestries, backgrounds, deities, domains, conditions, and actions.
+- The **Library** browses the full compendium by category: ancestries, heritages, backgrounds, classes, class features, feats, spells, items, creatures, deities, domains, conditions, and actions.
 
 ### Character builder and sheet
 

@@ -14,8 +14,15 @@ import {
   heritages,
   lookupItem,
   monsters,
+  searchActions,
+  searchAncestries,
+  searchBackgrounds,
+  searchClasses,
+  searchClassFeatures,
+  searchConditions,
   searchEquipment,
   searchFeats,
+  searchHeritages,
   searchMonsters,
   searchSpells,
   spells,
@@ -28,6 +35,38 @@ describe("compendium search", () => {
       "Toughness"
     );
     expect(searchMonsters({ q: "Goblin Warrior", limit: 5 }).items[0]?.name).toBe("Goblin Warrior");
+  });
+
+  it("searches every category exposed by the library", () => {
+    expect(searchAncestries({ q: "Elf", limit: 5, includeLegacy: true }).items[0]?.name).toBe(
+      "Elf"
+    );
+    expect(
+      searchHeritages({ q: "Ancient Elf", limit: 5, includeLegacy: true }).items[0]?.name
+    ).toBe("Ancient Elf");
+    expect(searchBackgrounds({ q: "Acolyte", limit: 5, includeLegacy: true }).items[0]?.name).toBe(
+      "Acolyte"
+    );
+    expect(searchClasses({ q: "Wizard", limit: 5, includeLegacy: true }).items[0]?.name).toBe(
+      "Wizard"
+    );
+    expect(
+      searchClassFeatures({ q: "Sneak Attack", limit: 5, includeLegacy: true }).items[0]?.name
+    ).toBe("Sneak Attack");
+    expect(
+      searchConditions({ q: "Frightened", limit: 5, includeLegacy: true }).items[0]?.name
+    ).toBe("Frightened");
+    expect(searchActions({ q: "Stride", limit: 5, includeLegacy: true }).items[0]?.name).toBe(
+      "Stride"
+    );
+  });
+
+  it("returns every entry when a category is not paginated", () => {
+    expect(searchClasses({ includeLegacy: true }).items).toHaveLength(classes.length);
+    const page = searchClassFeatures({ includeLegacy: true, limit: 10 });
+    expect(page.items).toHaveLength(10);
+    expect(page.total).toBe(classFeatures.length);
+    expect(page.next).toBe(10);
   });
 
   it("filters recommended feats to common, non-playtest options", () => {

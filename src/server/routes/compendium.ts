@@ -1,23 +1,25 @@
 import type { FastifyInstance } from "fastify";
 import {
-  actions,
-  ancestries,
-  backgrounds,
   classes,
   compendiumCounts,
-  conditions,
   deities,
   equipment,
   feats,
   compendiumEntry,
   globalSearch,
-  heritages,
   lookupItem,
   monsters,
+  searchActions,
+  searchAncestries,
+  searchBackgrounds,
+  searchClasses,
+  searchClassFeatures,
+  searchConditions,
   searchDeities,
   searchDomains,
   searchEquipment,
   searchFeats,
+  searchHeritages,
   searchMonsters,
   searchSpells,
   spells,
@@ -71,49 +73,30 @@ export async function registerCompendiumRoutes(app: FastifyInstance): Promise<vo
     return reply.send({ counts: compendiumCounts });
   });
 
-  app.get("/api/compendium/ancestries", async (_request, reply) => {
-    return reply.send({ items: ancestries });
+  app.get("/api/compendium/ancestries", async (request, reply) => {
+    const query = request.query as Record<string, unknown>;
+    return reply.send(searchAncestries(parseSearch(query)));
   });
 
   app.get("/api/compendium/heritages", async (request, reply) => {
     const query = request.query as Record<string, unknown>;
-    const ancestry = typeof query.ancestry === "string" ? query.ancestry.toLowerCase() : "";
-    const q = typeof query.q === "string" ? query.q.toLowerCase() : "";
-    const items = heritages.filter((heritage) => {
-      if (
-        ancestry &&
-        !heritage.versatile &&
-        heritage.ancestrySlug.toLowerCase() !== ancestry &&
-        heritage.ancestry.toLowerCase() !== ancestry
-      ) {
-        return false;
-      }
-      if (q && !heritage.name.toLowerCase().includes(q)) return false;
-      return true;
-    });
-    return reply.send({ items });
+    const ancestry = typeof query.ancestry === "string" ? query.ancestry : undefined;
+    return reply.send(searchHeritages({ ...parseSearch(query), ancestry }));
   });
 
   app.get("/api/compendium/backgrounds", async (request, reply) => {
     const query = request.query as Record<string, unknown>;
-    const q = typeof query.q === "string" ? query.q.toLowerCase() : "";
-    const legacy = bool(query.legacy, true);
-    const items = backgrounds.filter((background) => {
-      if (!legacy && !background.remaster) return false;
-      if (
-        q &&
-        !`${background.name} ${background.traits.join(" ")} ${background.source}`
-          .toLowerCase()
-          .includes(q)
-      )
-        return false;
-      return true;
-    });
-    return reply.send({ items });
+    return reply.send(searchBackgrounds(parseSearch(query)));
   });
 
-  app.get("/api/compendium/classes", async (_request, reply) => {
-    return reply.send({ items: classes });
+  app.get("/api/compendium/classes", async (request, reply) => {
+    const query = request.query as Record<string, unknown>;
+    return reply.send(searchClasses(parseSearch(query)));
+  });
+
+  app.get("/api/compendium/class-features", async (request, reply) => {
+    const query = request.query as Record<string, unknown>;
+    return reply.send(searchClassFeatures(parseSearch(query)));
   });
 
   app.get("/api/compendium/classes/:id", async (request, reply) => {
@@ -187,16 +170,14 @@ export async function registerCompendiumRoutes(app: FastifyInstance): Promise<vo
     return reply.send(result);
   });
 
-  app.get("/api/compendium/conditions", async (_request, reply) => {
-    return reply.send({ items: conditions });
+  app.get("/api/compendium/conditions", async (request, reply) => {
+    const query = request.query as Record<string, unknown>;
+    return reply.send(searchConditions(parseSearch(query)));
   });
 
   app.get("/api/compendium/actions", async (request, reply) => {
     const query = request.query as Record<string, unknown>;
-    const q = typeof query.q === "string" ? query.q.toLowerCase() : "";
-    return reply.send({
-      items: actions.filter((action) => !q || action.name.toLowerCase().includes(q)),
-    });
+    return reply.send(searchActions(parseSearch(query)));
   });
 
   app.get("/api/compendium/monsters", async (request, reply) => {

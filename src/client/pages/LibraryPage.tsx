@@ -2,16 +2,36 @@ import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent }
 import {
   BookOpen,
   Dices,
+  GitBranch,
+  GraduationCap,
+  HeartPulse,
   Landmark,
+  Layers,
+  ScrollText,
   Search,
   Shield,
   Skull,
   Sparkles,
   Swords,
+  Users,
   X,
+  Zap,
 } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
-import type { Deity, Equipment, Feat, Monster, Spell } from "../../shared/types";
+import type {
+  ActionRef,
+  Ancestry,
+  Background,
+  ClassData,
+  ClassFeature,
+  ConditionRef,
+  Deity,
+  Equipment,
+  Feat,
+  Heritage,
+  Monster,
+  Spell,
+} from "../../shared/types";
 import type { DomainEntry } from "../../shared/domains";
 import {
   compendiumEntryPath,
@@ -36,26 +56,76 @@ import {
 import { CompendiumDetail } from "../components/CompendiumDetail";
 import { HoverCard } from "../components/HoverCard";
 
-type Tab = "feats" | "spells" | "items" | "bestiary" | "deities" | "domains";
+type Tab =
+  | "ancestries"
+  | "heritages"
+  | "backgrounds"
+  | "classes"
+  | "classFeatures"
+  | "feats"
+  | "spells"
+  | "items"
+  | "bestiary"
+  | "deities"
+  | "domains"
+  | "conditions"
+  | "actions";
 
 const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
+  { id: "ancestries", label: "Ancestries", icon: <Users size={15} /> },
+  { id: "heritages", label: "Heritages", icon: <GitBranch size={15} /> },
+  { id: "backgrounds", label: "Backgrounds", icon: <ScrollText size={15} /> },
+  { id: "classes", label: "Classes", icon: <GraduationCap size={15} /> },
+  { id: "classFeatures", label: "Class Features", icon: <Layers size={15} /> },
   { id: "feats", label: "Feats", icon: <Swords size={15} /> },
   { id: "spells", label: "Spells", icon: <Sparkles size={15} /> },
-  { id: "items", label: "Equipment", icon: <Shield size={15} /> },
+  { id: "items", label: "Items", icon: <Shield size={15} /> },
   { id: "bestiary", label: "Bestiary", icon: <Skull size={15} /> },
   { id: "deities", label: "Deities", icon: <BookOpen size={15} /> },
   { id: "domains", label: "Domains", icon: <Landmark size={15} /> },
+  { id: "conditions", label: "Conditions", icon: <HeartPulse size={15} /> },
+  { id: "actions", label: "Actions", icon: <Zap size={15} /> },
 ];
 
-type Entry = Feat | Spell | Equipment | Monster | Deity | DomainEntry;
+type Entry =
+  | Ancestry
+  | Heritage
+  | Background
+  | ClassData
+  | ClassFeature
+  | Feat
+  | Spell
+  | Equipment
+  | Monster
+  | Deity
+  | DomainEntry
+  | ConditionRef
+  | ActionRef;
 
 const TAB_KINDS: Record<Tab, CompendiumEntryKind> = {
+  ancestries: "ancestry",
+  heritages: "heritage",
+  backgrounds: "background",
+  classes: "class",
+  classFeatures: "classFeature",
   feats: "feat",
   spells: "spell",
   items: "equipment",
   bestiary: "monster",
   deities: "deity",
   domains: "domain",
+  conditions: "condition",
+  actions: "action",
+};
+
+const TAB_ROUTES: Partial<Record<Tab, string>> = {
+  ancestries: "/api/compendium/ancestries",
+  heritages: "/api/compendium/heritages",
+  backgrounds: "/api/compendium/backgrounds",
+  classes: "/api/compendium/classes",
+  classFeatures: "/api/compendium/class-features",
+  conditions: "/api/compendium/conditions",
+  actions: "/api/compendium/actions",
 };
 
 function entrySubtitle(item: Entry, tab: Tab): string {
@@ -63,6 +133,26 @@ function entrySubtitle(item: Entry, tab: Tab): string {
   // transition can never feed a feat into the spell formatter.
   const kind = compendiumKindFromId(item.id) ?? TAB_KINDS[tab];
   switch (kind) {
+    case "ancestry": {
+      const ancestry = item as Ancestry;
+      return `${ancestry.hp} HP · ${ancestry.size} · ${ancestry.vision}`;
+    }
+    case "heritage": {
+      const heritage = item as Heritage;
+      return `${heritage.ancestry}${heritage.versatile ? " · versatile" : ""}`;
+    }
+    case "background": {
+      const background = item as Background;
+      return `${background.trainedSkills.slice(0, 2).join(", ") || "Background"} · ${background.source}`;
+    }
+    case "class": {
+      const cls = item as ClassData;
+      return `${cls.hp} HP · ${cls.keyAbility.map((ability) => ability.toUpperCase()).join("/")}`;
+    }
+    case "classFeature": {
+      const feature = item as ClassFeature;
+      return `Level ${feature.level} · ${feature.traits.slice(0, 2).join(", ") || "Class feature"}`;
+    }
     case "feat":
       return `Level ${(item as Feat).level} · ${(item as Feat).category}`;
     case "spell": {
@@ -78,6 +168,12 @@ function entrySubtitle(item: Entry, tab: Tab): string {
     case "domain": {
       const domain = item as DomainEntry;
       return `${domain.domainSpell.name || "Domain"} · ${domain.deities.length} deities`;
+    }
+    case "condition":
+      return (item as ConditionRef).source;
+    case "action": {
+      const action = item as ActionRef;
+      return `${action.category} · ${action.actionType ?? "Action"}`;
     }
     default:
       return item.name;
@@ -255,6 +351,8 @@ export function LibraryPage() {
           params.set("limit", "100");
           params.set("offset", String(offset));
           if (!legacy) params.set("legacy", "0");
+          const route = TAB_ROUTES[tab];
+          if (route) url = `${route}?${params}`;
           if (tab === "feats") url = `/api/compendium/feats?${params}`;
           if (tab === "spells") url = `/api/compendium/spells?${params}`;
           if (tab === "items") url = `/api/compendium/equipment?${params}`;
@@ -297,7 +395,8 @@ export function LibraryPage() {
           <PageEyebrow>The archive</PageEyebrow>
           <h1>Library</h1>
           <p className="sub">
-            Every feat, spell, item, creature, and deity available to your table.
+            Search ancestries, classes, feats, spells, items, creatures, deities, and rules
+            references.
           </p>
         </div>
         <div className="library-count">
@@ -394,7 +493,7 @@ export function LibraryPage() {
                     {"gmDescription" in item && item.gmDescription ? (
                       <Tag tone="violet">GM source</Tag>
                     ) : null}
-                    {item.rarity && item.rarity !== "common" ? (
+                    {"rarity" in item && item.rarity && item.rarity !== "common" ? (
                       <RarityTag rarity={item.rarity} />
                     ) : null}
                   </button>
