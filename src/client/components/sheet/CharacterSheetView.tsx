@@ -53,6 +53,13 @@ import {
   type SpellCastChoice,
 } from "../../../shared/spellcasting";
 import { innateUsesRemaining } from "../../../shared/innate";
+import { ritualPrimarySkillName } from "../../../shared/ritual";
+import {
+  beginSustainedSpell,
+  endSustainedSpell,
+  spellNeedsSustain,
+  sustainedSpellFor,
+} from "../../../shared/sustain";
 import { api, formatCp } from "../../api";
 import { useConditionOptions } from "../../conditionOptions";
 import { errorMessage, useToasts } from "../../stores";
@@ -895,9 +902,17 @@ export function CharacterSheetView({
       toast("That spell has no uses left at the selected rank.", "error");
       return;
     }
-    const saved = await persist(result.draft);
+    const sustains = spellNeedsSustain(spell);
+    let nextDraft: CharacterDraft = result.draft;
+    if (sustains) {
+      nextDraft = beginSustainedSpell(nextDraft, spell, result.option.rank).draft;
+    }
+    const saved = await persist(nextDraft);
     if (!saved) return;
-    toast(`Cast ${spell.name} at rank ${result.option.rank}.`, "success");
+    toast(
+      `Cast ${spell.name} at rank ${result.option.rank}${sustains ? " · sustained" : ""}.`,
+      "success"
+    );
     if (character?.campaignId) {
       getSocket().emit("chat:send", {
         campaignId: character.campaignId,
@@ -935,9 +950,65 @@ export function CharacterSheetView({
       toast("There is no spent use to restore for that spell.", "info");
       return;
     }
-    const saved = await persist(result);
+    const restored = spellNeedsSustain(spell) ? endSustainedSpell(result, spell.id) : result;
+    const saved = await persist(restored);
     if (!saved) return;
     toast(`Restored ${spell.name} at rank ${choice.rank}.`, "success");
+  };
+
+  const toggleSustain = async (spell: Spell, group: string) => {
+    if (!canEdit) return;
+    const currentDraft = draftRef.current;
+    if (!currentDraft) return;
+    if (!spellNeedsSustain(spell)) {
+      toast("That spell does not use the Sustain action.", "info");
+      return;
+    }
+    const existing = sustainedSpellFor(currentDraft, spell.id);
+    if (existing) {
+      const saved = await persist(endSustainedSpell(currentDraft, spell.id));
+      if (saved) toast(`Ended ${spell.name}.`, "info");
+      return;
+    }
+    const options = optionsForSpell(spell, group);
+    const choice = selectedChoiceFor(spell, group, options);
+    const result = beginSustainedSpell(
+      currentDraft,
+      spell,
+      choice?.rank ?? Math.max(1, spell.rank)
+    );
+    if (!result.added && result.reason !== "already-active") {
+      toast("This spell cannot be sustained from the sheet.", "info");
+      return;
+    }
+    const saved = await persist(result.draft);
+    if (saved) toast(`Sustaining ${spell.name}.`, "success");
+  };
+
+  const stopSustain = async (spellId: string) => {
+    if (!canEdit) return;
+    const currentDraft = draftRef.current;
+    if (!currentDraft) return;
+    const saved = await persist(endSustainedSpell(currentDraft, spellId));
+    if (saved) toast("Sustain ended.", "info");
+  };
+
+  const rollRitual = (spell: Spell) => {
+    const primary = ritualPrimarySkillName(spell.description);
+    if (!primary) {
+      toast("This ritual has no readable primary check; resolve it manually.", "info");
+      return;
+    }
+    const skill = (derived?.skills ?? []).find(
+      (entry) => entry.id.toLowerCase() === primary || entry.name.toLowerCase() === primary
+    );
+    const lore = (derived?.lore ?? []).find((entry) => entry.name.toLowerCase() === primary);
+    const mod = skill?.mod ?? lore?.mod;
+    if (mod === undefined) {
+      toast(`This character has no ${titleCase(primary)} skill for the ritual check.`, "error");
+      return;
+    }
+    postRoll(`1d20${signed(mod)}`, `${spell.name} primary check (${titleCase(primary)})`);
   };
 
   const takeLongRest = async (result: LongRestResult) => {
@@ -1940,6 +2011,28 @@ export function CharacterSheetView({
                     ) : null}
                   </div>
                 ) : null}
+                {draft.play.sustainedSpells.length ? (
+                  <div className="pb-sustain-list" data-testid="sustained-spells">
+                    <span className="tiny muted">Sustained</span>
+                    <div className="chip-row">
+                      {draft.play.sustainedSpells.map((entry) => (
+                        <span className="pb-sustain-chip" key={entry.id}>
+                          <strong>{entry.name}</strong>
+                          <em>rank {entry.rank}</em>
+                          {canEdit ? (
+                            <button
+                              type="button"
+                              className="pb-small-button"
+                              onClick={() => void stopSustain(entry.spellId)}
+                            >
+                              End
+                            </button>
+                          ) : null}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
                 <div className="pb-slot-list">
                   {(derived.spellSlots ?? []).map((slotTotal, index) => {
                     if (slotTotal <= 0) return null;
@@ -2088,6 +2181,8 @@ export function CharacterSheetView({
                       })
                     );
                     const profile = spellProfileFor(group);
+                    const sustained = spell ? sustainedSpellFor(draft, spell.id) : null;
+                    const sustains = spell ? spellNeedsSustain(spell) : false;
                     return (
                       <div className="pb-spell-row" key={`${group}-${id}-${index}`}>
                         <Link to={`/library/spell/${id}`}>
@@ -2158,6 +2253,24 @@ export function CharacterSheetView({
                               onClick={() => void restore(spell, group)}
                             >
                               Restore
+                            </button>
+                          ) : null}
+                          {canEdit && spell && sustains ? (
+                            <button
+                              type="button"
+                              className="pb-small-button"
+                              onClick={() => void toggleSustain(spell, group)}
+                            >
+                              {sustained ? "End sustain" : "Sustain"}
+                            </button>
+                          ) : null}
+                          {canEdit && spell && group === "Rituals" ? (
+                            <button
+                              type="button"
+                              className="pb-small-button"
+                              onClick={() => rollRitual(spell)}
+                            >
+                              Primary check
                             </button>
                           ) : null}
                         </div>

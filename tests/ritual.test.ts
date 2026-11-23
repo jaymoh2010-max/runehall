@@ -14,5 +14,7 @@ describe("ritual primary checks", () => {
 
   it("returns null when the ritual text has no primary check", () => {
     expect(ritualPrimarySkillName("You travel to another plane.")).toBeNull();
+    expect(ritualPrimarySkillName("Primary Check to cast the ritual")).toBeNull();
+    expect(ritualPrimarySkillName("Primary Check Cooking Lore")).toBeNull();
   });
 });

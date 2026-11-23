@@ -2,7 +2,7 @@
 
 Date: 2026-11-23
 
-Status: review complete. Sprint 1 (the daily spellcasting loop) and the class-grant portion of Sprint 2 were implemented on 2026-11-23. The findings below describe the pre-Sprint state; the implementation status sections record what changed, and the remaining class and table gaps stay in the backlog.
+Status: review complete. Sprint 1 (the daily spellcasting loop), the class-grant portion of Sprint 2, and the first table-magic pass of Sprint 3 were implemented on 2026-11-23. The findings below describe the pre-Sprint state; the implementation status sections record what changed, and the remaining class and table gaps stay in the backlog.
 
 > **Follow-up (2026-11-23):** `docs/RULES-AUDIT.md` corrected two table errors
 > this review did not catch: bards use the 2/3 full-caster slot table (not the
@@ -80,6 +80,16 @@ The class-specific grant pass is implemented:
 
 Still open after this pass: magus studious slots, the animist prepared/spontaneous split, spontaneous known-at-rank copies, psi amp actions, item spellcasting, rituals, sustain, and multiclass archetype casting.
 
+## Sprint 3 implementation status (2026-11-23)
+
+The first table-magic pass is implemented:
+
+- Casting a spell whose text uses Sustain now records it in the sheet's sustained-spell list. Sustained spells can be ended from the list or from the spell row, and Restore removes the active sustain when it undoes the cast.
+- Ritual rows expose a **Primary check** action. When the generated description names a known skill, the sheet rolls that skill modifier and posts the check. Many generated ritual descriptions omit the primary-check skill, so those rituals explicitly fall back to manual resolution instead of guessing.
+- The ritual helper now rejects prose matches such as "Primary Check to cast..." and unknown Lore names.
+
+Still open: item spellcasting, spellbook learning, and multiclass archetype casting.
+
 ## Rules baseline
 
 ### Core spellcasting
@@ -152,8 +162,8 @@ Legend: Yes = modeled and usable; Partial = some support with known gaps; No = n
 | Summoner link spells | Yes | Evolution Surge and Boost Eidolon granted; eidolon actions remain manual |
 | Magus studious slots | No | Not tracked separately |
 | Animist prepared/spontaneous split | No | Combined slot total; manual split |
-| Rituals | No | List only; sheet explicitly disables Cast for rituals |
-| Sustained spells | No | Helpers exist; no UI starts or ends a sustained spell |
+| Rituals | Partial | Primary-check rolls work when the description names a known skill; missing data falls back to manual |
+| Sustained spells | Partial | Casting starts sustain, active spells can be ended, and Restore clears them; no table turn prompt yet |
 | Spellbook capacity and learning | No | No starting-spellbook or Learn a Spell accounting |
 | Item spellcasting | No | Scrolls are generic consumables; staves/wands do not cast spells |
 | Multiclass spellcasting archetypes | No | Only the primary class contributes caster progression |
@@ -304,19 +314,23 @@ Fix: Add an explicit restore/undo action per cast, or store a small daily cast l
 
 ### F10. The sustain subsystem is unused (P2)
 
-`src/shared/sustain.ts` implements `beginSustainedSpell`, `endSustainedSpell`, `sustainedSpellFor`, and a 3-spell limit. No client component imports it. `applyLongRest` clears `play.sustainedSpells`.
+Status: partly fixed in Sprint 3. The sheet starts, lists, and ends sustained spells; a table turn prompt is still open.
 
-Impact: The sheet cannot start or end a sustained spell, and the table has no reminder to spend the Sustain action.
+`src/shared/sustain.ts` implements `beginSustainedSpell`, `endSustainedSpell`, `sustainedSpellFor`, and a 12-spell UI safety cap. Casting a sustain spell now records it, Restore clears it, and the Spells tab lists active sustained spells with an End action.
 
-Fix: Add a Sustain control to spell rows that need it, show active sustained spells on the sheet, and surface a turn reminder at the table. This can be a separate table-magic sprint.
+Impact: The sheet now starts and ends sustained spells, but the table still has no automatic turn prompt to remind the player to spend the Sustain action.
+
+Fix: The sheet controls are in place. A future table-magic pass can add a turn-start reminder and a one-click Sustain action from the initiative bar.
 
 ### F11. Rituals are a stub (P2)
 
-`src/shared/ritual.ts` can derive a primary-check skill from ritual prose, but nothing calls it. The sheet lists rituals and explicitly excludes them from Cast (`group !== "Rituals"`).
+Status: partly fixed in Sprint 3. Ritual rows expose a Primary check action; generated data is incomplete.
 
-Impact: A ritual is only a link. The sheet does not roll the primary check or track the ritual's cost, secondary casters, or outcome.
+`src/shared/ritual.ts` derives a primary-check skill from ritual prose, and the sheet now uses it. Generated descriptions often omit the primary-check skill, so those rituals explicitly fall back to manual resolution. The sheet still leaves cost, secondary casters, and outcomes to the table.
 
-Fix: Add a ritual workflow that reads the primary check, lets the player choose the skill and DC, rolls it, and posts to chat. Cost and secondary casters can remain manual.
+Impact: Rituals with a readable skill can be rolled directly; the rest are a link plus a manual note.
+
+Fix: Ingest the structured primary-check skill and DC from the source data, then show a ritual detail card with cost, secondary casters, and degree-of-success guidance.
 
 ### F12. Item spellcasting is not modeled (P2)
 

@@ -194,8 +194,9 @@ The character builder is already good enough for a core campaign at low levels. 
    - Character sheets take a long rest, preview the reset, and open daily preparations; prepared casters choose ranked spells and prepared cantrips, with pending reminders in the sheet, builder, party rail, dashboard, and campaign party cards.
    - Focus-only classes get their own spell attack/DC, innate spells use a separate Charisma-based profile, and the sheet uses the correct source per spell row.
    - Class grants cover psychic conscious minds and psi cantrips, necromancer grave spells, summoner link spells, and cleric deity spells.
+   - Sustained spells are recorded when cast, listed on the sheet, and can be ended; ritual rows roll a primary check when the description names a known skill.
    - Verified in-browser: a wizard with four rank-1 slots showed 4/4 prepared and disabled a fifth preparation.
-   - Remaining: free-choice grants (domains, devotion spells, variable bloodline gifts, curriculum variants), magus studious slots, the animist prepared/spontaneous split, spontaneous known-at-rank copies, psi amps, and full spellbook-vs-known presentation for all prepared classes.
+   - Remaining: free-choice grants (domains, devotion spells, variable bloodline gifts, curriculum variants), magus studious slots, the animist prepared/spontaneous split, spontaneous known-at-rank copies, psi amps, item spellcasting, structured ritual data, and full spellbook-vs-known presentation for all prepared classes.
 
 7. **Companions and print (manual roster complete)**
    - Animal companions, familiars, eidolons, and summons can be recorded with name, kind, level, HP, AC, and attack notes.
