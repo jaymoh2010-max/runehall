@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft,
@@ -26,7 +26,6 @@ import {
   Swords,
   Trash2,
   TrendingUp,
-  Upload,
   UserRound,
   Users,
 } from "lucide-react";
@@ -82,7 +81,7 @@ import {
   traitLabel,
   weaponDamageLabel,
 } from "../../../../shared/rules";
-import { api, formatCp, uploadImage } from "../../../api";
+import { api, formatCp } from "../../../api";
 import { errorMessage } from "../../../stores";
 import { useToasts } from "../../../stores";
 import {
@@ -119,8 +118,7 @@ import { heritageLanguageOptions } from "../../../../shared/heritage";
 import type { BuilderProps } from "../shared";
 import { StepHeading, ValidationNote, SearchInput, MiniFeatureList } from "../shared";
 
-export function DetailsStep({ draft, update, context, setStep, onPortrait }: BuilderProps) {
-  const fileRef = useRef<HTMLInputElement>(null);
+export function DetailsStep({ draft, update, context, setStep, onChoosePortrait }: BuilderProps) {
   const toast = useToasts((state) => state.push);
   const [bestiaryFor, setBestiaryFor] = useState<string | null>(null);
   const [monsterQuery, setMonsterQuery] = useState("");
@@ -221,16 +219,12 @@ export function DetailsStep({ draft, update, context, setStep, onPortrait }: Bui
           <div className="grow">
             <h3>Portrait</h3>
             <p className="muted small">
-              Upload a portrait for your sheet and table token. PNG, JPG, WebP, GIF, or AVIF up to
-              15 MB.
+              Choose a painted portrait from the library, or upload your own image and crop it to a
+              square. The same art appears on your sheet and table token.
             </p>
             <div className="row wrap" style={{ marginTop: 10 }}>
-              <Button
-                size="sm"
-                icon={<Upload size={14} />}
-                onClick={() => fileRef.current?.click()}
-              >
-                Upload portrait
+              <Button size="sm" icon={<UserRound size={14} />} onClick={onChoosePortrait}>
+                Choose portrait
               </Button>
               {draft.portraitUrl ? (
                 <Button
@@ -242,17 +236,6 @@ export function DetailsStep({ draft, update, context, setStep, onPortrait }: Bui
                 </Button>
               ) : null}
             </div>
-            <input
-              ref={fileRef}
-              type="file"
-              hidden
-              accept="image/png,image/jpeg,image/webp,image/gif,image/avif"
-              onChange={(event) => {
-                const file = event.target.files?.[0];
-                if (file) void onPortrait(file);
-                event.target.value = "";
-              }}
-            />
           </div>
         </div>
       </Card>

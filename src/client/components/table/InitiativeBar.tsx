@@ -1,16 +1,5 @@
-import { useEffect, useState } from "react";
-import {
-  ArrowDown,
-  ArrowUp,
-  ChevronLeft,
-  ChevronRight,
-  Dices,
-  Plus,
-  RefreshCw,
-  Swords,
-  Trash2,
-  X,
-} from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { ArrowDown, ArrowUp, Dices, Plus, RefreshCw, Swords, Trash2, X } from "lucide-react";
 import type { InitiativeEntry } from "../../../shared/types";
 import { Button, IconButton } from "../ui";
 
@@ -54,8 +43,6 @@ export function InitiativeBar({
   turnIndex,
   isGm,
   onRoll,
-  onNext,
-  onPrevious,
   onClear,
   onRemove,
   onReroll,
@@ -69,8 +56,6 @@ export function InitiativeBar({
   turnIndex: number;
   isGm: boolean;
   onRoll: () => void;
-  onNext: () => void;
-  onPrevious: () => void;
   onClear: () => void;
   onRemove: (entryId: string) => void;
   onReroll: (entryId: string) => void;
@@ -80,9 +65,27 @@ export function InitiativeBar({
   onSetTurn: (index: number) => void;
 }) {
   const [adding, setAdding] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [manualName, setManualName] = useState("");
   const [manualValue, setManualValue] = useState("10");
+  const menuRef = useRef<HTMLDivElement>(null);
   const active = entries[turnIndex] ?? null;
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onPointerDown = (event: PointerEvent) => {
+      if (!menuRef.current?.contains(event.target as Node)) setMenuOpen(false);
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMenuOpen(false);
+    };
+    window.addEventListener("pointerdown", onPointerDown);
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("pointerdown", onPointerDown);
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [menuOpen]);
 
   const submitManual = () => {
     const name = manualName.trim();
@@ -91,6 +94,7 @@ export function InitiativeBar({
     setManualName("");
     setManualValue("10");
     setAdding(false);
+    setMenuOpen(false);
   };
 
   return (
@@ -164,67 +168,95 @@ export function InitiativeBar({
         )}
       </div>
 
-      <div className="initiative-controls core-initiative-controls">
-        {isGm ? (
-          <>
-            <Button size="sm" variant="secondary" icon={<Dices size={14} />} onClick={onRoll}>
-              Roll initiative
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              icon={<Plus size={14} />}
-              onClick={() => setAdding((current) => !current)}
-            >
-              Add
-            </Button>
-          </>
-        ) : null}
-        <IconButton label="Previous turn" onClick={onPrevious} disabled={!entries.length}>
-          <ChevronLeft size={14} />
-        </IconButton>
-        <IconButton label="Next turn" onClick={onNext} disabled={!entries.length}>
-          <ChevronRight size={14} />
-        </IconButton>
-        {isGm ? (
-          <IconButton label="Clear initiative" onClick={onClear} disabled={!entries.length}>
-            <Trash2 size={14} />
-          </IconButton>
-        ) : null}
-      </div>
-
-      {adding ? (
-        <form
-          className="core-initiative-add"
-          onSubmit={(event) => {
-            event.preventDefault();
-            submitManual();
-          }}
-        >
-          <input
-            autoFocus
-            value={manualName}
-            placeholder="Combatant name"
-            aria-label="Combatant name"
-            onChange={(event) => setManualName(event.target.value)}
-          />
-          <input
-            type="number"
-            value={manualValue}
-            aria-label="Initiative total"
-            onChange={(event) => setManualValue(event.target.value)}
-          />
-          <Button size="sm" type="submit" variant="primary">
-            Add
-          </Button>
-        </form>
-      ) : null}
-
       {active ? (
         <span className="core-initiative-current tiny muted" title="Current combatant">
           Current: <strong>{active.name}</strong>
         </span>
       ) : null}
+
+      <div className="initiative-controls core-initiative-controls">
+        {isGm ? (
+          <div className="initiative-gm-menu" ref={menuRef}>
+            <Button
+              size="sm"
+              variant="secondary"
+              icon={<Dices size={14} />}
+              aria-haspopup="menu"
+              aria-expanded={menuOpen}
+              onClick={() => setMenuOpen((current) => !current)}
+            >
+              GM
+            </Button>
+            {menuOpen ? (
+              <div
+                className="initiative-gm-menu-popover"
+                role="menu"
+                aria-label="GM initiative controls"
+              >
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onRoll();
+                  }}
+                >
+                  <Dices size={14} />
+                  <span>Roll initiative</span>
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => setAdding((current) => !current)}
+                >
+                  <Plus size={14} />
+                  <span>{adding ? "Cancel add" : "Add combatant"}</span>
+                </button>
+                {adding ? (
+                  <form
+                    className="initiative-gm-add"
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      submitManual();
+                    }}
+                  >
+                    <input
+                      autoFocus
+                      value={manualName}
+                      placeholder="Combatant name"
+                      aria-label="Combatant name"
+                      onChange={(event) => setManualName(event.target.value)}
+                    />
+                    <div className="initiative-gm-add-row">
+                      <input
+                        type="number"
+                        value={manualValue}
+                        aria-label="Initiative total"
+                        onChange={(event) => setManualValue(event.target.value)}
+                      />
+                      <Button size="sm" type="submit" variant="primary">
+                        Add
+                      </Button>
+                    </div>
+                  </form>
+                ) : null}
+                <button
+                  type="button"
+                  role="menuitem"
+                  disabled={!entries.length}
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onClear();
+                  }}
+                >
+                  <Trash2 size={14} />
+                  <span>Clear initiative</span>
+                </button>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }

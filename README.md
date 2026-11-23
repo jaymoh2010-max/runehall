@@ -20,13 +20,13 @@ Four campaign sections:
 ### Table
 
 - Scene maps with grid calibration, pan/zoom, token drag, snap, and a live movement-distance readout while dragging.
-- Built-in maps plus custom uploads. The library uses CC BY 4.0 cartography from Dyson Logos and Free Fantasy Maps; see `public/maps/ATTRIBUTION.md`.
+- Built-in maps plus custom uploads. The library has 37 grid-aligned colour and line-art maps from Dyson Logos, Free Fantasy Maps, and mbround18, with terrain and Pathfinder adventure-theme filters; see `public/maps/ATTRIBUTION.md`.
 - Fog of war, distance measuring, pointer pings, and player presence.
 - Tokens for party characters, monsters, and custom markers. Players can upload art for their own token; the GM can upload art for any token.
 - Bestiary creatures get CC BY 3.0 archetype icons from Game-icons.net when no custom art is uploaded; see `public/tokens/creature/ATTRIBUTION.md`.
 - A compact token panel for HP, AC, conditions, visibility, locks, and sheet access. Creature HP/AC is GM-only; linked party characters keep their shared stats.
 - Condition fields autocomplete from the PF2e condition database.
-- **Manual initiative order**: roll the scene or add combatants by hand, type a total, reorder, set the active combatant, and step next/previous. Nothing ticks or resolves automatically.
+- **Manual initiative order**: a top-of-table bar shows the round, order, and current combatant. The GM rolls, adds combatants, reorders, and clears from a compact dropdown on the right; nothing ticks or resolves automatically.
 - Shared dice roller and persistent chat. Secret GM rolls and roll requests remain available.
 - Compact Pathbuilder-inspired dark/orange interface: slim top bar, dense panels, and orange action accents.
 - A **Pathbuilder-style character sheet** that opens over the table from **My sheet**, a party avatar, or a linked token. It uses a compact three-column layout: build summary and a level-by-level character plan on the left, stats and skills in the center, and tabbed Weapons / Defense / Gear / Spells / Feats / Details / Status panels on the right.
@@ -42,6 +42,7 @@ Four campaign sections:
 
 - Level 1–20 builder with live PF2e math.
 - Ancestry, heritage, background, class, deity, abilities, skills, feats, spells, gear, details, and review.
+- Built-in painted portrait library plus upload-and-crop, with 512 × 512 square exports for character sheets and table tokens; see `public/portraits/ATTRIBUTION.md`.
 - Core sources by default, with an **Expanded sources** toggle.
 - Feat prerequisite checks and curated always-on effects for common feats and items.
 - Weapon, armor, and shield runes; bulk; wealth; inventory.

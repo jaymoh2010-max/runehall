@@ -612,6 +612,21 @@ export function VttTable({ initial, campaignId, user, isGm, active }: VttTablePr
         ) : null}
 
         <div className="vtt-center">
+          <InitiativeBar
+            entries={initiative}
+            round={round}
+            turnIndex={turnIndex}
+            isGm={isGm}
+            onRoll={rollInitiative}
+            onClear={clearInitiative}
+            onRemove={(entryId) => getSocket().emit("initiative:remove", { campaignId, entryId })}
+            onReroll={(entryId) => getSocket().emit("initiative:reroll", { campaignId, entryId })}
+            onMove={moveInitiativeEntry}
+            onSetValue={setInitiativeValue}
+            onAddManual={addManualInitiative}
+            onSetTurn={(index) => emitInitiative(initiative, round, index)}
+          />
+
           <SceneCanvas
             scene={canvasScene}
             tokens={sceneTokens}
@@ -672,23 +687,6 @@ export function VttTable({ initial, campaignId, user, isGm, active }: VttTablePr
               onAddToInitiative={addSelectedToInitiative}
             />
           ) : null}
-
-          <InitiativeBar
-            entries={initiative}
-            round={round}
-            turnIndex={turnIndex}
-            isGm={isGm}
-            onRoll={rollInitiative}
-            onNext={() => getSocket().emit("initiative:next", { campaignId, direction: 1 })}
-            onPrevious={() => getSocket().emit("initiative:next", { campaignId, direction: -1 })}
-            onClear={clearInitiative}
-            onRemove={(entryId) => getSocket().emit("initiative:remove", { campaignId, entryId })}
-            onReroll={(entryId) => getSocket().emit("initiative:reroll", { campaignId, entryId })}
-            onMove={moveInitiativeEntry}
-            onSetValue={setInitiativeValue}
-            onAddManual={addManualInitiative}
-            onSetTurn={(index) => emitInitiative(initiative, round, index)}
-          />
         </div>
 
         {rightOpen ? (

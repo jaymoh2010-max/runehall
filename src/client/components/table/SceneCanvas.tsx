@@ -27,6 +27,7 @@ import { blockingPropForMove } from "../../../shared/collision";
 import { findPathAroundProps } from "../../../shared/pathfinding";
 import { blockingWallForMove, nearestWall } from "../../../shared/walls";
 import { computeVision } from "../../../shared/vision";
+import { BUILTIN_MAPS } from "../../../shared/builtinMaps";
 import { lightColorRgba } from "../../../shared/lighting";
 import { evaluateCover } from "../../../shared/cover";
 import { loadExplored, saveExplored } from "./explored";
@@ -1097,6 +1098,7 @@ export function SceneCanvas({
     ? (tokens.find((token) => token.id === dragging.tokenId) ?? null)
     : null;
   const dragEnd = dragging && draggedToken ? dragging.positions[dragging.tokenId] : null;
+  const builtinMapColor = BUILTIN_MAPS.some((map) => map.imageUrl === scene.imageUrl && map.color);
 
   return (
     <div
@@ -1132,7 +1134,7 @@ export function SceneCanvas({
       >
         {scene.imageUrl ? (
           <img
-            className={`scene-map-img ${scene.imageUrl.startsWith("/maps/") ? "is-builtin-map" : ""}`}
+            className={`scene-map-img ${scene.imageUrl.startsWith("/maps/") ? "is-builtin-map" : ""} ${builtinMapColor ? "is-color-map" : ""}`}
             src={scene.imageUrl}
             alt=""
             draggable={false}

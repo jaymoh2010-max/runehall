@@ -34,7 +34,6 @@ import {
   Swords,
   Trash2,
   TrendingUp,
-  Upload,
   UserRound,
   Users,
 } from "lucide-react";
@@ -89,7 +88,7 @@ import {
   traitLabel,
   weaponDamageLabel,
 } from "../../shared/rules";
-import { api, ApiError, formatCp, uploadImage } from "../api";
+import { api, ApiError, formatCp } from "../api";
 import { errorMessage } from "../stores";
 import { useToasts } from "../stores";
 import {
@@ -119,6 +118,7 @@ import {
 } from "../components/builder/pickers";
 import { ContentSourceToggle } from "../components/builder/ContentSourceToggle";
 import { RunePicker } from "../components/builder/RunePicker";
+import { PortraitPicker } from "../components/PortraitPicker";
 import {
   STEPS,
   type BuilderProps,
@@ -189,6 +189,7 @@ export function CharacterBuilderPage({
   const [pendingSheet, setPendingSheet] = useState(false);
   const [conflict, setConflict] = useState<CharacterRecord | null>(null);
   const [checklistOpen, setChecklistOpen] = useState(false);
+  const [portraitOpen, setPortraitOpen] = useState(false);
   const initialized = useRef(false);
   const skipInitialSave = useRef(true);
   const saveInFlight = useRef(false);
@@ -197,7 +198,6 @@ export function CharacterBuilderPage({
   const draftRef = useRef<CharacterDraft | null>(null);
   const dirtyRef = useRef(false);
   const conflictRef = useRef(false);
-  const portraitRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -452,14 +452,9 @@ export function CharacterBuilderPage({
     });
   };
 
-  const portrait = async (file: File) => {
-    try {
-      const result = await uploadImage(file, character?.campaignId);
-      update((current) => ({ ...current, portraitUrl: result.url }));
-      toast("Portrait updated.", "success");
-    } catch (err) {
-      toast(errorMessage(err), "error");
-    }
+  const choosePortrait = async (url: string | null) => {
+    update((current) => ({ ...current, portraitUrl: url }));
+    toast(url ? "Portrait updated." : "Portrait removed.", "success");
   };
 
   const exportJson = () => {
@@ -717,7 +712,7 @@ export function CharacterBuilderPage({
       legacyDefault,
       legacyLocked,
       openPicker: setPicker,
-      onPortrait: portrait,
+      onChoosePortrait: () => setPortraitOpen(true),
       setStep,
     };
     switch (step) {
@@ -963,22 +958,11 @@ export function CharacterBuilderPage({
               <button
                 type="button"
                 className="summary-portrait-edit"
-                title="Upload portrait"
-                onClick={() => portraitRef.current?.click()}
+                title="Choose portrait"
+                onClick={() => setPortraitOpen(true)}
               >
-                <Upload size={13} />
+                <UserRound size={13} />
               </button>
-              <input
-                ref={portraitRef}
-                type="file"
-                hidden
-                accept="image/png,image/jpeg,image/webp,image/gif,image/avif"
-                onChange={(event) => {
-                  const file = event.target.files?.[0];
-                  if (file) void portrait(file);
-                  event.target.value = "";
-                }}
-              />
             </div>
             <h2>{draft.name || "Unnamed Hero"}</h2>
             <p className="muted small">
@@ -1261,6 +1245,14 @@ export function CharacterBuilderPage({
           }}
         />
       ) : null}
+      <PortraitPicker
+        open={portraitOpen}
+        onClose={() => setPortraitOpen(false)}
+        name={draft.name}
+        value={draft.portraitUrl}
+        campaignId={character?.campaignId}
+        onSelect={choosePortrait}
+      />
       <Modal
         open={levelUpOpen}
         onClose={() => setLevelUpOpen(false)}

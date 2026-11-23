@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { KeyRound, LogOut, Monitor, Save, ShieldAlert, UserRound } from "lucide-react";
 import { api } from "../api";
+import { PortraitPicker } from "../components/PortraitPicker";
 import { errorMessage, useSession, useToasts } from "../stores";
 import type { AuthSession, PublicUser } from "../../shared/types";
 import {
@@ -53,6 +54,8 @@ export function AccountPage() {
   const setUser = useSession((state) => state.setUser);
   const toast = useToasts((state) => state.push);
   const [displayName, setDisplayName] = useState(user?.displayName ?? "");
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(user?.avatarUrl ?? null);
+  const [portraitOpen, setPortraitOpen] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -68,7 +71,8 @@ export function AccountPage() {
 
   useEffect(() => {
     setDisplayName(user?.displayName ?? "");
-  }, [user?.displayName]);
+    setAvatarUrl(user?.avatarUrl ?? null);
+  }, [user?.displayName, user?.avatarUrl]);
 
   const loadSessions = async () => {
     setSessionsLoading(true);
@@ -133,15 +137,26 @@ export function AccountPage() {
 
   const otherSessions = sessions.filter((session) => !session.current);
 
+  const applyAvatar = async (url: string | null) => {
+    const result = await api<{ user: PublicUser }>("/api/auth/me", {
+      method: "PATCH",
+      body: { displayName: displayName.trim() || user.displayName, avatarUrl: url },
+    });
+    setUser(result.user);
+    setAvatarUrl(result.user.avatarUrl ?? null);
+    toast(url ? "Portrait updated." : "Portrait removed.", "success");
+  };
+
   const saveProfile = async (event: FormEvent) => {
     event.preventDefault();
     setSavingProfile(true);
     try {
       const result = await api<{ user: PublicUser }>("/api/auth/me", {
         method: "PATCH",
-        body: { displayName: displayName.trim() },
+        body: { displayName: displayName.trim(), avatarUrl },
       });
       setUser(result.user);
+      setAvatarUrl(result.user.avatarUrl ?? null);
       toast("Profile updated.", "success");
     } catch (err) {
       toast(errorMessage(err), "error");
@@ -196,11 +211,20 @@ export function AccountPage() {
             }
           />
           <div className="account-identity">
-            <Avatar name={user.displayName} src={user.avatarUrl} size={52} />
-            <div>
+            <Avatar name={user.displayName} src={avatarUrl} size={52} />
+            <div className="grow">
               <strong>{user.displayName}</strong>
               <div className="tiny muted">@{user.username}</div>
             </div>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              icon={<UserRound size={14} />}
+              onClick={() => setPortraitOpen(true)}
+            >
+              Change portrait
+            </Button>
           </div>
           <form className="stack" onSubmit={saveProfile}>
             <Field label="Display name">
@@ -350,6 +374,14 @@ export function AccountPage() {
           </p>
         </div>
       </Card>
+
+      <PortraitPicker
+        open={portraitOpen}
+        onClose={() => setPortraitOpen(false)}
+        name={user.displayName}
+        value={avatarUrl}
+        onSelect={applyAvatar}
+      />
     </div>
   );
 }

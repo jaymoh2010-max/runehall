@@ -6,6 +6,7 @@ import { canSeeCreatureStats } from "../../../shared/tokenVisibility";
 import { uploadImage } from "../../api";
 import { useConditionOptions } from "../../conditionOptions";
 import { errorMessage } from "../../stores";
+import { PortraitPicker } from "../PortraitPicker";
 import { Avatar, Button, IconButton, Tag } from "../ui";
 
 /**
@@ -69,6 +70,7 @@ export function TokenQuickPanel({
   const [condition, setCondition] = useState("");
   const [imageBusy, setImageBusy] = useState(false);
   const [imageError, setImageError] = useState("");
+  const [portraitOpen, setPortraitOpen] = useState(false);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const conditions = useConditionOptions();
   const character = token.characterId
@@ -302,6 +304,16 @@ export function TokenQuickPanel({
                 void uploadArt(file);
               }}
             />
+            {isGm ? (
+              <Button
+                size="sm"
+                variant="secondary"
+                icon={<UserRound size={14} />}
+                onClick={() => setPortraitOpen(true)}
+              >
+                Portrait library
+              </Button>
+            ) : null}
             <Button
               size="sm"
               variant="secondary"
@@ -359,6 +371,15 @@ export function TokenQuickPanel({
         ) : null}
         {imageError ? <span className="core-token-error">{imageError}</span> : null}
       </div>
+      <PortraitPicker
+        open={portraitOpen}
+        onClose={() => setPortraitOpen(false)}
+        name={token.name}
+        value={token.imageUrl}
+        campaignId={campaignId}
+        onSelect={(url) => onUpdate({ imageUrl: url })}
+        title={`${token.name} portrait`}
+      />
     </aside>
   );
 }

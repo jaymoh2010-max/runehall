@@ -125,7 +125,7 @@ export interface BuilderProps {
   legacyDefault: boolean;
   legacyLocked: boolean;
   openPicker: (picker: Picker) => void;
-  onPortrait: (file: File) => Promise<void>;
+  onChoosePortrait: () => void;
   setStep: (step: StepId) => void;
 }
 

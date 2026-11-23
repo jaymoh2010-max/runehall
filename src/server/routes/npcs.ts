@@ -63,7 +63,7 @@ function imageUrl(value: unknown): string | null | undefined {
   if (value === null || value === "") return null;
   if (typeof value !== "string") return null;
   const url = value.trim();
-  return /^\/uploads\/[A-Za-z0-9._-]+$/.test(url) ? url : null;
+  return /^\/(?:uploads|portraits)\/[A-Za-z0-9._-]+$/.test(url) ? url : null;
 }
 
 function nextSortOrder(campaignId: string): number {

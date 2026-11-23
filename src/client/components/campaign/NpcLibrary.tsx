@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { ImagePlus, MapPin, Pencil, Plus, Search, Shield, Trash2, UserRound } from "lucide-react";
 import type {
   CampaignFaction,
@@ -17,8 +17,9 @@ import {
   normalizeNpcKind,
   reputationLabel,
 } from "../../../shared/people";
-import { api, uploadImage } from "../../api";
+import { api } from "../../api";
 import { errorMessage } from "../../stores";
+import { PortraitPicker } from "../PortraitPicker";
 import {
   Avatar,
   Badge,
@@ -484,7 +485,7 @@ function NpcEditor({
   onError: (message: string) => void;
 }) {
   const editing = npc && npc !== "new" ? npc : null;
-  const fileRef = useRef<HTMLInputElement>(null);
+  const [portraitOpen, setPortraitOpen] = useState(false);
   const [kind, setKind] = useState<"npc" | "hazard">("npc");
   const [complexity, setComplexity] = useState<"simple" | "complex">("complex");
   const [trigger, setTrigger] = useState("");
@@ -506,7 +507,6 @@ function NpcEditor({
   const [publicDescription, setPublicDescription] = useState("");
   const [secrets, setSecrets] = useState("");
   const [visible, setVisible] = useState(false);
-  const [uploading, setUploading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -539,19 +539,6 @@ function NpcEditor({
     setVisible(Boolean(editing?.visible));
     setError("");
   }, [open, editing?.id, defaultKind]);
-
-  const upload = async (file: File) => {
-    setUploading(true);
-    setError("");
-    try {
-      const result = await uploadImage(file, campaignId);
-      setImageUrl(result.url);
-    } catch (err) {
-      setError(errorMessage(err));
-    } finally {
-      setUploading(false);
-    }
-  };
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -639,30 +626,19 @@ function NpcEditor({
               variant="secondary"
               size="sm"
               icon={<ImagePlus size={14} />}
-              loading={uploading}
-              onClick={() => fileRef.current?.click()}
+              onClick={() => setPortraitOpen(true)}
               block
             >
-              Upload art
+              Choose portrait
             </Button>
             {imageUrl ? (
               <Button variant="ghost" size="sm" onClick={() => setImageUrl(null)} block>
                 Use initials
               </Button>
             ) : null}
-            <input
-              ref={fileRef}
-              type="file"
-              hidden
-              accept="image/png,image/jpeg,image/webp,image/gif,image/avif"
-              onChange={(event) => {
-                const file = event.target.files?.[0];
-                if (file) void upload(file);
-                event.target.value = "";
-              }}
-            />
             <p className="tiny muted">
-              Token art is optional. Initials are used when no image is set.
+              Pick painted art from the portrait library, or upload and crop your own. Initials are
+              used when no image is set.
             </p>
           </div>
           <div className="npc-editor-fields">
@@ -861,6 +837,15 @@ function NpcEditor({
           </div>
         </div>
       </form>
+      <PortraitPicker
+        open={portraitOpen}
+        onClose={() => setPortraitOpen(false)}
+        name={name || (kind === "hazard" ? "this hazard" : "this NPC")}
+        value={imageUrl}
+        campaignId={campaignId}
+        onSelect={(url) => setImageUrl(url)}
+        title={kind === "hazard" ? "Choose hazard art" : "Choose NPC portrait"}
+      />
     </Modal>
   );
 }

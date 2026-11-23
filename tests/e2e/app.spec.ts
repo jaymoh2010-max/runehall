@@ -676,7 +676,9 @@ test("GM places a token, chats, rolls, and opens the scenes manager", async ({ p
     timeout: 15_000,
   });
 
-  await page.getByRole("button", { name: "Roll initiative" }).click();
+  const initiativeControls = page.locator(".core-initiative-controls");
+  await initiativeControls.getByRole("button", { name: "GM", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Roll initiative" }).click();
   await expect(page.locator(".initiative-chip.is-active")).toBeVisible({ timeout: 15_000 });
   await expect(page.locator(".action-pip")).toHaveCount(0);
 

@@ -32,11 +32,14 @@ import type {
 } from "../../../shared/types";
 import {
   BUILTIN_MAP_CATEGORIES,
+  BUILTIN_MAP_THEMES,
   BUILTIN_MAPS,
   builtinMapCategoryLabel,
   builtinMapSquares,
+  builtinMapThemeLabel,
   type BuiltinMap,
   type BuiltinMapCategory,
+  type BuiltinMapTheme,
 } from "../../../shared/builtinMaps";
 import { tokenTurnEffectsFromMonster } from "../../../shared/tokenTurnEffects";
 import {
@@ -520,6 +523,7 @@ export function SceneManagerModal({
   const [uploadPreview, setUploadPreview] = useState<string | null>(null);
   const [selectedBuiltinId, setSelectedBuiltinId] = useState<string | null>(null);
   const [mapCategory, setMapCategory] = useState<"all" | BuiltinMapCategory>("all");
+  const [mapTheme, setMapTheme] = useState<"all" | BuiltinMapTheme>("all");
   const [dimensions, setDimensions] = useState({ width: 1600, height: 1000 });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -529,10 +533,11 @@ export function SceneManagerModal({
   const selectedBuiltin = selectedBuiltinId
     ? (BUILTIN_MAPS.find((map) => map.id === selectedBuiltinId) ?? null)
     : null;
-  const visibleBuiltinMaps =
-    mapCategory === "all"
-      ? BUILTIN_MAPS
-      : BUILTIN_MAPS.filter((map) => map.category === mapCategory);
+  const visibleBuiltinMaps = BUILTIN_MAPS.filter(
+    (map) =>
+      (mapCategory === "all" || map.category === mapCategory) &&
+      (mapTheme === "all" || map.themes.includes(mapTheme))
+  ).sort((a, b) => Number(Boolean(b.color)) - Number(Boolean(a.color)));
 
   useEffect(() => {
     if (!open) {
@@ -543,6 +548,7 @@ export function SceneManagerModal({
       setUploadPreview(null);
       setSelectedBuiltinId(null);
       setMapCategory("all");
+      setMapTheme("all");
       setError("");
     }
   }, [open]);
@@ -774,14 +780,32 @@ export function SceneManagerModal({
             />
           </Field>
           <div className="map-library">
-            <div className="row-between">
+            <div className="map-library-head">
               <div>
                 <strong>Map library</strong>
-                <p className="tiny muted">Grid-aligned tactical maps. Click one to use it.</p>
+                <p className="tiny muted">
+                  Grid-aligned colour and line-art maps. Adventure themes are fan-made picks, not
+                  official Paizo maps.
+                </p>
               </div>
-              <Button type="button" size="sm" variant="ghost" onClick={() => selectBuiltin(null)}>
-                Blank canvas
-              </Button>
+              <div className="map-library-tools">
+                <Select
+                  className="map-theme-select"
+                  aria-label="Filter maps by adventure theme"
+                  value={mapTheme}
+                  onChange={(event) => setMapTheme(event.target.value as "all" | BuiltinMapTheme)}
+                >
+                  <option value="all">All adventure themes</option>
+                  {BUILTIN_MAP_THEMES.map((theme) => (
+                    <option key={theme.id} value={theme.id}>
+                      {theme.label}
+                    </option>
+                  ))}
+                </Select>
+                <Button type="button" size="sm" variant="ghost" onClick={() => selectBuiltin(null)}>
+                  Blank canvas
+                </Button>
+              </div>
             </div>
             <div className="map-library-categories">
               {BUILTIN_MAP_CATEGORIES.map((category) => (
@@ -810,9 +834,15 @@ export function SceneManagerModal({
                     <img src={map.thumbnailUrl} alt="" loading="lazy" decoding="async" />
                     <span className="map-library-copy">
                       <strong>{map.name}</strong>
-                      <span className="tiny muted">
-                        {builtinMapCategoryLabel(map.category)} · {squares.cols}×{squares.rows}{" "}
-                        squares
+                      <span className="map-library-meta">
+                        {map.color ? <em className="map-library-color">Colour</em> : null}
+                        <span className="tiny muted">
+                          {builtinMapCategoryLabel(map.category)} · {squares.cols}×{squares.rows}{" "}
+                          squares
+                        </span>
+                      </span>
+                      <span className="map-library-themes">
+                        {map.themes.slice(0, 2).map(builtinMapThemeLabel).join(" · ")}
                       </span>
                       {map.credit ? (
                         <span className="map-library-credit">
@@ -824,6 +854,11 @@ export function SceneManagerModal({
                 );
               })}
             </div>
+            {!visibleBuiltinMaps.length ? (
+              <p className="muted small">
+                No maps match that category and adventure theme. Try another combination.
+              </p>
+            ) : null}
           </div>
           <div className="map-upload-zone compact" onClick={() => fileRef.current?.click()}>
             {uploadPreview ? (
@@ -855,7 +890,8 @@ export function SceneManagerModal({
           ) : null}
           {selectedBuiltin ? (
             <p className="tiny muted">
-              Selected: <strong>{selectedBuiltin.name}</strong> — {selectedBuiltin.description}
+              Selected: <strong>{selectedBuiltin.name}</strong> — {selectedBuiltin.description}{" "}
+              Themes: {selectedBuiltin.themes.map(builtinMapThemeLabel).join(", ")}.
               {selectedBuiltin.credit ? (
                 <>
                   {" "}
