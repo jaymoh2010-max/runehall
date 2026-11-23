@@ -318,6 +318,41 @@ test("GM creates a campaign and builds a character through the lazy routes", asy
   await expect(page.locator(".pb-sheet-page")).toBeVisible({ timeout: 15_000 });
 });
 
+test("sheet item browser filters by category, subtype, and level", async ({ page }) => {
+  test.setTimeout(60_000);
+  await signIn(page, admin);
+  const campaignId = campaignPath.split("/").pop();
+  const list = await page.request.get(`/api/characters?campaignId=${campaignId}`);
+  const characters = (await list.json()) as {
+    characters: { id: string; name: string }[];
+  };
+  const hero = characters.characters.find((entry) => entry.name === "E2E Hero");
+  expect(hero).toBeTruthy();
+
+  await page.goto(`/characters/${hero!.id}`);
+  await page.getByRole("button", { name: "Gear", exact: true }).click();
+  const categories = page.getByRole("group", { name: "Item categories" });
+  await categories.getByRole("button", { name: "Weapons", exact: true }).click();
+  const subcategories = page.getByRole("group", { name: "Item subcategories" });
+  await subcategories.getByRole("button", { name: "Martial", exact: true }).click();
+  await page.getByPlaceholder("Search the item database").fill("Longsword");
+  const longsword = page.locator(".pb-item-row").filter({ hasText: "Longsword" }).first();
+  await expect(longsword).toBeVisible({ timeout: 15_000 });
+  await expect(longsword.locator(".pb-item-name span")).toContainText("Martial weapon");
+
+  await page.getByLabel("Item level").selectOption("16+");
+  await expect(page.locator(".pb-item-row").filter({ hasText: "Longsword" })).toHaveCount(0, {
+    timeout: 15_000,
+  });
+
+  await page.getByRole("button", { name: "Reset item filters" }).click();
+  await expect(page.getByPlaceholder("Search the item database")).toHaveValue("");
+  await expect(categories.getByRole("button", { name: "All", exact: true })).toHaveAttribute(
+    "aria-pressed",
+    "true"
+  );
+});
+
 test("GM downloads a self-contained campaign archive", async ({ page }) => {
   await signIn(page, admin);
   await page.goto(`${campaignPath}?tab=settings`);
@@ -635,6 +670,9 @@ test("players buy gear and only grant it when the GM allows", async ({ page, bro
   await expect(
     playerPage.locator(".pb-inventory-row").filter({ hasText: "Backpack" }).first()
   ).toContainText("×3");
+  await expect(
+    playerPage.locator(".pb-inventory-group").filter({ hasText: "Containers" })
+  ).toBeVisible();
   await playerContext.close();
 
   await page.reload();
