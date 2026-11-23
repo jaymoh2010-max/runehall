@@ -150,6 +150,7 @@ export function CharacterSheetView({
   const [itemError, setItemError] = useState("");
   const [itemLoading, setItemLoading] = useState(false);
   const characterRef = useRef<CharacterRecord | null>(null);
+  const loadedCharacterIdRef = useRef<string | null>(null);
   const draftRef = useRef<CharacterDraft | null>(null);
   const savingRef = useRef(false);
   const pendingDraftRef = useRef<CharacterDraft | null>(null);
@@ -164,6 +165,10 @@ export function CharacterSheetView({
     );
     characterRef.current = record;
     draftRef.current = normalized;
+    if (loadedCharacterIdRef.current !== record.id) {
+      loadedCharacterIdRef.current = record.id;
+      setDetailsDirty(false);
+    }
     setCharacter(record);
     setDraft(normalized);
     setContext(contextResult.context);

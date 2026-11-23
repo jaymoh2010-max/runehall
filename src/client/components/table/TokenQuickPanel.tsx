@@ -1,7 +1,42 @@
-import { useState } from "react";
+import { useEffect, useState, type InputHTMLAttributes } from "react";
 import { Dices, Eye, EyeOff, Lock, Unlock, Trash2, UserRound, X } from "lucide-react";
 import type { CharacterRecord, Token } from "../../../shared/types";
 import { Avatar, Button, IconButton, Tag } from "../ui";
+
+/**
+ * Token fields commit on blur or Enter. Sending an update per keystroke makes
+ * the socket echo fight the caret and floods the table with broadcasts.
+ */
+function TokenInput({
+  value,
+  onCommit,
+  ...props
+}: {
+  value: string;
+  onCommit: (value: string) => void;
+} & Omit<InputHTMLAttributes<HTMLInputElement>, "value" | "onChange" | "onBlur" | "onKeyDown">) {
+  const [draft, setDraft] = useState(value);
+
+  useEffect(() => {
+    setDraft(value);
+  }, [value]);
+
+  const commit = () => {
+    if (draft !== value) onCommit(draft);
+  };
+
+  return (
+    <input
+      {...props}
+      value={draft}
+      onChange={(event) => setDraft(event.target.value)}
+      onBlur={commit}
+      onKeyDown={(event) => {
+        if (event.key === "Enter") event.currentTarget.blur();
+      }}
+    />
+  );
+}
 
 export function TokenQuickPanel({
   token,
@@ -93,11 +128,11 @@ export function TokenQuickPanel({
             <Button size="sm" variant="ghost" onClick={() => setHp(currentHp - 5)}>
               −5
             </Button>
-            <input
+            <TokenInput
               type="number"
               aria-label="Current hit points"
-              value={currentHp}
-              onChange={(event) => setHp(Number(event.target.value) || 0)}
+              value={String(currentHp)}
+              onCommit={(value) => setHp(Number(value) || 0)}
             />
             <span className="muted">/ {maxHp ?? "—"}</span>
             <Button size="sm" variant="ghost" onClick={() => setHp(currentHp + 5)}>
@@ -108,13 +143,11 @@ export function TokenQuickPanel({
         <div className="core-token-ac">
           <span className="tiny muted">AC</span>
           {isGm ? (
-            <input
+            <TokenInput
               type="number"
               aria-label="Armor class"
-              value={token.ac ?? ""}
-              onChange={(event) =>
-                onUpdate({ ac: event.target.value === "" ? null : Number(event.target.value) || 0 })
-              }
+              value={token.ac === null ? "" : String(token.ac)}
+              onCommit={(value) => onUpdate({ ac: value === "" ? null : Number(value) || 0 })}
             />
           ) : (
             <strong>{token.ac ?? "—"}</strong>
@@ -130,23 +163,19 @@ export function TokenQuickPanel({
               canManage ? (
                 <div className="core-token-condition" key={`${entry.name}-${index}`}>
                   <span className="core-token-condition-name">{entry.name}</span>
-                  <input
+                  <TokenInput
                     type="number"
-                    value={entry.value ?? ""}
+                    value={entry.value == null ? "" : String(entry.value)}
                     placeholder="Val"
                     aria-label={`Value for ${entry.name}`}
-                    onChange={(event) =>
-                      updateCondition(index, { value: numberOrNull(event.target.value) })
-                    }
+                    onCommit={(value) => updateCondition(index, { value: numberOrNull(value) })}
                   />
-                  <input
+                  <TokenInput
                     type="number"
-                    value={entry.duration ?? ""}
+                    value={entry.duration == null ? "" : String(entry.duration)}
                     placeholder="Rds"
                     aria-label={`Duration for ${entry.name}`}
-                    onChange={(event) =>
-                      updateCondition(index, { duration: numberOrNull(event.target.value) })
-                    }
+                    onCommit={(value) => updateCondition(index, { duration: numberOrNull(value) })}
                   />
                   <IconButton label={`Remove ${entry.name}`} onClick={() => removeCondition(index)}>
                     <X size={11} />
@@ -190,18 +219,18 @@ export function TokenQuickPanel({
           <summary>Edit token</summary>
           <label>
             <span>Name</span>
-            <input
+            <TokenInput
               value={token.name}
               maxLength={80}
-              onChange={(event) => onUpdate({ name: event.target.value })}
+              onCommit={(value) => onUpdate({ name: value })}
             />
           </label>
           <label>
             <span>Image URL</span>
-            <input
+            <TokenInput
               value={token.imageUrl ?? ""}
               placeholder="https://…"
-              onChange={(event) => onUpdate({ imageUrl: event.target.value || null })}
+              onCommit={(value) => onUpdate({ imageUrl: value || null })}
             />
           </label>
           <label>

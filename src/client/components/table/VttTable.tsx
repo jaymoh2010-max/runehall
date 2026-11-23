@@ -130,7 +130,7 @@ export function VttTable({ initial, campaignId, user, isGm, active }: VttTablePr
     myCharacterChoice && myCharacters.some((character) => character.id === myCharacterChoice)
       ? myCharacterChoice
       : null;
-  const myCharacterId = tokenCharacter?.id ?? chosenCharacter ?? myCharacters[0]?.id ?? null;
+  const myCharacterId = chosenCharacter ?? tokenCharacter?.id ?? myCharacters[0]?.id ?? null;
   const canvasScene = useMemo(
     () =>
       activeScene
