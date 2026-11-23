@@ -14,6 +14,7 @@ const compendiumSpells = JSON.parse(
   fs.readFileSync(path.resolve("data", "compendium", "spells.json"), "utf8")
 ) as { id: string; name: string }[];
 const sorcererId = compendiumClasses.find((entry) => entry.name === "Sorcerer")!.id;
+const psychicId = compendiumClasses.find((entry) => entry.name === "Psychic")!.id;
 const fireballId = compendiumSpells.find((entry) => entry.name === "Fireball")!.id;
 const elementBloodlineId = "cf:RXRnJcG4XSabZ35a";
 const admin = {
@@ -1366,6 +1367,68 @@ test("builder learns a spontaneous spell at more than one rank", async ({ page }
   await rankChoices.selectOption("5:slot");
   await fireball.getByRole("button", { name: "Cast" }).click();
   await expect(page.getByText(/Cast Fireball at rank 5/)).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator(".pb-save")).toHaveText("Saved");
+});
+
+test("sheet casts psychic psi cantrip amps with focus", async ({ page }) => {
+  test.setTimeout(60_000);
+  await signIn(page, admin);
+  const expandedCampaign = `E2E Psychic ${runId}`;
+  const createdCampaign = await page.request.post("/api/campaigns", {
+    data: { name: expandedCampaign, ruleset: "expanded" },
+  });
+  expect(createdCampaign.ok()).toBe(true);
+  const campaignId = (await createdCampaign.json()) as { campaign: { id: string } };
+  const created = await page.request.post("/api/characters", {
+    data: { name: "E2E Psychic", campaignId: campaignId.campaign.id },
+  });
+  expect(created.ok()).toBe(true);
+  const character = (await created.json()) as { character: { id: string } };
+  const draft = emptyCharacterDraft("E2E Psychic");
+  draft.level = 1;
+  draft.classId = psychicId;
+  draft.keyAbility = "int";
+  draft.play.focusPoints = 2;
+  draft.classChoices["cf:0fv6NVMZZ0peGL9e:psychic-conscious-mind"] = ["cf:1rlBo3LcwIuPDCvz"];
+  draft.classChoices["cf:79ZetrRF6S01P4Vf:psychic-subconscious-mind"] = ["cf:Qrhw4SILfT8YNQgB"];
+  const saved = await page.request.put(`/api/characters/${character.character.id}`, {
+    data: { data: draft, force: true },
+  });
+  expect(saved.ok()).toBe(true);
+
+  await page.goto(`/characters/${character.character.id}/edit`);
+  await expect(page.getByRole("heading", { name: "E2E Psychic" })).toBeVisible({
+    timeout: 15_000,
+  });
+  await goToStep(page, "Spells");
+  await expect(page.getByRole("heading", { name: "Psi amps" })).toBeVisible();
+  await expect(
+    page.locator(".spell-section").filter({ has: page.getByRole("heading", { name: "Psi amps" }) })
+  ).toContainText("Telekinetic Projectile");
+
+  await page.goto(`/characters/${character.character.id}`);
+  await expect(page.getByRole("heading", { name: "E2E Psychic" })).toBeVisible({
+    timeout: 15_000,
+  });
+  await page.getByRole("button", { name: "Spells", exact: true }).click();
+  const projectile = page
+    .locator(".pb-spell-row")
+    .filter({ hasText: "Telekinetic Projectile" })
+    .first();
+  await expect(projectile.getByText(/Amp \(1 Focus\):/)).toBeVisible();
+  const focusRow = page.locator(".pb-slot-row").filter({ hasText: "Focus" });
+  await expect(focusRow).toContainText("2 / 2");
+  const rankChoice = projectile.locator("select");
+  await expect(rankChoice.locator("option")).toHaveText([
+    "Rank 1 · cantrip",
+    "Rank 1 · Amp (1 Focus)",
+  ]);
+  await rankChoice.selectOption("1:amp");
+  await projectile.getByRole("button", { name: "Cast" }).click();
+  await expect(page.getByText(/Cast Telekinetic Projectile at rank 1 · amped/)).toBeVisible({
+    timeout: 15_000,
+  });
+  await expect(focusRow).toContainText("1 / 2");
   await expect(page.locator(".pb-save")).toHaveText("Saved");
 });
 

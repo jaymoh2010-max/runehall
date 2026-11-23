@@ -2,7 +2,7 @@
 
 Date: 2026-11-23
 
-Status: review complete. Sprint 1 (the daily spellcasting loop), the class-grant portion of Sprint 2, the first table-magic pass of Sprint 3, the magus studious-slot pass of Sprint 4, the animist prepared/spontaneous split of Sprint 5, and the spontaneous known-at-rank pass of Sprint 6 were implemented on 2026-11-23. The findings below describe the pre-Sprint state; the implementation status sections record what changed, and the remaining class and table gaps stay in the backlog.
+Status: review complete. Sprint 1 (the daily spellcasting loop), the class-grant portion of Sprint 2, the first table-magic pass of Sprint 3, the magus studious-slot pass of Sprint 4, the animist prepared/spontaneous split of Sprint 5, the spontaneous known-at-rank pass of Sprint 6, and the psychic psi-amp pass of Sprint 7 were implemented on 2026-11-23. The findings below describe the pre-Sprint state; the implementation status sections record what changed, and the remaining class and table gaps stay in the backlog.
 
 > **Follow-up (2026-11-23):** `docs/RULES-AUDIT.md` corrected two table errors
 > this review did not catch: bards use the 2/3 full-caster slot table (not the
@@ -73,12 +73,12 @@ The class-specific grant pass is implemented:
 
 - Focus and innate spell attack/DC are derived separately from class spellcasting. Focus-only classes (champion, monk, ranger, and other focus sources) get their own spell DC/attack, and innate spells use their Charisma-based trained/expert profile. The sheet uses the correct attack modifier and shows focus/innate DC on the row.
 - The "spellcasting class feature" prerequisite now requires actual spell slots, so focus-only classes no longer qualify accidentally.
-- Psychic has a bounded spontaneous repertoire limit, conscious-mind 1st-rank grants, and granted psi cantrips. Clarity of Focus already raises the pool at 5th level. Psi amps remain manual.
+- Psychic has a bounded spontaneous repertoire limit, conscious-mind 1st-rank grants, and granted psi cantrips. Clarity of Focus already raises the pool at 5th level. Psi amps are tracked in Sprint 7.
 - Necromancer grants Necrotic Bomb and the grim fascination grave spell, with a focus pool of 2.
 - Summoner grants Evolution Surge and the at-will Boost Eidolon link cantrip. The link cantrip does not count toward the focus pool.
 - Cleric deity spells are included in the available cleric list and can be prepared through the normal daily-preparation workflow.
 
-Still open after this pass: psi amp actions, item spellcasting, rituals, sustain, and multiclass archetype casting.
+Still open after this pass: item spellcasting, rituals, sustain, and multiclass archetype casting.
 
 ## Sprint 3 implementation status (2026-11-23)
 
@@ -100,7 +100,7 @@ Magus studious slots are implemented:
 - Casting spends a studious use, Restore returns it, and long rests reset the uses.
 - The sheet shows a separate studious slot row and offers the studious resource alongside ordinary slots.
 
-Still open: psi amps, item spellcasting, spellbook learning, structured ritual data, a table Sustain prompt, and multiclass archetype casting.
+Still open: item spellcasting, spellbook learning, structured ritual data, a table Sustain prompt, and multiclass archetype casting.
 
 ## Sprint 5 implementation status (2026-11-23)
 
@@ -125,6 +125,16 @@ Spontaneous known-at-rank copies are implemented:
 - The sheet shows every learned rank in the spell's cast selector.
 
 Still manual: using a higher-rank slot to cast a lower-rank spell without heightening it.
+
+## Sprint 7 implementation status (2026-11-23)
+
+Psychic psi amps are implemented:
+
+- The builder lists the three granted psi cantrips from the chosen conscious mind with curated amp summaries and heightened notes.
+- Psi cantrips remain at-will cantrips. An **Amp (1 Focus)** cast option appears beside the normal cantrip cast.
+- Casting an amp spends 1 Focus Point; Restore returns it, and an empty pool blocks amping while leaving the base cantrip castable.
+- The sheet shows the amp summary on each psi cantrip and marks the cast as amped in chat and toast output.
+- Higher-level unique psi cantrips beyond the granted surface cantrip remain manual.
 
 ## Rules baseline
 
@@ -189,11 +199,11 @@ Legend: Yes = modeled and usable; Partial = some support with known gaps; No = n
 | Spontaneous repertoire limits | Yes | Bard, oracle, sorcerer, summoner, and psychic; rank copies count against each learned rank |
 | Spontaneous heightening by learned rank | Yes | Known ranks are tracked; signature spells heighten upward. Higher-slot downcasting is manual |
 | Signature spells | Yes | One per rank, level 3 gate, validation |
-| Focus points and focus casting | Partial | Separate focus spell DC/attack now works; psi amps and some feat-granted pools remain manual |
+| Focus points and focus casting | Partial | Separate focus spell DC/attack works; psi amps now spend focus, while some feat-granted pools remain manual |
 | Focus spells from feats/archetypes | Partial | Manual focus list; no automatic grants or pool changes |
 | Innate spells and uses | Partial | Uses and casting work; innate attack/DC is derived separately |
 | Cleric deity spells | Yes | Deity spells are offered to prepare; higher-rank deity spells appear as level permits |
-| Psychic conscious minds | Partial | 1st-rank spell and psi cantrips granted; amps and higher-level unique cantrips manual |
+| Psychic conscious minds | Partial | 1st-rank spell, psi cantrips, and amp casting are granted; higher-level unique cantrips remain manual |
 | Necromancer grave spells | Partial | Necrotic Bomb and grim fascination spells granted; thralls and effects manual |
 | Summoner link spells | Yes | Evolution Surge and Boost Eidolon granted; eidolon actions remain manual |
 | Magus studious slots | Yes | Two special slots at 7th, rank 3 at 11th, rank 4 at 13th; hybrid-study list and preparation UI |
@@ -289,9 +299,9 @@ Fix: At minimum, introduce labels by class (`spellbook`, `familiar`, `dirge`, `s
 
 ### F6. Several class resources are missing or hard-coded (P1)
 
-Status: partly fixed in Sprint 2, Sprint 4, and Sprint 5. Psychic, necromancer, summoner, cleric deity spells, magus studious slots, and the animist prepared/spontaneous split are now granted or tracked.
+Status: partly fixed in Sprint 2, Sprint 4, Sprint 5, and Sprint 7. Psychic, necromancer, summoner, cleric deity spells, magus studious slots, the animist prepared/spontaneous split, and psychic psi amps are now granted or tracked.
 
-- **Psychic**: repertoire limits, conscious-mind 1st-rank spells, and psi cantrips are granted. Psi amps and higher-level unique psi cantrips remain manual.
+- **Psychic**: repertoire limits, conscious-mind 1st-rank spells, psi cantrips, and amp casting are granted; amps spend focus and show their summaries in the builder and sheet. Higher-level unique psi cantrips remain manual.
 - **Necromancer**: Necrotic Bomb, grim fascination grave spells, and the focus pool are granted. Thralls and full grave-spell effects remain manual.
 - **Magus**: studious slots are tracked at 7th/11th/13th level with the hybrid-study spell list. Spellstrike, Arcane Cascade, and conflux spell recharge remain manual.
 - **Summoner**: `evolution surge` and `boost eidolon` are granted; the link cantrip does not count toward the focus pool. Eidolon actions remain manual.
@@ -300,7 +310,7 @@ Status: partly fixed in Sprint 2, Sprint 4, and Sprint 5. Psychic, necromancer, 
 - **Sorcerer/oracle**: higher-rank bloodline/mystery gifts remain manual.
 - **Cleric**: deity spells are resolved and offered through the normal preparation workflow.
 
-Impact: These classes are usable only with manual bookkeeping. The most visible remaining class gaps are psi amps and higher-level class-specific gifts.
+Impact: These classes are usable only with manual bookkeeping. The most visible remaining class gaps are higher-level class-specific gifts and item spellcasting.
 
 Fix: Treat class completeness as a separate sprint. Start with grants and caps that can be curated from existing class-choice descriptions; avoid a generic parser until the curated path is stable.
 
@@ -503,7 +513,7 @@ Tasks:
    - Add psychic to bounded spontaneous repertoire limits.
    - Curate conscious-mind grants: the 1st-rank spell, two common psi cantrips, and the unique psi cantrip.
    - Model psi cantrips separately from regular cantrips.
-   - Add amp metadata and an Amp action that spends 1 Focus Point.
+   - Add amp metadata and an Amp action that spends 1 Focus Point. (Implemented in Sprint 7.)
    - Add Clarity of Focus at 5th level.
 
 3. **Necromancer and Magus**

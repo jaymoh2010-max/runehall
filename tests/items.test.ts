@@ -107,12 +107,13 @@ describe("curated item effects", () => {
     });
     expect(ITEM_EFFECTS[thirdEye.id]).toEqual({
       perceptionItemBonus: 2,
-      notes: [
-        "Apex: when invested, increase your Wisdom modifier by 1 or to +4, whichever is higher.",
-      ],
+      apexAbilities: ["wis"],
     });
     for (const item of [beltOfStrength, bracersOfStrength, bracersOfHammers]) {
-      expect(ITEM_EFFECTS[item.id]).toMatchObject({ skillItemBonus: { athletics: 3 } });
+      expect(ITEM_EFFECTS[item.id]).toMatchObject({
+        skillItemBonus: { athletics: 3 },
+        apexAbilities: ["str"],
+      });
     }
     expect(ITEM_EFFECTS[kinshipAmulet.id]).toMatchObject({ saveItemBonus: { will: 2 } });
     expect(ITEM_EFFECTS[storytellingAmulet.id]).toMatchObject({
@@ -209,11 +210,38 @@ describe("curated item effects", () => {
     }
   });
 
-  it("applies a perception item bonus to perception and initiative", () => {
+  it("applies a perception item bonus and apex ability increase", () => {
     const baseline = computeCharacter(fighterDraft([]), context([thirdEye]));
     const withAmulet = computeCharacter(fighterDraft([], [thirdEye]), context([thirdEye]));
-    expect(withAmulet.perception).toBe(baseline.perception + 2);
-    expect(withAmulet.initiative).toBe(baseline.initiative + 2);
+    const apexWis = Math.max(baseline.abilityMods.wis + 1, 4);
+    expect(withAmulet.abilityMods.wis).toBe(apexWis);
+    expect(withAmulet.perception).toBe(
+      baseline.perception + 2 + (apexWis - baseline.abilityMods.wis)
+    );
+    expect(withAmulet.initiative).toBe(withAmulet.perception);
+  });
+
+  it("applies one apex item's ability increase and warns about extras", () => {
+    const baseline = computeCharacter(fighterDraft([]), context([thirdEye, beltOfStrength]));
+    const withBoth = computeCharacter(
+      fighterDraft([], [thirdEye, beltOfStrength]),
+      context([thirdEye, beltOfStrength])
+    );
+    const expectedWis = Math.max(baseline.abilityMods.wis + 1, 4);
+    expect(withBoth.abilityMods.wis).toBe(expectedWis);
+    expect(withBoth.abilityMods.str).toBe(baseline.abilityMods.str);
+    expect(withBoth.validation.some((issue) => issue.message.includes("Only one apex item"))).toBe(
+      true
+    );
+  });
+
+  it("applies a Strength apex item", () => {
+    const baseline = computeCharacter(fighterDraft([]), context([beltOfStrength]));
+    const withBelt = computeCharacter(
+      fighterDraft([], [beltOfStrength]),
+      context([beltOfStrength])
+    );
+    expect(withBelt.abilityMods.str).toBe(Math.max(baseline.abilityMods.str + 1, 4));
   });
 
   it("applies handwraps runes to the unarmed strike", () => {

@@ -198,8 +198,9 @@ The character builder is already good enough for a core campaign at low levels. 
    - Magus studious slots scale at 7th/11th/13th level; the builder and daily preparations only allow Gecko Grip, Haste, Fly, and the chosen hybrid study's studious spells.
    - Animist prepared slots and spontaneous apparition slots are separate, with all 14 apparitions, daily attunement, signature-style heightening, and the primary vessel focus spell.
    - Spontaneous casters track the ranks at which each spell is known; rank copies count against the matching repertoire limit and cast options only offer learned ranks (signature spells heighten upward).
-   - Verified in-browser: a wizard with four rank-1 slots showed 4/4 prepared and disabled a fifth preparation; an animist cast Sure Strike from an apparition slot while the prepared rank-1 slot stayed full; a sorcerer learned Fireball at ranks 3 and 5 and the sheet offered only those cast ranks.
-   - Remaining: free-choice grants (domains, devotion spells, variable bloodline gifts, curriculum variants), psi amps, item spellcasting, structured ritual data, higher-slot downcasting without heightening, and full spellbook-vs-known presentation for all prepared classes.
+   - Psychic psi cantrips expose an Amp cast that spends 1 Focus Point, with curated amp summaries and heightened notes in the builder and sheet; the base cantrip stays at will.
+   - Verified in-browser: a wizard with four rank-1 slots showed 4/4 prepared and disabled a fifth preparation; an animist cast Sure Strike from an apparition slot while the prepared rank-1 slot stayed full; a sorcerer learned Fireball at ranks 3 and 5 and the sheet offered only those cast ranks; a psychic amped Telekinetic Projectile and spent one focus point.
+   - Remaining: free-choice grants (domains, devotion spells, variable bloodline gifts, curriculum variants), item spellcasting, structured ritual data, higher-slot downcasting without heightening, and full spellbook-vs-known presentation for all prepared classes.
 
 7. **Companions and print (manual roster complete)**
    - Animal companions, familiars, eidolons, and summons can be recorded with name, kind, level, HP, AC, and attack notes.

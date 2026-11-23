@@ -140,6 +140,7 @@ import {
   rulesetLabel,
 } from "../../../../shared/content";
 import { summarizeRunes } from "../../../../shared/runes";
+import { psiAmpFor, type PsiAmpInfo } from "../../../../shared/psiAmps";
 import type { BuilderProps } from "../shared";
 import { StepHeading, ValidationNote, SearchInput, MiniFeatureList } from "../shared";
 
@@ -212,6 +213,12 @@ export function SpellsStep({ draft, update, derived, context, setStep, openPicke
   const isSpontaneousCaster =
     !isPreparedCaster && caster.progression !== "none" && caster.progression !== "focus";
   const isAnimist = classData?.name.toLowerCase() === "animist";
+  const isPsychic = classData?.name.toLowerCase() === "psychic";
+  const psiAmps: PsiAmpInfo[] = isPsychic
+    ? derived.grantedSpells
+        .map((spell) => psiAmpFor(spell.id))
+        .filter((amp): amp is PsiAmpInfo => Boolean(amp))
+    : [];
   const preparedListLabel = isAnimist
     ? "prepared list"
     : isPreparedCaster
@@ -821,6 +828,39 @@ export function SpellsStep({ draft, update, derived, context, setStep, openPicke
                 </div>
               );
             })}
+          </div>
+        </Card>
+      ) : null}
+
+      {psiAmps.length ? (
+        <Card className="spell-section" data-testid="psi-amps">
+          <div className="row-between">
+            <div>
+              <h3>Psi amps</h3>
+              <p className="muted small">
+                Amping one of these cantrips costs 1 Focus Point. The cantrip remains castable at
+                will without spending focus.
+              </p>
+            </div>
+            <Tag tone="gold">{psiAmps.length} amps</Tag>
+          </div>
+          <div className="stack" style={{ gap: 8, marginTop: 10 }}>
+            {psiAmps.map((amp) => (
+              <div key={amp.spellId} className="prepared-at-rank" style={{ padding: "8px 10px" }}>
+                <div className="row-between">
+                  <strong>{amp.name}</strong>
+                  <Tag tone="blue">{amp.mind.replace(/^The /, "")}</Tag>
+                </div>
+                <p className="tiny muted" style={{ margin: "4px 0 0" }}>
+                  {amp.summary}
+                </p>
+                {amp.heightened ? (
+                  <p className="tiny gold-text" style={{ margin: "3px 0 0" }}>
+                    {amp.heightened}
+                  </p>
+                ) : null}
+              </div>
+            ))}
           </div>
         </Card>
       ) : null}
