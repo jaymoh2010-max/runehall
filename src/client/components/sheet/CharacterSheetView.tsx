@@ -54,6 +54,7 @@ import {
   type SpellCastChoice,
 } from "../../../shared/spellcasting";
 import { innateUsesRemaining } from "../../../shared/innate";
+import { psiAmpFor } from "../../../shared/psiAmps";
 import { ritualPrimarySkillName } from "../../../shared/ritual";
 import {
   beginSustainedSpell,
@@ -994,14 +995,15 @@ export function CharacterSheetView({
     }
     const saved = await persist(nextDraft);
     if (!saved) return;
+    const amped = result.option.resource === "amp";
     toast(
-      `Cast ${spell.name} at rank ${result.option.rank}${sustains ? " · sustained" : ""}.`,
+      `Cast ${spell.name} at rank ${result.option.rank}${amped ? " · amped" : ""}${sustains ? " · sustained" : ""}.`,
       "success"
     );
     if (character?.campaignId) {
       getSocket().emit("chat:send", {
         campaignId: character.campaignId,
-        content: `${currentDraft.name} casts ${spell.name} at rank ${result.option.rank} (${result.option.label}).`,
+        content: `${currentDraft.name} casts ${spell.name} at rank ${result.option.rank}${amped ? " (amped)" : ""} (${result.option.label}).`,
         visibility: "all",
       });
     }
@@ -2440,6 +2442,10 @@ export function CharacterSheetView({
                     const profile = spellProfileFor(group);
                     const sustained = spell ? sustainedSpellFor(draft, spell.id) : null;
                     const sustains = spell ? spellNeedsSustain(spell) : false;
+                    const amp =
+                      spell && context?.classData?.name.toLowerCase() === "psychic"
+                        ? psiAmpFor(spell.id)
+                        : null;
                     return (
                       <div className="pb-spell-row" key={`${group}-${id}-${index}`}>
                         <Link to={`/library/spell/${id}`}>
@@ -2455,6 +2461,14 @@ export function CharacterSheetView({
                               ? ` · DC ${profile.dc ?? "—"}`
                               : ""}
                           </span>
+                          {amp ? (
+                            <span
+                              className="pb-amp-note"
+                              title={`${amp.summary}${amp.heightened ? ` ${amp.heightened}` : ""}`}
+                            >
+                              Amp (1 Focus): {amp.summary}
+                            </span>
+                          ) : null}
                         </Link>
                         <div className="pb-row-actions">
                           {spell?.traits.includes("attack") && profile.attack !== null ? (
@@ -2489,7 +2503,8 @@ export function CharacterSheetView({
                                   key={`${option.rank}-${option.resource}`}
                                   value={`${option.rank}:${option.resource}`}
                                 >
-                                  Rank {option.rank} · {option.resource}
+                                  Rank {option.rank} ·{" "}
+                                  {option.resource === "amp" ? "Amp (1 Focus)" : option.resource}
                                 </option>
                               ))}
                             </select>
