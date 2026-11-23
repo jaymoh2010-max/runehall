@@ -128,6 +128,47 @@ export const FEAT_EFFECTS: Record<string, EffectModifiers> = {
     initiativeBonus: 2,
     notes: ["Tie-breaking initiative against an opponent remains manual."],
   },
+  // Proximity Alert — +2 circumstance bonus to Perception initiative rolls.
+  "feat:enRKfPyCLU5FMUOX": { initiativeBonus: 2 },
+  // Unconditional ancestry/class senses.
+  "feat:e0Gz3tjd55A5ggYK": { senses: ["darkvision"] }, // Alabaster Eyes
+  "feat:YG6OCTbbqZwqRTr3": {
+    senses: ["darkvision"], // Arcane Eye
+    notes: ["The See the Unseen innate spell and invisible-creature sight remain manual."],
+  },
+  "feat:qVk9htKv47niPmXS": { senses: ["darkvision"] }, // Deep Vision
+  "feat:6ENHSzqg88J6dri6": { senses: ["darkvision"] }, // Elemental Eyes
+  "feat:mAhmb9CkYe0J2bCD": { senses: ["darkvision"] }, // Elucidating Vision
+  "feat:5EpkOj9CFOjt8vsK": { senses: ["darkvision"] }, // Eyes of Night
+  "feat:hxCqQPjlyVI57vQt": { senses: ["darkvision"] }, // Gravesight
+  "feat:WzJaArukCUf9hpeP": { senses: ["darkvision"] }, // Hag's Sight
+  "feat:RDRNtaFEq9p6KzEO": { senses: ["darkvision"] }, // Jotun's Eyes
+  "feat:sza9YDyDBSHbzCjc": { senses: ["darkvision"] }, // Nalinivati's Light
+  "feat:akCO62yBCJLjjCZJ": { senses: ["darkvision"] }, // Nephilim Eyes
+  "feat:cixf1uAQF2Y3w1Qx": { senses: ["darkvision"] }, // Nightvision Adaptation
+  "feat:BNIAfaJPNCWKs3FN": { senses: ["darkvision"] }, // Nocturnal Tripkee
+  "feat:SCgqIo8VQZZKZ1Ws": { senses: ["darkvision"] }, // Orc Sight
+  "feat:NN1U8ifiURc0h4Fx": { senses: ["darkvision"] }, // Pierce the Darkness
+  "feat:XM4zR0q9rBxjR3lG": { senses: ["darkvision"] }, // Darkseer
+  "feat:akrj9t0lTrndmf0q": { senses: ["low-light vision"] }, // Canopy Sight
+  "feat:sL2GmYve5NXJ0wc1": { senses: ["low-light vision"] }, // Gloomseer
+  "feat:lkl5QaDb1mlSD7SC": {
+    senses: ["darkvision", "low-light vision"], // Visual Fidelity
+    notes: ["Seeing invisible creatures as translucent remains manual."],
+  },
+  "feat:c3FOqUTK6VJyuCzR": {
+    senses: ["darkvision"], // Eyes of the Sea
+    notes: ["Underwater visibility remains manual."],
+  },
+  "feat:CBJ3GZZsrAXioDNM": {
+    senses: ["darkvision"], // Worm Sense
+    notes: ["Tremorsense remains manual."],
+  },
+  "feat:3urmaBBJ1obyU90b": {
+    senses: ["darkvision"], // Wild Hunter Dedication
+    languages: ["Fey"],
+    notes: ["The Additional Lore feat remains manual."],
+  },
   // Incredible Investiture — increase the invested item limit from 10 to 12.
   "feat:4vu6P3cYoOOeUbLK": { investedLimit: 2 },
   // Unburdened Iron — ignore armor Speed penalties and reduce one other penalty by 5.
