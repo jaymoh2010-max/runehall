@@ -200,8 +200,9 @@ The character builder is already good enough for a core campaign at low levels. 
    - Spontaneous casters track the ranks at which each spell is known; rank copies count against the matching repertoire limit, signature spells heighten upward, and non-signature spells can downcast from higher slots.
    - Psychic psi cantrips expose an Amp cast that spends 1 Focus Point, with curated amp summaries and heightened notes in the builder and sheet; the base cantrip stays at will.
    - The table shows a turn-start Sustain reminder for the active character, with a one-click Sustain acknowledgement and per-spell End.
-   - Verified in-browser: a wizard with four rank-1 slots showed 4/4 prepared and disabled a fifth preparation; an animist cast Sure Strike from an apparition slot while the prepared rank-1 slot stayed full; a sorcerer learned Fireball at ranks 3 and 5, then downcast it from a rank-4 slot; a psychic amped Telekinetic Projectile and spent one focus point; a sustained Flaming Sphere produced a table reminder and ended cleanly.
-   - Remaining: free-choice grants (domains, devotion spells, variable bloodline gifts, curriculum variants), item spellcasting, structured ritual data, and full spellbook-vs-known presentation for all prepared classes.
+   - Scrolls expose a Cast scroll action that filters by the character's spell list and consumes the scroll; wands and staves remain manual.
+   - Verified in-browser: a wizard with four rank-1 slots showed 4/4 prepared and disabled a fifth preparation; an animist cast Sure Strike from an apparition slot while the prepared rank-1 slot stayed full; a sorcerer learned Fireball at ranks 3 and 5, downcast it from a rank-4 slot, and cast it from a rank-3 scroll that was consumed; a psychic amped Telekinetic Projectile and spent one focus point; a sustained Flaming Sphere produced a table reminder and ended cleanly.
+   - Remaining: free-choice grants (domains, devotion spells, variable bloodline gifts, curriculum variants), wand and staff spellcasting, structured ritual data, and full spellbook-vs-known presentation for all prepared classes.
 
 7. **Companions and print (manual roster complete)**
    - Animal companions, familiars, eidolons, and summons can be recorded with name, kind, level, HP, AC, and attack notes.

@@ -491,6 +491,7 @@ export function SpellPicker({
   legacyLocked,
   onLegacyChange,
   excludeIds,
+  confirmLabel,
   onSelect,
 }: PickerBase & {
   rank: number | null;
@@ -506,6 +507,7 @@ export function SpellPicker({
   legacyLocked?: boolean;
   onLegacyChange?: (value: boolean) => void;
   excludeIds?: string[];
+  confirmLabel?: string;
   onSelect: (spell: Spell) => void;
 }) {
   const [query, setQuery] = useState("");
@@ -747,7 +749,7 @@ export function SpellPicker({
                     onClose();
                   }}
                 >
-                  Learn {selected.name}
+                  {confirmLabel ?? `Learn ${selected.name}`}
                 </Button>
               </div>
             </>
