@@ -262,6 +262,7 @@ export function ClassStep({
                     tradition: null,
                     cantrips: [],
                     known: [],
+                    knownRanks: {},
                     prepared: [],
                     preparedByRank: {},
                     preparedCantrips: [],

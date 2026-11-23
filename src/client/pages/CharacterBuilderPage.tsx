@@ -66,6 +66,7 @@ import {
 } from "../../shared/types";
 import {
   abilityMod,
+  addKnownSpellAtRank,
   animistApparitionSlots,
   applicableChoiceGroups,
   casterInfo,
@@ -76,6 +77,7 @@ import {
   featSlotsFor,
   flexibleBoosts,
   grantedTrainedSkills,
+  knownSpellRanks,
   normalizeCharacterDraft,
   requiredExtraSkills,
   selectedChoiceOptions,
@@ -1135,7 +1137,9 @@ export function CharacterBuilderPage({
           open
           onClose={() => setPicker(null)}
           rank={Number.isFinite(picker.rank) ? picker.rank : null}
-          maxRank={picker.focus ? Math.max(1, Math.ceil(draft.level / 2)) : null}
+          maxRank={
+            picker.maxRank ?? (picker.focus ? Math.max(1, Math.ceil(draft.level / 2)) : null)
+          }
           tradition={
             picker.target === "rituals" || picker.target === "innate"
               ? null
@@ -1161,7 +1165,14 @@ export function CharacterBuilderPage({
                     ? draft.spells.rituals
                     : picker.target === "innate"
                       ? draft.spells.innate
-                      : draft.spells.known),
+                      : picker.target === "knownAtRank" && picker.learnRank
+                        ? draft.spells.known.filter((id) => {
+                            const spell = context.spells[id];
+                            return spell
+                              ? knownSpellRanks(draft, spell).includes(picker.learnRank!)
+                              : (draft.spells.knownRanks[id] ?? []).includes(picker.learnRank!);
+                          })
+                        : draft.spells.known),
             ])
           )}
           onSelect={(spell) => {
@@ -1170,6 +1181,9 @@ export function CharacterBuilderPage({
               spells: { ...current.spells, [spell.id]: spell },
             }));
             update((current) => {
+              if (picker.target === "knownAtRank") {
+                return addKnownSpellAtRank(current, spell, picker.learnRank ?? spell.rank);
+              }
               if (picker.target === "cantrips" && spell.rank !== 0) return current;
               const target =
                 picker.target === "rituals"

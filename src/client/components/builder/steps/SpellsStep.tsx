@@ -81,6 +81,7 @@ import {
   isChosenFontSpell,
   isFontSpell,
   isPreparedCasterClass,
+  knownSpellRanks,
   normalizeCharacterDraft,
   ordinaryPreparedLimitAt,
   preparedCantripIds,
@@ -89,6 +90,7 @@ import {
   removePreparedCantrip,
   removePreparedCopy,
   removePreparedSpellEverywhere,
+  removeKnownSpellAtRank,
   removeStudiousSpell,
   requiredExtraSkills,
   selectedChoiceOptions,
@@ -207,6 +209,8 @@ export function SpellsStep({ draft, update, derived, context, setStep, openPicke
   const knownCantripCap = cantripLimitFor(classData) ?? repertoire?.cantrips ?? null;
   const preparedCantripCap = cantripPreparedLimitFor(classData);
   const isPreparedCaster = isPreparedCasterClass(classData?.name);
+  const isSpontaneousCaster =
+    !isPreparedCaster && caster.progression !== "none" && caster.progression !== "focus";
   const isAnimist = classData?.name.toLowerCase() === "animist";
   const preparedListLabel = isAnimist
     ? "prepared list"
@@ -253,12 +257,15 @@ export function SpellsStep({ draft, update, derived, context, setStep, openPicke
   const fontLabel = fontChoice ? titleCase(fontChoice) : "Heal or Harm";
   const issues = derived.validation.filter((issue) => issue.step === "spells");
   const knownByRank = new Map<number, Spell[]>();
-  const addRanked = (spell: Spell) => {
-    const list = knownByRank.get(spell.rank) ?? [];
+  const addRanked = (spell: Spell, rank = spell.rank) => {
+    const list = knownByRank.get(rank) ?? [];
     if (!list.some((entry) => entry.id === spell.id)) list.push(spell);
-    knownByRank.set(spell.rank, list);
+    knownByRank.set(rank, list);
   };
-  for (const spell of known) addRanked(spell);
+  for (const spell of known) {
+    const ranks = isSpontaneousCaster ? knownSpellRanks(draft, spell) : [spell.rank];
+    for (const rank of ranks) addRanked(spell, rank);
+  }
   for (const spell of grantedNonFocus) {
     const resolved = context.spells[spell.id];
     if (resolved) addRanked(resolved);
@@ -281,10 +288,13 @@ export function SpellsStep({ draft, update, derived, context, setStep, openPicke
   const removeSpell = (id: string, target: "cantrips" | "known" | "focus" | "rituals" | "innate") =>
     update((current) => {
       const cleared = removePreparedSpellEverywhere(current, id);
+      const knownRanks = { ...cleared.spells.knownRanks };
+      if (target === "known") delete knownRanks[id];
       let next: CharacterDraft = {
         ...cleared,
         spells: {
           ...cleared.spells,
+          knownRanks,
           [target]: cleared.spells[target].filter((s) => s !== id),
         },
       };
@@ -1057,7 +1067,19 @@ export function SpellsStep({ draft, update, derived, context, setStep, openPicke
                         repertoire && chosenSpells.length >= (repertoire.ranks[rank - 1] ?? 0)
                       )
                     }
-                    onClick={() => openPicker({ kind: "spell", rank, target: "known" })}
+                    onClick={() =>
+                      openPicker(
+                        isPreparedCaster
+                          ? { kind: "spell", rank, target: "known" }
+                          : {
+                              kind: "spell",
+                              rank: null,
+                              maxRank: rank,
+                              target: "knownAtRank",
+                              learnRank: rank,
+                            }
+                      )
+                    }
                   >
                     Add spell
                   </Button>
@@ -1137,6 +1159,9 @@ export function SpellsStep({ draft, update, derived, context, setStep, openPicke
                       >
                         <div className="grow">
                           <strong>{spell.name}</strong>
+                          {rank !== spell.rank ? (
+                            <span className="tiny muted"> base rank {spell.rank}</span>
+                          ) : null}
                           {grantedSpell ? <Tag tone="gold">Granted</Tag> : null}
                           <span className="tiny muted">
                             {" "}
@@ -1163,6 +1188,12 @@ export function SpellsStep({ draft, update, derived, context, setStep, openPicke
                                   return parts;
                                 })
                                 .join(", ")}
+                            </span>
+                          ) : null}
+                          {isSpontaneousCaster && knownSpellRanks(draft, spell).length > 1 ? (
+                            <span className="tiny muted">
+                              {" "}
+                              · learned at ranks {knownSpellRanks(draft, spell).join(", ")}
                             </span>
                           ) : null}
                         </div>
@@ -1211,8 +1242,16 @@ export function SpellsStep({ draft, update, derived, context, setStep, openPicke
                           <button
                             type="button"
                             className="icon-btn"
-                            aria-label={`Remove ${spell.name} from spellbook`}
-                            onClick={() => removeSpell(spell.id, "known")}
+                            aria-label={
+                              isSpontaneousCaster
+                                ? `Remove ${spell.name} from rank ${rank}`
+                                : `Remove ${spell.name} from spellbook`
+                            }
+                            onClick={() =>
+                              isSpontaneousCaster
+                                ? update((current) => removeKnownSpellAtRank(current, spell, rank))
+                                : removeSpell(spell.id, "known")
+                            }
                           >
                             <Trash2 size={13} />
                           </button>
