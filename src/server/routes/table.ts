@@ -31,6 +31,7 @@ import {
   serializeToken,
   touchCampaign,
 } from "../serialize";
+import { redactTokenForPlayers } from "../../shared/tokenVisibility";
 import { clamp, now, safeInt, safeString } from "../util";
 import { normalizeAmbientLight, normalizePartyVisionScope } from "../../shared/lighting";
 import { filterInitiativeForPlayers } from "../../shared/initiative";
@@ -186,7 +187,10 @@ export async function registerTableRoutes(app: FastifyInstance): Promise<void> {
       ),
       characters: memberCharacters,
       scenes: scenes.map(role === "player" ? serializeSceneForPlayers : serializeScene),
-      tokens: tokenRows.map((token) => serializeToken(token, token.owner_name ?? undefined)),
+      tokens: tokenRows.map((token) => {
+        const serialized = serializeToken(token, token.owner_name ?? undefined);
+        return role === "player" ? redactTokenForPlayers(serialized) : serialized;
+      }),
       activeSceneId:
         state.active_scene_id && sceneIds.has(state.active_scene_id)
           ? state.active_scene_id

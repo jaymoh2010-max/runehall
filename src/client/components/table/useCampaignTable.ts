@@ -155,7 +155,8 @@ export function useCampaignTable({ initial, campaignId, toast }: UseCampaignTabl
     const socket = connectSocket();
     setConnectionStatus("connecting");
     const leaveCampaignRoom = joinCampaign(campaignId, (ack) => {
-      const result = ack as { ok?: boolean; role?: string } | undefined;
+      const result = ack as { ok?: boolean; role?: string; presence?: PresenceUser[] } | undefined;
+      if (result?.presence) setPresence(result.presence);
       if (!result?.ok) {
         setConnectionStatus("offline");
         toast("Could not join the live table.", "error");

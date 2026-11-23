@@ -661,6 +661,7 @@ export function VttTable({ initial, campaignId, user, isGm, active }: VttTablePr
           {selectedToken && !sheetCharacterId ? (
             <TokenQuickPanel
               token={selectedToken}
+              campaignId={campaignId}
               characters={characters}
               isGm={isGm}
               canManage={isGm || selectedToken.ownerId === user.id}

@@ -27,7 +27,6 @@ import type {
   CharacterContext,
   CharacterDraft,
   CharacterRecord,
-  ConditionRef,
   DerivedCharacter,
   Equipment,
   SaveKey,
@@ -45,6 +44,7 @@ import { rollFormula } from "../../../shared/dice";
 import { castSpell, spellCastOptions, type SpellCastChoice } from "../../../shared/spellcasting";
 import { innateUsesRemaining } from "../../../shared/innate";
 import { api, formatCp } from "../../api";
+import { useConditionOptions } from "../../conditionOptions";
 import { errorMessage, useToasts } from "../../stores";
 
 const CharacterBuilderPage = lazy(() =>
@@ -121,7 +121,7 @@ export function CharacterSheetView({
   const [conditionName, setConditionName] = useState("");
   const [conditionValue, setConditionValue] = useState("");
   const [conditionDuration, setConditionDuration] = useState("");
-  const [conditions, setConditions] = useState<ConditionRef[]>([]);
+  const conditions = useConditionOptions();
   const [actions, setActions] = useState<ActionRef[]>([]);
   const [actionQuery, setActionQuery] = useState("");
   const [actionCategory, setActionCategory] = useState("all");
@@ -241,12 +241,6 @@ export function CharacterSheetView({
       cancelled = true;
     };
   }, [actions.length, tab]);
-
-  useEffect(() => {
-    void api<{ items: ConditionRef[] }>("/api/compendium/conditions")
-      .then((result) => setConditions(result.items))
-      .catch(() => setConditions([]));
-  }, []);
 
   useEffect(() => {
     const campaignId = character?.campaignId;

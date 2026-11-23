@@ -19,11 +19,13 @@ Four campaign sections:
 
 ### Table
 
-- Scene maps with grid calibration, pan/zoom, token drag and snap.
+- Scene maps with grid calibration, pan/zoom, token drag, snap, and a live movement-distance readout while dragging.
 - Built-in maps plus custom uploads.
 - Fog of war, distance measuring, pointer pings, and player presence.
-- Tokens for party characters, monsters, and custom markers.
-- A compact token panel for HP, AC, conditions, visibility, locks, and sheet access.
+- Tokens for party characters, monsters, and custom markers. Players can upload art for their own token; the GM can upload art for any token.
+- Bestiary creatures get deterministic procedural fallback portraits when no custom art is uploaded.
+- A compact token panel for HP, AC, conditions, visibility, locks, and sheet access. Creature HP/AC is GM-only; linked party characters keep their shared stats.
+- Condition fields autocomplete from the PF2e condition database.
 - **Manual initiative order**: roll the scene or add combatants by hand, type a total, reorder, set the active combatant, and step next/previous. Nothing ticks or resolves automatically.
 - Shared dice roller and persistent chat. Secret GM rolls and roll requests remain available.
 - Compact Pathbuilder-inspired dark/orange interface: slim top bar, dense panels, and orange action accents.

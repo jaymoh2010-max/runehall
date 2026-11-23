@@ -51,10 +51,13 @@ describe("hidden token broadcasts", () => {
     ]);
   });
 
-  it("sends visible token creation to everyone", () => {
+  it("sends visible token creation to the GM and a redacted copy to players", () => {
     const { events, eventsFor } = collect();
     eventsFor.created(token({ hidden: false }));
-    expect(events[0].target).toBe("all");
+    expect(events.map((entry) => entry.target)).toEqual(["gm", "players"]);
+    expect(events[1].payload).toEqual(
+      expect.objectContaining({ id: "tok_hidden", hpCurrent: null, hpMax: null, ac: null })
+    );
   });
 
   it("treats hiding and showing as delete/create for players", () => {
@@ -88,11 +91,11 @@ describe("hidden token broadcasts", () => {
     expect(events.map((entry) => entry.target)).toEqual(["gm", "gm"]);
   });
 
-  it("broadcasts visible updates, moves, and deletions to everyone", () => {
+  it("broadcasts visible updates with GM stats and player redaction, moves, and deletions", () => {
     const { events, eventsFor } = collect();
     eventsFor.updated(token({ hidden: false }), false);
     eventsFor.moved({ tokenId: "tok_hidden", sceneId: "scene_1", x: 200, y: 100 }, false);
     eventsFor.deleted({ tokenId: "tok_hidden", sceneId: "scene_1" }, false);
-    expect(events.map((entry) => entry.target)).toEqual(["all", "all", "all"]);
+    expect(events.map((entry) => entry.target)).toEqual(["gm", "players", "all", "all"]);
   });
 });

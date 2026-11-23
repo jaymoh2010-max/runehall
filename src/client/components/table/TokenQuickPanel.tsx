@@ -1,6 +1,11 @@
-import { useEffect, useState, type InputHTMLAttributes } from "react";
-import { Dices, Eye, EyeOff, Lock, Unlock, Trash2, UserRound, X } from "lucide-react";
+import { useEffect, useRef, useState, type InputHTMLAttributes } from "react";
+import { Dices, Eye, EyeOff, ImagePlus, Lock, Unlock, Trash2, UserRound, X } from "lucide-react";
 import type { CharacterRecord, Token } from "../../../shared/types";
+import { creatureAvatarDataUrl } from "../../../shared/creatureAvatar";
+import { canSeeCreatureStats } from "../../../shared/tokenVisibility";
+import { uploadImage } from "../../api";
+import { useConditionOptions } from "../../conditionOptions";
+import { errorMessage } from "../../stores";
 import { Avatar, Button, IconButton, Tag } from "../ui";
 
 /**
@@ -40,6 +45,7 @@ function TokenInput({
 
 export function TokenQuickPanel({
   token,
+  campaignId,
   characters,
   isGm,
   canManage,
@@ -50,6 +56,7 @@ export function TokenQuickPanel({
   onAddToInitiative,
 }: {
   token: Token;
+  campaignId: string;
   characters: CharacterRecord[];
   isGm: boolean;
   canManage: boolean;
@@ -60,11 +67,20 @@ export function TokenQuickPanel({
   onAddToInitiative: () => void;
 }) {
   const [condition, setCondition] = useState("");
+  const [imageBusy, setImageBusy] = useState(false);
+  const [imageError, setImageError] = useState("");
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const conditions = useConditionOptions();
   const character = token.characterId
     ? (characters.find((entry) => entry.id === token.characterId) ?? null)
     : null;
   const maxHp = token.hpMax;
   const currentHp = token.hpCurrent ?? maxHp ?? 0;
+  const showVitals = canSeeCreatureStats(token, isGm);
+  const avatarSrc =
+    token.imageUrl ??
+    character?.summary?.portraitUrl ??
+    (token.characterId ? null : creatureAvatarDataUrl(token.name, token.monsterId ?? token.name));
 
   const setHp = (value: number) => {
     const next =
@@ -102,10 +118,24 @@ export function TokenQuickPanel({
 
   const numberOrNull = (value: string) => (value === "" ? null : Number(value) || 0);
 
+  const uploadArt = async (file: File | null | undefined) => {
+    if (!file) return;
+    setImageBusy(true);
+    setImageError("");
+    try {
+      const result = await uploadImage(file, campaignId);
+      onUpdate({ imageUrl: result.url });
+    } catch (error) {
+      setImageError(errorMessage(error));
+    } finally {
+      setImageBusy(false);
+    }
+  };
+
   return (
     <aside className="core-token-panel" aria-label={`${token.name} token details`}>
       <div className="core-token-head">
-        <Avatar name={token.name} src={token.imageUrl} size={40} />
+        <Avatar name={token.name} src={avatarSrc} size={40} />
         <div className="grow">
           <strong>{token.name}</strong>
           <span className="tiny muted">
@@ -121,39 +151,41 @@ export function TokenQuickPanel({
         </IconButton>
       </div>
 
-      <div className="core-token-stats">
-        <div className="core-token-hp">
-          <span className="tiny muted">Hit points</span>
-          <div className="core-hp-row">
-            <Button size="sm" variant="ghost" onClick={() => setHp(currentHp - 5)}>
-              −5
-            </Button>
-            <TokenInput
-              type="number"
-              aria-label="Current hit points"
-              value={String(currentHp)}
-              onCommit={(value) => setHp(Number(value) || 0)}
-            />
-            <span className="muted">/ {maxHp ?? "—"}</span>
-            <Button size="sm" variant="ghost" onClick={() => setHp(currentHp + 5)}>
-              +5
-            </Button>
+      {showVitals ? (
+        <div className="core-token-stats">
+          <div className="core-token-hp">
+            <span className="tiny muted">Hit points</span>
+            <div className="core-hp-row">
+              <Button size="sm" variant="ghost" onClick={() => setHp(currentHp - 5)}>
+                −5
+              </Button>
+              <TokenInput
+                type="number"
+                aria-label="Current hit points"
+                value={String(currentHp)}
+                onCommit={(value) => setHp(Number(value) || 0)}
+              />
+              <span className="muted">/ {maxHp ?? "—"}</span>
+              <Button size="sm" variant="ghost" onClick={() => setHp(currentHp + 5)}>
+                +5
+              </Button>
+            </div>
+          </div>
+          <div className="core-token-ac">
+            <span className="tiny muted">AC</span>
+            {isGm ? (
+              <TokenInput
+                type="number"
+                aria-label="Armor class"
+                value={token.ac === null ? "" : String(token.ac)}
+                onCommit={(value) => onUpdate({ ac: value === "" ? null : Number(value) || 0 })}
+              />
+            ) : (
+              <strong>{token.ac ?? "—"}</strong>
+            )}
           </div>
         </div>
-        <div className="core-token-ac">
-          <span className="tiny muted">AC</span>
-          {isGm ? (
-            <TokenInput
-              type="number"
-              aria-label="Armor class"
-              value={token.ac === null ? "" : String(token.ac)}
-              onCommit={(value) => onUpdate({ ac: value === "" ? null : Number(value) || 0 })}
-            />
-          ) : (
-            <strong>{token.ac ?? "—"}</strong>
-          )}
-        </div>
-      </div>
+      ) : null}
 
       <div className="core-token-conditions">
         <span className="tiny muted">Conditions</span>
@@ -202,17 +234,59 @@ export function TokenQuickPanel({
             }}
           >
             <input
+              list="token-condition-options"
               value={condition}
               placeholder="Add condition"
               aria-label="Add condition"
               onChange={(event) => setCondition(event.target.value)}
             />
+            <datalist id="token-condition-options">
+              {conditions.map((entry) => (
+                <option key={entry.id} value={entry.name} />
+              ))}
+            </datalist>
             <Button size="sm" type="submit" variant="secondary">
               Add
             </Button>
           </form>
         ) : null}
       </div>
+
+      {canManage ? (
+        <div className="core-token-art">
+          <input
+            ref={imageInputRef}
+            type="file"
+            accept="image/*"
+            hidden
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              event.target.value = "";
+              void uploadArt(file);
+            }}
+          />
+          <Button
+            size="sm"
+            variant="secondary"
+            icon={<ImagePlus size={14} />}
+            loading={imageBusy}
+            onClick={() => imageInputRef.current?.click()}
+          >
+            Upload image
+          </Button>
+          {token.imageUrl ? (
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={imageBusy}
+              onClick={() => onUpdate({ imageUrl: null })}
+            >
+              Default art
+            </Button>
+          ) : null}
+          {imageError ? <span className="core-token-error">{imageError}</span> : null}
+        </div>
+      ) : null}
 
       {isGm ? (
         <details className="core-token-edit">

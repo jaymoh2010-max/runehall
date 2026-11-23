@@ -20,6 +20,8 @@ import type {
   WallKind,
 } from "../../../shared/types";
 import type { PropPreset } from "../../../shared/props";
+import { canSeeCreatureStats } from "../../../shared/tokenVisibility";
+import { creatureAvatarDataUrl } from "../../../shared/creatureAvatar";
 import { measureGridDistance } from "../../../shared/measurement";
 import { blockingPropForMove } from "../../../shared/collision";
 import { findPathAroundProps } from "../../../shared/pathfinding";
@@ -139,6 +141,8 @@ export function SceneCanvas({
     tokenId: string;
     positions: Record<string, { x: number; y: number }>;
     paths: Record<string, DragPath>;
+    feet: number;
+    squares: number;
   } | null>(null);
   const [panning, setPanning] = useState<{
     startX: number;
@@ -851,7 +855,6 @@ export function SceneCanvas({
     if (!selectedTokenIds.includes(token.id)) onSelectToken(token.id);
     if (event.button !== 0) return;
     if (!isGm && (token.ownerId !== userId || token.locked)) return;
-    const point = scenePoint(event.clientX, event.clientY);
     const movingIds = new Set(selectedTokenIds);
     movingIds.add(token.id);
     if (token.groupId) {
@@ -860,7 +863,7 @@ export function SceneCanvas({
       }
     }
     const positions: Record<string, { x: number; y: number }> = {
-      [token.id]: { x: point.x, y: point.y },
+      [token.id]: { x: token.x, y: token.y },
     };
     for (const id of movingIds) {
       const member = tokens.find((entry) => entry.id === id);
@@ -869,7 +872,7 @@ export function SceneCanvas({
       positions[id] = { x: member.x, y: member.y };
     }
     dragTarget.current = null;
-    setDragging({ tokenId: token.id, positions, paths: {} });
+    setDragging({ tokenId: token.id, positions, paths: {}, feet: 0, squares: 0 });
     (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
   };
 
@@ -890,6 +893,7 @@ export function SceneCanvas({
     dragTarget.current = { tokenId: token.id, x: nextX, y: nextY };
     const dx = nextX - token.x;
     const dy = nextY - token.y;
+    const distance = measureGridDistance(dx, dy, scene.gridSize);
     const members = Object.keys(dragging.positions)
       .map((id) => tokens.find((entry) => entry.id === id))
       .filter((entry): entry is Token => Boolean(entry));
@@ -950,7 +954,13 @@ export function SceneCanvas({
         unreachable: result.unreachable,
       };
     }
-    setDragging({ tokenId: token.id, positions, paths });
+    setDragging({
+      tokenId: token.id,
+      positions,
+      paths,
+      feet: distance.feet,
+      squares: distance.squares,
+    });
   };
 
   const onTokenPointerUp = (event: ReactPointerEvent<HTMLDivElement>, token: Token) => {
@@ -1083,6 +1093,10 @@ export function SceneCanvas({
   const activePathLabel = activePath
     ? `${activePath.feet} ft${activePath.reachedGoal ? "" : activePath.unreachable ? " · no path" : " · speed limit"}`
     : null;
+  const draggedToken = dragging
+    ? (tokens.find((token) => token.id === dragging.tokenId) ?? null)
+    : null;
+  const dragEnd = dragging && draggedToken ? dragging.positions[dragging.tokenId] : null;
 
   return (
     <div
@@ -1160,9 +1174,13 @@ export function SceneCanvas({
           const size = token.size * scene.gridSize;
           const position = dragPosition(token);
           const portrait =
-            token.imageUrl || (token.characterId ? portraitMap.get(token.characterId) : null);
+            token.imageUrl ||
+            (token.characterId
+              ? portraitMap.get(token.characterId)
+              : creatureAvatarDataUrl(token.name, token.monsterId ?? token.name));
           const canDrag = isGm || (token.ownerId === userId && !token.locked);
           const isSelected = selectedTokenIds.includes(token.id) || selectedTokenId === token.id;
+          const showCreatureStats = canSeeCreatureStats(token, isGm);
           const character = token.characterId ? characterMap.get(token.characterId) : null;
           const summary = character?.summary;
           const conditions = token.conditions
@@ -1190,10 +1208,10 @@ export function SceneCanvas({
               ? `${cover.summary} vs. ${coverObserver?.name ?? "observer"}`
               : null;
           const tokenMeta = [
-            token.hpMax !== null && token.hpCurrent !== null
+            showCreatureStats && token.hpMax !== null && token.hpCurrent !== null
               ? `HP ${token.hpCurrent}/${token.hpMax}`
               : "",
-            token.ac !== null ? `AC ${token.ac}` : "",
+            showCreatureStats && token.ac !== null ? `AC ${token.ac}` : "",
             conditions ? `Conditions: ${conditions}` : "",
             coverSummary ?? "",
           ].filter(Boolean);
@@ -1254,7 +1272,7 @@ export function SceneCanvas({
                 tabIndex={0}
                 role="button"
                 aria-label={`${token.name}${token.characterId ? ", character token" : ""}${
-                  token.hpMax !== null && token.hpCurrent !== null
+                  showCreatureStats && token.hpMax !== null && token.hpCurrent !== null
                     ? `, ${token.hpCurrent} of ${token.hpMax} hit points`
                     : ""
                 }${isGm ? ", right-click to edit" : ""}`}
@@ -1270,7 +1288,7 @@ export function SceneCanvas({
                   </span>
                 )}
                 <span className="scene-token-name">{token.name}</span>
-                {token.hpMax !== null && token.hpCurrent !== null ? (
+                {showCreatureStats && token.hpMax !== null && token.hpCurrent !== null ? (
                   <span className="token-hp">
                     <span
                       style={{
@@ -1430,6 +1448,18 @@ export function SceneCanvas({
             style={{ left: activePathEnd.x, top: activePathEnd.y - 8 }}
           >
             {activePathLabel}
+          </div>
+        ) : null}
+        {dragging && draggedToken && dragEnd && dragging.feet > 0 ? (
+          <div
+            className="measure-label drag-label"
+            title="Distance moved since you started this drag. PF2e diagonals alternate 5 ft and 10 ft."
+            style={{
+              left: dragEnd.x,
+              top: dragEnd.y - (draggedToken.size * scene.gridSize) / 2 - 4,
+            }}
+          >
+            Moved {dragging.feet} ft · {dragging.squares} sq
           </div>
         ) : null}
       </div>

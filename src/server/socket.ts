@@ -493,7 +493,7 @@ export function registerSocketServer(io: TypedServer): void {
       socket.data.campaigns.add(campaignId);
       addPresence(socket, campaignId, role);
       emitPresence(io, campaignId);
-      ack?.({ ok: true, role });
+      ack?.({ ok: true, role, presence: presenceList(campaignId) });
     });
 
     on("campaign:leave", ({ campaignId }) => {
@@ -560,8 +560,6 @@ export function registerSocketServer(io: TypedServer): void {
       };
       if (role === "gm") {
         if (token.name !== undefined) add("name", safeString(token.name, row.name, 80));
-        if (token.imageUrl !== undefined)
-          add("image_url", token.imageUrl ? safeString(token.imageUrl, "", 500) : null);
         if (token.x !== undefined) add("x", clamp(Number(token.x) || 0, 0, scene.width));
         if (token.y !== undefined) add("y", clamp(Number(token.y) || 0, 0, scene.height));
         if (token.size !== undefined) add("size", clamp(safeInt(token.size, row.size, 1, 6), 1, 6));
@@ -619,6 +617,20 @@ export function registerSocketServer(io: TypedServer): void {
           "hp_current",
           token.hpCurrent === null ? null : safeInt(token.hpCurrent, 0, -1_000_000, 1_000_000)
         );
+      }
+      if (token.imageUrl !== undefined) {
+        if (token.imageUrl === null || token.imageUrl === "") {
+          add("image_url", null);
+        } else {
+          const imageUrl = safeString(token.imageUrl, "", 500);
+          // Players may point a token at an uploaded asset, but arbitrary
+          // remote URLs can leak the table's IPs to a third party.
+          if (imageUrl && (role === "gm" || imageUrl.startsWith("/uploads/"))) {
+            add("image_url", imageUrl);
+          } else if (role !== "gm") {
+            sendError(socket, "Use the Upload image button for token art.");
+          }
+        }
       }
       if (token.conditions !== undefined) {
         add("conditions", JSON.stringify(normalizeTokenConditions(token.conditions)));
