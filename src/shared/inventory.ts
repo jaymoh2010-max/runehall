@@ -20,6 +20,18 @@ export function cpToCurrency(copper: number): CharacterCurrency {
   };
 }
 
+export function formatCopper(cp: number): string {
+  const safe = Math.max(0, Math.round(Number(cp) || 0));
+  const gp = Math.floor(safe / 100);
+  const sp = Math.floor((safe % 100) / 10);
+  const copper = safe % 10;
+  const parts: string[] = [];
+  if (gp) parts.push(`${gp.toLocaleString("en-US")} gp`);
+  if (sp) parts.push(`${sp} sp`);
+  if (copper || !parts.length) parts.push(`${copper} cp`);
+  return parts.join(" ");
+}
+
 export function spendCurrency(
   currency: CharacterCurrency,
   amountCp: number

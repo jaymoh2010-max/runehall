@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ArrowDown,
   ArrowUp,
@@ -13,6 +13,40 @@ import {
 } from "lucide-react";
 import type { InitiativeEntry } from "../../../shared/types";
 import { Button, IconButton } from "../ui";
+
+function InitiativeScore({
+  entry,
+  onSetValue,
+}: {
+  entry: InitiativeEntry;
+  onSetValue: (entryId: string, value: number) => void;
+}) {
+  const [value, setValue] = useState(String(entry.initiative));
+
+  useEffect(() => {
+    setValue(String(entry.initiative));
+  }, [entry.initiative]);
+
+  const commit = () => {
+    const parsed = Math.round(Number(value) || 0);
+    setValue(String(parsed));
+    if (parsed !== entry.initiative) onSetValue(entry.id, parsed);
+  };
+
+  return (
+    <input
+      className="core-initiative-score"
+      type="number"
+      value={value}
+      aria-label={`Initiative for ${entry.name}`}
+      onChange={(event) => setValue(event.target.value)}
+      onBlur={commit}
+      onKeyDown={(event) => {
+        if (event.key === "Enter") event.currentTarget.blur();
+      }}
+    />
+  );
+}
 
 export function InitiativeBar({
   entries,
@@ -87,13 +121,7 @@ export function InitiativeBar({
               <span className="initiative-color" style={{ background: entry.color }} />
               <span className="initiative-name">{entry.name}</span>
               {isGm ? (
-                <input
-                  className="core-initiative-score"
-                  type="number"
-                  value={entry.initiative}
-                  aria-label={`Initiative for ${entry.name}`}
-                  onChange={(event) => onSetValue(entry.id, Number(event.target.value) || 0)}
-                />
+                <InitiativeScore entry={entry} onSetValue={onSetValue} />
               ) : (
                 <strong>{entry.initiative}</strong>
               )}

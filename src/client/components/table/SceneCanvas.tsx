@@ -47,14 +47,6 @@ interface DragPath {
   feet: number;
   reachedGoal: boolean;
   unreachable: boolean;
-  budget: number | null;
-}
-
-interface ActiveMovement {
-  tokenId: string;
-  speed: number | null;
-  movementUsed: number;
-  diagonalSteps: number;
 }
 
 interface SceneCanvasProps {
@@ -65,8 +57,6 @@ interface SceneCanvasProps {
   userId: string;
   selectedTokenId: string | null;
   selectedTokenIds: string[];
-  /** Movement tracker for the combatant whose turn is active, if any. */
-  activeMovement: ActiveMovement | null;
   onSelectToken: (id: string | null, additive?: boolean) => void;
   onSelectTokens: (ids: string[], additive?: boolean) => void;
   onOpenCharacter: (id: string) => void;
@@ -109,7 +99,6 @@ export function SceneCanvas({
   userId,
   selectedTokenId,
   selectedTokenIds,
-  activeMovement,
   onSelectToken,
   onSelectTokens,
   onOpenCharacter,
@@ -852,12 +841,6 @@ export function SceneCanvas({
     }
   };
 
-  const movementBudgetFor = (member: Token): number | null => {
-    if (isGm || !activeMovement || activeMovement.tokenId !== member.id) return null;
-    if (activeMovement.speed === null) return null;
-    return Math.max(0, activeMovement.speed - Math.max(0, activeMovement.movementUsed));
-  };
-
   const onTokenPointerDown = (event: ReactPointerEvent<HTMLDivElement>, token: Token) => {
     event.stopPropagation();
     const additive = event.shiftKey || event.ctrlKey || event.metaKey;
@@ -935,7 +918,6 @@ export function SceneCanvas({
         ? blockingWallForMove(scene.walls, { x: member.x, y: member.y }, target)
         : null;
       if (!blockedProp && !blockedWall) continue;
-      const budget = movementBudgetFor(member);
       const result = findPathAroundProps({
         props,
         propCollision: scene.propCollision,
@@ -949,8 +931,6 @@ export function SceneCanvas({
         tokenSize: member.size,
         from: { x: member.x, y: member.y },
         to: target,
-        budget,
-        diagonalStart: activeMovement?.tokenId === member.id ? activeMovement.diagonalSteps : 0,
       });
       if (!result.points.length) {
         positions[member.id] = { x: member.x, y: member.y };
@@ -959,7 +939,6 @@ export function SceneCanvas({
           feet: 0,
           reachedGoal: false,
           unreachable: result.unreachable,
-          budget,
         };
         continue;
       }
@@ -969,7 +948,6 @@ export function SceneCanvas({
         feet: result.feet,
         reachedGoal: result.reachedGoal,
         unreachable: result.unreachable,
-        budget,
       };
     }
     setDragging({ tokenId: token.id, positions, paths });
@@ -1447,9 +1425,7 @@ export function SceneCanvas({
             title={
               activePath.reachedGoal
                 ? "Shortest path around blocking props and walls."
-                : activePath.unreachable
-                  ? "The destination cannot be reached around the blocking props and walls."
-                  : `The rest of the path would exceed the ${activePath.budget ?? 0} ft of movement left this turn.`
+                : "The destination cannot be reached around the blocking props and walls."
             }
             style={{ left: activePathEnd.x, top: activePathEnd.y - 8 }}
           >

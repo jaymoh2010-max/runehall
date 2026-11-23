@@ -2120,12 +2120,6 @@ export interface ClientToServerEvents {
     turnIndex?: number;
   }) => void;
   "initiative:next": (payload: { campaignId: string; direction?: 1 | -1 }) => void;
-  "initiative:action": (payload: {
-    campaignId: string;
-    entryId: string;
-    actions?: number;
-    reactions?: number;
-  }) => void;
   "initiative:add": (payload: { campaignId: string; tokenId: string; value?: number }) => void;
   "initiative:reroll": (payload: { campaignId: string; entryId: string }) => void;
   "initiative:remove": (payload: { campaignId: string; entryId: string }) => void;

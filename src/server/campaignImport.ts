@@ -206,6 +206,7 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
   const settlementLevel = normalizeSettlementLevel(campaignData.settlementLevel);
   const freeArchetype = campaignData.freeArchetype === true;
   const automaticBonusProgression = campaignData.automaticBonusProgression === true;
+  const playerItemGrant = campaignData.playerItemGrant === true;
   const shopMode = normalizeShopStockMode(campaignData.shopMode);
   const worldDate = normalizeGolarionDate(campaignData.worldDate);
 
@@ -255,8 +256,13 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
       ts
     );
     db.prepare(
-      "UPDATE campaigns SET free_archetype = ?, automatic_bonus_progression = ? WHERE id = ?"
-    ).run(freeArchetype ? 1 : 0, automaticBonusProgression ? 1 : 0, campaignId);
+      "UPDATE campaigns SET free_archetype = ?, automatic_bonus_progression = ?, player_item_grant = ? WHERE id = ?"
+    ).run(
+      freeArchetype ? 1 : 0,
+      automaticBonusProgression ? 1 : 0,
+      playerItemGrant ? 1 : 0,
+      campaignId
+    );
     db.prepare(
       "INSERT INTO campaign_members (campaign_id, user_id, role, joined_at) VALUES (?, ?, 'gm', ?)"
     ).run(campaignId, userId, ts);

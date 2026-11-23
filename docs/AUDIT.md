@@ -20,10 +20,29 @@ All current gates pass:
 | --- | --- |
 | `npm run check` | Pass |
 | `npm run smoke` | Pass |
-| `npm run e2e` | 26 passed, 23 skipped |
+| `npm run e2e` | 26 passed, 0 skipped |
 | `npm run simulate:campaign` | 78 passed, 0 failed |
 
-The 23 skipped browser tests cover intentionally removed or parked automation (turn effects, shops, travel, sessions, request flows, and old sheet widgets). They are now test-suite debt rather than active coverage.
+The 23 skipped browser tests were removed from the serial suite; the active suite now covers only the current manual-first product.
+
+## Remediation status
+
+The follow-up `audit-fixes` pass addressed the P0 findings and the targeted P1/P2 items:
+
+- Read-only sheets hide or disable HP, conditions, pips, gear actions, spell casts, details editing, and the builder.
+- Sheet saves are serialized through a queue that keeps the latest draft and resolves waiting callers; Cast waits for the save before posting chat.
+- HP/focus/slot pips apply each click to the current draft, so rapid changes are not dropped.
+- Initiative score inputs keep local text and commit on blur or Enter.
+- Granted spells are merged into the Spells tab; innate spells receive their remaining-use count and stay visible beside cantrips.
+- Item grants bump the campaign revision, campaign import/export preserves `playerItemGrant`, and campaign settings updates write an audit entry.
+- The token panel can remove conditions, edit value/duration, and (for the GM) change name, art, and size; players no longer see the GM-only initiative action.
+- `My sheet` prefers the selected token's character and offers a picker when the user owns several characters.
+- Socket refreshes are silent, unsaved details survive unrelated saves, sheet rolls have a DC/secret control, and deleting from the embedded builder returns to the table.
+- Dead turn automation, the `initiative:action` socket event, active-movement UI code, and the `.core-sheet-drawer` CSS were removed.
+- Legacy campaign tab URLs now redirect to the table; XP/advancement settings moved behind an advanced disclosure and settlement level left the core Settings page.
+- Action filters expose `aria-pressed`, action lists show a count with progressive loading, item-price errors use the shared currency formatter, and the sheet restores the document title on close.
+
+Intentional follow-ups: token owner and temp-HP editing were not added because tokens do not store temp HP; legacy campaign render blocks remain bundled but unreachable; `npm audit` stays a manual periodic check (`npm audit --omit=dev` currently reports 0 vulnerabilities).
 
 ---
 

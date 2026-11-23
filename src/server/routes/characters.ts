@@ -33,6 +33,7 @@ import {
   addCurrency,
   addItemToDraft,
   currencyToCp,
+  formatCopper,
   removeItemQuantity,
   spendCurrency,
 } from "../../shared/inventory";
@@ -1033,9 +1034,9 @@ export async function registerCharacterRoutes(app: FastifyInstance): Promise<voi
     if (mode === "buy") {
       const currency = spendCurrency(draft.currency, costCp);
       if (!currency) {
-        return reply
-          .code(400)
-          .send({ error: `Not enough coins for ${quantity}× ${item.name} (${costCp} cp).` });
+        return reply.code(400).send({
+          error: `Not enough coins for ${quantity}× ${item.name} (${formatCopper(costCp)}).`,
+        });
       }
       draft.currency = currency;
     }
@@ -1051,6 +1052,7 @@ export async function registerCharacterRoutes(app: FastifyInstance): Promise<voi
       "UPDATE characters SET data = ?, summary = ?, updated_at = ?, revision = revision + 1 WHERE id = ?"
     ).run(JSON.stringify(nextDraft), JSON.stringify(summary), now(), id);
     syncCharacterDraft(app, row, nextDraft, summary);
+    if (row.campaign_id) touchCampaign(row.campaign_id);
     const updated = getCharacter(id)!;
     if (row.campaign_id) {
       app.broadcastCampaign(row.campaign_id, "character:updated", {

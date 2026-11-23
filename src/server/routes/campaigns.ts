@@ -1424,6 +1424,18 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
     const updated = getCampaign(id)!;
     if (variantsChanged) refreshVariantSummaries(app, updated);
     broadcastCampaignSummary(app, updated);
+    logAudit({
+      action: "campaign.update",
+      actor: request.user,
+      targetType: "campaign",
+      targetId: id,
+      detail: `${name} (${ruleset}/${xpMode}/${advancementSpeed}; free archetype ${
+        freeArchetype ? "on" : "off"
+      }; automatic bonus progression ${automaticBonusProgression ? "on" : "off"}; player gear grant ${
+        playerItemGrant ? "on" : "off"
+      })`,
+      request,
+    });
     return reply.send({
       campaign: serializeCampaignSummary(updated, "gm", campaignCounts(updated)),
     });

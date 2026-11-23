@@ -41,6 +41,8 @@ export function CoreToolbar({
   expanded,
   onFullscreen,
   myCharacterId,
+  myCharacters,
+  onMyCharacterChange,
   onOpenMySheet,
 }: {
   isGm: boolean;
@@ -66,6 +68,8 @@ export function CoreToolbar({
   expanded: boolean;
   onFullscreen: () => void;
   myCharacterId: string | null;
+  myCharacters: { id: string; name: string }[];
+  onMyCharacterChange: (characterId: string) => void;
   onOpenMySheet: () => void;
 }) {
   return (
@@ -159,6 +163,21 @@ export function CoreToolbar({
       </div>
 
       <div className="vtt-toolbar-right">
+        {myCharacters.length > 1 ? (
+          <Select
+            value={myCharacterId ?? ""}
+            onChange={(event) => onMyCharacterChange(event.target.value)}
+            className="core-sheet-picker"
+            aria-label="Character for My sheet"
+            title="Choose which of your characters to open"
+          >
+            {myCharacters.map((character) => (
+              <option key={character.id} value={character.id}>
+                {character.name}
+              </option>
+            ))}
+          </Select>
+        ) : null}
         <Button
           size="sm"
           variant="secondary"

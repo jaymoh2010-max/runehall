@@ -2062,6 +2062,11 @@ async function runCampaignA(gm: Account, players: Account[]): Promise<void> {
           status: "active",
         },
       });
+      await api(`/api/campaigns/${campaignId}`, {
+        method: "PATCH",
+        cookie: gm.cookie,
+        body: { playerItemGrant: true },
+      });
       const exported = await api(`/api/campaigns/${campaignId}/export`, { cookie: gm.cookie });
       const payload = exported.payload;
       assertEqual(payload.format, "runehall-campaign", "Export format");
@@ -2085,6 +2090,7 @@ async function runCampaignA(gm: Account, players: Account[]): Promise<void> {
       );
       assertEqual(payload.campaign.worldDate.year, 4726, "Export world year");
       assertEqual(payload.campaign.xpMode, "xp", "Export XP mode");
+      assertEqual(payload.campaign.playerItemGrant, true, "Export player item grant");
       assert(payload.scenes.length >= 1, "Export did not include scenes");
       assert(payload.journal.length >= 2, "Export did not include journal entries");
       assert(payload.loot.length >= parcelCount, "Export did not include loot parcels");
@@ -2136,6 +2142,7 @@ async function runCampaignA(gm: Account, players: Account[]): Promise<void> {
       );
       assertEqual(importedCampaign.worldDate.year, 4726, "Imported world year");
       assertEqual(importedCampaign.xpMode, "xp", "Imported XP mode");
+      assertEqual(importedCampaign.playerItemGrant, true, "Imported player item grant");
       assertEqual(importedCampaign.shopMode, "stocked", "Imported shop mode");
       const importedShop = await api(`/api/campaigns/${importedCampaign.id}/shop`, {
         cookie: gm.cookie,

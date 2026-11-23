@@ -187,24 +187,7 @@ export function CampaignPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const rawTab = searchParams.get("tab");
   const requestedTab: Tab =
-    rawTab === "overview" ||
-    rawTab === "session-zero" ||
-    rawTab === "party" ||
-    rawTab === "people" ||
-    rawTab === "arc" ||
-    rawTab === "travel" ||
-    rawTab === "clocks" ||
-    rawTab === "sessions" ||
-    rawTab === "encounters" ||
-    rawTab === "loot" ||
-    rawTab === "npcs" ||
-    rawTab === "assets" ||
-    rawTab === "journal" ||
-    rawTab === "notes" ||
-    rawTab === "gm-screen" ||
-    rawTab === "settings"
-      ? rawTab
-      : "table";
+    rawTab === "party" || rawTab === "journal" || rawTab === "settings" ? rawTab : "table";
   const [campaign, setCampaign] = useState<CampaignSummary | null>(null);
   const [prepOpen, setPrepOpen] = useState(false);
   const prepRef = useRef<HTMLDivElement>(null);
@@ -266,7 +249,6 @@ export function CampaignPage() {
   const [settingsXpMode, setSettingsXpMode] = useState<XpMode>("milestone");
   const [settingsAdvancementSpeed, setSettingsAdvancementSpeed] =
     useState<AdvancementSpeed>("medium");
-  const [settingsSettlementLevel, setSettingsSettlementLevel] = useState("1");
   const [settingsFreeArchetype, setSettingsFreeArchetype] = useState(false);
   const [settingsAutomaticBonusProgression, setSettingsAutomaticBonusProgression] = useState(false);
   const [settingsPlayerItemGrant, setSettingsPlayerItemGrant] = useState(false);
@@ -306,16 +288,7 @@ export function CampaignPage() {
       : xpKind === "accomplishment"
         ? ACCOMPLISHMENT_XP[xpAccomplishmentTier]
         : Math.max(0, Math.floor(Number(xpAmount) || 0));
-  const tab: Tab =
-    (requestedTab === "encounters" ||
-      requestedTab === "loot" ||
-      requestedTab === "npcs" ||
-      requestedTab === "assets" ||
-      requestedTab === "gm-screen") &&
-    campaign &&
-    !isGm
-      ? "table"
-      : requestedTab;
+  const tab = requestedTab as Tab;
   const visibleTabs = isGm ? TABS : TABS.filter((entry) => !entry.gmOnly);
   const primaryTabs = visibleTabs.filter((entry) => PRIMARY_TAB_IDS.has(entry.id));
   const prepTabs = visibleTabs.filter(
@@ -423,7 +396,6 @@ export function CampaignPage() {
       setSettingsRuleset(details.campaign.ruleset);
       setSettingsXpMode(details.campaign.xpMode);
       setSettingsAdvancementSpeed(details.campaign.advancementSpeed);
-      setSettingsSettlementLevel(String(details.campaign.settlementLevel));
       setSettingsFreeArchetype(details.campaign.freeArchetype);
       setSettingsAutomaticBonusProgression(details.campaign.automaticBonusProgression);
       setSettingsPlayerItemGrant(details.campaign.playerItemGrant);
@@ -889,7 +861,6 @@ export function CampaignPage() {
           ruleset: settingsRuleset,
           xpMode: settingsXpMode,
           advancementSpeed: settingsAdvancementSpeed,
-          settlementLevel: Number(settingsSettlementLevel) || 0,
           freeArchetype: settingsFreeArchetype,
           automaticBonusProgression: settingsAutomaticBonusProgression,
           playerItemGrant: settingsPlayerItemGrant,
@@ -2207,51 +2178,54 @@ export function CampaignPage() {
                     ))}
                   </Select>
                 </Field>
-                <Field
-                  label="Advancement"
-                  hint={
-                    isGm
-                      ? XP_MODE_OPTIONS.find((option) => option.value === settingsXpMode)
-                          ?.description
-                      : "Set by the campaign GM. It controls whether encounter XP budgets and awards are shown."
-                  }
-                >
-                  <Select
-                    value={settingsXpMode}
-                    onChange={(event) => setSettingsXpMode(event.target.value as XpMode)}
-                    disabled={!isGm}
-                  >
-                    {XP_MODE_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </Select>
-                </Field>
-                <Field
-                  label="Advancement speed"
-                  hint={
-                    isGm
-                      ? ADVANCEMENT_SPEED_OPTIONS.find(
-                          (option) => option.value === settingsAdvancementSpeed
-                        )?.description
-                      : "Set by the campaign GM. It controls how much XP each level requires."
-                  }
-                >
-                  <Select
-                    value={settingsAdvancementSpeed}
-                    onChange={(event) =>
-                      setSettingsAdvancementSpeed(event.target.value as AdvancementSpeed)
+                <details className="settings-advanced">
+                  <summary>Advanced: XP and advancement</summary>
+                  <Field
+                    label="Advancement"
+                    hint={
+                      isGm
+                        ? XP_MODE_OPTIONS.find((option) => option.value === settingsXpMode)
+                            ?.description
+                        : "Set by the campaign GM. It controls whether encounter XP budgets and awards are shown."
                     }
-                    disabled={!isGm}
                   >
-                    {ADVANCEMENT_SPEED_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </Select>
-                </Field>
+                    <Select
+                      value={settingsXpMode}
+                      onChange={(event) => setSettingsXpMode(event.target.value as XpMode)}
+                      disabled={!isGm}
+                    >
+                      {XP_MODE_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </Select>
+                  </Field>
+                  <Field
+                    label="Advancement speed"
+                    hint={
+                      isGm
+                        ? ADVANCEMENT_SPEED_OPTIONS.find(
+                            (option) => option.value === settingsAdvancementSpeed
+                          )?.description
+                        : "Set by the campaign GM. It controls how much XP each level requires."
+                    }
+                  >
+                    <Select
+                      value={settingsAdvancementSpeed}
+                      onChange={(event) =>
+                        setSettingsAdvancementSpeed(event.target.value as AdvancementSpeed)
+                      }
+                      disabled={!isGm}
+                    >
+                      {ADVANCEMENT_SPEED_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </Select>
+                  </Field>
+                </details>
                 <div>
                   <Checkbox
                     label="Free Archetype variant"
@@ -2288,23 +2262,6 @@ export function CampaignPage() {
                     The GM can always grant gear.
                   </p>
                 </div>
-                <Field
-                  label="Settlement level"
-                  hint={
-                    isGm
-                      ? "The shop stocks common items of this level or lower. Characters sell gear for half price. Set 0 for a tiny outpost."
-                      : "Set by the campaign GM. It controls which common items the settlement shop stocks."
-                  }
-                >
-                  <Input
-                    type="number"
-                    min={0}
-                    max={25}
-                    value={settingsSettlementLevel}
-                    onChange={(event) => setSettingsSettlementLevel(event.target.value)}
-                    disabled={!isGm}
-                  />
-                </Field>
                 {isGm ? (
                   <Field
                     label="Transfer GM"

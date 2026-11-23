@@ -50,6 +50,23 @@ export function TokenQuickPanel({
     setCondition("");
   };
 
+  const updateCondition = (
+    index: number,
+    patch: { value?: number | null; duration?: number | null }
+  ) => {
+    onUpdate({
+      conditions: token.conditions.map((entry, entryIndex) =>
+        entryIndex === index ? { ...entry, ...patch } : entry
+      ),
+    });
+  };
+
+  const removeCondition = (index: number) => {
+    onUpdate({ conditions: token.conditions.filter((_entry, entryIndex) => entryIndex !== index) });
+  };
+
+  const numberOrNull = (value: string) => (value === "" ? null : Number(value) || 0);
+
   return (
     <aside className="core-token-panel" aria-label={`${token.name} token details`}>
       <div className="core-token-head">
@@ -107,18 +124,46 @@ export function TokenQuickPanel({
 
       <div className="core-token-conditions">
         <span className="tiny muted">Conditions</span>
-        <div className="chip-row">
-          {token.conditions.length ? (
-            token.conditions.map((entry) => (
-              <Tag key={`${entry.name}-${entry.value ?? ""}`} tone="red">
-                {entry.name}
-                {entry.value ? ` ${entry.value}` : ""}
-              </Tag>
-            ))
-          ) : (
-            <span className="tiny muted">None</span>
-          )}
-        </div>
+        {token.conditions.length ? (
+          <div className="core-token-condition-list">
+            {token.conditions.map((entry, index) =>
+              canManage ? (
+                <div className="core-token-condition" key={`${entry.name}-${index}`}>
+                  <span className="core-token-condition-name">{entry.name}</span>
+                  <input
+                    type="number"
+                    value={entry.value ?? ""}
+                    placeholder="Val"
+                    aria-label={`Value for ${entry.name}`}
+                    onChange={(event) =>
+                      updateCondition(index, { value: numberOrNull(event.target.value) })
+                    }
+                  />
+                  <input
+                    type="number"
+                    value={entry.duration ?? ""}
+                    placeholder="Rds"
+                    aria-label={`Duration for ${entry.name}`}
+                    onChange={(event) =>
+                      updateCondition(index, { duration: numberOrNull(event.target.value) })
+                    }
+                  />
+                  <IconButton label={`Remove ${entry.name}`} onClick={() => removeCondition(index)}>
+                    <X size={11} />
+                  </IconButton>
+                </div>
+              ) : (
+                <Tag key={`${entry.name}-${index}`} tone="red">
+                  {entry.name}
+                  {entry.value ? ` ${entry.value}` : ""}
+                  {entry.duration ? ` (${entry.duration}r)` : ""}
+                </Tag>
+              )
+            )}
+          </div>
+        ) : (
+          <span className="tiny muted">None</span>
+        )}
         {canManage ? (
           <form
             className="core-condition-add"
@@ -140,6 +185,41 @@ export function TokenQuickPanel({
         ) : null}
       </div>
 
+      {isGm ? (
+        <details className="core-token-edit">
+          <summary>Edit token</summary>
+          <label>
+            <span>Name</span>
+            <input
+              value={token.name}
+              maxLength={80}
+              onChange={(event) => onUpdate({ name: event.target.value })}
+            />
+          </label>
+          <label>
+            <span>Image URL</span>
+            <input
+              value={token.imageUrl ?? ""}
+              placeholder="https://…"
+              onChange={(event) => onUpdate({ imageUrl: event.target.value || null })}
+            />
+          </label>
+          <label>
+            <span>Size</span>
+            <select
+              value={token.size}
+              onChange={(event) => onUpdate({ size: Number(event.target.value) || 1 })}
+            >
+              {[1, 2, 3, 4].map((size) => (
+                <option key={size} value={size}>
+                  {size}×{size}
+                </option>
+              ))}
+            </select>
+          </label>
+        </details>
+      ) : null}
+
       <div className="core-token-actions">
         {character ? (
           <Button
@@ -151,9 +231,11 @@ export function TokenQuickPanel({
             Open sheet
           </Button>
         ) : null}
-        <Button size="sm" variant="ghost" icon={<Dices size={14} />} onClick={onAddToInitiative}>
-          Add to initiative
-        </Button>
+        {isGm ? (
+          <Button size="sm" variant="ghost" icon={<Dices size={14} />} onClick={onAddToInitiative}>
+            Add to initiative
+          </Button>
+        ) : null}
         {isGm ? (
           <>
             <IconButton
