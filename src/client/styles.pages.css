@@ -11421,6 +11421,16 @@ body.table-fullscreen-active {
   color: var(--pb-muted);
   font-size: 0.67rem;
 }
+.pb-spell-row .pb-amp-note {
+  display: -webkit-box;
+  max-width: 72ch;
+  overflow: hidden;
+  color: var(--pb-orange-bright);
+  font-size: 0.64rem;
+  line-height: 1.35;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
 .pb-tags {
   display: flex;
   flex-wrap: wrap;

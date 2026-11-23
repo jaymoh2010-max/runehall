@@ -540,8 +540,7 @@ export const CLASS_GRANTS: Record<string, ClassGrant> = {
   },
 
   // Psychic conscious minds. The listed 1st-rank spell is an extra repertoire
-  // entry; the psi cantrips are granted cantrips whose amps stay manual until
-  // the focus-point amp workflow lands.
+  // entry; the psi cantrips are granted cantrips and their amps spend focus.
   "cf:1rlBo3LcwIuPDCvz": {
     spells: [
       repertoire("spell:sPHcuLIKj9SDaDAD", "Kinetic Ram"),
@@ -549,7 +548,7 @@ export const CLASS_GRANTS: Record<string, ClassGrant> = {
       focusCantrip("spell:60sgbuMWN0268dB7", "Telekinetic Projectile"),
       focusCantrip("spell:yyz029C9eqfY38PT", "Telekinetic Rend"),
     ],
-    notes: ["Distant Grasp: psi amps and higher-level unique psi cantrips remain manual."],
+    notes: ["Distant Grasp: amps are tracked; higher-level unique psi cantrips remain manual."],
   },
   "cf:rvpTsj9epRuNH3uB": {
     spells: [
@@ -558,7 +557,7 @@ export const CLASS_GRANTS: Record<string, ClassGrant> = {
       focusCantrip("spell:izcxFQFwf3woCnFs", "Guidance"),
       focusCantrip("spell:cNnHV97gPqxJ3Rrr", "Glimpse Weakness"),
     ],
-    notes: ["Infinite Eye: psi amps and higher-level unique psi cantrips remain manual."],
+    notes: ["Infinite Eye: amps are tracked; higher-level unique psi cantrips remain manual."],
   },
   "cf:5tSR0WzMPFn5s3Xs": {
     spells: [
@@ -567,7 +566,7 @@ export const CLASS_GRANTS: Record<string, ClassGrant> = {
       focusCantrip("spell:6DfLZBl8wKIV03Iq", "Ignition"),
       focusCantrip("spell:dhpXpzt7TCm8TbHM", "Thermal Stasis"),
     ],
-    notes: ["Oscillating Wave: psi amps and higher-level unique psi cantrips remain manual."],
+    notes: ["Oscillating Wave: amps are tracked; higher-level unique psi cantrips remain manual."],
   },
   "cf:rdWWlqvxXgfWDaSO": {
     spells: [
@@ -576,7 +575,7 @@ export const CLASS_GRANTS: Record<string, ClassGrant> = {
       focusCantrip("spell:vLzFcIaSXs7YTIqJ", "Message"),
       focusCantrip("spell:lpoWfblSMLcJfxsZ", "Forbidden Thought"),
     ],
-    notes: ["Silent Whisper: psi amps and higher-level unique psi cantrips remain manual."],
+    notes: ["Silent Whisper: amps are tracked; higher-level unique psi cantrips remain manual."],
   },
   "cf:8dAm3ULUqaK4N5a7": {
     spells: [
@@ -585,7 +584,7 @@ export const CLASS_GRANTS: Record<string, ClassGrant> = {
       focusCantrip("spell:TVKNbcgTee19PXZR", "Shield"),
       focusCantrip("spell:sUr5KCpeE6AXfvPp", "Imaginary Weapon"),
     ],
-    notes: ["Tangible Dream: psi amps and higher-level unique psi cantrips remain manual."],
+    notes: ["Tangible Dream: amps are tracked; higher-level unique psi cantrips remain manual."],
   },
   "cf:FaSY47siV1x6CAQp": {
     spells: [
@@ -594,7 +593,7 @@ export const CLASS_GRANTS: Record<string, ClassGrant> = {
       focusCantrip("spell:sX2g6WFSQPNW9jzx", "Warp Step"),
       focusCantrip("spell:WOM9alxiTdp0HEVD", "Distortion Lens"),
     ],
-    notes: ["Unbound Step: psi amps and higher-level unique psi cantrips remain manual."],
+    notes: ["Unbound Step: amps are tracked; higher-level unique psi cantrips remain manual."],
   },
 
   // Necromancer grave spells
@@ -667,7 +666,7 @@ const CLASS_NOTES: Record<string, string[]> = {
     "Prepared animist slots and spontaneous apparition slots are tracked separately; attune apparitions during daily preparations. The primary apparition's vessel focus spell is granted automatically.",
   ],
   psychic: [
-    "Psi cantrips are granted, but amps, their Focus Point costs, and higher-level unique psi cantrips remain manual.",
+    "Psi cantrips and their amps are granted and amp casting spends 1 Focus Point; higher-level unique psi cantrips remain manual.",
   ],
   necromancer: [
     "Thralls and the full grave-spell effects remain manual; the granted grave spells and focus pool are tracked.",

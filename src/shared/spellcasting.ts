@@ -11,10 +11,11 @@ import {
   studiousSlotInfoFor,
 } from "./rules";
 import { consumeInnateUse } from "./innate";
+import { psiAmpFor } from "./psiAmps";
 import type { CharacterContext, CharacterDraft, Spell } from "./types";
 
 export type SpellCastResource =
-  "cantrip" | "focus" | "font" | "slot" | "innate" | "studious" | "apparition";
+  "cantrip" | "focus" | "font" | "slot" | "innate" | "studious" | "apparition" | "amp";
 
 export interface SpellCastOption {
   rank: number;
@@ -134,7 +135,7 @@ export function spellCastOptions(
 
   if (spell.rank === 0) {
     if (!isCantripPrepared(draft, context, spell.id)) return [];
-    return [
+    const options: SpellCastOption[] = [
       {
         rank: cantripCastRank(level),
         resource: "cantrip",
@@ -142,6 +143,17 @@ export function spellCastOptions(
         label: "Cantrip",
       },
     ];
+    const amp = psiAmpFor(spell.id);
+    if (amp && context.classData?.name.toLowerCase() === "psychic") {
+      const max = clampInt(opts.focusPointsMax ?? 0, 0, 3);
+      options.push({
+        rank: cantripCastRank(level),
+        resource: "amp",
+        remaining: clampInt(draft.play.focusPoints, 0, max),
+        label: "Amp (1 Focus)",
+      });
+    }
+    return options;
   }
 
   const caster = casterInfo(context.classData);
@@ -287,6 +299,16 @@ export function castSpell(
 
   if (option.resource === "cantrip") return { draft, option };
 
+  if (option.resource === "amp") {
+    const max = clampInt(opts.focusPointsMax ?? 0, 0, 3);
+    const current = clampInt(draft.play.focusPoints, 0, max);
+    if (current < 1) return null;
+    return {
+      draft: { ...draft, play: { ...draft.play, focusPoints: current - 1 } },
+      option: { ...option, remaining: current - 1 },
+    };
+  }
+
   if (option.resource === "innate") {
     if (option.remaining !== null && option.remaining <= 0) return null;
     const next = option.remaining === null ? draft : consumeInnateUse(draft, spell.id);
@@ -422,7 +444,7 @@ export function canRestoreSpellUse(
   if (choice.resource === "innate") {
     return Math.max(0, Math.round(Number(draft.spells.innateUsed[spell.id]) || 0)) > 0;
   }
-  if (choice.resource === "focus") {
+  if (choice.resource === "focus" || choice.resource === "amp") {
     const max = clampInt(opts.focusPointsMax ?? 0, 0, 3);
     return clampInt(draft.play.focusPoints, 0, max) < max;
   }
@@ -467,7 +489,7 @@ export function restoreSpellUse(
     };
   }
 
-  if (choice.resource === "focus") {
+  if (choice.resource === "focus" || choice.resource === "amp") {
     const max = clampInt(opts.focusPointsMax ?? 0, 0, 3);
     const current = clampInt(draft.play.focusPoints, 0, max);
     return {
