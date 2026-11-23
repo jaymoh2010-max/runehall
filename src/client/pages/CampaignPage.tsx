@@ -69,6 +69,7 @@ import {
 } from "../components/ui";
 import { VttTable } from "../components/table/VttTable";
 import { InviteModal } from "../components/campaign/InviteModal";
+import { AwardTreasureModal } from "../components/campaign/AwardTreasureModal";
 import { CorePartyPanel } from "../components/campaign/CorePartyPanel";
 import { JournalBody } from "../components/JournalBody";
 import { ImportReport } from "../components/ImportReport";
@@ -150,6 +151,7 @@ export function CampaignPage() {
   const [settingsAutomaticBonusProgression, setSettingsAutomaticBonusProgression] = useState(false);
   const [settingsPlayerItemGrant, setSettingsPlayerItemGrant] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [awardOpen, setAwardOpen] = useState(false);
   const [levelingId, setLevelingId] = useState<string | null>(null);
 
   const isGm = campaign?.role === "gm";
@@ -934,6 +936,7 @@ export function CampaignPage() {
             isGm={isGm}
             onNewCharacter={createCharacter}
             onLevelUp={(characterId) => void levelUpCharacters(characterId)}
+            onAwardTreasure={() => setAwardOpen(true)}
             levelingId={levelingId}
           />
         ) : null}
@@ -1653,6 +1656,30 @@ export function CampaignPage() {
             ? { id: campaign.id, name: campaign.name, inviteCode: campaign.inviteCode }
             : null
         }
+      />
+
+      <AwardTreasureModal
+        open={awardOpen}
+        onClose={() => setAwardOpen(false)}
+        campaignId={campaign.id}
+        characters={characters}
+        onAwarded={(result) => {
+          const updated = new Map(result.characters.map((character) => [character.id, character]));
+          setCharacters((current) =>
+            current.map((character) => updated.get(character.id) ?? character)
+          );
+          setTableData((current) =>
+            current
+              ? {
+                  ...current,
+                  characters: current.characters.map(
+                    (character) => updated.get(character.id) ?? character
+                  ),
+                }
+              : current
+          );
+          toast(result.message, "success");
+        }}
       />
 
       <Modal

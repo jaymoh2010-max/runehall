@@ -571,6 +571,13 @@ export interface CharacterCurrency {
   cp: number;
 }
 
+/** A player-authored inventory item that does not come from the compendium. */
+export interface CharacterCustomItem {
+  id: string;
+  name: string;
+  description: string;
+}
+
 export interface CharacterCondition {
   name: string;
   value?: number | null;
@@ -864,6 +871,8 @@ export interface CharacterDraft {
     preparationsPending: boolean;
   };
   equipment: CharacterEquipment[];
+  /** Homebrew and story items stored alongside the compendium inventory. */
+  customItems: CharacterCustomItem[];
   companions: CharacterCompanion[];
   currency: CharacterCurrency;
   /**

@@ -9,6 +9,7 @@ import {
   type Background,
   type CasterProgression,
   type CharacterContext,
+  type CharacterCustomItem,
   type CharacterDraft,
   type ClassChoiceGroup,
   type ClassChoiceOption,
@@ -1151,6 +1152,7 @@ export function emptyCharacterDraft(name = "New Hero"): CharacterDraft {
       preparationsPending: false,
     },
     equipment: [],
+    customItems: [],
     companions: [],
     currency: { gp: 0, sp: 0, cp: 0 },
     wealthBudgetCp: startingWealthCp(1),
@@ -1327,6 +1329,21 @@ export function normalizeCharacterDraft(input: unknown, fallbackName = "New Hero
     }
   }
   const equipmentEntries = [...equipmentMap.values()];
+  const customItemIds = new Set<string>();
+  const customItems: CharacterCustomItem[] = [];
+  for (const item of arr<Record<string, unknown>>(raw.customItems)) {
+    if (!item || typeof item.id !== "string" || !item.id.startsWith("custom:")) continue;
+    const id = item.id.slice(0, 120);
+    if (customItemIds.has(id)) continue;
+    const name = str(item.name).trim().slice(0, 120);
+    if (!name) continue;
+    customItemIds.add(id);
+    customItems.push({
+      id,
+      name,
+      description: str(item.description).slice(0, 4000),
+    });
+  }
 
   return {
     version: 1,
@@ -1423,6 +1440,7 @@ export function normalizeCharacterDraft(input: unknown, fallbackName = "New Hero
       preparationsPending: spells.preparationsPending === true,
     },
     equipment: equipmentEntries,
+    customItems,
     companions: arr<Record<string, unknown>>(raw.companions)
       .filter((companion) => companion && typeof companion.name === "string")
       .map((companion) => {

@@ -60,6 +60,91 @@ describe("compendium data", () => {
     }
   });
 
+  it("covers every equipment category and subtype used by the item database", () => {
+    const types = [...new Set(equipment.map((item) => item.type))].sort();
+    expect(types).toEqual([
+      "ammo",
+      "armor",
+      "backpack",
+      "consumable",
+      "equipment",
+      "kit",
+      "shield",
+      "treasure",
+      "weapon",
+    ]);
+
+    for (const item of equipment) {
+      expect(item.name.trim().length, "equipment name").toBeGreaterThan(0);
+      expect(item.price.cpTotal, `${item.name} price`).toBeGreaterThanOrEqual(0);
+      expect(Number.isFinite(item.bulk), `${item.name} bulk`).toBe(true);
+      if (item.type === "weapon") expect(item.weapon?.category, `${item.name} weapon`).toBeTruthy();
+      if (item.type === "armor") expect(item.armor?.category, `${item.name} armor`).toBeTruthy();
+      if (item.type === "shield") expect(item.shield, `${item.name} shield`).toBeTruthy();
+      if (item.type === "consumable") {
+        expect(item.consumable?.category, `${item.name} consumable`).toBeTruthy();
+      }
+    }
+
+    const weaponCategories = [
+      ...new Set(equipment.flatMap((item) => (item.weapon ? [item.weapon.category] : []))),
+    ].sort();
+    expect(weaponCategories).toEqual(["advanced", "martial", "simple", "unarmed"]);
+
+    const armorCategories = [
+      ...new Set(equipment.flatMap((item) => (item.armor ? [item.armor.category] : []))),
+    ].sort();
+    expect(armorCategories).toEqual([
+      "heavy",
+      "heavy-barding",
+      "light",
+      "light-barding",
+      "medium",
+      "unarmored",
+    ]);
+
+    const consumableCategories = [
+      ...new Set(equipment.flatMap((item) => (item.consumable ? [item.consumable.category] : []))),
+    ].sort();
+    expect(consumableCategories).toEqual([
+      "catalyst",
+      "drug",
+      "elixir",
+      "fulu",
+      "gadget",
+      "mutagen",
+      "oil",
+      "other",
+      "poison",
+      "potion",
+      "scroll",
+      "snare",
+      "talisman",
+      "toolkit",
+      "wand",
+    ]);
+
+    const traits = new Set(equipment.flatMap((item) => item.traits));
+    for (const trait of [
+      "alchemical",
+      "artifact",
+      "grimoire",
+      "invested",
+      "magical",
+      "spellheart",
+      "staff",
+      "talisman",
+      "tattoo",
+      "wand",
+    ]) {
+      expect(traits.has(trait), `${trait} items`).toBe(true);
+    }
+    expect(
+      equipment.filter((item) => item.usage.startsWith("etched-onto")).length,
+      "etched runes"
+    ).toBeGreaterThan(100);
+  });
+
   it("keeps spell damage formulas and heightening data", () => {
     const fireball = byName(spells, "Fireball");
     expect(fireball.rank).toBe(3);
