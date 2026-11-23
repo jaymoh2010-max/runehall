@@ -42,6 +42,10 @@ const bracersOfHammers = byName(equipment, "Bracers of Hammers");
 const chainMail = byName(equipment, "Chain Mail");
 const armorPotency = byName(equipment, "Armor Potency (+1)");
 const resilient = byName(equipment, "Resilient");
+const handwraps = byName(equipment, "Handwraps of Mighty Blows");
+const weaponPotency = byName(equipment, "Weapon Potency (+1)");
+const striking = byName(equipment, "Striking");
+const flaming = byName(equipment, "Flaming");
 
 function fighterDraft(trainedSkills: string[], worn: Equipment[] = []) {
   const draft = emptyCharacterDraft("Items Fighter");
@@ -106,6 +110,9 @@ describe("curated item effects", () => {
     });
     for (const item of [beltOfStrength, bracersOfStrength, bracersOfHammers]) {
       expect(ITEM_EFFECTS[item.id]).toMatchObject({ skillItemBonus: { athletics: 3 } });
+    }
+    for (const id of Object.keys(ITEM_EFFECTS)) {
+      expect(equipment.some((item) => item.id === id)).toBe(true);
     }
   });
 
@@ -196,5 +203,27 @@ describe("curated item effects", () => {
     const withAmulet = computeCharacter(fighterDraft([], [thirdEye]), context([thirdEye]));
     expect(withAmulet.perception).toBe(baseline.perception + 2);
     expect(withAmulet.initiative).toBe(baseline.initiative + 2);
+  });
+
+  it("applies handwraps runes to the unarmed strike", () => {
+    const draft = fighterDraft([]);
+    draft.equipment = [
+      {
+        itemId: handwraps.id,
+        quantity: 1,
+        equipped: true,
+        invested: true,
+        runes: [weaponPotency.id, striking.id, flaming.id],
+      },
+    ];
+    const items = [handwraps, weaponPotency, striking, flaming];
+    const baseline = computeCharacter(fighterDraft([]), context([]));
+    const applied = computeCharacter(draft, context(items));
+    const baselineFist = baseline.attacks.find((attack) => attack.id === "unarmed:fist");
+    const fist = applied.attacks.find((attack) => attack.id === "unarmed:fist");
+    expect(fist?.attackBonus).toBe((baselineFist?.attackBonus ?? 0) + 1);
+    expect(fist?.damageFormula.startsWith("2d4")).toBe(true);
+    expect(fist?.extraDamage?.some((damage) => damage.type === "fire")).toBe(true);
+    expect(fist?.notes).toContain("Flaming");
   });
 });

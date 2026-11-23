@@ -49,6 +49,8 @@ export interface EffectModifiers {
   armorProficiency?: boolean;
   /** Train martial weapons, or a chosen advanced weapon (Weapon Proficiency). */
   weaponProficiency?: boolean;
+  /** Train specific weapons by name (for example, a clan pistol). */
+  specificWeaponProficiency?: string[];
   /** Lore skills granted by a choice or effect. */
   lore?: { name: string; rank: number }[];
 }
@@ -132,6 +134,21 @@ export const FEAT_EFFECTS: Record<string, EffectModifiers> = {
   "feat:C1R4wd6G46CAVIn7": {
     ignoreArmorSpeedPenalty: true,
     speedPenaltyReduction: 5,
+  },
+  // Clan Pistol — trained with a clan pistol; the social circumstance bonus is manual.
+  "feat:LvVg83ZDj8mabcWF": {
+    specificWeaponProficiency: ["clan pistol"],
+    notes: [
+      "Training with the clan pistol is applied. The +1 circumstance bonus while the pistol is visible remains manual.",
+    ],
+  },
+  // Hellspawn — trained in Deception and Legal Lore, plus the Lie to Me feat.
+  "feat:EXVHePH8alsTZ5TB": {
+    trainedSkills: ["deception"],
+    lore: [{ name: "Legal Lore", rank: 1 }],
+    notes: [
+      "If already trained in Deception, choose another skill. The Lie to Me feat remains manual.",
+    ],
   },
   // Breath Control — longer breath holding and a bonus against inhaled threats.
   "feat:aJUXbe9HJVvv0Mxa": {
@@ -354,6 +371,12 @@ export function mergeEffects(effects: (EffectModifiers | undefined)[]): EffectMo
     }
     if (effect.armorProficiency) merged.armorProficiency = true;
     if (effect.weaponProficiency) merged.weaponProficiency = true;
+    if (effect.specificWeaponProficiency?.length) {
+      merged.specificWeaponProficiency = [
+        ...(merged.specificWeaponProficiency ?? []),
+        ...effect.specificWeaponProficiency,
+      ];
+    }
     if (effect.lore?.length) merged.lore = [...(merged.lore ?? []), ...effect.lore];
   }
   return merged;

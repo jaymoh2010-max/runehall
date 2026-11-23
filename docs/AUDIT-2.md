@@ -62,15 +62,16 @@ A second pass over the manual-first table after the first audit remediation, foc
   AC, saves, attacks, damage, and validation.
 - **Feats.** Curated always-on effects cover Toughness, Fleet, Incredible Initiative, Untrained
   Improvisation, Armor Proficiency, Weapon Proficiency, Canny Acumen, Additional Lore, Nimble Elf,
-  Elven Instincts, Incredible Investiture, and Unburdened Iron. Natural Ambition and Ancestral
-  Paragon resolve their granted feat. Feats with conditional or activity-based text remain labelled
-  **Manual** or **Partly automated** in the builder.
+  Elven Instincts, Incredible Investiture, Unburdened Iron, Clan Pistol, and Hellspawn. Natural
+  Ambition and Ancestral Paragon resolve their granted feat. Feats with conditional or
+  activity-based text remain labelled **Manual** or **Partly automated** in the builder.
 - **Items.** Base weapons, armor, shields, potency/striking/resilient/property runes, and curated
   worn-item bonuses are applied. Invested magic items now require the **Invest** toggle before their
   bonuses count, and the sheet warns when an equipped invested item is inactive. Item bonuses of the
   same type no longer stack: armor potency, ABP defense, resilient runes, and item bonuses such as
   Bands of Force use the highest value. Added static Athletics bonuses for Belt of Giant Strength and
-  the Strength/Hammers bracers.
+  the Strength/Hammers bracers. Handwraps of Mighty Blows accept weapon runes in the builder and
+  apply them to the unarmed strike.
 - **Conditions.** Frightened, sickened, clumsy, enfeebled, stupefied, drained, fatigued, off-guard,
   prone, grabbed, restrained, blinded, confused, unconscious, encumbered, and the dying/wounded/doomed
   track are applied to the derived sheet. Blinded now also applies off-guard. Deafened, fleeing,

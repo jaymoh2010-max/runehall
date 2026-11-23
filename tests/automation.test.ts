@@ -89,4 +89,12 @@ describe("automation labels", () => {
     ).toBe("partial");
     expect(automationForEquipment(item({ type: "consumable", level: 1 })).level).toBe("manual");
   });
+
+  it("marks handwraps of mighty blows as partly automated", () => {
+    expect(
+      automationForEquipment(
+        item({ name: "Handwraps of Mighty Blows", level: 2, traits: ["invested", "magical"] })
+      ).level
+    ).toBe("partial");
+  });
 });
