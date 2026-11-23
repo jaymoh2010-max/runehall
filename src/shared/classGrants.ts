@@ -664,7 +664,7 @@ const CLASS_NOTES: Record<string, string[]> = {
     "Spellstrike, Arcane Cascade, and conflux spell recharge remain manual.",
   ],
   animist: [
-    "Prepared animist slots and spontaneous apparition slots are shown as a combined total; track the split manually.",
+    "Prepared animist slots and spontaneous apparition slots are tracked separately; attune apparitions during daily preparations. The primary apparition's vessel focus spell is granted automatically.",
   ],
   psychic: [
     "Psi cantrips are granted, but amps, their Focus Point costs, and higher-level unique psi cantrips remain manual.",

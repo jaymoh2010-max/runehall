@@ -66,6 +66,7 @@ import {
 } from "../../shared/types";
 import {
   abilityMod,
+  animistApparitionSlots,
   applicableChoiceGroups,
   casterInfo,
   classKeyOptions,
@@ -597,7 +598,11 @@ export function CharacterBuilderPage({
     if (currentCaster.progression !== "none") {
       const currentRank = derived.maxSpellRank;
       const newSlots = spellSlotsFor(nextLevel, currentCaster.progression, context.classData?.name);
-      const newRank = newSlots?.length ?? currentRank;
+      const apparitionRank =
+        context.classData?.name.toLowerCase() === "animist"
+          ? animistApparitionSlots(nextLevel).length
+          : 0;
+      const newRank = Math.max(newSlots?.length ?? currentRank, apparitionRank);
       if (newRank > currentRank) {
         levelUpItems.push({
           id: `spells-${newRank}`,
