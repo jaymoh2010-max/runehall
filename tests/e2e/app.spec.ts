@@ -44,10 +44,6 @@ async function signIn(page: Page, user: typeof admin): Promise<void> {
   await expect(page).toHaveURL(/\/campaigns$/);
 }
 
-async function openPartyActions(page: Page): Promise<void> {
-  await page.getByRole("button", { name: /Party actions/ }).click();
-}
-
 async function openNewCharacter(page: Page, name: string): Promise<void> {
   await page.goto("/campaigns");
   await page.getByRole("button", { name: "New character" }).click();

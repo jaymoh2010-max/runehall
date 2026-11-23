@@ -47,6 +47,18 @@ tables can find the original works. Files were downloaded from OpenGameArt on 20
 The DM/table can remove library tracks from a campaign without deleting the bundled file. Uploaded
 audio remains the responsibility of the uploader.
 
+## Bundled map, portrait, and token art
+
+The built-in art libraries use openly licensed work. Full credits and license links live beside
+the files:
+
+- `public/maps/ATTRIBUTION.md` — Dyson Logos, Free Fantasy Maps, and mbround18 VTT maps.
+- `public/portraits/ATTRIBUTION.md` — built-in portrait art.
+- `public/tokens/creature/ATTRIBUTION.md` — creature token icons.
+
+Check each file before redistributing the bundled art. User-uploaded art remains the
+responsibility of the uploader and their table.
+
 ## Software
 
 Runehall uses open-source npm packages including React, Vite, Fastify, Socket.IO, Zustand, React Router, Lucide, sanitize-html, and TypeScript. Their licenses remain with their respective authors; see `node_modules/<package>/LICENSE` after installation.

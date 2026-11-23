@@ -79,33 +79,30 @@ This is the short checklist for the friend hosting Runehall and for the GM runni
 
 ## GM: session 1 checklist
 
-1. Open **Sessions** and schedule the next gathering. That calendar is the single source for the
-   Overview's next-session date; add a shared teaser and GM notes on **Overview** if useful.
-2. Open **Party** and confirm every approved character is present, at the expected level, and not
+1. Open **Party** and confirm every approved character is present, at the expected level, and not
    marked **Needs choices**. If a card is marked, the player can open **Edit** and the pinned
    checklist links to every unresolved chapter.
-3. Open **Table**, pick or create a scene, and upload a map if needed.
-4. Add character tokens from **Add token**, then place monsters from the bestiary or encounter
-   builder.
-5. Roll initiative when combat starts. The tracker handles grouped monsters, rounds, movement, HP,
-   and conditions. A condition applied to a PC token updates that player's sheet automatically.
-6. Use **Table talk** for shared chat, **GM only** for whispered messages, and the dice tray's
+2. Open **Table**, pick or create a scene, and upload a map if needed.
+3. Add character tokens from **Add token**, then place monsters from the bestiary.
+4. Roll initiative when combat starts. The tracker keeps rounds and the current combatant, but it
+   does not enforce movement or turn effects. A condition applied to a PC token updates that
+   player's sheet automatically.
+5. Use **Table talk** for shared chat, **GM only** for whispered messages, and the dice tray's
    **Secret GM roll** toggle for private rolls. The two toggles are independent. On a character
    sheet, set a target DC/AC to see degrees of success, tick **Secret roll** for private checks, and
    use the attack row's **2nd**, **3rd**, and **Crit ×2** buttons for MAP and critical damage.
-7. Use the **Soundtrack** panel to upload a track or add one from the bundled CC0 music library.
+6. Use the **Soundtrack** panel to upload a track or add one from the bundled CC0 music library.
    Players click **Join audio** once; they can leave audio locally without pausing the table. After
    a reload, the GM also gets **Join audio** when shared playback is already running.
-8. Distribute treasure from **Loot**, award XP only if using XP mode, and use **Long rest** when the
-   party rests. Quest XP can only be paid out in XP tracking mode; milestone campaigns store the
-   value for reference. A direct HP correction applies dying/unconscious at 0 and wounded when the
-   character is healed back above 0, without consuming temporary HP.
-9. Record notes, handouts, and quests in **Journal**. Mark handouts visible when players should see
+7. Track HP, conditions, and XP on the character sheet. Quest XP can only be paid out in XP
+   tracking mode; milestone campaigns store the value for reference. A direct HP correction
+   applies dying/unconscious at 0 and wounded when the character is healed back above 0, without
+   consuming temporary HP.
+8. Record notes, handouts, and quests in **Journal**. Mark handouts visible when players should see
    them. A paid quest keeps its reward marker even if the handout is edited later.
-10. When combat ends, use **Clear launched** in the encounter launch dialog if monster tokens should
-    leave the scene. A fresh launch also replaces that encounter's earlier tokens on the same scene.
-11. Before ending the night, write a short recap, mark the session played in **Sessions**, and take a
-    backup.
+9. Advance the party from **Party** or **Settings** when the story calls for it. No character levels
+   up automatically.
+10. Before ending the night, write a short recap in **Journal** and take a backup.
 
 ## Known limits worth telling the table
 
@@ -119,14 +116,8 @@ This is the short checklist for the friend hosting Runehall and for the GM runni
   errors it can detect, but not every missing situational bonus.
 - Only Pathbuilder imports go through the GM approval queue. A player who joins without a character
   can create one directly in the campaign; the GM should check the Party tab before play.
-- Encounter cleanup only knows tokens launched after this update. Tokens created by older launches
-  have no encounter tag, so remove any existing duplicates once by hand.
-- **Clear launched** removes every token that encounter placed across the campaign's scenes. It
-  intentionally leaves character, NPC, and manually created tokens on the table.
 - The character sheet autosaves after a short delay. Wait for the saved indicator before immediately
   leaving the sheet.
-- Session zero and safety tools are built in: a shared table charter, private lines/veils, and an anonymous pause/X-card signal to the GM.
-- The Travel tab tracks a journey, watches, weather, and exploration activities, but there is no hex/pointcrawl map, automatic weather or encounter checks, or AP chapter importer yet.
 - The soundtrack is one shared track list, not per-player playlists. Sync is on play/pause/track
   change and is not sample-accurate.
 - Campaign JSON exports carry metadata; uploaded audio/image files are restored from

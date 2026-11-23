@@ -66,7 +66,7 @@ Four campaign sections:
 - No speed or movement enforcement. Tokens move where the GM or owner drags them.
 - No automatic damage application from chat rolls.
 - No automatic leveling. The GM advances the party when the story says so.
-- Loot, shops, downtime, travel, session scheduling, and similar campaign tooling are not part of the core navigation.
+- The campaign navigation is intentionally limited to **Table**, **Party**, **Journal**, and **Settings**. Loot, shops, downtime, travel, session scheduling, encounter builders, NPC libraries, clocks, notes, and prep dashboards are not exposed in the current UI.
 
 ---
 

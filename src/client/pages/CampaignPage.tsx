@@ -1,56 +1,31 @@
-import {
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type FormEvent,
-  type KeyboardEvent as ReactKeyboardEvent,
-} from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   Award,
-  BookOpen,
-  CalendarClock,
-  CalendarDays,
-  Check,
-  ChevronDown,
-  Coins,
-  Compass,
   Copy,
   Crown,
-  DoorOpen,
   Download,
   FileImage,
   FilePlus2,
-  HeartHandshake,
   ImagePlus,
   Images,
   LayoutGrid,
   LogOut,
-  Milestone,
-  Moon,
   Pencil,
-  Plus,
   RefreshCw,
   ScrollText,
   Settings,
   Shield,
-  Skull,
   Sparkles,
-  Star,
   Swords,
-  Timer,
   Trash2,
   UserPlus,
-  UserRound,
   Users,
-  X,
 } from "lucide-react";
 import type {
   CampaignJoinRequest,
   CampaignMember,
   CampaignAsset,
-  CampaignRequest,
   CampaignRuleset,
   AdvancementSpeed,
   CampaignSummary,
@@ -60,9 +35,6 @@ import type {
   JournalEntry,
   JournalKind,
   QuestStatus,
-  Token,
-  XpAward,
-  XpAwardKind,
   XpMode,
 } from "../../shared/types";
 import {
@@ -72,28 +44,9 @@ import {
   rulesetLabel,
 } from "../../shared/content";
 import { QUEST_STATUS_OPTIONS, normalizeQuestXp } from "../../shared/journal";
-import { CAMPAIGN_REQUEST_KIND_LABELS, campaignRequestStatusLabel } from "../../shared/requests";
-import {
-  ACCOMPLISHMENT_LABELS,
-  ACCOMPLISHMENT_TIERS,
-  ACCOMPLISHMENT_XP,
-  XP_AWARD_KIND_LABELS,
-  XP_AWARD_KINDS,
-  hazardXp,
-  xpPerLevel,
-  xpProgress,
-  type AccomplishmentTier,
-} from "../../shared/xp";
-import { startingWealthCp } from "../../shared/rules";
-import { api, copyText, formatCp, formatDate, uploadImage } from "../api";
+import { xpPerLevel } from "../../shared/xp";
+import { api, copyText, formatDate, uploadImage } from "../api";
 import { connectSocket, joinCampaign } from "../socket";
-import { TravelTab } from "../components/campaign/TravelTab";
-import { ClocksTab } from "../components/campaign/ClocksTab";
-import { SessionZeroTab } from "../components/campaign/SessionZeroTab";
-import { PeopleTab } from "../components/campaign/PeopleTab";
-import { PlayerRequestsCard } from "../components/campaign/PlayerRequestsCard";
-import { NotesTab } from "../components/campaign/NotesTab";
-import { CampaignArcTab } from "../components/campaign/CampaignArcTab";
 import { errorMessage } from "../stores";
 import { useSession, useToasts } from "../stores";
 import {
@@ -103,34 +56,20 @@ import {
   Card,
   Checkbox,
   EmptyState,
-  ErrorState,
   Field,
   Input,
   LoadingScreen,
   Modal,
   PageEyebrow,
-  ProgressBar,
-  RichText,
   Select,
   Spinner,
-  Stat,
   Tag,
   Textarea,
   Toggle,
 } from "../components/ui";
 import { VttTable } from "../components/table/VttTable";
 import { InviteModal } from "../components/campaign/InviteModal";
-import {
-  EncounterBuilder,
-  type EncounterLaunchResult,
-} from "../components/campaign/EncounterBuilder";
-import { LootBuilder } from "../components/campaign/LootBuilder";
-import { CampaignDashboard } from "../components/campaign/CampaignDashboard";
 import { CorePartyPanel } from "../components/campaign/CorePartyPanel";
-import { AssetLibrary } from "../components/campaign/AssetLibrary";
-import { NpcLibrary } from "../components/campaign/NpcLibrary";
-import { SessionsPage } from "../components/campaign/SessionsPage";
-import { GmScreen } from "../components/campaign/GmScreen";
 import { JournalBody } from "../components/JournalBody";
 import { ImportReport } from "../components/ImportReport";
 
@@ -142,31 +81,13 @@ function questStatusTone(status: QuestStatus): "blue" | "green" | "red" {
   return status === "completed" ? "green" : status === "failed" ? "red" : "blue";
 }
 
-type Tab =
-  | "table"
-  | "overview"
-  | "session-zero"
-  | "party"
-  | "people"
-  | "arc"
-  | "travel"
-  | "clocks"
-  | "sessions"
-  | "encounters"
-  | "loot"
-  | "npcs"
-  | "assets"
-  | "journal"
-  | "notes"
-  | "gm-screen"
-  | "settings";
+type Tab = "table" | "party" | "journal" | "settings";
 
 interface CampaignDetails {
   campaign: CampaignSummary;
   members: CampaignMember[];
   characters: CharacterRecord[];
   joinRequests?: CampaignJoinRequest[];
-  requests?: CampaignRequest[];
 }
 
 const TABS: { id: Tab; label: string; icon: React.ReactNode; gmOnly?: boolean }[] = [
@@ -175,8 +96,6 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode; gmOnly?: boolean }[
   { id: "journal", label: "Journal", icon: <ScrollText size={15} /> },
   { id: "settings", label: "Settings", icon: <Settings size={15} /> },
 ];
-
-const PRIMARY_TAB_IDS = new Set<Tab>(["table", "party", "journal"]);
 
 export function CampaignPage() {
   const { id } = useParams<{ id: string }>();
@@ -189,32 +108,10 @@ export function CampaignPage() {
   const requestedTab: Tab =
     rawTab === "party" || rawTab === "journal" || rawTab === "settings" ? rawTab : "table";
   const [campaign, setCampaign] = useState<CampaignSummary | null>(null);
-  const [prepOpen, setPrepOpen] = useState(false);
-  const prepRef = useRef<HTMLDivElement>(null);
-  const [partyActionsOpen, setPartyActionsOpen] = useState(false);
-  const partyActionsRef = useRef<HTMLDivElement>(null);
-  const partyActionsMenuRef = useRef<HTMLDivElement>(null);
   const [members, setMembers] = useState<CampaignMember[]>([]);
   const [characters, setCharacters] = useState<CharacterRecord[]>([]);
   const [joinRequests, setJoinRequests] = useState<CampaignJoinRequest[]>([]);
   const [joinRequestBusy, setJoinRequestBusy] = useState<string | null>(null);
-  const [requests, setRequests] = useState<CampaignRequest[]>([]);
-  const [requestLevelUpBusy, setRequestLevelUpBusy] = useState<string | null>(null);
-  const [requestDowntimeCharacter, setRequestDowntimeCharacter] = useState<CharacterRecord | null>(
-    null
-  );
-  const [requestDowntimeDays, setRequestDowntimeDays] = useState("1");
-  const [requestDowntimeNote, setRequestDowntimeNote] = useState("");
-  const [requestDowntimeBusy, setRequestDowntimeBusy] = useState(false);
-  const [requestWithdrawBusy, setRequestWithdrawBusy] = useState<string | null>(null);
-  const [reviewRequest, setReviewRequest] = useState<CampaignRequest | null>(null);
-  const [reviewNote, setReviewNote] = useState("");
-  const [reviewBusy, setReviewBusy] = useState<"approve" | "deny" | null>(null);
-  const [journalProposalOpen, setJournalProposalOpen] = useState(false);
-  const [proposalTitle, setProposalTitle] = useState("");
-  const [proposalContent, setProposalContent] = useState("");
-  const [proposalNote, setProposalNote] = useState("");
-  const [proposalBusy, setProposalBusy] = useState(false);
   const [tableData, setTableData] = useState<CampaignTable | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -253,128 +150,13 @@ export function CampaignPage() {
   const [settingsAutomaticBonusProgression, setSettingsAutomaticBonusProgression] = useState(false);
   const [settingsPlayerItemGrant, setSettingsPlayerItemGrant] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
-  const [levelUpBusy, setLevelUpBusy] = useState(false);
-  const [catchUpBusy, setCatchUpBusy] = useState(false);
   const [levelingId, setLevelingId] = useState<string | null>(null);
-  const [wealthBusyId, setWealthBusyId] = useState<string | null>(null);
-  const [restBusy, setRestBusy] = useState(false);
-  const [xpOpen, setXpOpen] = useState(false);
-  const [xpAwards, setXpAwards] = useState<XpAward[]>([]);
-  const [xpKind, setXpKind] = useState<XpAwardKind>("encounter");
-  const [xpAmount, setXpAmount] = useState("20");
-  const [xpReason, setXpReason] = useState("");
-  const [xpHazardLevel, setXpHazardLevel] = useState("1");
-  const [xpPartyLevel, setXpPartyLevel] = useState("1");
-  const [xpHazardComplexity, setXpHazardComplexity] = useState<"simple" | "complex">("complex");
-  const [xpAccomplishmentTier, setXpAccomplishmentTier] = useState<AccomplishmentTier>("moderate");
-  const [xpRecipientIds, setXpRecipientIds] = useState<string[]>([]);
-  const [xpBusy, setXpBusy] = useState(false);
-  const [xpError, setXpError] = useState("");
-  const [downtimeOpen, setDowntimeOpen] = useState(false);
-  const [downtimeDays, setDowntimeDays] = useState("1");
-  const [downtimeTargetIds, setDowntimeTargetIds] = useState<string[]>([]);
-  const [downtimeBusy, setDowntimeBusy] = useState(false);
-  const [downtimeError, setDowntimeError] = useState("");
-  const [heroPointOpen, setHeroPointOpen] = useState(false);
-  const [heroPointAmount, setHeroPointAmount] = useState("1");
-  const [heroPointRecipientIds, setHeroPointRecipientIds] = useState<string[]>([]);
-  const [heroPointBusy, setHeroPointBusy] = useState(false);
-  const [heroPointError, setHeroPointError] = useState("");
 
   const isGm = campaign?.role === "gm";
-  const xpPreviewAmount =
-    xpKind === "hazard"
-      ? hazardXp(Number(xpHazardLevel) || 0, Number(xpPartyLevel) || 1, xpHazardComplexity)
-      : xpKind === "accomplishment"
-        ? ACCOMPLISHMENT_XP[xpAccomplishmentTier]
-        : Math.max(0, Math.floor(Number(xpAmount) || 0));
   const tab = requestedTab as Tab;
   const visibleTabs = isGm ? TABS : TABS.filter((entry) => !entry.gmOnly);
-  const primaryTabs = visibleTabs.filter((entry) => PRIMARY_TAB_IDS.has(entry.id));
-  const prepTabs = visibleTabs.filter(
-    (entry) => entry.id !== "settings" && !PRIMARY_TAB_IDS.has(entry.id)
-  );
+  const primaryTabs = visibleTabs.filter((entry) => entry.id !== "settings");
   const settingsTab = visibleTabs.find((entry) => entry.id === "settings");
-  const activePrepTab = prepTabs.find((entry) => entry.id === tab);
-
-  useEffect(() => {
-    if (!prepOpen) return;
-    const onPointerDown = (event: MouseEvent) => {
-      if (!prepRef.current?.contains(event.target as Node)) setPrepOpen(false);
-    };
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setPrepOpen(false);
-    };
-    window.addEventListener("mousedown", onPointerDown);
-    window.addEventListener("keydown", onKeyDown);
-    return () => {
-      window.removeEventListener("mousedown", onPointerDown);
-      window.removeEventListener("keydown", onKeyDown);
-    };
-  }, [prepOpen]);
-
-  useEffect(() => {
-    if (!partyActionsOpen) return;
-    const onPointerDown = (event: MouseEvent) => {
-      if (!partyActionsRef.current?.contains(event.target as Node)) setPartyActionsOpen(false);
-    };
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setPartyActionsOpen(false);
-    };
-    window.addEventListener("mousedown", onPointerDown);
-    window.addEventListener("keydown", onKeyDown);
-    return () => {
-      window.removeEventListener("mousedown", onPointerDown);
-      window.removeEventListener("keydown", onKeyDown);
-    };
-  }, [partyActionsOpen]);
-
-  useEffect(() => {
-    if (!partyActionsOpen) return;
-    const items = partyActionsMenuRef.current?.querySelectorAll<HTMLButtonElement>(
-      '[role="menuitem"]:not(:disabled)'
-    );
-    items?.[0]?.focus();
-  }, [partyActionsOpen]);
-
-  const handlePartyActionsMenuKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
-    if (event.key === "Escape") {
-      event.preventDefault();
-      setPartyActionsOpen(false);
-      partyActionsRef.current?.querySelector<HTMLButtonElement>("button")?.focus();
-      return;
-    }
-
-    if (event.key === "Tab") {
-      setPartyActionsOpen(false);
-      partyActionsRef.current?.querySelector<HTMLButtonElement>("button")?.focus();
-      return;
-    }
-
-    const items = Array.from(
-      event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="menuitem"]:not(:disabled)')
-    );
-    if (!items.length) return;
-    const currentIndex = items.indexOf(document.activeElement as HTMLButtonElement);
-
-    if (event.key === "ArrowDown") {
-      event.preventDefault();
-      items[(currentIndex + 1) % items.length]?.focus();
-    } else if (event.key === "ArrowUp") {
-      event.preventDefault();
-      items[currentIndex <= 0 ? items.length - 1 : currentIndex - 1]?.focus();
-    } else if (event.key === "Home") {
-      event.preventDefault();
-      items[0]?.focus();
-    } else if (event.key === "End") {
-      event.preventDefault();
-      items[items.length - 1]?.focus();
-    }
-  };
-
-  useEffect(() => {
-    setPartyActionsOpen(false);
-  }, [tab]);
 
   const load = async () => {
     if (!id) return;
@@ -389,7 +171,6 @@ export function CampaignPage() {
       setMembers(details.members);
       setCharacters(details.characters);
       setJoinRequests(details.joinRequests ?? []);
-      setRequests(details.requests ?? []);
       setTableData(table);
       setSettingsName(details.campaign.name);
       setSettingsDescription(details.campaign.description);
@@ -399,14 +180,6 @@ export function CampaignPage() {
       setSettingsFreeArchetype(details.campaign.freeArchetype);
       setSettingsAutomaticBonusProgression(details.campaign.automaticBonusProgression);
       setSettingsPlayerItemGrant(details.campaign.playerItemGrant);
-      if (details.campaign.role === "gm") {
-        try {
-          const ledger = await api<{ awards: XpAward[] }>(`/api/campaigns/${id}/xp-awards`);
-          setXpAwards(ledger.awards);
-        } catch {
-          setXpAwards([]);
-        }
-      }
       setSelectedJournalId((current) => current ?? table.journal[0]?.id ?? null);
     } catch (err) {
       setError(errorMessage(err));
@@ -446,8 +219,7 @@ export function CampaignPage() {
   // Refresh party/settings data when those tabs are opened so newly joined
   // players and newly created characters show up without a full page reload.
   useEffect(() => {
-    if (!id || (tab !== "overview" && tab !== "party" && tab !== "loot" && tab !== "settings"))
-      return;
+    if (!id || (tab !== "party" && tab !== "settings")) return;
     let cancelled = false;
     api<CampaignDetails>(`/api/campaigns/${id}`)
       .then((details) => {
@@ -456,22 +228,6 @@ export function CampaignPage() {
         setMembers(details.members);
         setCharacters(details.characters);
         setJoinRequests(details.joinRequests ?? []);
-        setRequests(details.requests ?? []);
-      })
-      .catch(() => undefined);
-    return () => {
-      cancelled = true;
-    };
-  }, [id, tab]);
-
-  // Encounter and NPC prep read scene/token state from the table snapshot.
-  // Refresh it when those tabs open so scenes created this session appear.
-  useEffect(() => {
-    if (!id || (tab !== "encounters" && tab !== "npcs")) return;
-    let cancelled = false;
-    api<CampaignTable>(`/api/campaigns/${id}/table`)
-      .then((table) => {
-        if (!cancelled) setTableData(table);
       })
       .catch(() => undefined);
     return () => {
@@ -499,18 +255,8 @@ export function CampaignPage() {
           setMembers(details.members);
           setCharacters(details.characters);
           setJoinRequests(details.joinRequests ?? []);
-          setRequests(details.requests ?? []);
         })
         .catch(() => undefined);
-    };
-    const refreshRequests = () => {
-      api<CampaignDetails>(`/api/campaigns/${id}`)
-        .then((details) => setRequests(details.requests ?? []))
-        .catch(() => undefined);
-    };
-    const onRequestCreated = (payload: { title: string; playerName: string }) => {
-      toast(`${payload.playerName} sent a request: ${payload.title}`, "info");
-      refreshRequests();
     };
     const onCharacterRemoved = ({ characterId }: { characterId: string }) => {
       setCharacters((current) => current.filter((character) => character.id !== characterId));
@@ -562,9 +308,6 @@ export function CampaignPage() {
           : current
       );
     };
-    const onSafetySignal = (payload: { message: string }) => {
-      toast(payload.message, "error");
-    };
     socket.on("campaign:updated", applySummary);
     socket.on("character:updated", onCharacterUpdated);
     socket.on("character:created", onCharacterCreated);
@@ -574,9 +317,6 @@ export function CampaignPage() {
     socket.on("journal:deleted", onJournalDeleted);
     socket.on("join-request:created", refreshDetails);
     socket.on("join-request:updated", refreshDetails);
-    socket.on("campaign-request:created", onRequestCreated);
-    socket.on("campaign-request:updated", refreshRequests);
-    socket.on("safety:signal", onSafetySignal);
     const leaveCampaignRoom = joinCampaign(id);
     return () => {
       socket.off("campaign:updated", applySummary);
@@ -588,9 +328,6 @@ export function CampaignPage() {
       socket.off("journal:deleted", onJournalDeleted);
       socket.off("join-request:created", refreshDetails);
       socket.off("join-request:updated", refreshDetails);
-      socket.off("campaign-request:created", onRequestCreated);
-      socket.off("campaign-request:updated", refreshRequests);
-      socket.off("safety:signal", onSafetySignal);
       leaveCampaignRoom();
     };
   }, [id, toast]);
@@ -817,13 +554,8 @@ export function CampaignPage() {
         amount: number;
         recipients: number;
         characters: CharacterRecord[];
-        award?: XpAward;
       }>(`/api/campaigns/${id}/journal/${entry.id}/award-quest-xp`, { method: "POST" });
       setCharacters(result.characters);
-      const award = result.award;
-      if (award) {
-        setXpAwards((current) => [award, ...current].slice(0, 20));
-      }
       setTableData((current) =>
         current
           ? {
@@ -974,7 +706,6 @@ export function CampaignPage() {
       setMembers(details.members);
       setCharacters(details.characters);
       setJoinRequests(details.joinRequests ?? []);
-      setRequests(details.requests ?? []);
       toast(
         decision === "approve"
           ? `${request.characterName} joined the party.`
@@ -1034,7 +765,6 @@ export function CampaignPage() {
       : `Advance every character in this campaign by one level? The GM controls advancement, and each character advances with ${cost}.`;
     if (!window.confirm(message)) return;
     if (target) setLevelingId(target.id);
-    else setLevelUpBusy(true);
     try {
       const result = await api<{
         leveled: number;
@@ -1075,536 +805,7 @@ export function CampaignPage() {
       toast(errorMessage(err), "error");
     } finally {
       setLevelingId(null);
-      setLevelUpBusy(false);
     }
-  };
-
-  const catchUpParty = async () => {
-    if (!id || !isGm) return;
-    const confirmed = window.confirm(
-      "Raise every character below the party's highest level up to that level and match its XP? Use this for new or returning characters; review their new feats and spells afterward."
-    );
-    if (!confirmed) return;
-    setCatchUpBusy(true);
-    try {
-      const result = await api<{
-        caughtUp: number;
-        alreadyCurrent: number;
-        skipped: number;
-        targetLevel: number;
-        targetXp: number;
-        characters: CharacterRecord[];
-      }>(`/api/campaigns/${id}/catch-up`, { method: "POST" });
-      setCharacters(result.characters);
-      setTableData((current) =>
-        current ? { ...current, characters: result.characters } : current
-      );
-      if (result.caughtUp > 0) {
-        toast(
-          `Caught up ${result.caughtUp} ${
-            result.caughtUp === 1 ? "character" : "characters"
-          } to level ${result.targetLevel}. Review new class choices.`,
-          "success"
-        );
-      } else {
-        toast("The whole party is already caught up.", "info");
-      }
-    } catch (err) {
-      toast(errorMessage(err), "error");
-    } finally {
-      setCatchUpBusy(false);
-    }
-  };
-
-  const topUpWealth = async (character: CharacterRecord) => {
-    if (!id || !isGm || !character.summary) return;
-    const level = character.summary.level;
-    const targetCp = startingWealthCp(level);
-    const confirmed = window.confirm(
-      `Top up ${character.name}'s wealth to the level ${level} lump-sum benchmark (${formatCp(targetCp)} total)? This grants only the difference.`
-    );
-    if (!confirmed) return;
-    setWealthBusyId(character.id);
-    try {
-      const result = await api<{
-        character: CharacterRecord;
-        grantCp: number;
-        targetCp: number;
-        committedCp: number;
-      }>(`/api/campaigns/${id}/characters/${character.id}/wealth`, { method: "POST" });
-      setCharacters((current) =>
-        current.map((entry) => (entry.id === result.character.id ? result.character : entry))
-      );
-      setTableData((current) =>
-        current
-          ? {
-              ...current,
-              characters: current.characters.map((entry) =>
-                entry.id === result.character.id ? result.character : entry
-              ),
-            }
-          : current
-      );
-      toast(
-        result.grantCp > 0
-          ? `Granted ${formatCp(result.grantCp)} to ${result.character.name}. Total wealth is now about ${formatCp(result.committedCp)}.`
-          : `${result.character.name} already meets the level ${level} wealth benchmark.`,
-        "success"
-      );
-    } catch (err) {
-      toast(errorMessage(err), "error");
-    } finally {
-      setWealthBusyId(null);
-    }
-  };
-
-  const requestLevelUp = async (character: CharacterRecord) => {
-    if (!id) return;
-    setRequestLevelUpBusy(character.id);
-    try {
-      const result = await api<{ request: CampaignRequest }>(`/api/campaigns/${id}/requests`, {
-        method: "POST",
-        body: { kind: "level-up", characterId: character.id },
-      });
-      setRequests((current) => [
-        result.request,
-        ...current.filter((entry) => entry.id !== result.request.id),
-      ]);
-      toast(`Level-up request sent for ${character.name}. The GM will review it.`, "success");
-    } catch (err) {
-      toast(errorMessage(err), "error");
-    } finally {
-      setRequestLevelUpBusy(null);
-    }
-  };
-
-  const openRequestDowntime = (character: CharacterRecord) => {
-    setRequestDowntimeCharacter(character);
-    setRequestDowntimeDays("1");
-    setRequestDowntimeNote("");
-  };
-
-  const submitDowntimeRequest = async () => {
-    if (!id || !requestDowntimeCharacter) return;
-    const days = Math.max(1, Math.min(3650, Math.round(Number(requestDowntimeDays) || 1)));
-    setRequestDowntimeBusy(true);
-    try {
-      const result = await api<{ request: CampaignRequest }>(`/api/campaigns/${id}/requests`, {
-        method: "POST",
-        body: {
-          kind: "downtime",
-          characterId: requestDowntimeCharacter.id,
-          days,
-          note: requestDowntimeNote,
-        },
-      });
-      setRequests((current) => [
-        result.request,
-        ...current.filter((entry) => entry.id !== result.request.id),
-      ]);
-      setRequestDowntimeCharacter(null);
-      toast("Downtime request sent to the GM.", "success");
-    } catch (err) {
-      toast(errorMessage(err), "error");
-    } finally {
-      setRequestDowntimeBusy(false);
-    }
-  };
-
-  const withdrawRequest = async (entry: CampaignRequest) => {
-    if (!id) return;
-    setRequestWithdrawBusy(entry.id);
-    try {
-      await api(`/api/campaigns/${id}/requests/${entry.id}`, { method: "DELETE" });
-      setRequests((current) =>
-        current.map((row) => (row.id === entry.id ? { ...row, status: "withdrawn" as const } : row))
-      );
-      toast("Request withdrawn.", "info");
-    } catch (err) {
-      toast(errorMessage(err), "error");
-    } finally {
-      setRequestWithdrawBusy(null);
-    }
-  };
-
-  const openRequestReview = (entry: CampaignRequest) => {
-    setReviewRequest(entry);
-    setReviewNote("");
-  };
-
-  const resolveRequest = async (decision: "approve" | "deny") => {
-    if (!id || !reviewRequest) return;
-    setReviewBusy(decision);
-    try {
-      await api<{ request: CampaignRequest }>(
-        `/api/campaigns/${id}/requests/${reviewRequest.id}/${decision}`,
-        { method: "POST", body: { note: reviewNote } }
-      );
-      const details = await api<CampaignDetails>(`/api/campaigns/${id}`);
-      setRequests(details.requests ?? []);
-      setCharacters(details.characters);
-      setTableData((current) =>
-        current ? { ...current, characters: details.characters } : current
-      );
-      setReviewRequest(null);
-      toast(
-        decision === "approve"
-          ? `Approved: ${reviewRequest.title}.`
-          : `Denied: ${reviewRequest.title}.`,
-        decision === "approve" ? "success" : "info"
-      );
-    } catch (err) {
-      toast(errorMessage(err), "error");
-    } finally {
-      setReviewBusy(null);
-    }
-  };
-
-  const submitJournalProposal = async () => {
-    if (!id) return;
-    if (!proposalTitle.trim() || !proposalContent.trim()) {
-      toast("Add a title and some text for the GM to review.", "error");
-      return;
-    }
-    setProposalBusy(true);
-    try {
-      const result = await api<{ request: CampaignRequest }>(`/api/campaigns/${id}/requests`, {
-        method: "POST",
-        body: {
-          kind: "journal",
-          title: proposalTitle,
-          content: proposalContent,
-          note: proposalNote,
-        },
-      });
-      setRequests((current) => [
-        result.request,
-        ...current.filter((entry) => entry.id !== result.request.id),
-      ]);
-      setJournalProposalOpen(false);
-      setProposalTitle("");
-      setProposalContent("");
-      setProposalNote("");
-      toast("Journal entry sent to the GM for approval.", "success");
-    } catch (err) {
-      toast(errorMessage(err), "error");
-    } finally {
-      setProposalBusy(false);
-    }
-  };
-
-  const openXpAward = () => {
-    const partyLevel = Math.max(1, ...characters.map((character) => character.summary?.level ?? 1));
-    setXpKind("encounter");
-    setXpAmount("20");
-    setXpReason("");
-    setXpHazardLevel(String(partyLevel));
-    setXpPartyLevel(String(partyLevel));
-    setXpHazardComplexity("complex");
-    setXpAccomplishmentTier("moderate");
-    setXpRecipientIds(characters.map((character) => character.id));
-    setXpError("");
-    setXpOpen(true);
-  };
-
-  const toggleXpRecipient = (characterId: string, checked: boolean) => {
-    setXpRecipientIds((current) =>
-      checked
-        ? [...new Set([...current, characterId])]
-        : current.filter((entry) => entry !== characterId)
-    );
-  };
-
-  const awardXp = async () => {
-    if (!id) return;
-    if (xpPreviewAmount < 1) {
-      setXpError("This award is worth no XP. Raise the hazard level or award at least 1 XP.");
-      return;
-    }
-    if (!xpRecipientIds.length) {
-      setXpError("Choose at least one character.");
-      return;
-    }
-    setXpBusy(true);
-    setXpError("");
-    try {
-      const result = await api<{
-        amount: number;
-        recipients: number;
-        skipped: number;
-        characters: CharacterRecord[];
-        award: XpAward;
-      }>(`/api/campaigns/${id}/award-xp`, {
-        method: "POST",
-        body: {
-          kind: xpKind,
-          amount: xpPreviewAmount,
-          characterIds: xpRecipientIds,
-          reason: xpReason.trim(),
-          hazardLevel: Number(xpHazardLevel),
-          partyLevel: Number(xpPartyLevel),
-          hazardComplexity: xpHazardComplexity,
-          tier: xpAccomplishmentTier,
-        },
-      });
-      setCharacters(result.characters);
-      setTableData((current) =>
-        current ? { ...current, characters: result.characters } : current
-      );
-      if (result.award) {
-        setXpAwards((current) => [result.award, ...current].slice(0, 20));
-      }
-      setXpOpen(false);
-      toast(
-        `Awarded ${result.amount} XP to ${result.recipients} ${
-          result.recipients === 1 ? "character" : "characters"
-        }. Level-ups remain GM-triggered.`,
-        "success"
-      );
-    } catch (err) {
-      setXpError(errorMessage(err));
-    } finally {
-      setXpBusy(false);
-    }
-  };
-
-  const openDowntime = () => {
-    setDowntimeDays("1");
-    setDowntimeTargetIds(characters.map((character) => character.id));
-    setDowntimeError("");
-    setDowntimeOpen(true);
-  };
-
-  const toggleDowntimeTarget = (characterId: string, checked: boolean) => {
-    setDowntimeTargetIds((current) =>
-      checked
-        ? [...new Set([...current, characterId])]
-        : current.filter((entry) => entry !== characterId)
-    );
-  };
-
-  const grantDowntime = async () => {
-    if (!id) return;
-    const days = Math.max(1, Math.floor(Number(downtimeDays) || 0));
-    if (!downtimeTargetIds.length) {
-      setDowntimeError("Choose at least one character.");
-      return;
-    }
-    setDowntimeBusy(true);
-    setDowntimeError("");
-    try {
-      const result = await api<{
-        days: number;
-        recipients: number;
-        characters: CharacterRecord[];
-      }>(`/api/campaigns/${id}/downtime`, {
-        method: "POST",
-        body: { days, characterIds: downtimeTargetIds },
-      });
-      setCharacters(result.characters);
-      setTableData((current) =>
-        current ? { ...current, characters: result.characters } : current
-      );
-      setDowntimeOpen(false);
-      toast(
-        `Granted ${result.days} downtime day${result.days === 1 ? "" : "s"} to ${
-          result.recipients
-        } character${result.recipients === 1 ? "" : "s"}.`,
-        "success"
-      );
-    } catch (err) {
-      setDowntimeError(errorMessage(err));
-    } finally {
-      setDowntimeBusy(false);
-    }
-  };
-
-  const openHeroPoints = () => {
-    setHeroPointAmount("1");
-    setHeroPointRecipientIds(characters.map((character) => character.id));
-    setHeroPointError("");
-    setHeroPointOpen(true);
-  };
-
-  const toggleHeroPointRecipient = (characterId: string, checked: boolean) => {
-    setHeroPointRecipientIds((current) =>
-      checked
-        ? [...new Set([...current, characterId])]
-        : current.filter((entry) => entry !== characterId)
-    );
-  };
-
-  const awardHeroPoints = async () => {
-    if (!id) return;
-    if (!heroPointRecipientIds.length) {
-      setHeroPointError("Choose at least one character.");
-      return;
-    }
-    setHeroPointBusy(true);
-    setHeroPointError("");
-    try {
-      const result = await api<{
-        amount: number;
-        recipients: number;
-        capped: number;
-        skipped: number;
-        characters: CharacterRecord[];
-      }>(`/api/campaigns/${id}/award-hero-points`, {
-        method: "POST",
-        body: {
-          amount: Math.max(1, Math.min(3, Math.floor(Number(heroPointAmount) || 1))),
-          characterIds: heroPointRecipientIds,
-        },
-      });
-      setCharacters(result.characters);
-      setTableData((current) =>
-        current ? { ...current, characters: result.characters } : current
-      );
-      setHeroPointOpen(false);
-      toast(
-        `Awarded ${result.amount} Hero Point${result.amount === 1 ? "" : "s"} to ${
-          result.recipients
-        } character${result.recipients === 1 ? "" : "s"}${
-          result.capped ? `; ${result.capped} already at the maximum` : ""
-        }.`,
-        "success"
-      );
-    } catch (err) {
-      setHeroPointError(errorMessage(err));
-    } finally {
-      setHeroPointBusy(false);
-    }
-  };
-
-  const startNewSession = async () => {
-    if (!id) return;
-    if (
-      !window.confirm(
-        "Start a new session? Every character's Hero Points are set to 1. HP, focus, spells, conditions, and session status are unchanged."
-      )
-    ) {
-      return;
-    }
-    setHeroPointBusy(true);
-    setHeroPointError("");
-    try {
-      const result = await api<{
-        value: number;
-        recipients: number;
-        skipped: number;
-        characters: CharacterRecord[];
-      }>(`/api/campaigns/${id}/reset-hero-points`, {
-        method: "POST",
-        body: { value: 1 },
-      });
-      setCharacters(result.characters);
-      setTableData((current) =>
-        current ? { ...current, characters: result.characters } : current
-      );
-      setHeroPointOpen(false);
-      toast(
-        result.recipients > 0
-          ? `New session: reset ${result.recipients} character${
-              result.recipients === 1 ? "" : "s"
-            } to 1 Hero Point.`
-          : "New session: every character already had 1 Hero Point.",
-        "success"
-      );
-    } catch (err) {
-      setHeroPointError(errorMessage(err));
-    } finally {
-      setHeroPointBusy(false);
-    }
-  };
-
-  const longRestParty = async () => {
-    if (!id || !campaign) return;
-    if (
-      !window.confirm(
-        "Apply a long rest to every character in this campaign? This heals, resets spell slots and focus, clears temporary HP, removes fatigued, and reduces doomed and drained by 1."
-      )
-    ) {
-      return;
-    }
-    setRestBusy(true);
-    try {
-      const result = await api<{
-        rested: number;
-        skipped: number;
-        healed: number;
-        conditionsRemoved: number;
-        conditionsReduced: number;
-        slotsRestored: number;
-        focusRestored: number;
-        characters: CharacterRecord[];
-      }>(`/api/campaigns/${id}/long-rest`, { method: "POST" });
-      setCharacters(result.characters);
-      setTableData((current) =>
-        current ? { ...current, characters: result.characters } : current
-      );
-      if (result.rested > 0) {
-        toast(
-          `Long rest complete for ${result.rested} ${
-            result.rested === 1 ? "character" : "characters"
-          }: +${result.healed} HP, ${result.slotsRestored} spell slots restored, ${result.conditionsRemoved} conditions removed${
-            result.conditionsReduced ? `, ${result.conditionsReduced} reduced` : ""
-          }.`,
-          "success"
-        );
-      } else {
-        toast("No characters could rest. Check their drafts in the builder.", "info");
-      }
-    } catch (err) {
-      toast(errorMessage(err), "error");
-    } finally {
-      setRestBusy(false);
-    }
-  };
-
-  const handleCharacterUpdated = (character: CharacterRecord) => {
-    setCharacters((current) =>
-      current.map((entry) => (entry.id === character.id ? character : entry))
-    );
-    setTableData((current) =>
-      current
-        ? {
-            ...current,
-            characters: current.characters.map((entry) =>
-              entry.id === character.id ? character : entry
-            ),
-          }
-        : current
-    );
-  };
-
-  const handleNpcTokenCreated = (token: Token, _sceneId: string) => {
-    setTableData((current) =>
-      current
-        ? {
-            ...current,
-            tokens: current.tokens.some((entry) => entry.id === token.id)
-              ? current.tokens
-              : [...current.tokens, token],
-          }
-        : current
-    );
-  };
-
-  const handleEncounterLaunch = (result: EncounterLaunchResult) => {
-    setTableData((current) => {
-      if (!current) return current;
-      const known = new Set(current.tokens.map((token) => token.id));
-      return {
-        ...current,
-        activeSceneId: result.sceneId,
-        tokens: [...current.tokens, ...result.tokens.filter((token) => !known.has(token.id))],
-        initiative: result.initiative,
-        round: result.round,
-        turnIndex: result.turnIndex,
-      };
-    });
-    setTableMounted(true);
-    setTab("table");
   };
 
   const deleteCampaign = async () => {
@@ -1696,47 +897,6 @@ export function CampaignPage() {
           </button>
         ))}
 
-        {prepTabs.length ? (
-          <div className="campaign-tab-group" ref={prepRef}>
-            <button
-              type="button"
-              className={`campaign-tab-prep ${activePrepTab ? "is-active" : ""}`}
-              aria-expanded={prepOpen}
-              aria-haspopup="menu"
-              onClick={() => setPrepOpen((current) => !current)}
-              title={activePrepTab ? `Prep tools · ${activePrepTab.label}` : "Prep tools"}
-            >
-              <BookOpen size={15} />
-              <span>Prep</span>
-              {activePrepTab ? (
-                <span className="campaign-tab-prep-current">{activePrepTab.label}</span>
-              ) : null}
-              <ChevronDown size={13} className={prepOpen ? "is-open" : ""} />
-            </button>
-            {prepOpen ? (
-              <div className="campaign-tab-menu" role="menu" aria-label="Prep tools">
-                {prepTabs.map((entry) => (
-                  <button
-                    key={entry.id}
-                    type="button"
-                    role="menuitem"
-                    className={tab === entry.id ? "is-active" : ""}
-                    aria-current={tab === entry.id ? "page" : undefined}
-                    onClick={() => {
-                      setTab(entry.id);
-                      setPrepOpen(false);
-                    }}
-                  >
-                    {entry.icon}
-                    <span>{entry.label}</span>
-                    {tab === entry.id ? <Check size={13} /> : null}
-                  </button>
-                ))}
-              </div>
-            ) : null}
-          </div>
-        ) : null}
-
         {settingsTab ? (
           <button
             type="button"
@@ -1768,68 +928,6 @@ export function CampaignPage() {
       </div>
 
       <div className="campaign-content" style={{ display: tab === "table" ? "none" : undefined }}>
-        {tab === "overview" ? (
-          <CampaignDashboard
-            campaignId={campaign.id}
-            isGm={isGm}
-            currentUserId={user?.id ?? ""}
-            memberCount={members.length}
-            journalCount={tableData.journal.filter((entry) => entry.kind === "handout").length}
-            characters={characters}
-            worldDate={campaign.worldDate}
-            onWorldDateChange={(worldDate) => {
-              setCampaign((current) => (current ? { ...current, worldDate } : current));
-              setTableData((current) =>
-                current ? { ...current, campaign: { ...current.campaign, worldDate } } : current
-              );
-            }}
-            onNavigate={(next) => setTab(next)}
-            onJournalCreated={(entry) => {
-              setTableData((current) =>
-                current ? { ...current, journal: [entry, ...current.journal] } : current
-              );
-              setSelectedJournalId(entry.id);
-            }}
-            onInvite={() => setInviteOpen(true)}
-            toast={toast}
-          />
-        ) : null}
-
-        {tab === "session-zero" ? (
-          <SessionZeroTab
-            campaignId={campaign.id}
-            isGm={isGm}
-            refreshKey={campaign.updatedAt}
-            toast={toast}
-          />
-        ) : null}
-
-        {tab === "people" ? (
-          <PeopleTab campaignId={campaign.id} refreshKey={campaign.updatedAt} />
-        ) : null}
-
-        {tab === "arc" ? (
-          <CampaignArcTab
-            campaignId={campaign.id}
-            isGm={Boolean(isGm)}
-            refreshKey={campaign.updatedAt}
-            toast={toast}
-          />
-        ) : null}
-
-        {tab === "travel" ? (
-          <TravelTab
-            campaignId={campaign.id}
-            isGm={isGm}
-            characters={characters}
-            worldDate={campaign.worldDate}
-            refreshKey={campaign.updatedAt}
-            toast={toast}
-          />
-        ) : null}
-
-        {tab === "clocks" ? <ClocksTab campaignId={campaign.id} isGm={isGm} /> : null}
-
         {tab === "party" ? (
           <CorePartyPanel
             characters={characters}
@@ -1837,61 +935,6 @@ export function CampaignPage() {
             onNewCharacter={createCharacter}
             onLevelUp={(characterId) => void levelUpCharacters(characterId)}
             levelingId={levelingId}
-          />
-        ) : null}
-
-        {tab === "sessions" ? (
-          <SessionsPage
-            campaignId={campaign.id}
-            isGm={isGm}
-            currentUserId={user?.id ?? ""}
-            toast={toast}
-          />
-        ) : null}
-
-        {tab === "encounters" ? (
-          <EncounterBuilder
-            campaignId={campaign.id}
-            isGm={isGm}
-            xpMode={campaign.xpMode}
-            characters={characters}
-            scenes={tableData.scenes}
-            activeSceneId={tableData.activeSceneId}
-            onLaunched={handleEncounterLaunch}
-            toast={toast}
-          />
-        ) : null}
-
-        {tab === "loot" ? (
-          <LootBuilder
-            campaignId={campaign.id}
-            isGm={isGm}
-            ruleset={campaign.ruleset}
-            characters={characters}
-            onCharacterUpdated={handleCharacterUpdated}
-            toast={toast}
-          />
-        ) : null}
-
-        {tab === "npcs" ? (
-          <NpcLibrary
-            campaignId={campaign.id}
-            isGm={isGm}
-            scenes={tableData.scenes}
-            activeSceneId={tableData.activeSceneId}
-            onTokenCreated={handleNpcTokenCreated}
-            toast={toast}
-          />
-        ) : null}
-
-        {tab === "assets" ? <AssetLibrary campaignId={campaign.id} toast={toast} /> : null}
-
-        {tab === "notes" ? (
-          <NotesTab
-            campaignId={campaign.id}
-            isGm={Boolean(isGm)}
-            refreshKey={campaign.updatedAt}
-            toast={toast}
           />
         ) : null}
 
@@ -1903,19 +946,10 @@ export function CampaignPage() {
                   <PageEyebrow>Chronicle</PageEyebrow>
                   <h2 style={{ marginTop: 5 }}>Journal</h2>
                   <p className="tiny muted" style={{ marginTop: 4 }}>
-                    Session recaps, handouts, and quests. Private notes and shared lore are in Notes
-                    &amp; lore.
+                    Session recaps, handouts, and quests.
                   </p>
                 </div>
                 <div className="row wrap" style={{ gap: 8 }}>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    icon={<BookOpen size={14} />}
-                    onClick={() => setTab("notes")}
-                  >
-                    Notes &amp; lore
-                  </Button>
                   {isGm ? (
                     <Button
                       size="sm"
@@ -1925,21 +959,7 @@ export function CampaignPage() {
                     >
                       New entry
                     </Button>
-                  ) : (
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      icon={<FilePlus2 size={14} />}
-                      onClick={() => {
-                        setProposalTitle("");
-                        setProposalContent("");
-                        setProposalNote("");
-                        setJournalProposalOpen(true);
-                      }}
-                    >
-                      Propose entry
-                    </Button>
-                  )}
+                  ) : null}
                 </div>
               </div>
               <div className="segmented journal-filter">
@@ -2133,10 +1153,6 @@ export function CampaignPage() {
           </div>
         ) : null}
 
-        {tab === "gm-screen" ? (
-          <GmScreen campaignId={campaign.id} characters={characters} toast={toast} />
-        ) : null}
-
         {tab === "settings" ? (
           <div className="page-inner settings-layout">
             <Card className="settings-card">
@@ -2186,7 +1202,7 @@ export function CampaignPage() {
                       isGm
                         ? XP_MODE_OPTIONS.find((option) => option.value === settingsXpMode)
                             ?.description
-                        : "Set by the campaign GM. It controls whether encounter XP budgets and awards are shown."
+                        : "Set by the campaign GM. It controls whether level-ups spend XP and whether quest rewards can be granted."
                     }
                   >
                     <Select
@@ -2303,8 +1319,8 @@ export function CampaignPage() {
                 <div className="settings-note">
                   <Sparkles size={15} />
                   <p>
-                    Switch to <strong>XP tracking</strong> to see PF2e encounter difficulty and
-                    award XP. <strong>Milestone</strong> hides those numbers. Advancement speed sets
+                    Switch to <strong>XP tracking</strong> to spend XP on level-ups and award quest
+                    rewards. <strong>Milestone</strong> skips XP bookkeeping. Advancement speed sets
                     the XP threshold for each level (fast 800, medium 1,000, slow 1,200). Either
                     way, no character levels up automatically; use <strong>Level up party</strong>{" "}
                     or the <strong>Level up</strong> button on a party card when you decide.
@@ -2612,8 +1628,8 @@ export function CampaignPage() {
       >
         <div className="stack">
           <p className="small muted">
-            This removes the campaign, every scene and token, journal entries, sessions, loot, NPCs,
-            and character links. Characters themselves are kept but unassigned.
+            This removes the campaign, every scene and token, journal entries, and character links.
+            Characters themselves are kept but unassigned.
           </p>
           <Field
             label="Type the campaign name to confirm"
@@ -2877,507 +1893,6 @@ export function CampaignPage() {
             ))}
           </div>
         )}
-      </Modal>
-
-      <Modal
-        open={downtimeOpen}
-        onClose={() => setDowntimeOpen(false)}
-        title="Grant downtime"
-        subtitle="Give the party time between adventures. Players spend the days from their character sheet."
-        footer={
-          <>
-            <Button variant="ghost" onClick={() => setDowntimeOpen(false)}>
-              Cancel
-            </Button>
-            <Button
-              variant="primary"
-              icon={<CalendarClock size={15} />}
-              loading={downtimeBusy}
-              onClick={() => void grantDowntime()}
-            >
-              Grant downtime
-            </Button>
-          </>
-        }
-      >
-        <div className="stack">
-          {downtimeError ? <div className="auth-error">{downtimeError}</div> : null}
-          <Field
-            label="Downtime days"
-            hint="Each character receives this many days to spend on earn income, crafting, retraining, or other downtime activities."
-          >
-            <Input
-              type="number"
-              min={1}
-              max={365}
-              value={downtimeDays}
-              onChange={(event) => setDowntimeDays(event.target.value)}
-            />
-          </Field>
-          <div className="row-between">
-            <strong>Recipients</strong>
-            <div className="row" style={{ gap: 6 }}>
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                onClick={() => setDowntimeTargetIds(characters.map((entry) => entry.id))}
-              >
-                All
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                onClick={() => setDowntimeTargetIds([])}
-              >
-                None
-              </Button>
-            </div>
-          </div>
-          <div className="stack" style={{ gap: 4 }}>
-            {characters.map((entry) => (
-              <Checkbox
-                key={entry.id}
-                label={`${entry.name} (${entry.summary?.downtimeDays ?? 0} ${
-                  entry.summary?.downtimeDays === 1 ? "day" : "days"
-                })`}
-                checked={downtimeTargetIds.includes(entry.id)}
-                onChange={(checked) => toggleDowntimeTarget(entry.id, checked)}
-              />
-            ))}
-          </div>
-        </div>
-      </Modal>
-
-      <Modal
-        open={heroPointOpen}
-        onClose={() => setHeroPointOpen(false)}
-        title="Hero Points"
-        subtitle="Award points for heroic actions, or reset the table for a new session."
-        footer={
-          <>
-            <Button variant="ghost" onClick={() => setHeroPointOpen(false)}>
-              Cancel
-            </Button>
-            <Button
-              variant="primary"
-              icon={<Star size={15} />}
-              loading={heroPointBusy}
-              onClick={() => void awardHeroPoints()}
-            >
-              Award Hero Points
-            </Button>
-          </>
-        }
-      >
-        <div className="stack">
-          {heroPointError ? <div className="auth-error">{heroPointError}</div> : null}
-          <Field
-            label="Amount"
-            hint="Hero Points are capped at 3. Award 1 for a notable heroic act, or more for an especially memorable moment."
-          >
-            <Select
-              value={heroPointAmount}
-              onChange={(event) => setHeroPointAmount(event.target.value)}
-            >
-              <option value="1">1 Hero Point</option>
-              <option value="2">2 Hero Points</option>
-              <option value="3">3 Hero Points</option>
-            </Select>
-          </Field>
-          <div className="row-between">
-            <strong>Recipients</strong>
-            <div className="row" style={{ gap: 6 }}>
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                onClick={() => setHeroPointRecipientIds(characters.map((entry) => entry.id))}
-              >
-                All
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                onClick={() => setHeroPointRecipientIds([])}
-              >
-                None
-              </Button>
-            </div>
-          </div>
-          <div className="stack" style={{ gap: 4 }}>
-            {characters.map((entry) => (
-              <Checkbox
-                key={entry.id}
-                label={`${entry.name} (${entry.summary?.heroPoints ?? 0} / 3)`}
-                checked={heroPointRecipientIds.includes(entry.id)}
-                onChange={(checked) => toggleHeroPointRecipient(entry.id, checked)}
-              />
-            ))}
-          </div>
-          <div className="divider" />
-          <div>
-            <strong>Start a new session</strong>
-            <p className="tiny muted">
-              Sets every character's Hero Points to 1. HP, focus, spells, conditions, and session
-              status are unchanged.
-            </p>
-            <Button
-              type="button"
-              variant="secondary"
-              loading={heroPointBusy}
-              onClick={() => void startNewSession()}
-            >
-              Start new session (reset to 1)
-            </Button>
-          </div>
-        </div>
-      </Modal>
-
-      <Modal
-        open={xpOpen}
-        onClose={() => setXpOpen(false)}
-        title="Award XP"
-        subtitle="Track experience without advancing anyone automatically. Level-ups stay in the GM's hands."
-        footer={
-          <>
-            <Button variant="ghost" onClick={() => setXpOpen(false)}>
-              Cancel
-            </Button>
-            <Button
-              variant="primary"
-              icon={<Award size={15} />}
-              loading={xpBusy}
-              onClick={() => void awardXp()}
-            >
-              Award XP
-            </Button>
-          </>
-        }
-      >
-        <div className="stack">
-          {xpError ? <div className="auth-error">{xpError}</div> : null}
-          <Field
-            label="Award type"
-            hint="Encounters use the PF2e threat XP. Hazards use the level-difference table. Accomplishments cover exploration and story milestones."
-          >
-            <Select
-              value={xpKind}
-              onChange={(event) => setXpKind(event.target.value as XpAwardKind)}
-            >
-              {XP_AWARD_KINDS.filter((kind) => kind !== "quest").map((kind) => (
-                <option key={kind} value={kind}>
-                  {XP_AWARD_KIND_LABELS[kind]}
-                </option>
-              ))}
-            </Select>
-          </Field>
-          {xpKind === "hazard" ? (
-            <>
-              <div className="form-grid three">
-                <Field label="Hazard level">
-                  <Input
-                    type="number"
-                    min={0}
-                    max={30}
-                    value={xpHazardLevel}
-                    onChange={(event) => setXpHazardLevel(event.target.value)}
-                  />
-                </Field>
-                <Field label="Party level">
-                  <Input
-                    type="number"
-                    min={1}
-                    max={20}
-                    value={xpPartyLevel}
-                    onChange={(event) => setXpPartyLevel(event.target.value)}
-                  />
-                </Field>
-                <Field label="Hazard type">
-                  <Select
-                    value={xpHazardComplexity}
-                    onChange={(event) =>
-                      setXpHazardComplexity(event.target.value as "simple" | "complex")
-                    }
-                  >
-                    <option value="complex">Complex hazard</option>
-                    <option value="simple">Simple hazard</option>
-                  </Select>
-                </Field>
-              </div>
-              <p className="tiny muted">
-                This hazard is worth <strong>{xpPreviewAmount.toLocaleString()} XP</strong>. Award
-                it once, whether the party disables, avoids, or endures the hazard.
-              </p>
-            </>
-          ) : null}
-          {xpKind === "accomplishment" ? (
-            <Field
-              label="Accomplishment"
-              hint="Minor 10 XP, moderate 30 XP, major 80 XP. Moderate and major awards often also grant a Hero Point."
-            >
-              <div className="xp-quick">
-                {ACCOMPLISHMENT_TIERS.map((tier) => (
-                  <Button
-                    key={tier}
-                    type="button"
-                    size="sm"
-                    variant={xpAccomplishmentTier === tier ? "primary" : "ghost"}
-                    onClick={() => setXpAccomplishmentTier(tier)}
-                  >
-                    {ACCOMPLISHMENT_LABELS[tier]} ({ACCOMPLISHMENT_XP[tier]} XP)
-                  </Button>
-                ))}
-              </div>
-            </Field>
-          ) : null}
-          {xpKind === "encounter" || xpKind === "other" ? (
-            <>
-              <Field
-                label="XP amount"
-                hint="PF2e encounter awards: trivial 10, low 15, moderate 20, severe 30, extreme 40."
-              >
-                <Input
-                  type="number"
-                  min={1}
-                  max={100000}
-                  value={xpAmount}
-                  onChange={(event) => setXpAmount(event.target.value)}
-                />
-              </Field>
-              <div className="xp-quick">
-                {[10, 15, 20, 30, 40].map((value) => (
-                  <Button
-                    key={value}
-                    type="button"
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => setXpAmount(String(value))}
-                  >
-                    {value} XP
-                  </Button>
-                ))}
-              </div>
-            </>
-          ) : null}
-          <Field label="Reason (optional)">
-            <Input
-              value={xpReason}
-              onChange={(event) => setXpReason(event.target.value)}
-              placeholder="Moderate encounter · Session 12"
-            />
-          </Field>
-          <div className="row-between">
-            <strong>Recipients</strong>
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              onClick={() => setXpRecipientIds(characters.map((character) => character.id))}
-            >
-              Select all
-            </Button>
-          </div>
-          <div className="xp-recipients">
-            {characters.map((character) => (
-              <Checkbox
-                key={character.id}
-                checked={xpRecipientIds.includes(character.id)}
-                onChange={(checked) => toggleXpRecipient(character.id, checked)}
-                label={
-                  <span>
-                    {character.name}
-                    {character.summary ? (
-                      <span className="tiny muted">
-                        {" "}
-                        · Level {character.summary.level} · {character.summary.xp ?? 0} XP
-                      </span>
-                    ) : null}
-                  </span>
-                }
-              />
-            ))}
-            {!characters.length ? (
-              <p className="muted small">No characters in this campaign yet.</p>
-            ) : null}
-          </div>
-          <div className="settings-note">
-            <Award size={16} />
-            <span>
-              XP never triggers a level-up. Use <strong>Level up</strong> on a party card or{" "}
-              <strong>Level up party</strong> when you decide.
-            </span>
-          </div>
-        </div>
-      </Modal>
-
-      <Modal
-        open={Boolean(requestDowntimeCharacter)}
-        onClose={() => setRequestDowntimeCharacter(null)}
-        title="Request downtime"
-        subtitle={
-          requestDowntimeCharacter
-            ? `Ask the GM to grant downtime days to ${requestDowntimeCharacter.name}.`
-            : undefined
-        }
-        footer={
-          <>
-            <Button variant="ghost" onClick={() => setRequestDowntimeCharacter(null)}>
-              Cancel
-            </Button>
-            <Button
-              variant="primary"
-              icon={<CalendarClock size={15} />}
-              loading={requestDowntimeBusy}
-              onClick={() => void submitDowntimeRequest()}
-            >
-              Send request
-            </Button>
-          </>
-        }
-      >
-        <div className="stack">
-          <Field
-            label="Downtime days"
-            hint="The GM can approve the request as written or deny it with a note."
-          >
-            <Input
-              type="number"
-              min={1}
-              max={3650}
-              value={requestDowntimeDays}
-              onChange={(event) => setRequestDowntimeDays(event.target.value)}
-            />
-          </Field>
-          <Field label="What do you want to do? (optional)">
-            <Textarea
-              value={requestDowntimeNote}
-              onChange={(event) => setRequestDowntimeNote(event.target.value)}
-              placeholder="Craft a striking rune, retrain a skill, earn income..."
-              rows={3}
-            />
-          </Field>
-        </div>
-      </Modal>
-
-      <Modal
-        open={Boolean(reviewRequest)}
-        onClose={() => setReviewRequest(null)}
-        title="Review request"
-        subtitle={reviewRequest?.title}
-        footer={
-          <>
-            <Button variant="ghost" onClick={() => setReviewRequest(null)}>
-              Cancel
-            </Button>
-            <Button
-              variant="danger"
-              icon={<X size={15} />}
-              loading={reviewBusy === "deny"}
-              disabled={reviewBusy === "approve"}
-              onClick={() => void resolveRequest("deny")}
-            >
-              Deny
-            </Button>
-            <Button
-              variant="primary"
-              icon={<Check size={15} />}
-              loading={reviewBusy === "approve"}
-              disabled={reviewBusy === "deny"}
-              onClick={() => void resolveRequest("approve")}
-            >
-              Approve
-            </Button>
-          </>
-        }
-      >
-        {reviewRequest ? (
-          <div className="stack">
-            <div className="request-review-meta">
-              <Tag tone="violet">{CAMPAIGN_REQUEST_KIND_LABELS[reviewRequest.kind]}</Tag>
-              <span className="tiny muted">
-                From {reviewRequest.playerName || "a player"} ·{" "}
-                {formatDate(reviewRequest.createdAt)}
-              </span>
-            </div>
-            <p>{reviewRequest.detail}</p>
-            {reviewRequest.note ? <p className="request-note">“{reviewRequest.note}”</p> : null}
-            {reviewRequest.kind === "journal" ? (
-              <div className="request-proposal">
-                <strong>{reviewRequest.payload.title}</strong>
-                <p>{reviewRequest.payload.content}</p>
-              </div>
-            ) : null}
-            <Field
-              label="GM note (optional)"
-              hint="The player sees this note with the request's resolution."
-            >
-              <Textarea
-                value={reviewNote}
-                onChange={(event) => setReviewNote(event.target.value)}
-                placeholder="Approved. Spend the days before the next session."
-                rows={3}
-              />
-            </Field>
-            <div className="settings-note">
-              <Sparkles size={16} />
-              <span>
-                Approving applies the change immediately. Level-ups consume XP in XP tracking mode;
-                journal proposals become shared entries.
-              </span>
-            </div>
-          </div>
-        ) : null}
-      </Modal>
-
-      <Modal
-        open={journalProposalOpen}
-        onClose={() => setJournalProposalOpen(false)}
-        title="Propose a journal entry"
-        subtitle="The GM reviews player-written recaps, lore, and handouts before they join the chronicle."
-        footer={
-          <>
-            <Button variant="ghost" onClick={() => setJournalProposalOpen(false)}>
-              Cancel
-            </Button>
-            <Button
-              variant="primary"
-              icon={<FilePlus2 size={15} />}
-              loading={proposalBusy}
-              onClick={() => void submitJournalProposal()}
-            >
-              Send to GM
-            </Button>
-          </>
-        }
-      >
-        <div className="stack">
-          <Field label="Title">
-            <Input
-              value={proposalTitle}
-              maxLength={140}
-              onChange={(event) => setProposalTitle(event.target.value)}
-              placeholder="Session 12: The Sunken Gate"
-            />
-          </Field>
-          <Field label="Entry" hint="Markdown is supported.">
-            <Textarea
-              value={proposalContent}
-              onChange={(event) => setProposalContent(event.target.value)}
-              placeholder="What happened, who we met, and what we owe..."
-              rows={9}
-            />
-          </Field>
-          <Field label="Note to the GM (optional)">
-            <Input
-              value={proposalNote}
-              onChange={(event) => setProposalNote(event.target.value)}
-              placeholder="This is the recap I promised."
-            />
-          </Field>
-        </div>
       </Modal>
 
       <Modal
