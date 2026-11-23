@@ -179,9 +179,7 @@ export function PartyRail({
                         ? "Online"
                         : "Offline"}
                   </span>
-                  <span>
-                    {token ? "Click to select · Double-click for sheet" : "Double-click for sheet"}
-                  </span>
+                  <span>Click to open sheet</span>
                 </div>
               </div>
             </div>

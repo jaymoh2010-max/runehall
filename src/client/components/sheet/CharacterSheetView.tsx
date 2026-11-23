@@ -1,5 +1,5 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
   BookOpen,
@@ -43,6 +43,7 @@ import { currencyToCp } from "../../../shared/inventory";
 import { applyHpEditToDraft } from "../../../shared/damage";
 import { rollFormula } from "../../../shared/dice";
 import { castSpell, spellCastOptions, type SpellCastChoice } from "../../../shared/spellcasting";
+import { innateUsesRemaining } from "../../../shared/innate";
 import { api, formatCp } from "../../api";
 import { errorMessage, useToasts } from "../../stores";
 
@@ -101,6 +102,7 @@ export function CharacterSheetView({
   onRoll?: (formula: string, label: string, dc: number | null, gmOnly: boolean) => void;
 }) {
   const toast = useToasts((state) => state.push);
+  const navigate = useNavigate();
   const [character, setCharacter] = useState<CharacterRecord | null>(null);
   const [draft, setDraft] = useState<CharacterDraft | null>(null);
   const [context, setContext] = useState<CharacterContext | null>(null);
@@ -123,6 +125,7 @@ export function CharacterSheetView({
   const [actions, setActions] = useState<ActionRef[]>([]);
   const [actionQuery, setActionQuery] = useState("");
   const [actionCategory, setActionCategory] = useState("all");
+  const [actionLimit, setActionLimit] = useState(120);
   const [actionsLoading, setActionsLoading] = useState(false);
   const [detailsForm, setDetailsForm] = useState({
     name: "",
@@ -137,12 +140,21 @@ export function CharacterSheetView({
     notes: "",
   });
   const [detailsSaving, setDetailsSaving] = useState(false);
+  const [detailsDirty, setDetailsDirty] = useState(false);
+  const [sheetDc, setSheetDc] = useState("");
+  const [sheetSecret, setSheetSecret] = useState(false);
   const [itemQuery, setItemQuery] = useState("");
   const [itemResults, setItemResults] = useState<Equipment[]>([]);
   const [itemQuantities, setItemQuantities] = useState<Record<string, string>>({});
   const [itemBusy, setItemBusy] = useState<string | null>(null);
   const [itemError, setItemError] = useState("");
   const [itemLoading, setItemLoading] = useState(false);
+  const characterRef = useRef<CharacterRecord | null>(null);
+  const draftRef = useRef<CharacterDraft | null>(null);
+  const savingRef = useRef(false);
+  const pendingDraftRef = useRef<CharacterDraft | null>(null);
+  const saveWaitersRef = useRef<Array<(ok: boolean) => void>>([]);
+  const canEdit = Boolean(character?.permissions?.canEdit);
 
   const applyRecord = useCallback(async (record: CharacterRecord) => {
     const normalized = normalizeCharacterDraft(record.data, record.name);
@@ -150,6 +162,8 @@ export function CharacterSheetView({
       `/api/characters/${record.id}/context`,
       { method: "POST", body: { draft: normalized } }
     );
+    characterRef.current = record;
+    draftRef.current = normalized;
     setCharacter(record);
     setDraft(normalized);
     setContext(contextResult.context);
@@ -157,29 +171,39 @@ export function CharacterSheetView({
     document.title = `${normalized.name} · Runehall`;
   }, []);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError("");
-    try {
-      const result = await api<{ character: CharacterRecord }>(`/api/characters/${characterId}`);
-      await applyRecord(result.character);
-    } catch (err) {
-      setError(errorMessage(err));
-    } finally {
-      setLoading(false);
-    }
-  }, [applyRecord, characterId]);
+  const load = useCallback(
+    async (options: { silent?: boolean } = {}) => {
+      if (!options.silent) setLoading(true);
+      setError("");
+      try {
+        const result = await api<{ character: CharacterRecord }>(`/api/characters/${characterId}`);
+        await applyRecord(result.character);
+      } catch (err) {
+        setError(errorMessage(err));
+      } finally {
+        if (!options.silent) setLoading(false);
+      }
+    },
+    [applyRecord, characterId]
+  );
 
   useEffect(() => {
     void load();
   }, [load]);
 
   useEffect(() => {
+    const previousTitle = document.title;
+    return () => {
+      document.title = previousTitle;
+    };
+  }, []);
+
+  useEffect(() => {
     if (derived) setHpInput(String(derived.currentHp));
   }, [derived?.currentHp, derived]);
 
   useEffect(() => {
-    if (!character || !draft) return;
+    if (!character || !draft || detailsDirty) return;
     setDetailsForm({
       name: draft.name,
       age: draft.details.age,
@@ -192,7 +216,7 @@ export function CharacterSheetView({
       beliefs: draft.details.beliefs,
       notes: draft.details.notes,
     });
-  }, [character?.revision, draft]);
+  }, [character?.revision, detailsDirty, draft]);
 
   useEffect(() => {
     if (tab !== "actions" || actions.length) return;
@@ -225,14 +249,14 @@ export function CharacterSheetView({
     const socket = getSocket();
     const leave = mode === "page" && !onRoll ? joinCampaign(campaignId) : () => undefined;
     const onCharacterUpdated = (payload: { characterId: string }) => {
-      if (payload.characterId === characterId && !saving) void load();
+      if (payload.characterId === characterId && !savingRef.current) void load({ silent: true });
     };
     socket.on("character:updated", onCharacterUpdated);
     return () => {
       socket.off("character:updated", onCharacterUpdated);
       leave();
     };
-  }, [character?.campaignId, characterId, load, mode, onRoll, saving]);
+  }, [character?.campaignId, characterId, load, mode, onRoll]);
 
   useEffect(() => {
     if (tab !== "gear") return;
@@ -257,9 +281,10 @@ export function CharacterSheetView({
     };
   }, [itemQuery, tab]);
 
-  const targetDc = null;
+  const parsedDc = Number(sheetDc);
+  const targetDc = sheetDc.trim() !== "" && Number.isFinite(parsedDc) ? Math.round(parsedDc) : null;
   const postRoll = useCallback(
-    (formula: string, label: string, dc: number | null = targetDc, gmOnly = false) => {
+    (formula: string, label: string, dc: number | null = targetDc, gmOnly = sheetSecret) => {
       if (onRoll) {
         onRoll(formula, label, dc, gmOnly);
         return;
@@ -304,49 +329,89 @@ export function CharacterSheetView({
         }
       );
     },
-    [character?.campaignId, onRoll, targetDc, toast]
+    [character?.campaignId, onRoll, sheetSecret, targetDc, toast]
   );
 
-  const persist = async (next: CharacterDraft) => {
-    if (!character || !context || saving) return;
-    const normalized = normalizeCharacterDraft(next, next.name);
+  const persist = async (
+    next: CharacterDraft | ((current: CharacterDraft) => CharacterDraft)
+  ): Promise<boolean> => {
+    if (!canEdit) {
+      toast("This sheet is read-only.", "error");
+      return false;
+    }
+    const base = draftRef.current;
+    if (!base || !context) return false;
+    const target = typeof next === "function" ? next(base) : next;
+    const normalized = normalizeCharacterDraft(target, target.name);
+    draftRef.current = normalized;
     setDraft(normalized);
     setDerived(computeCharacter(normalized, context));
+    pendingDraftRef.current = normalized;
+    if (savingRef.current) {
+      return new Promise<boolean>((resolve) => saveWaitersRef.current.push(resolve));
+    }
+    savingRef.current = true;
     setSaving(true);
+    let succeeded = true;
     try {
-      const result = await api<{ character: CharacterRecord }>(`/api/characters/${character.id}`, {
-        method: "PUT",
-        body: { data: normalized, expectedRevision: character.revision },
-      });
-      setCharacter(result.character);
+      while (pendingDraftRef.current) {
+        const draftToSave = pendingDraftRef.current;
+        pendingDraftRef.current = null;
+        const current: CharacterRecord | null = characterRef.current;
+        if (!current) break;
+        const result: { character: CharacterRecord } = await api<{ character: CharacterRecord }>(
+          `/api/characters/${current.id}`,
+          {
+            method: "PUT",
+            body: { data: draftToSave, expectedRevision: current.revision },
+          }
+        );
+        characterRef.current = result.character;
+        setCharacter(result.character);
+        if (!pendingDraftRef.current) {
+          const saved = normalizeCharacterDraft(result.character.data, result.character.name);
+          draftRef.current = saved;
+          setDraft(saved);
+          setDerived(computeCharacter(saved, context));
+        }
+      }
       toast("Saved.", "success");
     } catch (err) {
+      pendingDraftRef.current = null;
+      succeeded = false;
       toast(errorMessage(err), "error");
-      await load();
+      await load({ silent: true });
     } finally {
+      savingRef.current = false;
       setSaving(false);
+      const waiters = saveWaitersRef.current.splice(0);
+      for (const resolve of waiters) resolve(succeeded);
     }
+    return succeeded;
   };
 
   const changeHp = (value: number) => {
-    if (!draft || !derived) return;
-    const hp = Math.max(0, Math.min(derived.maxHp, Math.round(value)));
-    const result = applyHpEditToDraft(draft, derived.maxHp, { type: "set", hp });
-    void persist(result.draft);
+    if (!canEdit || !derived) return;
+    void persist((currentDraft) => {
+      const hp = Math.max(0, Math.min(derived.maxHp, Math.round(value)));
+      return applyHpEditToDraft(currentDraft, derived.maxHp, { type: "set", hp }).draft;
+    });
   };
 
-  const updateDetails = (key: keyof typeof detailsForm, value: string) =>
+  const updateDetails = (key: keyof typeof detailsForm, value: string) => {
+    setDetailsDirty(true);
     setDetailsForm((current) => ({ ...current, [key]: value }));
+  };
 
   const saveDetails = async () => {
-    if (!draft) return;
+    if (!canEdit || !draft) return;
     setDetailsSaving(true);
     try {
-      await persist({
-        ...draft,
-        name: detailsForm.name.trim() || draft.name,
+      const saved = await persist((currentDraft) => ({
+        ...currentDraft,
+        name: detailsForm.name.trim() || currentDraft.name,
         details: {
-          ...draft.details,
+          ...currentDraft.details,
           age: detailsForm.age,
           gender: detailsForm.gender,
           pronouns: detailsForm.pronouns,
@@ -357,7 +422,8 @@ export function CharacterSheetView({
           beliefs: detailsForm.beliefs,
           notes: detailsForm.notes,
         },
-      });
+      }));
+      if (saved) setDetailsDirty(false);
     } finally {
       setDetailsSaving(false);
     }
@@ -373,18 +439,18 @@ export function CharacterSheetView({
       duration:
         conditionDuration === "" ? null : Math.max(0, Math.round(Number(conditionDuration))),
     };
-    void persist({
-      ...draft,
+    void persist((currentDraft) => ({
+      ...currentDraft,
       play: {
-        ...draft.play,
+        ...currentDraft.play,
         conditions: [
-          ...draft.play.conditions.filter(
+          ...currentDraft.play.conditions.filter(
             (condition) => condition.name.toLowerCase() !== name.toLowerCase()
           ),
           entry,
         ],
       },
-    });
+    }));
     setConditionName("");
     setConditionValue("");
     setConditionDuration("");
@@ -392,17 +458,17 @@ export function CharacterSheetView({
 
   const removeCondition = (index: number) => {
     if (!draft) return;
-    void persist({
-      ...draft,
+    void persist((currentDraft) => ({
+      ...currentDraft,
       play: {
-        ...draft.play,
-        conditions: draft.play.conditions.filter((_condition, at) => at !== index),
+        ...currentDraft.play,
+        conditions: currentDraft.play.conditions.filter((_condition, at) => at !== index),
       },
-    });
+    }));
   };
 
   const buyItem = async (item: Equipment, mode: "buy" | "grant") => {
-    if (!character || itemBusy) return;
+    if (!canEdit || !character || itemBusy) return;
     setItemBusy(item.id);
     setItemError("");
     try {
@@ -426,17 +492,22 @@ export function CharacterSheetView({
   };
 
   const toggleEquipment = (itemId: string, field: "equipped" | "invested") => {
-    if (!draft) return;
-    void persist({
-      ...draft,
-      equipment: draft.equipment.map((entry) =>
+    if (!canEdit || !draft) return;
+    void persist((currentDraft) => ({
+      ...currentDraft,
+      equipment: currentDraft.equipment.map((entry) =>
         entry.itemId === itemId ? { ...entry, [field]: !entry[field] } : entry
       ),
-    });
+    }));
   };
 
   const spellEntries = useMemo(() => {
     if (!draft || !context) return [];
+    const grantedGroups = (derived?.grantedSpells ?? []).map((spell) => ({
+      label:
+        spell.kind === "focus" ? "Focus" : spell.kind === "curriculum" ? "Curriculum" : "Granted",
+      ids: [spell.id],
+    }));
     const groups: { label: string; ids: string[] }[] = [
       { label: "Cantrips", ids: draft.spells.cantrips },
       { label: "Prepared", ids: draft.spells.prepared },
@@ -444,14 +515,18 @@ export function CharacterSheetView({
       { label: "Focus", ids: draft.spells.focus },
       { label: "Innate", ids: draft.spells.innate },
       { label: "Rituals", ids: draft.spells.rituals },
+      ...grantedGroups,
     ];
     const seen = new Set<string>();
     return groups.flatMap((group) =>
       [...new Set(group.ids)]
         .filter((id) => {
-          // Prepared casters often list the same spell in both their book and
-          // today's preparations. Show the prepared entry once.
-          if (group.label === "Spells" && seen.has(id)) return false;
+          // Prepared casters list known spells in their book and again in
+          // today's preparations; show the prepared copy once. Innate copies
+          // spend a different resource, so they stay visible alongside a
+          // cantrip or prepared copy of the same spell.
+          if (group.label === "Innate") return true;
+          if (seen.has(id)) return false;
           seen.add(id);
           return true;
         })
@@ -461,7 +536,7 @@ export function CharacterSheetView({
           id,
         }))
     );
-  }, [context, draft]);
+  }, [context, derived?.grantedSpells, draft]);
 
   const featName = useCallback(
     (id: string | null | undefined) => (id ? (context?.feats[id]?.name ?? id) : ""),
@@ -533,6 +608,10 @@ export function CharacterSheetView({
     });
   }, [actionCategory, actionQuery, actions]);
 
+  useEffect(() => {
+    setActionLimit(120);
+  }, [actionCategory, actionQuery]);
+
   const actionCategories = useMemo(
     () => [...new Set(actions.map((action) => action.category).filter(Boolean))].sort(),
     [actions]
@@ -547,12 +626,16 @@ export function CharacterSheetView({
         focus: group === "Focus",
         focusPointsMax: derived?.focusPointsMax ?? 0,
         innate: group === "Innate",
+        innateRemaining:
+          group === "Innate" && draft ? innateUsesRemaining(draft, spell) : undefined,
       }),
     [context, derived?.focusPointsMax, draft]
   );
 
-  const cast = (spell: Spell, group: string) => {
-    if (!draft || !context) return;
+  const cast = async (spell: Spell, group: string) => {
+    if (!canEdit || !context) return;
+    const currentDraft = draftRef.current;
+    if (!currentDraft) return;
     const options = optionsForSpell(spell, group);
     const key = `${group}:${spell.id}`;
     const selected =
@@ -565,21 +648,23 @@ export function CharacterSheetView({
       toast("No spell resource is available for that spell.", "error");
       return;
     }
-    const result = castSpell(draft, spell, context, choice, {
+    const result = castSpell(currentDraft, spell, context, choice, {
       focus: group === "Focus",
       focusPointsMax: derived?.focusPointsMax ?? 0,
       innate: group === "Innate",
+      innateRemaining: group === "Innate" ? innateUsesRemaining(currentDraft, spell) : undefined,
     });
     if (!result) {
       toast("That spell has no uses left at the selected rank.", "error");
       return;
     }
-    void persist(result.draft);
+    const saved = await persist(result.draft);
+    if (!saved) return;
     toast(`Cast ${spell.name} at rank ${result.option.rank}.`, "success");
     if (character?.campaignId) {
       getSocket().emit("chat:send", {
         campaignId: character.campaignId,
-        content: `${draft.name} casts ${spell.name} at rank ${result.option.rank} (${result.option.label}).`,
+        content: `${currentDraft.name} casts ${spell.name} at rank ${result.option.rank} (${result.option.label}).`,
         visibility: "all",
       });
     }
@@ -655,16 +740,39 @@ export function CharacterSheetView({
           </span>
         </div>
         <div className="pb-topbar-right">
+          <div className="pb-dc-control">
+            <label>
+              <span>DC</span>
+              <input
+                type="number"
+                value={sheetDc}
+                placeholder="—"
+                aria-label="Target DC for sheet rolls"
+                onChange={(event) => setSheetDc(event.target.value)}
+              />
+            </label>
+            <button
+              type="button"
+              className={sheetSecret ? "pb-button is-on" : "pb-button"}
+              aria-pressed={sheetSecret}
+              title="Send these rolls to the GM only"
+              onClick={() => setSheetSecret((current) => !current)}
+            >
+              Secret
+            </button>
+          </div>
           <button type="button" className="pb-button" onClick={() => window.print()}>
             <Printer size={14} /> Print
           </button>
-          <button
-            type="button"
-            className="pb-button is-primary"
-            onClick={() => setBuilderOpen(true)}
-          >
-            <Pencil size={14} /> Edit build
-          </button>
+          {canEdit ? (
+            <button
+              type="button"
+              className="pb-button is-primary"
+              onClick={() => setBuilderOpen(true)}
+            >
+              <Pencil size={14} /> Edit build
+            </button>
+          ) : null}
           {mode === "overlay" && onClose ? (
             <button
               type="button"
@@ -838,6 +946,7 @@ export function CharacterSheetView({
                   type="button"
                   onClick={() => changeHp(derived.currentHp - 1)}
                   aria-label="Decrease hit points"
+                  disabled={!canEdit}
                 >
                   <Minus size={12} />
                 </button>
@@ -845,6 +954,7 @@ export function CharacterSheetView({
                   type="number"
                   aria-label="Current hit points"
                   value={hpInput}
+                  disabled={!canEdit}
                   onChange={(event) => setHpInput(event.target.value)}
                   onBlur={() => changeHp(Number(hpInput) || 0)}
                   onKeyDown={(event) => {
@@ -855,13 +965,22 @@ export function CharacterSheetView({
                   type="button"
                   onClick={() => changeHp(derived.currentHp + 1)}
                   aria-label="Increase hit points"
+                  disabled={!canEdit}
                 >
                   <Plus size={12} />
                 </button>
-                <button type="button" onClick={() => changeHp(derived.currentHp - 5)}>
+                <button
+                  type="button"
+                  onClick={() => changeHp(derived.currentHp - 5)}
+                  disabled={!canEdit}
+                >
                   −5
                 </button>
-                <button type="button" onClick={() => changeHp(derived.currentHp + 5)}>
+                <button
+                  type="button"
+                  onClick={() => changeHp(derived.currentHp + 5)}
+                  disabled={!canEdit}
+                >
                   +5
                 </button>
               </div>
@@ -903,14 +1022,16 @@ export function CharacterSheetView({
                     type="button"
                     className={draft.play.heroPoints > index ? "is-on" : ""}
                     aria-label={`Set hero points to ${index + 1}`}
+                    disabled={!canEdit}
                     onClick={() =>
-                      void persist({
-                        ...draft,
+                      void persist((currentDraft) => ({
+                        ...currentDraft,
                         play: {
-                          ...draft.play,
-                          heroPoints: draft.play.heroPoints === index + 1 ? index : index + 1,
+                          ...currentDraft.play,
+                          heroPoints:
+                            currentDraft.play.heroPoints === index + 1 ? index : index + 1,
                         },
-                      })
+                      }))
                     }
                   />
                 ))}
@@ -1194,7 +1315,7 @@ export function CharacterSheetView({
                         <button
                           type="button"
                           className="pb-small-button is-primary"
-                          disabled={itemBusy === item.id}
+                          disabled={!canEdit || itemBusy === item.id}
                           onClick={() => void buyItem(item, "buy")}
                         >
                           Buy
@@ -1203,7 +1324,7 @@ export function CharacterSheetView({
                           <button
                             type="button"
                             className="pb-small-button"
-                            disabled={itemBusy === item.id}
+                            disabled={!canEdit || itemBusy === item.id}
                             title="Add without paying (GM permission)"
                             onClick={() => void buyItem(item, "grant")}
                           >
@@ -1242,6 +1363,7 @@ export function CharacterSheetView({
                               className={
                                 entry.equipped ? "pb-small-button is-on" : "pb-small-button"
                               }
+                              disabled={!canEdit}
                               onClick={() => toggleEquipment(entry.itemId, "equipped")}
                             >
                               {entry.equipped ? "Equipped" : "Equip"}
@@ -1251,6 +1373,7 @@ export function CharacterSheetView({
                               className={
                                 entry.invested ? "pb-small-button is-on" : "pb-small-button"
                               }
+                              disabled={!canEdit}
                               onClick={() => toggleEquipment(entry.itemId, "invested")}
                             >
                               {entry.invested ? "Invested" : "Invest"}
@@ -1312,16 +1435,25 @@ export function CharacterSheetView({
                               type="button"
                               className={used > pip ? "is-used" : ""}
                               aria-label={`Set rank ${rank} slots used to ${pip + 1}`}
+                              disabled={!canEdit}
                               onClick={() =>
-                                void persist({
-                                  ...draft,
-                                  spells: {
-                                    ...draft.spells,
-                                    slotsUsed: {
-                                      ...draft.spells.slotsUsed,
-                                      [String(rank)]: used === pip + 1 ? pip : pip + 1,
+                                void persist((currentDraft) => {
+                                  const currentUsed = Math.max(
+                                    0,
+                                    Math.round(
+                                      Number(currentDraft.spells.slotsUsed[String(rank)]) || 0
+                                    )
+                                  );
+                                  return {
+                                    ...currentDraft,
+                                    spells: {
+                                      ...currentDraft.spells,
+                                      slotsUsed: {
+                                        ...currentDraft.spells.slotsUsed,
+                                        [String(rank)]: currentUsed === pip + 1 ? pip : pip + 1,
+                                      },
                                     },
-                                  },
+                                  };
                                 })
                               }
                             />
@@ -1345,13 +1477,20 @@ export function CharacterSheetView({
                               type="button"
                               className={used > pip ? "is-used" : ""}
                               aria-label={`Set divine font slots used to ${pip + 1}`}
+                              disabled={!canEdit}
                               onClick={() =>
-                                void persist({
-                                  ...draft,
-                                  spells: {
-                                    ...draft.spells,
-                                    divineFontUsed: used === pip + 1 ? pip : pip + 1,
-                                  },
+                                void persist((currentDraft) => {
+                                  const currentUsed = Math.max(
+                                    0,
+                                    Math.round(Number(currentDraft.spells.divineFontUsed) || 0)
+                                  );
+                                  return {
+                                    ...currentDraft,
+                                    spells: {
+                                      ...currentDraft.spells,
+                                      divineFontUsed: currentUsed === pip + 1 ? pip : pip + 1,
+                                    },
+                                  };
                                 })
                               }
                             />
@@ -1375,14 +1514,16 @@ export function CharacterSheetView({
                             type="button"
                             className={draft.play.focusPoints > pip ? "is-used" : ""}
                             aria-label={`Set focus points to ${pip + 1}`}
+                            disabled={!canEdit}
                             onClick={() =>
-                              void persist({
-                                ...draft,
+                              void persist((currentDraft) => ({
+                                ...currentDraft,
                                 play: {
-                                  ...draft.play,
-                                  focusPoints: draft.play.focusPoints === pip + 1 ? pip : pip + 1,
+                                  ...currentDraft.play,
+                                  focusPoints:
+                                    currentDraft.play.focusPoints === pip + 1 ? pip : pip + 1,
                                 },
-                              })
+                              }))
                             }
                           />
                         ))}
@@ -1437,6 +1578,7 @@ export function CharacterSheetView({
                               className="pb-cast-select"
                               aria-label={`Cast rank for ${spell?.name ?? id}`}
                               value={selected}
+                              disabled={!canEdit}
                               onChange={(event) =>
                                 setCastChoices((current) => ({
                                   ...current,
@@ -1454,11 +1596,11 @@ export function CharacterSheetView({
                               ))}
                             </select>
                           ) : null}
-                          {spell && group !== "Rituals" && available.length ? (
+                          {canEdit && spell && group !== "Rituals" && available.length ? (
                             <button
                               type="button"
                               className="pb-small-button is-primary"
-                              onClick={() => cast(spell, group)}
+                              onClick={() => void cast(spell, group)}
                             >
                               Cast
                             </button>
@@ -1529,6 +1671,7 @@ export function CharacterSheetView({
                     <button
                       type="button"
                       className={actionCategory === "all" ? "is-active" : ""}
+                      aria-pressed={actionCategory === "all"}
                       onClick={() => setActionCategory("all")}
                     >
                       All
@@ -1538,18 +1681,22 @@ export function CharacterSheetView({
                         key={category}
                         type="button"
                         className={actionCategory === category ? "is-active" : ""}
+                        aria-pressed={actionCategory === category}
                         onClick={() => setActionCategory(category)}
                       >
                         {titleCase(category)}
                       </button>
                     ))}
                   </div>
+                  <span className="pb-action-count">
+                    {visibleActions.length} action{visibleActions.length === 1 ? "" : "s"}
+                  </span>
                 </div>
                 {actionsLoading ? (
                   <p className="pb-empty">Loading actions…</p>
                 ) : visibleActions.length ? (
                   <div className="pb-action-list">
-                    {visibleActions.slice(0, 120).map((action) => (
+                    {visibleActions.slice(0, actionLimit).map((action) => (
                       <Link
                         className="pb-action-row"
                         key={action.id}
@@ -1572,6 +1719,15 @@ export function CharacterSheetView({
                 ) : (
                   <p className="pb-empty">No actions match that search.</p>
                 )}
+                {visibleActions.length > actionLimit ? (
+                  <button
+                    type="button"
+                    className="pb-small-button"
+                    onClick={() => setActionLimit((current) => current + 120)}
+                  >
+                    Show {Math.min(120, visibleActions.length - actionLimit)} more
+                  </button>
+                ) : null}
               </div>
             ) : null}
 
@@ -1640,85 +1796,91 @@ export function CharacterSheetView({
                     <h3>Edit details</h3>
                     <span>Saved to the character sheet</span>
                   </div>
-                  <div className="pb-edit-grid">
-                    <label className="pb-edit-field">
-                      <span>Name</span>
-                      <input
-                        value={detailsForm.name}
-                        onChange={(event) => updateDetails("name", event.target.value)}
+                  <fieldset className="pb-detail-fields" disabled={!canEdit}>
+                    <div className="pb-edit-grid">
+                      <label className="pb-edit-field">
+                        <span>Name</span>
+                        <input
+                          value={detailsForm.name}
+                          onChange={(event) => updateDetails("name", event.target.value)}
+                        />
+                      </label>
+                      <label className="pb-edit-field">
+                        <span>Age</span>
+                        <input
+                          value={detailsForm.age}
+                          onChange={(event) => updateDetails("age", event.target.value)}
+                        />
+                      </label>
+                      <label className="pb-edit-field">
+                        <span>Gender</span>
+                        <input
+                          value={detailsForm.gender}
+                          onChange={(event) => updateDetails("gender", event.target.value)}
+                        />
+                      </label>
+                      <label className="pb-edit-field">
+                        <span>Pronouns</span>
+                        <input
+                          value={detailsForm.pronouns}
+                          onChange={(event) => updateDetails("pronouns", event.target.value)}
+                        />
+                      </label>
+                      <label className="pb-edit-field">
+                        <span>Height</span>
+                        <input
+                          value={detailsForm.height}
+                          onChange={(event) => updateDetails("height", event.target.value)}
+                        />
+                      </label>
+                      <label className="pb-edit-field">
+                        <span>Weight</span>
+                        <input
+                          value={detailsForm.weight}
+                          onChange={(event) => updateDetails("weight", event.target.value)}
+                        />
+                      </label>
+                    </div>
+                    <label className="pb-edit-field is-full">
+                      <span>Appearance</span>
+                      <textarea
+                        value={detailsForm.appearance}
+                        onChange={(event) => updateDetails("appearance", event.target.value)}
                       />
                     </label>
-                    <label className="pb-edit-field">
-                      <span>Age</span>
-                      <input
-                        value={detailsForm.age}
-                        onChange={(event) => updateDetails("age", event.target.value)}
+                    <label className="pb-edit-field is-full">
+                      <span>Personality</span>
+                      <textarea
+                        value={detailsForm.personality}
+                        onChange={(event) => updateDetails("personality", event.target.value)}
                       />
                     </label>
-                    <label className="pb-edit-field">
-                      <span>Gender</span>
-                      <input
-                        value={detailsForm.gender}
-                        onChange={(event) => updateDetails("gender", event.target.value)}
+                    <label className="pb-edit-field is-full">
+                      <span>Beliefs</span>
+                      <textarea
+                        value={detailsForm.beliefs}
+                        onChange={(event) => updateDetails("beliefs", event.target.value)}
                       />
                     </label>
-                    <label className="pb-edit-field">
-                      <span>Pronouns</span>
-                      <input
-                        value={detailsForm.pronouns}
-                        onChange={(event) => updateDetails("pronouns", event.target.value)}
+                    <label className="pb-edit-field is-full">
+                      <span>Notes</span>
+                      <textarea
+                        className="is-tall"
+                        value={detailsForm.notes}
+                        onChange={(event) => updateDetails("notes", event.target.value)}
                       />
                     </label>
-                    <label className="pb-edit-field">
-                      <span>Height</span>
-                      <input
-                        value={detailsForm.height}
-                        onChange={(event) => updateDetails("height", event.target.value)}
-                      />
-                    </label>
-                    <label className="pb-edit-field">
-                      <span>Weight</span>
-                      <input
-                        value={detailsForm.weight}
-                        onChange={(event) => updateDetails("weight", event.target.value)}
-                      />
-                    </label>
-                  </div>
-                  <label className="pb-edit-field is-full">
-                    <span>Appearance</span>
-                    <textarea
-                      value={detailsForm.appearance}
-                      onChange={(event) => updateDetails("appearance", event.target.value)}
-                    />
-                  </label>
-                  <label className="pb-edit-field is-full">
-                    <span>Personality</span>
-                    <textarea
-                      value={detailsForm.personality}
-                      onChange={(event) => updateDetails("personality", event.target.value)}
-                    />
-                  </label>
-                  <label className="pb-edit-field is-full">
-                    <span>Beliefs</span>
-                    <textarea
-                      value={detailsForm.beliefs}
-                      onChange={(event) => updateDetails("beliefs", event.target.value)}
-                    />
-                  </label>
-                  <label className="pb-edit-field is-full">
-                    <span>Notes</span>
-                    <textarea
-                      className="is-tall"
-                      value={detailsForm.notes}
-                      onChange={(event) => updateDetails("notes", event.target.value)}
-                    />
-                  </label>
+                  </fieldset>
                   <div className="pb-edit-actions">
-                    <span className="pb-hint">Changes save to the shared character record.</span>
+                    <span className="pb-hint">
+                      {canEdit
+                        ? "Changes save to the shared character record."
+                        : "This sheet is read-only."}
+                    </span>
                     <button
                       type="button"
                       className="pb-small-button is-primary"
-                      disabled={detailsSaving || saving}
+                      disabled={!canEdit || detailsSaving || saving}
                       onClick={() => void saveDetails()}
                     >
                       {detailsSaving || saving ? "Saving…" : "Save details"}
@@ -1743,54 +1905,58 @@ export function CharacterSheetView({
                           {condition.value ? ` ${condition.value}` : ""}
                           {condition.duration ? ` (${condition.duration}r)` : ""}
                         </Tag>
-                        <button
-                          type="button"
-                          aria-label={`Remove ${condition.name}`}
-                          onClick={() => removeCondition(index)}
-                        >
-                          <X size={13} />
-                        </button>
+                        {canEdit ? (
+                          <button
+                            type="button"
+                            aria-label={`Remove ${condition.name}`}
+                            onClick={() => removeCondition(index)}
+                          >
+                            <X size={13} />
+                          </button>
+                        ) : null}
                       </div>
                     ))
                   ) : (
                     <p className="pb-empty">No conditions.</p>
                   )}
                 </div>
-                <div className="pb-condition-form">
-                  <input
-                    list="pb-condition-options"
-                    value={conditionName}
-                    placeholder="Condition"
-                    aria-label="Condition name"
-                    onChange={(event) => setConditionName(event.target.value)}
-                  />
-                  <datalist id="pb-condition-options">
-                    {conditions.map((condition) => (
-                      <option key={condition.id} value={condition.name} />
-                    ))}
-                  </datalist>
-                  <input
-                    type="number"
-                    value={conditionValue}
-                    placeholder="Value"
-                    aria-label="Condition value"
-                    onChange={(event) => setConditionValue(event.target.value)}
-                  />
-                  <input
-                    type="number"
-                    value={conditionDuration}
-                    placeholder="Rounds"
-                    aria-label="Condition duration in rounds"
-                    onChange={(event) => setConditionDuration(event.target.value)}
-                  />
-                  <button
-                    type="button"
-                    className="pb-small-button is-primary"
-                    onClick={addCondition}
-                  >
-                    Add
-                  </button>
-                </div>
+                {canEdit ? (
+                  <div className="pb-condition-form">
+                    <input
+                      list="pb-condition-options"
+                      value={conditionName}
+                      placeholder="Condition"
+                      aria-label="Condition name"
+                      onChange={(event) => setConditionName(event.target.value)}
+                    />
+                    <datalist id="pb-condition-options">
+                      {conditions.map((condition) => (
+                        <option key={condition.id} value={condition.name} />
+                      ))}
+                    </datalist>
+                    <input
+                      type="number"
+                      value={conditionValue}
+                      placeholder="Value"
+                      aria-label="Condition value"
+                      onChange={(event) => setConditionValue(event.target.value)}
+                    />
+                    <input
+                      type="number"
+                      value={conditionDuration}
+                      placeholder="Rounds"
+                      aria-label="Condition duration in rounds"
+                      onChange={(event) => setConditionDuration(event.target.value)}
+                    />
+                    <button
+                      type="button"
+                      className="pb-small-button is-primary"
+                      onClick={addCondition}
+                    >
+                      Add
+                    </button>
+                  </div>
+                ) : null}
                 <p className="pb-hint">
                   Conditions affect the character math, but durations and recovery checks are
                   manual.
@@ -1862,7 +2028,7 @@ export function CharacterSheetView({
           <Dices size={24} />
         </button>
       </div>
-      {builderOpen ? (
+      {builderOpen && canEdit ? (
         <div className="pb-builder-overlay">
           <Suspense fallback={<Spinner label="Opening the planner…" />}>
             <CharacterBuilderPage
@@ -1870,6 +2036,12 @@ export function CharacterSheetView({
               onClose={() => {
                 setBuilderOpen(false);
                 void load();
+              }}
+              onDeleted={() => {
+                setBuilderOpen(false);
+                if (onClose) onClose();
+                else if (character.campaignId) navigate(`/campaigns/${character.campaignId}`);
+                else navigate("/campaigns");
               }}
             />
           </Suspense>

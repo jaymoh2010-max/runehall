@@ -1,3 +1,5 @@
+import { formatCopper } from "../shared/inventory";
+
 export class ApiError extends Error {
   status: number;
   payload: unknown;
@@ -121,13 +123,5 @@ export async function copyText(value: string): Promise<boolean> {
 }
 
 export function formatCp(cp: number): string {
-  const safe = Math.max(0, Math.round(cp));
-  const gp = Math.floor(safe / 100);
-  const sp = Math.floor((safe % 100) / 10);
-  const copper = safe % 10;
-  const parts: string[] = [];
-  if (gp) parts.push(`${gp.toLocaleString()} gp`);
-  if (sp) parts.push(`${sp} sp`);
-  if (copper || !parts.length) parts.push(`${copper} cp`);
-  return parts.join(" ");
+  return formatCopper(cp);
 }

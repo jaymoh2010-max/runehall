@@ -10,16 +10,12 @@ import {
   normalizeTokenConditions,
   sheetConditionsFromToken,
   syncLifeConditions,
-  tickTokenConditions,
 } from "../shared/tokens";
 import { applyHpEditToDraft, applyHpEditToState } from "../shared/damage";
 import { applyDamageDefenses } from "../shared/damageDefenses";
 import {
   filterInitiativeForPlayers,
-  normalizeInitiativeResources,
   renameInitiativeEntries,
-  setInitiativeActions,
-  setInitiativeReaction,
   sortInitiativeEntries,
 } from "../shared/initiative";
 import { normalizeAoeTemplate, normalizeAoeTemplates } from "../shared/templates";
@@ -310,65 +306,6 @@ function groupTokens(sceneId: string, groupId: string): TokenRow[] {
       "SELECT * FROM tokens WHERE scene_id = ? AND group_id = ? ORDER BY sort_order ASC, created_at ASC"
     )
     .all(sceneId, groupId) as TokenRow[];
-}
-
-function tickConditionsForEntry(
-  io: TypedServer,
-  campaignId: string,
-  entry: InitiativeEntry | undefined
-): boolean {
-  if (!entry) return false;
-  let rows: TokenRow[] = [];
-  if (entry.groupId && entry.sceneId) rows = groupTokens(entry.sceneId, entry.groupId);
-  else if (entry.tokenId) {
-    const row = tokenRow(entry.tokenId);
-    if (row) rows = [row];
-  }
-  let changed = false;
-  for (const row of rows) {
-    const current = normalizeTokenConditions(parseJson(row.conditions, []));
-    const next = tickTokenConditions(current);
-    if (JSON.stringify(next) === JSON.stringify(current)) continue;
-    db.prepare("UPDATE tokens SET conditions = ?, updated_at = ? WHERE id = ?").run(
-      JSON.stringify(next),
-      now(),
-      row.id
-    );
-    const updated = tokenRow(row.id);
-    if (updated) {
-      socketTokenEvents(io, campaignId).updated(tokenWithOwner(updated), Boolean(row.hidden));
-    }
-    changed = true;
-  }
-  const characterIds = new Set(
-    rows
-      .map((row) => row.character_id)
-      .filter((id): id is string => typeof id === "string" && Boolean(id))
-  );
-  for (const characterId of characterIds) {
-    const character = getCharacter(characterId);
-    if (!character) continue;
-    try {
-      const draft = normalizeCharacterDraft(JSON.parse(character.data), character.name);
-      const current = draft.play.conditions;
-      const next = tickTokenConditions(current);
-      if (JSON.stringify(next) === JSON.stringify(current)) continue;
-      draft.play.conditions = next;
-      const summary = characterSummary(draft, contextForDraft(draft));
-      db.prepare(
-        "UPDATE characters SET data = ?, summary = ?, updated_at = ?, revision = revision + 1 WHERE id = ?"
-      ).run(JSON.stringify(draft), JSON.stringify(summary), now(), characterId);
-      io.to(room(campaignId)).emit("character:updated", {
-        characterId,
-        summary,
-        name: draft.name,
-      });
-      changed = true;
-    } catch {
-      // A malformed draft should not block the initiative advance.
-    }
-  }
-  return changed;
 }
 
 function initiativeEntriesForTokens(tokens: TokenRow[]): InitiativeEntry[] {
@@ -1460,44 +1397,6 @@ export function registerSocketServer(io: TypedServer): void {
       db.prepare(
         "UPDATE campaign_state SET turn_index = ?, round = ?, updated_at = ? WHERE campaign_id = ?"
       ).run(turn, round, now(), campaignId);
-      broadcastInitiative(io, campaignId, ensureState(campaignId));
-      touchCampaign(campaignId);
-    });
-
-    on("initiative:action", ({ campaignId, entryId, actions, reactions }) => {
-      const role = getCampaignRole(campaignId, socket.data.user.id);
-      if (!role) return;
-      const state = ensureState(campaignId);
-      const entries = serializeInitiative(JSON.parse(state.initiative || "[]"));
-      const index = entries.findIndex((entry) => entry.id === entryId);
-      if (index < 0) return;
-      const entry = entries[index];
-      const active = index === state.turn_index;
-      if (role !== "gm") {
-        if (entry.ownerId !== socket.data.user.id) {
-          sendError(socket, "You can only track actions for your own character.");
-          return;
-        }
-        if (actions !== undefined && !active) {
-          sendError(socket, "You can only spend actions on your turn.");
-          return;
-        }
-      }
-      let next = entries;
-      if (actions !== undefined) {
-        next = setInitiativeActions(next, entryId, safeInt(actions, entry.actionsUsed ?? 0, 0, 3));
-      }
-      if (reactions !== undefined) {
-        next = setInitiativeReaction(
-          next,
-          entryId,
-          safeInt(reactions, entry.reactionsUsed ?? 0, 0, 1)
-        );
-      }
-      const normalized = next.map(normalizeInitiativeResources);
-      db.prepare(
-        "UPDATE campaign_state SET initiative = ?, updated_at = ? WHERE campaign_id = ?"
-      ).run(JSON.stringify(normalized), now(), campaignId);
       broadcastInitiative(io, campaignId, ensureState(campaignId));
       touchCampaign(campaignId);
     });

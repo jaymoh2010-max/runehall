@@ -70,6 +70,7 @@ export function VttTable({ initial, campaignId, user, isGm, active }: VttTablePr
   const [partyOpen, setPartyOpen] = useState(true);
   const [rightOpen, setRightOpen] = useState(true);
   const [sheetCharacterId, setSheetCharacterId] = useState<string | null>(null);
+  const [myCharacterChoice, setMyCharacterChoice] = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [theaterMode, setTheaterMode] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -112,13 +113,24 @@ export function VttTable({ initial, campaignId, user, isGm, active }: VttTablePr
     [tokens, activeSceneId, isGm]
   );
   const selectedToken = sceneTokens.find((token) => token.id === selectedTokenId) ?? null;
-  const myCharacterId =
-    characters
-      .filter((character) => character.userId === user.id)
-      .sort(
-        (a, b) =>
-          Number(Boolean(b.summary)) - Number(Boolean(a.summary)) || b.updatedAt - a.updatedAt
-      )[0]?.id ?? null;
+  const myCharacters = useMemo(
+    () =>
+      characters
+        .filter((character) => character.userId === user.id)
+        .sort(
+          (a, b) =>
+            Number(Boolean(b.summary)) - Number(Boolean(a.summary)) || b.updatedAt - a.updatedAt
+        ),
+    [characters, user.id]
+  );
+  const tokenCharacter = selectedToken?.characterId
+    ? (myCharacters.find((character) => character.id === selectedToken.characterId) ?? null)
+    : null;
+  const chosenCharacter =
+    myCharacterChoice && myCharacters.some((character) => character.id === myCharacterChoice)
+      ? myCharacterChoice
+      : null;
+  const myCharacterId = tokenCharacter?.id ?? chosenCharacter ?? myCharacters[0]?.id ?? null;
   const canvasScene = useMemo(
     () =>
       activeScene
@@ -575,6 +587,11 @@ export function VttTable({ initial, campaignId, user, isGm, active }: VttTablePr
         expanded={expanded}
         onFullscreen={toggleFullscreen}
         myCharacterId={myCharacterId}
+        myCharacters={myCharacters.map((character) => ({
+          id: character.id,
+          name: character.name,
+        }))}
+        onMyCharacterChange={setMyCharacterChoice}
         onOpenMySheet={() => {
           if (myCharacterId) setSheetCharacterId(myCharacterId);
           else toast("You do not have a character in this campaign yet.", "info");
@@ -603,7 +620,6 @@ export function VttTable({ initial, campaignId, user, isGm, active }: VttTablePr
             userId={user.id}
             selectedTokenId={selectedTokenId}
             selectedTokenIds={selectedTokenIds}
-            activeMovement={null}
             onSelectToken={selectToken}
             onSelectTokens={selectTokens}
             onOpenCharacter={setSheetCharacterId}

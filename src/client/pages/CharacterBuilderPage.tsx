@@ -161,9 +161,11 @@ type LevelUpTask = Omit<LevelUpChoice, "step"> & {
 export function CharacterBuilderPage({
   characterId,
   onClose,
+  onDeleted,
 }: {
   characterId?: string;
   onClose?: () => void;
+  onDeleted?: () => void;
 } = {}) {
   const params = useParams<{ id: string }>();
   const id = characterId ?? params.id;
@@ -515,7 +517,8 @@ export function CharacterBuilderPage({
     try {
       await api(`/api/characters/${id}`, { method: "DELETE" });
       toast("Character deleted.", "success");
-      navigate("/campaigns");
+      if (onDeleted) onDeleted();
+      else navigate("/campaigns");
     } catch (err) {
       toast(errorMessage(err), "error");
     }
