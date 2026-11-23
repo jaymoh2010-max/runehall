@@ -377,6 +377,7 @@ export function Modal({
   footer,
   wide,
   extraWide,
+  elevated,
   closeOnBackdrop = true,
 }: {
   open: boolean;
@@ -387,6 +388,8 @@ export function Modal({
   footer?: ReactNode;
   wide?: boolean;
   extraWide?: boolean;
+  /** Render above full-screen sheet and builder overlays. */
+  elevated?: boolean;
   closeOnBackdrop?: boolean;
 }) {
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -463,7 +466,7 @@ export function Modal({
   if (!open) return null;
   return createPortal(
     <div
-      className="modal-backdrop"
+      className={`modal-backdrop ${elevated ? "modal-backdrop-elevated" : ""}`}
       onMouseDown={(event) => {
         if (closeOnBackdrop && event.target === event.currentTarget) onClose();
       }}

@@ -9009,6 +9009,9 @@
 .library-detail-body {
   max-width: 780px;
 }
+.compendium-preview .library-detail-body {
+  max-width: none;
+}
 .library-detail-head {
   display: flex;
   align-items: flex-start;

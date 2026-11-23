@@ -161,6 +161,7 @@ test("icon-only navigation keeps accessible names", async ({ page }) => {
 });
 
 test("GM creates a campaign and builds a character through the lazy routes", async ({ page }) => {
+  test.setTimeout(60_000);
   await signIn(page, admin);
   await page.getByRole("button", { name: "Create campaign", exact: true }).click();
 
@@ -292,9 +293,17 @@ test("GM creates a campaign and builds a character through the lazy routes", asy
   await page.getByRole("button", { name: "Gear", exact: true }).click();
   await expect(page.getByPlaceholder("Search the item database")).toBeVisible();
   await page.getByPlaceholder("Search the item database").fill("Backpack");
-  await expect(page.locator(".pb-item-row").filter({ hasText: "Backpack" }).first()).toBeVisible({
+  const backpackRow = page.locator(".pb-item-row").filter({ hasText: "Backpack" }).first();
+  await expect(backpackRow).toBeVisible({
     timeout: 15_000,
   });
+  await backpackRow.getByRole("link").click();
+  const itemPreview = page.getByRole("dialog", { name: "Item" });
+  await expect(itemPreview).toBeVisible();
+  await expect(itemPreview.locator(".compendium-detail h2")).toContainText("Backpack");
+  await expect(page).toHaveURL(/\/characters\/[^/]+$/);
+  await page.keyboard.press("Escape");
+  await expect(itemPreview).toBeHidden();
 
   await page.getByRole("button", { name: "Actions", exact: true }).click();
   await page.getByPlaceholder("Search actions").fill("Stride");
@@ -458,6 +467,15 @@ test("player sees the core table without GM tools", async ({ page, browser }) =>
 
   await page.getByRole("button", { name: "My sheet", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Pathbuilder E2E Hero" })).toBeVisible();
+  await page.getByRole("button", { name: "Feats", exact: true }).click();
+  const overlayFeat = page.locator(".pb-feat-row").filter({ hasText: "Toughness" });
+  await expect(overlayFeat).toBeVisible();
+  await overlayFeat.getByRole("link").click();
+  const overlayPreview = page.getByRole("dialog", { name: "Feat" });
+  await expect(overlayPreview).toBeVisible();
+  await expect(overlayPreview.locator(".compendium-detail h2")).toContainText("Toughness");
+  await overlayPreview.locator(".modal-foot").getByRole("button", { name: "Close" }).click();
+  await expect(overlayPreview).toBeHidden();
   await expect(page.getByRole("button", { name: "Minimize sheet" })).toBeVisible();
   await page.getByRole("button", { name: "Minimize sheet" }).click();
   await expect(page.getByRole("heading", { name: "The First Step" })).toBeVisible();
