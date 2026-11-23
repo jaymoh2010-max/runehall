@@ -2,7 +2,7 @@
 
 Date: 2026-11-23
 
-Status: review complete. Sprint 1 (the daily spellcasting loop), the class-grant portion of Sprint 2, and the first table-magic pass of Sprint 3 were implemented on 2026-11-23. The findings below describe the pre-Sprint state; the implementation status sections record what changed, and the remaining class and table gaps stay in the backlog.
+Status: review complete. Sprint 1 (the daily spellcasting loop), the class-grant portion of Sprint 2, the first table-magic pass of Sprint 3, the magus studious-slot pass of Sprint 4, and the animist prepared/spontaneous split of Sprint 5 were implemented on 2026-11-23. The findings below describe the pre-Sprint state; the implementation status sections record what changed, and the remaining class and table gaps stay in the backlog.
 
 > **Follow-up (2026-11-23):** `docs/RULES-AUDIT.md` corrected two table errors
 > this review did not catch: bards use the 2/3 full-caster slot table (not the
@@ -78,7 +78,7 @@ The class-specific grant pass is implemented:
 - Summoner grants Evolution Surge and the at-will Boost Eidolon link cantrip. The link cantrip does not count toward the focus pool.
 - Cleric deity spells are included in the available cleric list and can be prepared through the normal daily-preparation workflow.
 
-Still open after this pass: magus studious slots, the animist prepared/spontaneous split, spontaneous known-at-rank copies, psi amp actions, item spellcasting, rituals, sustain, and multiclass archetype casting.
+Still open after this pass: spontaneous known-at-rank copies, psi amp actions, item spellcasting, rituals, sustain, and multiclass archetype casting.
 
 ## Sprint 3 implementation status (2026-11-23)
 
@@ -89,6 +89,30 @@ The first table-magic pass is implemented:
 - The ritual helper now rejects prose matches such as "Primary Check to cast..." and unknown Lore names.
 
 Still open: item spellcasting, spellbook learning, and multiclass archetype casting.
+
+## Sprint 4 implementation status (2026-11-23)
+
+Magus studious slots are implemented:
+
+- Two special slots appear at 7th level, become 3rd rank at 11th, and 4th rank at 13th.
+- The allowed list combines Gecko Grip, Haste, Fly, and the chosen hybrid study's 7th/11th/13th studious spells.
+- Studious spells are prepared separately in the builder and daily-preparations modal.
+- Casting spends a studious use, Restore returns it, and long rests reset the uses.
+- The sheet shows a separate studious slot row and offers the studious resource alongside ordinary slots.
+
+Still open: spontaneous known-at-rank copies, psi amps, item spellcasting, spellbook learning, structured ritual data, a table Sustain prompt, and multiclass archetype casting.
+
+## Sprint 5 implementation status (2026-11-23)
+
+The animist prepared/spontaneous split is implemented:
+
+- Animist spellcasting uses the prepared-slot column, while apparition spellcasting uses a separate spontaneous-slot pool.
+- The 14 War of Immortals apparitions have curated cantrip and rank 1-9 spell lists, including their vessel focus spells.
+- The builder and daily-preparations modal choose two apparitions at 1st level, three at 7th, and four at 15th, with one primary apparition.
+- Attuned apparition spells form a spontaneous repertoire. Every apparition spell is a signature spell and can heighten into any available apparition slot.
+- The primary apparition's vessel spell is granted as a focus spell, and the focus pool rises at 7th and 15th level.
+- Apparition slots are tracked and restored separately from prepared slots; long rests and daily preparations clear both pools.
+- The sheet lists attuned apparitions, apparition slots, and the apparition repertoire, and casting an apparition spell never spends a prepared animist slot.
 
 ## Rules baseline
 
@@ -160,8 +184,8 @@ Legend: Yes = modeled and usable; Partial = some support with known gaps; No = n
 | Psychic conscious minds | Partial | 1st-rank spell and psi cantrips granted; amps and higher-level unique cantrips manual |
 | Necromancer grave spells | Partial | Necrotic Bomb and grim fascination spells granted; thralls and effects manual |
 | Summoner link spells | Yes | Evolution Surge and Boost Eidolon granted; eidolon actions remain manual |
-| Magus studious slots | No | Not tracked separately |
-| Animist prepared/spontaneous split | No | Combined slot total; manual split |
+| Magus studious slots | Yes | Two special slots at 7th, rank 3 at 11th, rank 4 at 13th; hybrid-study list and preparation UI |
+| Animist prepared/spontaneous split | Yes | Prepared animist slots and spontaneous apparition slots, attunement, repertoire, and vessel focus spells |
 | Rituals | Partial | Primary-check rolls work when the description names a known skill; missing data falls back to manual |
 | Sustained spells | Partial | Casting starts sustain, active spells can be ended, and Restore clears them; no table turn prompt yet |
 | Spellbook capacity and learning | No | No starting-spellbook or Learn a Spell accounting |
@@ -253,18 +277,18 @@ Fix: At minimum, introduce labels by class (`spellbook`, `familiar`, `dirge`, `s
 
 ### F6. Several class resources are missing or hard-coded (P1)
 
-Status: partly fixed in Sprint 2. Psychic, necromancer, summoner, and cleric deity spells are now granted; magus studious slots and the animist split remain open.
+Status: partly fixed in Sprint 2, Sprint 4, and Sprint 5. Psychic, necromancer, summoner, cleric deity spells, magus studious slots, and the animist prepared/spontaneous split are now granted or tracked.
 
 - **Psychic**: repertoire limits, conscious-mind 1st-rank spells, and psi cantrips are granted. Psi amps and higher-level unique psi cantrips remain manual.
 - **Necromancer**: Necrotic Bomb, grim fascination grave spells, and the focus pool are granted. Thralls and full grave-spell effects remain manual.
-- **Magus**: no studious spell slots. The spellbook cantrip cap is now 8, but studious slots remain open.
+- **Magus**: studious slots are tracked at 7th/11th/13th level with the hybrid-study spell list. Spellstrike, Arcane Cascade, and conflux spell recharge remain manual.
 - **Summoner**: `evolution surge` and `boost eidolon` are granted; the link cantrip does not count toward the focus pool. Eidolon actions remain manual.
-- **Animist**: `animistSlots` is a combined total and every slot is treated as prepared. The apparition repertoire and spontaneous apparition slots are not separate.
+- **Animist**: prepared animist slots and spontaneous apparition slots are separate. Attuned apparitions supply a curated repertoire, the primary apparition grants its vessel focus spell, and apparition slots reset during daily preparations. Invocations and wandering-feat retraining remain manual.
 - **Wizard**: higher-rank curriculum spells are not granted, so the extra slot is effectively unrestricted at those ranks.
 - **Sorcerer/oracle**: higher-rank bloodline/mystery gifts remain manual.
 - **Cleric**: deity spells are resolved and offered through the normal preparation workflow.
 
-Impact: These classes are usable only with manual bookkeeping. The most visible remaining errors are magus studious slots and animist's prepared/spontaneous mix.
+Impact: These classes are usable only with manual bookkeeping. The most visible remaining gap is spontaneous known-at-rank heightening.
 
 Fix: Treat class completeness as a separate sprint. Start with grants and caps that can be curated from existing class-choice descriptions; avoid a generic parser until the curated path is stable.
 

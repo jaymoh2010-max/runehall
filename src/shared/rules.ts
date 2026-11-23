@@ -28,6 +28,11 @@ import {
   type Spell,
   type SpellTradition,
   type PreparedSpellsByRank,
+  type AnimistApparitionInfo,
+  type ApparitionSpell,
+  type AttunedApparition,
+  type StudiousSlotInfo,
+  type StudiousSlotSpell,
   type ValidationIssue,
 } from "./types";
 import {
@@ -64,7 +69,8 @@ import {
   heritageGrantedTraits,
   heritageSkillChoice,
 } from "./heritage";
-import { selectedClassGrants } from "./classGrants";
+import { MAGUS_STUDIOUS_BASE, MAGUS_STUDIOUS_BY_STUDY, selectedClassGrants } from "./classGrants";
+import { APPARITION_BY_ID } from "./apparitions";
 import { activeGrantChoiceGroups } from "./classGrantChoices";
 
 // ---------------------------------------------------------------------------
@@ -406,6 +412,70 @@ export function animistSlots(level: number): number[] {
   return table[safe - 1];
 }
 
+/**
+ * Animist prepared slots per rank. The animist table prints "prepared+spontaneous"
+ * pairs; this is the left-hand number from each column.
+ */
+export function animistPreparedSlots(level: number): number[] {
+  const table: number[][] = [
+    [1],
+    [2],
+    [2, 1],
+    [2, 2],
+    [2, 2, 1],
+    [2, 2, 2],
+    [2, 2, 2, 1],
+    [2, 2, 2, 2],
+    [2, 2, 2, 2, 1],
+    [2, 2, 2, 2, 2],
+    [2, 2, 2, 2, 2, 1],
+    [2, 2, 2, 2, 2, 2],
+    [2, 2, 2, 2, 2, 2, 1],
+    [2, 2, 2, 2, 2, 2, 2],
+    [2, 2, 2, 2, 2, 2, 2, 1],
+    [2, 2, 2, 2, 2, 2, 2, 2],
+    [2, 2, 2, 2, 2, 2, 2, 2, 1],
+    [2, 2, 2, 2, 2, 2, 2, 2, 2],
+    [2, 2, 2, 2, 2, 2, 2, 2, 2],
+    [2, 2, 2, 2, 2, 2, 2, 2, 2],
+  ];
+  const safe = Math.max(1, Math.min(20, Math.floor(level || 1)));
+  return table[safe - 1];
+}
+
+/** Animist spontaneous apparition slots per rank (the right-hand table column). */
+export function animistApparitionSlots(level: number): number[] {
+  const table: number[][] = [
+    [1],
+    [1],
+    [1, 1],
+    [1, 1],
+    [1, 1, 1],
+    [1, 1, 1],
+    [1, 1, 1, 1],
+    [1, 1, 1, 1],
+    [1, 1, 1, 1, 1],
+    [2, 2, 2, 1, 1],
+    [2, 2, 2, 1, 1, 1],
+    [2, 2, 2, 2, 1, 1],
+    [2, 2, 2, 2, 2, 1, 1],
+    [2, 2, 2, 2, 2, 1, 1],
+    [2, 2, 2, 2, 2, 2, 1, 1],
+    [2, 2, 2, 2, 2, 2, 1, 1],
+    [2, 2, 2, 2, 2, 2, 2, 1, 1],
+    [2, 2, 2, 2, 2, 2, 2, 1, 1],
+    [2, 2, 2, 2, 2, 2, 2, 2, 1, 1],
+    [2, 2, 2, 2, 2, 2, 2, 2, 1, 1],
+  ];
+  const safe = Math.max(1, Math.min(20, Math.floor(level || 1)));
+  return table[safe - 1];
+}
+
+/** Apparitions attuned each day: two at 1st, three at 7th, four at 15th. */
+export function animistApparitionLimit(level: number): number {
+  return level >= 15 ? 4 : level >= 7 ? 3 : 2;
+}
+
 /** Wizards gain one extra curriculum spell slot at each rank up to 9th. */
 export function wizardSlots(level: number): number[] {
   return fullCasterSlots(level).map((count, index) => (index < 9 ? count + 1 : count));
@@ -440,7 +510,7 @@ export function spellSlotsFor(
   if (progression === "full") {
     switch (className?.toLowerCase()) {
       case "animist":
-        return animistSlots(level);
+        return animistPreparedSlots(level);
       case "cleric":
         return clericSlots(level);
       case "wizard":
@@ -495,7 +565,9 @@ const CANTRIP_LIMITS: Record<string, number> = {
   // Psychic gains three regular occult cantrips, plus three psi cantrips from
   // the conscious mind.
   psychic: 3,
-  animist: 4,
+  // An animist's two prepared cantrips are the only cantrips stored here;
+  // apparition cantrips come from the attuned apparitions.
+  animist: 2,
   necromancer: 5,
 };
 
@@ -512,7 +584,7 @@ const PREPARED_CANTRIP_LIMITS: Record<string, number> = {
   wizard: 5,
   magus: 5,
   necromancer: 5,
-  animist: 4,
+  animist: 2,
 };
 
 export function cantripPreparedLimitFor(classData: ClassData | null | undefined): number | null {
@@ -558,12 +630,13 @@ export function preparedCantripIds(
 }
 
 export function isCantripPrepared(
-  draft: Pick<CharacterDraft, "spells">,
+  draft: Pick<CharacterDraft, "level" | "spells">,
   context: CantripContext,
   spellId: string
 ): boolean {
   if (!isPreparedCasterClass(context.classData?.name)) return true;
-  return preparedCantripIds(draft, context).includes(spellId);
+  if (preparedCantripIds(draft, context).includes(spellId)) return true;
+  return apparitionCantripIds(draft, context).includes(spellId);
 }
 
 /**
@@ -641,6 +714,252 @@ export function removePreparedCantrip(
       preparedCantrips: prepared.filter((id) => id !== spellId),
     },
   };
+}
+
+/**
+ * Magus studious slots: two special slots from 7th level, becoming 3rd rank at
+ * 11th and 4th rank at 13th. Only Gecko Grip, Haste, Fly, and the chosen hybrid
+ * study's studious spells can be prepared in them.
+ */
+export function studiousSlotInfoFor(
+  draft: Pick<CharacterDraft, "level" | "classChoices">,
+  classData: ClassData | null | undefined
+): StudiousSlotInfo | null {
+  if (classData?.name.toLowerCase() !== "magus" || draft.level < 7) return null;
+  const rank = draft.level >= 13 ? 4 : draft.level >= 11 ? 3 : 2;
+  const group = classData.choiceGroups.find((entry) => entry.tag === "magus-hybrid-study");
+  const chosen = group ? (draft.classChoices[group.key]?.[0] ?? null) : null;
+  const hybrid = chosen ? MAGUS_STUDIOUS_BY_STUDY[chosen] : undefined;
+  const spells: StudiousSlotSpell[] = [];
+  for (const entry of MAGUS_STUDIOUS_BASE) {
+    if (entry.level <= draft.level) spells.push(entry.spell);
+  }
+  for (const tier of ["7", "11", "13"] as const) {
+    const spell = hybrid?.[tier];
+    if (spell && Number(tier) <= draft.level) spells.push(spell);
+  }
+  const unique = [...new Map(spells.map((spell) => [spell.id, spell])).values()].filter(
+    (spell) => spell.rank <= rank
+  );
+  return { rank, count: 2, spells: unique };
+}
+
+export function canPrepareStudiousSpell(
+  draft: Pick<CharacterDraft, "level" | "classChoices" | "spells">,
+  classData: ClassData | null | undefined,
+  spellId: string
+): boolean {
+  const info = studiousSlotInfoFor(draft, classData);
+  if (!info) return false;
+  if (!info.spells.some((spell) => spell.id === spellId)) return false;
+  return draft.spells.studiousPrepared.length < info.count;
+}
+
+export function addStudiousSpell(
+  draft: CharacterDraft,
+  classData: ClassData | null | undefined,
+  spellId: string
+): CharacterDraft {
+  if (!canPrepareStudiousSpell(draft, classData, spellId)) return draft;
+  return {
+    ...draft,
+    spells: {
+      ...draft.spells,
+      studiousPrepared: [...draft.spells.studiousPrepared, spellId],
+    },
+  };
+}
+
+export function removeStudiousSpell(
+  draft: CharacterDraft,
+  classData: ClassData | null | undefined,
+  spellId: string
+): CharacterDraft {
+  const info = studiousSlotInfoFor(draft, classData);
+  if (!info) return draft;
+  const prepared = [...draft.spells.studiousPrepared];
+  const index = prepared.lastIndexOf(spellId);
+  if (index < 0) return draft;
+  prepared.splice(index, 1);
+  const copies = prepared.filter((id) => id === spellId).length;
+  const used = { ...draft.spells.studiousUsed };
+  if (copies === 0) delete used[spellId];
+  else if ((used[spellId] ?? 0) > copies) used[spellId] = copies;
+  return {
+    ...draft,
+    spells: {
+      ...draft.spells,
+      studiousPrepared: prepared,
+      studiousUsed: used,
+    },
+  };
+}
+
+/**
+ * Resolve the curated apparition spell names against the compendium. The
+ * index is cached per compendium spell record, which is stable for a session.
+ */
+const apparitionSpellIndexes = new WeakMap<Record<string, Spell>, Map<string, Spell>>();
+
+function apparitionSpellKey(name: string): string {
+  return name
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "");
+}
+
+function apparitionSpellIndex(spells: Record<string, Spell>): Map<string, Spell> {
+  const cached = apparitionSpellIndexes.get(spells);
+  if (cached) return cached;
+  const index = new Map<string, Spell>();
+  for (const spell of Object.values(spells)) {
+    index.set(apparitionSpellKey(spell.name), spell);
+  }
+  apparitionSpellIndexes.set(spells, index);
+  return index;
+}
+
+/**
+ * The animist's attuned apparitions and their repertoire. Prepared animist
+ * spells use ordinary prepared slots; these spells use their own spontaneous
+ * apparition slots and never mix with the prepared pool.
+ */
+export function animistApparitionInfo(
+  draft: Pick<CharacterDraft, "level" | "spells">,
+  context: Pick<CharacterContext, "spells" | "classData">
+): AnimistApparitionInfo | null {
+  if (context.classData?.name.toLowerCase() !== "animist") return null;
+  const level = Math.max(1, Math.min(20, Math.floor(draft.level || 1)));
+  const slots = animistApparitionSlots(level);
+  const maxRank = slots.length;
+  const index = apparitionSpellIndex(context.spells);
+  const resolve = (name: string): Spell | null => index.get(apparitionSpellKey(name)) ?? null;
+
+  const attuned: AttunedApparition[] = [];
+  const selected = draft.spells.attunedApparitions ?? [];
+  for (const id of selected) {
+    const definition = APPARITION_BY_ID.get(id);
+    if (!definition) continue;
+    const cantrip = resolve(definition.spells.find((entry) => entry.rank === 0)?.name ?? "");
+    const spells = definition.spells
+      .filter((entry) => entry.rank > 0 && entry.rank <= maxRank)
+      .map((entry) => resolve(entry.name))
+      .filter((spell): spell is Spell => Boolean(spell))
+      .sort((a, b) => a.rank - b.rank || a.name.localeCompare(b.name));
+    attuned.push({
+      id: definition.id,
+      name: definition.name,
+      skills: definition.skills,
+      cantrip,
+      spells,
+      vesselSpell: resolve(definition.vesselSpell),
+    });
+  }
+
+  const primary = draft.spells.primaryApparition;
+  const primaryId =
+    primary && attuned.some((entry) => entry.id === primary) ? primary : (attuned[0]?.id ?? null);
+
+  const byId = new Map<string, ApparitionSpell>();
+  for (const apparition of attuned) {
+    const available = [...(apparition.cantrip ? [apparition.cantrip] : []), ...apparition.spells];
+    for (const spell of available) {
+      if (byId.has(spell.id)) continue;
+      byId.set(spell.id, {
+        apparitionId: apparition.id,
+        apparitionName: apparition.name,
+        spell,
+      });
+    }
+  }
+  const repertoire = [...byId.values()].sort(
+    (a, b) => a.spell.rank - b.spell.rank || a.spell.name.localeCompare(b.spell.name)
+  );
+
+  return {
+    slots,
+    maxAttuned: animistApparitionLimit(level),
+    primaryId,
+    attuned,
+    repertoire,
+  };
+}
+
+/** Whether another apparition can be attuned during daily preparations. */
+export function canAttuneApparition(
+  draft: Pick<CharacterDraft, "level" | "spells">,
+  classData: ClassData | null | undefined,
+  apparitionId: string
+): boolean {
+  if (classData?.name.toLowerCase() !== "animist") return false;
+  if (!APPARITION_BY_ID.has(apparitionId)) return false;
+  if (draft.spells.attunedApparitions.includes(apparitionId)) return false;
+  return draft.spells.attunedApparitions.length < animistApparitionLimit(draft.level);
+}
+
+export function addAttunedApparition(
+  draft: CharacterDraft,
+  classData: ClassData | null | undefined,
+  apparitionId: string
+): CharacterDraft {
+  if (!canAttuneApparition(draft, classData, apparitionId)) return draft;
+  const attuned = [...draft.spells.attunedApparitions, apparitionId];
+  return {
+    ...draft,
+    spells: {
+      ...draft.spells,
+      attunedApparitions: attuned,
+      primaryApparition: draft.spells.primaryApparition ?? apparitionId,
+    },
+  };
+}
+
+export function removeAttunedApparition(
+  draft: CharacterDraft,
+  classData: ClassData | null | undefined,
+  apparitionId: string
+): CharacterDraft {
+  if (classData?.name.toLowerCase() !== "animist") return draft;
+  if (!draft.spells.attunedApparitions.includes(apparitionId)) return draft;
+  const attuned = draft.spells.attunedApparitions.filter((id) => id !== apparitionId);
+  return {
+    ...draft,
+    spells: {
+      ...draft.spells,
+      attunedApparitions: attuned,
+      primaryApparition:
+        draft.spells.primaryApparition === apparitionId
+          ? (attuned[0] ?? null)
+          : draft.spells.primaryApparition,
+    },
+  };
+}
+
+export function setPrimaryApparition(
+  draft: CharacterDraft,
+  classData: ClassData | null | undefined,
+  apparitionId: string | null
+): CharacterDraft {
+  if (classData?.name.toLowerCase() !== "animist") return draft;
+  if (apparitionId && !draft.spells.attunedApparitions.includes(apparitionId)) return draft;
+  return {
+    ...draft,
+    spells: { ...draft.spells, primaryApparition: apparitionId },
+  };
+}
+
+/** Cantrips granted by attuned apparitions; these are castable at will. */
+export function apparitionCantripIds(
+  draft: Pick<CharacterDraft, "level" | "spells">,
+  context: Pick<CharacterContext, "spells" | "classData">
+): string[] {
+  return (
+    animistApparitionInfo(draft, context)
+      ?.repertoire.filter((entry) => entry.spell.rank === 0)
+      .map((entry) => entry.spell.id) ?? []
+  );
 }
 
 /** Heal/Harm are the only spells a cleric's divine font can prepare. */
@@ -1139,6 +1458,11 @@ export function emptyCharacterDraft(name = "New Hero"): CharacterDraft {
       prepared: [],
       preparedByRank: {},
       preparedCantrips: [],
+      studiousPrepared: [],
+      studiousUsed: {},
+      attunedApparitions: [],
+      primaryApparition: null,
+      apparitionUsed: {},
       focus: [],
       divineFontUsed: 0,
       fontChoice: null,
@@ -1403,6 +1727,35 @@ export function normalizeCharacterDraft(input: unknown, fallbackName = "New Hero
       preparedCantrips: Array.isArray(spells.preparedCantrips)
         ? [...new Set(arr<string>(spells.preparedCantrips).filter((x) => typeof x === "string"))]
         : null,
+      studiousPrepared: arr<string>(spells.studiousPrepared)
+        .filter((x) => typeof x === "string")
+        .slice(0, 10),
+      studiousUsed: Object.fromEntries(
+        Object.entries(obj(spells.studiousUsed))
+          .filter(([, value]) => typeof value === "number" && Number.isFinite(value))
+          .map(([key, value]) => [key, Math.max(0, Math.floor(value as number))])
+      ) as Record<string, number>,
+      attunedApparitions: [
+        ...new Set(
+          arr<string>(spells.attunedApparitions).filter(
+            (id) => typeof id === "string" && APPARITION_BY_ID.has(id)
+          )
+        ),
+      ].slice(0, 8),
+      primaryApparition:
+        typeof spells.primaryApparition === "string" ? spells.primaryApparition : null,
+      apparitionUsed: Object.fromEntries(
+        Object.entries(obj(spells.apparitionUsed))
+          .filter(
+            ([key, value]) =>
+              /^\d+$/.test(key) &&
+              Number(key) >= 1 &&
+              Number(key) <= 10 &&
+              typeof value === "number" &&
+              Number.isFinite(value)
+          )
+          .map(([key, value]) => [key, Math.max(0, Math.min(20, Math.floor(value as number)))])
+      ) as Record<string, number>,
       focus: arr<string>(spells.focus).filter((x) => typeof x === "string"),
       signature: arr<string>(spells.signature).filter((x) => typeof x === "string"),
       rituals: [...new Set(arr<string>(spells.rituals).filter((x) => typeof x === "string"))].slice(
@@ -2725,6 +3078,25 @@ export function computeCharacter(
   const classData = context.classData ?? null;
   const background = context.background ?? null;
   const classGrants = selectedClassGrants(draft, classData, context.deity);
+  const animistApparitions = animistApparitionInfo(draft, {
+    spells: context.spells,
+    classData,
+  });
+  const primaryApparition = animistApparitions?.attuned.find(
+    (entry) => entry.id === animistApparitions.primaryId
+  );
+  if (
+    primaryApparition?.vesselSpell &&
+    !classGrants.spells.some((spell) => spell.id === primaryApparition.vesselSpell!.id)
+  ) {
+    classGrants.spells.push({
+      id: primaryApparition.vesselSpell.id,
+      name: primaryApparition.vesselSpell.name,
+      rank: primaryApparition.vesselSpell.rank,
+      kind: "focus",
+      source: primaryApparition.name,
+    });
+  }
   const abilities = baseAbilityScores(draft, context);
   if (
     context.automaticBonusProgression &&
@@ -3159,6 +3531,16 @@ export function computeCharacter(
       });
     }
   }
+  for (const apparition of animistApparitions?.attuned ?? []) {
+    const rank = draft.level >= 15 ? 4 : draft.level >= 7 ? 3 : draft.level >= 3 ? 2 : 1;
+    for (const name of apparition.skills) {
+      lore.push({
+        name,
+        mod: proficiencyBonus(rank, draft.level) + abilityMods.int + conditionEffects.checks.int,
+        rank,
+      });
+    }
+  }
   for (const entry of featMods.lore ?? []) {
     lore.push({
       name: entry.name,
@@ -3562,6 +3944,7 @@ export function computeCharacter(
     : caster.progression === "none"
       ? 0
       : Math.ceil(draft.level / 2);
+  const studiousSlots = studiousSlotInfoFor(draft, classData);
   const tradition = casterTraditionFor(draft, classData);
   if (caster.traditionOptions && !tradition) {
     issue("error", "Choose your magical tradition.", "spells");
@@ -3823,6 +4206,58 @@ export function computeCharacter(
       );
     }
   }
+  if (studiousSlots) {
+    const prepared = draft.spells.studiousPrepared;
+    if (prepared.length > studiousSlots.count) {
+      issue(
+        "error",
+        `Magus studious slots hold ${studiousSlots.count} spells, but ${prepared.length} are prepared.`,
+        "spells"
+      );
+    }
+    const allowed = new Set(studiousSlots.spells.map((spell) => spell.id));
+    for (const spellId of new Set(prepared)) {
+      if (!allowed.has(spellId)) {
+        const spell = context.spells[spellId];
+        issue(
+          "warning",
+          `${spell?.name ?? "A prepared spell"} is not a valid magus studious spell for your hybrid study and level.`,
+          "spells"
+        );
+      }
+    }
+    const used = Object.values(draft.spells.studiousUsed).reduce(
+      (total, value) => total + Math.max(0, Math.round(Number(value) || 0)),
+      0
+    );
+    if (used > studiousSlots.count) {
+      issue("warning", "More studious spell uses are spent than the slots allow.", "spells");
+    }
+  }
+  if (animistApparitions) {
+    const attuned = draft.spells.attunedApparitions;
+    if (attuned.length !== animistApparitions.maxAttuned) {
+      issue(
+        "error",
+        `Attune to ${animistApparitions.maxAttuned} apparition${animistApparitions.maxAttuned === 1 ? "" : "s"} during daily preparations (${attuned.length} selected).`,
+        "spells"
+      );
+    }
+    if (draft.spells.primaryApparition && !attuned.includes(draft.spells.primaryApparition)) {
+      issue("warning", "The primary apparition must be one of your attuned apparitions.", "spells");
+    }
+    for (const [rank, used] of Object.entries(draft.spells.apparitionUsed)) {
+      const count = animistApparitions.slots[Number(rank) - 1] ?? 0;
+      if (Math.max(0, Math.round(Number(used) || 0)) > count) {
+        issue(
+          "warning",
+          `More rank ${rank} apparition slots are spent than the ${count} available.`,
+          "spells"
+        );
+      }
+    }
+  }
+
   const repertoire = spellRepertoireLimits(classData, draft.level);
   if (repertoire) {
     const baseCantrips = draft.spells.cantrips.filter(
@@ -4108,9 +4543,10 @@ export function computeCharacter(
     focusPointsMax = Math.max(focusPointsMax, 3);
   }
   // An animist starts with one Focus Point from their primary apparition's
-  // vessel spell even when the spell itself has not been picked manually.
+  // vessel spell; Third and Fourth Apparition raise the pool at 7th and 15th.
   if (focusClassName === "animist") {
-    focusPointsMax = Math.max(focusPointsMax, 1);
+    const apparitionFocus = 1 + (draft.level >= 7 ? 1 : 0) + (draft.level >= 15 ? 1 : 0);
+    focusPointsMax = Math.max(focusPointsMax, Math.min(3, apparitionFocus));
   }
   // A focus pool can hold one point per focus spell, up to 3. Count both
   // manually chosen and class-granted focus spells without double-counting.
@@ -4169,7 +4605,7 @@ export function computeCharacter(
     caster.progression === "focus"
       ? "Focus spells only. Champions use Charisma for spell attack rolls and spell DCs."
       : className === "animist"
-        ? "Animist slots combine prepared animist spells and spontaneous apparition slots; the tracker shows the total per rank."
+        ? "Animist prepared slots and spontaneous apparition slots are separate; apparition spells can only use apparition slots."
         : className === "cleric"
           ? `Divine font: ${font?.slots ?? 0} rank ${font?.rank ?? 1} ${(context.deity?.font?.length
               ? context.deity.font
@@ -4210,6 +4646,8 @@ export function computeCharacter(
     attacks,
     spellSlots: slots,
     spellSlotsNote,
+    studiousSlots,
+    animistApparitions,
     divineFontSlots,
     divineFontRank,
     focusPointsMax,

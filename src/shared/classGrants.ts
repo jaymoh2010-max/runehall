@@ -5,6 +5,7 @@ import type {
   ClassGrantFeat,
   ClassGrantSpell,
   Deity,
+  StudiousSlotSpell,
 } from "./types";
 import { activeGrantChoiceGroups } from "./classGrantChoices";
 
@@ -44,6 +45,82 @@ function curriculum(id: string, name: string, rank = 1, source?: string): ClassG
  * (domains, devotion spells, variable bloodline gifts, curriculum variants)
  * stay explicit notes until they have their own draft controls.
  */
+export const MAGUS_STUDIOUS_BASE: Array<{ level: 7 | 11 | 13; spell: StudiousSlotSpell }> = [
+  { level: 7, spell: { id: "spell:5KobTMrZeZxuXMgl", name: "Gecko Grip", rank: 2 } },
+  { level: 11, spell: { id: "spell:o6YCGx4lycsYpww4", name: "Haste", rank: 3 } },
+  { level: 13, spell: { id: "spell:A2JfEKe6BZcTG1S8", name: "Fly", rank: 4 } },
+];
+
+/**
+ * Hybrid-study studious spells. The class grants these in addition to Gecko
+ * Grip, Haste, and Fly; the special slots only accept this list.
+ */
+export const MAGUS_STUDIOUS_BY_STUDY: Record<
+  string,
+  Partial<Record<"7" | "11" | "13", StudiousSlotSpell>>
+> = {
+  // Aloof Firmament
+  "cf:9CC5Ek0Mq768Lhgx": {
+    "7": { id: "spell:Seaah9amXg70RKw2", name: "Water Walk", rank: 2 },
+    "11": { id: "spell:it4ZsAi6XgvGcodc", name: "Wall of Wind", rank: 3 },
+    "13": { id: "spell:DcmWrD0V5PWQQyDm", name: "Variable Gravity", rank: 4 },
+  },
+  // Inexorable Iron
+  "cf:ZslXrvYRxHBXc1Ds": {
+    "7": { id: "spell:wzctak6BxOW8xvFV", name: "Enlarge", rank: 2 },
+    "11": { id: "spell:gPvtmKMRpg9I9D7H", name: "Earthbind", rank: 3 },
+    "13": { id: "spell:ksLCg62cLOojw3gN", name: "Planar Tether", rank: 4 },
+  },
+  // Laughing Shadow
+  "cf:3gVDqDPSz4fB5T9G": {
+    "7": { id: "spell:3JG1t3T4mWn6vTke", name: "Blur", rank: 2 },
+    "11": { id: "spell:AMEu5zzLN7uCX645", name: "Ghostly Weapon", rank: 3 },
+    "13": { id: "spell:VlNcjmYyu95vOUe8", name: "Translocate", rank: 4 },
+  },
+  // Resurgent Maelstrom
+  "cf:X3nPGnqh6rkRJ75i": {
+    "7": { id: "spell:Seaah9amXg70RKw2", name: "Water Walk", rank: 2 },
+    "11": { id: "spell:oUDNCArkQTdhllxD", name: "Aqueous Orb", rank: 3 },
+    "13": { id: "spell:aqRYNoSvxsVfqglH", name: "Unfettered Movement", rank: 4 },
+  },
+  // Sparkling Targe
+  "cf:maGzhKLmgubAdUlN": {
+    "7": { id: "spell:Fr58LDSrbndgld9n", name: "Resist Energy", rank: 2 },
+    "11": { id: "spell:CIjj9CU5ekeq1oLT", name: "Warding Aggression", rank: 3 },
+    "13": { id: "spell:2BV2yYPfVJ5zirZt", name: "Mountain Resilience", rank: 4 },
+  },
+  // Starlit Span
+  "cf:Pew7duAozEeAemif": {
+    "7": { id: "spell:mrDi3v933gsmnw25", name: "Telekinetic Maneuver", rank: 2 },
+    "11": { id: "spell:it4ZsAi6XgvGcodc", name: "Wall of Wind", rank: 3 },
+    "13": { id: "spell:aqRYNoSvxsVfqglH", name: "Unfettered Movement", rank: 4 },
+  },
+  // Twisting Tree
+  "cf:6YJ8KFl7THkVy6Gm": {
+    "7": { id: "spell:YWrfKetOqDwVFut7", name: "Oaken Resilience", rank: 2 },
+    "11": { id: "spell:WsUwpfmhKrKwoIe3", name: "Slow", rank: 3 },
+    "13": { id: "spell:zR67Rt3UMHKC5evy", name: "Flicker", rank: 4 },
+  },
+  // Twofold Tine
+  "cf:h6WJ9Se8ahvOG3XB": {
+    "7": { id: "spell:3JG1t3T4mWn6vTke", name: "Blur", rank: 2 },
+    "11": { id: "spell:06pzGkKTyPE3tHR8", name: "Gravity Well", rank: 3 },
+    "13": { id: "spell:aqRYNoSvxsVfqglH", name: "Unfettered Movement", rank: 4 },
+  },
+  // Unfurling Brocade
+  "cf:y0WQzzshwGIymZsr": {
+    "7": { id: "spell:9s5tqqXNzcoKamWx", name: "Web", rank: 2 },
+    "11": { id: "spell:k9x6bXXpIgAXMDsx", name: "Whirling Scarves", rank: 3 },
+    "13": { id: "spell:ksLCg62cLOojw3gN", name: "Planar Tether", rank: 4 },
+  },
+  // Volatile Spark
+  "cf:aRDNtB0mh6MMRSKf": {
+    "7": { id: "spell:J6vNvrUT3b1hx2iA", name: "Entangling Flora", rank: 2 },
+    "11": { id: "spell:gPvtmKMRpg9I9D7H", name: "Earthbind", rank: 3 },
+    "13": { id: "spell:gfKhtVsXF3HKSdmY", name: "Seal Fate", rank: 4 },
+  },
+};
+
 export const CLASS_GRANTS: Record<string, ClassGrant> = {
   // Druid orders
   "cf:POBvoXifa9HaejAg": {
@@ -587,7 +664,7 @@ const CLASS_NOTES: Record<string, string[]> = {
     "Spellstrike, Arcane Cascade, and conflux spell recharge remain manual.",
   ],
   animist: [
-    "Prepared animist slots and spontaneous apparition slots are shown as a combined total; track the split manually.",
+    "Prepared animist slots and spontaneous apparition slots are tracked separately; attune apparitions during daily preparations. The primary apparition's vessel focus spell is granted automatically.",
   ],
   psychic: [
     "Psi cantrips are granted, but amps, their Focus Point costs, and higher-level unique psi cantrips remain manual.",

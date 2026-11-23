@@ -26,6 +26,7 @@ import {
   heritageFeatGrant,
 } from "../shared/heritage";
 import { selectedClassGrants } from "../shared/classGrants";
+import { APPARITION_BY_ID } from "../shared/apparitions";
 import { customItemToEquipment } from "../shared/inventory";
 import {
   COMPENDIUM_KIND_ORDER,
@@ -100,6 +101,17 @@ const maps = {
   action: new Map(actions.map((item) => [item.id, item])),
   monster: new Map(monsters.map((item) => [item.id, item])),
 };
+
+function normalizedSpellName(name: string): string {
+  return name
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "");
+}
+
+const spellByName = new Map(spells.map((item) => [normalizedSpellName(item.name), item] as const));
 
 export function lookupItem(id: string): unknown | null {
   const kind = compendiumKindFromId(id);
@@ -634,6 +646,18 @@ export function contextForDraft(
   for (const granted of classGrants.spells) {
     const spell = maps.spell.get(granted.id);
     if (spell) spellMap[spell.id] = spell;
+  }
+  if (classData?.name.toLowerCase() === "animist") {
+    for (const id of draft.spells.attunedApparitions) {
+      const definition = APPARITION_BY_ID.get(id);
+      if (!definition) continue;
+      for (const entry of definition.spells) {
+        const spell = spellByName.get(normalizedSpellName(entry.name));
+        if (spell) spellMap[spell.id] = spell;
+      }
+      const vessel = spellByName.get(normalizedSpellName(definition.vesselSpell));
+      if (vessel) spellMap[vessel.id] = vessel;
+    }
   }
 
   const equipmentMap: Record<string, Equipment> = {};

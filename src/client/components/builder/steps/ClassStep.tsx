@@ -234,7 +234,8 @@ export function ClassStep({
                 draft.spells.known.length ||
                 draft.spells.prepared.length ||
                 Object.keys(draft.spells.preparedByRank).length ||
-                draft.spells.focus.length
+                draft.spells.focus.length ||
+                draft.spells.attunedApparitions.length
                   ? "spellcasting"
                   : null,
               ].filter(Boolean);
@@ -264,6 +265,11 @@ export function ClassStep({
                     prepared: [],
                     preparedByRank: {},
                     preparedCantrips: [],
+                    studiousPrepared: [],
+                    studiousUsed: {},
+                    attunedApparitions: [],
+                    primaryApparition: null,
+                    apparitionUsed: {},
                     focus: [],
                     slotsUsed: {},
                     divineFontUsed: 0,
