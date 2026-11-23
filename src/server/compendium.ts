@@ -17,6 +17,7 @@ import type {
   Monster,
   Spell,
 } from "../shared/types";
+import type { DomainEntry } from "../shared/domains";
 import { isCoreSource } from "../shared/content";
 import { FEAT_GRANTS } from "../shared/effects";
 import {
@@ -78,6 +79,7 @@ export const feats = readArray<Feat>("feats.json");
 export const spells = readArray<Spell>("spells.json");
 export const equipment = readArray<Equipment>("equipment.json");
 export const deities = readArray<Deity>("deities.json");
+export const domains = readArray<DomainEntry>("domains.json");
 export const conditions = readArray<ConditionRef>("conditions.json");
 export const actions = readArray<ActionRef>("actions.json");
 export const monsters = readArray<Monster>("monsters.json");
@@ -92,6 +94,7 @@ const maps = {
   spell: new Map(spells.map((item) => [item.id, item])),
   equipment: new Map(equipment.map((item) => [item.id, item])),
   deity: new Map(deities.map((item) => [item.id, item])),
+  domain: new Map(domains.map((item) => [item.id, item])),
   condition: new Map(conditions.map((item) => [item.id, item])),
   action: new Map(actions.map((item) => [item.id, item])),
   monster: new Map(monsters.map((item) => [item.id, item])),
@@ -279,6 +282,19 @@ export function searchDeities(q?: string, limit = 80) {
   };
 }
 
+export function searchDomains(q?: string, limit = 200) {
+  const filtered = domains.filter((domain) =>
+    matchesText(
+      `${domain.name} ${domain.description} ${domain.deities.join(" ")} ${domain.alternateDeities.join(" ")} ${domain.pantheons.join(" ")}`,
+      q
+    )
+  );
+  return {
+    items: filtered.slice(0, Math.max(1, Math.min(500, limit))),
+    total: filtered.length,
+  };
+}
+
 interface SearchCandidate {
   id: string;
   name: string;
@@ -336,6 +352,7 @@ const searchCandidates: SearchCandidate[] = (() => {
   add(spells, "spell", (item: Spell) => item.rank);
   add(equipment, "equipment", (item: Equipment) => item.level);
   add(deities, "deity", () => null);
+  add(domains, "domain", () => null);
   add(conditions, "condition", () => null);
   add(actions, "action", () => null);
   add(monsters, "monster", (item: Monster) => item.level);
@@ -589,6 +606,7 @@ export const compendiumCounts = {
   spells: spells.length,
   equipment: equipment.length,
   deities: deities.length,
+  domains: domains.length,
   conditions: conditions.length,
   actions: actions.length,
   monsters: monsters.length,

@@ -15,6 +15,7 @@ import {
   lookupItem,
   monsters,
   searchDeities,
+  searchDomains,
   searchEquipment,
   searchFeats,
   searchMonsters,
@@ -172,6 +173,15 @@ export async function registerCompendiumRoutes(app: FastifyInstance): Promise<vo
     const result = searchDeities(
       typeof query.q === "string" ? query.q : undefined,
       num(query.limit) ?? 500
+    );
+    return reply.send(result);
+  });
+
+  app.get("/api/compendium/domains", async (request, reply) => {
+    const query = request.query as Record<string, unknown>;
+    const result = searchDomains(
+      typeof query.q === "string" ? query.q : undefined,
+      num(query.limit) ?? 200
     );
     return reply.send(result);
   });

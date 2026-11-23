@@ -20,6 +20,7 @@ The generated compendium is currently tracked in Git so a fresh clone is runnabl
 - `actions`
 - `pathfinder-monster-core`, `pathfinder-monster-core-2`, `pathfinder-npc-core`
 - legacy/expansion bestiaries: `pathfinder-bestiary`, `pathfinder-bestiary-2`, `pathfinder-bestiary-3`, `lost-omens-bestiary`, `npc-gallery`, `battlecry-bestiary`, `howl-of-the-wild-bestiary`, `book-of-the-dead-bestiary`, `rage-of-elements-bestiary`, `war-of-immortals-bestiary`
+- `journals` (`domains.json` for the domain reference)
 - localization: `static/lang/en.json`, `re-en.json`, `action-en.json`
 
 ## Rebuild the data
@@ -56,6 +57,7 @@ git -C $cache sparse-checkout set `
   packs/pf2e/book-of-the-dead-bestiary `
   packs/pf2e/rage-of-elements-bestiary `
   packs/pf2e/war-of-immortals-bestiary `
+  packs/pf2e/journals `
   static/lang
 ```
 
@@ -91,6 +93,7 @@ The script writes:
 | `spells.json` | Spells with rank (cantrips normalized to rank 0), traditions, defense, damage, heightening |
 | `equipment.json` | Weapons/armor/shields/consumables/gear with price, bulk, traits, mechanics |
 | `deities.json` | Domains, divine font, skill, favored weapon, spells |
+| `domains.json` | Domain descriptions, initial/advanced domain spells, deity and pantheon lists |
 | `conditions.json` | Conditions |
 | `actions.json` | Actions and activities |
 | `monsters.json` | Bestiary/NPC data, attacks, abilities, stat block |

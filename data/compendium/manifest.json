@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-23T07:14:09.527Z",
+  "generatedAt": "2026-11-23T07:31:07.103Z",
   "source": "https://github.com/foundryvtt/pf2e (Apache-2.0)",
   "sourceCommit": "a70593f7d52ba6357c3bdc05c09dcb9d4f2765dc",
   "sourceRef": "a70593f7",
@@ -14,6 +14,7 @@
     "spells": 2036,
     "equipment": 6005,
     "deities": 483,
+    "domains": 61,
     "conditions": 43,
     "actions": 592,
     "monsters": 2384

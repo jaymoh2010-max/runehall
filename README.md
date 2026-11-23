@@ -36,7 +36,7 @@ Four campaign sections:
 - **Minimize** returns to the map without losing table state. Rolls from the sheet post to the same chat as the manual dice tray.
 - The bestiary palette for dragging monsters onto the map.
 - A shared soundtrack player with GM uploads and a bundled music library.
-- Global compendium search (`Ctrl+K`) for feats, spells, items, creatures, ancestries, backgrounds, deities, conditions, and actions.
+- Global compendium search (`Ctrl+K`) for feats, spells, items, creatures, ancestries, backgrounds, deities, domains, conditions, and actions.
 
 ### Character builder and sheet
 

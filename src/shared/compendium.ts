@@ -13,6 +13,7 @@ export type CompendiumEntryKind =
   | "spell"
   | "equipment"
   | "deity"
+  | "domain"
   | "condition"
   | "action"
   | "monster";
@@ -28,6 +29,7 @@ export const COMPENDIUM_KIND_ORDER: CompendiumEntryKind[] = [
   "class",
   "classFeature",
   "deity",
+  "domain",
   "condition",
   "action",
 ];
@@ -42,6 +44,7 @@ export const COMPENDIUM_KIND_LABELS: Record<CompendiumEntryKind, string> = {
   spell: "Spell",
   equipment: "Item",
   deity: "Deity",
+  domain: "Domain",
   condition: "Condition",
   action: "Action",
   monster: "Creature",
@@ -57,6 +60,7 @@ export const COMPENDIUM_KIND_PLURALS: Record<CompendiumEntryKind, string> = {
   spell: "Spells",
   equipment: "Items",
   deity: "Deities",
+  domain: "Domains",
   condition: "Conditions",
   action: "Actions",
   monster: "Creatures",
@@ -93,6 +97,7 @@ const ID_PREFIXES: Record<string, CompendiumEntryKind> = {
   spell: "spell",
   item: "equipment",
   deity: "deity",
+  domain: "domain",
   cond: "condition",
   act: "action",
   mon: "monster",

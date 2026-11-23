@@ -29,6 +29,7 @@ const files = [
   { key: "spells", prefix: "spell", label: "Spells" },
   { key: "equipment", prefix: "item", label: "Items" },
   { key: "deities", prefix: "deity", label: "Deities" },
+  { key: "domains", prefix: "domain", label: "Domains" },
   { key: "conditions", prefix: "cond", label: "Conditions" },
   { key: "actions", prefix: "act", label: "Actions" },
   { key: "monsters", prefix: "mon", label: "Creatures" },
@@ -191,6 +192,15 @@ requireFields("deities", [
   "description",
   "source",
 ]);
+requireFields("domains", [
+  "name",
+  "description",
+  "domainSpell",
+  "advancedDomainSpell",
+  "deities",
+  "aliases",
+  "source",
+]);
 requireFields("conditions", ["name", "description", "source"]);
 requireFields("actions", ["name", "category", "description", "source"]);
 requireFields("monsters", [
@@ -215,6 +225,32 @@ const ancestryNames = new Set((data.ancestries ?? []).map((item) => item.name.to
 for (const heritage of data.heritages ?? []) {
   if (!heritage.versatile && !ancestryNames.has(String(heritage.ancestry).toLowerCase())) {
     fail(`heritage ${heritage.name}: ancestry "${heritage.ancestry}" does not exist`);
+  }
+}
+
+const spellIds = new Set((data.spells ?? []).map((item) => item.id));
+const domainIds = new Set((data.domains ?? []).map((item) => item.id));
+for (const domain of data.domains ?? []) {
+  for (const [label, spell] of [
+    ["domain spell", domain.domainSpell],
+    ["advanced domain spell", domain.advancedDomainSpell],
+  ]) {
+    if (spell?.id && !spellIds.has(spell.id)) {
+      fail(`domain ${domain.name}: ${label} ${spell.name} is missing`);
+    }
+  }
+}
+const domainKeys = new Map(
+  (data.domains ?? []).map((domain) => [domain.id.replace(/^domain:/, ""), domain.id])
+);
+for (const domain of data.domains ?? []) {
+  for (const alias of domain.aliases ?? []) domainKeys.set(alias, domain.id);
+}
+for (const deity of data.deities ?? []) {
+  for (const key of [...(deity.domains ?? []), ...(deity.alternateDomains ?? [])]) {
+    if (!domainKeys.has(String(key).toLowerCase())) {
+      fail(`deity ${deity.name}: domain "${key}" has no reference entry`);
+    }
   }
 }
 

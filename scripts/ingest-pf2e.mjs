@@ -767,6 +767,8 @@ for (const file of walkJson(path.join(PACKS, "actions"))) {
   const j = readJson(file);
   if (j?.type === "action") raw.actions.push(j);
 }
+// The domains reference is a journal with one page per domain.
+const domainsJournal = readJson(path.join(PACKS, "journals", "domains.json"));
 for (const pack of [
   "pathfinder-monster-core",
   "pathfinder-monster-core-2",
@@ -1676,6 +1678,90 @@ const deities = raw.deities
   })
   .sort((a, b) => a.name.localeCompare(b.name));
 
+// --- Domains ---------------------------------------------------------------
+function domainSlug(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+domain$/, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+const DOMAIN_ALIASES = {
+  delirium: "disorientation",
+  void: "nothingness",
+  wyrmkin: "dragon",
+};
+
+function domainAliases(name) {
+  const slug = domainSlug(name);
+  return Object.entries(DOMAIN_ALIASES)
+    .filter(([, target]) => target === slug)
+    .map(([alias]) => alias);
+}
+
+function domainUuidNames(html) {
+  const names = [];
+  for (const match of String(html ?? "").matchAll(/@UUID\[([^\]]+)\](?:\{([^}]*)\})?/g)) {
+    const name = match[2]?.trim() || nameFromUuid(match[1]);
+    if (name) names.push(name);
+  }
+  return [...new Set(names)];
+}
+
+function domainAlternates(html) {
+  const parts = String(html ?? "").split(/<p><em>Alternate Domain<\/em><\/p>/i);
+  return [domainUuidNames(parts[0] ?? ""), domainUuidNames(parts[1] ?? "")];
+}
+
+const domains = (domainsJournal?.pages ?? [])
+  .map((page) => {
+    const content = String(page.text?.content ?? "");
+    const description = cleanHtml(content.split(/<p><strong>Domain Spell<\/strong>/i)[0] ?? "");
+    const domainUuid = content.match(
+      /<strong>Domain Spell<\/strong>[\s\S]*?@UUID\[([^\]]+)\]/i
+    )?.[1];
+    const advancedUuid = content.match(
+      /<strong>Advanced Domain Spell<\/strong>[\s\S]*?@UUID\[([^\]]+)\]/i
+    )?.[1];
+    const sections = {};
+    const chunks = content.split(/<h4><strong>([^<]+)<\/strong><\/h4>/i);
+    for (let index = 1; index < chunks.length; index += 2) {
+      sections[chunks[index].trim().toLowerCase()] = chunks[index + 1] ?? "";
+    }
+    const [deities, alternateDeities] = domainAlternates(sections.deities ?? "");
+    const [covenants, alternateCovenants] = domainAlternates(sections.covenants ?? "");
+    const [pantheons, alternatePantheons] = domainAlternates(sections.pantheons ?? "");
+    const name = String(page.name ?? "")
+      .replace(/\s+Domain$/i, "")
+      .trim();
+    if (!name) return null;
+    return {
+      id: `domain:${domainSlug(name)}`,
+      name,
+      type: "domain",
+      description,
+      domainSpell: resolveDeitySpell(domainUuid),
+      advancedDomainSpell: resolveDeitySpell(advancedUuid),
+      deities,
+      alternateDeities,
+      covenants,
+      alternateCovenants,
+      pantheons,
+      alternatePantheons,
+      mysteries: domainUuidNames(sections["oracle mysteries"] ?? ""),
+      aliases: domainAliases(name),
+      rarity: "common",
+      traits: [],
+      source: "Pathfinder 2e",
+      license: "ORC",
+      remaster: true,
+    };
+  })
+  .filter(Boolean)
+  .sort((a, b) => a.name.localeCompare(b.name));
+
 // --- Conditions / actions --------------------------------------------------
 const conditions = raw.conditions
   .map((j) => ({
@@ -1840,6 +1926,7 @@ write("feats.json", feats);
 write("spells.json", spells);
 write("equipment.json", equipment);
 write("deities.json", deities);
+write("domains.json", domains);
 write("conditions.json", conditions);
 write("actions.json", actions);
 write("monsters.json", monsters);
@@ -1875,6 +1962,7 @@ const manifest = {
     spells: spells.length,
     equipment: equipment.length,
     deities: deities.length,
+    domains: domains.length,
     conditions: conditions.length,
     actions: actions.length,
     monsters: monsters.length,

@@ -56,6 +56,7 @@ describe("compendium search", () => {
       ["Fireball", "spell"],
       ["Longsword", "equipment"],
       ["Abadar", "deity"],
+      ["Air", "domain"],
       ["Frightened", "condition"],
       ["A Challenge for Heroes", "action"],
       ["Goblin Warrior", "monster"],
