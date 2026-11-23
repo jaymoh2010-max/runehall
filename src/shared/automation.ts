@@ -64,6 +64,7 @@ export function automationForFeat(feat: Feat): AutomationInfo {
       Boolean(effect.untrainedImprovisation) ||
       Boolean(effect.armorProficiency) ||
       Boolean(effect.weaponProficiency) ||
+      Boolean(effect.apexAbilities?.length) ||
       Boolean(effect.specificWeaponProficiency?.length) ||
       Boolean(effect.investedLimit) ||
       Boolean(effect.ignoreArmorSpeedPenalty) ||
@@ -114,13 +115,14 @@ export function automationForEquipment(item: Equipment): AutomationInfo {
       Boolean(effect.perceptionItemBonus) ||
       Boolean(effect.saveItemBonus) ||
       Boolean(effect.acItemBonus) ||
+      Boolean(effect.apexAbilities?.length) ||
       Boolean(effect.hpPerLevel) ||
       Boolean(effect.speed);
     return numeric
       ? {
           level: "partial",
           reason:
-            "Runehall applies the item bonus when the item is equipped and invested; activated or conditional effects may need tracking.",
+            "Runehall applies the item and apex bonuses when the item is equipped and invested; activated or conditional effects may need tracking.",
         }
       : {
           level: "manual",

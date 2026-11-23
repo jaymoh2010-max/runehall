@@ -1,4 +1,4 @@
-import type { SaveKey, SkillId } from "./types";
+import type { AbilityKey, SaveKey, SkillId } from "./types";
 
 /**
  * Structured, curated character effects. The compendium does not carry rule
@@ -39,6 +39,8 @@ export interface EffectModifiers {
   acItemBonus?: number;
   /** Proficiency-rank floors keyed by perception, fortitude, reflex, or will. */
   proficiencyRanks?: Record<string, number>;
+  /** Apex items raise the chosen ability modifier by 1 or to +4. */
+  apexAbilities?: AbilityKey[];
   /** Additional worn magic items that can be invested beyond the base limit. */
   investedLimit?: number;
   /** Ignore the Speed penalty from worn armor. */
@@ -223,12 +225,10 @@ export const ITEM_EFFECTS: Record<string, EffectModifiers> = {
   "item:8NgA4PFFXZPZ9SSg": { skillItemBonus: { acrobatics: 2 } },
   // Cloak of Elvenkind — +1 item bonus to Stealth.
   "item:MNBnZn0b80Q7yHJM": { skillItemBonus: { stealth: 1 } },
-  // Amulet of the Third Eye — +2 item bonus to Perception.
+  // Amulet of the Third Eye — +2 item bonus to Perception and an apex Wisdom boost.
   "item:mNgScZVAq037JuNb": {
     perceptionItemBonus: 2,
-    notes: [
-      "Apex: when invested, increase your Wisdom modifier by 1 or to +4, whichever is higher.",
-    ],
+    apexAbilities: ["wis"],
   },
   // Bands of Force — +1 item bonus to AC and saving throws.
   "item:02q8s6sSicMkhs1l": {
@@ -248,26 +248,21 @@ export const ITEM_EFFECTS: Record<string, EffectModifiers> = {
     saveItemBonus: { fortitude: 3, reflex: 3, will: 3 },
     notes: ["Acts as armor with a maximum Dexterity modifier of +5."],
   },
-  // Belt of Giant Strength — +3 item bonus to Athletics.
+  // Belt of Giant Strength — +3 item bonus to Athletics and an apex Strength boost.
   "item:7utuH8VJjKEzKtNw": {
     skillItemBonus: { athletics: 3 },
-    notes: [
-      "Apex: when invested, increase your Strength modifier by 1 or to +4, whichever is higher.",
-    ],
+    apexAbilities: ["str"],
   },
-  // Bracers of Strength — +3 item bonus to Athletics.
+  // Bracers of Strength — +3 item bonus to Athletics and an apex Strength boost.
   "item:WOiCJSS2MicKCMVs": {
     skillItemBonus: { athletics: 3 },
-    notes: [
-      "Apex: when invested, increase your Strength modifier by 1 or to +4, whichever is higher.",
-    ],
+    apexAbilities: ["str"],
   },
-  // Bracers of Hammers — +3 item bonus to Athletics.
+  // Bracers of Hammers — +3 item bonus to Athletics and an apex Strength boost.
   "item:tIta1GNQK6sSWnr6": {
     skillItemBonus: { athletics: 3 },
-    notes: [
-      "Apex: when invested, increase your Strength modifier by 1 or to +4, whichever is higher. Disarm/Trip bonuses and damage remain manual.",
-    ],
+    apexAbilities: ["str"],
+    notes: ["Disarm/Trip bonuses and damage remain manual."],
   },
   // Amulet of Kinship's Strength — +2 item bonus to Will saves (+3 against fear).
   "item:P9v4lpVpLlL7AGnw": {
@@ -446,6 +441,9 @@ export function mergeEffects(effects: (EffectModifiers | undefined)[]): EffectMo
     }
     if (effect.armorProficiency) merged.armorProficiency = true;
     if (effect.weaponProficiency) merged.weaponProficiency = true;
+    if (effect.apexAbilities?.length) {
+      merged.apexAbilities = [...(merged.apexAbilities ?? []), ...effect.apexAbilities];
+    }
     if (effect.specificWeaponProficiency?.length) {
       merged.specificWeaponProficiency = [
         ...(merged.specificWeaponProficiency ?? []),

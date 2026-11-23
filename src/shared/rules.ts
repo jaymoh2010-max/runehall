@@ -3263,6 +3263,13 @@ export function computeCharacter(
       })
       .map((entry) => entry.itemId)
   );
+  const apexAbility = itemMods.apexAbilities?.[0];
+  let apexNote: string | null = null;
+  if (apexAbility) {
+    // Apex items raise the modifier by 1 or to +4, whichever is higher.
+    abilityMods[apexAbility] = Math.max(abilityMods[apexAbility] + 1, 4);
+    apexNote = `Apex: ${ABILITY_LABELS[apexAbility]} modifier increased to ${abilityMods[apexAbility] >= 0 ? "+" : ""}${abilityMods[apexAbility]}.`;
+  }
   const caster = casterInfo(classData);
   const keyOptions = classKeyOptions(draft, classData);
   const key =
@@ -3879,6 +3886,13 @@ export function computeCharacter(
         "gear"
       );
     }
+  }
+  if ((itemMods.apexAbilities?.length ?? 0) > 1) {
+    issue(
+      "warning",
+      "Only one apex item's ability increase applies. Uninvest the others or choose which one is active.",
+      "gear"
+    );
   }
 
   for (const { entry, item } of ownedEquipment) {
@@ -4721,7 +4735,12 @@ export function computeCharacter(
     (value, index, arr) => arr.findIndex((x) => x.toLowerCase() === value.toLowerCase()) === index
   );
   const notes = [
-    ...new Set([...(featMods.notes ?? []), ...(itemMods.notes ?? []), ...classGrants.notes]),
+    ...new Set([
+      ...(featMods.notes ?? []),
+      ...(itemMods.notes ?? []),
+      ...classGrants.notes,
+      ...(apexNote ? [apexNote] : []),
+    ]),
     ...(hasFocusSpells && caster.progression === "none"
       ? [
           "Focus spell attack rolls and DCs use Wisdom unless the granting ability names a different attribute.",

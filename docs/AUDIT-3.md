@@ -25,6 +25,9 @@ Audit date: 2026-11-23
   feats are chosen.
 - **Animist attunement was missing.** After the Animist spellcasting split, the simulator now
   attunes the required two/three/four apparitions at each level and sets a primary apparition.
+- **Apex item ability increases are applied.** Amulet of the Third Eye, Belt of Giant Strength,
+  Bracers of Strength, and Bracers of Hammers now raise the selected ability modifier by 1 or to
+  +4. Only one apex item applies, with a sheet warning when several are invested.
 - **The character simulator is now reusable.** The deterministic level builder is exported,
   the CLI is entry-point guarded, and a focused unit test covers the previously failing
   classes.
@@ -58,5 +61,4 @@ Audit date: 2026-11-23
   compendium ships prose rather than structured rule elements.
 - The party simulator rebuilds each complete sheet at every level to exercise all class
   features and choices; it is not a narrative continuity test for a single saved build.
-- Apex item ability modifiers, repeatable feat grants, and handwrap/companion edge cases remain
-  candidates for future curated coverage.
+- Repeatable feat grants and companion edge cases remain candidates for future curated coverage.
