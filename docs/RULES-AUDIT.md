@@ -65,7 +65,7 @@ After regeneration the local compendium has **54 ancestries, 357 heritages,
 | `npm run verify:data` | Pass |
 | `npm run smoke` | Pass (two-user GM/player flow) |
 | `npm run e2e` | 26 passed, 0 skipped |
-| `npm run simulate:campaign` | 78 passed, 0 failed |
+| `npm run simulate:campaign` | 17 passed, 0 failed |
 | `npm run build` | Pass |
 | `npm run check:bundle` | Pass |
 
@@ -127,7 +127,8 @@ current data model or intentionally manual:
 - **Afflictions** are templates in the sheet; individual curse/disease statblocks
   are not part of the compendium.
 - **Adventure-path bestiaries** (thousands of creatures) are not loaded. The
-  core legacy and major expansion bestiaries now are.
+  core legacy and major expansion bestiaries now are, but the bestiary UI does
+  not filter legacy creatures by campaign ruleset; all 2,384 are available.
 - **Commander tactics** and **Runesmith runes** are class content without
   first-class pickers. The classes and feats are present; the build choices are
   manual.
