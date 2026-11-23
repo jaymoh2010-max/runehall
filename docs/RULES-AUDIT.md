@@ -124,6 +124,8 @@ current data model or intentionally manual:
   ingested. The app has a separate GM hazard library on an unmerged branch, but
   not a compendium hazard browser.
 - **Traits** are labels only. There is no trait glossary or per-trait rules text.
+- **Domain descriptions** are not ingested. Deity pages list domains and their
+  initial domain spells, but there is no standalone domain reference page.
 - **Afflictions** are templates in the sheet; individual curse/disease statblocks
   are not part of the compendium.
 - **Adventure-path bestiaries** (thousands of creatures) are not loaded. The
