@@ -4,6 +4,8 @@ data/*.db
 data/*.db-*
 data/uploads/*
 !data/uploads/.gitkeep
+data/demo/
+scripts/_demo-*.ts
 .cache/
 backups/
 *.log

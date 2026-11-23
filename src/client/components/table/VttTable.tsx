@@ -641,7 +641,6 @@ export function VttTable({ initial, campaignId, user, isGm, active }: VttTablePr
             onSelectToken={selectToken}
             onSelectTokens={selectTokens}
             onOpenCharacter={setSheetCharacterId}
-            onEditToken={undefined}
             onMoveToken={moveToken}
             onFog={applyFog}
             fogBrush={activeScene.fogEnabled ? fogBrush : null}

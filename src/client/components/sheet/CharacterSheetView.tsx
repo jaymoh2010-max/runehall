@@ -53,6 +53,7 @@ const CharacterBuilderPage = lazy(() =>
   }))
 );
 import { getSocket, joinCampaign } from "../../socket";
+import { CompendiumPreviewModal, parseCompendiumPreviewHref } from "../CompendiumPreview";
 import { Avatar, Badge, Spinner, Tag } from "../ui";
 
 type SheetTab =
@@ -120,6 +121,7 @@ export function CharacterSheetView({
   const [tab, setTab] = useState<SheetTab>("weapons");
   const [showFullPlan, setShowFullPlan] = useState(false);
   const [builderOpen, setBuilderOpen] = useState(false);
+  const [previewPath, setPreviewPath] = useState<string | null>(null);
   const [castChoices, setCastChoices] = useState<Record<string, string>>({});
   const [lastRoll, setLastRoll] = useState<LastRoll | null>(null);
   const [hpInput, setHpInput] = useState("");
@@ -684,7 +686,9 @@ export function CharacterSheetView({
   };
 
   const weaponNameHref = (attackId: string | null, name: string) =>
-    attackId ? `/library/item/${attackId}` : `/rules?tab=actions&q=${encodeURIComponent(name)}`;
+    attackId
+      ? `/library/equipment/${attackId}`
+      : `/rules?tab=actions&q=${encodeURIComponent(name)}`;
 
   if (loading) {
     return (
@@ -715,9 +719,18 @@ export function CharacterSheetView({
     <div
       className={mode === "overlay" ? "pb-sheet-overlay" : "pb-sheet-page"}
       onClickCapture={(event) => {
-        if (mode !== "overlay") return;
         const anchor = (event.target as HTMLElement | null)?.closest("a");
-        if (!anchor || anchor.target === "_blank") return;
+        if (!anchor) return;
+        const preview = parseCompendiumPreviewHref(anchor.getAttribute("href"));
+        const modified =
+          event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0;
+        if (preview) {
+          if (modified || anchor.target === "_blank") return;
+          event.preventDefault();
+          setPreviewPath(preview.path);
+          return;
+        }
+        if (mode !== "overlay" || anchor.target === "_blank") return;
         event.preventDefault();
         window.open(anchor.href, "_blank", "noopener");
       }}
@@ -1317,7 +1330,7 @@ export function CharacterSheetView({
                   <div className="pb-item-results">
                     {itemResults.slice(0, 16).map((item) => (
                       <div className="pb-item-row" key={item.id}>
-                        <Link to={`/library/item/${item.id}`} className="pb-item-name">
+                        <Link to={`/library/equipment/${item.id}`} className="pb-item-name">
                           <strong>{item.name}</strong>
                           <span>
                             Level {item.level} · {formatCp(item.price.cpTotal)}
@@ -1376,7 +1389,7 @@ export function CharacterSheetView({
                       const item = context.equipment[entry.itemId] ?? null;
                       return (
                         <div className="pb-inventory-row" key={entry.itemId}>
-                          <Link to={`/library/item/${entry.itemId}`}>
+                          <Link to={`/library/equipment/${entry.itemId}`}>
                             <Package size={13} />
                             <strong>{item?.name ?? entry.itemId}</strong>
                             <span>×{entry.quantity}</span>
@@ -2072,6 +2085,11 @@ export function CharacterSheetView({
           </Suspense>
         </div>
       ) : null}
+      <CompendiumPreviewModal
+        href={previewPath}
+        elevated={mode === "overlay"}
+        onClose={() => setPreviewPath(null)}
+      />
     </div>
   );
 }

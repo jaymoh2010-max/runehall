@@ -63,7 +63,6 @@ interface SceneCanvasProps {
   onSelectToken: (id: string | null, additive?: boolean) => void;
   onSelectTokens: (ids: string[], additive?: boolean) => void;
   onOpenCharacter: (id: string) => void;
-  onEditToken?: (id: string) => void;
   onMoveToken: (tokenId: string, x: number, y: number) => void;
   onFog: (cells: string[], mode: FogMode) => void;
   fogBrush: FogMode | null;
@@ -105,7 +104,6 @@ export function SceneCanvas({
   onSelectToken,
   onSelectTokens,
   onOpenCharacter,
-  onEditToken,
   onMoveToken,
   onFog,
   fogBrush,
@@ -1270,13 +1268,6 @@ export function SceneCanvas({
                 onPointerUp={(event) => onTokenPointerUp(event, token)}
                 onPointerCancel={(event) => onTokenPointerUp(event, token)}
                 onDoubleClick={() => token.characterId && onOpenCharacter(token.characterId)}
-                onContextMenu={(event) => {
-                  if (!onEditToken) return;
-                  event.preventDefault();
-                  event.stopPropagation();
-                  onSelectToken(token.id);
-                  onEditToken(token.id);
-                }}
                 onKeyDown={(event) => {
                   if (event.key === "Enter" || event.key === " ") {
                     event.preventDefault();
@@ -1289,7 +1280,7 @@ export function SceneCanvas({
                   showCreatureStats && token.hpMax !== null && token.hpCurrent !== null
                     ? `, ${token.hpCurrent} of ${token.hpMax} hit points`
                     : ""
-                }${isGm ? ", right-click to edit" : ""}`}
+                }`}
               >
                 {portrait ? (
                   <img

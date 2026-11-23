@@ -975,6 +975,9 @@ hr {
   backdrop-filter: blur(4px);
   animation: fadeIn 0.14s ease;
 }
+.modal-backdrop-elevated {
+  z-index: 1400;
+}
 .modal {
   width: min(640px, 100%);
   max-height: min(86vh, 900px);

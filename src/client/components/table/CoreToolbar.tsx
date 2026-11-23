@@ -189,7 +189,7 @@ export function CoreToolbar({
         >
           My sheet
         </Button>
-        <div className="core-presence" aria-label="Players online">
+        <div className="core-presence" role="group" aria-label="Players online">
           {presence.slice(0, 4).map((person) => (
             <Avatar key={person.userId} name={person.displayName} size={24} />
           ))}

@@ -85,13 +85,13 @@ export const XP_MODE_OPTIONS: { value: XpMode; label: string; description: strin
     value: "milestone",
     label: "Milestone (GM decides)",
     description:
-      "Default. You decide when the party or an individual character levels up. Encounter budgets and XP awards stay hidden.",
+      "Default. You decide when the party or an individual character levels up. XP bookkeeping stays hidden.",
   },
   {
     value: "xp",
     label: "XP tracking (GM levels up)",
     description:
-      "Track PF2e encounter budgets and award XP. Characters still level up only when the GM chooses.",
+      "Track character XP and quest rewards. Characters still level up only when the GM chooses.",
   },
 ];
 

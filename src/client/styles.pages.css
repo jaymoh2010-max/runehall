@@ -9009,6 +9009,9 @@
 .library-detail-body {
   max-width: 780px;
 }
+.compendium-preview .library-detail-body {
+  max-width: none;
+}
 .library-detail-head {
   display: flex;
   align-items: flex-start;
@@ -10514,8 +10517,8 @@
   gap: 1px;
 }
 .core-initiative-actions .icon-btn {
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
 }
 .core-initiative-controls {
   display: flex;

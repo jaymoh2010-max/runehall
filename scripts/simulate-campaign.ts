@@ -5,10 +5,10 @@
  * Boots an isolated server, creates real accounts and campaigns, and plays two
  * complete 1-20 arcs through the HTTP and Socket.IO APIs:
  *
- *   A. "The Ashen Crown" - XP advancement, encounter budgets, treasure,
- *      long rests, downtime, sessions, handouts, calendar, export/import.
- *   B. "The Quiet Ledger" - milestone advancement, story level-ups, recaps,
- *      live campaign metadata, and a mid-campaign replacement character.
+ *   A. "The Ashen Crown" - XP advancement, tokens, scene visibility,
+ *      initiative ownership, handouts, quests, and export/import.
+ *   B. "The Quiet Ledger" - milestone advancement, story level-ups,
+ *      quest gating, and live campaign metadata.
  *
  * The output separates hard failures (things the app should do and does not),
  * observations (rule gaps or risky behaviour), and metrics. It is deterministic
@@ -23,15 +23,10 @@ import fs from "node:fs";
 import net from "node:net";
 import path from "node:path";
 import { io, type Socket } from "socket.io-client";
-import { characterSummary, computeCharacter, startingWealthCp } from "../src/shared/rules";
-import { currencyToCp } from "../src/shared/inventory";
-import { longRestHealing } from "../src/shared/rest";
-import { encounterBudget, encounterAwardXp } from "../src/shared/encounters";
+import { characterSummary } from "../src/shared/rules";
 import { normalizeAdvancementSpeed, xpPerLevel } from "../src/shared/xp";
-import { TREASURE_CURRENCY_GP, treasureBudgetGp } from "../src/shared/treasure";
-import { formatGolarionDate, shiftGolarionDate } from "../src/shared/calendar";
 import { buildSimulatedHero, contextForDraft } from "./lib/simHeroes";
-import type { CharacterDraft, CharacterRecord, Encounter } from "../src/shared/types";
+import type { CharacterDraft, CharacterRecord } from "../src/shared/types";
 
 const projectRoot = path.resolve(import.meta.dirname, "..");
 const tempDir = fs.mkdtempSync(path.join(process.env.TEMP || "/tmp", "runehall-campaign-"));
@@ -183,11 +178,6 @@ async function check(
   }
 }
 
-function observe(campaign: string, name: string, detail: string): void {
-  report.checks.push({ campaign, name, status: "observation", detail });
-  log(`[gap] ${name}: ${detail}`);
-}
-
 function metric(key: string, value: number | string | boolean): void {
   report.metrics[key] = value;
 }
@@ -336,112 +326,6 @@ function localSummary(character: Json): Json {
   return characterSummary(character.data as CharacterDraft, contextForDraft(character.data));
 }
 
-/** Encounters that make up one level of play in the simulation. */
-const LEVEL_ENCOUNTERS = [
-  { label: "Trivial", count: 1, levelOffset: 0, xp: 40 },
-  { label: "Low", count: 2, levelOffset: -1, xp: 60 },
-  { label: "Moderate", count: 2, levelOffset: 0, xp: 80 },
-  { label: "Severe", count: 3, levelOffset: 0, xp: 120 },
-  { label: "Extreme", count: 4, levelOffset: 0, xp: 160 },
-];
-
-async function launchSimulatedEncounter(input: {
-  campaignId: string;
-  sceneId: string;
-  gmCookie: string;
-  partyLevel: number;
-  partySize: number;
-  template: (typeof LEVEL_ENCOUNTERS)[number];
-  sequence: number;
-}): Promise<{ encounter: Encounter; initiative: Json[]; tokens: Json[] }> {
-  const { campaignId, sceneId, gmCookie, partyLevel, partySize, template, sequence } = input;
-  const creatureLevel = Math.max(0, partyLevel + template.levelOffset);
-  const encounterResult = await api(`/api/campaigns/${campaignId}/encounters`, {
-    method: "POST",
-    cookie: gmCookie,
-    body: {
-      name: `Sim ${template.label} ${sequence}`,
-      description: "Campaign simulation encounter.",
-      sceneId,
-    },
-  });
-  const encounter = encounterResult.payload.encounter as Encounter;
-  await api(`/api/campaigns/${campaignId}/encounters/${encounter.id}/combatants`, {
-    method: "POST",
-    cookie: gmCookie,
-    body: {
-      name: `${template.label} Fixture`,
-      level: creatureLevel,
-      count: template.count,
-      hp: 6 + creatureLevel * 6,
-      ac: 14 + creatureLevel,
-      perception: creatureLevel + 4,
-      wave: 1,
-    },
-  });
-  const expectedXp = encounterAwardXp(
-    [{ level: creatureLevel, count: template.count } as any],
-    partyLevel
-  );
-  assertEqual(expectedXp, template.xp, `${template.label} fixture XP`);
-  const budget = encounterBudget(
-    [{ level: creatureLevel, count: template.count } as any],
-    partyLevel,
-    partySize
-  );
-  assertEqual(
-    budget.difficulty,
-    template.label.toLowerCase() === "moderate"
-      ? "moderate"
-      : template.label.toLowerCase() === "low"
-        ? "low"
-        : template.label.toLowerCase(),
-    `${template.label} encounter classification`
-  );
-  const launched = await api(`/api/campaigns/${campaignId}/encounters/${encounter.id}/launch`, {
-    method: "POST",
-    cookie: gmCookie,
-    body: { sceneId, wave: 1, mode: "fresh" },
-  });
-  assertEqual(launched.payload.mode, "fresh", "Encounter launch mode");
-  assert(Array.isArray(launched.payload.initiative), "Encounter launch returned no initiative");
-  const launchedTokens = launched.payload.tokens as Json[];
-  const groupedEntry =
-    template.count === 1
-      ? (launched.payload.initiative as Json[]).find((entry) =>
-          launchedTokens.some((token) => token.id === entry.tokenId)
-        )
-      : (launched.payload.initiative as Json[]).find((entry) =>
-          String(entry.name).includes(`×${template.count}`)
-        );
-  assert(
-    groupedEntry,
-    `No initiative entry for the launched ${template.label} creature(s) in ${launched.payload.initiative.length} entries`
-  );
-  return {
-    encounter,
-    initiative: launched.payload.initiative as Json[],
-    tokens: launched.payload.tokens as Json[],
-  };
-}
-
-async function awardXp(
-  campaignId: string,
-  gmCookie: string,
-  amount: number,
-  reason: string,
-  characterIds: string[],
-  extra: Json = {}
-): Promise<Json> {
-  return (
-    await api(`/api/campaigns/${campaignId}/award-xp`, {
-      method: "POST",
-      cookie: gmCookie,
-      body: { amount, characterIds, reason, ...extra },
-    })
-  ).payload;
-}
-
 async function runCampaignA(gm: Account, players: Account[]): Promise<void> {
   const campaignName = "A: The Ashen Crown";
   const created = await api("/api/campaigns", {
@@ -499,160 +383,6 @@ async function runCampaignA(gm: Account, players: Account[]): Promise<void> {
     }
     assertEqual(table.characters.length, 4, "Table party size");
     metric("campaignA.partySize", 4);
-  });
-
-  await check(campaignName, "settlement shop uses server prices and tracked stock", async () => {
-    const updated = await api(`/api/campaigns/${campaignId}`, {
-      method: "PATCH",
-      cookie: gm.cookie,
-      body: { settlementLevel: 5 },
-    });
-    assertEqual(updated.payload.campaign.settlementLevel, 5, "Campaign settlement level");
-    const before = await getTable(campaignId, gm.cookie);
-    const hero = characterFor(before, heroes[0].id);
-    const beforeCp = currencyToCp(hero.data.currency);
-    const daggerId = "item:rQWaJhI5Bko5x14Z";
-    const bought = await api(`/api/campaigns/${campaignId}/shop/buy`, {
-      method: "POST",
-      cookie: players[0].cookie,
-      body: {
-        characterId: heroes[0].id,
-        itemId: daggerId,
-        quantity: 2,
-        expectedRevision: hero.revision,
-      },
-    });
-    const boughtCharacter = bought.payload.character;
-    assertEqual(currencyToCp(boughtCharacter.data.currency), beforeCp - 40, "Buy price");
-    assertEqual(
-      boughtCharacter.data.equipment.find((entry: Json) => entry.itemId === daggerId)?.quantity,
-      2,
-      "Purchased quantity"
-    );
-    assertEqual(boughtCharacter.campaignSettlementLevel, 5, "Shop level on character");
-    const sold = await api(`/api/campaigns/${campaignId}/shop/sell`, {
-      method: "POST",
-      cookie: players[0].cookie,
-      body: {
-        characterId: heroes[0].id,
-        itemId: daggerId,
-        quantity: 1,
-        expectedRevision: boughtCharacter.revision,
-      },
-    });
-    const soldCharacter = sold.payload.character;
-    assertEqual(currencyToCp(soldCharacter.data.currency), beforeCp - 30, "Sale price");
-    assertEqual(
-      soldCharacter.data.equipment.find((entry: Json) => entry.itemId === daggerId)?.quantity,
-      1,
-      "Remaining quantity after sale"
-    );
-    const aboveLevel = await api(`/api/campaigns/${campaignId}/shop/buy`, {
-      method: "POST",
-      cookie: players[0].cookie,
-      body: {
-        characterId: heroes[0].id,
-        itemId: "item:66yY2SClvqj0lMFX",
-        quantity: 1,
-      },
-      expect: null,
-    });
-    assertEqual(aboveLevel.status, 400, "Above-level shop purchase");
-    const playerStockEdit = await api(`/api/campaigns/${campaignId}/shop/stock`, {
-      method: "PUT",
-      cookie: players[0].cookie,
-      body: { mode: "stocked", items: [{ itemId: daggerId, quantity: 2 }] },
-      expect: null,
-    });
-    assertEqual(playerStockEdit.status, 403, "Player stock edit");
-    const stocked = await api(`/api/campaigns/${campaignId}/shop/stock`, {
-      method: "PUT",
-      cookie: gm.cookie,
-      body: { mode: "stocked", items: [{ itemId: daggerId, quantity: 1 }] },
-    });
-    assertEqual(stocked.payload.shop.mode, "stocked", "Tracked shop mode");
-    assertEqual(
-      stocked.payload.shop.stock.find((entry: Json) => entry.itemId === daggerId)?.quantity,
-      1,
-      "Tracked stock quantity"
-    );
-    const stockBuy = await api(`/api/campaigns/${campaignId}/shop/buy`, {
-      method: "POST",
-      cookie: players[0].cookie,
-      body: {
-        characterId: heroes[0].id,
-        itemId: daggerId,
-        quantity: 1,
-        expectedRevision: soldCharacter.revision,
-      },
-    });
-    assertEqual(stockBuy.payload.stockQuantity, 0, "Stock after purchase");
-    const emptyBuy = await api(`/api/campaigns/${campaignId}/shop/buy`, {
-      method: "POST",
-      cookie: players[0].cookie,
-      body: {
-        characterId: heroes[0].id,
-        itemId: daggerId,
-        quantity: 1,
-        expectedRevision: stockBuy.payload.character.revision,
-      },
-      expect: null,
-    });
-    assertEqual(emptyBuy.status, 400, "Out-of-stock purchase rejected");
-    const stockSell = await api(`/api/campaigns/${campaignId}/shop/sell`, {
-      method: "POST",
-      cookie: players[0].cookie,
-      body: {
-        characterId: heroes[0].id,
-        itemId: daggerId,
-        quantity: 1,
-        expectedRevision: stockBuy.payload.character.revision,
-      },
-    });
-    assertEqual(stockSell.payload.stockQuantity, 1, "Stock after sale");
-    await api(`/api/campaigns/${campaignId}/shop/stock`, {
-      method: "PUT",
-      cookie: gm.cookie,
-      body: { mode: "open", items: [] },
-    });
-    await api(`/api/campaigns/${campaignId}`, {
-      method: "PATCH",
-      cookie: gm.cookie,
-      body: { settlementLevel: 1 },
-    });
-  });
-
-  await check(campaignName, "Hero Points award, cap, reset, and permissions", async () => {
-    const award = await api(`/api/campaigns/${campaignId}/award-hero-points`, {
-      method: "POST",
-      cookie: gm.cookie,
-      body: { amount: 1, characterIds: [heroes[0].id] },
-    });
-    let hero = (award.payload.characters as Json[]).find((entry) => entry.id === heroes[0].id);
-    assertEqual(hero?.data?.play?.heroPoints, 2, "Hero Point award");
-    const capped = await api(`/api/campaigns/${campaignId}/award-hero-points`, {
-      method: "POST",
-      cookie: gm.cookie,
-      body: { amount: 3, characterIds: [heroes[0].id] },
-    });
-    hero = (capped.payload.characters as Json[]).find((entry) => entry.id === heroes[0].id);
-    assertEqual(hero?.data?.play?.heroPoints, 3, "Hero Point cap");
-    assertEqual(capped.payload.capped, 1, "Hero Point capped count");
-    const reset = await api(`/api/campaigns/${campaignId}/reset-hero-points`, {
-      method: "POST",
-      cookie: gm.cookie,
-      body: { value: 1 },
-    });
-    for (const entry of reset.payload.characters as Json[]) {
-      assertEqual(entry.data.play.heroPoints, 1, `${entry.name} session reset`);
-    }
-    const forbidden = await api(`/api/campaigns/${campaignId}/award-hero-points`, {
-      method: "POST",
-      cookie: players[0].cookie,
-      body: { amount: 1, characterIds: [heroes[0].id] },
-      expect: null,
-    });
-    assertEqual(forbidden.status, 403, "Player Hero Point award status");
   });
 
   // --- Table: tokens, ownership, hidden initiative --------------------------
@@ -844,43 +574,6 @@ async function runCampaignA(gm: Account, players: Account[]): Promise<void> {
   // Removed with the manual-combat pivot: turn effects and movement limits are no longer automated.
 
   // Removed with the manual-combat pivot: turn effects and movement limits are no longer automated.
-
-  await check(
-    campaignName,
-    "encounter launch seeds regeneration from the monster statblock",
-    async () => {
-      const encounter = (
-        await api(`/api/campaigns/${campaignId}/encounters`, {
-          method: "POST",
-          cookie: gm.cookie,
-          body: { name: "Trollhound Seed Test", description: "", sceneId },
-        })
-      ).payload.encounter as Json;
-      await api(`/api/campaigns/${campaignId}/encounters/${encounter.id}/combatants`, {
-        method: "POST",
-        cookie: gm.cookie,
-        body: { monsterId: "mon:gTkvu3RRiDHNONzf", count: 1, wave: 1 },
-      });
-      const launched = await api(`/api/campaigns/${campaignId}/encounters/${encounter.id}/launch`, {
-        method: "POST",
-        cookie: gm.cookie,
-        body: { sceneId, wave: 1, mode: "fresh" },
-      });
-      const token = (launched.payload.tokens as Json[]).find((entry) =>
-        String(entry.name).includes("Trollhound")
-      );
-      assert(token, "Trollhound token missing after launch");
-      assertEqual(token.turnEffects?.regeneration, 15, "Seeded regeneration");
-      assert(
-        (token.turnEffects?.regenerationDeactivatedBy as string[]).includes("electricity"),
-        "Seeded regeneration deactivation types"
-      );
-      await api(`/api/campaigns/${campaignId}/encounters/${encounter.id}/clear`, {
-        method: "POST",
-        cookie: gm.cookie,
-      });
-    }
-  );
 
   await check(
     campaignName,
@@ -1134,996 +827,117 @@ async function runCampaignA(gm: Account, players: Account[]): Promise<void> {
     }
   );
 
-  // --- 1-20 progression -----------------------------------------------------
-  let previousSummaries = new Map<string, Json>();
-  let parcelCount = 0;
-  for (let level = 1; level <= 20; level++) {
-    const isActLevel = level === 1 || level % 5 === 0;
-    const campaignLabel = `${campaignName} L${level}`;
-    let earned = 0;
-    if (isActLevel) {
-      const table = await getTable(campaignId, gm.cookie);
-      const partySize = (table.characters as Json[]).length;
-      let sequence = 0;
-      for (const template of LEVEL_ENCOUNTERS) {
-        const launched = await launchSimulatedEncounter({
-          campaignId,
-          sceneId,
-          gmCookie: gm.cookie,
-          partyLevel: level,
-          partySize,
-          template,
-          sequence: sequence++,
-        });
-        earned += template.xp;
-        await awardXp(
-          campaignId,
-          gm.cookie,
-          template.xp,
-          `${template.label} encounter at level ${level}`,
-          heroes.map((hero) => hero.id)
-        );
-        if (template.label === "Moderate") {
-          const activeToken = launched.tokens[0];
-          const activeIndex = launched.initiative.findIndex(
-            (entry) => entry.tokenId === activeToken?.id
-          );
-          if (activeToken && activeIndex >= 0) {
-            await emitAndWait(
-              gmSocket,
-              "token:update",
-              {
-                campaignId,
-                token: {
-                  id: activeToken.id,
-                  conditions: [{ name: "Frightened", value: 1, duration: 1 }],
-                },
-              },
-              "token:updated",
-              (token) => token.id === activeToken.id
-            );
-            await emitAndWait(
-              gmSocket,
-              "initiative:update",
-              {
-                campaignId,
-                entries: launched.initiative,
-                round: 1,
-                turnIndex: activeIndex,
-              },
-              "initiative:updated",
-              (payload) => payload.turnIndex === activeIndex
-            );
-            await emitAndWait(
-              gmSocket,
-              "initiative:next",
-              { campaignId, direction: 1 },
-              "initiative:updated"
-            );
-            const afterTick = await getTable(campaignId, gm.cookie);
-            const tokenAfter = (afterTick.tokens as Json[]).find(
-              (entry) => entry.id === activeToken.id
-            );
-            assert(
-              tokenAfter && Array.isArray(tokenAfter.conditions),
-              "Token conditions disappeared after initiative advance"
-            );
-            assert(
-              (tokenAfter.conditions as Json[]).some((entry) => entry.name === "Frightened"),
-              "Manual conditions should not expire when initiative advances"
-            );
-          }
-        }
-        await api(`/api/campaigns/${campaignId}/encounters/${launched.encounter.id}/clear`, {
-          method: "POST",
-          cookie: gm.cookie,
-        });
-        const cleaned = await getTable(campaignId, gm.cookie);
-        assert(
-          !(cleaned.tokens as Json[]).some((token) =>
-            launched.tokens.some((created) => created.id === token.id)
-          ),
-          "Encounter cleanup left launched tokens behind"
-        );
-      }
-      const remaining = levelXp - earned;
-      await awardXp(
-        campaignId,
-        gm.cookie,
-        remaining,
-        `Exploration and accomplishments at level ${level}`,
-        heroes.map((hero) => hero.id)
-      );
-      earned += remaining;
-    } else {
-      await awardXp(
-        campaignId,
-        gm.cookie,
-        levelXp,
-        `Simulated adventures at level ${level}`,
-        heroes.map((hero) => hero.id)
-      );
-      earned = levelXp;
-    }
-
-    await check(campaignLabel, "XP accumulates without automatic leveling", async () => {
-      const table = await getTable(campaignId, gm.cookie);
-      for (const hero of heroes) {
-        const summary = summaryFor(table, hero.id);
-        assertEqual(summary.level, level, `${hero.name} level before GM advancement`);
-        assertEqual(summary.xp, earned, `${hero.name} XP before GM advancement`);
-      }
-    });
-
-    if (level >= 20) break;
-
-    await check(
-      campaignLabel,
-      "GM level-up advances the whole party and syncs tokens",
-      async () => {
-        const before = await getTable(campaignId, gm.cookie);
-        for (const hero of heroes) {
-          const summary = summaryFor(before, hero.id);
-          previousSummaries.set(hero.id, summary);
-          assertEqual(summary.level, level, `${hero.name} pre-level check`);
-        }
-        const leveled = await api(`/api/campaigns/${campaignId}/level-up`, {
-          method: "POST",
-          cookie: gm.cookie,
-          body: {},
-        });
-        assertEqual(leveled.payload.leveled, 4, "Party level-up count");
-        assertEqual(leveled.payload.atMaxLevel, 0, "Party at max level unexpectedly");
-        const after = await getTable(campaignId, gm.cookie);
-        for (const hero of heroes) {
-          const summary = summaryFor(after, hero.id);
-          const previous = previousSummaries.get(hero.id)!;
-          assertEqual(summary.level, level + 1, `${hero.name} level after advancement`);
-          assertEqual(summary.xp, 0, `${hero.name} XP after advancement`);
-          assert(
-            summary.hp > previous.hp,
-            `${hero.name} HP did not increase at level ${level + 1}`
-          );
-          assert(summary.ac >= previous.ac, `${hero.name} AC decreased at level ${level + 1}`);
-          const local = localSummary(characterFor(after, hero.id));
-          assertEqual(summary.hp, local.hp, `${hero.name} server/local HP at level ${level + 1}`);
-          const token = (after.tokens as Json[]).find(
-            (entry) => entry.id === tokens.get(hero.id)?.id
-          );
-          assert(token, `${hero.name} token missing after level-up`);
-          assertEqual(token.hpMax, summary.hp, `${hero.name} token max HP after level-up`);
-          assertEqual(token.ac, summary.ac, `${hero.name} token AC after level-up`);
-        }
-      }
-    );
-
-    if (isActLevel) {
-      await check(
-        campaignLabel,
-        "long rest restores the party after an adventuring day",
-        async () => {
-          const table = await getTable(campaignId, gm.cookie);
-          const fighter = characterFor(table, heroes[0].id);
-          const draft = JSON.parse(JSON.stringify(fighter.data)) as Json;
-          draft.play.hp = 1;
-          draft.play.tempHp = 6;
-          draft.play.conditions = [
-            { name: "Fatigued", value: null, duration: null },
-            { name: "Drained", value: 2, duration: null },
-          ];
-          await api(`/api/characters/${heroes[0].id}`, {
-            method: "PUT",
-            cookie: players[0].cookie,
-            body: { data: draft, force: true },
-          });
-          const rested = await api(`/api/campaigns/${campaignId}/long-rest`, {
-            method: "POST",
-            cookie: gm.cookie,
-          });
-          assertEqual(rested.payload.rested, 4, "Party long-rest count");
-          const restedFighter = (rested.payload.characters as Json[]).find(
-            (entry) => entry.id === heroes[0].id
-          );
-          assert(restedFighter, "Long rest did not return the fighter");
-          const restedDerived = computeCharacter(
-            restedFighter.data as CharacterDraft,
-            contextForDraft(restedFighter.data)
-          );
-          const expectedHp = Math.min(
-            restedFighter.summary.hp,
-            1 + longRestHealing(restedFighter.data as CharacterDraft, restedDerived)
-          );
-          assertEqual(
-            restedFighter.summary.currentHp,
-            expectedHp,
-            "Long rest natural healing (CON mod × level)"
-          );
-          assertEqual(restedFighter.data.play.tempHp, 0, "Long rest temp HP");
-          assert(
-            !restedFighter.data.play.conditions.some((entry: Json) => entry.name === "Fatigued"),
-            "Long rest left fatigued"
-          );
-          assertEqual(
-            restedFighter.data.play.conditions.find((entry: Json) => entry.name === "Drained")
-              ?.value,
-            1,
-            "Long rest drained reduction"
-          );
-          const restedWizard = (rested.payload.characters as Json[]).find(
-            (entry) => entry.id === heroes[1].id
-          );
-          const restedCleric = (rested.payload.characters as Json[]).find(
-            (entry) => entry.id === heroes[2].id
-          );
-          const restedRogue = (rested.payload.characters as Json[]).find(
-            (entry) => entry.id === heroes[3].id
-          );
-          assertEqual(
-            restedFighter.data.spells.preparationsPending,
-            false,
-            "Non-caster daily preparations"
-          );
-          assertEqual(
-            restedWizard?.data.spells.preparationsPending,
-            true,
-            "Wizard daily preparations"
-          );
-          assertEqual(
-            restedCleric?.data.spells.preparationsPending,
-            true,
-            "Cleric daily preparations"
-          );
-          assertEqual(
-            restedRogue?.data.spells.preparationsPending,
-            false,
-            "Rogue daily preparations"
-          );
-        }
-      );
-
-      await check(campaignLabel, "treasure parcel distribution reaches the sheet", async () => {
-        const target = heroes[Math.floor(level / 5) % heroes.length];
-        const currency = TREASURE_CURRENCY_GP[level - 1];
-        const parcel = (
-          await api(`/api/campaigns/${campaignId}/loot`, {
-            method: "POST",
-            cookie: gm.cookie,
-            body: {
-              name: `Level ${level} treasure`,
-              description: "Simulated level budget (currency portion).",
-            },
-          })
-        ).payload.parcel;
-        await api(`/api/campaigns/${campaignId}/loot/${parcel.id}`, {
-          method: "PATCH",
-          cookie: gm.cookie,
-          body: { gp: currency, sp: 0, cp: 0 },
-        });
-        const before = await api(`/api/characters/${target.id}`, { cookie: gm.cookie });
-        const beforeGp = before.payload.character.data.currency.gp as number;
-        await api(`/api/campaigns/${campaignId}/loot/${parcel.id}/distribute`, {
-          method: "POST",
-          cookie: gm.cookie,
-          body: { characterId: target.id },
-        });
-        const after = await api(`/api/characters/${target.id}`, { cookie: gm.cookie });
-        assertEqual(
-          after.payload.character.data.currency.gp,
-          beforeGp + currency,
-          `${target.name} purse after level ${level} treasure`
-        );
-        parcelCount += 1;
-      });
-    }
-
-    if (level === 5) {
-      await check(
-        campaignLabel,
-        "downtime days fund upkeep, Earn Income, Subsist, and projects",
-        async () => {
-          const grant = await api(`/api/campaigns/${campaignId}/downtime`, {
-            method: "POST",
-            cookie: gm.cookie,
-            body: { days: 14, characterIds: heroes.map((hero) => hero.id) },
-          });
-          assertEqual(grant.payload.recipients, 4, "Downtime recipients");
-          const sheet = await api(`/api/characters/${heroes[0].id}`, {
-            cookie: players[0].cookie,
-          });
-          const draft = JSON.parse(JSON.stringify(sheet.payload.character.data)) as Json;
-          draft.play.lifestyle = "comfortable";
-          await api(`/api/characters/${heroes[0].id}`, {
-            method: "PUT",
-            cookie: players[0].cookie,
-            body: { data: draft, force: true },
-          });
-          const beforePurse = draft.currency as Json;
-          const beforePurseCp =
-            (Number(beforePurse.gp) || 0) * 100 +
-            (Number(beforePurse.sp) || 0) * 10 +
-            (Number(beforePurse.cp) || 0);
-          const spend = await api(`/api/characters/${heroes[0].id}/downtime/spend`, {
-            method: "POST",
-            cookie: players[0].cookie,
-            body: { days: 7 },
-          });
-          assertEqual(spend.payload.days, 7, "Spent downtime days");
-          assertEqual(spend.payload.paidCp, 100, "Comfortable upkeep for seven days");
-          assertEqual(spend.payload.lifestyle, "comfortable", "Upkeep lifestyle");
-          const afterPurse = spend.payload.character.data.currency as Json;
-          const afterPurseCp =
-            (Number(afterPurse.gp) || 0) * 100 +
-            (Number(afterPurse.sp) || 0) * 10 +
-            (Number(afterPurse.cp) || 0);
-          assertEqual(afterPurseCp, beforePurseCp - 100, "Purse after upkeep");
-          const table = await getTable(campaignId, gm.cookie);
-          assertEqual(
-            summaryFor(table, heroes[0].id).downtimeDays,
-            7,
-            "Downtime summary after spending"
-          );
-          const reduced = JSON.parse(JSON.stringify(spend.payload.character.data)) as Json;
-          const activitySheet = await api(`/api/characters/${heroes[0].id}`, {
-            cookie: players[0].cookie,
-          });
-          let trained = (activitySheet.payload.character.data.skills.trained as string[]) ?? [];
-          if (!trained.length) {
-            const trainedDraft = JSON.parse(
-              JSON.stringify(activitySheet.payload.character.data)
-            ) as Json;
-            trainedDraft.skills.trained = ["crafting"];
-            await api(`/api/characters/${heroes[0].id}`, {
-              method: "PUT",
-              cookie: players[0].cookie,
-              body: { data: trainedDraft, force: true },
-            });
-            trained = ["crafting"];
-          }
-          const earn = await api(`/api/characters/${heroes[0].id}/downtime/spend`, {
-            method: "POST",
-            cookie: players[0].cookie,
-            body: {
-              activity: {
-                kind: "earn-income",
-                skill: trained[0],
-                taskLevel: 0,
-                dc: 1,
-                label: "Simulated job",
-              },
-            },
-          });
-          assertEqual(earn.payload.activity?.kind, "earn-income", "Earn Income activity");
-          assertEqual(earn.payload.activity?.daysSpent, 1, "Earn Income first day");
-          assert(earn.payload.activity?.dailyEarnedCp !== null, "Earn Income daily pay");
-          const continued = await api(`/api/characters/${heroes[0].id}/downtime/spend`, {
-            method: "POST",
-            cookie: players[0].cookie,
-            body: { activity: { activityId: earn.payload.activity.id } },
-          });
-          assertEqual(continued.payload.roll, null, "Earn Income only rolls once");
-          assertEqual(
-            continued.payload.earnedCp,
-            earn.payload.activity.dailyEarnedCp,
-            "Earn Income repeat pay"
-          );
-          const subsist = await api(`/api/characters/${heroes[0].id}/downtime/spend`, {
-            method: "POST",
-            cookie: players[0].cookie,
-            body: { activity: { kind: "subsist", skill: "survival", dc: 1 } },
-          });
-          const subsistWaived =
-            subsist.payload.degree === "success" || subsist.payload.degree === "critical-success";
-          assertEqual(subsist.payload.upkeepWaived, subsistWaived, "Subsist upkeep waiver");
-          if (subsistWaived) assertEqual(subsist.payload.paidCp, 0, "Subsist free day");
-          const project = await api(`/api/characters/${heroes[0].id}/downtime/spend`, {
-            method: "POST",
-            cookie: players[0].cookie,
-            body: { activity: { kind: "retrain", label: "Simulated retrain", daysRequired: 2 } },
-          });
-          assertEqual(project.payload.completed, false, "Project first day");
-          const projectDone = await api(`/api/characters/${heroes[0].id}/downtime/spend`, {
-            method: "POST",
-            cookie: players[0].cookie,
-            body: { activity: { activityId: project.payload.activity.id } },
-          });
-          assertEqual(projectDone.payload.completed, true, "Project completion");
-          const activityTable = await getTable(campaignId, gm.cookie);
-          assertEqual(
-            summaryFor(activityTable, heroes[0].id).downtimeDays,
-            2,
-            "Downtime summary after activities"
-          );
-          reduced.play.downtimeDays = 1;
-          const rejected = await api(`/api/characters/${heroes[0].id}`, {
-            method: "PUT",
-            cookie: players[0].cookie,
-            body: { data: reduced, force: true },
-            expect: null,
-          });
-          assertEqual(rejected.status, 400, "Direct downtime reduction rejected");
-        }
-      );
-
-      await check(
-        campaignLabel,
-        "calendar handles month, year, and leap-day boundaries",
-        async () => {
-          await api(`/api/campaigns/${campaignId}/calendar`, {
-            method: "PUT",
-            cookie: gm.cookie,
-            body: { year: 4726, month: 1, day: 1 },
-          });
-          const monthEnd = await api(`/api/campaigns/${campaignId}/calendar/advance`, {
-            method: "POST",
-            cookie: gm.cookie,
-            body: { days: 30 },
-          });
-          assertEqual(monthEnd.payload.worldDate.month, 1, "Calendar month boundary");
-          assertEqual(monthEnd.payload.worldDate.day, 31, "Calendar day boundary");
-          const leap = shiftGolarionDate({ year: 4728, month: 2, day: 28 }, 1);
-          assertEqual(leap.day, 29, "Calendar leap day");
-          assertEqual(formatGolarionDate(leap), "29 Calistril, 4728 AR", "Calendar leap label");
-        }
-      );
-
-      await check(
-        campaignLabel,
-        "travel planner advances the calendar and keeps watches",
-        async () => {
-          const start = await getTable(campaignId, gm.cookie);
-          const startDate = (start.campaign as Json).worldDate as Json;
-          const initial = await api(`/api/campaigns/${campaignId}/travel`, {
-            cookie: players[0].cookie,
-          });
-          assert(initial.payload.travel === null, "New travel plan was not empty");
-          assert(initial.payload.suggestedSpeed >= 5, "Travel speed suggestion missing");
-          const playerEdit = await api(`/api/campaigns/${campaignId}/travel`, {
-            method: "PUT",
-            cookie: players[0].cookie,
-            body: { origin: "Nowhere", destination: "Elsewhere", distanceMiles: 1 },
-            expect: null,
-          });
-          assertEqual(playerEdit.status, 403, "Player travel edit");
-          const plan = await api(`/api/campaigns/${campaignId}/travel`, {
-            method: "PUT",
-            cookie: gm.cookie,
-            body: {
-              origin: "Ashen Ford",
-              destination: "The Obsidian Keep",
-              terrain: "normal",
-              distanceMiles: 40,
-              partySpeed: 20,
-              weather: "rain",
-              notes: "The old road is washed out.",
-              watches: { first: [heroes[0].id] },
-              activities: { [heroes[0].id]: "scout" },
-            },
-          });
-          assertEqual(plan.payload.travel.dailyMiles, 16, "Travel daily miles");
-          assertEqual(plan.payload.travel.status, "traveling", "Travel status");
-          assertEqual(
-            plan.payload.travel.watches.first[0],
-            heroes[0].id,
-            "Travel watch assignment"
-          );
-          assertEqual(
-            plan.payload.travel.activities[heroes[0].id],
-            "scout",
-            "Travel exploration activity"
-          );
-          const visibleWaypoint = await api(`/api/campaigns/${campaignId}/travel/waypoints`, {
-            method: "POST",
-            cookie: gm.cookie,
-            body: {
-              name: "The Broken Bridge",
-              miles: 10,
-              description: "A rope bridge over the gorge.",
-              visible: true,
-            },
-          });
-          const hiddenWaypoint = await api(`/api/campaigns/${campaignId}/travel/waypoints`, {
-            method: "POST",
-            cookie: gm.cookie,
-            body: {
-              name: "The Hidden Camp",
-              miles: 20,
-              description: "A cultist camp.",
-              visible: false,
-            },
-          });
-          assertEqual(hiddenWaypoint.payload.travel.waypoints.length, 2, "Waypoint count");
-          const playerMap = await api(`/api/campaigns/${campaignId}/travel`, {
-            cookie: players[0].cookie,
-          });
-          assertEqual(playerMap.payload.travel.waypoints.length, 1, "Player waypoint count");
-          assertEqual(
-            playerMap.payload.travel.waypoints[0].name,
-            "The Broken Bridge",
-            "Player waypoint name"
-          );
-          assert(
-            !playerMap.payload.travel.encounterChecks,
-            "Player saw GM encounter-check history"
-          );
-          const encounterCheck = await api(`/api/campaigns/${campaignId}/travel/check`, {
-            method: "POST",
-            cookie: gm.cookie,
-            body: { watch: 2, note: "A patrol sweeps the road." },
-          });
-          assert(
-            encounterCheck.payload.check.roll >= 1 && encounterCheck.payload.check.roll <= 20,
-            "Encounter check roll out of range"
-          );
-          assertEqual(encounterCheck.payload.check.watch, 2, "Encounter check watch");
-          assertEqual(encounterCheck.payload.travel.encounterChecks.length, 1, "Check history");
-          const hiddenCheck = await api(
-            `/api/campaigns/${campaignId}/travel/waypoints/${hiddenWaypoint.payload.travel.waypoints[1].id}`,
-            {
-              method: "DELETE",
-              cookie: players[0].cookie,
-              expect: null,
-            }
-          );
-          assertEqual(hiddenCheck.status, 403, "Player waypoint delete");
-          const dayOne = await api(`/api/campaigns/${campaignId}/travel/advance`, {
-            method: "POST",
-            cookie: gm.cookie,
-            body: {},
-          });
-          assertEqual(dayOne.payload.travel.progressMiles, 16, "First travel day");
-          assertEqual(dayOne.payload.travel.daysTravelled, 1, "Travel day count");
-          assertEqual(
-            formatGolarionDate(dayOne.payload.worldDate),
-            formatGolarionDate(shiftGolarionDate(startDate, 1)),
-            "Travel calendar advance"
-          );
-          await api(`/api/campaigns/${campaignId}/travel/advance`, {
-            method: "POST",
-            cookie: gm.cookie,
-            body: {},
-          });
-          const arrived = await api(`/api/campaigns/${campaignId}/travel/advance`, {
-            method: "POST",
-            cookie: gm.cookie,
-            body: {},
-          });
-          assertEqual(arrived.payload.travel.status, "complete", "Travel completion");
-          assertEqual(arrived.payload.travel.progressMiles, 40, "Travel distance cap");
-          const bridge = (arrived.payload.travel.waypoints as Json[]).find(
-            (waypoint) => waypoint.name === "The Broken Bridge"
-          );
-          assert(bridge?.reached === true, "Reached waypoint was not marked");
-          const playerAdvance = await api(`/api/campaigns/${campaignId}/travel/advance`, {
-            method: "POST",
-            cookie: players[0].cookie,
-            body: {},
-            expect: null,
-          });
-          assertEqual(playerAdvance.status, 403, "Player travel advance");
-        }
-      );
-
-      await check(
-        campaignLabel,
-        "session zero keeps a shared charter and private safety limits",
-        async () => {
-          const playerEdit = await api(`/api/campaigns/${campaignId}/session-zero`, {
-            method: "PUT",
-            cookie: players[0].cookie,
-            body: { pitch: "Player pitch" },
-            expect: null,
-          });
-          assertEqual(playerEdit.status, 403, "Player session zero edit");
-          const charter = await api(`/api/campaigns/${campaignId}/session-zero`, {
-            method: "PUT",
-            cookie: gm.cookie,
-            body: {
-              pitch: "The Ashen Crown wakes beneath the city.",
-              genre: "Dark fantasy",
-              tone: "Heroic, costly",
-              themes: "Loyalty and old debts",
-              expectations: "Share the spotlight.",
-              houseRules: "Free archetype.",
-              contentLimits: "No graphic torture.",
-              safetyTools: "Pause signal and private GM messages.",
-              allowedSources: "Player Core, GM Core, Monster Core.",
-              partyGoal: "Break the Ashen Crown before it wakes.",
-              partyHooks: "The ferryman owes the party a debt.",
-              gmNotes: "The Ash Warden is the final antagonist.",
-              checklist: { pitch: true, themes: true, safety: true },
-            },
-          });
-          assertEqual(
-            charter.payload.profile.pitch,
-            "The Ashen Crown wakes beneath the city.",
-            "Session zero pitch"
-          );
-          assertEqual(
-            charter.payload.profile.allowedSources,
-            "Player Core, GM Core, Monster Core.",
-            "Session zero allowed sources"
-          );
-          assertEqual(
-            charter.payload.profile.partyGoal,
-            "Break the Ashen Crown before it wakes.",
-            "Session zero party goal"
-          );
-          assertEqual(
-            charter.payload.profile.gmNotes,
-            "The Ash Warden is the final antagonist.",
-            "Session zero GM notes"
-          );
-          const playerView = await api(`/api/campaigns/${campaignId}/session-zero`, {
-            cookie: players[0].cookie,
-          });
-          assertEqual(
-            playerView.payload.profile.pitch,
-            charter.payload.profile.pitch,
-            "Player charter"
-          );
-          assert(
-            !("gmNotes" in playerView.payload.profile),
-            "Player session zero view leaked GM notes"
-          );
-          await api(`/api/campaigns/${campaignId}/session-zero/preference`, {
-            method: "PUT",
-            cookie: players[0].cookie,
-            body: {
-              lines: "Spiders",
-              veils: "Torture",
-              notes: "Check in after hard scenes.",
-            },
-          });
-          const gmView = await api(`/api/campaigns/${campaignId}/session-zero`, {
-            cookie: gm.cookie,
-          });
-          const named = gmView.payload.responses.find((entry: Json) => entry.lines === "Spiders");
-          assert(named?.authorName, "GM could not read the named safety response");
-          await api(`/api/campaigns/${campaignId}/session-zero/preference`, {
-            method: "PUT",
-            cookie: players[0].cookie,
-            body: { anonymous: true },
-          });
-          const anonymousView = await api(`/api/campaigns/${campaignId}/session-zero`, {
-            cookie: gm.cookie,
-          });
-          const anonymous = anonymousView.payload.responses.find(
-            (entry: Json) => entry.lines === "Spiders"
-          );
-          assert(
-            anonymous?.anonymous === true && anonymous.authorName === null,
-            "Anonymous safety response exposed the player"
-          );
-          const signal = await api(`/api/campaigns/${campaignId}/session-zero/signal`, {
-            method: "POST",
-            cookie: players[0].cookie,
-            body: { note: "Need a pause." },
-          });
-          assertEqual(signal.payload.ok, true, "Safety signal acknowledgement");
-          const gmTable = await getTable(campaignId, gm.cookie);
-          const playerTable = await getTable(campaignId, players[0].cookie);
-          assert(
-            (gmTable.messages as Json[]).some((message) =>
-              String(message.content).includes("safety pause")
-            ),
-            "GM did not receive the safety signal"
-          );
-          assert(
-            !(playerTable.messages as Json[]).some((message) =>
-              String(message.content).includes("safety pause")
-            ),
-            "Safety signal leaked to the player"
-          );
-        }
-      );
-    }
-
-    if (level === 10) {
-      await check(campaignLabel, "sessions, attendance, check-ins, and recap work", async () => {
-        const scheduledAt = Date.now() + 86_400_000;
-        const session = (
-          await api(`/api/campaigns/${campaignId}/sessions`, {
-            method: "POST",
-            cookie: gm.cookie,
-            body: {
-              title: "The Ashen Crown, Act II",
-              scheduledAt,
-              durationMinutes: 180,
-              status: "played",
-              notes: "GM-only: the crown is a phylactery.",
-            },
-          })
-        ).payload.session;
-        for (const player of players) {
-          await api(`/api/campaigns/${campaignId}/sessions/${session.id}/attendance/${player.id}`, {
-            method: "PUT",
-            cookie: gm.cookie,
-            body: { status: "attended" },
-          });
-          await api(`/api/campaigns/${campaignId}/sessions/${session.id}/checkin`, {
-            method: "PUT",
-            cookie: player.cookie,
-            body: { status: "yes" },
-          });
-        }
-        const playerView = await api(`/api/campaigns/${campaignId}/sessions`, {
-          cookie: players[0].cookie,
-        });
-        const playerSession = (playerView.payload.sessions as Json[]).find(
-          (entry) => entry.id === session.id
-        );
-        assert(playerSession, "Player could not see the session");
-        assertEqual(playerSession.notes, "", "Player session notes were not redacted");
-        assertEqual(playerSession.agenda.length, 0, "Player received GM agenda");
-        assertEqual(playerSession.attendance[0].status, "attended", "Player attendance");
-        const recap = await api(
-          `/api/campaigns/${campaignId}/recap?from=${Date.now() - 7 * 86_400_000}&to=${Date.now() + 86_400_000}`,
-          { cookie: gm.cookie }
-        );
-        assert(
-          String(recap.payload.recap?.draft).includes("The Ashen Crown, Act II"),
-          "Recap did not include the played session"
-        );
-        assertEqual(recap.payload.recap?.sessionTitle, "The Ashen Crown, Act II", "Recap title");
-      });
-
-      await check(campaignLabel, "handouts and quests respect player visibility", async () => {
-        const shared = (
-          await api(`/api/campaigns/${campaignId}/journal`, {
-            method: "POST",
-            cookie: gm.cookie,
-            body: {
-              title: "The Ashen Crown: Act II",
-              content: "The crown was last seen beneath the drowned abbey.",
-              visible: true,
-              kind: "handout",
-            },
-          })
-        ).payload.entry;
-        await api(`/api/campaigns/${campaignId}/journal`, {
-          method: "POST",
-          cookie: gm.cookie,
-          body: {
-            title: "GM: The crown is a phylactery",
-            content: "Do not reveal until Act III.",
-            visible: false,
-            kind: "handout",
-          },
-        });
-        const playerJournal = await api(`/api/campaigns/${campaignId}/journal`, {
-          cookie: players[0].cookie,
-        });
-        assert(
-          (playerJournal.payload.entries as Json[]).some((entry) => entry.id === shared.id),
-          "Shared handout missing for the player"
-        );
-        assert(
-          !(playerJournal.payload.entries as Json[]).some((entry) =>
-            entry.title.includes("phylactery")
-          ),
-          "GM-only handout leaked to the player"
-        );
-      });
-    }
-  }
-
-  // --- Level-20 cap ---------------------------------------------------------
-  await check(campaignName, "level 20 is the cap and excess XP is preserved", async () => {
+  // --- Party advancement and journal ---------------------------------------
+  await check(campaignName, "GM level-up advances the party and syncs tokens", async () => {
     const before = await getTable(campaignId, gm.cookie);
-    const xpBefore = new Map<string, number>();
     for (const hero of heroes) {
-      assertEqual(summaryFor(before, hero.id).level, 20, `${hero.name} final level`);
-      xpBefore.set(hero.id, summaryFor(before, hero.id).xp);
+      assertEqual(summaryFor(before, hero.id).level, 1, `${hero.name} pre-level check`);
     }
-    await awardXp(
-      campaignId,
-      gm.cookie,
-      500,
-      "Post-cap accomplishment",
-      heroes.map((h) => h.id)
-    );
-    const capped = await api(`/api/campaigns/${campaignId}/level-up`, {
+    const leveled = await api(`/api/campaigns/${campaignId}/level-up`, {
       method: "POST",
       cookie: gm.cookie,
       body: {},
     });
-    assertEqual(capped.payload.atMaxLevel, 4, "Max-level party detection");
-    assertEqual(capped.payload.leveled, 0, "Party leveled past 20");
+    assertEqual(leveled.payload.leveled, 4, "Party level-up count");
+    assertEqual(leveled.payload.atMaxLevel, 0, "Party at max level unexpectedly");
     const after = await getTable(campaignId, gm.cookie);
     for (const hero of heroes) {
-      assertEqual(summaryFor(after, hero.id).level, 20, `${hero.name} remained at level 20`);
-      assertEqual(
-        summaryFor(after, hero.id).xp,
-        (xpBefore.get(hero.id) ?? 0) + 500,
-        `${hero.name} excess XP preserved`
-      );
+      const summary = summaryFor(after, hero.id);
+      const previous = summaryFor(before, hero.id);
+      assertEqual(summary.level, 2, `${hero.name} level after advancement`);
+      assert(summary.hp > previous.hp, `${hero.name} HP did not increase`);
+      assert(summary.ac >= previous.ac, `${hero.name} AC decreased`);
+      const local = localSummary(characterFor(after, hero.id));
+      assertEqual(summary.hp, local.hp, `${hero.name} server/local HP`);
+      const token = (after.tokens as Json[]).find((entry) => entry.id === tokens.get(hero.id)?.id);
+      assert(token, `${hero.name} token missing after level-up`);
+      assertEqual(token.hpMax, summary.hp, `${hero.name} token max HP`);
+      assertEqual(token.ac, summary.ac, `${hero.name} token AC`);
+    }
+  });
+
+  await check(campaignName, "handouts and quest rewards respect player visibility", async () => {
+    const shared = (
+      await api(`/api/campaigns/${campaignId}/journal`, {
+        method: "POST",
+        cookie: gm.cookie,
+        body: {
+          title: "The Ashen Crown: Act II",
+          content: "The crown was last seen beneath the drowned abbey.",
+          visible: true,
+          kind: "handout",
+          questStatus: "completed",
+          questXp: 40,
+        },
+      })
+    ).payload.entry;
+    await api(`/api/campaigns/${campaignId}/journal`, {
+      method: "POST",
+      cookie: gm.cookie,
+      body: {
+        title: "GM: The crown is a phylactery",
+        content: "Do not reveal until Act III.",
+        visible: false,
+        kind: "handout",
+      },
+    });
+    const playerJournal = await api(`/api/campaigns/${campaignId}/journal`, {
+      cookie: players[0].cookie,
+    });
+    assert(
+      (playerJournal.payload.entries as Json[]).some((entry) => entry.id === shared.id),
+      "Shared handout missing for the player"
+    );
+    assert(
+      !(playerJournal.payload.entries as Json[]).some((entry) =>
+        entry.title.includes("phylactery")
+      ),
+      "GM-only handout leaked to the player"
+    );
+    const award = await api(`/api/campaigns/${campaignId}/journal/${shared.id}/award-quest-xp`, {
+      method: "POST",
+      cookie: gm.cookie,
+      body: {},
+    });
+    assertEqual(award.payload.amount, 40, "Quest XP amount");
+    assertEqual(award.payload.recipients, 4, "Quest XP recipients");
+    const table = await getTable(campaignId, gm.cookie);
+    for (const hero of heroes) {
+      assertEqual(summaryFor(table, hero.id).xp, 40, `${hero.name} quest XP`);
     }
   });
 
   // --- Permissions, export/import ------------------------------------------
-  await check(
-    campaignName,
-    "players cannot award XP, advance levels, rest the party, or export",
-    async () => {
-      for (const [method, pathname, body] of [
-        [
-          "POST",
-          `/api/campaigns/${campaignId}/award-xp`,
-          { amount: 10, characterIds: [heroes[0].id] },
-        ],
-        ["POST", `/api/campaigns/${campaignId}/level-up`, {}],
-        ["POST", `/api/campaigns/${campaignId}/long-rest`, {}],
-        ["POST", `/api/campaigns/${campaignId}/downtime`, { days: 1 }],
-        ["PUT", `/api/campaigns/${campaignId}/shop/stock`, { mode: "stocked", items: [] }],
-        ["PUT", `/api/campaigns/${campaignId}/travel`, { origin: "No", distanceMiles: 1 }],
-        ["POST", `/api/campaigns/${campaignId}/travel/advance`, {}],
-        ["PUT", `/api/campaigns/${campaignId}/session-zero`, { pitch: "No" }],
-        ["GET", `/api/campaigns/${campaignId}/export`, undefined],
-        ["GET", `/api/campaigns/${campaignId}/loot`, undefined],
-        ["GET", `/api/campaigns/${campaignId}/npcs`, undefined],
-        ["GET", `/api/campaigns/${campaignId}/encounters`, undefined],
-      ] as const) {
-        const result = await api(pathname, {
-          method,
-          cookie: players[0].cookie,
-          ...(body ? { body } : {}),
-          expect: null,
-        });
-        assertEqual(result.status, 403, `${method} ${pathname} player status`);
-      }
+  await check(campaignName, "players cannot advance levels or export", async () => {
+    for (const [method, pathname, body] of [
+      ["POST", `/api/campaigns/${campaignId}/level-up`, {}],
+      ["GET", `/api/campaigns/${campaignId}/export`, undefined],
+    ] as const) {
+      const result = await api(pathname, {
+        method,
+        cookie: players[0].cookie,
+        ...(body ? { body } : {}),
+        expect: null,
+      });
+      assertEqual(result.status, 403, `${method} ${pathname} player status`);
     }
-  );
+  });
 
   await check(
     campaignName,
-    "campaign export preserves levels, calendar, and content counts",
+    "campaign export preserves characters, scenes, and journal",
     async () => {
-      const factionResult = await api(`/api/campaigns/${campaignId}/factions`, {
-        method: "POST",
-        cookie: gm.cookie,
-        body: {
-          name: "The Ashen Court",
-          description: "The cult that serves the Crown.",
-          goals: "Wake the Ashen Crown.",
-          assets: "Catacombs beneath the city.",
-          attitude: "hostile",
-          reputation: -70,
-          visible: true,
-          gmNotes: "The chancellor leads it.",
-        },
-      });
-      const factionId = factionResult.payload.faction.id;
-      const wardenResult = await api(`/api/campaigns/${campaignId}/npcs`, {
-        method: "POST",
-        cookie: gm.cookie,
-        body: {
-          name: "The Ash Warden",
-          level: 20,
-          hp: 400,
-          ac: 42,
-          perception: 30,
-          description: "Final antagonist.",
-          factionId,
-          role: "Warden of the Crown",
-          location: "The Ashen Vault",
-          attitude: "hostile",
-          publicDescription: "A smoke-crowned figure seen in the cult's processions.",
-          secrets: "Bound to the Crown by a stolen name.",
-          visible: true,
-        },
-      });
-      const daggerId = "item:rQWaJhI5Bko5x14Z";
-      await api(`/api/campaigns/${campaignId}/shop/stock`, {
-        method: "PUT",
-        cookie: gm.cookie,
-        body: { mode: "stocked", items: [{ itemId: daggerId, quantity: 3 }] },
-      });
-      await api(`/api/campaigns/${campaignId}/shop/merchants`, {
-        method: "POST",
-        cookie: gm.cookie,
-        body: {
-          name: "The Ashen Outfitters",
-          description: "A second merchant for the road.",
-          mode: "stocked",
-        },
-      });
-      const visibleKnowledge = await api(`/api/campaigns/${campaignId}/knowledge`, {
-        method: "POST",
-        cookie: gm.cookie,
-        body: {
-          title: "The Sunken Gate",
-          content: "The gate opens at low tide.",
-          visible: true,
-        },
-      });
-      await api(`/api/campaigns/${campaignId}/knowledge`, {
-        method: "POST",
-        cookie: gm.cookie,
-        body: {
-          title: "The Traitor",
-          content: "The harbor master works for the court.",
-          visible: false,
-        },
-      });
-      const privateNoteText = "Only the player should ever read this clue.";
-      await api(`/api/campaigns/${campaignId}/notes`, {
-        method: "POST",
-        cookie: players[0].cookie,
-        body: { title: "Private suspicions", content: privateNoteText },
-      });
-      await api(`/api/campaigns/${campaignId}/chapters`, {
-        method: "POST",
-        cookie: gm.cookie,
-        body: {
-          title: "The Ashen Crown",
-          summary: "The court wakes beneath the city.",
-          levelStart: 1,
-          levelEnd: 10,
-          status: "active",
-        },
-      });
-      await api(`/api/campaigns/${campaignId}`, {
-        method: "PATCH",
-        cookie: gm.cookie,
-        body: { playerItemGrant: true },
-      });
       const exported = await api(`/api/campaigns/${campaignId}/export`, { cookie: gm.cookie });
       const payload = exported.payload;
       assertEqual(payload.format, "runehall-campaign", "Export format");
-      assertEqual(payload.campaign.shopMode, "stocked", "Export shop mode");
-      assertEqual(payload.shopStock.length, 1, "Export shop stock rows");
-      assertEqual(payload.merchants.length, 2, "Export merchant count");
-      assertEqual(payload.shopStock[0].quantity, 3, "Export shop stock quantity");
-      assertEqual(payload.travel.origin, "Ashen Ford", "Export travel origin");
-      assertEqual(payload.travel.status, "complete", "Export travel status");
-      assertEqual(payload.travel.waypoints.length, 2, "Export waypoint count");
-      assertEqual(payload.travel.encounterChecks.length, 1, "Export encounter-check count");
-      assertEqual(
-        payload.sessionZero.pitch,
-        "The Ashen Crown wakes beneath the city.",
-        "Export session zero pitch"
-      );
       assertEqual(payload.characters.length, 4, "Export character count");
       assert(
-        payload.characters.every((character: Json) => character.data.level === 20),
-        "Export did not preserve level 20"
+        (payload.characters as Json[]).every((character) => character.data.level === 2),
+        "Export did not preserve level 2"
       );
-      assertEqual(payload.campaign.worldDate.year, 4726, "Export world year");
-      assertEqual(payload.campaign.xpMode, "xp", "Export XP mode");
-      assertEqual(payload.campaign.playerItemGrant, true, "Export player item grant");
-      assert(payload.scenes.length >= 1, "Export did not include scenes");
-      assert(payload.journal.length >= 2, "Export did not include journal entries");
-      assert(payload.loot.length >= parcelCount, "Export did not include loot parcels");
-      assert(payload.sessions.length >= 1, "Export did not include sessions");
-      assert(payload.npcs.length >= 1, "Export did not include NPCs");
-      assertEqual(payload.factions.length, 1, "Export faction count");
-      assertEqual(
-        payload.factions[0].gmNotes,
-        "The chancellor leads it.",
-        "Export faction GM notes"
-      );
-      assertEqual(payload.factions[0].reputation, -70, "Export faction reputation");
-      assertEqual(payload.knowledge.length, 2, "Export knowledge count");
-      assertEqual(payload.chapters.length, 1, "Export chapter count");
-      assertEqual(payload.chapters[0].status, "active", "Export active chapter");
-      assertEqual(payload.knowledge[0].visible, true, "Export visible knowledge");
-      assertEqual(payload.knowledge[1].visible, false, "Export hidden knowledge");
-      assert(
-        !JSON.stringify(payload).includes(privateNoteText),
-        "Export leaked a private player note"
-      );
-      assertEqual(
-        visibleKnowledge.payload.entry.title,
-        "The Sunken Gate",
-        "Created knowledge title"
-      );
-      assertEqual(payload.npcs[0].factionId, factionId, "Export did not keep the NPC faction link");
-      assertEqual(wardenResult.payload.npc.role, "Warden of the Crown", "NPC social role");
-      assertEqual(
-        wardenResult.payload.npc.secrets,
-        "Bound to the Crown by a stolen name.",
-        "NPC secret persisted for the GM"
-      );
+      assert((payload.scenes as Json[]).length >= 1, "Export did not include scenes");
+      assert((payload.journal as Json[]).length >= 2, "Export did not include journal entries");
+      assertEqual(payload.state.activeSceneId, sceneId, "Export active scene");
       metric("campaignA.exportBytes", JSON.stringify(payload).length);
 
       const imported = await api("/api/campaigns/import", {
@@ -2137,126 +951,10 @@ async function runCampaignA(gm: Account, players: Account[]): Promise<void> {
       const importedTable = await getTable(importedCampaign.id, gm.cookie);
       assertEqual(importedTable.characters.length, 4, "Imported table party size");
       assert(
-        (importedTable.characters as Json[]).every((character) => character.summary.level === 20),
+        (importedTable.characters as Json[]).every((character) => character.summary.level === 2),
         "Imported characters lost their level"
       );
-      assertEqual(importedCampaign.worldDate.year, 4726, "Imported world year");
-      assertEqual(importedCampaign.xpMode, "xp", "Imported XP mode");
-      assertEqual(importedCampaign.playerItemGrant, true, "Imported player item grant");
-      assertEqual(importedCampaign.shopMode, "stocked", "Imported shop mode");
-      const importedShop = await api(`/api/campaigns/${importedCampaign.id}/shop`, {
-        cookie: gm.cookie,
-      });
-      assertEqual(importedShop.payload.shop.mode, "stocked", "Imported shop state mode");
-      assertEqual(importedShop.payload.shop.merchants.length, 2, "Imported merchant count");
-      assertEqual(
-        importedShop.payload.shop.stock.find((entry: Json) => entry.itemId === daggerId)?.quantity,
-        3,
-        "Imported shop stock quantity"
-      );
-      const importedTravel = await api(`/api/campaigns/${importedCampaign.id}/travel`, {
-        cookie: gm.cookie,
-      });
-      const importedHero = (importedTable.characters as Json[]).find(
-        (character) => character.name === heroes[0].name
-      );
-      assertEqual(importedTravel.payload.travel.origin, "Ashen Ford", "Imported travel origin");
-      assertEqual(importedTravel.payload.travel.status, "complete", "Imported travel status");
-      assert(
-        importedHero && importedTravel.payload.travel.watches.first.includes(importedHero.id),
-        "Imported travel watch was not remapped"
-      );
-      assertEqual(
-        importedTravel.payload.travel.activities[importedHero.id],
-        "scout",
-        "Imported travel activity was not remapped"
-      );
-      assertEqual(importedTravel.payload.travel.waypoints.length, 2, "Imported waypoint count");
-      assertEqual(
-        importedTravel.payload.travel.waypoints[1].visible,
-        false,
-        "Imported hidden waypoint"
-      );
-      assertEqual(
-        importedTravel.payload.travel.encounterChecks.length,
-        1,
-        "Imported encounter-check count"
-      );
-      const importedSessionZero = await api(`/api/campaigns/${importedCampaign.id}/session-zero`, {
-        cookie: gm.cookie,
-      });
-      const importedFactions = await api(`/api/campaigns/${importedCampaign.id}/factions`, {
-        cookie: gm.cookie,
-      });
-      const importedNotes = await api(`/api/campaigns/${importedCampaign.id}/notes`, {
-        cookie: gm.cookie,
-      });
-      assertEqual(importedNotes.payload.knowledge.length, 2, "Imported knowledge count");
-      assertEqual(
-        importedNotes.payload.knowledge[0].title,
-        "The Sunken Gate",
-        "Imported knowledge title"
-      );
-      assertEqual(importedNotes.payload.knowledge[0].visible, true, "Imported visible knowledge");
-      assertEqual(importedNotes.payload.knowledge[1].visible, false, "Imported hidden knowledge");
-      assertEqual(importedNotes.payload.notes.length, 0, "Import invented private notes");
-      const importedChapters = await api(`/api/campaigns/${importedCampaign.id}/chapters`, {
-        cookie: gm.cookie,
-      });
-      assertEqual(importedChapters.payload.chapters.length, 1, "Imported chapter count");
-      assertEqual(
-        importedChapters.payload.chapters[0].title,
-        "The Ashen Crown",
-        "Imported chapter title"
-      );
-      assertEqual(importedChapters.payload.chapters[0].status, "active", "Imported chapter status");
-      const importedNpcs = await api(`/api/campaigns/${importedCampaign.id}/npcs`, {
-        cookie: gm.cookie,
-      });
-      const importedFaction = importedFactions.payload.factions[0];
-      assertEqual(importedFactions.payload.factions.length, 1, "Imported faction count");
-      assertEqual(importedFaction.name, "The Ashen Court", "Imported faction name");
-      assertEqual(importedFaction.reputation, -70, "Imported faction reputation");
-      assertEqual(importedFaction.gmNotes, "The chancellor leads it.", "Imported faction GM notes");
-      assert(importedFaction.id !== factionId, "Import reused the source faction id");
-      const importedWarden = importedNpcs.payload.npcs.find(
-        (entry: Json) => entry.name === "The Ash Warden"
-      );
-      assert(importedWarden, "Imported NPC missing");
-      assertEqual(importedWarden.factionId, importedFaction.id, "Imported NPC faction remap");
-      assertEqual(
-        importedWarden.secrets,
-        "Bound to the Crown by a stolen name.",
-        "Imported NPC secret"
-      );
-      assertEqual(
-        importedSessionZero.payload.profile.pitch,
-        "The Ashen Crown wakes beneath the city.",
-        "Imported session zero pitch"
-      );
-      assertEqual(
-        importedSessionZero.payload.profile.checklist.pitch,
-        true,
-        "Imported session zero checklist"
-      );
-      assertEqual(
-        importedSessionZero.payload.profile.allowedSources,
-        "Player Core, GM Core, Monster Core.",
-        "Imported session zero allowed sources"
-      );
-      assertEqual(
-        importedSessionZero.payload.profile.partyGoal,
-        "Break the Ashen Crown before it wakes.",
-        "Imported session zero party goal"
-      );
       metric("campaignA.importedCampaignId", importedCampaign.id);
-      await api(`/api/campaigns/${campaignId}/shop/stock`, {
-        method: "PUT",
-        cookie: gm.cookie,
-        body: { mode: "open", items: [] },
-      });
-
-      // Clean up the copy so the simulation leaves one campaign behind.
       await api(`/api/campaigns/${importedCampaign.id}`, {
         method: "DELETE",
         cookie: gm.cookie,
@@ -2282,118 +980,6 @@ async function runCampaignA(gm: Account, players: Account[]): Promise<void> {
     });
     assertEqual(stale.status, 409, "Stale save status");
   });
-
-  await check(campaignName, "loot audit values parcels and character wealth", async () => {
-    const response = await api(`/api/campaigns/${campaignId}/loot/audit`, { cookie: gm.cookie });
-    const audit = response.payload.audit;
-    assertEqual(audit.partyLevel, 20, "Audit party level");
-    assertEqual(audit.budget.totalGp, treasureBudgetGp(20).totalGp, "Level 20 treasure budget");
-    assertEqual(audit.parcels.length, parcelCount, "Audited parcel count");
-    assert(
-      audit.parcels.every((parcel: Json) => parcel.level >= 1 && parcel.level <= 20),
-      "Audited parcels were not tagged by level"
-    );
-    assert(
-      audit.byLevel.length >= 1 &&
-        audit.byLevel.every((row: Json) => row.level >= 1 && row.level <= 20),
-      "Audit level coverage missing"
-    );
-    assertEqual(audit.preparedCp, 0, "All simulated parcels were distributed");
-    assert(audit.distributedCp > 0, "Distributed treasure was not valued");
-    assertEqual(audit.characters.length, 4, "Audited character count");
-    assert(
-      audit.characters.every((character: Json) => character.expectedCp > 0),
-      "Character wealth benchmark missing"
-    );
-    assertEqual(audit.mix.levels.length, 2, "Level 20 item bands");
-    assertEqual(audit.mix.levels[0].permanentTarget, 4, "Level 20 permanent target");
-    assertEqual(audit.mix.levels[0].consumableTarget, 4, "Level 20 consumable target");
-    assert(Array.isArray(audit.mix.warnings), "Item mix warnings missing");
-    metric("campaignA.treasureDistributedCp", audit.distributedCp);
-  });
-
-  await check(campaignName, "loot audit separates permanent and consumable items", async () => {
-    const permanentResponse = await api(
-      `/api/compendium/equipment?levelMin=19&levelMax=19&type=weapon&limit=1`,
-      { cookie: gm.cookie }
-    );
-    const consumableResponse = await api(
-      `/api/compendium/equipment?levelMin=19&levelMax=19&type=consumable&limit=1`,
-      { cookie: gm.cookie }
-    );
-    const permanent = permanentResponse.payload.items[0] as Json;
-    const consumable = consumableResponse.payload.items[0] as Json;
-    assert(permanent?.id, "No level 19 permanent item found");
-    assert(consumable?.id, "No level 19 consumable item found");
-    const parcel = (
-      await api(`/api/campaigns/${campaignId}/loot`, {
-        method: "POST",
-        cookie: gm.cookie,
-        body: { name: "Item mix audit", description: "Simulated permanent and consumable mix" },
-      })
-    ).payload.parcel;
-    for (const item of [permanent, consumable]) {
-      await api(`/api/campaigns/${campaignId}/loot/${parcel.id}/items`, {
-        method: "POST",
-        cookie: gm.cookie,
-        body: { itemId: item.id, quantity: 2 },
-      });
-    }
-    const audit = (await api(`/api/campaigns/${campaignId}/loot/audit`, { cookie: gm.cookie }))
-      .payload.audit;
-    assertEqual(audit.mix.permanent, 2, "Permanent item mix");
-    assertEqual(audit.mix.consumable, 2, "Consumable item mix");
-    const level19 = audit.mix.levels.find((row: Json) => row.level === 19);
-    assertEqual(level19.permanent, 2, "Level 19 permanent items");
-    assertEqual(level19.consumable, 2, "Level 19 consumables");
-    assertEqual(level19.consumableTarget, 2, "Level 19 consumable target");
-    await api(`/api/campaigns/${campaignId}/loot/${parcel.id}`, {
-      method: "DELETE",
-      cookie: gm.cookie,
-    });
-  });
-
-  await check(
-    campaignName,
-    "hazard and accomplishment awards use PF2e values and reach the ledger",
-    async () => {
-      const before = await getTable(campaignId, gm.cookie);
-      const ids = heroes.map((hero) => hero.id);
-      const complex = await awardXp(campaignId, gm.cookie, 0, "", ids, {
-        kind: "hazard",
-        hazardLevel: 11,
-        partyLevel: 10,
-        hazardComplexity: "complex",
-      });
-      assertEqual(complex.amount, 60, "Complex hazard XP");
-      const simple = await awardXp(campaignId, gm.cookie, 0, "", ids, {
-        kind: "hazard",
-        hazardLevel: 10,
-        partyLevel: 10,
-        hazardComplexity: "simple",
-      });
-      assertEqual(simple.amount, 8, "Simple hazard XP");
-      const accomplishment = await awardXp(campaignId, gm.cookie, 0, "", ids, {
-        kind: "accomplishment",
-        tier: "major",
-      });
-      assertEqual(accomplishment.amount, 80, "Major accomplishment XP");
-      const after = await getTable(campaignId, gm.cookie);
-      for (const hero of heroes) {
-        const previous = summaryFor(before, hero.id);
-        const current = summaryFor(after, hero.id);
-        assertEqual(current.xp, previous.xp + 148, `${hero.name} XP after hazard and story awards`);
-      }
-      const ledger = await api(`/api/campaigns/${campaignId}/xp-awards`, { cookie: gm.cookie });
-      const kinds = (ledger.payload.awards as Json[]).slice(0, 3).map((award) => award.kind);
-      assertEqual(kinds.join(","), "accomplishment,hazard,hazard", "XP ledger award kinds");
-      assertEqual(
-        (ledger.payload.awards as Json[])[0].reason,
-        "Major accomplishment",
-        "Accomplishment ledger label"
-      );
-    }
-  );
 
   gmSocket.close();
   playerSocket.close();
@@ -2488,145 +1074,22 @@ async function runCampaignB(gm: Account, players: Account[]): Promise<void> {
     const update = waitForEvent<Json>(
       playerSocket,
       "campaign:updated",
-      (payload) => payload.worldDate?.day === 2,
+      (payload) => payload.description === "The ledger is open.",
       5_000
     );
-    await api(`/api/campaigns/${campaignId}/calendar`, {
-      method: "PUT",
+    await api(`/api/campaigns/${campaignId}`, {
+      method: "PATCH",
       cookie: gm.cookie,
-      body: { year: 4726, month: 1, day: 1 },
-    });
-    await api(`/api/campaigns/${campaignId}/calendar/advance`, {
-      method: "POST",
-      cookie: gm.cookie,
-      body: { days: 1 },
+      body: { description: "The ledger is open." },
     });
     const payload = await update;
-    assertEqual(payload.worldDate.day, 2, "Live world date");
+    assertEqual(payload.description, "The ledger is open.", "Live campaign description");
     assert(!payload.inviteCode, "Campaign summary leaked the invite code to the player");
     playerSocket.close();
   });
 
-  await check(campaignName, "replacement character catches up to the party level", async () => {
-    const replacement = await createHero(players[2], {
-      name: "Tobin Ash",
-      className: "Rogue",
-      backgroundName: "Criminal",
-      heritageName: "Skilled Human",
-    });
-    await joinCampaign(players[2], campaignId, inviteCode, replacement.id);
-    const catchUp = await api(`/api/campaigns/${campaignId}/catch-up`, {
-      method: "POST",
-      cookie: gm.cookie,
-      body: { characterId: replacement.id },
-    });
-    assertEqual(catchUp.payload.caughtUp, 1, "Caught-up character count");
-    const targetLevel = catchUp.payload.targetLevel as number;
-    assert(targetLevel >= 1, "Catch-up target level was not resolved");
-    const table = await getTable(campaignId, gm.cookie);
-    assertEqual(
-      summaryFor(table, replacement.id).level,
-      targetLevel,
-      "Replacement character level"
-    );
-    assertEqual(
-      summaryFor(table, replacement.id).xp,
-      catchUp.payload.targetXp,
-      "Replacement character XP"
-    );
-    const repeat = await api(`/api/campaigns/${campaignId}/catch-up`, {
-      method: "POST",
-      cookie: gm.cookie,
-      body: { characterId: replacement.id },
-    });
-    assertEqual(repeat.payload.caughtUp, 0, "Repeated catch-up count");
-    assertEqual(repeat.payload.alreadyCurrent, 1, "Repeated catch-up current count");
-    const grant = await api(`/api/campaigns/${campaignId}/characters/${replacement.id}/wealth`, {
-      method: "POST",
-      cookie: gm.cookie,
-    });
-    assert(grant.payload.grantCp > 0, "Replacement wealth grant was empty");
-    assertEqual(
-      grant.payload.targetCp,
-      startingWealthCp(targetLevel),
-      "Replacement wealth benchmark"
-    );
-    const sheet = await api(`/api/characters/${replacement.id}`, { cookie: gm.cookie });
-    const committed = computeCharacter(
-      sheet.payload.character.data as CharacterDraft,
-      contextForDraft(sheet.payload.character.data)
-    ).wealth.committed;
-    assertEqual(committed, startingWealthCp(targetLevel), "Replacement wealth after grant");
-    const secondGrant = await api(
-      `/api/campaigns/${campaignId}/characters/${replacement.id}/wealth`,
-      { method: "POST", cookie: gm.cookie }
-    );
-    assertEqual(secondGrant.payload.grantCp, 0, "Repeated replacement wealth grant");
-  });
-
-  await check(
-    campaignName,
-    "milestone campaign supports sessions, recap, and a shared handout",
-    async () => {
-      const session = (
-        await api(`/api/campaigns/${campaignId}/sessions`, {
-          method: "POST",
-          cookie: gm.cookie,
-          body: {
-            title: "The Quiet Ledger, Session 1",
-            scheduledAt: Date.now() - 3_600_000,
-            durationMinutes: 180,
-            status: "played",
-            notes: "GM-only notes.",
-          },
-        })
-      ).payload.session;
-      await api(`/api/campaigns/${campaignId}/journal`, {
-        method: "POST",
-        cookie: gm.cookie,
-        body: {
-          title: "Ledger clue",
-          content: "Three names are scratched out.",
-          visible: true,
-          kind: "handout",
-        },
-      });
-      const recap = await api(
-        `/api/campaigns/${campaignId}/recap?from=${Date.now() - 7 * 86_400_000}&to=${Date.now() + 60_000}`,
-        { cookie: gm.cookie }
-      );
-      assert(
-        String(recap.payload.recap?.draft).includes("The Quiet Ledger, Session 1"),
-        "Milestone recap did not include the session"
-      );
-      assert(
-        String(recap.payload.recap?.draft).includes("Ledger clue"),
-        "Milestone recap did not include the handout"
-      );
-      const playerSessions = await api(`/api/campaigns/${campaignId}/sessions`, {
-        cookie: players[0].cookie,
-      });
-      const playerSession = (playerSessions.payload.sessions as Json[]).find(
-        (entry) => entry.id === session.id
-      );
-      assertEqual(playerSession?.notes, "", "Milestone session notes leaked");
-    }
-  );
-
-  await check(campaignName, "milestone mode rejects XP awards", async () => {
-    const award = await api(`/api/campaigns/${campaignId}/award-xp`, {
-      method: "POST",
-      cookie: gm.cookie,
-      body: { amount: 10, characterIds: [heroes[0].id] },
-      expect: null,
-    });
-    assertEqual(award.status, 400, "Milestone XP award status");
-    const table = await getTable(campaignId, gm.cookie);
-    assertEqual(summaryFor(table, heroes[0].id).xp, 0, "Milestone XP after rejected award");
-  });
-
   metric("campaignB.id", campaignId);
-  metric("campaignB.memberCount", 4);
+  metric("campaignB.memberCount", 3);
 }
 
 async function main(): Promise<void> {

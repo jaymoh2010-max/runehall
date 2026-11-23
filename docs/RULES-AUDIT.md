@@ -207,7 +207,9 @@ current data model or intentionally manual:
 - **Low encounter budget** per additional character is 15 XP, not 20.
 - **Creatures five or more levels below the party** are worth 0 XP; the table
   previously awarded 10 XP to any deeper under-level creature.
-- **Trivial encounters** no longer advertise full XP in the encounter builder.
+- The shared encounter XP helper remains correct for trivial/low budgets; the
+  campaign encounter-builder UI was removed from the current core in a separate
+  product pass.
 - **Low-light vision in darkness** is concealed (DC 5), not hidden (DC 11).
 - **Damage defenses** now understand `physical`, `all-damage`, and
   `nonlethal-attacks`, apply exceptions, and use the correct order: weakness

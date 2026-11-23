@@ -20,7 +20,7 @@ A second pass over the manual-first table after the first audit remediation, foc
 - **Creature tokens have default portraits.** Any unlinked creature token without custom art gets an archetype icon based on its bestiary traits. The bestiary list shows the same avatar. The icon set is CC BY 3.0 from Game-icons.net; see `public/tokens/creature/ATTRIBUTION.md`.
 - **The built-in map library uses open cartography.** The library now has 37 grid-aligned maps, mostly full colour, from Dyson Logos (CC BY 4.0), Free Fantasy Maps (CC BY 4.0), and mbround18 (CC BY-SA 4.0). Maps include grid sizes, offsets, thumbnails, credit lines, terrain filters, and Pathfinder adventure-theme tags. See `public/maps/ATTRIBUTION.md`.
 - **Players can pick or crop portraits.** The account page and character builder share a portrait picker with 35 built-in painted portraits and an upload flow that crops to a square and exports 512 × 512 WebP. Built-in art is CC BY 4.0 from Joseph Hewitt and CC BY 3.0 / CC BY-SA 3.0 from Justin Nichol / Flare. See `public/portraits/ATTRIBUTION.md`.
-- **GMs can use the portrait library for NPC and token art.** The NPC editor and the token quick panel both open the same picker, including upload-and-crop. The NPC route accepts built-in `/portraits/` URLs as well as uploads.
+- **GMs can use the portrait library for token art.** The table token quick panel opens the same picker, including upload-and-crop.
 - **The initiative bar sits at the top of the table.** Round, current combatant, and the GM menu are stacked in a compact block under the round marker, leaving the full width for the order. The GM can roll, add a combatant, end the round manually, reorder the active combatant, or clear from that menu.
 - **The table toolbar wraps cleanly.** Scene controls, fog controls, and the sheet/presence controls now space themselves across the row and fall to a second row on narrow screens instead of crowding together.
 - **The token panel header uses generated creature art.** The 40px avatar now matches the token on the map.
@@ -32,11 +32,29 @@ A second pass over the manual-first table after the first audit remediation, foc
 | `npm run check` | Pass |
 | `npm run smoke` | Pass |
 | `npm run e2e` | 26 passed, 0 skipped |
+| `npm run simulate:campaign` | 17 passed, 0 failed |
 | Player token-art upload | Verified manually with Playwright, including reset |
+
+## Cleanup pass
+
+- Campaign navigation is now exactly **Table / Party / Journal / Settings**. The hidden prep tabs
+  (Overview, Session Zero, People, Arc, Travel, Clocks, Sessions, Encounters, Loot, NPCs, Assets,
+  Notes, and GM Screen) and their client components were removed.
+- The API route modules behind those screens were removed: chapters, clocks, dashboard, encounters,
+  loot, NPCs, notes, sessions, session zero, shop, and travel. Unused campaign-request, calendar,
+  catch-up, wealth, XP-award, Hero Point, downtime, and long-rest endpoints were removed from the
+  campaign route.
+- Shared PF2e rules helpers and their unit tests remain in the repository as reusable rules library
+  code even where no current screen calls them.
+- The campaign simulator now covers the four-tab loop: party membership, tokens and ownership, scene
+  visibility, initiative visibility, level-up sync, journal visibility and quest XP, revisions,
+  export/import, milestone advancement, and live metadata.
+- Accessibility cleanup: the presence group has an explicit role, initiative reroll/remove targets
+  are 24px, and scene tokens no longer advertise a right-click editor that is not wired up.
+- Bundled map, portrait, and creature-token credits are linked from `THIRD_PARTY_NOTICES.md`.
 
 ## Remaining opportunities
 
 - Token owner reassignment and temp-HP editing still use the character sheet rather than the token panel.
-- Legacy campaign render blocks remain bundled even though legacy tab URLs redirect to the table.
 - Default creature portraits are curated CC BY 3.0 archetype icons. Curated per-monster art can replace them later without changing token data.
 - `npm audit` remains a manual periodic check; production dependencies currently report zero vulnerabilities.

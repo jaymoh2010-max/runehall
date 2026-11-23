@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft,
   ArrowRight,
@@ -64,7 +64,6 @@ interface PathbuilderImportResponse {
 
 export function JoinCampaignPage() {
   const { code = "" } = useParams<{ code: string }>();
-  const location = useLocation();
   const navigate = useNavigate();
   const user = useSession((state) => state.user);
   const ready = useSession((state) => state.ready);
