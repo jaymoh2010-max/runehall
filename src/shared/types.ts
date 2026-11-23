@@ -878,6 +878,11 @@ export interface CharacterDraft {
     tradition: SpellTradition | null;
     cantrips: string[];
     known: string[];
+    /**
+     * Ranks at which each spontaneous spell is known, keyed by spell id.
+     * Missing entries fall back to the spell's printed rank.
+     */
+    knownRanks: Record<string, number[]>;
     /** Spell IDs prepared for the day by prepared casters. */
     prepared: string[];
     /**

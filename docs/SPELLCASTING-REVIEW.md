@@ -2,7 +2,7 @@
 
 Date: 2026-11-23
 
-Status: review complete. Sprint 1 (the daily spellcasting loop), the class-grant portion of Sprint 2, the first table-magic pass of Sprint 3, the magus studious-slot pass of Sprint 4, and the animist prepared/spontaneous split of Sprint 5 were implemented on 2026-11-23. The findings below describe the pre-Sprint state; the implementation status sections record what changed, and the remaining class and table gaps stay in the backlog.
+Status: review complete. Sprint 1 (the daily spellcasting loop), the class-grant portion of Sprint 2, the first table-magic pass of Sprint 3, the magus studious-slot pass of Sprint 4, the animist prepared/spontaneous split of Sprint 5, and the spontaneous known-at-rank pass of Sprint 6 were implemented on 2026-11-23. The findings below describe the pre-Sprint state; the implementation status sections record what changed, and the remaining class and table gaps stay in the backlog.
 
 > **Follow-up (2026-11-23):** `docs/RULES-AUDIT.md` corrected two table errors
 > this review did not catch: bards use the 2/3 full-caster slot table (not the
@@ -78,7 +78,7 @@ The class-specific grant pass is implemented:
 - Summoner grants Evolution Surge and the at-will Boost Eidolon link cantrip. The link cantrip does not count toward the focus pool.
 - Cleric deity spells are included in the available cleric list and can be prepared through the normal daily-preparation workflow.
 
-Still open after this pass: spontaneous known-at-rank copies, psi amp actions, item spellcasting, rituals, sustain, and multiclass archetype casting.
+Still open after this pass: psi amp actions, item spellcasting, rituals, sustain, and multiclass archetype casting.
 
 ## Sprint 3 implementation status (2026-11-23)
 
@@ -100,7 +100,7 @@ Magus studious slots are implemented:
 - Casting spends a studious use, Restore returns it, and long rests reset the uses.
 - The sheet shows a separate studious slot row and offers the studious resource alongside ordinary slots.
 
-Still open: spontaneous known-at-rank copies, psi amps, item spellcasting, spellbook learning, structured ritual data, a table Sustain prompt, and multiclass archetype casting.
+Still open: psi amps, item spellcasting, spellbook learning, structured ritual data, a table Sustain prompt, and multiclass archetype casting.
 
 ## Sprint 5 implementation status (2026-11-23)
 
@@ -113,6 +113,18 @@ The animist prepared/spontaneous split is implemented:
 - The primary apparition's vessel spell is granted as a focus spell, and the focus pool rises at 7th and 15th level.
 - Apparition slots are tracked and restored separately from prepared slots; long rests and daily preparations clear both pools.
 - The sheet lists attuned apparitions, apparition slots, and the apparition repertoire, and casting an apparition spell never spends a prepared animist slot.
+
+## Sprint 6 implementation status (2026-11-23)
+
+Spontaneous known-at-rank copies are implemented:
+
+- `spells.knownRanks` records the ranks at which each spontaneous spell is known; legacy drafts fall back to the spell's printed rank.
+- The builder lets a spontaneous caster add the same spell again at a higher rank, and each rank copy counts against that rank's repertoire limit.
+- Cast options offer only the learned ranks for non-signature spells. Signature spells heighten upward from their lowest learned rank.
+- Casting a rank copy spends the matching slot and Restore returns it.
+- The sheet shows every learned rank in the spell's cast selector.
+
+Still manual: using a higher-rank slot to cast a lower-rank spell without heightening it.
 
 ## Rules baseline
 
@@ -174,8 +186,8 @@ Legend: Yes = modeled and usable; Partial = some support with known gaps; No = n
 | Divine font | Yes | Rank, slot count, dual-font choice, separate usage |
 | Wizard curriculum | Partial | Extra slot and rank-1 validation; higher-rank curriculum lists remain manual |
 | Prepared cantrips | Yes | Daily prepared list, class caps, and the wizard curriculum extra |
-| Spontaneous repertoire limits | Partial | Bard, oracle, sorcerer, summoner, and psychic; spontaneous known-at-rank copies remain open |
-| Spontaneous heightening by learned rank | No | Only signature spells can heighten |
+| Spontaneous repertoire limits | Yes | Bard, oracle, sorcerer, summoner, and psychic; rank copies count against each learned rank |
+| Spontaneous heightening by learned rank | Yes | Known ranks are tracked; signature spells heighten upward. Higher-slot downcasting is manual |
 | Signature spells | Yes | One per rank, level 3 gate, validation |
 | Focus points and focus casting | Partial | Separate focus spell DC/attack now works; psi amps and some feat-granted pools remain manual |
 | Focus spells from feats/archetypes | Partial | Manual focus list; no automatic grants or pool changes |
@@ -288,7 +300,7 @@ Status: partly fixed in Sprint 2, Sprint 4, and Sprint 5. Psychic, necromancer, 
 - **Sorcerer/oracle**: higher-rank bloodline/mystery gifts remain manual.
 - **Cleric**: deity spells are resolved and offered through the normal preparation workflow.
 
-Impact: These classes are usable only with manual bookkeeping. The most visible remaining gap is spontaneous known-at-rank heightening.
+Impact: These classes are usable only with manual bookkeeping. The most visible remaining class gaps are psi amps and higher-level class-specific gifts.
 
 Fix: Treat class completeness as a separate sprint. Start with grants and caps that can be curated from existing class-choice descriptions; avoid a generic parser until the curated path is stable.
 
@@ -310,6 +322,8 @@ Impact: A monk with ki spells has no focus spell DC or attack. A wizard with an 
 Fix: Add separate derived profiles for class, focus, and innate casting. At minimum expose `focusSpellDc`, `focusSpellAttack`, `innateSpellDc`, and `innateSpellAttack`, and use the row's source in the sheet. Change the "spellcasting class feature" prerequisite check to require spell slots, not focus progression.
 
 ### F8. Spontaneous heightening is incomplete (P1)
+
+Status: fixed for learned-rank copies in Sprint 6. Signature heightening and the spell's learned ranks are now separate. Casting a lower-rank known spell with a higher-rank slot without heightening it remains manual.
 
 Evidence:
 
@@ -511,7 +525,7 @@ Tasks:
    - Add apparition attunement and the apparition repertoire.
    - If the full split is too large, label the current combined tracker as manual and prevent it from implying that all slots are prepared.
 
-7. **Spontaneous known-at-rank**
+7. **Spontaneous known-at-rank** (implemented in Sprint 6; downcasting remains manual)
    - Add `knownByRank` (or a rank-aware known list) and migrate the flat list.
    - Use it for repertoire limits, cast options, and signature validation.
    - Add an option to cast a lower-rank known spell using a higher slot without heightening.

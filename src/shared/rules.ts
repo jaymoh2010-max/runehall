@@ -1245,6 +1245,89 @@ export function removePreparedSpellEverywhere(
   };
 }
 
+/**
+ * Ranks at which a spontaneous caster knows a spell. Legacy drafts fall back
+ * to the spell's printed rank; knownRanks only stores extra learned ranks.
+ */
+export function knownSpellRanks(
+  draft: Pick<CharacterDraft, "spells">,
+  spell: Pick<Spell, "id" | "rank">
+): number[] {
+  if (spell.rank <= 0) return [0];
+  const stored = draft.spells.knownRanks?.[spell.id] ?? [];
+  const ranks = [...new Set(stored)].filter((rank) => rank >= spell.rank && rank <= 10);
+  return ranks.length ? ranks.sort((a, b) => a - b) : [spell.rank];
+}
+
+/** Learn a spontaneous spell at a specific rank (or add another rank copy). */
+export function addKnownSpellAtRank(
+  draft: CharacterDraft,
+  spell: Pick<Spell, "id" | "rank">,
+  rank: number
+): CharacterDraft {
+  if (spell.rank <= 0) return draft;
+  if (!Number.isInteger(rank) || rank < spell.rank || rank > 10) return draft;
+  const isKnown = draft.spells.known.includes(spell.id);
+  const current = isKnown ? knownSpellRanks(draft, spell) : [];
+  if (current.includes(rank)) return draft;
+  return {
+    ...draft,
+    spells: {
+      ...draft.spells,
+      known: isKnown ? draft.spells.known : [...draft.spells.known, spell.id],
+      knownRanks: {
+        ...draft.spells.knownRanks,
+        [spell.id]: [...current, rank].sort((a, b) => a - b),
+      },
+    },
+  };
+}
+
+/**
+ * Remove one learned rank of a spontaneous spell. Removing the last rank also
+ * removes the spell from the repertoire and clears its signature flag.
+ */
+export function removeKnownSpellAtRank(
+  draft: CharacterDraft,
+  spell: Pick<Spell, "id" | "rank">,
+  rank: number
+): CharacterDraft {
+  if (spell.rank <= 0) return draft;
+  const current = knownSpellRanks(draft, spell);
+  if (!current.includes(rank)) return draft;
+  const remaining = current.filter((entry) => entry !== rank);
+  const knownRanks = { ...draft.spells.knownRanks };
+  if (remaining.length) {
+    knownRanks[spell.id] = remaining;
+  } else {
+    delete knownRanks[spell.id];
+  }
+  return {
+    ...draft,
+    spells: {
+      ...draft.spells,
+      known:
+        remaining.length > 0
+          ? draft.spells.known
+          : draft.spells.known.filter((id) => id !== spell.id),
+      knownRanks,
+      signature:
+        remaining.length > 0
+          ? draft.spells.signature
+          : draft.spells.signature.filter((id) => id !== spell.id),
+    },
+  };
+}
+
+/** Whether a spontaneous spell is known at this rank. */
+export function knowsSpellAtRank(
+  draft: Pick<CharacterDraft, "spells">,
+  spell: Pick<Spell, "id" | "rank">,
+  rank: number
+): boolean {
+  return knownSpellRanks(draft, spell).includes(rank);
+}
+
 /** Ordinary prepared slots available at one rank, excluding the divine font. */
 export function ordinaryPreparedLimitAt(
   draft: CharacterDraft,
@@ -1455,6 +1538,7 @@ export function emptyCharacterDraft(name = "New Hero"): CharacterDraft {
       tradition: null,
       cantrips: [],
       known: [],
+      knownRanks: {},
       prepared: [],
       preparedByRank: {},
       preparedCantrips: [],
@@ -1722,6 +1806,28 @@ export function normalizeCharacterDraft(input: unknown, fallbackName = "New Hero
         : null,
       cantrips: arr<string>(spells.cantrips).filter((x) => typeof x === "string"),
       known: arr<string>(spells.known).filter((x) => typeof x === "string"),
+      knownRanks: Object.fromEntries(
+        Object.entries(obj(spells.knownRanks))
+          .filter(([, value]) => Array.isArray(value))
+          .map(([key, value]) => [
+            key,
+            [
+              ...new Set(
+                (value as unknown[])
+                  .filter(
+                    (rank): rank is number =>
+                      typeof rank === "number" &&
+                      Number.isFinite(rank) &&
+                      Number.isInteger(rank) &&
+                      rank >= 1 &&
+                      rank <= 10
+                  )
+                  .map((rank) => rank)
+              ),
+            ].sort((a, b) => a - b),
+          ])
+          .filter(([, ranks]) => (ranks as number[]).length > 0)
+      ) as Record<string, number[]>,
       prepared: finalPrepared,
       preparedByRank,
       preparedCantrips: Array.isArray(spells.preparedCantrips)
@@ -4258,6 +4364,10 @@ export function computeCharacter(
     }
   }
 
+  const spontaneousCaster =
+    caster.progression !== "none" &&
+    caster.progression !== "focus" &&
+    !isPreparedCasterClass(classData?.name);
   const repertoire = spellRepertoireLimits(classData, draft.level);
   if (repertoire) {
     const baseCantrips = draft.spells.cantrips.filter(
@@ -4279,7 +4389,10 @@ export function computeCharacter(
       if (grantedKnownSpellIds.has(spellId)) continue;
       const spell = context.spells[spellId];
       if (!spell) continue;
-      knownByRank.set(spell.rank, (knownByRank.get(spell.rank) ?? 0) + 1);
+      const ranks = spontaneousCaster ? knownSpellRanks(draft, spell) : [spell.rank];
+      for (const rank of ranks) {
+        knownByRank.set(rank, (knownByRank.get(rank) ?? 0) + 1);
+      }
     }
     // Sorcerer bloodline gifts are part of the spells-known total. Other
     // class-granted repertoire spells are extras and must not shrink the
@@ -4303,10 +4416,29 @@ export function computeCharacter(
     }
   }
 
-  const spontaneousCaster =
-    caster.progression !== "none" &&
-    caster.progression !== "focus" &&
-    !isPreparedCasterClass(classData?.name);
+  if (spontaneousCaster) {
+    for (const [spellId, ranks] of Object.entries(draft.spells.knownRanks)) {
+      if (!draft.spells.known.includes(spellId)) {
+        issue(
+          "warning",
+          "A learned spell rank is recorded for a spell that is not in the repertoire.",
+          "spells"
+        );
+        continue;
+      }
+      const spell = context.spells[spellId];
+      if (!spell) continue;
+      for (const rank of ranks) {
+        if (rank < spell.rank || rank > maxSpellRank) {
+          issue(
+            "warning",
+            `${spell.name} is learned at rank ${rank}, outside the available range for a rank ${spell.rank} spell at level ${draft.level}.`,
+            "spells"
+          );
+        }
+      }
+    }
+  }
   if (spontaneousCaster && draft.spells.signature.length) {
     if (draft.level < 3) {
       issue("warning", "Signature spells are gained at 3rd level.", "spells");

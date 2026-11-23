@@ -4,6 +4,7 @@ import {
   divineFontInfo,
   isCantripPrepared,
   isPreparedCasterClass,
+  knownSpellRanks,
   ordinarySpellSlotsFor,
   preparedEntries,
   preparedUsedKey,
@@ -243,17 +244,17 @@ export function spellCastOptions(
     );
   }
 
-  // A spontaneous caster can only heighten a spell freely when it is one of
-  // their signature spells. A heightened copy learned at a higher rank is not
-  // modelled separately, so non-signature spells stay at their printed rank.
+  // A spontaneous caster can cast a spell at each rank where they learned it.
+  // Signature spells can be freely heightened to any available slot rank.
   const signature = new Set(draft.spells.signature ?? []);
-  const ranks: number[] = [spell.rank];
-  if (signature.has(spell.id)) {
-    for (let rank = spell.rank + 1; rank <= maxRank; rank += 1) ranks.push(rank);
+  const learnedRanks = knownSpellRanks(draft, spell);
+  const ranks = new Set<number>(learnedRanks);
+  if (signature.has(spell.id) && learnedRanks.length) {
+    for (let rank = Math.min(...learnedRanks); rank <= maxRank; rank += 1) ranks.add(rank);
   }
 
   const options: SpellCastOption[] = [];
-  for (const rank of ranks) {
+  for (const rank of [...ranks].filter((entry) => entry <= maxRank).sort((a, b) => a - b)) {
     const slotCount = ordinary[rank - 1] ?? 0;
     const used = clampInt(draft.spells.slotsUsed[String(rank)], 0, slotCount);
     options.push({
