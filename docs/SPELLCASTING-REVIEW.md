@@ -1,0 +1,481 @@
+# Spellcasting support review and sprint plan
+
+Date: 2026-11-23
+
+Status: review complete. No code changes in this pass; this document records the rules baseline, the current implementation, the gaps, and a proposed sprint sequence.
+
+## Scope
+
+This review covers every class that gains spellcasting, focus spells, or innate spells, plus the table-facing spell loop:
+
+- Spell slots and daily preparations
+- Prepared vs. spontaneous casting
+- Cantrips and heightening
+- Divine font, wizard curriculum, and other class resources
+- Focus spells, focus points, and Refocus
+- Innate spells and innate uses
+- Rituals
+- Spellbook / repertoire bookkeeping
+- The character builder, character sheet, and campaign rest flow
+
+The audit is based on the Player Core / remastered rules, with class-specific checks against the local compendium data. Rules references are listed at the end.
+
+## Executive summary
+
+The foundation is good. Runehall already has:
+
+- Correct full-caster, spontaneous full-caster, bounded-caster, and animist slot tables
+- Prepared copies at specific ranks, including duplicate preparations and upcasting
+- Cleric divine font, including a dual-font lock-in
+- Wizard curriculum slots and rank-aware validation
+- Focus points, innate uses, and cantrip/focus automatic heightening
+- Structured spell damage heightening for safe interval formulas
+- A single Cast action that spends the selected resource and posts to chat
+
+The largest correctness gap is the **daily preparation loop**. The data model records `spells.preparationsPending`, and the campaign long-rest route sets it for prepared casters, but no current UI reads it. The old `DailyPreparationsModal` was removed when the table was simplified in `f4d23aa`. A wizard can long-rest, see no reminder, keep casting the previous day's list, and never be prompted to prepare.
+
+There are also several class-specific approximations:
+
+- Prepared cantrips are not a daily choice; the builder treats all selected cantrips as always castable.
+- Wizard and magus cantrip caps conflate spellbook size with the number prepared per day.
+- Psychic has no repertoire limit, no conscious-mind grants, no psi cantrips, and no Clarity of Focus increase.
+- Necromancer has no grave-spell grants.
+- Magus has no studious spell slots.
+- Summoner has no link spell or link cantrip.
+- Animist combines prepared and spontaneous apparition slots into one prepared pool.
+- Focus and innate spells use the class spell attack/DC, which is wrong for non-spellcasters and for innate spells on any character.
+- Spontaneous casters cannot represent a spell learned at more than one rank.
+- The sustain module is implemented but unused by the UI.
+- Rituals are a list and a link, not a castable workflow.
+
+The recommended first sprint is therefore the **daily spellcasting loop**, not broad class automation. Once rest, pending preparations, prepared cantrips, and spell-use reconciliation are correct, every prepared class benefits immediately and the later class-specific work has a stable base.
+
+## Rules baseline
+
+### Core spellcasting
+
+- **Prepared casters** choose spells during daily preparations. Each prepared spell is tied to a slot of a specific rank and is expended after one casting. Preparing the same spell twice is how you cast it twice. Cantrips are the exception: a prepared caster prepares a limited number of cantrips each day, and those cantrips are then cast at will. A cantrip cannot occupy a spell slot.
+- **Spontaneous casters** refresh their spell slots during daily preparations but do not change their repertoire. They can cast any spell in their repertoire using a slot of the spell's rank. To heighten a spell, they must know it at the higher rank or use a signature spell. They can also spend a higher-rank slot to cast a lower-rank spell without heightening it.
+- **Heightening** raises the spell's effective rank to the slot used or the rank at which it was prepared. Specific heightened entries only apply at the listed ranks or intervals.
+- **Cantrips** are automatically heightened to half the caster's level, rounded up. A typical caster's cantrips are therefore the same rank as their highest spell slot.
+- **Focus spells** are gained from class features and feats, not chosen from a tradition list. Casting one costs 1 Focus Point. Focus spells are automatically heightened to half the caster's level, rounded up. The focus pool maximum is the number of focus spells known, capped at 3. Only spells that actually cost Focus Points count; a bard's composition cantrips and a summoner's link cantrips do not. Focus Points refill during daily preparations and can be regained with Refocus.
+- **Focus spells from non-spellcasters** use the proficiency, spell attack modifier, spell DC, and tradition granted by the ability that gave the focus spell. They do not make the character a spellcaster for feat prerequisites.
+- **Innate spells** are refreshed during daily preparations and have their own frequency. Innate cantrips are at will and automatically heightened. Non-cantrip innate spells cannot normally be heightened. Innate spells use their own spell attack modifier and spell DC: trained, increasing to expert at 12th level, usually using Charisma.
+- **Daily preparations** happen after 8 hours of rest and take about an hour. They refresh spell slots, Focus Points, per-day abilities, and magic item uses. Prepared casters choose their spells; characters equip gear and invest up to 10 worn magic items.
+
+### Class-specific expectations
+
+| Class | Casting model | Key spell resources |
+| --- | --- | --- |
+| Wizard | Full prepared arcane | Spellbook; 10 starting cantrips; prepares 5 cantrips plus 1 curriculum cantrip; extra curriculum spell slot at each rank; Drain Bonded Item |
+| Cleric | Full prepared divine | Divine font (heal or harm) at the highest rank; deity spells added to the divine list; doctrine proficiencies; Battle Creed variant |
+| Druid | Full prepared primal | Druid order focus spell; 5 prepared cantrips |
+| Witch | Full prepared, patron tradition | Familiar holds the spell list; patron spells; hex focus spells |
+| Animist | Full prepared animist slots plus spontaneous apparition slots | Apparitions grant a separate repertoire and spontaneous slots; the two pools are not interchangeable |
+| Magus | Bounded prepared arcane | Spellbook; 8 starting cantrips; prepares 5 cantrips; conflux focus spells; studious spell slots from 7th level |
+| Necromancer | Bounded prepared occult | Dirge spell list; grave focus spells; focus pool 2 |
+| Bard | Full spontaneous occult | Repertoire; muse grants a repertoire spell; composition cantrips; signature spells |
+| Sorcerer | Full spontaneous, bloodline tradition | Repertoire; bloodline cantrip, 1st-rank gift, focus spell, and higher-rank gifts; signature spells |
+| Oracle | Full spontaneous divine | Repertoire; mystery revelation focus spells; curse; signature spells |
+| Psychic | Bounded spontaneous occult | 3 regular cantrips plus 3 psi cantrips; amps spend Focus Points; focus pool 2, increasing to 3 with Clarity of Focus; signature spells; 10th-rank capstone |
+| Summoner | Bounded spontaneous, eidolon tradition | Repertoire; link spell (focus) and link cantrip (no Focus Point cost); signature spells |
+| Champion | Focus only, divine | Devotion spells use the focus pool; no spell slots |
+| Monk, Ranger, and other focus classes | Focus only | Ki, warden, and similar focus spells use the class that granted them for proficiency and tradition |
+
+## Current implementation map
+
+- `src/shared/types.ts` - `CharacterDraft["spells"]` and `DerivedCharacter` spell fields.
+- `src/shared/rules.ts` - caster progression, slot tables, prepared entries, divine font, curriculum validation, focus pool, spell attack/DC, repertoire limits.
+- `src/shared/spellcasting.ts` - cast options, resource spending, heightening, action variants.
+- `src/shared/rest.ts` - long rest and daily reset rules.
+- `src/shared/innate.ts` - innate uses.
+- `src/shared/sustain.ts` - sustained spell helpers.
+- `src/shared/ritual.ts` - ritual primary-check hint.
+- `src/shared/classGrants.ts` and `classGrantChoices.ts` - class-granted spells and focus spells.
+- `src/client/components/builder/steps/SpellsStep.tsx` - builder spellbook/repertoire and preparation UI.
+- `src/client/components/sheet/CharacterSheetView.tsx` - sheet slots and Cast action.
+- `src/server/routes/campaigns.ts` - party long rest.
+- `tests/dailyPreparations.test.ts`, `tests/prepared.test.ts`, `tests/spellcasting.test.ts` - current coverage.
+
+## Support matrix
+
+Legend: Yes = modeled and usable; Partial = some support with known gaps; No = not modeled.
+
+| Area | Status | Notes |
+| --- | --- | --- |
+| Full-caster slot tables | Yes | Wizard, cleric, druid, bard, oracle, sorcerer, witch, animist tables are present |
+| Spontaneous full-caster slots | Yes | Sorcerer and oracle use the correct table |
+| Bounded-caster slots | Yes | Magus, summoner, psychic, and necromancer; psychic/necromancer get the 10th-rank capstone |
+| Prepared copies by rank | Yes | Duplicates, upcasting, and rank-aware validation |
+| Divine font | Yes | Rank, slot count, dual-font choice, separate usage |
+| Wizard curriculum | Partial | Extra slot and rank-1 validation; higher-rank curriculum lists remain manual |
+| Prepared cantrips | No | All selected cantrips are treated as prepared and castable |
+| Spontaneous repertoire limits | Partial | Bard, oracle, sorcerer, summoner; psychic is missing |
+| Spontaneous heightening by learned rank | No | Only signature spells can heighten |
+| Signature spells | Yes | One per rank, level 3 gate, validation |
+| Focus points and focus casting | Partial | Pool and casting work; focus-only classes lack their own spell DC/attack |
+| Focus spells from feats/archetypes | Partial | Manual focus list; no automatic grants or pool changes |
+| Innate spells and uses | Partial | Uses and casting work; innate attack/DC is wrong |
+| Rituals | No | List only; sheet explicitly disables Cast for rituals |
+| Sustained spells | No | Helpers exist; no UI starts or ends a sustained spell |
+| Spellbook capacity and learning | No | No starting-spellbook or Learn a Spell accounting |
+| Item spellcasting | No | Scrolls are generic consumables; staves/wands do not cast spells |
+| Multiclass spellcasting archetypes | No | Only the primary class contributes caster progression |
+
+## Findings
+
+### F1. The daily preparation reminder is not surfaced (P0)
+
+Evidence:
+
+- `CharacterDraft["spells"].preparationsPending` exists in `src/shared/types.ts`.
+- `applyLongRest` sets it for prepared casters in `src/shared/rest.ts`.
+- The campaign long-rest route passes `preparedCaster: isPreparedCasterClass(...)` in `src/server/routes/campaigns.ts`.
+- No client component reads `preparationsPending`. A repository search finds it only in the builder's class reset, normalization, tests, and the campaign simulation.
+
+Impact: A wizard, cleric, druid, witch, magus, necromancer, or animist can long-rest and receive no prompt to prepare spells. The flag is dead state.
+
+Fix: Restore a daily preparations workflow in the sheet and builder. The old `DailyPreparationsModal` from commit `773588f` is a good starting point; it was removed in `f4d23aa`. It already supports prepared copies, rank limits, divine font, and clearing the pending flag. It needs prepared cantrips added and integration with the current sheet's save queue.
+
+### F2. There is no per-character long rest (P0)
+
+Evidence:
+
+- The only rest entry point is `POST /api/campaigns/:id/long-rest`, and it is GM-only (`src/server/routes/campaigns.ts`).
+- `CharacterSheetView` has HP, condition, slot, and focus controls, but no Rest or Daily preparations action.
+- Characters outside a campaign have no rest flow at all.
+
+Impact: A player cannot run their own daily preparations, and a solo/offline character cannot reset slots or focus without manually editing pips. This is the main reason the reminder gap is visible in play.
+
+Fix: Add a Long rest action to the sheet for editors. Preview the existing `applyLongRest` summary (HP, slots, font, focus, conditions), then persist. For prepared casters, open the daily preparations modal immediately after rest, or show a prominent pending banner.
+
+### F3. Prepared cantrips are not modeled (P0/P1)
+
+Evidence:
+
+- `CharacterDraft["spells"]` has one `cantrips` array. There is no prepared-cantrip list.
+- The builder treats every selected cantrip as available (`SpellsStep.tsx`).
+- The sheet's `Cantrips` group uses `draft.spells.cantrips` directly (`CharacterSheetView.tsx`).
+- `spellCastOptions` always returns a cantrip option at `cantripCastRank(level)` (`src/shared/spellcasting.ts`).
+
+Rules: A prepared caster prepares a specific number of cantrips each day; those are then cast at will. A wizard prepares five cantrips plus one curriculum cantrip. A magus prepares five. Cleric, druid, witch, and necromancer prepare five; animist prepares its own number.
+
+Impact: A wizard with 10 spellbook cantrips can cast all 10. The "prepare spells" reminder is incomplete because the most-used spells at low levels are cantrips.
+
+Fix: Add `spells.preparedCantrips: string[]`. Keep `spells.cantrips` as the known list/spellbook/repertoire. For prepared casters, only `preparedCantrips` are castable; for spontaneous casters, `cantrips` remain the repertoire. Add a daily-preparation cantrip section with the correct class cap and the wizard's extra curriculum cantrip.
+
+### F4. Cantrip caps conflate spellbook size and prepared count (P1)
+
+Evidence: `CANTRIP_LIMITS` in `src/shared/rules.ts` uses:
+
+- Wizard: 10
+- Magus: 5
+- Psychic: 3
+
+Rules:
+
+- Wizard: 10 spellbook cantrips, prepares 5 plus 1 curriculum cantrip.
+- Magus: 8 spellbook cantrips, prepares 5.
+- Psychic: 3 regular occult cantrips plus 3 psi cantrips.
+
+Impact: The builder's `Add cantrip` button blocks a magus at 5 known cantrips even though the spellbook should hold 8. The wizard cap is correct for the spellbook but is then used as the castable limit. Psychic's psi cantrips are not represented at all.
+
+Fix: Split `cantripKnownLimitFor(classData)` from `cantripPreparedLimitFor(classData, level)`. Use the known limit for the spellbook/repertoire picker and the prepared limit for the daily list. Handle wizard curriculum and psychic psi cantrips separately.
+
+### F5. Spellbook, known list, and repertoire are one data field (P1)
+
+Evidence:
+
+- `draft.spells.known` is used for both a prepared caster's spellbook and a spontaneous caster's repertoire.
+- The builder switches the label between "spellbook" and "repertoire" but not the behavior (`SpellsStep.tsx`).
+- Cleric, druid, and animist also see "spellbook" labels even though they prepare from a class spell list, not a book.
+- There is no spellbook capacity check for wizard, magus, witch, or necromancer.
+
+Impact: The data model cannot distinguish "in my book" from "I can prepare this today", and class-specific spellbook rules (starting contents, two spells per level, Learn a Spell, familiar) are not enforceable.
+
+Fix: At minimum, introduce labels by class (`spellbook`, `familiar`, `dirge`, `spell list`, `repertoire`) and add prepared cantrips. A full split into `spellbook` vs `prepared` can follow as a migration, but the UI should stop claiming every prepared class has a spellbook.
+
+### F6. Several class resources are missing or hard-coded (P1)
+
+- **Psychic**: `spellRepertoireLimits` excludes psychic, so its repertoire is unlimited. The conscious mind does not grant its 1st-rank spell, two common psi cantrips, and unique psi cantrip. Psi amps, the focus pool increase at Clarity of Focus, and the amp UI are missing.
+- **Necromancer**: no `CLASS_GRANTS` entry for Necrotic Bomb, grim fascination grave spells, or their focus pool. `focusPointsMax` hard-codes 2 for necromancer.
+- **Magus**: no studious spell slots. The spellbook cantrip cap is 5 instead of 8.
+- **Summoner**: no `evolution surge` link spell or `boost eidolon` link cantrip. The link cantrip must not count toward the focus pool.
+- **Animist**: `animistSlots` is a combined total and every slot is treated as prepared. The apparition repertoire and spontaneous apparition slots are not separate.
+- **Wizard**: higher-rank curriculum spells are not granted, so the extra slot is effectively unrestricted at those ranks.
+- **Sorcerer/oracle**: higher-rank bloodline/mystery gifts remain manual.
+- **Cleric**: deity spells stored in `deity.spells` are not resolved or added to the cleric's spell list.
+
+Impact: These classes are usable only with manual bookkeeping. The most visible errors are psychic's missing repertoire limit and cantrips, and animist's prepared/spontaneous mix.
+
+Fix: Treat class completeness as a separate sprint. Start with grants and caps that can be curated from existing class-choice descriptions; avoid a generic parser until the curated path is stable.
+
+### F7. Focus and innate spell attack/DC are wrong (P1)
+
+Evidence:
+
+- `computeCharacter` derives one `spellDc` and one `spellAttack` from the class caster profile (`src/shared/rules.ts`).
+- For a non-caster, both are `null`, even if the character has focus spells or innate spells.
+- The sheet always uses the global spell attack for an attack roll (`CharacterSheetView.tsx`).
+- The global spell DC uses the class spellcasting ability and proficiency, including for innate spells.
+
+Rules: Innate spells use their own attack/DC (trained, expert at 12, usually Charisma). Focus spells from a non-spellcaster use the source's proficiency and tradition. A wizard's innate spell does not use the wizard's Intelligence and master proficiency.
+
+Impact: A monk with ki spells has no focus spell DC or attack. A wizard with an innate spell rolls the wrong attack modifier and shows the wrong DC. A champion is treated as having a spellcasting class feature for prerequisites even though it only has focus spells.
+
+Fix: Add separate derived profiles for class, focus, and innate casting. At minimum expose `focusSpellDc`, `focusSpellAttack`, `innateSpellDc`, and `innateSpellAttack`, and use the row's source in the sheet. Change the "spellcasting class feature" prerequisite check to require spell slots, not focus progression.
+
+### F8. Spontaneous heightening is incomplete (P1)
+
+Evidence:
+
+- `spellCastOptions` offers a spontaneous spell only at its printed rank unless it is a signature spell (`src/shared/spellcasting.ts`).
+- The data model stores `spells.known` as one flat list of spell IDs.
+
+Rules: A spontaneous caster can learn the same spell at multiple ranks. They can cast it at any rank they know it. A signature spell can be freely heightened. They can also use a higher-rank slot to cast a lower-rank spell without heightening it.
+
+Impact: A sorcerer who learns Fireball at 3rd and 5th rank cannot represent both copies. The only workaround is to mark Fireball as a signature spell, which is a different resource and is limited to one spell per rank.
+
+Fix: Add rank-aware known spells, analogous to `preparedByRank`, or a `knownByRank` map. Use it for repertoire limits and cast options. Keep the flat `known` list as a compatibility mirror during migration. Add the "cast at known rank using a higher slot" option later if the table needs it.
+
+### F9. Slot pips and prepared usage can desynchronize (P1)
+
+Evidence:
+
+- The sheet's slot pips update only `spells.slotsUsed`.
+- Casting increments both `spells.slotsUsed` and `spells.preparedUsed` (and font usage).
+- Restoring a pip on the sheet does not restore `preparedUsed`.
+
+Impact: After casting the only prepared copy of a spell, clicking the slot pip back to unused leaves `preparedUsed` at 1. The spell still cannot be cast because the prepared copy is exhausted. The user sees a free slot but no available spell.
+
+Fix: Add an explicit restore/undo action per cast, or store a small daily cast ledger and derive the counters. A ledger is the durable fix; a per-row Restore action is a reasonable sprint-sized fix.
+
+### F10. The sustain subsystem is unused (P2)
+
+`src/shared/sustain.ts` implements `beginSustainedSpell`, `endSustainedSpell`, `sustainedSpellFor`, and a 3-spell limit. No client component imports it. `applyLongRest` clears `play.sustainedSpells`.
+
+Impact: The sheet cannot start or end a sustained spell, and the table has no reminder to spend the Sustain action.
+
+Fix: Add a Sustain control to spell rows that need it, show active sustained spells on the sheet, and surface a turn reminder at the table. This can be a separate table-magic sprint.
+
+### F11. Rituals are a stub (P2)
+
+`src/shared/ritual.ts` can derive a primary-check skill from ritual prose, but nothing calls it. The sheet lists rituals and explicitly excludes them from Cast (`group !== "Rituals"`).
+
+Impact: A ritual is only a link. The sheet does not roll the primary check or track the ritual's cost, secondary casters, or outcome.
+
+Fix: Add a ritual workflow that reads the primary check, lets the player choose the skill and DC, rolls it, and posts to chat. Cost and secondary casters can remain manual.
+
+### F12. Item spellcasting is not modeled (P2)
+
+`src/shared/itemActivation.ts` handles consumables, wands, and staves generically. A scroll is consumed, a wand spends a charge, and a staff is manual. None of them cast the spell, use the character's spell DC, or present heightened options.
+
+Impact: Scrolls, wands, and staves are inventory items rather than spellcasting resources.
+
+Fix: Model item spells with their own cast path and charges. This also gives spontaneous casters a way to use spells outside their repertoire, which is a core part of the item economy.
+
+### F13. Multiclass spellcasting archetypes are not modeled (P2)
+
+`casterInfo` reads only `context.classData`. Spellcasting dedication feats do not add slots, cantrips, or a second tradition.
+
+Impact: A fighter with a wizard dedication has no spell slots or cantrip tracking from the dedication.
+
+Fix: Treat this as a larger rules-engine feature. Add a secondary caster profile per dedication and a separate slot pool. Do not fake it by changing the primary class's progression.
+
+### F14. Spellbook capacity and spell learning are not enforced (P2)
+
+The builder has no starting-spellbook check, no two-spells-per-level accounting, and no Learn a Spell cost. This is lower priority for a table tool because players often import or hand-wave spell acquisition, but it is part of the prepared-caster rules.
+
+## Sprint plan
+
+### Sprint 1 - Daily spellcasting loop (recommended next)
+
+Goal: A prepared caster can rest, be reminded to prepare, choose ranked spells and cantrips, and cast from the correct resources. The loop works on the sheet and in the builder for every prepared class.
+
+Estimated effort: 4-6 focused development days.
+
+#### Task 1. Restore long rest and daily preparations in the sheet
+
+- Restore `src/client/components/DailyPreparationsModal.tsx` from commit `773588f` and adapt it to the current sheet's props and save queue.
+- Add a Long rest action in `CharacterSheetView` for users with `canEdit`.
+- Preview the `applyLongRest` summary, including HP, slots restored, font restored, focus, conditions, and pending preparations.
+- Persist the rest result and immediately open the daily preparations modal for prepared casters.
+- Keep the campaign GM long rest as the party-wide path; add a toast that prepared casters still need to choose spells.
+- Update the builder's "Reset slots" wording so it says spell uses reset on a long rest or daily preparations, not "between sessions".
+
+Acceptance:
+
+- A wizard can rest from the sheet and sees a "Preparations pending" banner.
+- Applying preparations clears `preparationsPending`.
+- A non-prepared caster does not see the preparation prompt.
+- A read-only viewer cannot rest.
+
+#### Task 2. Make pending preparations visible everywhere
+
+- Add an optional `spellPreparationsPending` to `CharacterSummary` and populate it from `draft.spells.preparationsPending`.
+- Show a badge in the party rail and any campaign character list.
+- Show a banner in `SpellsStep` and on the sheet's Spells tab with a direct action.
+- Add a clear "Prepare today's spells" button for prepared casters; use the pending state to make it primary.
+
+Acceptance:
+
+- The pending state survives a reload and appears in the party rail.
+- A GM long rest produces a visible reminder for every prepared character.
+- The reminder disappears after preparations are applied.
+
+#### Task 3. Add prepared cantrips
+
+- Add `spells.preparedCantrips: string[]` to the draft, defaults, normalization, class-change reset, and importer if needed.
+- Add helpers in `src/shared/rules.ts`: known cantrip limit, prepared cantrip limit, legality, add/remove, and a legacy fallback.
+- Builder: show known cantrips and a "Prepared today" selection. Prepared casters can only cast prepared cantrips; spontaneous casters keep the current repertoire behavior.
+- Daily preparations modal: add a cantrip section with the correct class cap. Wizard gets five plus one curriculum cantrip; magus gets five; cleric, druid, witch, and necromancer get five; animist uses its own cap.
+- Sheet: label the prepared-caster group "Prepared cantrips" and hide unprepared spellbook cantrips from the cast list, or show them with no Cast action.
+- Validation: warn when a prepared caster has no prepared cantrips, and reject duplicate or over-cap selections.
+
+Acceptance:
+
+- A wizard with 10 spellbook cantrips can prepare 5 plus 1 curriculum cantrip and only cast those.
+- A magus can hold 8 spellbook cantrips and prepare 5.
+- A spontaneous caster's cantrip behavior is unchanged.
+- Existing drafts still load; legacy cantrip lists default to the known list until the first daily preparation.
+
+#### Task 4. Fix cantrip caps and labels
+
+- Replace the single `CANTRIP_LIMITS` use with separate known and prepared limits.
+- Wizard known limit 10; magus known limit 8; psychic known limit 3 regular cantrips, with psi cantrips as a separate future list.
+- Use class-specific labels: spellbook, familiar, dirge, spell list, repertoire.
+- Update the picker and builder validation to use the known limit, not the prepared limit.
+
+Acceptance:
+
+- The "Add cantrip" button no longer blocks a magus at 5.
+- The builder shows both "in spellbook" and "prepared today" counts for prepared classes.
+- The label matches the class.
+
+#### Task 5. Reconcile cast usage with prepared copies
+
+- Add a Restore/Undo action for a prepared spell cast on the sheet, or add a small daily cast ledger if the implementation stays clean.
+- Restoring a cast must decrement the correct rank's `slotsUsed` and the spell's `preparedUsed`; restore `divineFontUsed` and `fontUsed` for font casts.
+- Ensure the manual slot pips and the per-spell remaining count agree after cast, restore, and reload.
+- Add a unit test for cast, restore, and cast again.
+
+Acceptance:
+
+- After casting the only prepared copy, restoring the slot makes the spell castable again.
+- Font casts restore both the font pool and the font copy count.
+- A reload preserves the reconciled state.
+
+#### Task 6. Verification and documentation
+
+- Unit tests:
+  - Pending flag set/clear behavior.
+  - Prepared cantrip caps and wizard curriculum cantrip.
+  - Cantrip casting only from prepared list.
+  - Slot/prepared restore.
+- E2E:
+  - Wizard long rest from the sheet, pending banner, prepare ranked spells and cantrips, cast.
+  - Cleric long rest, font choice, prepare font and ordinary spells.
+  - Spontaneous caster is not prompted.
+- Campaign simulation:
+  - Party long rest sets pending only for prepared casters.
+  - Applying preparations clears it.
+- Docs: update `README.md` and `docs/ROADMAP.md` so they no longer claim a rest flow that is absent, and describe the new daily loop.
+
+Gate: `npm run check`, `npm run smoke`, `npm run e2e`, and `npm run simulate:campaign`.
+
+### Sprint 2 - Class-specific casting correctness
+
+Goal: Each spellcasting class's signature resource is either automated or explicitly labeled manual.
+
+Tasks:
+
+1. **Focus and innate casting profiles**
+   - Add separate spell attack/DC for class, focus, and innate sources.
+   - Use the correct source in sheet rows and roll buttons.
+   - Fix the "spellcasting class feature" prerequisite to require spell slots, not focus progression.
+   - Add a focus pool increase for Clarity of Focus.
+
+2. **Psychic**
+   - Add psychic to bounded spontaneous repertoire limits.
+   - Curate conscious-mind grants: the 1st-rank spell, two common psi cantrips, and the unique psi cantrip.
+   - Model psi cantrips separately from regular cantrips.
+   - Add amp metadata and an Amp action that spends 1 Focus Point.
+   - Add Clarity of Focus at 5th level.
+
+3. **Necromancer and Magus**
+   - Add Necrotic Bomb and grim fascination grave spells.
+   - Add magus studious spell slots and their specific spell options.
+   - Correct the magus spellbook cantrip cap.
+
+4. **Summoner**
+   - Add `evolution surge` as a focus spell and `boost eidolon` as a link cantrip that does not count toward the focus pool.
+   - Ensure the eidolon choice drives the tradition and any granted spells.
+
+5. **Cleric, Wizard, Sorcerer, Oracle**
+   - Resolve `deity.spells` UUIDs and add deity spells to the cleric's available list.
+   - Curate higher-rank wizard curriculum spells from the arcane-school descriptions.
+   - Curate higher-rank bloodline and mystery gifts, or keep them explicit manual notes.
+
+6. **Animist**
+   - Separate prepared animist slots from spontaneous apparition slots.
+   - Add apparition attunement and the apparition repertoire.
+   - If the full split is too large, label the current combined tracker as manual and prevent it from implying that all slots are prepared.
+
+7. **Spontaneous known-at-rank**
+   - Add `knownByRank` (or a rank-aware known list) and migrate the flat list.
+   - Use it for repertoire limits, cast options, and signature validation.
+   - Add an option to cast a lower-rank known spell using a higher slot without heightening.
+
+### Sprint 3 - Table magic depth
+
+Goal: Spells are usable at the table beyond the cast button.
+
+Tasks:
+
+1. **Sustain**
+   - Add Start/End Sustain controls to relevant spell rows.
+   - Show active sustained spells and a turn reminder to spend the Sustain action.
+   - Clear sustained spells on rest (already done in `applyLongRest`).
+
+2. **Rituals**
+   - Add a ritual workflow that reads the primary check, rolls the chosen skill, and posts the result.
+   - Keep cost, secondary casters, and consequences manual but visible.
+
+3. **Item spellcasting**
+   - Cast from scrolls, wands, and staves with the correct charges and DC.
+   - Consume scrolls; track wand and staff charges; respect daily preparations.
+
+4. **Spellbook and learning**
+   - Add starting spellbook contents and two-spells-per-level accounting.
+   - Add Learn a Spell downtime cost and a way to add a found scroll to the book.
+
+5. **Multiclass spellcasting**
+   - Add a secondary caster profile for spellcasting dedication feats.
+   - Keep the primary class and dedication slots separate.
+
+## Decisions to make before Sprint 1
+
+1. **Prepared cantrip legacy behavior**: default old drafts to all known cantrips until the first daily preparation, or immediately require a legal prepared list? Recommendation: legacy fallback, then materialize on first apply.
+2. **Cleric/druid spell access**: keep the current `known` shortlist as a practical filter, or add a full class-list picker for daily preparation? Recommendation: keep the shortlist for Sprint 1; revisit with the spellbook split.
+3. **Cast ledger vs. per-row restore**: a ledger is more correct but larger. Recommendation: per-row restore in Sprint 1; ledger if the team wants undo history.
+4. **Animist scope**: a true prepared/spontaneous split is a larger rules-engine task. Recommendation: Sprint 2, not Sprint 1.
+5. **Archetype spellcasting**: confirm whether multiclass dedications are in scope for the next few sprints or stay manual.
+
+## Rules references
+
+- Prepared Spells: <https://2e.aonprd.com/Rules.aspx?ID=271>
+- Spontaneous Spells: <https://2e.aonprd.com/Rules.aspx?ID=272>
+- Heightened Spells: <https://2e.aonprd.com/Rules.aspx?ID=273>
+- Heightened Spontaneous Spells: <https://2e.aonprd.com/Rules.aspx?ID=274>
+- Cantrips: <https://2e.aonprd.com/Rules.aspx?ID=275>
+- Focus Spells: <https://2e.aonprd.com/Rules.aspx?ID=276>
+- Spellcasters with Focus Spells: <https://2e.aonprd.com/Rules.aspx?ID=277>
+- Non-Spellcasters with Focus Spells: <https://2e.aonprd.com/Rules.aspx?ID=278>
+- Innate Spells: <https://2e.aonprd.com/Rules.aspx?ID=279>
+- Daily Preparations: <https://2e.aonprd.com/Rules.aspx?ID=536>
+- Rest and Daily Preparations: <https://2e.aonprd.com/Rules.aspx?ID=2443>
+- Wizard: <https://2e.aonprd.com/Classes.aspx?ID=39>
+- Magus: <https://2e.aonprd.com/Classes.aspx?ID=17>
+- Psychic: <https://2e.aonprd.com/Classes.aspx?ID=21>
+- Sorcerer: <https://2e.aonprd.com/Classes.aspx?ID=62>
+- Summoner: <https://2e.aonprd.com/Classes.aspx?ID=18>
