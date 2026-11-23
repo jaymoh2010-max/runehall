@@ -113,7 +113,7 @@ import {
   rulesetIncludesLegacy,
   rulesetLabel,
 } from "../../../../shared/content";
-import { summarizeRunes } from "../../../../shared/runes";
+import { summarizeRunes, runeUsageForTarget } from "../../../../shared/runes";
 import type { BuilderProps } from "../shared";
 import { StepHeading, ValidationNote, SearchInput, MiniFeatureList } from "../shared";
 
@@ -233,11 +233,13 @@ export function GearStep({
           const attachedRunes = (entry.runes ?? [])
             .map((id) => context.equipment[id])
             .filter((rune): rune is Equipment => Boolean(rune));
-          const canHaveRunes = Boolean(item.weapon || item.armor || item.shield);
+          const runeTarget = runeUsageForTarget(item);
+          const weaponRunes = runeTarget === "etched-onto-a-weapon";
+          const canHaveRunes = Boolean(runeTarget);
           return (
             <div key={entry.itemId} className="equipment-row">
               <div className="equipment-icon">
-                {item.weapon ? (
+                {item.weapon || /handwraps/i.test(item.name) ? (
                   <Swords size={18} />
                 ) : item.armor || item.shield ? (
                   <Shield size={18} />
@@ -258,8 +260,8 @@ export function GearStep({
                   {item.weapon ? ` · ${weaponDamageLabel(item.weapon)}` : ""}
                   {item.armor ? ` · +${item.armor.acBonus} AC · Dex cap +${item.armor.dexCap}` : ""}
                   {item.shield ? ` · +${item.shield.acBonus} AC shield` : ""}
-                  {item.weapon && runes.weaponPotency ? ` · +${runes.weaponPotency} potency` : ""}
-                  {item.weapon && runes.strikingDice > 1
+                  {weaponRunes && runes.weaponPotency ? ` · +${runes.weaponPotency} potency` : ""}
+                  {weaponRunes && runes.strikingDice > 1
                     ? ` · ${runes.strikingDice} damage dice`
                     : ""}
                   {item.armor && runes.armorPotency

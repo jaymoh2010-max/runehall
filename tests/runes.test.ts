@@ -3,8 +3,10 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   attachRuneIds,
+  isHandwrapsOfMightyBlows,
   propertyRuneSlots,
   runeCategory,
+  runeUsageForTarget,
   shieldRuneBonus,
   strikingDiceForRune,
 } from "../src/shared/runes";
@@ -40,6 +42,13 @@ describe("rune helpers", () => {
     const withProperty = attachRuneIds(upgraded, flaming, map);
     expect(withProperty).toEqual([potency2.id, flaming.id]);
     expect(propertyRuneSlots(withProperty, map)).toBe(2);
+  });
+
+  it("treats handwraps of mighty blows as a weapon rune target", () => {
+    const handwraps = byName("Handwraps of Mighty Blows");
+    expect(isHandwrapsOfMightyBlows(handwraps)).toBe(true);
+    expect(runeUsageForTarget(handwraps)).toBe("etched-onto-a-weapon");
+    expect(runeUsageForTarget(byName("Chain Mail"))).toBe("etched-onto-armor");
   });
 
   it("parses reinforcing rune durability and recognizes its category", () => {

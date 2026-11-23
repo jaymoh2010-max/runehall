@@ -1,5 +1,6 @@
 import type { Equipment, Feat } from "./types";
 import { featChoice, featEffect, featGrant, itemEffect } from "./effects";
+import { isHandwrapsOfMightyBlows } from "./runes";
 
 export type AutomationLevel = "full" | "partial" | "manual";
 
@@ -51,6 +52,7 @@ export function automationForFeat(feat: Feat): AutomationInfo {
       Boolean(effect.untrainedImprovisation) ||
       Boolean(effect.armorProficiency) ||
       Boolean(effect.weaponProficiency) ||
+      Boolean(effect.specificWeaponProficiency?.length) ||
       Boolean(effect.investedLimit) ||
       Boolean(effect.ignoreArmorSpeedPenalty) ||
       Boolean(effect.speedPenaltyReduction) ||
@@ -121,6 +123,13 @@ export function automationForEquipment(item: Equipment): AutomationInfo {
     return {
       level: "full",
       reason: "Base weapon, armor, or shield math is applied to the sheet.",
+    };
+  }
+  if (isHandwrapsOfMightyBlows(item)) {
+    return {
+      level: "partial",
+      reason:
+        "Rune bonuses apply to your unarmed strikes when the handwraps are equipped and invested; activated effects may need tracking.",
     };
   }
   if (item.weapon || item.armor || item.shield) {

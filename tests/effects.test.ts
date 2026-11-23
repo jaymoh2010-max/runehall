@@ -3,7 +3,9 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { automationForFeat } from "../src/shared/automation";
 import {
+  FEAT_CHOICES,
   FEAT_EFFECTS,
+  FEAT_GRANTS,
   collectFeatChoiceEffects,
   collectFeatEffects,
   featChoice,
@@ -43,6 +45,8 @@ const cannyAcumen = byName(feats, "Canny Acumen");
 const additionalLore = byName(feats, "Additional Lore");
 const armorProficiency = byName(feats, "Armor Proficiency");
 const weaponProficiency = byName(feats, "Weapon Proficiency");
+const clanPistolFeat = byName(feats, "Clan Pistol");
+const hellspawn = byName(feats, "Hellspawn");
 const nimbleElf = byName(feats, "Nimble Elf");
 const elvenInstincts = byName(feats, "Elven Instincts");
 const incredibleInvestiture = byName(feats, "Incredible Investiture");
@@ -54,6 +58,7 @@ const wizard = byName(classes, "Wizard");
 const rogue = byName(classes, "Rogue");
 const aldori = byName(equipment, "Aldori Dueling Sword");
 const fullPlate = byName(equipment, "Full Plate");
+const clanPistol = byName(equipment, "Clan Pistol");
 
 function fighterDraft() {
   const draft = emptyCharacterDraft("Effects Fighter");
@@ -154,6 +159,13 @@ describe("curated feat effects", () => {
       ignoreArmorSpeedPenalty: true,
       speedPenaltyReduction: 5,
     });
+    for (const id of [
+      ...Object.keys(FEAT_EFFECTS),
+      ...Object.keys(FEAT_CHOICES),
+      ...Object.keys(FEAT_GRANTS),
+    ]) {
+      expect(feats.some((feat) => feat.id === id)).toBe(true);
+    }
   });
 
   it("labels curated feats as fully automated", () => {
@@ -268,6 +280,30 @@ describe("curated feat effects", () => {
     );
     expect(withoutFeat.speed).toBe(15);
     expect(withFeat.speed).toBe(20);
+  });
+
+  it("trains a specific weapon with Clan Pistol", () => {
+    const draft = wizardDraft();
+    draft.equipment = [{ itemId: clanPistol.id, quantity: 1, equipped: true }];
+    const items = { [clanPistol.id]: clanPistol };
+    const baseline = computeCharacter(draft, { ...wizardContext({}), equipment: items });
+    const applied = computeCharacter(draft, {
+      ...wizardContext({ [clanPistolFeat.id]: clanPistolFeat }),
+      equipment: items,
+    });
+    expect(baseline.prof.attacks["weapon-base-clan-pistol"] ?? 0).toBe(0);
+    expect(applied.prof.attacks["weapon-base-clan-pistol"]).toBe(1);
+    const baselineAttack = baseline.attacks.find((attack) => attack.name === "Clan Pistol");
+    const featAttack = applied.attacks.find((attack) => attack.name === "Clan Pistol");
+    expect(featAttack?.attackBonus).toBeGreaterThan(baselineAttack?.attackBonus ?? 0);
+    expect(automationForFeat(clanPistolFeat).level).toBe("partial");
+  });
+
+  it("applies Hellspawn's trained skill and Legal Lore", () => {
+    const applied = computeCharacter(wizardDraft(), wizardContext({ [hellspawn.id]: hellspawn }));
+    expect(applied.skills.find((skill) => skill.id === "deception")?.trained).toBe(true);
+    expect(applied.lore.find((lore) => lore.name === "Legal Lore")?.rank).toBe(1);
+    expect(automationForFeat(hellspawn).level).toBe("partial");
   });
 
   it("applies a choice-driven feat to the chosen proficiency", () => {

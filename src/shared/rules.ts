@@ -29,7 +29,12 @@ import {
   type PreparedSpellsByRank,
   type ValidationIssue,
 } from "./types";
-import { propertyRuneDamage, shieldRuneBonus, summarizeRunes } from "./runes";
+import {
+  isHandwrapsOfMightyBlows,
+  propertyRuneDamage,
+  shieldRuneBonus,
+  summarizeRunes,
+} from "./runes";
 import { conditionModifiers } from "./conditions";
 import { normalizeAfflictions } from "./afflictions";
 import { normalizePersistentDamageList } from "./persistentDamage";
@@ -1623,6 +1628,12 @@ export function grantedTrainedSkills(
     []) {
     out.add(skill);
   }
+  const activeFeatIds = Object.keys(context.feats);
+  const featEffects = mergeEffects([
+    collectFeatEffects(activeFeatIds),
+    collectFeatChoiceEffects(draft.featChoices, activeFeatIds, draft.level),
+  ]);
+  for (const skill of featEffects.trainedSkills ?? []) out.add(skill);
 
   for (const group of context.background?.skillChoices ?? []) {
     for (const skill of draft.skills.background) {
@@ -2742,6 +2753,10 @@ export function computeCharacter(
       }
     }
   }
+  for (const weaponName of featMods.specificWeaponProficiency ?? []) {
+    const key = `weapon-base-${weaponSlug(weaponName)}`;
+    prof.attacks[key] = Math.max(prof.attacks[key] ?? 0, 1);
+  }
   const itemMods = collectItemEffects(
     draft.equipment
       .filter((entry) => {
@@ -3468,23 +3483,45 @@ export function computeCharacter(
   }
   const deityFist =
     context.deity?.weapons.some((weapon) => /^(fist|unarmed)/i.test(weapon)) ?? false;
+  const handwrapsEntry =
+    draft.equipment.find((entry) => {
+      if (!entry.equipped || !entry.invested) return false;
+      return isHandwrapsOfMightyBlows(context.equipment[entry.itemId]);
+    }) ?? null;
+  const handwrapsRunes = summarizeRunes(handwrapsEntry?.runes, context.equipment);
   const fistRank = Math.max(
     prof.attacks.unarmed ?? 0,
     deityFist ? (prof.attacks.favoredWeapon ?? 0) : 0
   );
   const fistAbilityKey: AbilityKey = abilityMods.dex > abilityMods.str ? "dex" : "str";
+  const fistPotency = Math.max(handwrapsRunes.weaponPotency, abp.attack);
   const fistAttack =
     proficiencyBonus(fistRank, draft.level) +
     Math.max(abilityMods.str, abilityMods.dex) +
-    abp.attack +
+    fistPotency +
     conditionEffects.checks[fistAbilityKey] +
     conditionEffects.attackCircumstance;
   const fistDamage =
     abilityMods.str + weaponSpecializationBonus(activeFeatures, fistRank) + conditionEffects.damage;
+  const unarmedStriking = Math.max(handwrapsRunes.strikingDice, abp.damageDice);
   const unarmedBase = bumpDamageDice(
     classData?.name.toLowerCase() === "monk" ? monkUnarmedDamage(draft.level) : "1d4",
-    abp.damageDice
+    unarmedStriking
   );
+  const fistExtraDamage = classSituationalDamage(classData, draft.level, false, {
+    unarmed: true,
+    choices: chosenOptions.map((option) => option.name),
+  });
+  for (const rune of handwrapsRunes.property) {
+    const damage = propertyRuneDamage(rune);
+    if (damage) fistExtraDamage.push(damage);
+  }
+  const fistNotes = [
+    "Nonlethal",
+    fistPotency ? `+${fistPotency} attack potency` : "",
+    unarmedStriking > 1 ? `${unarmedStriking} damage dice` : "",
+    ...handwrapsRunes.property.map((rune) => rune.name),
+  ].filter(Boolean);
   attacks.push({
     id: "unarmed:fist",
     name: classData?.name.toLowerCase() === "monk" ? "Unarmed strike" : "Fist",
@@ -3493,14 +3530,11 @@ export function computeCharacter(
     attackFormula: `1d20${signed(fistAttack)}`,
     damageFormula: fistDamage === 0 ? unarmedBase : `${unarmedBase}${signed(fistDamage)}`,
     damageType: "bludgeoning",
-    extraDamage: classSituationalDamage(classData, draft.level, false, {
-      unarmed: true,
-      choices: chosenOptions.map((option) => option.name),
-    }),
+    extraDamage: fistExtraDamage,
     traits: ["agile", "finesse", "nonlethal", "unarmed"],
     hands: 1,
     ranged: false,
-    notes: "Nonlethal",
+    notes: fistNotes.join(" · "),
   });
 
   // --- Spells --------------------------------------------------------------

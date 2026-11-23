@@ -21,8 +21,12 @@ const EMPTY_EFFECTS: RuneEffects = {
   shield: [],
 };
 
+export function isHandwrapsOfMightyBlows(item: Equipment | null | undefined): boolean {
+  return /handwraps of mighty blows/i.test(item?.name ?? "");
+}
+
 export function runeUsageForTarget(item: Equipment | null | undefined): string | null {
-  if (item?.weapon) return "etched-onto-a-weapon";
+  if (item?.weapon || isHandwrapsOfMightyBlows(item)) return "etched-onto-a-weapon";
   if (item?.armor) return "etched-onto-armor";
   if (item?.shield) return "etched-onto-a-shield";
   return null;
