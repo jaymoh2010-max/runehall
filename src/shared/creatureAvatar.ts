@@ -1,7 +1,89 @@
+import type { Monster } from "./types";
+
 /**
- * Procedural fallback portraits for creature tokens. The bestiary has no
- * artwork, so every unlinked token gets a deterministic face based on its
- * monster id or name. Uploaded art always wins.
+ * Map bestiary creatures to the bundled game-icons.net archetype art. The
+ * SVGs are white-on-transparent, so the token's dark disc shows through.
+ */
+export function creatureAvatarUrl(monster: Pick<Monster, "name" | "traits">): string {
+  const traits = new Set(monster.traits.map((trait) => trait.toLowerCase()));
+  const name = monster.name.toLowerCase();
+  const has = (...values: string[]) => values.some((value) => traits.has(value));
+  const named = (...values: string[]) => values.some((value) => name.includes(value));
+  const icon = (slug: string) => `/tokens/creature/${slug}.svg`;
+
+  if (has("hydra") || named("hydra")) return icon("hydra");
+  if (has("dragon", "wyvern") || named("dragon", "wyvern", "drake")) return icon("dragon");
+  if (has("troll") || named("troll")) return icon("troll");
+  if (has("werewolf", "lycanthrope") || named("werewolf", "lycanthrope")) return icon("werewolf");
+  if (has("bat") || named("bat")) return icon("bat");
+  if (has("vampire") || named("vampire")) return icon("vampire");
+  if (has("mummy") || named("mummy")) return icon("mummy");
+  if (has("skeleton") || named("skeleton")) return icon("skeleton");
+  if (has("ghost", "spectre", "wraith", "incorporeal") || named("ghost", "wraith", "spectre")) {
+    return icon("ghost");
+  }
+  if (has("undead", "zombie", "lich") || named("zombie", "lich")) return icon("undead");
+
+  if (has("fiend", "demon", "devil", "daemon") || named("demon", "devil", "fiend")) {
+    return icon("fiend");
+  }
+  if (has("celestial", "angel", "archon", "azata") || named("angel", "archon", "azata")) {
+    return icon("celestial");
+  }
+  if (has("fey", "fairy", "sprite") || named("fey", "fairy", "sprite")) return icon("fey");
+
+  if (has("giant", "ogre", "cyclops", "titan") || named("giant", "ogre", "cyclops", "titan")) {
+    return icon("giant");
+  }
+  if (has("construct", "golem", "clockwork", "automaton") || named("golem", "construct")) {
+    return icon("construct");
+  }
+
+  if (has("fire") || named("fire", "flame", "inferno")) return icon("elemental-fire");
+  if (has("water") || named("water", "tide", "wave")) return icon("elemental-water");
+  if (has("earth", "stone") || named("earth", "stone")) return icon("elemental-earth");
+  if (has("air", "wind") || named("air", "wind")) return icon("elemental-air");
+  if (has("ice", "cold") || named("ice", "frost", "cold")) return icon("elemental-ice");
+  if (has("electricity", "lightning") || named("lightning", "thunder")) {
+    return icon("elemental-lightning");
+  }
+  if (has("elemental") || named("elemental")) return icon("elemental-fire");
+
+  if (has("ooze", "slime") || named("ooze", "slime")) return icon("ooze");
+  if (has("fungus", "mushroom") || named("fungus", "mushroom", "leshy")) return icon("fungus");
+  if (has("plant", "tree") || named("plant", "tree", "vine")) return icon("plant");
+  if (has("aberration", "tentacle") || named("aberration", "tentacle")) return icon("aberration");
+  if (has("swarm") || named("swarm")) return icon("swarm");
+  if (has("insect") || named("insect", "beetle", "wasp", "ant")) return icon("insect");
+  if (has("spider", "arachnid", "vermin") || named("spider", "arachnid")) return icon("vermin");
+  if (has("aquatic", "fish", "shark", "amphibious") || named("fish", "shark", "kraken", "squid")) {
+    return icon("aquatic");
+  }
+  if (has("snake", "serpent") || named("snake", "cobra", "viper", "serpent")) return icon("snake");
+  if (has("reptile", "lizard") || named("lizard", "sauropod", "dinosaur")) return icon("reptile");
+
+  if (has("minotaur") || named("minotaur")) return icon("minotaur");
+  if (has("harpy") || named("harpy")) return icon("harpy");
+  if (has("unicorn") || named("unicorn")) return icon("unicorn");
+  if (has("griffin", "griffon") || named("griffin", "griffon")) return icon("griffin");
+
+  if (has("goblin") || named("goblin")) return icon("goblin");
+  if (has("orc") || named("orc")) return icon("orc");
+  if (has("dwarf") || named("dwarf")) return icon("dwarf");
+  if (has("elf") || named("elf")) return icon("elf");
+  if (has("humanoid", "human") || named("human")) return icon("humanoid");
+
+  if (named("bear")) return icon("bear");
+  if (named("boar", "pig")) return icon("boar");
+  if (named("bird", "eagle", "hawk", "raven", "crow", "owl")) return icon("bird");
+  if (has("animal", "beast") || named("wolf", "hound", "cat", "beast")) return icon("beast");
+
+  return icon("default");
+}
+
+/**
+ * Procedural fallback for unlinked tokens that are not bestiary creatures
+ * (custom markers, NPCs without a monster id, and so on).
  */
 function hashString(value: string): number {
   let hash = 2166136261;

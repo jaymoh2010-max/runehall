@@ -9,7 +9,7 @@ import {
 import { api } from "../../api";
 import { errorMessage } from "../../stores";
 import { stripHtml } from "../../../shared/compendium";
-import { creatureAvatarDataUrl } from "../../../shared/creatureAvatar";
+import { creatureAvatarUrl } from "../../../shared/creatureAvatar";
 import { Button, Field, IconButton, Input, Select, Spinner } from "../ui";
 import { HoverCard } from "../HoverCard";
 import { BESTIARY_DRAG_TYPE, type BestiaryDragPayload } from "./bestiaryDrag";
@@ -164,11 +164,7 @@ export function BestiaryPalette({
                   }}
                 >
                   <GripVertical size={13} className="muted" />
-                  <img
-                    className="vtt-bestiary-avatar"
-                    src={creatureAvatarDataUrl(adjusted.name, adjusted.id)}
-                    alt=""
-                  />
+                  <img className="vtt-bestiary-avatar" src={creatureAvatarUrl(adjusted)} alt="" />
                   <span className="vtt-bestiary-mark">L{adjusted.level}</span>
                   <span className="grow">
                     <strong>{adjusted.name}</strong>

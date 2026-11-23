@@ -17,7 +17,7 @@ A second pass over the manual-first table after the first audit remediation, foc
 - **Condition entry autocompletes from the compendium.** Both the sheet Status tab and the table token panel use a shared cached PF2e condition list.
 - **Creature HP and AC are GM-only.** Unlinked creature tokens are redacted in table snapshots and token broadcasts. Linked character tokens keep party HP/AC. The token panel and map also hide creature defenses defensively.
 - **Token art uploads are available to owners and the GM.** Players can upload art for their own token; the GM can upload for any token. Player-supplied URLs are restricted to uploaded assets, while the GM retains the URL field.
-- **Creature tokens have default portraits.** Any unlinked creature token without custom art gets a deterministic procedural face based on its monster id or name. The bestiary list shows the same avatar.
+- **Creature tokens have default portraits.** Any unlinked creature token without custom art gets an archetype icon based on its bestiary traits. The bestiary list shows the same avatar. The icon set is CC BY 3.0 from Game-icons.net; see `public/tokens/creature/ATTRIBUTION.md`.
 - **The token panel header uses generated creature art.** The 40px avatar now matches the token on the map.
 
 ## Verification
@@ -33,5 +33,5 @@ A second pass over the manual-first table after the first audit remediation, foc
 
 - Token owner reassignment and temp-HP editing still use the character sheet rather than the token panel.
 - Legacy campaign render blocks remain bundled even though legacy tab URLs redirect to the table.
-- Default creature portraits are procedural placeholders. Curated art can replace them later without changing token data.
+- Default creature portraits are curated CC BY 3.0 archetype icons. Curated per-monster art can replace them later without changing token data.
 - `npm audit` remains a manual periodic check; production dependencies currently report zero vulnerabilities.

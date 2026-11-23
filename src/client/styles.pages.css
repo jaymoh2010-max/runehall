@@ -7220,7 +7220,8 @@
   border: 1px solid var(--line);
   border-radius: 6px;
   object-fit: cover;
-  background: #0b1017;
+  background: radial-gradient(circle at 50% 30%, rgba(176, 103, 103, 0.45), #0b1017 72%);
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.6));
 }
 .vtt-bestiary-row .grow {
   display: flex;
@@ -7377,6 +7378,12 @@
   object-fit: cover;
   border-radius: 50%;
   pointer-events: none;
+}
+.scene-token img.is-default-token-art {
+  padding: 14%;
+  object-fit: contain;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.75));
+  opacity: 0.95;
 }
 .scene-token > span:first-child {
   width: 100%;

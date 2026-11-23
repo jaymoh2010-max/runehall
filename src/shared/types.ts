@@ -1793,6 +1793,8 @@ export interface Token {
   sceneId: string;
   name: string;
   imageUrl: string | null;
+  /** Server-provided archetype art when no custom image is set. */
+  defaultImageUrl?: string | null;
   characterId: string | null;
   /** Bestiary source for an unlinked monster token, used for defenses. */
   monsterId?: string | null;

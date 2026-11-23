@@ -23,7 +23,7 @@ Four campaign sections:
 - Built-in maps plus custom uploads.
 - Fog of war, distance measuring, pointer pings, and player presence.
 - Tokens for party characters, monsters, and custom markers. Players can upload art for their own token; the GM can upload art for any token.
-- Bestiary creatures get deterministic procedural fallback portraits when no custom art is uploaded.
+- Bestiary creatures get CC BY 3.0 archetype icons from Game-icons.net when no custom art is uploaded; see `public/tokens/creature/ATTRIBUTION.md`.
 - A compact token panel for HP, AC, conditions, visibility, locks, and sheet access. Creature HP/AC is GM-only; linked party characters keep their shared stats.
 - Condition fields autocomplete from the PF2e condition database.
 - **Manual initiative order**: roll the scene or add combatants by hand, type a total, reorder, set the active combatant, and step next/previous. Nothing ticks or resolves automatically.

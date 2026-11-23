@@ -80,6 +80,7 @@ export function TokenQuickPanel({
   const avatarSrc =
     token.imageUrl ??
     character?.summary?.portraitUrl ??
+    token.defaultImageUrl ??
     (token.characterId ? null : creatureAvatarDataUrl(token.name, token.monsterId ?? token.name));
 
   const setHp = (value: number) => {

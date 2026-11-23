@@ -1173,11 +1173,13 @@ export function SceneCanvas({
         {tokens.map((token) => {
           const size = token.size * scene.gridSize;
           const position = dragPosition(token);
+          const defaultArt =
+            !token.imageUrl && !token.characterId ? (token.defaultImageUrl ?? null) : null;
           const portrait =
             token.imageUrl ||
             (token.characterId
               ? portraitMap.get(token.characterId)
-              : creatureAvatarDataUrl(token.name, token.monsterId ?? token.name));
+              : (defaultArt ?? creatureAvatarDataUrl(token.name, token.monsterId ?? token.name)));
           const canDrag = isGm || (token.ownerId === userId && !token.locked);
           const isSelected = selectedTokenIds.includes(token.id) || selectedTokenId === token.id;
           const showCreatureStats = canSeeCreatureStats(token, isGm);
@@ -1250,6 +1252,11 @@ export function SceneCanvas({
                   left: position.x - size / 2,
                   top: position.y - size / 2,
                   borderColor: token.color,
+                  ...(defaultArt
+                    ? {
+                        background: `radial-gradient(circle at 50% 32%, ${token.color}99, #0d121a 72%)`,
+                      }
+                    : {}),
                 }}
                 onPointerDown={(event) => onTokenPointerDown(event, token)}
                 onPointerMove={(event) => onTokenPointerMove(event, token)}
@@ -1278,7 +1285,12 @@ export function SceneCanvas({
                 }${isGm ? ", right-click to edit" : ""}`}
               >
                 {portrait ? (
-                  <img src={portrait} alt="" draggable={false} />
+                  <img
+                    src={portrait}
+                    alt=""
+                    draggable={false}
+                    className={defaultArt ? "is-default-token-art" : undefined}
+                  />
                 ) : (
                   <span
                     aria-hidden="true"

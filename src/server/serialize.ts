@@ -92,6 +92,8 @@ import {
 import { parseJson } from "./util";
 import { pendingJoinRequestCount, type JoinRequestViewRow } from "./access";
 import { bumpCampaign } from "./revisions";
+import { monsters } from "./compendium";
+import { creatureAvatarUrl } from "../shared/creatureAvatar";
 import { normalizeTokenConditions } from "../shared/tokens";
 import { normalizeAoeTemplates } from "../shared/templates";
 import { normalizeGolarionDate } from "../shared/calendar";
@@ -117,6 +119,8 @@ import {
 } from "../shared/people";
 import { normalizeChapterLevel, normalizeChapterStatus } from "../shared/chapters";
 import { isCampaignRequestKind, isCampaignRequestStatus } from "../shared/requests";
+
+const monsterById = new Map(monsters.map((monster) => [monster.id, monster]));
 
 export function serializeCampaignSummary(
   campaign: CampaignRow,
@@ -448,11 +452,13 @@ export function serializeSceneForPlayers(row: SceneRow): Scene {
 }
 
 export function serializeToken(row: TokenRow, ownerName?: string): Token {
+  const monster = row.monster_id ? (monsterById.get(row.monster_id) ?? null) : null;
   return {
     id: row.id,
     sceneId: row.scene_id,
     name: row.name,
     imageUrl: row.image_url,
+    defaultImageUrl: monster ? creatureAvatarUrl(monster) : null,
     characterId: row.character_id,
     monsterId: row.monster_id ?? null,
     ownerId: row.owner_id,
