@@ -252,42 +252,6 @@ export function TokenQuickPanel({
         ) : null}
       </div>
 
-      {canManage ? (
-        <div className="core-token-art">
-          <input
-            ref={imageInputRef}
-            type="file"
-            accept="image/*"
-            hidden
-            onChange={(event) => {
-              const file = event.target.files?.[0];
-              event.target.value = "";
-              void uploadArt(file);
-            }}
-          />
-          <Button
-            size="sm"
-            variant="secondary"
-            icon={<ImagePlus size={14} />}
-            loading={imageBusy}
-            onClick={() => imageInputRef.current?.click()}
-          >
-            Upload image
-          </Button>
-          {token.imageUrl ? (
-            <Button
-              size="sm"
-              variant="ghost"
-              disabled={imageBusy}
-              onClick={() => onUpdate({ imageUrl: null })}
-            >
-              Default art
-            </Button>
-          ) : null}
-          {imageError ? <span className="core-token-error">{imageError}</span> : null}
-        </div>
-      ) : null}
-
       {isGm ? (
         <details className="core-token-edit">
           <summary>Edit token</summary>
@@ -324,6 +288,40 @@ export function TokenQuickPanel({
       ) : null}
 
       <div className="core-token-actions">
+        {canManage ? (
+          <>
+            <input
+              ref={imageInputRef}
+              type="file"
+              accept="image/*"
+              hidden
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                event.target.value = "";
+                void uploadArt(file);
+              }}
+            />
+            <Button
+              size="sm"
+              variant="secondary"
+              icon={<ImagePlus size={14} />}
+              loading={imageBusy}
+              onClick={() => imageInputRef.current?.click()}
+            >
+              Upload image
+            </Button>
+            {token.imageUrl ? (
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={imageBusy}
+                onClick={() => onUpdate({ imageUrl: null })}
+              >
+                Default art
+              </Button>
+            ) : null}
+          </>
+        ) : null}
         {character ? (
           <Button
             size="sm"
@@ -335,9 +333,9 @@ export function TokenQuickPanel({
           </Button>
         ) : null}
         {isGm ? (
-          <Button size="sm" variant="ghost" icon={<Dices size={14} />} onClick={onAddToInitiative}>
-            Add to initiative
-          </Button>
+          <IconButton label="Add to initiative" onClick={onAddToInitiative}>
+            <Dices size={14} />
+          </IconButton>
         ) : null}
         {isGm ? (
           <>
@@ -358,6 +356,7 @@ export function TokenQuickPanel({
             </IconButton>
           </>
         ) : null}
+        {imageError ? <span className="core-token-error">{imageError}</span> : null}
       </div>
     </aside>
   );
