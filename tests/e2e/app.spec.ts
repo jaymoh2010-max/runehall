@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
+import { currencyToCp } from "../../src/shared/inventory";
 
 test.describe.configure({ mode: "serial" });
 
@@ -344,6 +345,13 @@ test("sheet item browser filters by category, subtype, and level", async ({ page
   await expect(page.locator(".pb-item-row").filter({ hasText: "Longsword" })).toHaveCount(0, {
     timeout: 15_000,
   });
+
+  await page.getByLabel("Item level").selectOption("all");
+  await categories.getByRole("button", { name: "Runes", exact: true }).click();
+  await page.getByPlaceholder("Search the item database").fill("Striking");
+  const rune = page.locator(".pb-item-row").filter({ hasText: "Striking" }).first();
+  await expect(rune).toBeVisible({ timeout: 15_000 });
+  await expect(rune.locator(".pb-item-name span")).toContainText("Rune");
 
   await page.getByRole("button", { name: "Reset item filters" }).click();
   await expect(page.getByPlaceholder("Search the item database")).toHaveValue("");
@@ -690,6 +698,137 @@ test("players buy gear and only grant it when the GM allows", async ({ page, bro
   await expect(checkRow).toBeVisible({ timeout: 15_000 });
   await expect(checkRow.getByRole("button", { name: "Grant" })).toHaveCount(0);
   await checkContext.close();
+});
+
+test("GM awards gold to the party and an item to one hero", async ({ page }) => {
+  test.setTimeout(60_000);
+  await signIn(page, admin);
+  const campaignId = campaignPath.split("/").pop();
+  const listResponse = await page.request.get(`/api/characters?campaignId=${campaignId}`);
+  const list = (await listResponse.json()) as {
+    characters: {
+      id: string;
+      name: string;
+      data: {
+        currency: { gp: number; sp: number; cp: number };
+        equipment: { itemId: string; quantity: number }[];
+      };
+    }[];
+  };
+  const characters = list.characters;
+  const beforeCp = new Map(
+    characters.map((character) => [character.id, currencyToCp(character.data.currency)])
+  );
+  const playerHero = characters.find((character) => character.name === "Pathbuilder E2E Hero");
+  expect(playerHero).toBeTruthy();
+  const backpackResponse = await page.request.get(`/api/compendium/equipment?q=Backpack&limit=10`);
+  const backpackItems = (await backpackResponse.json()) as {
+    items: { id: string; name: string }[];
+  };
+  const backpack = backpackItems.items.find((item) => item.name === "Backpack");
+  expect(backpack).toBeTruthy();
+  const beforeBackpacks =
+    playerHero!.data.equipment.find((entry) => entry.itemId === backpack!.id)?.quantity ?? 0;
+
+  await page.goto(`${campaignPath}?tab=party`);
+  await page.getByRole("button", { name: "Award treasure" }).click();
+  const awardDialog = page.getByRole("dialog", { name: "Award treasure" });
+  await expect(awardDialog).toBeVisible();
+  await awardDialog.getByLabel("Gold pieces").fill("10");
+  await expect(awardDialog.getByText(/split across \d+ characters/)).toBeVisible();
+  await awardDialog.getByRole("button", { name: "Award", exact: true }).click();
+  await expect(awardDialog).toBeHidden({ timeout: 15_000 });
+
+  const afterGoldResponse = await page.request.get(`/api/characters?campaignId=${campaignId}`);
+  const afterGold = (await afterGoldResponse.json()) as {
+    characters: { id: string; data: { currency: { gp: number; sp: number; cp: number } } }[];
+  };
+  let gainedCp = 0;
+  for (const character of afterGold.characters) {
+    const gained = currencyToCp(character.data.currency) - (beforeCp.get(character.id) ?? 0);
+    expect(gained).toBeGreaterThanOrEqual(0);
+    gainedCp += gained;
+  }
+  expect(gainedCp).toBe(1000);
+
+  await page.getByRole("button", { name: "Award treasure" }).click();
+  await expect(awardDialog).toBeVisible();
+  await awardDialog.getByRole("button", { name: "Item", exact: true }).click();
+  await awardDialog.getByLabel("Recipient").selectOption(playerHero!.id);
+  await awardDialog.getByPlaceholder("Search items to award").fill("Backpack");
+  await awardDialog.locator(".award-item-row").filter({ hasText: "Backpack" }).first().click();
+  await awardDialog.getByRole("button", { name: "Award", exact: true }).click();
+  await expect(awardDialog).toBeHidden({ timeout: 15_000 });
+
+  const afterItemResponse = await page.request.get(`/api/characters/${playerHero!.id}`);
+  const afterItem = (await afterItemResponse.json()) as {
+    character: { data: { equipment: { itemId: string; quantity: number }[] } };
+  };
+  const afterBackpacks =
+    afterItem.character.data.equipment.find((entry) => entry.itemId === backpack!.id)?.quantity ??
+    0;
+  expect(afterBackpacks).toBe(beforeBackpacks + 1);
+
+  const plateResponse = await page.request.get(`/api/compendium/equipment?q=Full%20Plate&limit=5`);
+  const plateItems = (await plateResponse.json()) as {
+    items: { id: string; name: string }[];
+  };
+  const fullPlate = plateItems.items.find((item) => item.name === "Full Plate");
+  expect(fullPlate).toBeTruthy();
+  const purchase = await page.request.post(`/api/characters/${playerHero!.id}/items`, {
+    data: { itemId: fullPlate!.id, quantity: 1, mode: "buy" },
+  });
+  expect(purchase.status()).toBe(400);
+  expect(await purchase.text()).toContain("Not enough coins");
+});
+
+test("players add and remove custom inventory items", async ({ page }) => {
+  test.setTimeout(60_000);
+  await signIn(page, importer);
+  const campaignId = campaignPath.split("/").pop();
+  const listResponse = await page.request.get(`/api/characters?campaignId=${campaignId}`);
+  const list = (await listResponse.json()) as {
+    characters: { id: string; name: string }[];
+  };
+  const hero = list.characters.find((character) => character.name === "Pathbuilder E2E Hero");
+  expect(hero).toBeTruthy();
+
+  await page.goto(`/characters/${hero!.id}`);
+  await page.getByRole("button", { name: "Gear", exact: true }).click();
+  await page.getByRole("button", { name: "Add custom item" }).click();
+  const addDialog = page.getByRole("dialog", { name: "Add custom item" });
+  await expect(addDialog).toBeVisible();
+  await addDialog.getByLabel("Item name").fill("Family compass");
+  await addDialog.getByLabel("Description").fill("A brass compass with a scratched lid.");
+  await addDialog.getByRole("button", { name: "Add item" }).click();
+  await expect(addDialog).toBeHidden({ timeout: 15_000 });
+
+  const customGroup = page.locator(".pb-inventory-group").filter({ hasText: "Custom" });
+  await expect(customGroup).toContainText("Family compass");
+  await customGroup.getByRole("button", { name: /Family compass/ }).click();
+  const viewDialog = page.getByRole("dialog", { name: "Family compass" });
+  await expect(viewDialog).toContainText("A brass compass with a scratched lid.");
+  await viewDialog.locator(".modal-foot").getByRole("button", { name: "Close" }).click();
+
+  await page.reload();
+  await page.getByRole("button", { name: "Gear", exact: true }).click();
+  await expect(page.locator(".pb-inventory-group").filter({ hasText: "Custom" })).toContainText(
+    "Family compass"
+  );
+  await page
+    .locator(".pb-inventory-group")
+    .filter({ hasText: "Custom" })
+    .getByRole("button", { name: /Family compass/ })
+    .click();
+  const reopened = page.getByRole("dialog", { name: "Family compass" });
+  await reopened.getByRole("button", { name: "Remove from inventory" }).click();
+  await expect(reopened).toBeHidden({ timeout: 15_000 });
+  await expect(page.locator(".pb-inventory-group").filter({ hasText: "Custom" })).toHaveCount(0);
+
+  await page.getByPlaceholder("Search the item database").fill("Full Plate");
+  const plateRow = page.locator(".pb-item-row").filter({ hasText: "Full Plate" }).first();
+  await expect(plateRow).toBeVisible({ timeout: 15_000 });
+  await expect(plateRow.getByRole("button", { name: "Buy" })).toBeDisabled();
 });
 
 test("Pathbuilder JSON import creates a character from the dashboard", async ({ page }) => {

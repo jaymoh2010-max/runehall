@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Pencil, Plus, ScrollText, Sparkles, Users } from "lucide-react";
+import { Gift, Pencil, Plus, ScrollText, Sparkles, Users } from "lucide-react";
 import type { CharacterRecord } from "../../../shared/types";
 import { Avatar, Badge, Button, EmptyState, PageEyebrow, Stat } from "../ui";
 
@@ -8,12 +8,14 @@ export function CorePartyPanel({
   isGm,
   onNewCharacter,
   onLevelUp,
+  onAwardTreasure,
   levelingId,
 }: {
   characters: CharacterRecord[];
   isGm: boolean;
   onNewCharacter: () => void;
   onLevelUp: (characterId: string) => void;
+  onAwardTreasure: () => void;
   levelingId: string | null;
 }) {
   return (
@@ -24,9 +26,21 @@ export function CorePartyPanel({
           <h2>Who&apos;s at the table?</h2>
           <p>Open a sheet to roll, manage gear, or make changes between sessions.</p>
         </div>
-        <Button variant="primary" icon={<Plus size={15} />} onClick={onNewCharacter}>
-          New character
-        </Button>
+        <div className="row wrap" style={{ gap: 8 }}>
+          {isGm ? (
+            <Button
+              variant="gold"
+              icon={<Gift size={15} />}
+              disabled={!characters.length}
+              onClick={onAwardTreasure}
+            >
+              Award treasure
+            </Button>
+          ) : null}
+          <Button variant="primary" icon={<Plus size={15} />} onClick={onNewCharacter}>
+            New character
+          </Button>
+        </div>
       </div>
 
       <div className="party-grid">

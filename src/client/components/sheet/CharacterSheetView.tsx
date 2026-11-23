@@ -26,6 +26,7 @@ import type {
   ActionRef,
   CharacterCondition,
   CharacterContext,
+  CharacterCustomItem,
   CharacterDraft,
   CharacterRecord,
   DerivedCharacter,
@@ -66,7 +67,7 @@ const CharacterBuilderPage = lazy(() =>
 );
 import { getSocket, joinCampaign } from "../../socket";
 import { CompendiumPreviewModal, parseCompendiumPreviewHref } from "../CompendiumPreview";
-import { Avatar, Badge, Spinner, Tag } from "../ui";
+import { Avatar, Badge, Button, Field, Input, Modal, Spinner, Tag, Textarea } from "../ui";
 
 type SheetTab =
   "weapons" | "defense" | "gear" | "spells" | "feats" | "actions" | "details" | "status";
@@ -105,8 +106,10 @@ type ItemCategoryId =
   | "consumable"
   | "ammo"
   | "equipment"
+  | "rune"
   | "treasure"
   | "container"
+  | "custom"
   | "other";
 
 interface ItemSubcategory {
@@ -123,14 +126,17 @@ const ITEM_CATEGORY_LABELS: Record<ItemCategoryId, string> = {
   consumable: "Consumables",
   ammo: "Ammunition",
   equipment: "Gear",
+  rune: "Runes",
   treasure: "Treasure",
   container: "Containers",
+  custom: "Custom",
   other: "Other",
 };
 
 const ITEM_CATEGORIES: {
   id: ItemCategoryId;
   type?: string;
+  runeOnly?: boolean;
   subcategories?: ItemSubcategory[];
 }[] = [
   { id: "all" },
@@ -181,6 +187,7 @@ const ITEM_CATEGORIES: {
   },
   { id: "ammo", type: "ammo" },
   { id: "equipment", type: "equipment" },
+  { id: "rune", type: "equipment", runeOnly: true },
   { id: "treasure", type: "treasure" },
   { id: "container", type: "backpack,kit" },
 ];
@@ -192,8 +199,10 @@ const ITEM_CATEGORY_ORDER: ItemCategoryId[] = [
   "consumable",
   "ammo",
   "equipment",
+  "rune",
   "treasure",
   "container",
+  "custom",
   "other",
 ];
 
@@ -225,7 +234,13 @@ function itemCategoryForType(type: string): ItemCategoryId {
     return type;
   }
   if (type === "backpack" || type === "kit") return "container";
+  if (type === "custom") return "custom";
   return "other";
+}
+
+function itemCategoryFor(item: Equipment): ItemCategoryId {
+  if (item.type === "equipment" && item.usage.startsWith("etched-onto")) return "rune";
+  return itemCategoryForType(item.type);
 }
 
 function equipmentTypeLabel(item: Equipment): string {
@@ -247,7 +262,10 @@ function equipmentTypeLabel(item: Equipment): string {
     case "kit":
       return "Kit";
     case "equipment":
+      if (item.usage.startsWith("etched-onto")) return "Rune";
       return item.traits.includes("magical") ? "Magic item" : "Gear";
+    case "custom":
+      return "Custom item";
     default:
       return titleCase(item.type || "Item");
   }
@@ -334,6 +352,12 @@ export function CharacterSheetView({
   const [itemMagicOnly, setItemMagicOnly] = useState(false);
   const [itemLimit, setItemLimit] = useState(30);
   const [itemTotal, setItemTotal] = useState(0);
+  const [customItemOpen, setCustomItemOpen] = useState(false);
+  const [customItemView, setCustomItemView] = useState<CharacterCustomItem | null>(null);
+  const [customItemName, setCustomItemName] = useState("");
+  const [customItemDescription, setCustomItemDescription] = useState("");
+  const [customItemQuantity, setCustomItemQuantity] = useState("1");
+  const [customItemSaving, setCustomItemSaving] = useState(false);
   const characterRef = useRef<CharacterRecord | null>(null);
   const loadedCharacterIdRef = useRef<string | null>(null);
   const draftRef = useRef<CharacterDraft | null>(null);
@@ -454,6 +478,7 @@ export function CharacterSheetView({
         params.set("limit", String(itemLimit));
         const category = ITEM_CATEGORIES.find((entry) => entry.id === itemCategory);
         if (category?.type) params.set("type", category.type);
+        if (category?.runeOnly) params.set("runeOnly", "1");
         const subcategory = category?.subcategories?.find((entry) => entry.id === itemSubcategory);
         if (subcategory?.values?.length) {
           params.set("subcategory", subcategory.values.join(","));
@@ -486,7 +511,7 @@ export function CharacterSheetView({
     const groups = new Map<ItemCategoryId, typeof draft.equipment>();
     for (const entry of draft.equipment) {
       const item = context.equipment[entry.itemId] ?? null;
-      const category = item ? itemCategoryForType(item.type) : "other";
+      const category = item ? itemCategoryFor(item) : "other";
       const entries = groups.get(category) ?? [];
       entries.push(entry);
       groups.set(category, entries);
@@ -506,6 +531,11 @@ export function CharacterSheetView({
         ),
       }));
   }, [context, draft]);
+
+  const customItemsById = useMemo(
+    () => new Map((draft?.customItems ?? []).map((item) => [item.id, item])),
+    [draft?.customItems]
+  );
 
   const parsedDc = Number(sheetDc);
   const targetDc = sheetDc.trim() !== "" && Number.isFinite(parsedDc) ? Math.round(parsedDc) : null;
@@ -732,6 +762,57 @@ export function CharacterSheetView({
         entry.itemId === itemId ? { ...entry, [field]: !entry[field] } : entry
       ),
     }));
+  };
+
+  const addCustomItem = async () => {
+    if (!canEdit || customItemSaving) return;
+    const name = customItemName.trim();
+    if (!name) return;
+    const quantity = Math.max(1, Math.min(999, Math.round(Number(customItemQuantity) || 1)));
+    const random =
+      globalThis.crypto?.randomUUID?.() ??
+      `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+    const id = `custom:${random}`;
+    setCustomItemSaving(true);
+    try {
+      const saved = await persist((currentDraft) => ({
+        ...currentDraft,
+        customItems: [
+          ...currentDraft.customItems,
+          {
+            id,
+            name: name.slice(0, 120),
+            description: customItemDescription.trim().slice(0, 4000),
+          },
+        ],
+        equipment: [
+          ...currentDraft.equipment,
+          { itemId: id, quantity, equipped: false, invested: false, runes: [] },
+        ],
+      }));
+      if (!saved) return;
+      setCustomItemOpen(false);
+      setCustomItemName("");
+      setCustomItemDescription("");
+      setCustomItemQuantity("1");
+      toast("Custom item added to inventory.", "success");
+      if (characterRef.current) await applyRecord(characterRef.current);
+    } finally {
+      setCustomItemSaving(false);
+    }
+  };
+
+  const removeCustomItem = async (itemId: string) => {
+    if (!canEdit) return;
+    const saved = await persist((currentDraft) => ({
+      ...currentDraft,
+      customItems: currentDraft.customItems.filter((item) => item.id !== itemId),
+      equipment: currentDraft.equipment.filter((entry) => entry.itemId !== itemId),
+    }));
+    if (!saved) return;
+    setCustomItemView(null);
+    toast("Custom item removed.", "success");
+    if (characterRef.current) await applyRecord(characterRef.current);
   };
 
   const spellEntries = useMemo(() => {
@@ -1749,50 +1830,67 @@ export function CharacterSheetView({
                   </div>
                   {itemError ? <p className="pb-error-text">{itemError}</p> : null}
                   <div className="pb-item-results">
-                    {itemResults.map((item) => (
-                      <div className="pb-item-row" key={item.id}>
-                        <Link to={`/library/equipment/${item.id}`} className="pb-item-name">
-                          <strong>{item.name}</strong>
-                          <span>
-                            {equipmentTypeLabel(item)} · Level {item.level} ·{" "}
-                            {formatCp(item.price.cpTotal)}
-                          </span>
-                        </Link>
-                        <input
-                          className="pb-qty"
-                          type="number"
-                          min={1}
-                          max={99}
-                          aria-label={`Quantity for ${item.name}`}
-                          value={itemQuantities[item.id] ?? "1"}
-                          onChange={(event) =>
-                            setItemQuantities((current) => ({
-                              ...current,
-                              [item.id]: event.target.value,
-                            }))
-                          }
-                        />
-                        <button
-                          type="button"
-                          className="pb-small-button is-primary"
-                          disabled={!canEdit || itemBusy === item.id}
-                          onClick={() => void buyItem(item, "buy")}
-                        >
-                          Buy
-                        </button>
-                        {canGrant ? (
+                    {itemResults.map((item) => {
+                      const quantity = Math.max(
+                        1,
+                        Math.round(Number(itemQuantities[item.id] ?? "1") || 1)
+                      );
+                      const costCp = Math.max(0, Math.round(item.price.cpTotal)) * quantity;
+                      const purseCp = currencyToCp(draft.currency);
+                      const canAfford = item.price.cpTotal > 0 && costCp <= purseCp;
+                      return (
+                        <div className="pb-item-row" key={item.id}>
+                          <Link to={`/library/equipment/${item.id}`} className="pb-item-name">
+                            <strong>{item.name}</strong>
+                            <span>
+                              {equipmentTypeLabel(item)} · Level {item.level} ·{" "}
+                              {formatCp(item.price.cpTotal)}
+                              {quantity > 1 ? ` · ${formatCp(costCp)} total` : ""}
+                            </span>
+                          </Link>
+                          <input
+                            className="pb-qty"
+                            type="number"
+                            min={1}
+                            max={99}
+                            aria-label={`Quantity for ${item.name}`}
+                            value={itemQuantities[item.id] ?? "1"}
+                            onChange={(event) =>
+                              setItemQuantities((current) => ({
+                                ...current,
+                                [item.id]: event.target.value,
+                              }))
+                            }
+                          />
                           <button
                             type="button"
-                            className="pb-small-button"
-                            disabled={!canEdit || itemBusy === item.id}
-                            title="Add without paying (GM permission)"
-                            onClick={() => void buyItem(item, "grant")}
+                            className="pb-small-button is-primary"
+                            disabled={!canEdit || itemBusy === item.id || !canAfford}
+                            title={
+                              item.price.cpTotal <= 0
+                                ? "This item has no purchase price."
+                                : !canAfford
+                                  ? `Not enough coins — ${formatCp(costCp)} needed.`
+                                  : undefined
+                            }
+                            onClick={() => void buyItem(item, "buy")}
                           >
-                            Grant
+                            Buy
                           </button>
-                        ) : null}
-                      </div>
-                    ))}
+                          {canGrant ? (
+                            <button
+                              type="button"
+                              className="pb-small-button"
+                              disabled={!canEdit || itemBusy === item.id}
+                              title="Add without paying (GM permission)"
+                              onClick={() => void buyItem(item, "grant")}
+                            >
+                              Grant
+                            </button>
+                          ) : null}
+                        </div>
+                      );
+                    })}
                     {!itemResults.length && !itemLoading ? (
                       <p className="pb-empty">
                         {itemFiltersActive
@@ -1826,9 +1924,21 @@ export function CharacterSheetView({
                 <div className="pb-inventory">
                   <div className="pb-inventory-head">
                     <h3>Inventory</h3>
-                    <span>
-                      {draft.equipment.length} item{draft.equipment.length === 1 ? "" : "s"}
-                    </span>
+                    <div className="pb-inventory-head-actions">
+                      <span>
+                        {draft.equipment.length} item{draft.equipment.length === 1 ? "" : "s"}
+                      </span>
+                      {canEdit ? (
+                        <button
+                          type="button"
+                          className="pb-small-button"
+                          aria-label="Add custom item"
+                          onClick={() => setCustomItemOpen(true)}
+                        >
+                          <Plus size={12} /> Custom
+                        </button>
+                      ) : null}
+                    </div>
                   </div>
                   {inventoryGroups.length ? (
                     inventoryGroups.map((group) => (
@@ -1842,37 +1952,72 @@ export function CharacterSheetView({
                         </h4>
                         {group.entries.map((entry) => {
                           const item = context.equipment[entry.itemId] ?? null;
+                          const custom = entry.itemId.startsWith("custom:")
+                            ? (customItemsById.get(entry.itemId) ?? null)
+                            : null;
                           return (
                             <div className="pb-inventory-row" key={entry.itemId}>
-                              <Link to={`/library/equipment/${entry.itemId}`}>
-                                <Package size={13} />
-                                <strong>{item?.name ?? entry.itemId}</strong>
-                                <span>×{entry.quantity}</span>
-                              </Link>
+                              {custom ? (
+                                <button
+                                  type="button"
+                                  className="pb-inventory-link"
+                                  onClick={() => setCustomItemView(custom)}
+                                >
+                                  <Package size={13} />
+                                  <strong>{custom.name}</strong>
+                                  <span>×{entry.quantity}</span>
+                                </button>
+                              ) : entry.itemId.startsWith("custom:") ? (
+                                <div className="pb-inventory-link">
+                                  <Package size={13} />
+                                  <strong>{item?.name ?? entry.itemId}</strong>
+                                  <span>×{entry.quantity}</span>
+                                </div>
+                              ) : (
+                                <Link to={`/library/equipment/${entry.itemId}`}>
+                                  <Package size={13} />
+                                  <strong>{item?.name ?? entry.itemId}</strong>
+                                  <span>×{entry.quantity}</span>
+                                </Link>
+                              )}
                               <div className="pb-row-actions">
-                                {item?.price ? (
-                                  <span>{formatCp(item.price.cpTotal)} each</span>
-                                ) : null}
-                                <button
-                                  type="button"
-                                  className={
-                                    entry.equipped ? "pb-small-button is-on" : "pb-small-button"
-                                  }
-                                  disabled={!canEdit}
-                                  onClick={() => toggleEquipment(entry.itemId, "equipped")}
-                                >
-                                  {entry.equipped ? "Equipped" : "Equip"}
-                                </button>
-                                <button
-                                  type="button"
-                                  className={
-                                    entry.invested ? "pb-small-button is-on" : "pb-small-button"
-                                  }
-                                  disabled={!canEdit}
-                                  onClick={() => toggleEquipment(entry.itemId, "invested")}
-                                >
-                                  {entry.invested ? "Invested" : "Invest"}
-                                </button>
+                                {custom ? (
+                                  <button
+                                    type="button"
+                                    className="pb-small-button"
+                                    disabled={!canEdit}
+                                    title="Remove this custom item from the inventory"
+                                    onClick={() => void removeCustomItem(custom.id)}
+                                  >
+                                    Remove
+                                  </button>
+                                ) : (
+                                  <>
+                                    {item?.price ? (
+                                      <span>{formatCp(item.price.cpTotal)} each</span>
+                                    ) : null}
+                                    <button
+                                      type="button"
+                                      className={
+                                        entry.equipped ? "pb-small-button is-on" : "pb-small-button"
+                                      }
+                                      disabled={!canEdit}
+                                      onClick={() => toggleEquipment(entry.itemId, "equipped")}
+                                    >
+                                      {entry.equipped ? "Equipped" : "Equip"}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className={
+                                        entry.invested ? "pb-small-button is-on" : "pb-small-button"
+                                      }
+                                      disabled={!canEdit}
+                                      onClick={() => toggleEquipment(entry.itemId, "invested")}
+                                    >
+                                      {entry.invested ? "Invested" : "Invest"}
+                                    </button>
+                                  </>
+                                )}
                               </div>
                             </div>
                           );
@@ -2618,6 +2763,90 @@ export function CharacterSheetView({
         derived={derived}
         onApply={(next) => void applyPreparations(next)}
       />
+      <Modal
+        open={customItemOpen}
+        onClose={() => {
+          if (!customItemSaving) setCustomItemOpen(false);
+        }}
+        title="Add custom item"
+        subtitle="Track a homebrew, story, or improvised item on this sheet."
+        elevated={mode === "overlay"}
+        footer={
+          <>
+            <Button
+              variant="ghost"
+              disabled={customItemSaving}
+              onClick={() => setCustomItemOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              loading={customItemSaving}
+              disabled={!customItemName.trim()}
+              onClick={() => void addCustomItem()}
+            >
+              Add item
+            </Button>
+          </>
+        }
+      >
+        <div className="stack">
+          <Field label="Item name">
+            <Input
+              autoFocus
+              value={customItemName}
+              maxLength={120}
+              onChange={(event) => setCustomItemName(event.target.value)}
+            />
+          </Field>
+          <Field label="Quantity">
+            <Input
+              type="number"
+              min={1}
+              max={999}
+              value={customItemQuantity}
+              onChange={(event) => setCustomItemQuantity(event.target.value)}
+            />
+          </Field>
+          <Field label="Description" hint="Optional. Plain text is fine.">
+            <Textarea
+              rows={5}
+              value={customItemDescription}
+              maxLength={4000}
+              onChange={(event) => setCustomItemDescription(event.target.value)}
+            />
+          </Field>
+        </div>
+      </Modal>
+      <Modal
+        open={Boolean(customItemView)}
+        onClose={() => setCustomItemView(null)}
+        title={customItemView?.name ?? "Custom item"}
+        subtitle="Custom inventory item"
+        elevated={mode === "overlay"}
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setCustomItemView(null)}>
+              Close
+            </Button>
+            {customItemView && canEdit ? (
+              <Button
+                variant="danger"
+                onClick={() => {
+                  if (customItemView) void removeCustomItem(customItemView.id);
+                }}
+              >
+                Remove from inventory
+              </Button>
+            ) : null}
+          </>
+        }
+      >
+        <p className="custom-item-description">
+          {customItemView?.description || "No description recorded."}
+        </p>
+      </Modal>
       <CompendiumPreviewModal
         href={previewPath}
         elevated={mode === "overlay"}

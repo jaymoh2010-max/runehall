@@ -771,6 +771,7 @@ const ITEM_TYPES = [
   ["equipment", "Gear"],
   ["ammo", "Ammo"],
   ["treasure", "Treasure"],
+  ["backpack,kit", "Containers"],
 ] as const;
 
 export function EquipmentPicker({
