@@ -2,7 +2,7 @@
 
 Date: 2026-11-23
 
-Status: review complete. Sprint 1 (the daily spellcasting loop), the class-grant portion of Sprint 2, the first table-magic pass of Sprint 3, the magus studious-slot pass of Sprint 4, the animist prepared/spontaneous split of Sprint 5, the spontaneous known-at-rank pass of Sprint 6, the psychic psi-amp pass of Sprint 7, and the table Sustain-reminder pass of Sprint 8 were implemented on 2026-11-23. The findings below describe the pre-Sprint state; the implementation status sections record what changed, and the remaining class and table gaps stay in the backlog.
+Status: review complete. Sprint 1 (the daily spellcasting loop), the class-grant portion of Sprint 2, the first table-magic pass of Sprint 3, the magus studious-slot pass of Sprint 4, the animist prepared/spontaneous split of Sprint 5, the spontaneous known-at-rank pass of Sprint 6, the psychic psi-amp pass of Sprint 7, the table Sustain-reminder pass of Sprint 8, and the higher-slot downcast pass of Sprint 9 were implemented on 2026-11-23. The findings below describe the pre-Sprint state; the implementation status sections record what changed, and the remaining class and table gaps stay in the backlog.
 
 > **Follow-up (2026-11-23):** `docs/RULES-AUDIT.md` corrected two table errors
 > this review did not catch: bards use the 2/3 full-caster slot table (not the
@@ -146,6 +146,16 @@ The table Sustain reminder is implemented:
 - The reminder resets on the next turn or round and disappears when the character has no sustained spells.
 - Opening the character sheet from the reminder is one click away.
 
+## Sprint 9 implementation status (2026-11-23)
+
+Spontaneous higher-slot downcasting is implemented:
+
+- A non-signature spontaneous spell can use a higher-rank slot to cast at a lower rank the character knows, without heightening it.
+- Cast options label the slot rank and the effective cast rank, and the sheet tracks the slot spent.
+- Signature spells continue to heighten upward normally instead of showing redundant downcast options.
+- The sheet toast and chat log record the effective spell rank and the slot rank used.
+- Sustained spells started by a downcast record the effective rank.
+
 ## Rules baseline
 
 ### Core spellcasting
@@ -207,7 +217,7 @@ Legend: Yes = modeled and usable; Partial = some support with known gaps; No = n
 | Wizard curriculum | Partial | Extra slot and rank-1 validation; higher-rank curriculum lists remain manual |
 | Prepared cantrips | Yes | Daily prepared list, class caps, and the wizard curriculum extra |
 | Spontaneous repertoire limits | Yes | Bard, oracle, sorcerer, summoner, and psychic; rank copies count against each learned rank |
-| Spontaneous heightening by learned rank | Yes | Known ranks are tracked; signature spells heighten upward. Higher-slot downcasting is manual |
+| Spontaneous heightening by learned rank | Yes | Known ranks are tracked; signature spells heighten upward and non-signature spells can downcast from higher slots |
 | Signature spells | Yes | One per rank, level 3 gate, validation |
 | Focus points and focus casting | Partial | Separate focus spell DC/attack works; psi amps now spend focus, while some feat-granted pools remain manual |
 | Focus spells from feats/archetypes | Partial | Manual focus list; no automatic grants or pool changes |
@@ -343,7 +353,7 @@ Fix: Add separate derived profiles for class, focus, and innate casting. At mini
 
 ### F8. Spontaneous heightening is incomplete (P1)
 
-Status: fixed for learned-rank copies in Sprint 6. Signature heightening and the spell's learned ranks are now separate. Casting a lower-rank known spell with a higher-rank slot without heightening it remains manual.
+Status: fixed in Sprint 6 for learned-rank copies and Sprint 9 for higher-slot downcasting. Signature heightening, known ranks, and non-heightened downcasts are now distinct.
 
 Evidence:
 
@@ -545,10 +555,10 @@ Tasks:
    - Add apparition attunement and the apparition repertoire.
    - If the full split is too large, label the current combined tracker as manual and prevent it from implying that all slots are prepared.
 
-7. **Spontaneous known-at-rank** (implemented in Sprint 6; downcasting remains manual)
+7. **Spontaneous known-at-rank** (implemented in Sprint 6, with downcasting in Sprint 9)
    - Add `knownByRank` (or a rank-aware known list) and migrate the flat list.
    - Use it for repertoire limits, cast options, and signature validation.
-   - Add an option to cast a lower-rank known spell using a higher slot without heightening.
+   - A non-signature spontaneous spell can also use a higher-rank slot to cast at a lower known rank without heightening; the slot and effective rank are recorded separately. (Implemented in Sprint 9.)
 
 ### Sprint 3 - Table magic depth
 

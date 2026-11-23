@@ -200,18 +200,26 @@ describe("spell casting", () => {
     expect(castSpell(restored!, fireball, context, { rank: 3, resource: "slot" })).not.toBeNull();
   });
 
-  it("only heightens spontaneous spells that are signatures", () => {
+  it("downcasts non-signature spontaneous spells and heightens signatures", () => {
     const draft = draftFor(sorcerer);
     const context = contextFor(sorcerer, [fireball]);
     draft.level = 9;
     draft.spells.known = [fireball.id];
 
-    expect(spellCastOptions(fireball, draft, context).map((entry) => entry.rank)).toEqual([3]);
+    const nonSignature = spellCastOptions(fireball, draft, context);
+    expect(
+      nonSignature.map((entry) => ({ rank: entry.rank, castRank: entry.castRank ?? entry.rank }))
+    ).toEqual([
+      { rank: 3, castRank: 3 },
+      { rank: 4, castRank: 3 },
+      { rank: 5, castRank: 3 },
+    ]);
 
     draft.spells.signature = [fireball.id];
     const options = spellCastOptions(fireball, draft, context);
     expect(options.map((entry) => entry.rank)).toEqual([3, 4, 5]);
     expect(options.every((entry) => entry.resource === "slot")).toBe(true);
+    expect(options.every((entry) => entry.castRank === undefined)).toBe(true);
 
     const rankFive = castSpell(draft, fireball, context, { rank: 5, resource: "slot" });
     expect(rankFive?.draft.spells.slotsUsed).toEqual({ "5": 1 });
