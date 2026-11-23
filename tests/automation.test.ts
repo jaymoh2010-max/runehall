@@ -52,6 +52,12 @@ describe("automation labels", () => {
     ).toBe("manual");
   });
 
+  it("marks movement text as manual", () => {
+    expect(
+      automationForFeat(feat({ description: "You can Climb with your hands full." })).level
+    ).toBe("manual");
+  });
+
   it("marks pure flavor feats as full", () => {
     expect(
       automationForFeat(feat({ description: "You have a knack for local gossip." })).level

@@ -2593,7 +2593,14 @@ export function computeCharacter(
     }
   }
   const itemMods = collectItemEffects(
-    draft.equipment.filter((entry) => entry.equipped).map((entry) => entry.itemId)
+    draft.equipment
+      .filter((entry) => {
+        if (!entry.equipped) return false;
+        const item = context.equipment[entry.itemId];
+        // Invested magic items only grant their benefits after investiture.
+        return !item?.traits.includes("invested") || entry.invested;
+      })
+      .map((entry) => entry.itemId)
   );
   const caster = casterInfo(classData);
   const keyOptions = classKeyOptions(draft, classData);
@@ -3036,21 +3043,27 @@ export function computeCharacter(
     draft.play.shieldRaised && shield?.shield ? Math.abs(shield.shield.acBonus || 2) : 0;
   let ac: number;
   let speed = (ancestry?.speed ?? 25) + (featMods.speed ?? 0);
+  let speedPenalty = 0;
   if (armor?.armor) {
     const armorCategory = armor.armor.category === "unarmored" ? "unarmored" : armor.armor.category;
     // Negative Dexterity still applies; only the armor's Dex cap limits it.
     const dex = Math.min(abilityMods.dex, armor.armor.dexCap);
+    // Armor potency and ABP replace the armor's potency bonus, while a
+    // separate item bonus (such as Bands of Force) competes with the armor's
+    // total item bonus instead of stacking with it.
+    const armorItemBonus = armor.armor.acBonus + Math.max(armorRunes.armorPotency, abp.defense);
     ac =
       10 +
       dex +
-      armor.armor.acBonus +
-      Math.max(armorRunes.armorPotency, abp.defense, itemMods.acItemBonus ?? 0) +
+      Math.max(armorItemBonus, itemMods.acItemBonus ?? 0) +
       proficiencyBonus(prof.defenses[armorCategory] ?? 0, draft.level) +
       shieldBonus;
     // Armor speed penalties always apply. Meeting the Strength threshold
     // reduces the penalty by 5 feet (so full plate's -10 becomes -5).
     const armorSpeedPenalty = Math.min(0, armor.armor.speedPenalty || 0);
-    speed += meetsArmorStrength ? Math.min(0, armorSpeedPenalty + 5) : armorSpeedPenalty;
+    if (!featMods.ignoreArmorSpeedPenalty) {
+      speedPenalty += meetsArmorStrength ? Math.min(0, armorSpeedPenalty + 5) : armorSpeedPenalty;
+    }
   } else {
     ac =
       10 +
@@ -3059,8 +3072,12 @@ export function computeCharacter(
       proficiencyBonus(prof.defenses.unarmored ?? 0, draft.level) +
       shieldBonus;
   }
-  if (shield?.shield?.speedPenalty) speed += shield.shield.speedPenalty;
-  speed = Math.max(5, speed + conditionEffects.speed);
+  if (shield?.shield?.speedPenalty) speedPenalty += shield.shield.speedPenalty;
+  speedPenalty += conditionEffects.speed;
+  if (speedPenalty < 0 && featMods.speedPenaltyReduction) {
+    speedPenalty = Math.min(0, speedPenalty + featMods.speedPenaltyReduction);
+  }
+  speed = Math.max(5, speed + speedPenalty);
   ac += conditionEffects.ac;
 
   const saves: Record<SaveKey, number> = {
@@ -3132,12 +3149,22 @@ export function computeCharacter(
     );
 
   const invested = investedCount(draft);
-  if (invested > INVESTED_LIMIT) {
+  const investedLimit = INVESTED_LIMIT + (featMods.investedLimit ?? 0);
+  if (invested > investedLimit) {
     issue(
       "error",
-      `Invested ${invested} items; PF2e allows at most ${INVESTED_LIMIT}. Uninvest one before play.`,
+      `Invested ${invested} items; PF2e allows at most ${investedLimit}. Uninvest one before play.`,
       "gear"
     );
+  }
+  for (const { entry, item } of ownedEquipment) {
+    if (entry.equipped && !entry.invested && item.traits.includes("invested")) {
+      issue(
+        "warning",
+        `${item.name} is equipped but not invested; its magical bonuses are inactive until you invest it.`,
+        "gear"
+      );
+    }
   }
 
   for (const { entry, item } of ownedEquipment) {
