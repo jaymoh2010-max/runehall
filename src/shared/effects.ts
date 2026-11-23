@@ -95,7 +95,7 @@ export const GRANTED_FEAT_IDS = Object.keys(FEAT_GRANTS);
  * is verified; automation.ts reads the same table to label the feat "Automated".
  */
 export const FEAT_EFFECTS: Record<string, EffectModifiers> = {
-  // Toughness — increase maximum HP by your level.
+  // Toughness — increase maximum HP by your level and reduce recovery DCs by 1.
   "feat:AmP0qu7c5dlBSath": { hpPerLevel: 1 },
   // Fleet — +5 feet Speed.
   "feat:Ux73dmoF8KnavyUD": { speed: 5 },
@@ -226,6 +226,40 @@ export const ITEM_EFFECTS: Record<string, EffectModifiers> = {
     skillItemBonus: { athletics: 3 },
     notes: [
       "Apex: when invested, increase your Strength modifier by 1 or to +4, whichever is higher. Disarm/Trip bonuses and damage remain manual.",
+    ],
+  },
+  // Amulet of Kinship's Strength — +2 item bonus to Will saves (+3 against fear).
+  "item:P9v4lpVpLlL7AGnw": {
+    saveItemBonus: { will: 2 },
+    notes: ["The +3 item bonus against fear effects remains conditional and manual."],
+  },
+  // Uzunjati Storytelling Amulet — +1 item bonus to Performance.
+  "item:IIG33n6yrNjz07Ir": {
+    skillItemBonus: { performance: 1 },
+    notes: ["The Enamoring Story activation remains manual."],
+  },
+  // Assassin's Bracers (Type I) — +1 item bonus to AC and saving throws.
+  "item:LWMlDUCdDGo1wJnF": {
+    acItemBonus: 1,
+    saveItemBonus: { fortitude: 1, reflex: 1, will: 1 },
+    notes: [
+      "Acts as armor with a maximum Dexterity modifier of +5. The Focus on the Doomed activation remains manual.",
+    ],
+  },
+  // Assassin's Bracers (Type II) — +2 item bonus to AC and saving throws.
+  "item:dtiYqfBG2BcLHX92": {
+    acItemBonus: 2,
+    saveItemBonus: { fortitude: 2, reflex: 2, will: 2 },
+    notes: [
+      "Acts as armor with a maximum Dexterity modifier of +5. The Focus on the Doomed activation remains manual.",
+    ],
+  },
+  // Assassin's Bracers (Type III) — +3 item bonus to AC and saving throws.
+  "item:9pUwExXYzndCJFYj": {
+    acItemBonus: 3,
+    saveItemBonus: { fortitude: 3, reflex: 3, will: 3 },
+    notes: [
+      "Acts as armor with a maximum Dexterity modifier of +5. The Focus on the Doomed activation remains manual.",
     ],
   },
 };

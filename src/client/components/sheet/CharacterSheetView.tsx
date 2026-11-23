@@ -989,6 +989,18 @@ export function CharacterSheetView({
   const classData = context.classData ?? null;
   const preparedCaster = isPreparedCasterClass(classData?.name);
   const preparationsPending = preparedCaster && draft.spells.preparationsPending;
+  const spellProfileFor = (group: string): { attack: number | null; dc: number | null } => {
+    if (group === "Focus") {
+      return {
+        attack: derived.focusSpellAttack ?? derived.spellAttack,
+        dc: derived.focusSpellDc ?? derived.spellDc,
+      };
+    }
+    if (group === "Innate") {
+      return { attack: derived.innateSpellAttack, dc: derived.innateSpellDc };
+    }
+    return { attack: derived.spellAttack, dc: derived.spellDc };
+  };
   const hpPercent = derived.maxHp > 0 ? (derived.currentHp / derived.maxHp) * 100 : 0;
   const selectedFeatIds = new Set(derived.selectedFeats.map((feat) => feat.id));
   const activeItemCategory =
@@ -1897,6 +1909,18 @@ export function CharacterSheetView({
                       </button>
                     ) : null}
                   </div>
+                  {derived.focusSpellDc !== null && derived.focusSpellDc !== derived.spellDc ? (
+                    <div>
+                      <span>Focus DC</span>
+                      <strong>{derived.focusSpellDc}</strong>
+                    </div>
+                  ) : null}
+                  {derived.innateSpellDc !== null && derived.innateSpellDc !== derived.spellDc ? (
+                    <div>
+                      <span>Innate DC</span>
+                      <strong>{derived.innateSpellDc}</strong>
+                    </div>
+                  ) : null}
                 </div>
                 {preparedCaster ? (
                   <div className="row-between pb-prep-actions">
@@ -2063,6 +2087,7 @@ export function CharacterSheetView({
                         focusPointsMax: derived.focusPointsMax,
                       })
                     );
+                    const profile = spellProfileFor(group);
                     return (
                       <div className="pb-spell-row" key={`${group}-${id}-${index}`}>
                         <Link to={`/library/spell/${id}`}>
@@ -2074,16 +2099,19 @@ export function CharacterSheetView({
                                 ? "Cantrip"
                                 : `Rank ${spell.rank}`
                               : "Unknown rank"}
+                            {group === "Focus" || group === "Innate"
+                              ? ` · DC ${profile.dc ?? "—"}`
+                              : ""}
                           </span>
                         </Link>
                         <div className="pb-row-actions">
-                          {spell?.traits.includes("attack") && derived.spellAttack !== null ? (
+                          {spell?.traits.includes("attack") && profile.attack !== null ? (
                             <button
                               type="button"
                               className="pb-small-button"
                               onClick={() =>
                                 postRoll(
-                                  `1d20${signed(derived.spellAttack ?? 0)}`,
+                                  `1d20${signed(profile.attack ?? 0)}`,
                                   `${spell.name} spell attack`
                                 )
                               }

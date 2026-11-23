@@ -1,4 +1,4 @@
-import { applyDyingRecovery, applyHpEditToDraft } from "./damage";
+import { applyDyingRecovery, applyHpEditToDraft, recoveryDcForDraft } from "./damage";
 import {
   characterRegenerationActive,
   characterTurnHealingParts,
@@ -153,7 +153,7 @@ export function resolveStartOfTurn(
   }
 
   const recovery = rollFormula("1d20", {
-    dc: 10 + dyingBefore,
+    dc: recoveryDcForDraft(current, dyingBefore),
     label: label(options.labelPrefix, "Dying recovery check"),
     rng: options.rng,
   });

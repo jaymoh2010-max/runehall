@@ -25,6 +25,11 @@ function focus(id: string, name: string, source?: string): ClassGrantSpell {
   return { id, name, rank: 1, kind: "focus", source };
 }
 
+/** A focus cantrip is castable at will and does not spend a Focus Point. */
+function focusCantrip(id: string, name: string, source?: string): ClassGrantSpell {
+  return { id, name, rank: 0, kind: "focusCantrip", source };
+}
+
 function repertoire(id: string, name: string, rank = 1, source?: string): ClassGrantSpell {
   return { id, name, rank, kind: "repertoire", source };
 }
@@ -457,6 +462,93 @@ export const CLASS_GRANTS: Record<string, ClassGrant> = {
     notes: ["Wyrmblessed: choose your dragon type; it does not change the level-1 gifts."],
   },
 
+  // Psychic conscious minds. The listed 1st-rank spell is an extra repertoire
+  // entry; the psi cantrips are granted cantrips whose amps stay manual until
+  // the focus-point amp workflow lands.
+  "cf:1rlBo3LcwIuPDCvz": {
+    spells: [
+      repertoire("spell:sPHcuLIKj9SDaDAD", "Kinetic Ram"),
+      focusCantrip("spell:pwzdSlJgYqN7bs2w", "Telekinetic Hand"),
+      focusCantrip("spell:60sgbuMWN0268dB7", "Telekinetic Projectile"),
+      focusCantrip("spell:yyz029C9eqfY38PT", "Telekinetic Rend"),
+    ],
+    notes: ["Distant Grasp: psi amps and higher-level unique psi cantrips remain manual."],
+  },
+  "cf:rvpTsj9epRuNH3uB": {
+    spells: [
+      repertoire("spell:Gb7SeieEvd0pL2Eh", "Sure Strike"),
+      focusCantrip("spell:gpzpAAAJ1Lza2JVl", "Detect Magic"),
+      focusCantrip("spell:izcxFQFwf3woCnFs", "Guidance"),
+      focusCantrip("spell:cNnHV97gPqxJ3Rrr", "Glimpse Weakness"),
+    ],
+    notes: ["Infinite Eye: psi amps and higher-level unique psi cantrips remain manual."],
+  },
+  "cf:5tSR0WzMPFn5s3Xs": {
+    spells: [
+      repertoire("spell:y6rAdMK6EFlV6U0t", "Breathe Fire"),
+      focusCantrip("spell:IxhGEKl63R4QBvkj", "Frostbite"),
+      focusCantrip("spell:6DfLZBl8wKIV03Iq", "Ignition"),
+      focusCantrip("spell:dhpXpzt7TCm8TbHM", "Thermal Stasis"),
+    ],
+    notes: ["Oscillating Wave: psi amps and higher-level unique psi cantrips remain manual."],
+  },
+  "cf:rdWWlqvxXgfWDaSO": {
+    spells: [
+      repertoire("spell:D442XMADp01qJ7Cs", "Mindlink"),
+      focusCantrip("spell:4gBIw4IDrSfFHik4", "Daze"),
+      focusCantrip("spell:vLzFcIaSXs7YTIqJ", "Message"),
+      focusCantrip("spell:lpoWfblSMLcJfxsZ", "Forbidden Thought"),
+    ],
+    notes: ["Silent Whisper: psi amps and higher-level unique psi cantrips remain manual."],
+  },
+  "cf:8dAm3ULUqaK4N5a7": {
+    spells: [
+      repertoire("spell:UKsIOWmMx4hSpafl", "Dizzying Colors"),
+      focusCantrip("spell:0zU8CPejjQFnhZFI", "Figment"),
+      focusCantrip("spell:TVKNbcgTee19PXZR", "Shield"),
+      focusCantrip("spell:sUr5KCpeE6AXfvPp", "Imaginary Weapon"),
+    ],
+    notes: ["Tangible Dream: psi amps and higher-level unique psi cantrips remain manual."],
+  },
+  "cf:FaSY47siV1x6CAQp": {
+    spells: [
+      repertoire("spell:qTr2oCgIXl703Whb", "Thoughtful Gift"),
+      focusCantrip("spell:5gophZ4AOKW4VW27", "Phase Bolt"),
+      focusCantrip("spell:sX2g6WFSQPNW9jzx", "Warp Step"),
+      focusCantrip("spell:WOM9alxiTdp0HEVD", "Distortion Lens"),
+    ],
+    notes: ["Unbound Step: psi amps and higher-level unique psi cantrips remain manual."],
+  },
+
+  // Necromancer grave spells
+  "cf:oa47wZGEpPlVwPVz": {
+    spells: [focus("spell:cg1l2AxBenLU6JFE", "Necrotic Bomb")],
+    focusPoints: 2,
+    notes: ["Thralls, grave spell effects, and additional grave spells remain manual."],
+  },
+  "cf:gyN8OZZ3txxIAKLf": {
+    spells: [focus("spell:tFWa3ouvMC5Zz3P0", "Blood Infusion")],
+  },
+  "cf:4Y2Bt7bvuOeptAqS": {
+    spells: [focus("spell:4JXxqBXigKECcpTm", "Bone Spear")],
+  },
+  "cf:nJLKij2UY2nxVmb9": {
+    spells: [focus("spell:4kQMFyRKj5Gv13zl", "Dead Weight")],
+  },
+  "cf:qle7hjEReQK0nByC": {
+    spells: [focus("spell:fgmxDC2PH2TEYGKG", "Life Tap")],
+  },
+
+  // Summoner link spells: the link cantrip is at will and does not cost focus.
+  "cf:wguqw300DB5XdD8W": {
+    spells: [
+      focus("spell:lV8FkHZtzZu7Cy6j", "Evolution Surge"),
+      focusCantrip("spell:HStu2Yhw3iQER9tY", "Boost Eidolon"),
+    ],
+    focusPoints: 1,
+    notes: ["Eidolon abilities, tandem actions, and link cantrip amps remain manual."],
+  },
+
   // Cleric doctrines
   "cf:ZZzLMOUAtBVgV1DF": {
     feats: [feat("feat:hT4INKGtly4QY8KN", "Domain Initiate")],
@@ -488,6 +580,23 @@ const CLASS_NOTES: Record<string, string[]> = {
   ],
   cleric: [
     "Divine font slots are heal-or-harm only and are tracked separately from ordinary slots.",
+    "Spells granted by your deity are included as available cleric spells; prepare them like any other divine spell.",
+  ],
+  magus: [
+    "Studious spell slots are not tracked separately; add their specific spells manually.",
+    "Spellstrike, Arcane Cascade, and conflux spell recharge remain manual.",
+  ],
+  animist: [
+    "Prepared animist slots and spontaneous apparition slots are shown as a combined total; track the split manually.",
+  ],
+  psychic: [
+    "Psi cantrips are granted, but amps, their Focus Point costs, and higher-level unique psi cantrips remain manual.",
+  ],
+  necromancer: [
+    "Thralls and the full grave-spell effects remain manual; the granted grave spells and focus pool are tracked.",
+  ],
+  summoner: [
+    "The link cantrip is castable at will. Eidolon abilities and tandem actions remain manual.",
   ],
 };
 
@@ -513,16 +622,23 @@ export function selectedClassGrants(
     }
     for (const item of grant.spells ?? []) {
       if (item.rank > Math.ceil(draft.level / 2)) continue;
-      if (item.kind === "focus") {
-        // Focus wins over an earlier repertoire/curriculum grant of the same spell.
+      const focusLike = item.kind === "focus" || item.kind === "focusCantrip";
+      if (focusLike) {
+        // Focus and focus-cantrip grants win over an earlier repertoire or
+        // curriculum grant of the same spell.
         const duplicate = result.spells.findIndex(
-          (spell) => spell.id === item.id && spell.kind !== "focus"
+          (spell) => spell.id === item.id && spell.kind !== "focus" && spell.kind !== "focusCantrip"
         );
         if (duplicate >= 0) {
           const [removed] = result.spells.splice(duplicate, 1);
           spellKeys.delete(spellKey(removed));
         }
-      } else if (result.spells.some((spell) => spell.id === item.id && spell.kind === "focus")) {
+      } else if (
+        result.spells.some(
+          (spell) =>
+            spell.id === item.id && (spell.kind === "focus" || spell.kind === "focusCantrip")
+        )
+      ) {
         continue;
       }
       const key = spellKey(item);
@@ -561,6 +677,27 @@ export function selectedClassGrants(
     for (const pick of picks) {
       const option = group.options.find((entry) => entry.id === pick);
       if (option) addGrant(option.grant);
+    }
+  }
+
+  // A cleric can prepare spells granted by their deity in addition to the
+  // divine list. Treat them as granted repertoire entries so the builder and
+  // daily-preparations picker offer them without changing the deity data.
+  if (classData.name.toLowerCase() === "cleric" && deity) {
+    for (const [rankKey, entry] of Object.entries(deity.spells ?? {})) {
+      const rank = Number(rankKey);
+      if (!Number.isInteger(rank) || rank < 1 || rank > 10 || !entry?.id) continue;
+      addGrant({
+        spells: [
+          {
+            id: entry.id,
+            name: entry.name,
+            rank,
+            kind: "repertoire",
+            source: "Deity spells",
+          },
+        ],
+      });
     }
   }
 

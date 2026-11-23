@@ -39,6 +39,9 @@ const thirdEye = byName(equipment, "Amulet of the Third Eye");
 const beltOfStrength = byName(equipment, "Belt of Giant Strength");
 const bracersOfStrength = byName(equipment, "Bracers of Strength");
 const bracersOfHammers = byName(equipment, "Bracers of Hammers");
+const kinshipAmulet = byName(equipment, "Amulet of Kinship's Strength");
+const storytellingAmulet = byName(equipment, "Uzunjati Storytelling Amulet");
+const assassinBracers = byName(equipment, "Assassin's Bracers (Type I)");
 const chainMail = byName(equipment, "Chain Mail");
 const armorPotency = byName(equipment, "Armor Potency (+1)");
 const resilient = byName(equipment, "Resilient");
@@ -111,6 +114,14 @@ describe("curated item effects", () => {
     for (const item of [beltOfStrength, bracersOfStrength, bracersOfHammers]) {
       expect(ITEM_EFFECTS[item.id]).toMatchObject({ skillItemBonus: { athletics: 3 } });
     }
+    expect(ITEM_EFFECTS[kinshipAmulet.id]).toMatchObject({ saveItemBonus: { will: 2 } });
+    expect(ITEM_EFFECTS[storytellingAmulet.id]).toMatchObject({
+      skillItemBonus: { performance: 1 },
+    });
+    expect(ITEM_EFFECTS[assassinBracers.id]).toMatchObject({
+      acItemBonus: 1,
+      saveItemBonus: { fortitude: 1, reflex: 1, will: 1 },
+    });
     for (const id of Object.keys(ITEM_EFFECTS)) {
       expect(equipment.some((item) => item.id === id)).toBe(true);
     }

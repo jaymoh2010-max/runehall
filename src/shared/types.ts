@@ -156,7 +156,7 @@ export interface ReferenceItem {
   level: number;
 }
 
-export type ClassGrantSpellKind = "focus" | "repertoire" | "curriculum";
+export type ClassGrantSpellKind = "focus" | "focusCantrip" | "repertoire" | "curriculum";
 
 export interface ClassGrantFeat {
   id: string;
@@ -1040,6 +1040,12 @@ export interface DerivedCharacter {
   classDc: number;
   spellDc: number | null;
   spellAttack: number | null;
+  /** Spell attack/DC for focus spells from a class that does not grant slots. */
+  focusSpellDc: number | null;
+  focusSpellAttack: number | null;
+  /** Innate spells use their own Charisma-based proficiency. */
+  innateSpellDc: number | null;
+  innateSpellAttack: number | null;
   attacks: DerivedAttack[];
   spellSlots: number[] | null;
   spellSlotsNote: string | null;
