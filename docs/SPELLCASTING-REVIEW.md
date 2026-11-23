@@ -2,7 +2,7 @@
 
 Date: 2026-11-23
 
-Status: review complete. Sprint 1 (the daily spellcasting loop), the class-grant portion of Sprint 2, the first table-magic pass of Sprint 3, the magus studious-slot pass of Sprint 4, the animist prepared/spontaneous split of Sprint 5, the spontaneous known-at-rank pass of Sprint 6, and the psychic psi-amp pass of Sprint 7 were implemented on 2026-11-23. The findings below describe the pre-Sprint state; the implementation status sections record what changed, and the remaining class and table gaps stay in the backlog.
+Status: review complete. Sprint 1 (the daily spellcasting loop), the class-grant portion of Sprint 2, the first table-magic pass of Sprint 3, the magus studious-slot pass of Sprint 4, the animist prepared/spontaneous split of Sprint 5, the spontaneous known-at-rank pass of Sprint 6, the psychic psi-amp pass of Sprint 7, and the table Sustain-reminder pass of Sprint 8 were implemented on 2026-11-23. The findings below describe the pre-Sprint state; the implementation status sections record what changed, and the remaining class and table gaps stay in the backlog.
 
 > **Follow-up (2026-11-23):** `docs/RULES-AUDIT.md` corrected two table errors
 > this review did not catch: bards use the 2/3 full-caster slot table (not the
@@ -100,7 +100,7 @@ Magus studious slots are implemented:
 - Casting spends a studious use, Restore returns it, and long rests reset the uses.
 - The sheet shows a separate studious slot row and offers the studious resource alongside ordinary slots.
 
-Still open: item spellcasting, spellbook learning, structured ritual data, a table Sustain prompt, and multiclass archetype casting.
+Still open: item spellcasting, spellbook learning, structured ritual data, and multiclass archetype casting.
 
 ## Sprint 5 implementation status (2026-11-23)
 
@@ -135,6 +135,16 @@ Psychic psi amps are implemented:
 - Casting an amp spends 1 Focus Point; Restore returns it, and an empty pool blocks amping while leaving the base cantrip castable.
 - The sheet shows the amp summary on each psi cantrip and marks the cast as amped in chat and toast output.
 - Higher-level unique psi cantrips beyond the granted surface cantrip remain manual.
+
+## Sprint 8 implementation status (2026-11-23)
+
+The table Sustain reminder is implemented:
+
+- When the active combatant is a character with sustained spells, the table shows a Sustain reminder below the initiative bar.
+- The reminder lists each sustained spell with its cast rank and offers a one-click **Sustain** acknowledgement for the current turn.
+- Players who own the character and the GM can end a sustained spell directly from the reminder.
+- The reminder resets on the next turn or round and disappears when the character has no sustained spells.
+- Opening the character sheet from the reminder is one click away.
 
 ## Rules baseline
 
@@ -209,7 +219,7 @@ Legend: Yes = modeled and usable; Partial = some support with known gaps; No = n
 | Magus studious slots | Yes | Two special slots at 7th, rank 3 at 11th, rank 4 at 13th; hybrid-study list and preparation UI |
 | Animist prepared/spontaneous split | Yes | Prepared animist slots and spontaneous apparition slots, attunement, repertoire, and vessel focus spells |
 | Rituals | Partial | Primary-check rolls work when the description names a known skill; missing data falls back to manual |
-| Sustained spells | Partial | Casting starts sustain, active spells can be ended, and Restore clears them; no table turn prompt yet |
+| Sustained spells | Yes | Casting starts sustain, the sheet and table list active spells, Sustain/End actions are available, and Restore clears them |
 | Spellbook capacity and learning | No | No starting-spellbook or Learn a Spell accounting |
 | Item spellcasting | No | Scrolls are generic consumables; staves/wands do not cast spells |
 | Multiclass spellcasting archetypes | No | Only the primary class contributes caster progression |
@@ -362,13 +372,13 @@ Fix: Add an explicit restore/undo action per cast, or store a small daily cast l
 
 ### F10. The sustain subsystem is unused (P2)
 
-Status: partly fixed in Sprint 3. The sheet starts, lists, and ends sustained spells; a table turn prompt is still open.
+Status: fixed in Sprint 8. The sheet starts, lists, and ends sustained spells, and the table now shows a turn reminder with a one-click Sustain acknowledgement and per-spell End.
 
 `src/shared/sustain.ts` implements `beginSustainedSpell`, `endSustainedSpell`, `sustainedSpellFor`, and a 12-spell UI safety cap. Casting a sustain spell now records it, Restore clears it, and the Spells tab lists active sustained spells with an End action.
 
 Impact: The sheet now starts and ends sustained spells, but the table still has no automatic turn prompt to remind the player to spend the Sustain action.
 
-Fix: The sheet controls are in place. A future table-magic pass can add a turn-start reminder and a one-click Sustain action from the initiative bar.
+Fix: The table reminder now appears below the initiative bar for an active character with sustained spells, with Sustain and End controls. Further automation can add action-pip spending once the table tracks actions.
 
 ### F11. Rituals are a stub (P2)
 

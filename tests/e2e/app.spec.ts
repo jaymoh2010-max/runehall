@@ -889,6 +889,35 @@ test("Pathbuilder JSON import creates a character from the dashboard", async ({ 
 
 test("GM places a token, chats, rolls, and opens the scenes manager", async ({ page, browser }) => {
   await signIn(page, admin);
+  const campaignId = campaignPath.split("/").pop();
+  const list = await page.request.get(`/api/characters?campaignId=${campaignId}`);
+  expect(list.ok()).toBe(true);
+  const characters = (await list.json()) as { characters: { id: string; name: string }[] };
+  const hero = characters.characters.find((entry) => entry.name === "E2E Hero");
+  expect(hero).toBeTruthy();
+  const full = await page.request.get(`/api/characters/${hero!.id}`);
+  expect(full.ok()).toBe(true);
+  const record = (await full.json()) as {
+    character: { data: { play: Record<string, unknown> } };
+  };
+  const sustained = {
+    id: "sustain_e2e",
+    spellId: "spell:test-sustain",
+    name: "Flaming Sphere",
+    rank: 2,
+    duration: "sustained up to 1 minute",
+  };
+  const updated = await page.request.put(`/api/characters/${hero!.id}`, {
+    data: {
+      data: {
+        ...record.character.data,
+        play: { ...record.character.data.play, sustainedSpells: [sustained] },
+      },
+      force: true,
+    },
+  });
+  expect(updated.ok()).toBe(true);
+
   await page.goto(campaignPath);
   await expect(page.getByRole("heading", { name: campaignName })).toBeVisible();
   await expect(page.getByRole("heading", { name: "The First Step" })).toBeVisible({
@@ -914,6 +943,12 @@ test("GM places a token, chats, rolls, and opens the scenes manager", async ({ p
   await initiativeControls.getByRole("button", { name: "GM", exact: true }).click();
   await page.getByRole("menuitem", { name: "Roll initiative" }).click();
   await expect(page.locator(".initiative-chip.is-active")).toBeVisible({ timeout: 15_000 });
+  const sustainReminder = page.getByTestId("table-sustain-reminder");
+  await expect(sustainReminder).toContainText("Flaming Sphere");
+  await sustainReminder.getByRole("button", { name: "Sustain", exact: true }).click();
+  await expect(sustainReminder).toContainText("Sustained this turn");
+  await sustainReminder.getByRole("button", { name: "End sustained Flaming Sphere" }).click();
+  await expect(sustainReminder).toBeHidden({ timeout: 15_000 });
   await expect(page.locator(".action-pip")).toHaveCount(0);
   const roundBefore = Number((await page.locator(".initiative-round strong").textContent()) ?? "0");
   await initiativeControls.getByRole("button", { name: "GM", exact: true }).click();
