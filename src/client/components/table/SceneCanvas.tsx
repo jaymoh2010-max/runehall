@@ -1131,7 +1131,12 @@ export function SceneCanvas({
         }}
       >
         {scene.imageUrl ? (
-          <img className="scene-map-img" src={scene.imageUrl} alt="" draggable={false} />
+          <img
+            className={`scene-map-img ${scene.imageUrl.startsWith("/maps/") ? "is-builtin-map" : ""}`}
+            src={scene.imageUrl}
+            alt=""
+            draggable={false}
+          />
         ) : (
           <div className="scene-blank" />
         )}

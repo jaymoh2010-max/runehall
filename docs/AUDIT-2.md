@@ -18,6 +18,7 @@ A second pass over the manual-first table after the first audit remediation, foc
 - **Creature HP and AC are GM-only.** Unlinked creature tokens are redacted in table snapshots and token broadcasts. Linked character tokens keep party HP/AC. The token panel and map also hide creature defenses defensively.
 - **Token art uploads are available to owners and the GM.** Players can upload art for their own token; the GM can upload for any token. Player-supplied URLs are restricted to uploaded assets, while the GM retains the URL field.
 - **Creature tokens have default portraits.** Any unlinked creature token without custom art gets an archetype icon based on its bestiary traits. The bestiary list shows the same avatar. The icon set is CC BY 3.0 from Game-icons.net; see `public/tokens/creature/ATTRIBUTION.md`.
+- **The built-in map library uses open cartography.** The ten presets now use CC BY 4.0 maps from Dyson Logos and Free Fantasy Maps, with grid sizes, grid offsets, thumbnails, and in-app credit lines. See `public/maps/ATTRIBUTION.md`.
 - **The token panel header uses generated creature art.** The 40px avatar now matches the token on the map.
 
 ## Verification

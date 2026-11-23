@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   BUILTIN_MAP_CATEGORIES,
@@ -15,6 +16,11 @@ describe("built-in maps", () => {
       expect(categories.has(map.category)).toBe(true);
       expect(map.imageUrl.startsWith("/maps/")).toBe(true);
       expect(map.thumbnailUrl.startsWith("/maps/")).toBe(true);
+      expect(fs.existsSync(`public${map.imageUrl}`), map.imageUrl).toBe(true);
+      expect(fs.existsSync(`public${map.thumbnailUrl}`), map.thumbnailUrl).toBe(true);
+      expect(map.credit).toBeTruthy();
+      expect(map.license).toBe("CC BY 4.0");
+      expect(map.sourceUrl).toBeTruthy();
     }
     for (const entry of BUILTIN_MAP_CATEGORIES) {
       if (entry.id === "all") continue;
@@ -22,11 +28,15 @@ describe("built-in maps", () => {
     }
   });
 
-  it("uses exact grid-aligned dimensions", () => {
+  it("has usable grid dimensions and offsets", () => {
     for (const map of BUILTIN_MAPS) {
-      expect(map.width % map.gridSize).toBe(0);
-      expect(map.height % map.gridSize).toBe(0);
-      expect(builtinMapSquares(map)).toEqual({ cols: 24, rows: 16 });
+      const squares = builtinMapSquares(map);
+      expect(squares.cols).toBeGreaterThan(10);
+      expect(squares.rows).toBeGreaterThan(10);
+      expect(map.width % map.gridSize).toBeLessThan(map.gridSize);
+      expect(map.height % map.gridSize).toBeLessThan(map.gridSize);
+      expect(map.gridOffsetX ?? 0).toBeGreaterThanOrEqual(-map.gridSize);
+      expect(map.gridOffsetY ?? 0).toBeGreaterThanOrEqual(-map.gridSize);
     }
   });
 

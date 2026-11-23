@@ -20,7 +20,7 @@ Four campaign sections:
 ### Table
 
 - Scene maps with grid calibration, pan/zoom, token drag, snap, and a live movement-distance readout while dragging.
-- Built-in maps plus custom uploads.
+- Built-in maps plus custom uploads. The library uses CC BY 4.0 cartography from Dyson Logos and Free Fantasy Maps; see `public/maps/ATTRIBUTION.md`.
 - Fog of war, distance measuring, pointer pings, and player presence.
 - Tokens for party characters, monsters, and custom markers. Players can upload art for their own token; the GM can upload art for any token.
 - Bestiary creatures get CC BY 3.0 archetype icons from Game-icons.net when no custom art is uploaded; see `public/tokens/creature/ATTRIBUTION.md`.

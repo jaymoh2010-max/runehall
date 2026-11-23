@@ -610,6 +610,8 @@ export function SceneManagerModal({
           width: dimensions.width,
           height: dimensions.height,
           gridSize: Number(gridSize) || 70,
+          gridOffsetX: selectedBuiltin?.gridOffsetX ?? 0,
+          gridOffsetY: selectedBuiltin?.gridOffsetY ?? 0,
           activate: activateOnCreate,
           visible: visibleOnCreate,
         },
@@ -812,6 +814,11 @@ export function SceneManagerModal({
                         {builtinMapCategoryLabel(map.category)} · {squares.cols}×{squares.rows}{" "}
                         squares
                       </span>
+                      {map.credit ? (
+                        <span className="map-library-credit">
+                          {map.credit} · {map.license}
+                        </span>
+                      ) : null}
                     </span>
                   </button>
                 );
@@ -849,6 +856,12 @@ export function SceneManagerModal({
           {selectedBuiltin ? (
             <p className="tiny muted">
               Selected: <strong>{selectedBuiltin.name}</strong> — {selectedBuiltin.description}
+              {selectedBuiltin.credit ? (
+                <>
+                  {" "}
+                  · {selectedBuiltin.credit} ({selectedBuiltin.license})
+                </>
+              ) : null}
             </p>
           ) : null}
           <div className="form-grid">
