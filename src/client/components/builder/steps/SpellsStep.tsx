@@ -104,6 +104,7 @@ import {
   type DivineFontChoice,
 } from "../../../../shared/rules";
 import { api, formatCp, uploadImage } from "../../../api";
+import { AnimistApparitionsCard } from "../../AnimistApparitionsCard";
 import { errorMessage } from "../../../stores";
 import { useToasts } from "../../../stores";
 import {
@@ -154,7 +155,6 @@ export function SpellsStep({ draft, update, derived, context, setStep, openPicke
   const classData = context.classData;
   const caster = casterInfo(classData);
   const tradition = derived.casterTradition ?? draft.spells.tradition;
-  const classTrait = classData?.name.toLowerCase();
   const cantrips = draft.spells.cantrips
     .map((id) => context.spells[id])
     .filter((spell): spell is Spell => Boolean(spell));
@@ -207,6 +207,12 @@ export function SpellsStep({ draft, update, derived, context, setStep, openPicke
   const knownCantripCap = cantripLimitFor(classData) ?? repertoire?.cantrips ?? null;
   const preparedCantripCap = cantripPreparedLimitFor(classData);
   const isPreparedCaster = isPreparedCasterClass(classData?.name);
+  const isAnimist = classData?.name.toLowerCase() === "animist";
+  const preparedListLabel = isAnimist
+    ? "prepared list"
+    : isPreparedCaster
+      ? "spellbook"
+      : "repertoire";
   const cantripContext = { spells: context.spells, deity: context.deity, classData };
   const preparedCantripList = preparedCantripIds(draft, cantripContext);
   const preparedCantripSet = new Set(preparedCantripList);
@@ -628,6 +634,7 @@ export function SpellsStep({ draft, update, derived, context, setStep, openPicke
                       divineFontUsed: 0,
                       preparedUsed: {},
                       fontUsed: {},
+                      apparitionUsed: {},
                     },
                   }))
                 }
@@ -767,6 +774,10 @@ export function SpellsStep({ draft, update, derived, context, setStep, openPicke
           <p>{derived.spellSlotsNote ?? "This class has no spell slots."}</p>
         </div>
       )}
+
+      {isAnimist ? (
+        <AnimistApparitionsCard draft={draft} context={context} onChange={update} />
+      ) : null}
 
       {derived.grantedSpells.length ? (
         <Card className="spell-section">
@@ -1016,12 +1027,12 @@ export function SpellsStep({ draft, update, derived, context, setStep, openPicke
                 <div className="row-between">
                   <div>
                     <h3>
-                      Rank {rank} {isPreparedCaster ? "spellbook" : "repertoire"}
+                      Rank {rank} {preparedListLabel}
                     </h3>
                     <p className="muted small" data-testid={`rank-summary-${rank}`}>
                       {chosenSpells.length}
                       {repertoire ? ` / ${repertoire.ranks[rank - 1] ?? 0}` : ""}{" "}
-                      {isPreparedCaster ? "in spellbook" : "known"}
+                      {isPreparedCaster ? `in ${preparedListLabel}` : "known"}
                       {grantedForRank ? ` + ${grantedForRank} granted` : ""}
                       {isPreparedCaster
                         ? fontSlotsForRank

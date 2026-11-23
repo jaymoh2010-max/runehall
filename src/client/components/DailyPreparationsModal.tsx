@@ -23,6 +23,7 @@ import {
   type DivineFontChoice,
 } from "../../shared/rules";
 import { Button, Field, Modal, Select, Tag } from "./ui";
+import { AnimistApparitionsCard } from "./AnimistApparitionsCard";
 
 interface DailyPreparationsModalProps {
   open: boolean;
@@ -221,6 +222,7 @@ export function DailyPreparationsModal({
         fontUsed: {},
         divineFontUsed: 0,
         studiousUsed: {},
+        apparitionUsed: {},
       },
     });
   };
@@ -269,6 +271,11 @@ export function DailyPreparationsModal({
             </Button>
           </div>
         </div>
+        <AnimistApparitionsCard
+          draft={working}
+          context={context}
+          onChange={(updater) => setWorking((current) => (current ? updater(current) : current))}
+        />
         {fontSlots > 0 && fontChoices.length > 1 ? (
           <Field
             label="Divine font"

@@ -1,4 +1,5 @@
 import {
+  animistApparitionInfo,
   casterInfo,
   divineFontInfo,
   isCantripPrepared,
@@ -11,7 +12,8 @@ import {
 import { consumeInnateUse } from "./innate";
 import type { CharacterContext, CharacterDraft, Spell } from "./types";
 
-export type SpellCastResource = "cantrip" | "focus" | "font" | "slot" | "innate" | "studious";
+export type SpellCastResource =
+  "cantrip" | "focus" | "font" | "slot" | "innate" | "studious" | "apparition";
 
 export interface SpellCastOption {
   rank: number;
@@ -145,7 +147,8 @@ export function spellCastOptions(
   if (caster.progression === "none" || caster.progression === "focus") return [];
   const ordinary = ordinarySpellSlotsFor(level, caster.progression, context.classData?.name);
   if (!ordinary) return [];
-  const maxRank = ordinary.length;
+  const apparition = animistApparitionInfo(draft, context);
+  const maxRank = Math.max(ordinary.length, apparition?.slots.length ?? 0);
   if (spell.rank > maxRank) return [];
 
   const preparedCaster = isPreparedCasterClass(context.classData?.name);
@@ -160,7 +163,7 @@ export function spellCastOptions(
       deity: context.deity,
       classData: context.classData,
     }).filter(
-      (entry) => entry.id === spell.id && entry.rank >= spell.rank && entry.rank <= maxRank
+      (entry) => entry.id === spell.id && entry.rank >= spell.rank && entry.rank <= ordinary.length
     );
 
     const copiesByRank = new Map<number, { font: number; ordinary: number }>();
@@ -216,6 +219,20 @@ export function spellCastOptions(
         remaining: Math.max(0, Math.min(studious.count - totalUsed, copies - spent)),
         label: "Studious slot",
       });
+    }
+
+    if (apparition?.repertoire.some((entry) => entry.spell.id === spell.id)) {
+      for (let rank = spell.rank; rank <= apparition.slots.length; rank += 1) {
+        const slotCount = apparition.slots[rank - 1] ?? 0;
+        if (slotCount <= 0) continue;
+        const used = clampInt(draft.spells.apparitionUsed[String(rank)], 0, slotCount);
+        options.push({
+          rank,
+          resource: "apparition",
+          remaining: Math.max(0, slotCount - used),
+          label: "Apparition slot",
+        });
+      }
     }
 
     return options.sort(
@@ -345,6 +362,24 @@ export function castSpell(
     };
   }
 
+  if (option.resource === "apparition") {
+    const slots = animistApparitionInfo(draft, context)?.slots ?? [];
+    const slotCount = slots[option.rank - 1] ?? 0;
+    const key = String(option.rank);
+    const used = clampInt(draft.spells.apparitionUsed[key], 0, slotCount);
+    if (slotCount <= 0 || used >= slotCount) return null;
+    return {
+      draft: {
+        ...draft,
+        spells: {
+          ...draft.spells,
+          apparitionUsed: { ...draft.spells.apparitionUsed, [key]: used + 1 },
+        },
+      },
+      option: { ...option, remaining: Math.max(0, slotCount - used - 1) },
+    };
+  }
+
   const key = String(option.rank);
   const used = Math.max(0, Math.round(Number(draft.spells.slotsUsed[key]) || 0));
   if (option.remaining !== null && option.remaining <= 0) return null;
@@ -397,6 +432,11 @@ export function canRestoreSpellUse(
   }
   if (choice.resource === "studious") {
     return Math.max(0, Math.round(Number(draft.spells.studiousUsed[spell.id]) || 0)) > 0;
+  }
+  if (choice.resource === "apparition") {
+    return (
+      Math.max(0, Math.round(Number(draft.spells.apparitionUsed[String(choice.rank)]) || 0)) > 0
+    );
   }
   const key = String(choice.rank);
   return Math.max(0, Math.round(Number(draft.spells.slotsUsed[key]) || 0)) > 0;
@@ -455,6 +495,18 @@ export function restoreSpellUse(
       spells: {
         ...draft.spells,
         studiousUsed: { ...draft.spells.studiousUsed, [spell.id]: Math.max(0, used - 1) },
+      },
+    };
+  }
+
+  if (choice.resource === "apparition") {
+    const key = String(choice.rank);
+    const used = Math.max(0, Math.round(Number(draft.spells.apparitionUsed[key]) || 0));
+    return {
+      ...draft,
+      spells: {
+        ...draft.spells,
+        apparitionUsed: { ...draft.spells.apparitionUsed, [key]: Math.max(0, used - 1) },
       },
     };
   }

@@ -836,6 +836,10 @@ export function CharacterSheetView({
         ids: preparedCantripIds(draft, context),
       },
       { label: "Prepared", ids: draft.spells.prepared },
+      {
+        label: "Apparition",
+        ids: (derived?.animistApparitions?.repertoire ?? []).map((entry) => entry.spell.id),
+      },
       { label: "Spells", ids: draft.spells.known },
       { label: "Focus", ids: draft.spells.focus },
       { label: "Innate", ids: draft.spells.innate },
@@ -861,7 +865,7 @@ export function CharacterSheetView({
           id,
         }))
     );
-  }, [context, derived?.grantedSpells, draft]);
+  }, [context, derived?.animistApparitions?.repertoire, derived?.grantedSpells, draft]);
 
   const featName = useCallback(
     (id: string | null | undefined) => (id ? (context?.feats[id]?.name ?? id) : ""),
@@ -2178,6 +2182,24 @@ export function CharacterSheetView({
                     </div>
                   </div>
                 ) : null}
+                {derived.animistApparitions ? (
+                  <div className="pb-sustain-list" data-testid="attuned-apparitions">
+                    <span className="tiny muted">Apparitions</span>
+                    <div className="chip-row">
+                      {derived.animistApparitions.attuned.map((apparition) => (
+                        <span className="pb-sustain-chip" key={apparition.id}>
+                          <strong>{apparition.name}</strong>
+                          {derived.animistApparitions?.primaryId === apparition.id ? (
+                            <em>primary</em>
+                          ) : null}
+                        </span>
+                      ))}
+                      {!derived.animistApparitions.attuned.length ? (
+                        <span className="tiny muted">None attuned</span>
+                      ) : null}
+                    </div>
+                  </div>
+                ) : null}
                 <div className="pb-slot-list">
                   {(derived.spellSlots ?? []).map((slotTotal, index) => {
                     if (slotTotal <= 0) return null;
@@ -2226,6 +2248,56 @@ export function CharacterSheetView({
                         </div>
                         <em>
                           {total - used} / {total}
+                        </em>
+                      </div>
+                    );
+                  })}
+                  {(derived.animistApparitions?.slots ?? []).map((slotTotal, index) => {
+                    if (slotTotal <= 0) return null;
+                    const rank = index + 1;
+                    const used = Math.max(
+                      0,
+                      Math.min(
+                        slotTotal,
+                        Math.round(Number(draft.spells.apparitionUsed[String(rank)]) || 0)
+                      )
+                    );
+                    return (
+                      <div className="pb-slot-row" key={`apparition-rank-${rank}`}>
+                        <span>Apparition rank {rank}</span>
+                        <div className="pb-slot-pips">
+                          {Array.from({ length: slotTotal }).map((_pip, pip) => (
+                            <button
+                              key={pip}
+                              type="button"
+                              className={used > pip ? "is-used" : ""}
+                              aria-label={`Set apparition rank ${rank} slots used to ${pip + 1}`}
+                              disabled={!canEdit}
+                              onClick={() =>
+                                void persist((currentDraft) => {
+                                  const currentUsed = Math.max(
+                                    0,
+                                    Math.round(
+                                      Number(currentDraft.spells.apparitionUsed[String(rank)]) || 0
+                                    )
+                                  );
+                                  return {
+                                    ...currentDraft,
+                                    spells: {
+                                      ...currentDraft.spells,
+                                      apparitionUsed: {
+                                        ...currentDraft.spells.apparitionUsed,
+                                        [String(rank)]: currentUsed === pip + 1 ? pip : pip + 1,
+                                      },
+                                    },
+                                  };
+                                })
+                              }
+                            />
+                          ))}
+                        </div>
+                        <em>
+                          {slotTotal - used} / {slotTotal}
                         </em>
                       </div>
                     );

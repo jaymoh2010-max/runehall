@@ -187,6 +187,35 @@ export interface StudiousSlotInfo {
   spells: StudiousSlotSpell[];
 }
 
+/** One spell in an animist's apparition repertoire, with its source. */
+export interface ApparitionSpell {
+  apparitionId: string;
+  apparitionName: string;
+  spell: Spell;
+}
+
+/** One attuned apparition and the spells it contributes at this level. */
+export interface AttunedApparition {
+  id: string;
+  name: string;
+  skills: string[];
+  cantrip: Spell | null;
+  spells: Spell[];
+  vesselSpell: Spell | null;
+}
+
+export interface AnimistApparitionInfo {
+  /** Spontaneous apparition slots per rank. */
+  slots: number[];
+  /** Number of apparitions the character attunes to at this level. */
+  maxAttuned: number;
+  /** Effective primary apparition, which is always one of the attuned ids. */
+  primaryId: string | null;
+  attuned: AttunedApparition[];
+  /** Deduplicated apparition repertoire, ordered by rank then name. */
+  repertoire: ApparitionSpell[];
+}
+
 export interface ClassGrant {
   feats?: ClassGrantFeat[];
   spells?: ClassGrantSpell[];
@@ -867,6 +896,12 @@ export interface CharacterDraft {
     studiousPrepared: string[];
     /** Studious spell uses spent today, keyed by spell id. */
     studiousUsed: Record<string, number>;
+    /** Animist apparitions attuned during daily preparations. */
+    attunedApparitions: string[];
+    /** Animist primary apparition; must be one of `attunedApparitions`. */
+    primaryApparition: string | null;
+    /** Spontaneous apparition slot uses spent today, keyed by rank. */
+    apparitionUsed: Record<string, number>;
     focus: string[];
     /** Divine font pips spent today (cleric heal/harm slots). */
     divineFontUsed: number;
@@ -1078,6 +1113,8 @@ export interface DerivedCharacter {
   spellSlotsNote: string | null;
   /** Magus studious slots at 7th level and later, with their allowed spells. */
   studiousSlots: StudiousSlotInfo | null;
+  /** Animist prepared/spontaneous split, attunement, and repertoire. */
+  animistApparitions: AnimistApparitionInfo | null;
   /** Cleric divine font slots, tracked separately from ordinary slots. */
   divineFontSlots: number | null;
   divineFontRank: number | null;

@@ -3,6 +3,9 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { contextForDraft } from "../src/server/compendium";
 import {
+  animistApparitionLimit,
+  animistApparitionSlots,
+  animistPreparedSlots,
   animistSlots,
   boundedCasterSlots,
   casterInfo,
@@ -762,7 +765,18 @@ describe("PF2e character rules", () => {
     expect(animistSlots(3)).toEqual([3, 2]);
     expect(animistSlots(10)).toEqual([4, 4, 4, 3, 3]);
     expect(animistSlots(15)).toEqual([4, 4, 4, 4, 4, 4, 3, 2]);
-    expect(spellSlotsFor(10, "full", "Animist")).toEqual([4, 4, 4, 3, 3]);
+    expect(animistPreparedSlots(1)).toEqual([1]);
+    expect(animistApparitionSlots(1)).toEqual([1]);
+    expect(animistPreparedSlots(10)).toEqual([2, 2, 2, 2, 2]);
+    expect(animistApparitionSlots(10)).toEqual([2, 2, 2, 1, 1]);
+    expect(animistPreparedSlots(15)).toEqual([2, 2, 2, 2, 2, 2, 2, 1]);
+    expect(animistApparitionSlots(15)).toEqual([2, 2, 2, 2, 2, 2, 1, 1]);
+    expect(animistPreparedSlots(19)).toEqual([2, 2, 2, 2, 2, 2, 2, 2, 2]);
+    expect(animistApparitionSlots(19)).toEqual([2, 2, 2, 2, 2, 2, 2, 2, 1, 1]);
+    expect(animistApparitionLimit(1)).toBe(2);
+    expect(animistApparitionLimit(7)).toBe(3);
+    expect(animistApparitionLimit(15)).toBe(4);
+    expect(spellSlotsFor(10, "full", "Animist")).toEqual([2, 2, 2, 2, 2]);
     expect(spellSlotsFor(1, "full", "Cleric")).toEqual([6]);
     expect(spellSlotsFor(5, "full", "Cleric")).toEqual([3, 3, 7]);
     expect(spellSlotsFor(15, "full", "Cleric")).toEqual([3, 3, 3, 3, 3, 3, 3, 8]);
@@ -791,10 +805,11 @@ describe("PF2e character rules", () => {
     expect(cantripLimitFor(classes.find((entry) => entry.name === "Oracle"))).toBe(5);
     expect(cantripLimitFor(classes.find((entry) => entry.name === "Sorcerer"))).toBe(4);
     expect(cantripLimitFor(classes.find((entry) => entry.name === "Psychic"))).toBe(3);
-    expect(cantripLimitFor(classes.find((entry) => entry.name === "Animist"))).toBe(4);
+    expect(cantripLimitFor(classes.find((entry) => entry.name === "Animist"))).toBe(2);
     expect(cantripLimitFor(classes.find((entry) => entry.name === "Magus"))).toBe(8);
     expect(cantripPreparedLimitFor(classes.find((entry) => entry.name === "Wizard"))).toBe(5);
     expect(cantripPreparedLimitFor(classes.find((entry) => entry.name === "Magus"))).toBe(5);
+    expect(cantripPreparedLimitFor(classes.find((entry) => entry.name === "Animist"))).toBe(2);
     expect(cantripPreparedLimitFor(classes.find((entry) => entry.name === "Sorcerer"))).toBeNull();
     const heal = spells.find((entry) => entry.name === "Heal")!;
     const fireball = spells.find((entry) => entry.name === "Fireball")!;
