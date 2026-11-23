@@ -43,7 +43,11 @@ import {
   titleCase,
 } from "../../../shared/rules";
 import { currencyToCp } from "../../../shared/inventory";
-import { scrollSpellRank, wandSpellRank } from "../../../shared/itemSpellcasting";
+import {
+  scrollSpellRank,
+  specificWandSpell,
+  wandSpellRank,
+} from "../../../shared/itemSpellcasting";
 import { SpellPicker } from "../builder/pickers";
 import { applyHpEditToDraft } from "../../../shared/damage";
 import { rollFormula } from "../../../shared/dice";
@@ -569,6 +573,14 @@ export function CharacterSheetView({
     [draft?.customItems]
   );
 
+  const spellsByName = useMemo(
+    () =>
+      new Map(
+        Object.values(context?.spells ?? {}).map((spell) => [spell.name.toLowerCase(), spell])
+      ),
+    [context?.spells]
+  );
+
   const parsedDc = Number(sheetDc);
   const targetDc = sheetDc.trim() !== "" && Number.isFinite(parsedDc) ? Math.round(parsedDc) : null;
   const postRoll = useCallback(
@@ -847,45 +859,50 @@ export function CharacterSheetView({
     if (characterRef.current) await applyRecord(characterRef.current);
   };
 
+  const castWandSpell = async (item: Equipment, rank: number, spell: Spell) => {
+    if (!canEdit) return;
+    const entry = draftRef.current?.equipment.find((candidate) => candidate.itemId === item.id);
+    if (!entry) {
+      toast("That wand is no longer in the inventory.", "error");
+      return;
+    }
+    const max = Math.max(1, Math.round(entry.usesMax ?? 1));
+    const used = Math.max(0, Math.round(entry.usesUsed ?? 0));
+    if (used >= max) {
+      toast(`${item.name} has no uses left today.`, "error");
+      return;
+    }
+    const saved = await persist((currentDraft) => ({
+      ...currentDraft,
+      equipment: currentDraft.equipment.map((candidate) => {
+        if (candidate.itemId !== item.id) return candidate;
+        const candidateMax = Math.max(1, Math.round(candidate.usesMax ?? max));
+        const candidateUsed = Math.max(0, Math.round(candidate.usesUsed ?? 0));
+        return {
+          ...candidate,
+          usesUsed: Math.min(candidateMax, candidateUsed + 1),
+          usesMax: candidateMax,
+        };
+      }),
+    }));
+    if (!saved) return;
+    toast(`Cast ${spell.name} from a magic wand at rank ${rank}.`, "success");
+    const current = characterRef.current;
+    if (current?.campaignId) {
+      getSocket().emit("chat:send", {
+        campaignId: current.campaignId,
+        content: `${current.name} casts ${spell.name} at rank ${rank} from a magic wand.`,
+        visibility: "all",
+      });
+    }
+  };
+
   const castItemSpell = async (spell: Spell) => {
     if (!canEdit || !itemCast) return;
     const { item, rank, kind } = itemCast;
     setItemCast(null);
     if (kind === "wand") {
-      const entry = draftRef.current?.equipment.find((candidate) => candidate.itemId === item.id);
-      if (!entry) {
-        toast("That wand is no longer in the inventory.", "error");
-        return;
-      }
-      const max = Math.max(1, Math.round(entry.usesMax ?? 1));
-      const used = Math.max(0, Math.round(entry.usesUsed ?? 0));
-      if (used >= max) {
-        toast(`${item.name} has no uses left today.`, "error");
-        return;
-      }
-      const saved = await persist((currentDraft) => ({
-        ...currentDraft,
-        equipment: currentDraft.equipment.map((candidate) => {
-          if (candidate.itemId !== item.id) return candidate;
-          const candidateMax = Math.max(1, Math.round(candidate.usesMax ?? max));
-          const candidateUsed = Math.max(0, Math.round(candidate.usesUsed ?? 0));
-          return {
-            ...candidate,
-            usesUsed: Math.min(candidateMax, candidateUsed + 1),
-            usesMax: candidateMax,
-          };
-        }),
-      }));
-      if (!saved) return;
-      toast(`Cast ${spell.name} from a magic wand at rank ${rank}.`, "success");
-      const current = characterRef.current;
-      if (current?.campaignId) {
-        getSocket().emit("chat:send", {
-          campaignId: current.campaignId,
-          content: `${current.name} casts ${spell.name} at rank ${rank} from a magic wand.`,
-          visibility: "all",
-        });
-      }
+      await castWandSpell(item, rank, spell);
       return;
     }
     const saved = await persist((currentDraft) => ({
@@ -2117,6 +2134,22 @@ export function CharacterSheetView({
                           const wandUsed = Math.max(0, Math.round(entry.usesUsed ?? 0)) >= wandMax;
                           const canCastItem =
                             derived?.spellDc != null && Boolean(derived.casterTradition);
+                          const fixedWand = item ? specificWandSpell(item) : null;
+                          const fixedWandSpell = fixedWand
+                            ? (spellsByName.get(fixedWand.name.toLowerCase()) ?? null)
+                            : null;
+                          const fixedWandRank =
+                            fixedWand && fixedWandSpell
+                              ? (fixedWand.rank ?? fixedWandSpell.rank)
+                              : null;
+                          const fixedWandCastable =
+                            Boolean(fixedWandSpell && fixedWandRank && canCastItem) &&
+                            Boolean(
+                              fixedWandSpell &&
+                              derived?.casterTradition &&
+                              (fixedWandSpell.traditions.length === 0 ||
+                                fixedWandSpell.traditions.includes(derived.casterTradition))
+                            );
                           return (
                             <div className="pb-inventory-row" key={entry.itemId}>
                               {custom ? (
@@ -2189,6 +2222,27 @@ export function CharacterSheetView({
                                             rank: wandRank,
                                             kind: "wand",
                                           })
+                                        }
+                                      >
+                                        {wandUsed ? "Used today" : "Cast wand"}
+                                      </button>
+                                    ) : null}
+                                    {item &&
+                                    fixedWandSpell &&
+                                    fixedWandRank &&
+                                    fixedWandCastable ? (
+                                      <button
+                                        type="button"
+                                        className="pb-small-button"
+                                        disabled={!canEdit || wandUsed}
+                                        aria-label={
+                                          wandUsed
+                                            ? `${item.name} is used today`
+                                            : `Cast ${fixedWandSpell.name} from ${item.name}`
+                                        }
+                                        title="Magic wands have one cast per day; a long rest resets them."
+                                        onClick={() =>
+                                          void castWandSpell(item, fixedWandRank, fixedWandSpell)
                                         }
                                       >
                                         {wandUsed ? "Used today" : "Cast wand"}

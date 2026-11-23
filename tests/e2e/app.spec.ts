@@ -25,6 +25,9 @@ const scroll3Id = compendiumEquipment.find(
 const wand3Id = compendiumEquipment.find(
   (entry) => entry.name === "Magic Wand (3rd-Rank Spell)"
 )!.id;
+const lightningWandId = compendiumEquipment.find(
+  (entry) => entry.name === "Wand of Crackling Lightning (3rd-Rank Spell)"
+)!.id;
 const elementBloodlineId = "cf:RXRnJcG4XSabZ35a";
 const admin = {
   username: `e2e_gm_${runId}`,
@@ -1389,6 +1392,13 @@ test("builder learns a spontaneous spell at more than one rank", async ({ page }
     invested: false,
     runes: [],
   });
+  draft.equipment.push({
+    itemId: lightningWandId,
+    quantity: 1,
+    equipped: true,
+    invested: false,
+    runes: [],
+  });
   const saved = await page.request.put(`/api/characters/${character.character.id}`, {
     data: { data: draft, force: true },
   });
@@ -1462,6 +1472,15 @@ test("builder learns a spontaneous spell at more than one rank", async ({ page }
     timeout: 15_000,
   });
   await expect(wandRow.getByRole("button", { name: /used today/i })).toBeDisabled();
+  const fixedWandRow = page
+    .locator(".pb-inventory-row")
+    .filter({ hasText: "Wand of Crackling Lightning (3rd-Rank Spell)" });
+  await expect(fixedWandRow).toBeVisible();
+  await fixedWandRow.getByRole("button", { name: /Cast Lightning Bolt from/ }).click();
+  await expect(page.getByText(/Cast Lightning Bolt from a magic wand at rank 3/)).toBeVisible({
+    timeout: 15_000,
+  });
+  await expect(fixedWandRow.getByRole("button", { name: /used today/i })).toBeDisabled();
   await expect(page.locator(".pb-save")).toHaveText("Saved");
 
   await page.reload();
