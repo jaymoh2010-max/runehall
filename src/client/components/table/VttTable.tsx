@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Map, Plus, Volume2 } from "lucide-react";
 import type {
   CampaignTable,
+  CharacterRecord,
   InitiativeEntry,
   Monster,
   PublicUser,
@@ -16,6 +17,7 @@ import { Button, EmptyState } from "../ui";
 import { SceneCanvas } from "./SceneCanvas";
 import { ChatPanel } from "./ChatPanel";
 import { InitiativeBar } from "./InitiativeBar";
+import { SustainReminder } from "./SustainReminder";
 import { PartyRail } from "./PartyRail";
 import { AddTokenModal, SceneEditModal, SceneManagerModal } from "./TableModals";
 import { BestiaryPalette } from "./BestiaryPalette";
@@ -41,6 +43,7 @@ export function VttTable({ initial, campaignId, user, isGm, active }: VttTablePr
     tokens,
     setTokens,
     characters,
+    setCharacters,
     activeSceneId,
     setActiveSceneId,
     messages,
@@ -103,6 +106,13 @@ export function VttTable({ initial, campaignId, user, isGm, active }: VttTablePr
   }, []);
 
   const activeScene = scenes.find((scene) => scene.id === activeSceneId) ?? null;
+  const activeEntry = initiative[turnIndex] ?? null;
+  const activeToken = activeEntry?.tokenId
+    ? (tokens.find((token) => token.id === activeEntry.tokenId) ?? null)
+    : null;
+  const activeCharacter = activeToken?.characterId
+    ? (characters.find((character) => character.id === activeToken.characterId) ?? null)
+    : null;
   const sceneTokens = useMemo(
     () => tokens.filter((token) => token.sceneId === activeSceneId && (isGm || !token.hidden)),
     [tokens, activeSceneId, isGm]
@@ -379,6 +389,33 @@ export function VttTable({ initial, campaignId, user, isGm, active }: VttTablePr
     );
   };
 
+  const endTableSustain = async (record: CharacterRecord, spellId: string) => {
+    const spell = record.data.play.sustainedSpells.find((entry) => entry.spellId === spellId);
+    const nextDraft: CharacterRecord["data"] = {
+      ...record.data,
+      play: {
+        ...record.data.play,
+        sustainedSpells: record.data.play.sustainedSpells.filter(
+          (entry) => entry.spellId !== spellId
+        ),
+      },
+    };
+    try {
+      const result = await api<{ character: CharacterRecord }>(`/api/characters/${record.id}`, {
+        method: "PUT",
+        body: { data: nextDraft, expectedRevision: record.revision },
+      });
+      setCharacters((current) =>
+        current.map((character) =>
+          character.id === result.character.id ? result.character : character
+        )
+      );
+      toast(`Ended ${spell?.name ?? "sustained spell"}.`, "success");
+    } catch (error) {
+      toast(errorMessage(error), "error");
+    }
+  };
+
   const addManualInitiative = (name: string, value: number) => {
     const activeId = initiative[turnIndex]?.id ?? null;
     const next = [
@@ -623,6 +660,16 @@ export function VttTable({ initial, campaignId, user, isGm, active }: VttTablePr
             onAddManual={addManualInitiative}
             onSetTurn={(index) => emitInitiative(initiative, round, index)}
           />
+
+          {activeCharacter ? (
+            <SustainReminder
+              key={`${activeCharacter.id}:${round}:${turnIndex}`}
+              character={activeCharacter}
+              canEnd={isGm || activeCharacter.userId === user.id}
+              onEnd={(spellId) => void endTableSustain(activeCharacter, spellId)}
+              onOpenSheet={() => setSheetCharacterId(activeCharacter.id)}
+            />
+          ) : null}
 
           <SceneCanvas
             scene={canvasScene}
