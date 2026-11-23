@@ -85,6 +85,162 @@ const SAVE_LABELS: Record<SaveKey, string> = {
   will: "Will",
 };
 
+type ItemCategoryId =
+  | "all"
+  | "weapon"
+  | "armor"
+  | "shield"
+  | "consumable"
+  | "ammo"
+  | "equipment"
+  | "treasure"
+  | "container"
+  | "other";
+
+interface ItemSubcategory {
+  id: string;
+  label: string;
+  values?: string[];
+}
+
+const ITEM_CATEGORY_LABELS: Record<ItemCategoryId, string> = {
+  all: "All",
+  weapon: "Weapons",
+  armor: "Armor",
+  shield: "Shields",
+  consumable: "Consumables",
+  ammo: "Ammunition",
+  equipment: "Gear",
+  treasure: "Treasure",
+  container: "Containers",
+  other: "Other",
+};
+
+const ITEM_CATEGORIES: {
+  id: ItemCategoryId;
+  type?: string;
+  subcategories?: ItemSubcategory[];
+}[] = [
+  { id: "all" },
+  {
+    id: "weapon",
+    type: "weapon",
+    subcategories: [
+      { id: "all", label: "All weapons" },
+      { id: "simple", label: "Simple", values: ["simple"] },
+      { id: "martial", label: "Martial", values: ["martial"] },
+      { id: "advanced", label: "Advanced", values: ["advanced"] },
+      { id: "unarmed", label: "Unarmed", values: ["unarmed"] },
+    ],
+  },
+  {
+    id: "armor",
+    type: "armor",
+    subcategories: [
+      { id: "all", label: "All armor" },
+      { id: "unarmored", label: "Unarmored", values: ["unarmored"] },
+      { id: "light", label: "Light", values: ["light"] },
+      { id: "medium", label: "Medium", values: ["medium"] },
+      { id: "heavy", label: "Heavy", values: ["heavy"] },
+      { id: "barding", label: "Barding", values: ["light-barding", "heavy-barding"] },
+    ],
+  },
+  { id: "shield", type: "shield" },
+  {
+    id: "consumable",
+    type: "consumable",
+    subcategories: [
+      { id: "all", label: "All consumables" },
+      { id: "potion", label: "Potions", values: ["potion"] },
+      { id: "elixir", label: "Elixirs", values: ["elixir"] },
+      { id: "oil", label: "Oils", values: ["oil"] },
+      { id: "talisman", label: "Talismans", values: ["talisman"] },
+      { id: "wand", label: "Wands", values: ["wand"] },
+      { id: "scroll", label: "Scrolls", values: ["scroll"] },
+      { id: "snare", label: "Snares", values: ["snare"] },
+      { id: "poison", label: "Poisons", values: ["poison"] },
+      { id: "mutagen", label: "Mutagens", values: ["mutagen"] },
+      {
+        id: "other",
+        label: "Other",
+        values: ["other", "catalyst", "fulu", "gadget", "drug", "toolkit"],
+      },
+    ],
+  },
+  { id: "ammo", type: "ammo" },
+  { id: "equipment", type: "equipment" },
+  { id: "treasure", type: "treasure" },
+  { id: "container", type: "backpack,kit" },
+];
+
+const ITEM_CATEGORY_ORDER: ItemCategoryId[] = [
+  "weapon",
+  "armor",
+  "shield",
+  "consumable",
+  "ammo",
+  "equipment",
+  "treasure",
+  "container",
+  "other",
+];
+
+const ITEM_LEVEL_FILTERS: {
+  id: string;
+  label: string;
+  min?: number;
+  max?: number;
+}[] = [
+  { id: "all", label: "Any level" },
+  { id: "0", label: "Level 0", min: 0, max: 0 },
+  { id: "1-3", label: "Levels 1–3", min: 1, max: 3 },
+  { id: "4-6", label: "Levels 4–6", min: 4, max: 6 },
+  { id: "7-10", label: "Levels 7–10", min: 7, max: 10 },
+  { id: "11-15", label: "Levels 11–15", min: 11, max: 15 },
+  { id: "16+", label: "Levels 16+", min: 16 },
+];
+
+function itemCategoryForType(type: string): ItemCategoryId {
+  if (
+    type === "weapon" ||
+    type === "armor" ||
+    type === "shield" ||
+    type === "consumable" ||
+    type === "ammo" ||
+    type === "equipment" ||
+    type === "treasure"
+  ) {
+    return type;
+  }
+  if (type === "backpack" || type === "kit") return "container";
+  return "other";
+}
+
+function equipmentTypeLabel(item: Equipment): string {
+  switch (item.type) {
+    case "weapon":
+      return `${titleCase(item.weapon?.category ?? "weapon")} weapon`;
+    case "armor":
+      return `${titleCase(item.armor?.category ?? "armor")} armor`;
+    case "shield":
+      return "Shield";
+    case "consumable":
+      return titleCase(item.consumable?.category ?? "consumable");
+    case "ammo":
+      return "Ammunition";
+    case "treasure":
+      return "Treasure";
+    case "backpack":
+      return "Container";
+    case "kit":
+      return "Kit";
+    case "equipment":
+      return item.traits.includes("magical") ? "Magic item" : "Gear";
+    default:
+      return titleCase(item.type || "Item");
+  }
+}
+
 interface LastRoll {
   label: string;
   total: number;
@@ -158,6 +314,12 @@ export function CharacterSheetView({
   const [itemBusy, setItemBusy] = useState<string | null>(null);
   const [itemError, setItemError] = useState("");
   const [itemLoading, setItemLoading] = useState(false);
+  const [itemCategory, setItemCategory] = useState<ItemCategoryId>("all");
+  const [itemSubcategory, setItemSubcategory] = useState("all");
+  const [itemLevelFilter, setItemLevelFilter] = useState("all");
+  const [itemMagicOnly, setItemMagicOnly] = useState(false);
+  const [itemLimit, setItemLimit] = useState(30);
+  const [itemTotal, setItemTotal] = useState(0);
   const characterRef = useRef<CharacterRecord | null>(null);
   const loadedCharacterIdRef = useRef<string | null>(null);
   const draftRef = useRef<CharacterDraft | null>(null);
@@ -273,10 +435,26 @@ export function CharacterSheetView({
       setItemLoading(true);
       setItemError("");
       try {
-        const result = await api<{ items: Equipment[] }>(
-          `/api/compendium/equipment?q=${encodeURIComponent(itemQuery)}&limit=30`
+        const params = new URLSearchParams();
+        params.set("q", itemQuery);
+        params.set("limit", String(itemLimit));
+        const category = ITEM_CATEGORIES.find((entry) => entry.id === itemCategory);
+        if (category?.type) params.set("type", category.type);
+        const subcategory = category?.subcategories?.find((entry) => entry.id === itemSubcategory);
+        if (subcategory?.values?.length) {
+          params.set("subcategory", subcategory.values.join(","));
+        }
+        const level = ITEM_LEVEL_FILTERS.find((entry) => entry.id === itemLevelFilter);
+        if (level?.min !== undefined) params.set("levelMin", String(level.min));
+        if (level?.max !== undefined) params.set("levelMax", String(level.max));
+        if (itemMagicOnly) params.set("trait", "magical");
+        const result = await api<{ items: Equipment[]; total?: number }>(
+          `/api/compendium/equipment?${params.toString()}`
         );
-        if (!cancelled) setItemResults(result.items);
+        if (!cancelled) {
+          setItemResults(result.items);
+          setItemTotal(result.total ?? result.items.length);
+        }
       } catch (err) {
         if (!cancelled) setItemError(errorMessage(err));
       } finally {
@@ -287,7 +465,33 @@ export function CharacterSheetView({
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [itemQuery, tab]);
+  }, [itemCategory, itemLevelFilter, itemLimit, itemMagicOnly, itemQuery, itemSubcategory, tab]);
+
+  const inventoryGroups = useMemo(() => {
+    if (!draft || !context) return [];
+    const groups = new Map<ItemCategoryId, typeof draft.equipment>();
+    for (const entry of draft.equipment) {
+      const item = context.equipment[entry.itemId] ?? null;
+      const category = item ? itemCategoryForType(item.type) : "other";
+      const entries = groups.get(category) ?? [];
+      entries.push(entry);
+      groups.set(category, entries);
+    }
+    return [...groups.entries()]
+      .sort(
+        (left, right) =>
+          ITEM_CATEGORY_ORDER.indexOf(left[0]) - ITEM_CATEGORY_ORDER.indexOf(right[0])
+      )
+      .map(([id, entries]) => ({
+        id,
+        label: ITEM_CATEGORY_LABELS[id],
+        entries: [...entries].sort((left, right) =>
+          (context.equipment[left.itemId]?.name ?? left.itemId).localeCompare(
+            context.equipment[right.itemId]?.name ?? right.itemId
+          )
+        ),
+      }));
+  }, [context, draft]);
 
   const parsedDc = Number(sheetDc);
   const targetDc = sheetDc.trim() !== "" && Number.isFinite(parsedDc) ? Math.round(parsedDc) : null;
@@ -714,6 +918,15 @@ export function CharacterSheetView({
   const classData = context.classData ?? null;
   const hpPercent = derived.maxHp > 0 ? (derived.currentHp / derived.maxHp) * 100 : 0;
   const selectedFeatIds = new Set(derived.selectedFeats.map((feat) => feat.id));
+  const activeItemCategory =
+    ITEM_CATEGORIES.find((entry) => entry.id === itemCategory) ?? ITEM_CATEGORIES[0];
+  const itemSubcategories = activeItemCategory.subcategories ?? [];
+  const itemFiltersActive =
+    itemQuery.trim() !== "" ||
+    itemCategory !== "all" ||
+    itemSubcategory !== "all" ||
+    itemLevelFilter !== "all" ||
+    itemMagicOnly;
 
   return (
     <div
@@ -1316,24 +1529,122 @@ export function CharacterSheetView({
                 </div>
 
                 <div className="pb-gear-search">
+                  <div
+                    className="pb-filter-row pb-category-row"
+                    role="group"
+                    aria-label="Item categories"
+                  >
+                    {ITEM_CATEGORIES.map((category) => (
+                      <button
+                        key={category.id}
+                        type="button"
+                        className={itemCategory === category.id ? "is-active" : ""}
+                        aria-pressed={itemCategory === category.id}
+                        onClick={() => {
+                          setItemCategory(category.id);
+                          setItemSubcategory("all");
+                          setItemLimit(30);
+                        }}
+                      >
+                        {ITEM_CATEGORY_LABELS[category.id]}
+                      </button>
+                    ))}
+                  </div>
                   <div className="pb-search-row">
                     <Search size={14} />
                     <input
                       value={itemQuery}
-                      onChange={(event) => setItemQuery(event.target.value)}
+                      onChange={(event) => {
+                        setItemQuery(event.target.value);
+                        setItemLimit(30);
+                      }}
                       placeholder="Search the item database"
                       aria-label="Search the item database"
                     />
                     {itemLoading ? <span className="pb-loading-dot" /> : null}
                   </div>
+                  {itemSubcategories.length ? (
+                    <div
+                      className="pb-filter-row pb-subcategory-row"
+                      role="group"
+                      aria-label="Item subcategories"
+                    >
+                      {itemSubcategories.map((subcategory) => (
+                        <button
+                          key={subcategory.id}
+                          type="button"
+                          className={itemSubcategory === subcategory.id ? "is-active" : ""}
+                          aria-pressed={itemSubcategory === subcategory.id}
+                          onClick={() => {
+                            setItemSubcategory(subcategory.id);
+                            setItemLimit(30);
+                          }}
+                        >
+                          {subcategory.label}
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+                  <div className="pb-item-filter-row">
+                    <select
+                      className="pb-gear-filter-select"
+                      value={itemLevelFilter}
+                      aria-label="Item level"
+                      onChange={(event) => {
+                        setItemLevelFilter(event.target.value);
+                        setItemLimit(30);
+                      }}
+                    >
+                      {ITEM_LEVEL_FILTERS.map((level) => (
+                        <option key={level.id} value={level.id}>
+                          {level.label}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      className={`pb-filter-chip ${itemMagicOnly ? "is-active" : ""}`}
+                      aria-pressed={itemMagicOnly}
+                      title="Show only items with the magical trait"
+                      onClick={() => {
+                        setItemMagicOnly((current) => !current);
+                        setItemLimit(30);
+                      }}
+                    >
+                      Magic only
+                    </button>
+                    {itemFiltersActive ? (
+                      <button
+                        type="button"
+                        className="pb-filter-chip"
+                        aria-label="Reset item filters"
+                        onClick={() => {
+                          setItemQuery("");
+                          setItemCategory("all");
+                          setItemSubcategory("all");
+                          setItemLevelFilter("all");
+                          setItemMagicOnly(false);
+                          setItemLimit(30);
+                        }}
+                      >
+                        Reset
+                      </button>
+                    ) : null}
+                    <span className="pb-item-count" role="status">
+                      {itemLoading
+                        ? "Searching…"
+                        : `${itemTotal.toLocaleString()} item${itemTotal === 1 ? "" : "s"}`}
+                    </span>
+                  </div>
                   {itemError ? <p className="pb-error-text">{itemError}</p> : null}
                   <div className="pb-item-results">
-                    {itemResults.slice(0, 16).map((item) => (
+                    {itemResults.map((item) => (
                       <div className="pb-item-row" key={item.id}>
                         <Link to={`/library/equipment/${item.id}`} className="pb-item-name">
                           <strong>{item.name}</strong>
                           <span>
-                            Level {item.level} · {formatCp(item.price.cpTotal)}
+                            {equipmentTypeLabel(item)} · Level {item.level} ·{" "}
+                            {formatCp(item.price.cpTotal)}
                           </span>
                         </Link>
                         <input
@@ -1372,9 +1683,28 @@ export function CharacterSheetView({
                       </div>
                     ))}
                     {!itemResults.length && !itemLoading ? (
-                      <p className="pb-empty">No items match that search.</p>
+                      <p className="pb-empty">
+                        {itemFiltersActive
+                          ? "No items match those filters."
+                          : "No items available."}
+                      </p>
                     ) : null}
                   </div>
+                  {!itemLoading && itemResults.length < itemTotal && itemLimit < 200 ? (
+                    <button
+                      type="button"
+                      className="pb-small-button"
+                      onClick={() => setItemLimit((current) => Math.min(200, current + 30))}
+                    >
+                      Show {Math.min(30, itemTotal - itemResults.length)} more
+                    </button>
+                  ) : null}
+                  {itemResults.length < itemTotal ? (
+                    <p className="pb-hint">
+                      Showing {itemResults.length.toLocaleString()} of {itemTotal.toLocaleString()}.
+                      Refine the category or search to narrow it down.
+                    </p>
+                  ) : null}
                   {!canGrant ? (
                     <p className="pb-hint">
                       The GM can enable free gear grants in campaign settings.
@@ -1383,43 +1713,61 @@ export function CharacterSheetView({
                 </div>
 
                 <div className="pb-inventory">
-                  <h3>Inventory</h3>
-                  {draft.equipment.length ? (
-                    draft.equipment.map((entry) => {
-                      const item = context.equipment[entry.itemId] ?? null;
-                      return (
-                        <div className="pb-inventory-row" key={entry.itemId}>
-                          <Link to={`/library/equipment/${entry.itemId}`}>
-                            <Package size={13} />
-                            <strong>{item?.name ?? entry.itemId}</strong>
-                            <span>×{entry.quantity}</span>
-                          </Link>
-                          <div className="pb-row-actions">
-                            {item?.price ? <span>{formatCp(item.price.cpTotal)} each</span> : null}
-                            <button
-                              type="button"
-                              className={
-                                entry.equipped ? "pb-small-button is-on" : "pb-small-button"
-                              }
-                              disabled={!canEdit}
-                              onClick={() => toggleEquipment(entry.itemId, "equipped")}
-                            >
-                              {entry.equipped ? "Equipped" : "Equip"}
-                            </button>
-                            <button
-                              type="button"
-                              className={
-                                entry.invested ? "pb-small-button is-on" : "pb-small-button"
-                              }
-                              disabled={!canEdit}
-                              onClick={() => toggleEquipment(entry.itemId, "invested")}
-                            >
-                              {entry.invested ? "Invested" : "Invest"}
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })
+                  <div className="pb-inventory-head">
+                    <h3>Inventory</h3>
+                    <span>
+                      {draft.equipment.length} item{draft.equipment.length === 1 ? "" : "s"}
+                    </span>
+                  </div>
+                  {inventoryGroups.length ? (
+                    inventoryGroups.map((group) => (
+                      <section
+                        className="pb-inventory-group"
+                        key={group.id}
+                        aria-label={group.label}
+                      >
+                        <h4>
+                          {group.label} <span>{group.entries.length}</span>
+                        </h4>
+                        {group.entries.map((entry) => {
+                          const item = context.equipment[entry.itemId] ?? null;
+                          return (
+                            <div className="pb-inventory-row" key={entry.itemId}>
+                              <Link to={`/library/equipment/${entry.itemId}`}>
+                                <Package size={13} />
+                                <strong>{item?.name ?? entry.itemId}</strong>
+                                <span>×{entry.quantity}</span>
+                              </Link>
+                              <div className="pb-row-actions">
+                                {item?.price ? (
+                                  <span>{formatCp(item.price.cpTotal)} each</span>
+                                ) : null}
+                                <button
+                                  type="button"
+                                  className={
+                                    entry.equipped ? "pb-small-button is-on" : "pb-small-button"
+                                  }
+                                  disabled={!canEdit}
+                                  onClick={() => toggleEquipment(entry.itemId, "equipped")}
+                                >
+                                  {entry.equipped ? "Equipped" : "Equip"}
+                                </button>
+                                <button
+                                  type="button"
+                                  className={
+                                    entry.invested ? "pb-small-button is-on" : "pb-small-button"
+                                  }
+                                  disabled={!canEdit}
+                                  onClick={() => toggleEquipment(entry.itemId, "invested")}
+                                >
+                                  {entry.invested ? "Invested" : "Invest"}
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </section>
+                    ))
                   ) : (
                     <p className="pb-empty">No gear yet. Search above to buy or grant an item.</p>
                   )}

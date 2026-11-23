@@ -45,6 +45,47 @@ describe("compendium search", () => {
     expect(items.items.every((item) => item.rarity === "common" && !item.playtest)).toBe(true);
   });
 
+  it("filters equipment by category and subcategory", () => {
+    const martial = searchEquipment({
+      type: ["weapon"],
+      subcategory: ["martial"],
+      limit: 200,
+      includeLegacy: true,
+    });
+    expect(martial.total).toBeGreaterThan(0);
+    expect(
+      martial.items.every((item) => item.type === "weapon" && item.weapon?.category === "martial")
+    ).toBe(true);
+
+    const potions = searchEquipment({
+      type: ["consumable"],
+      subcategory: ["potion"],
+      limit: 200,
+      includeLegacy: true,
+    });
+    expect(potions.total).toBeGreaterThan(0);
+    expect(
+      potions.items.every(
+        (item) => item.type === "consumable" && item.consumable?.category === "potion"
+      )
+    ).toBe(true);
+
+    const lightOrMedium = searchEquipment({
+      type: ["armor"],
+      subcategory: ["light", "medium"],
+      limit: 200,
+      includeLegacy: true,
+    });
+    expect(lightOrMedium.total).toBeGreaterThan(0);
+    expect(
+      lightOrMedium.items.every(
+        (item) =>
+          item.type === "armor" &&
+          (item.armor?.category === "light" || item.armor?.category === "medium")
+      )
+    ).toBe(true);
+  });
+
   it("searches every compendium category from one query", () => {
     const cases: [string, string][] = [
       ["Dwarf", "ancestry"],

@@ -121,6 +121,7 @@ export interface SearchOptions {
   coreOnly?: boolean;
   recommended?: boolean;
   type?: string[];
+  subcategory?: string[];
   usage?: string[];
   ritual?: boolean;
 }
@@ -235,12 +236,18 @@ function matchesUsage(itemUsage: string, requested: string): boolean {
 
 export function searchEquipment(opts: SearchOptions) {
   const types = opts.type?.filter(Boolean) ?? [];
+  const subcategories = opts.subcategory?.filter(Boolean) ?? [];
   const usages = opts.usage?.filter(Boolean) ?? [];
   const filtered = equipment.filter((item) => {
     if (!opts.includeLegacy && !item.remaster) return false;
     if (opts.coreOnly && !isCoreSource(item.source)) return false;
     if (opts.recommended && (item.rarity !== "common" || item.playtest)) return false;
     if (types.length && !types.includes(item.type)) return false;
+    if (subcategories.length) {
+      const subcategory =
+        item.weapon?.category ?? item.armor?.category ?? item.consumable?.category;
+      if (!subcategory || !subcategories.includes(subcategory)) return false;
+    }
     if (usages.length && !usages.some((usage) => matchesUsage(item.usage, usage))) return false;
     if (opts.levelMin !== undefined && item.level < opts.levelMin) return false;
     if (opts.levelMax !== undefined && item.level > opts.levelMax) return false;

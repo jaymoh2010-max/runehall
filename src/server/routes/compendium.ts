@@ -59,6 +59,7 @@ function parseSearch(query: Record<string, unknown>): SearchOptions {
     coreOnly: bool(query.core, false),
     recommended: bool(query.recommended, false),
     type: csv(query.type),
+    subcategory: csv(query.subcategory),
     usage: csv(query.usage),
     ritual: query.ritual === undefined ? undefined : bool(query.ritual, false),
   };
