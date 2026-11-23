@@ -28,6 +28,8 @@ import {
   type Spell,
   type SpellTradition,
   type PreparedSpellsByRank,
+  type StudiousSlotInfo,
+  type StudiousSlotSpell,
   type ValidationIssue,
 } from "./types";
 import {
@@ -64,7 +66,7 @@ import {
   heritageGrantedTraits,
   heritageSkillChoice,
 } from "./heritage";
-import { selectedClassGrants } from "./classGrants";
+import { MAGUS_STUDIOUS_BASE, MAGUS_STUDIOUS_BY_STUDY, selectedClassGrants } from "./classGrants";
 import { activeGrantChoiceGroups } from "./classGrantChoices";
 
 // ---------------------------------------------------------------------------
@@ -643,6 +645,85 @@ export function removePreparedCantrip(
   };
 }
 
+/**
+ * Magus studious slots: two special slots from 7th level, becoming 3rd rank at
+ * 11th and 4th rank at 13th. Only Gecko Grip, Haste, Fly, and the chosen hybrid
+ * study's studious spells can be prepared in them.
+ */
+export function studiousSlotInfoFor(
+  draft: Pick<CharacterDraft, "level" | "classChoices">,
+  classData: ClassData | null | undefined
+): StudiousSlotInfo | null {
+  if (classData?.name.toLowerCase() !== "magus" || draft.level < 7) return null;
+  const rank = draft.level >= 13 ? 4 : draft.level >= 11 ? 3 : 2;
+  const group = classData.choiceGroups.find((entry) => entry.tag === "magus-hybrid-study");
+  const chosen = group ? (draft.classChoices[group.key]?.[0] ?? null) : null;
+  const hybrid = chosen ? MAGUS_STUDIOUS_BY_STUDY[chosen] : undefined;
+  const spells: StudiousSlotSpell[] = [];
+  for (const entry of MAGUS_STUDIOUS_BASE) {
+    if (entry.level <= draft.level) spells.push(entry.spell);
+  }
+  for (const tier of ["7", "11", "13"] as const) {
+    const spell = hybrid?.[tier];
+    if (spell && Number(tier) <= draft.level) spells.push(spell);
+  }
+  const unique = [...new Map(spells.map((spell) => [spell.id, spell])).values()].filter(
+    (spell) => spell.rank <= rank
+  );
+  return { rank, count: 2, spells: unique };
+}
+
+export function canPrepareStudiousSpell(
+  draft: Pick<CharacterDraft, "level" | "classChoices" | "spells">,
+  classData: ClassData | null | undefined,
+  spellId: string
+): boolean {
+  const info = studiousSlotInfoFor(draft, classData);
+  if (!info) return false;
+  if (!info.spells.some((spell) => spell.id === spellId)) return false;
+  return draft.spells.studiousPrepared.length < info.count;
+}
+
+export function addStudiousSpell(
+  draft: CharacterDraft,
+  classData: ClassData | null | undefined,
+  spellId: string
+): CharacterDraft {
+  if (!canPrepareStudiousSpell(draft, classData, spellId)) return draft;
+  return {
+    ...draft,
+    spells: {
+      ...draft.spells,
+      studiousPrepared: [...draft.spells.studiousPrepared, spellId],
+    },
+  };
+}
+
+export function removeStudiousSpell(
+  draft: CharacterDraft,
+  classData: ClassData | null | undefined,
+  spellId: string
+): CharacterDraft {
+  const info = studiousSlotInfoFor(draft, classData);
+  if (!info) return draft;
+  const prepared = [...draft.spells.studiousPrepared];
+  const index = prepared.lastIndexOf(spellId);
+  if (index < 0) return draft;
+  prepared.splice(index, 1);
+  const copies = prepared.filter((id) => id === spellId).length;
+  const used = { ...draft.spells.studiousUsed };
+  if (copies === 0) delete used[spellId];
+  else if ((used[spellId] ?? 0) > copies) used[spellId] = copies;
+  return {
+    ...draft,
+    spells: {
+      ...draft.spells,
+      studiousPrepared: prepared,
+      studiousUsed: used,
+    },
+  };
+}
+
 /** Heal/Harm are the only spells a cleric's divine font can prepare. */
 export function isFontSpell(spell: Spell, deity: Deity | null | undefined): boolean {
   const name = spell.name.trim().toLowerCase();
@@ -1139,6 +1220,8 @@ export function emptyCharacterDraft(name = "New Hero"): CharacterDraft {
       prepared: [],
       preparedByRank: {},
       preparedCantrips: [],
+      studiousPrepared: [],
+      studiousUsed: {},
       focus: [],
       divineFontUsed: 0,
       fontChoice: null,
@@ -1403,6 +1486,14 @@ export function normalizeCharacterDraft(input: unknown, fallbackName = "New Hero
       preparedCantrips: Array.isArray(spells.preparedCantrips)
         ? [...new Set(arr<string>(spells.preparedCantrips).filter((x) => typeof x === "string"))]
         : null,
+      studiousPrepared: arr<string>(spells.studiousPrepared)
+        .filter((x) => typeof x === "string")
+        .slice(0, 10),
+      studiousUsed: Object.fromEntries(
+        Object.entries(obj(spells.studiousUsed))
+          .filter(([, value]) => typeof value === "number" && Number.isFinite(value))
+          .map(([key, value]) => [key, Math.max(0, Math.floor(value as number))])
+      ) as Record<string, number>,
       focus: arr<string>(spells.focus).filter((x) => typeof x === "string"),
       signature: arr<string>(spells.signature).filter((x) => typeof x === "string"),
       rituals: [...new Set(arr<string>(spells.rituals).filter((x) => typeof x === "string"))].slice(
@@ -3562,6 +3653,7 @@ export function computeCharacter(
     : caster.progression === "none"
       ? 0
       : Math.ceil(draft.level / 2);
+  const studiousSlots = studiousSlotInfoFor(draft, classData);
   const tradition = casterTraditionFor(draft, classData);
   if (caster.traditionOptions && !tradition) {
     issue("error", "Choose your magical tradition.", "spells");
@@ -3823,6 +3915,35 @@ export function computeCharacter(
       );
     }
   }
+  if (studiousSlots) {
+    const prepared = draft.spells.studiousPrepared;
+    if (prepared.length > studiousSlots.count) {
+      issue(
+        "error",
+        `Magus studious slots hold ${studiousSlots.count} spells, but ${prepared.length} are prepared.`,
+        "spells"
+      );
+    }
+    const allowed = new Set(studiousSlots.spells.map((spell) => spell.id));
+    for (const spellId of new Set(prepared)) {
+      if (!allowed.has(spellId)) {
+        const spell = context.spells[spellId];
+        issue(
+          "warning",
+          `${spell?.name ?? "A prepared spell"} is not a valid magus studious spell for your hybrid study and level.`,
+          "spells"
+        );
+      }
+    }
+    const used = Object.values(draft.spells.studiousUsed).reduce(
+      (total, value) => total + Math.max(0, Math.round(Number(value) || 0)),
+      0
+    );
+    if (used > studiousSlots.count) {
+      issue("warning", "More studious spell uses are spent than the slots allow.", "spells");
+    }
+  }
+
   const repertoire = spellRepertoireLimits(classData, draft.level);
   if (repertoire) {
     const baseCantrips = draft.spells.cantrips.filter(
@@ -4210,6 +4331,7 @@ export function computeCharacter(
     attacks,
     spellSlots: slots,
     spellSlotsNote,
+    studiousSlots,
     divineFontSlots,
     divineFontRank,
     focusPointsMax,

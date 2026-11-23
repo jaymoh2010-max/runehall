@@ -173,6 +173,20 @@ export interface ClassGrantSpell {
   source?: string;
 }
 
+/** A spell available in a magus studious slot. */
+export interface StudiousSlotSpell {
+  id: string;
+  name: string;
+  rank: number;
+}
+
+export interface StudiousSlotInfo {
+  /** Rank of the current studious slots (2, 3, or 4). */
+  rank: number;
+  count: number;
+  spells: StudiousSlotSpell[];
+}
+
 export interface ClassGrant {
   feats?: ClassGrantFeat[];
   spells?: ClassGrantSpell[];
@@ -849,6 +863,10 @@ export interface CharacterDraft {
      * the known cantrip list; an empty array means no cantrips are prepared.
      */
     preparedCantrips: string[] | null;
+    /** Magus studious spells prepared in the special slots. */
+    studiousPrepared: string[];
+    /** Studious spell uses spent today, keyed by spell id. */
+    studiousUsed: Record<string, number>;
     focus: string[];
     /** Divine font pips spent today (cleric heal/harm slots). */
     divineFontUsed: number;
@@ -1058,6 +1076,8 @@ export interface DerivedCharacter {
   attacks: DerivedAttack[];
   spellSlots: number[] | null;
   spellSlotsNote: string | null;
+  /** Magus studious slots at 7th level and later, with their allowed spells. */
+  studiousSlots: StudiousSlotInfo | null;
   /** Cleric divine font slots, tracked separately from ordinary slots. */
   divineFontSlots: number | null;
   divineFontRank: number | null;

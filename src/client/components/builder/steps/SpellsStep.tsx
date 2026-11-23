@@ -61,9 +61,11 @@ import {
   abilityMod,
   addPreparedCantrip,
   addPreparedSpellCopy,
+  addStudiousSpell,
   applicableChoiceGroups,
   canPrepareCantrip,
   canPrepareSpellAtRank,
+  canPrepareStudiousSpell,
   casterInfo,
   cantripLimitFor,
   cantripPreparedLimitFor,
@@ -87,6 +89,7 @@ import {
   removePreparedCantrip,
   removePreparedCopy,
   removePreparedSpellEverywhere,
+  removeStudiousSpell,
   requiredExtraSkills,
   selectedChoiceOptions,
   selectedDeitySkill,
@@ -147,6 +150,7 @@ function spellTestId(value: string): string {
 export function SpellsStep({ draft, update, derived, context, setStep, openPicker }: BuilderProps) {
   const [prepRanks, setPrepRanks] = useState<Record<string, number>>({});
   const [prepOpen, setPrepOpen] = useState(false);
+  const [studiousChoice, setStudiousChoice] = useState("");
   const classData = context.classData;
   const caster = casterInfo(classData);
   const tradition = derived.casterTradition ?? draft.spells.tradition;
@@ -897,6 +901,95 @@ export function SpellsStep({ draft, update, derived, context, setStep, openPicke
               </p>
             ) : null}
           </Card>
+
+          {derived.studiousSlots ? (
+            <Card className="spell-section" data-testid="studious-slots">
+              <div className="row-between">
+                <div>
+                  <h3>Studious slots</h3>
+                  <p className="muted small">
+                    Rank {derived.studiousSlots.rank} · {draft.spells.studiousPrepared.length} /{" "}
+                    {derived.studiousSlots.count} prepared. These slots only hold your studious
+                    spells.
+                  </p>
+                </div>
+                <Tag tone={draft.spells.studiousPrepared.length ? "gold" : "blue"}>
+                  {draft.spells.studiousPrepared.length} / {derived.studiousSlots.count}
+                </Tag>
+              </div>
+              <div className="chip-row">
+                {derived.studiousSlots.spells
+                  .map((spell) => ({
+                    spell,
+                    count: draft.spells.studiousPrepared.filter((id) => id === spell.id).length,
+                  }))
+                  .filter((entry) => entry.count > 0)
+                  .map(({ spell, count }) => (
+                    <div key={spell.id} className="prepared-chip">
+                      <strong>{spell.name}</strong>
+                      <span className="tiny muted"> · rank {spell.rank}</span>
+                      <div className="prepared-stepper">
+                        <button
+                          type="button"
+                          aria-label={`Remove studious ${spell.name}`}
+                          onClick={() =>
+                            update((current) => removeStudiousSpell(current, classData, spell.id))
+                          }
+                        >
+                          <Minus size={12} />
+                        </button>
+                        <span>{count}</span>
+                        <button
+                          type="button"
+                          aria-label={`Add studious ${spell.name}`}
+                          disabled={!canPrepareStudiousSpell(draft, classData, spell.id)}
+                          onClick={() =>
+                            update((current) => addStudiousSpell(current, classData, spell.id))
+                          }
+                        >
+                          <Plus size={12} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                {!draft.spells.studiousPrepared.length ? (
+                  <p className="muted small">No studious spells prepared yet.</p>
+                ) : null}
+              </div>
+              <div className="prepared-adder">
+                <Select
+                  aria-label="Studious spell to prepare"
+                  value={studiousChoice}
+                  onChange={(event) => setStudiousChoice(event.target.value)}
+                >
+                  <option value="">Choose a studious spell…</option>
+                  {derived.studiousSlots.spells.map((spell) => {
+                    const room = canPrepareStudiousSpell(draft, classData, spell.id);
+                    return (
+                      <option key={spell.id} value={spell.id} disabled={!room}>
+                        {spell.name} · rank {spell.rank}
+                        {!room ? " — full" : ""}
+                      </option>
+                    );
+                  })}
+                </Select>
+                <Button
+                  size="sm"
+                  aria-label="Prepare selected studious spell"
+                  disabled={
+                    !studiousChoice || !canPrepareStudiousSpell(draft, classData, studiousChoice)
+                  }
+                  onClick={() => {
+                    if (!studiousChoice) return;
+                    update((current) => addStudiousSpell(current, classData, studiousChoice));
+                    setStudiousChoice("");
+                  }}
+                >
+                  Prepare
+                </Button>
+              </div>
+            </Card>
+          ) : null}
 
           {isPreparedCaster ? (
             <p className="tiny muted" style={{ marginTop: 10 }}>
