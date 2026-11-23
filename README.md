@@ -159,6 +159,7 @@ npm run verify:data  # compendium and SQLite integrity
 | `npm run ingest` | Rebuild the compendium from the Foundry PF2e data clone |
 | `npm run verify:data` | Validate compendium counts, required fields, and SQLite integrity |
 | `npm run simulate` | Generate characters across classes, levels, and options |
+| `npm run simulate:exhaustive` | Run the exhaustive class/ancestry/heritage/background/deity/subclass builder matrix |
 | `npm run simulate:campaign` | Run two isolated 1–20 campaign simulations through the API and sockets |
 | `npm run backup` | Snapshot SQLite + uploaded assets into `backups/` |
 | `npm run restore -- --from <dir> --yes` | Restore a backup (server must be stopped) |

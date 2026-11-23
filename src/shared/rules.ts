@@ -4000,6 +4000,14 @@ export function computeCharacter(
       context.deity,
       classGrants.feats.map((feat) => feat.id)
     )) {
+      if (!group.options.length) {
+        issue(
+          "error",
+          group.emptyHint ?? `${group.prompt} No legal options are available.`,
+          "class"
+        );
+        continue;
+      }
       const picks = [...new Set(draft.grantChoices[group.key] ?? [])];
       if (picks.length !== group.count) {
         issue(

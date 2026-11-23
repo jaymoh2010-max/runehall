@@ -13,6 +13,7 @@
     "ingest": "node scripts/ingest-pf2e.mjs",
     "verify:data": "node scripts/verify-compendium.mjs",
     "simulate": "tsx scripts/simulate-characters.ts 1000 --matrix --content --options --prereqs",
+    "simulate:exhaustive": "tsx scripts/simulate-characters.ts --full 200",
     "simulate:campaign": "tsx scripts/simulate-campaign.ts",
     "backup": "node scripts/backup.mjs",
     "ship-backup": "node scripts/ship-backup.mjs",

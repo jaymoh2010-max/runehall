@@ -1,3 +1,7 @@
+// Character-builder audit. By default this runs a random sample; pass --full
+// for the exhaustive matrix, --legacy to include legacy content, and
+// --capstone to run the category sweeps at level 20 instead of levels 1 and 5.
+// `--one <seed>` reproduces a single seed from the --levels sweep.
 import fs from "node:fs";
 import path from "node:path";
 import {
@@ -5,6 +9,8 @@ import {
   automaticSkillRanks,
   baseAbilityScores,
   casterInfo,
+  cantripLimitFor,
+  cantripPreparedLimitFor,
   classKeyOptions,
   computeCharacter,
   divineFontInfo,
@@ -28,7 +34,7 @@ import {
   heritageSkillChoice,
 } from "../src/shared/heritage";
 import { SKILLS } from "../src/shared/types";
-import { activeGrantChoiceGroups } from "../src/shared/classGrantChoices";
+import { activeGrantChoiceGroups, deitySupportsClass } from "../src/shared/classGrantChoices";
 import { selectedClassGrants } from "../src/shared/classGrants";
 import type {
   Ancestry,
@@ -68,6 +74,7 @@ const featNames = feats.map((entry) => entry.name.toLowerCase());
 const automationTally = { full: 0, partial: 0, manual: 0 };
 const manualFeatFrequency = new Map<string, number>();
 const manualItemFrequency = new Map<string, number>();
+let simulationCount = 0;
 
 function mulberry32(seed: number) {
   let value = seed >>> 0;
@@ -151,11 +158,17 @@ function chooseClassChoices(
 }
 
 function chooseGrantChoices(rng: () => number, draft: CharacterDraft, classData: ClassData) {
-  draft.grantChoices = {};
   const deity = deities.find((entry) => entry.id === draft.deityId) ?? null;
   const featIds = selectedClassGrants(draft, classData, deity).feats.map((feat) => feat.id);
   for (const group of activeGrantChoiceGroups(draft, classData, deity, featIds)) {
     if (!group.options.length) continue;
+    const existing = draft.grantChoices[group.key];
+    if (
+      existing?.length === group.count &&
+      existing.every((id) => group.options.some((option) => option.id === id))
+    ) {
+      continue;
+    }
     draft.grantChoices[group.key] = sample(rng, group.options, group.count).map(
       (option) => option.id
     );
@@ -226,19 +239,22 @@ function chooseSkills(rng: () => number, draft: CharacterDraft, context: Charact
   );
   const candidates = SKILLS.map((skill) => skill.id).filter((id) => !fixed.has(id));
   draft.skills.trained = sample(rng, candidates, Math.min(required, candidates.length));
+}
 
+function chooseSkillIncreases(rng: () => number, draft: CharacterDraft, context: CharacterContext) {
+  const classData = context.classData!;
+  const fixed = grantedTrainedSkills(draft, context);
   const ranks: Record<string, number> = {};
   for (const skill of SKILLS) ranks[skill.id] = 0;
   for (const skill of fixed) if (skill in ranks) ranks[skill] = 1;
   for (const skill of draft.skills.trained)
     if (skill in ranks) ranks[skill] = Math.max(ranks[skill], 1);
+  for (const [skill, rank] of Object.entries(automaticSkillRanks(draft, context))) {
+    if (skill in ranks) ranks[skill] = Math.max(ranks[skill], rank);
+  }
 
   draft.skills.increases = {};
   for (const level of classData.skillIncreaseLevels.filter((entry) => entry <= draft.level)) {
-    const automatic = automaticSkillRanks({ ...draft, level }, context);
-    for (const [skill, rank] of Object.entries(automatic)) {
-      if (skill in ranks) ranks[skill] = Math.max(ranks[skill], rank);
-    }
     const cap = skillRankCap(level);
     const options = SKILLS.map((skill) => skill.id).filter((id) => (ranks[id] ?? 0) < cap);
     if (!options.length) continue;
@@ -248,14 +264,48 @@ function chooseSkills(rng: () => number, draft: CharacterDraft, context: Charact
   }
 }
 
-function chooseDeity(rng: () => number, draft: CharacterDraft, classData: ClassData) {
+function rebalanceTrainedSkills(
+  rng: () => number,
+  draft: CharacterDraft,
+  context: CharacterContext
+) {
+  const classData = context.classData!;
+  const fixed = grantedTrainedSkills(draft, context);
+  const required = Math.max(
+    0,
+    classData.trainedSkills.additional +
+      Math.max(0, abilityMod(baseAbilityScores(draft, context).int))
+  );
+  const isSkill = (id: string) => SKILLS.some((skill) => skill.id === id);
+  const unique = [...new Set(draft.skills.trained)];
+  const extras = unique.filter((id) => isSkill(id) && !fixed.has(id));
+  if (extras.length < required) {
+    const candidates = SKILLS.map((skill) => skill.id).filter(
+      (id) => !fixed.has(id) && !unique.includes(id)
+    );
+    unique.push(...sample(rng, candidates, required - extras.length));
+  } else if (extras.length > required) {
+    const keep = new Set(extras.slice(0, required));
+    draft.skills.trained = unique.filter((id) => !isSkill(id) || fixed.has(id) || keep.has(id));
+    return;
+  }
+  draft.skills.trained = unique;
+}
+
+function chooseDeity(
+  rng: () => number,
+  draft: CharacterDraft,
+  classData: ClassData,
+  forcedDeity?: Deity
+) {
   const needsDeity =
     classData.name.toLowerCase() === "cleric" ||
     classData.name.toLowerCase() === "champion" ||
     classData.features.some((feature) => feature.name.toLowerCase().startsWith("deity ("));
-  if (!needsDeity) return;
-  const options = deities.filter((deity) => deity.weapons.length > 0 || deity.skill.length > 0);
-  const deity = pick(rng, options.length ? options : deities);
+  if (!needsDeity && !forcedDeity) return;
+  const legal = deities.filter((deity) => deitySupportsClass(deity, classData));
+  const options = legal.filter((deity) => deity.weapons.length > 0 || deity.skill.length > 0);
+  const deity = forcedDeity ?? pick(rng, options.length ? options : legal.length ? legal : deities);
   draft.deityId = deity.id;
   const skills = deity.skill ?? [];
   draft.deitySkill = skills.length > 1 ? pick(rng, skills) : null;
@@ -320,7 +370,7 @@ function chooseSpells(
   const maxRank = spellSlotsFor(draft.level, caster.progression, classData.name)?.length ?? 0;
   if (!maxRank) return;
 
-  const cantripLimit = 5;
+  const cantripLimit = cantripLimitFor(classData) ?? 5;
   for (const spell of sample(
     rng,
     pool.filter((entry) => entry.rank === 0),
@@ -343,7 +393,8 @@ function chooseSpells(
   ]);
   const prepared = preparedClasses.has(classTrait);
   if (prepared) {
-    draft.spells.preparedCantrips = draft.spells.cantrips.slice(0, cantripLimit);
+    const preparedCantripLimit = cantripPreparedLimitFor(classData) ?? cantripLimit;
+    draft.spells.preparedCantrips = draft.spells.cantrips.slice(0, preparedCantripLimit);
   }
   const slots = spellSlotsFor(draft.level, caster.progression, classData.name) ?? [];
   // Clerics track divine font separately; only ordinary slots may hold
@@ -352,9 +403,21 @@ function chooseSpells(
     ordinarySpellSlotsFor(draft.level, caster.progression, classData.name) ?? slots;
   const font = divineFontInfo(draft.level, classData.name);
   const classGrantSpells = selectedClassGrants(draft, classData, context.deity).spells;
+  // Sorcerer bloodline spells occupy part of the normal spells-known total.
+  const grantedByRank = new Map<number, number>();
+  if (repertoire?.subtractGranted) {
+    for (const spell of classGrantSpells) {
+      if (spell.kind === "focus" || spell.rank <= 0) continue;
+      grantedByRank.set(spell.rank, (grantedByRank.get(spell.rank) ?? 0) + 1);
+    }
+  }
   for (let rank = 1; rank <= maxRank; rank++) {
     const slotLimit = ordinarySlots[rank - 1] ?? 0;
-    const limit = repertoire?.ranks[rank - 1] ?? (prepared ? Math.max(1, slotLimit) : 1);
+    const limit = repertoire
+      ? Math.max(0, (repertoire.ranks[rank - 1] ?? 0) - (grantedByRank.get(rank) ?? 0))
+      : prepared
+        ? Math.max(1, slotLimit)
+        : 1;
     const exact = pool.filter((spell) => spell.rank === rank);
     const lower = pool.filter((spell) => spell.rank > 0 && spell.rank < rank);
     const rankPool = exact.length ? exact : lower;
@@ -558,7 +621,50 @@ function validateCharacter(
     }
   }
   const errors = derived.validation.filter((issue) => issue.severity === "error");
-  for (const error of errors) push("validation-error", error.message);
+  for (const error of errors) {
+    if (
+      process.env.DEBUG_SKILLS &&
+      /proficiency rank allowed|Domain Initiate/.test(error.message)
+    ) {
+      const deity = context.deity;
+      const grants = selectedClassGrants(draft, context.classData, deity);
+      const grantGroups = activeGrantChoiceGroups(
+        draft,
+        context.classData,
+        deity,
+        grants.feats.map((feat) => feat.id)
+      );
+      console.log(
+        "DEBUG_SKILLS",
+        JSON.stringify(
+          {
+            name: draft.name,
+            level: draft.level,
+            classChoices: draft.classChoices,
+            grantChoices: draft.grantChoices,
+            classGrants: grants.feats.map((feat) => feat.name),
+            grantGroups: grantGroups.map((group) => ({
+              key: group.key,
+              prompt: group.prompt,
+              count: group.count,
+              options: group.options.length,
+            })),
+            ancestryId: draft.ancestryId,
+            heritageId: draft.heritageId,
+            backgroundId: draft.backgroundId,
+            trained: draft.skills.trained,
+            backgroundSkills: draft.skills.background,
+            increases: draft.skills.increases,
+            automatic: automaticSkillRanks(draft, context),
+            feats: draft.feats,
+          },
+          null,
+          2
+        )
+      );
+    }
+    push("validation-error", error.message);
+  }
 }
 
 function simulate(
@@ -567,8 +673,11 @@ function simulate(
   forcedLevel?: number,
   forcedAncestry?: Ancestry,
   forcedBackground?: Background,
-  forcedChoice?: { groupKey: string; optionId: string }
+  forcedChoice?: { groupKey: string; optionId: string },
+  forcedHeritage?: Heritage,
+  forcedDeity?: Deity
 ): Problem[] {
+  simulationCount++;
   const rng = mulberry32(seed);
   const problems: Problem[] = [];
   const ancestry = forcedAncestry ?? pick(rng, remasterAncestries);
@@ -582,13 +691,14 @@ function simulate(
         entry.ancestry === ancestry.name ||
         entry.ancestrySlug === ancestry.name.toLowerCase())
   );
-  const heritage = heritageChoices.length ? pick(rng, heritageChoices) : null;
+  const heritage = forcedHeritage ?? (heritageChoices.length ? pick(rng, heritageChoices) : null);
   const background = forcedBackground ?? pick(rng, remasterBackgrounds);
   const classData = forcedClass ?? pick(rng, remasterClasses);
   const level = forcedLevel ?? pick(rng, [1, 5, 10, 15, 20]);
 
   const draft = emptyCharacterDraft(`${classData.name} ${ancestry.name} ${level}`);
   draft.contentMode = "expanded";
+  draft.includeLegacy = true;
   draft.level = level;
   draft.ancestryId = ancestry.id;
   draft.heritageId = heritage?.id ?? null;
@@ -599,7 +709,7 @@ function simulate(
   const baseContext = contextFor(draft, [], [], []);
   chooseClassChoices(rng, draft, classData, forcedChoice);
   chooseBoosts(rng, draft, baseContext);
-  chooseDeity(rng, draft, classData);
+  chooseDeity(rng, draft, classData, forcedDeity);
   chooseGrantChoices(rng, draft, classData);
 
   const heritageSkill = heritageSkillChoice(heritage);
@@ -625,6 +735,11 @@ function simulate(
 
   const selectedFeats: Feat[] = heritageFeat ? [heritageFeat] : [];
   chooseFeats(rng, draft, context, selectedFeats);
+  // A regular class feat can activate a grant-choice group (for example,
+  // Domain Initiate). Fill any groups that were not active before feats.
+  chooseGrantChoices(rng, draft, classData);
+  rebalanceTrainedSkills(rng, draft, context);
+  chooseSkillIncreases(rng, draft, context);
 
   const selectedSpells: Spell[] = [];
   chooseSpells(rng, draft, context, selectedSpells);
@@ -672,13 +787,42 @@ function simulate(
 }
 
 const args = process.argv.slice(2);
-const matrix = args.includes("--matrix");
-const content = args.includes("--content");
-const optionsSweep = args.includes("--options");
-const prereqSweep = args.includes("--prereqs");
-const seedArg = args.find((arg) => /^\d+$/.test(arg));
+const full = args.includes("--full");
+const includeLegacy = args.includes("--legacy");
+const matrix = full || args.includes("--matrix");
+const content = full || args.includes("--content");
+const optionsSweep = full || args.includes("--options");
+const prereqSweep = full || args.includes("--prereqs");
+const levelsSweep = full || args.includes("--levels");
+const ancestrySweep = full || args.includes("--ancestries");
+const crossSweep = full || args.includes("--cross");
+const heritageSweep = full || args.includes("--heritages");
+const backgroundSweep = full || args.includes("--backgrounds");
+const deitySweep = full || args.includes("--deities");
+const sweepLevels = args.includes("--capstone")
+  ? [20]
+  : args.includes("--deep")
+    ? [1, 10, 20]
+    : [1, 5];
+const seedArg = args.find((arg, index) => /^\d+$/.test(arg) && args[index - 1] !== "--one");
 const seeds = Number(seedArg ?? 200);
 const allProblems: Problem[] = [];
+const oneIndex = args.indexOf("--one");
+const sweepAncestries = includeLegacy ? ancestries : remasterAncestries;
+const sweepHeritages = includeLegacy ? heritages : heritages.filter((entry) => entry.remaster);
+const sweepBackgrounds = includeLegacy ? backgrounds : remasterBackgrounds;
+const sweepDeities = includeLegacy ? deities : deities.filter((entry) => entry.remaster);
+const sweepClasses = remasterClasses;
+if (oneIndex >= 0) {
+  const seed = Number(args[oneIndex + 1] ?? 40423);
+  const index = seed - 40_000;
+  const classData = sweepClasses[Math.floor(index / 20) % sweepClasses.length];
+  const level = (index % 20) + 1;
+  const ancestry = sweepAncestries[seed % sweepAncestries.length];
+  const background = sweepBackgrounds[seed % sweepBackgrounds.length];
+  allProblems.push(...simulate(seed, classData, level, ancestry, background));
+  console.log(`One: seed ${seed} -> ${classData.name} ${ancestry.name} level ${level}.`);
+}
 if (matrix) {
   const levels = [1, 5, 10, 15, 20];
   let seed = 10_000;
@@ -691,24 +835,131 @@ if (matrix) {
   }
   console.log(`Matrix: ${remasterClasses.length} classes x ${levels.length} levels.`);
 }
-if (optionsSweep) {
-  let seed = 30_000;
-  let optionCount = 0;
-  for (const classData of remasterClasses) {
-    for (const group of classData.choiceGroups) {
-      for (const option of group.options) {
-        const level = Math.max(1, group.sourceFeature?.level ?? 1);
-        allProblems.push(
-          ...simulate(seed++, classData, level, undefined, undefined, {
-            groupKey: group.key,
-            optionId: option.id,
-          })
-        );
-        optionCount++;
+if (levelsSweep) {
+  let seed = 40_000;
+  let count = 0;
+  for (const classData of sweepClasses) {
+    for (let level = 1; level <= 20; level++) {
+      const ancestry = sweepAncestries[seed % sweepAncestries.length];
+      const background = sweepBackgrounds[seed % sweepBackgrounds.length];
+      allProblems.push(...simulate(seed++, classData, level, ancestry, background));
+      count++;
+    }
+  }
+  console.log(`Levels: ${count} builds (${sweepClasses.length} classes x 20 levels).`);
+}
+if (ancestrySweep) {
+  let seed = 50_000;
+  let count = 0;
+  for (const ancestry of sweepAncestries) {
+    for (let level = 1; level <= 20; level++) {
+      const classData = sweepClasses[seed % sweepClasses.length];
+      const background = sweepBackgrounds[seed % sweepBackgrounds.length];
+      allProblems.push(...simulate(seed++, classData, level, ancestry, background));
+      count++;
+    }
+  }
+  console.log(`Ancestries: ${count} builds (${sweepAncestries.length} ancestries x 20 levels).`);
+}
+if (crossSweep) {
+  let seed = 60_000;
+  let count = 0;
+  for (const classData of sweepClasses) {
+    for (const ancestry of sweepAncestries) {
+      for (const level of sweepLevels) {
+        const background = sweepBackgrounds[seed % sweepBackgrounds.length];
+        allProblems.push(...simulate(seed++, classData, level, ancestry, background));
+        count++;
       }
     }
   }
-  console.log(`Options: ${optionCount} class/subclass options.`);
+  console.log(`Cross: ${count} class x ancestry builds at levels ${sweepLevels.join(", ")}.`);
+}
+if (heritageSweep) {
+  let seed = 70_000;
+  let count = 0;
+  let skipped = 0;
+  for (const heritage of sweepHeritages) {
+    const ancestry = heritage.versatile
+      ? sweepAncestries[seed % sweepAncestries.length]
+      : sweepAncestries.find(
+          (entry) =>
+            entry.name === heritage.ancestry ||
+            entry.name.toLowerCase().replace(/\s+/g, "-") === heritage.ancestrySlug.toLowerCase()
+        );
+    if (!ancestry) {
+      skipped++;
+      continue;
+    }
+    const classData = sweepClasses[seed % sweepClasses.length];
+    for (const level of sweepLevels) {
+      const background = sweepBackgrounds[seed % sweepBackgrounds.length];
+      allProblems.push(
+        ...simulate(seed++, classData, level, ancestry, background, undefined, heritage)
+      );
+      count++;
+    }
+  }
+  console.log(
+    `Heritages: ${count} builds (${sweepHeritages.length} heritages, ${skipped} without a matching ancestry) at levels ${sweepLevels.join(", ")}.`
+  );
+}
+if (backgroundSweep) {
+  let seed = 80_000;
+  let count = 0;
+  for (const background of sweepBackgrounds) {
+    const classData = sweepClasses[seed % sweepClasses.length];
+    const ancestry = sweepAncestries[seed % sweepAncestries.length];
+    for (const level of sweepLevels) {
+      allProblems.push(...simulate(seed++, classData, level, ancestry, background));
+      count++;
+    }
+  }
+  console.log(
+    `Backgrounds: ${count} builds (${sweepBackgrounds.length} backgrounds x ${sweepLevels.length} levels).`
+  );
+}
+if (deitySweep) {
+  let seed = 90_000;
+  let count = 0;
+  const divineClasses = sweepClasses.filter((entry) => ["Cleric", "Champion"].includes(entry.name));
+  for (const deity of sweepDeities) {
+    for (const classData of divineClasses) {
+      if (!deitySupportsClass(deity, classData)) continue;
+      for (const level of sweepLevels) {
+        const ancestry = sweepAncestries[seed % sweepAncestries.length];
+        const background = sweepBackgrounds[seed % sweepBackgrounds.length];
+        allProblems.push(
+          ...simulate(seed++, classData, level, ancestry, background, undefined, undefined, deity)
+        );
+        count++;
+      }
+    }
+  }
+  console.log(
+    `Deities: ${count} divine builds (${sweepDeities.length} deities x ${divineClasses.length} classes) at levels ${sweepLevels.join(", ")}.`
+  );
+}
+if (optionsSweep) {
+  let seed = 30_000;
+  let optionCount = 0;
+  for (const classData of sweepClasses) {
+    for (const group of classData.choiceGroups) {
+      for (const option of group.options) {
+        const levels = new Set([Math.max(1, group.sourceFeature?.level ?? 1), 20]);
+        for (const level of levels) {
+          allProblems.push(
+            ...simulate(seed++, classData, level, undefined, undefined, {
+              groupKey: group.key,
+              optionId: option.id,
+            })
+          );
+          optionCount++;
+        }
+      }
+    }
+  }
+  console.log(`Options: ${optionCount} class/subclass option builds.`);
 }
 if (prereqSweep) {
   const fighter = remasterClasses.find((entry) => entry.name === "Fighter") ?? remasterClasses[0];
@@ -735,16 +986,16 @@ if (prereqSweep) {
 }
 if (content) {
   let seed = 20_000;
-  for (const ancestry of remasterAncestries) {
+  for (const ancestry of sweepAncestries) {
     allProblems.push(...simulate(seed++, undefined, 1, ancestry));
     allProblems.push(...simulate(seed++, undefined, 5, ancestry));
   }
-  for (const background of remasterBackgrounds) {
+  for (const background of sweepBackgrounds) {
     allProblems.push(...simulate(seed++, undefined, 1, undefined, background));
     allProblems.push(...simulate(seed++, undefined, 5, undefined, background));
   }
   console.log(
-    `Content: ${remasterAncestries.length} ancestries and ${remasterBackgrounds.length} backgrounds at levels 1 and 5.`
+    `Content: ${sweepAncestries.length} ancestries and ${sweepBackgrounds.length} backgrounds at levels 1 and 5.`
   );
 }
 for (let seed = 1; seed <= seeds; seed++) allProblems.push(...simulate(seed));
@@ -757,7 +1008,7 @@ for (const problem of allProblems) {
   grouped.set(key, list);
 }
 console.log(
-  `Simulated ${seeds} characters; ${allProblems.length} problems in ${grouped.size} groups.`
+  `Simulated ${simulationCount} characters total (${seeds} random seeds, ${includeLegacy ? "all" : "remaster"} content); ${allProblems.length} problems in ${grouped.size} groups.`
 );
 console.log(
   `\nFeat automation across selections: ${automationTally.full} full / ${automationTally.partial} partial / ${automationTally.manual} manual.`

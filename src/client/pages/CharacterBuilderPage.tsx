@@ -1239,6 +1239,7 @@ export function CharacterBuilderPage({
           legacyDefault={legacyDefault}
           legacyLocked={legacyLocked}
           onLegacyChange={(value) => update((current) => ({ ...current, includeLegacy: value }))}
+          classData={context.classData}
           onSelect={(deity) => {
             setContext((current) => ({ ...current, deity }));
             update((current) => ({ ...current, deityId: deity.id, deitySkill: null }));

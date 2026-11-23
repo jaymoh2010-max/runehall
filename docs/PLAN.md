@@ -211,7 +211,7 @@ These gaps are surfaced in the interface rather than hidden so the table knows w
 ## 6. Testing and quality bar
 
 - Unit tests for the dice parser/degree logic, core cleric math, spell slot tables, armor/favored-weapon rules, and compendium integrity/source values.
-- `npm run simulate` generates valid characters across every class/level, ancestry/background, subclass option, random seeds, and a full feat-prerequisite sweep, then reports crashes/non-finite math/validation errors.
+- `npm run simulate` generates valid characters across random seeds, and `npm run simulate:exhaustive` covers every class/level, ancestry, heritage, background, subclass option, and valid deity pairing, plus a full feat-prerequisite sweep. Both report crashes, non-finite math, and validation errors.
 - TypeScript strict mode across client/server/shared.
 - Manual browser verification of:
   - register/login, campaign create/join, player access and read-only sheet;

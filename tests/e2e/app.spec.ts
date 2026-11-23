@@ -1096,6 +1096,7 @@ test("builder completes a level-1 Cleric with split divine-font preparation", as
     .getByRole("button", { name: /Cleric/ })
     .click();
   await page.getByRole("button", { name: "Choose deity" }).click();
+  await expect(page.getByRole("button", { name: /Laws of Mortality/ })).toHaveCount(0);
   await page.getByPlaceholder(/Search deities/).fill("Abadar");
   await page
     .locator(".picker-item-name", { hasText: /^Abadar$/ })
@@ -1357,6 +1358,7 @@ test("builder grants a Cloistered Cleric domain focus spell", async ({ page }) =
     .getByRole("button", { name: /Cleric/ })
     .click();
   await page.getByRole("button", { name: "Choose deity" }).click();
+  await expect(page.getByRole("button", { name: /Laws of Mortality/ })).toHaveCount(0);
   await page.getByPlaceholder(/Search deities/).fill("Abadar");
   await page
     .locator(".picker-item-name", { hasText: /^Abadar$/ })

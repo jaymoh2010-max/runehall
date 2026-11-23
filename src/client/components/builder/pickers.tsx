@@ -13,6 +13,7 @@ import {
 import type {
   CharacterContext,
   CharacterDraft,
+  ClassData,
   ContentMode,
   Deity,
   Equipment,
@@ -42,6 +43,7 @@ import {
 import { formatCp } from "../../api";
 import { computeCharacter, featPrerequisiteStatus, weaponDamageLabel } from "../../../shared/rules";
 import { selectedClassGrantFeatIds } from "../../../shared/classGrants";
+import { deitySupportsClass } from "../../../shared/classGrantChoices";
 import { HoverCard } from "../HoverCard";
 
 interface PickerBase {
@@ -1049,6 +1051,7 @@ export function DeityPicker({
   legacyDefault,
   legacyLocked,
   onLegacyChange,
+  classData,
   onSelect,
 }: PickerBase & {
   expanded: boolean;
@@ -1057,6 +1060,8 @@ export function DeityPicker({
   legacyDefault?: boolean;
   legacyLocked?: boolean;
   onLegacyChange?: (value: boolean) => void;
+  /** Limit the list to deities that satisfy the class's domain/font needs. */
+  classData?: ClassData | null;
   onSelect: (deity: Deity) => void;
 }) {
   const [query, setQuery] = useState("");
@@ -1089,6 +1094,7 @@ export function DeityPicker({
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return items.filter((deity) => {
+      if (!deitySupportsClass(deity, classData)) return false;
       if (!expanded && !isCoreSource(deity.source, "deity")) return false;
       if (!legacy && !deity.remaster) return false;
       if (!q) return true;
@@ -1096,7 +1102,7 @@ export function DeityPicker({
         .toLowerCase()
         .includes(q);
     });
-  }, [items, query, expanded, legacy]);
+  }, [items, query, expanded, legacy, classData]);
 
   return (
     <PickerShell

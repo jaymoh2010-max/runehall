@@ -43,6 +43,25 @@ export interface GrantChoiceGroup {
   options: GrantChoiceOption[];
 }
 
+/**
+ * Clerics need a deity that grants at least one domain and a divine font.
+ * Champions need a font to choose a devotion spell. Other classes may follow
+ * any deity, pantheon, or philosophy.
+ */
+export function deitySupportsClass(
+  deity: Deity | null | undefined,
+  classData: ClassData | null | undefined
+): boolean {
+  if (!deity) return false;
+  const name = classData?.name.toLowerCase();
+  if (name === "cleric") {
+    const domains = [...(deity.domains ?? []), ...(deity.alternateDomains ?? [])];
+    return domains.length > 0 && deity.font.length > 0;
+  }
+  if (name === "champion") return deity.font.length > 0;
+  return true;
+}
+
 export const GRANT_CHOICE_KEYS = {
   clericDomain: "grant:cleric-domain",
   championDevotion: "grant:champion-devotion",
@@ -459,7 +478,7 @@ export const GRANT_CHOICE_GROUPS: GrantChoiceGroup[] = [
     minLevel: 1,
     source: { kind: "feat", featId: "feat:hT4INKGtly4QY8KN" },
     baseGrant: { focusPoints: 1 },
-    emptyHint: "Choose a deity on the Class step to see its domains.",
+    emptyHint: "Choose a deity that grants domains on the Class step.",
     options: Object.keys(DOMAIN_SPELLS).map(domainOption),
   },
   {

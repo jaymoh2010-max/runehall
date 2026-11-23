@@ -5,6 +5,7 @@ import { contextForDraft } from "../src/server/compendium";
 import {
   activeGrantChoiceGroups,
   canonicalDomainKey,
+  deitySupportsClass,
   DOMAIN_SPELLS,
   GRANT_CHOICE_KEYS,
 } from "../src/shared/classGrantChoices";
@@ -76,6 +77,15 @@ function groupFor(
 }
 
 describe("free class grant choices", () => {
+  it("requires domain and font support for clerics and champions", () => {
+    const philosophy = byName(deities, "Laws of Mortality");
+    expect(deitySupportsClass(abadar, cleric)).toBe(true);
+    expect(deitySupportsClass(philosophy, cleric)).toBe(false);
+    expect(deitySupportsClass(abadar, champion)).toBe(true);
+    expect(deitySupportsClass(philosophy, champion)).toBe(false);
+    expect(deitySupportsClass(philosophy, wizard)).toBe(true);
+  });
+
   it("maps every deity domain to a rank-1 cleric focus spell", () => {
     const domainKeys = new Set(
       deities
