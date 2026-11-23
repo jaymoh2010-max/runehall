@@ -1,10 +1,21 @@
 import fs from "node:fs";
+import path from "node:path";
 import { expect, test, type Page } from "@playwright/test";
 import { currencyToCp } from "../../src/shared/inventory";
+import { emptyCharacterDraft } from "../../src/shared/rules";
 
 test.describe.configure({ mode: "serial" });
 
 const runId = Date.now().toString(36);
+const compendiumClasses = JSON.parse(
+  fs.readFileSync(path.resolve("data", "compendium", "classes.json"), "utf8")
+) as { id: string; name: string }[];
+const compendiumSpells = JSON.parse(
+  fs.readFileSync(path.resolve("data", "compendium", "spells.json"), "utf8")
+) as { id: string; name: string }[];
+const sorcererId = compendiumClasses.find((entry) => entry.name === "Sorcerer")!.id;
+const fireballId = compendiumSpells.find((entry) => entry.name === "Fireball")!.id;
+const elementBloodlineId = "cf:RXRnJcG4XSabZ35a";
 const admin = {
   username: `e2e_gm_${runId}`,
   displayName: "E2E GM",
@@ -1298,6 +1309,62 @@ test("builder splits animist prepared and apparition spellcasting", async ({ pag
   await expect(page.getByText(/Cast Sure Strike at rank 1/)).toBeVisible({ timeout: 15_000 });
   await expect(apparitionSlot).toContainText("0 / 1");
   await expect(preparedSlot).toContainText("1 / 1");
+  await expect(page.locator(".pb-save")).toHaveText("Saved");
+});
+
+test("builder learns a spontaneous spell at more than one rank", async ({ page }) => {
+  test.setTimeout(60_000);
+  await signIn(page, admin);
+  const campaignId = campaignPath.split("/").pop();
+  const created = await page.request.post("/api/characters", {
+    data: { name: "E2E Ranked Sorcerer", campaignId },
+  });
+  expect(created.ok()).toBe(true);
+  const character = (await created.json()) as { character: { id: string } };
+  const draft = emptyCharacterDraft("E2E Ranked Sorcerer");
+  draft.level = 11;
+  draft.classId = sorcererId;
+  draft.keyAbility = "cha";
+  draft.spells.tradition = "primal";
+  draft.classChoices["cf:2goYo6VNbwC6aKF1:sorcerer-bloodline"] = [elementBloodlineId];
+  draft.spells.known = [fireballId];
+  draft.spells.knownRanks = { [fireballId]: [3, 5] };
+  const saved = await page.request.put(`/api/characters/${character.character.id}`, {
+    data: { data: draft, force: true },
+  });
+  expect(saved.ok()).toBe(true);
+
+  await page.goto(`/characters/${character.character.id}/edit`);
+  await expect(page.getByRole("heading", { name: "E2E Ranked Sorcerer" })).toBeVisible({
+    timeout: 15_000,
+  });
+  await goToStep(page, "Spells");
+
+  const rankThree = page
+    .locator(".spell-section")
+    .filter({ has: page.getByRole("heading", { name: "Rank 3 repertoire" }) });
+  const rankFive = page
+    .locator(".spell-section")
+    .filter({ has: page.getByRole("heading", { name: "Rank 5 repertoire" }) });
+  await expect(rankThree.getByText("Fireball")).toBeVisible();
+  await expect(rankFive.getByText("Fireball")).toBeVisible();
+
+  await rankFive.getByRole("button", { name: "Add rank 5 spell to repertoire" }).click();
+  await pickSpell(page, "Fear");
+  await expect(rankFive.getByText("Fear")).toBeVisible();
+  await expect(rankFive.getByText("base rank 1")).toBeVisible();
+
+  await page.goto(`/characters/${character.character.id}`);
+  await expect(page.getByRole("heading", { name: "E2E Ranked Sorcerer" })).toBeVisible({
+    timeout: 15_000,
+  });
+  await page.getByRole("button", { name: "Spells", exact: true }).click();
+  const fireball = page.locator(".pb-spell-row").filter({ hasText: "Fireball" }).first();
+  const rankChoices = fireball.locator("select");
+  await expect(rankChoices.locator("option")).toHaveText(["Rank 3 · slot", "Rank 5 · slot"]);
+  await rankChoices.selectOption("5:slot");
+  await fireball.getByRole("button", { name: "Cast" }).click();
+  await expect(page.getByText(/Cast Fireball at rank 5/)).toBeVisible({ timeout: 15_000 });
   await expect(page.locator(".pb-save")).toHaveText("Saved");
 });
 

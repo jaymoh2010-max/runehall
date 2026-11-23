@@ -565,7 +565,9 @@ export function SpellPicker({
               ? "Choose a focus spell"
               : rank
                 ? `Choose a rank ${rank} spell`
-                : "Choose a spell"
+                : maxRank
+                  ? `Choose a spell of rank ${maxRank} or lower`
+                  : "Choose a spell"
       }
       subtitle={`${total} options${tradition ? ` · ${tradition}` : ""}`}
       onClose={onClose}

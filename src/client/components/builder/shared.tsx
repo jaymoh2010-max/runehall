@@ -53,8 +53,12 @@ export type Picker =
   | {
       kind: "spell";
       rank: number | null;
+      /** Allow spells up to this rank when the picker is adding a rank copy. */
+      maxRank?: number | null;
       focus?: boolean;
-      target: "cantrips" | "known" | "focus" | "rituals" | "innate";
+      target: "cantrips" | "known" | "knownAtRank" | "focus" | "rituals" | "innate";
+      /** Rank at which a spontaneous caster learns the selected spell. */
+      learnRank?: number;
     }
   | { kind: "equipment" }
   | { kind: "deity" }
