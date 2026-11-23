@@ -8,6 +8,9 @@ Audit date: 2026-11-23
   bundle budget, smoke test, browser e2e, data validation, and dependency audit.
 - Character simulator coverage across all 29 remaster classes at levels 1, 5, 10, 15, and
   20, plus every class/subclass choice and the feat prerequisite sweep.
+- Exhaustive builder matrix: every class at levels 1-20, every ancestry at levels 1-20,
+  every class x ancestry at levels 1 and 5, every heritage, background, and valid divine
+  deity pairing, plus every subclass choice at its unlock level and at level 20.
 - Seven isolated campaigns with 29 distinct class slots, advanced from level 1 to 20 through
   the real campaign level-up and character-save APIs. At every level the server table summary
   was compared with the locally computed sheet, including HP, AC, Speed, Perception, saves,
@@ -25,6 +28,14 @@ Audit date: 2026-11-23
   feats are chosen.
 - **Animist attunement was missing.** After the Animist spellcasting split, the simulator now
   attunes the required two/three/four apparitions at each level and sets a primary apparition.
+- **Invalid divine deity choices.** Clerics and champions could select philosophies with no
+  domains or divine font, leaving Domain Initiate or devotion spells with no legal option.
+  The deity picker now filters to deities that satisfy the class requirements, and validation
+  explains an empty grant-choice group.
+- **Deferred grant choices.** A regular class feat such as Domain Initiate can activate a
+  choice group after the initial class-grant pass; the simulator now fills those groups too.
+- **Skill increases** are chosen after feat-granted training is rebalanced, matching the final
+  order used by character validation.
 - **The character simulator is now reusable.** The deterministic level builder is exported,
   the CLI is entry-point guarded, and a focused unit test covers the previously failing
   classes.
@@ -39,6 +50,7 @@ Audit date: 2026-11-23
 | `npm run smoke` | Pass |
 | `npm run e2e` | 31 passed, 0 skipped |
 | `npm run simulate` | 1000 characters, 0 problems |
+| `npm run simulate:exhaustive` | 7,899 remaster + 10,529 all-content builds, 0 problems |
 | `npm run simulate:campaign` | 17 passed, 0 failed |
 | `npm run simulate:parties` | 22 checks passed, 0 failed; 29 classes across 7 campaigns |
 | `npm run verify:data` | Pass; 4 expected data warnings |
