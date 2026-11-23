@@ -315,6 +315,7 @@ function conditionBaseName(value: string): string {
 }
 
 const DIEHARD_FEAT_ID = "feat:I0BhPWqYf1bbzEYg";
+const TOUGHNESS_FEAT_ID = "feat:AmP0qu7c5dlBSath";
 
 function hasFeat(draft: CharacterDraft, featId: string): boolean {
   const feats = draft.feats;
@@ -338,6 +339,13 @@ function hasFeat(draft: CharacterDraft, featId: string): boolean {
 export function deathThresholdForDraft(draft: CharacterDraft): number {
   const base = hasFeat(draft, DIEHARD_FEAT_ID) ? 5 : 4;
   return base - conditionValue(draft.play.conditions, "doomed");
+}
+
+/** Dying recovery-check DC, including Toughness's −1 adjustment. */
+export function recoveryDcForDraft(draft: CharacterDraft, dying: number): number {
+  return (
+    10 + Math.max(0, Math.round(Number(dying) || 0)) - (hasFeat(draft, TOUGHNESS_FEAT_ID) ? 1 : 0)
+  );
 }
 
 /**
@@ -581,7 +589,9 @@ export function applyDamageToDraft(
       conditions = upsertCondition(conditions, "Dying", dying);
       conditions = upsertCondition(conditions, "Unconscious", null);
       notes.push(`Dropped to 0 HP: dying ${dying} and unconscious.`);
-      notes.push(`Recovery check DC ${10 + dying} at the start of each turn.`);
+      notes.push(
+        `Recovery check DC ${recoveryDcForDraft(working, dying)} at the start of each turn.`
+      );
       if (deathThreshold <= 0 || dying >= deathThreshold) {
         dead = true;
         conditions = conditions.filter(

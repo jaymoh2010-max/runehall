@@ -29,7 +29,19 @@ const MECHANICAL_TEXT =
  * compendium does not carry structured rule elements for feats, so the default
  * is necessarily text-based and conservative.
  */
-const FEAT_OVERRIDES: Record<string, AutomationInfo> = {};
+const FEAT_OVERRIDES: Record<string, AutomationInfo> = {
+  // Diehard is applied by damage.ts when it raises the dying threshold.
+  "feat:I0BhPWqYf1bbzEYg": {
+    level: "full",
+    reason: "Runehall raises your dying threshold to 5.",
+  },
+  // Robust Health is applied by the recovery and Battle Medicine routes.
+  "feat:yTLGclKtWVFZLKIz": {
+    level: "full",
+    reason:
+      "Runehall adds the extra recovery healing and shortens Battle Medicine immunity to 1 hour.",
+  },
+};
 
 function plainText(html: string): string {
   return html.replace(/<[^>]+>/g, " ");

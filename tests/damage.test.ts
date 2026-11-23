@@ -7,6 +7,7 @@ import {
   applyHpEditToDraft,
   applyHpEditToState,
   reconcileLifeConditions,
+  recoveryDcForDraft,
 } from "../src/shared/damage";
 import type { CharacterDraft, CharacterCondition } from "../src/shared/types";
 
@@ -24,6 +25,13 @@ function draftWith(input: {
 }
 
 describe("damage and dying", () => {
+  it("reduces the dying recovery DC with Toughness", () => {
+    const draft = draftWith({});
+    expect(recoveryDcForDraft(draft, 1)).toBe(11);
+    draft.feats.general["1"] = "feat:AmP0qu7c5dlBSath";
+    expect(recoveryDcForDraft(draft, 1)).toBe(10);
+  });
+
   it("absorbs damage with temporary HP before reducing HP", () => {
     const result = applyDamageToDraft(draftWith({ hp: 10, tempHp: 5 }), 20, 3);
     expect(result.tempHpAbsorbed).toBe(3);

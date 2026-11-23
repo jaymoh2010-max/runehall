@@ -47,6 +47,8 @@ const armorProficiency = byName(feats, "Armor Proficiency");
 const weaponProficiency = byName(feats, "Weapon Proficiency");
 const clanPistolFeat = byName(feats, "Clan Pistol");
 const hellspawn = byName(feats, "Hellspawn");
+const diehard = byName(feats, "Diehard");
+const robustHealth = byName(feats, "Robust Health");
 const nimbleElf = byName(feats, "Nimble Elf");
 const elvenInstincts = byName(feats, "Elven Instincts");
 const incredibleInvestiture = byName(feats, "Incredible Investiture");
@@ -168,7 +170,12 @@ describe("curated feat effects", () => {
     }
   });
 
-  it("labels curated feats as fully automated", () => {
+  it("labels applied recovery feats as fully automated", () => {
+    expect(automationForFeat(diehard).level).toBe("full");
+    expect(automationForFeat(robustHealth).level).toBe("full");
+  });
+
+  it("labels curated feats with the right automation level", () => {
     expect(automationForFeat(toughness).level).toBe("full");
     expect(automationForFeat(fleet).level).toBe("full");
   });
@@ -450,7 +457,8 @@ describe("curated feat effects", () => {
     expect(applied.notes).toHaveLength(2);
     expect(applied.notes.join(" ")).toContain("dying 5");
     expect(applied.notes.join(" ")).toContain("Battle Medicine");
-    expect(automationForFeat(diehard).level).toBe("partial");
+    expect(automationForFeat(diehard).level).toBe("full");
+    expect(automationForFeat(robustHealth).level).toBe("full");
   });
 
   it("does not add notes for fully numeric feats", () => {
