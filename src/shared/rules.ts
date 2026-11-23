@@ -2018,7 +2018,7 @@ export function checkFeatPrerequisite(
     return derived.focusPointsMax > 0 ? "met" : "unmet";
   }
   if (/^(you have( a| the)? )?spellcasting class feature$/.test(lower)) {
-    return derived.casterProgression !== "none" || derived.prof.spellcasting > 0 ? "met" : "unmet";
+    return derived.spellSlots?.some((count) => count > 0) ? "met" : "unmet";
   }
   if (/^(you have( a| the)? )?versatile heritage$/.test(lower)) {
     return context.heritage?.versatile ? "met" : "unmet";
@@ -2305,7 +2305,7 @@ export function spellRepertoireLimits(
   level: number
 ): SpellRepertoireLimits | null {
   const name = classData?.name.toLowerCase();
-  if (!name || !["bard", "oracle", "sorcerer", "summoner"].includes(name)) return null;
+  if (!name || !["bard", "oracle", "sorcerer", "summoner", "psychic"].includes(name)) return null;
   // Bards use the prepared full-caster table (3 slots per rank, 2 at 1st).
   // The muse spell is an extra repertoire entry, not one of those slots.
   if (name === "bard") {
@@ -2314,7 +2314,7 @@ export function spellRepertoireLimits(
     if (level >= 19) ranks[9] = Math.max(ranks[9] ?? 0, 2);
     return { cantrips: 5, ranks, subtractGranted: false };
   }
-  const bounded = name === "summoner";
+  const bounded = name === "summoner" || name === "psychic";
   const ranks: number[] = [];
   let previous: number[] = [];
   for (let current = 1; current <= level; current++) {
@@ -2328,13 +2328,17 @@ export function spellRepertoireLimits(
     }
     previous = slots;
   }
-  // Bloodline Paragon and Oracular Clarity add two 10th-rank spells to the
-  // repertoire. One is already counted by the rank-10 slot.
-  if (level >= 19 && ["oracle", "sorcerer"].includes(name)) {
+  // Bloodline Paragon, Oracular Clarity, and Infinite Mind add two
+  // 10th-rank spells to the repertoire.
+  if (level >= 19 && ["oracle", "sorcerer", "psychic"].includes(name)) {
     ranks[9] = Math.max(ranks[9] ?? 0, 2);
   }
   // Only the sorcerer's bloodline gifts are part of the base known total.
-  return { cantrips: 5, ranks, subtractGranted: name === "sorcerer" };
+  return {
+    cantrips: name === "psychic" ? 3 : 5,
+    ranks,
+    subtractGranted: name === "sorcerer",
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -3275,6 +3279,43 @@ export function computeCharacter(
         spellMod +
         (spellAbility ? conditionEffects.checks[spellAbility] : conditionEffects.allChecks);
 
+  // Focus spells from a class without spell slots use the proficiency and
+  // tradition of the ability that granted them. Monk ki and ranger warden
+  // spells use Wisdom; champions already have a focus caster profile.
+  const focusCasterClass = classData?.name.toLowerCase();
+  const focusAbility: AbilityKey | null =
+    caster.progression !== "none"
+      ? (caster.spellAbility ?? key ?? null)
+      : focusCasterClass === "champion"
+        ? "cha"
+        : "wis";
+  const classFocusGrants = classGrants.spells.filter((spell) => spell.kind === "focus");
+  const hasFocusSpells = draft.spells.focus.length > 0 || classFocusGrants.length > 0;
+  const focusRank = caster.progression !== "none" ? Math.max(1, prof.spellcasting) : 1;
+  const focusMod = focusAbility ? abilityMods[focusAbility] : 0;
+  const focusCondition = focusAbility
+    ? conditionEffects.checks[focusAbility]
+    : conditionEffects.allChecks;
+  const focusSpellDc = hasFocusSpells
+    ? 10 + proficiencyBonus(focusRank, draft.level) + focusMod + focusCondition
+    : null;
+  const focusSpellAttack = hasFocusSpells
+    ? proficiencyBonus(focusRank, draft.level) + focusMod + focusCondition
+    : null;
+
+  // Innate spells use their own trained (expert at 12th) Charisma-based
+  // proficiency. They do not inherit the class's spellcasting proficiency.
+  const hasInnateSpells = draft.spells.innate.length > 0;
+  const innateRank = draft.level >= 12 ? 2 : 1;
+  const innateMod = abilityMods.cha;
+  const innateCondition = conditionEffects.checks.cha;
+  const innateSpellDc = hasInnateSpells
+    ? 10 + proficiencyBonus(innateRank, draft.level) + innateMod + innateCondition
+    : null;
+  const innateSpellAttack = hasInnateSpells
+    ? proficiencyBonus(innateRank, draft.level) + innateMod + innateCondition
+    : null;
+
   // --- Equipment -----------------------------------------------------------
   if (bulkTotal > maxBulk) {
     issue(
@@ -4061,6 +4102,11 @@ export function computeCharacter(
   );
   const notes = [
     ...new Set([...(featMods.notes ?? []), ...(itemMods.notes ?? []), ...classGrants.notes]),
+    ...(hasFocusSpells && caster.progression === "none"
+      ? [
+          "Focus spell attack rolls and DCs use Wisdom unless the granting ability names a different attribute.",
+        ]
+      : []),
   ];
 
   const className = classData?.name.toLowerCase();
@@ -4105,6 +4151,10 @@ export function computeCharacter(
     classDc,
     spellDc,
     spellAttack,
+    focusSpellDc,
+    focusSpellAttack,
+    innateSpellDc,
+    innateSpellAttack,
     attacks,
     spellSlots: slots,
     spellSlotsNote,
