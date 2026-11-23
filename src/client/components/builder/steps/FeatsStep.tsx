@@ -574,7 +574,11 @@ export function FeatsStep({
                   {grantFeatId === feat.id && grantEntry?.grant ? (
                     <Field
                       label={grantEntry.grant.prompt}
-                      hint="The granted feat's effects apply to your sheet."
+                      hint={
+                        grantEntry.grant.repeatable
+                          ? "Runehall applies one granted feat. Additional repeatable picks remain manual."
+                          : "The granted feat's effects apply to your sheet."
+                      }
                     >
                       <Select
                         value={draft.featChoices[feat.id]?.[0] ?? ""}

@@ -9,6 +9,7 @@ import {
   collectFeatChoiceEffects,
   collectFeatEffects,
   featChoice,
+  featGrant,
   mergeEffects,
 } from "../src/shared/effects";
 import { computeCharacter, emptyCharacterDraft, proficiencyBonus } from "../src/shared/rules";
@@ -56,6 +57,7 @@ const nimbleElf = byName(feats, "Nimble Elf");
 const elvenInstincts = byName(feats, "Elven Instincts");
 const incredibleInvestiture = byName(feats, "Incredible Investiture");
 const unburdenedIron = byName(feats, "Unburdened Iron");
+const generalTraining = byName(feats, "General Training");
 const human = byName(ancestries, "Human");
 const warrior = byName(backgrounds, "Warrior");
 const fighter = byName(classes, "Fighter");
@@ -176,6 +178,15 @@ describe("curated feat effects", () => {
   it("labels applied recovery feats as fully automated", () => {
     expect(automationForFeat(diehard).level).toBe("full");
     expect(automationForFeat(robustHealth).level).toBe("full");
+  });
+
+  it("marks repeatable feat grants as partly automated", () => {
+    expect(featGrant(generalTraining.id)).toMatchObject({
+      category: "general",
+      level: 1,
+      repeatable: true,
+    });
+    expect(automationForFeat(generalTraining).level).toBe("partial");
   });
 
   it("applies curated senses and initiative", () => {

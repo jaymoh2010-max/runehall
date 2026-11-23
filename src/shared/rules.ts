@@ -3377,6 +3377,26 @@ export function computeCharacter(
       issue("warning", `${name}: ${FEAT_GRANTS[grantId].prompt}.`, "feats");
     }
   }
+  const featInstances = [
+    ...Object.values(draft.feats.ancestry),
+    ...Object.values(draft.feats.class),
+    ...Object.values(draft.feats.skill),
+    ...Object.values(draft.feats.general),
+    ...Object.values(draft.feats.freeArchetype),
+    ...draft.feats.extras,
+  ];
+  for (const [grantId, grant] of Object.entries(FEAT_GRANTS)) {
+    if (!grant.repeatable) continue;
+    const count = featInstances.filter((id) => id === grantId).length;
+    if (count > 1) {
+      const name = context.feats[grantId]?.name ?? "Repeatable feat";
+      issue(
+        "warning",
+        `${name}: ${count} selections found. The builder applies one granted feat; choose the additional granted feats manually.`,
+        "feats"
+      );
+    }
+  }
 
   // --- Ability boosts ------------------------------------------------------
   if (ancestry) {

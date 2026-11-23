@@ -64,6 +64,8 @@ export interface FeatGrantDefinition {
   /** Restrict the granted feat pool. */
   category: "ancestry" | "class" | "skill" | "general";
   level: number;
+  /** Repeatable feats can be selected more than once; only one grant is applied for now. */
+  repeatable?: boolean;
 }
 
 /**
@@ -78,11 +80,18 @@ export const FEAT_GRANTS: Record<string, FeatGrantDefinition> = {
     category: "ancestry",
     level: 1,
   },
-  // Natural Ambition — gain a 1st-level class feat.
+  // Natural Ambition - gain a 1st-level class feat.
   "feat:PodajLVxqYSAqVox": {
     prompt: "Choose a 1st-level class feat",
     category: "class",
     level: 1,
+  },
+  // General Training - gain a 1st-level general feat. Repeatable at higher levels.
+  "feat:D3SuA5MaKucO1flE": {
+    prompt: "Choose a 1st-level general feat",
+    category: "general",
+    level: 1,
+    repeatable: true,
   },
 };
 

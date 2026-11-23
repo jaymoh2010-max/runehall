@@ -38,4 +38,37 @@ describe("deterministic character simulation build", () => {
     const weaponAttack = derived.attacks.find((attack) => attack.sourceItemId);
     expect(weaponAttack?.damageFormula).toMatch(/[2-9]d/);
   });
+
+  it("resolves General Training into a granted general feat", () => {
+    const build = buildSimulatedCharacter({
+      seed: 5151,
+      className: "Fighter",
+      level: 1,
+      ancestryName: "Human",
+    });
+    const baseline = computeCharacter(build.draft, contextForDraft(build.draft));
+    build.draft.feats.ancestry["1"] = "feat:D3SuA5MaKucO1flE";
+    build.draft.featChoices["feat:D3SuA5MaKucO1flE"] = ["feat:Ux73dmoF8KnavyUD"];
+    const applied = computeCharacter(build.draft, contextForDraft(build.draft));
+    expect(applied.speed).toBe(baseline.speed + 5);
+    expect(applied.validation.filter((issue) => issue.severity === "error")).toHaveLength(0);
+  });
+
+  it("warns when a repeatable feat grant is selected more than once", () => {
+    const build = buildSimulatedCharacter({
+      seed: 5152,
+      className: "Fighter",
+      level: 5,
+      ancestryName: "Human",
+    });
+    build.draft.feats.ancestry["1"] = "feat:D3SuA5MaKucO1flE";
+    build.draft.feats.ancestry["5"] = "feat:D3SuA5MaKucO1flE";
+    build.draft.featChoices["feat:D3SuA5MaKucO1flE"] = ["feat:Ux73dmoF8KnavyUD"];
+    const applied = computeCharacter(build.draft, contextForDraft(build.draft));
+    expect(
+      applied.validation.some(
+        (issue) => issue.severity === "warning" && issue.message.includes("selections found")
+      )
+    ).toBe(true);
+  });
 });

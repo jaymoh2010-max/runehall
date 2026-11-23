@@ -42,6 +42,8 @@ Audit date: 2026-11-23
 - **Simulation gear scales with level.** Simulated level 20 characters now receive the highest
   fundamental weapon and armor runes available at their level, so high-level AC and attack checks
   exercise the real rune math instead of level-1 gear.
+- **General Training is resolved.** The builder now applies one chosen 1st-level general feat from
+  General Training; additional repeatable selections are flagged for manual tracking.
 - **The character simulator is now reusable.** The deterministic level builder is exported,
   the CLI is entry-point guarded, and a focused unit test covers the previously failing
   classes.
@@ -76,4 +78,5 @@ Audit date: 2026-11-23
   compendium ships prose rather than structured rule elements.
 - The party simulator rebuilds each complete sheet at every level to exercise all class
   features and choices; it is not a narrative continuity test for a single saved build.
-- Repeatable feat grants and companion edge cases remain candidates for future curated coverage.
+- Repeatable feat grants beyond the first General Training choice and companion edge cases remain
+  candidates for future curated coverage.
