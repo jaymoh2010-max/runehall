@@ -18,7 +18,13 @@ export type SpellCastResource =
   "cantrip" | "focus" | "font" | "slot" | "innate" | "studious" | "apparition" | "amp";
 
 export interface SpellCastOption {
+  /** Slot rank used for the cast. */
   rank: number;
+  /**
+   * Effective spell rank when a lower-rank spell is cast from a higher slot.
+   * Omitted when the slot rank and spell rank are the same.
+   */
+  castRank?: number;
   resource: SpellCastResource;
   /** Remaining uses, or null when the resource is unlimited (cantrips). */
   remaining: number | null;
@@ -28,6 +34,8 @@ export interface SpellCastOption {
 export interface SpellCastChoice {
   rank: number;
   resource: SpellCastResource;
+  /** Effective spell rank for a higher-slot downcast. */
+  castRank?: number;
 }
 
 export interface SpellCastResult {
@@ -257,27 +265,49 @@ export function spellCastOptions(
   }
 
   // A spontaneous caster can cast a spell at each rank where they learned it.
-  // Signature spells can be freely heightened to any available slot rank.
+  // Signature spells can be freely heightened to any available slot rank. A
+  // non-signature spell can also use a higher-rank slot without heightening,
+  // casting at a lower rank they know.
   const signature = new Set(draft.spells.signature ?? []);
   const learnedRanks = knownSpellRanks(draft, spell);
-  const ranks = new Set<number>(learnedRanks);
-  if (signature.has(spell.id) && learnedRanks.length) {
-    for (let rank = Math.min(...learnedRanks); rank <= maxRank; rank += 1) ranks.add(rank);
-  }
-
+  const learned = new Set(learnedRanks);
   const options: SpellCastOption[] = [];
-  for (const rank of [...ranks].filter((entry) => entry <= maxRank).sort((a, b) => a - b)) {
+  const seen = new Set<string>();
+  const pushOption = (rank: number, castRank: number) => {
+    const key = `${rank}:${castRank}`;
+    if (seen.has(key)) return;
+    seen.add(key);
     const slotCount = ordinary[rank - 1] ?? 0;
     const used = clampInt(draft.spells.slotsUsed[String(rank)], 0, slotCount);
     options.push({
       rank,
+      ...(castRank !== rank ? { castRank } : {}),
       resource: "slot",
       remaining: Math.max(0, slotCount - used),
-      label: `Rank ${rank} slot`,
+      label:
+        castRank === rank ? `Rank ${rank} slot` : `Rank ${rank} slot (cast at rank ${castRank})`,
     });
+  };
+
+  for (const rank of learnedRanks) {
+    if (rank <= maxRank) pushOption(rank, rank);
+  }
+  if (signature.has(spell.id) && learnedRanks.length) {
+    for (let rank = Math.min(...learnedRanks); rank <= maxRank; rank += 1) {
+      pushOption(rank, rank);
+    }
+  } else {
+    for (const castRank of learnedRanks) {
+      for (let rank = castRank + 1; rank <= maxRank; rank += 1) {
+        // A directly known higher rank is always the better option.
+        if (learned.has(rank)) continue;
+        if ((ordinary[rank - 1] ?? 0) <= 0) continue;
+        pushOption(rank, castRank);
+      }
+    }
   }
 
-  return options;
+  return options.sort((a, b) => a.rank - b.rank || (a.castRank ?? a.rank) - (b.castRank ?? b.rank));
 }
 
 export function castSpell(
@@ -293,7 +323,10 @@ export function castSpell(
   } = {}
 ): SpellCastResult | null {
   const option = spellCastOptions(spell, draft, context, opts).find(
-    (entry) => entry.rank === choice.rank && entry.resource === choice.resource
+    (entry) =>
+      entry.rank === choice.rank &&
+      entry.resource === choice.resource &&
+      (entry.castRank ?? entry.rank) === (choice.castRank ?? choice.rank)
   );
   if (!spellCastOptionAvailable(option) || !option) return null;
 
