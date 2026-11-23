@@ -2,7 +2,7 @@
 
 Date: 2026-11-23
 
-Status: review complete. Sprint 1 (the daily spellcasting loop), the class-grant portion of Sprint 2, the first table-magic pass of Sprint 3, the magus studious-slot pass of Sprint 4, the animist prepared/spontaneous split of Sprint 5, the spontaneous known-at-rank pass of Sprint 6, the psychic psi-amp pass of Sprint 7, the table Sustain-reminder pass of Sprint 8, the higher-slot downcast pass of Sprint 9, the scroll-spellcasting pass of Sprint 10, and the Magic Wand spellcasting pass of Sprint 11 were implemented on 2026-11-23. The findings below describe the pre-Sprint state; the implementation status sections record what changed, and the remaining class and table gaps stay in the backlog.
+Status: review complete. Sprint 1 (the daily spellcasting loop), the class-grant portion of Sprint 2, the first table-magic pass of Sprint 3, the magus studious-slot pass of Sprint 4, the animist prepared/spontaneous split of Sprint 5, the spontaneous known-at-rank pass of Sprint 6, the psychic psi-amp pass of Sprint 7, the table Sustain-reminder pass of Sprint 8, the higher-slot downcast pass of Sprint 9, the scroll-spellcasting pass of Sprint 10, the Magic Wand spellcasting pass of Sprint 11, and the fixed-spell specific-wand pass of Sprint 12 were implemented on 2026-11-23. The findings below describe the pre-Sprint state; the implementation status sections record what changed, and the remaining class and table gaps stay in the backlog.
 
 > **Follow-up (2026-11-23):** `docs/RULES-AUDIT.md` corrected two table errors
 > this review did not catch: bards use the 2/3 full-caster slot table (not the
@@ -177,6 +177,15 @@ Generic Magic Wand spellcasting is implemented:
 - Generic wands are treated as charged activations rather than expendable consumables, so activating one no longer spends the inventory stack.
 - The wand's chosen spell is not stored on the inventory entry, so the caster selects it when casting. Specific wands and staves remain manual.
 
+## Sprint 12 implementation status (2026-11-23)
+
+Fixed-spell specific wands are implemented:
+
+- Specific wands whose prose names one spell, such as a **Wand of Smoldering Fireballs**, expose a direct **Cast wand** action from the sheet's inventory.
+- The sheet reads the spell name and cast rank from the wand's name and description, including heightened wording such as "4th-rank Darkness" and "at 2nd rank".
+- Fixed-spell wands share the generic wand daily-use tracker and chat output; a long rest resets them.
+- The fixed spell must be on the character's spell list. Flexible wands that let the wielder choose or adjust an arbitrary spell, wands whose spell cannot be read from the data, and staves remain manual.
+
 ## Rules baseline
 
 ### Core spellcasting
@@ -252,7 +261,7 @@ Legend: Yes = modeled and usable; Partial = some support with known gaps; No = n
 | Rituals | Partial | Primary-check rolls work when the description names a known skill; missing data falls back to manual |
 | Sustained spells | Yes | Casting starts sustain, the sheet and table list active spells, Sustain/End actions are available, and Restore clears them |
 | Spellbook capacity and learning | No | No starting-spellbook or Learn a Spell accounting |
-| Item spellcasting | Partial | Scrolls cast from the character's spell list and consume on use; generic Magic Wands cast at their rank once per day and post to chat; specific wands and staves remain manual |
+| Item spellcasting | Partial | Scrolls cast from the character's spell list and consume on use; generic Magic Wands cast at their rank once per day; fixed-spell specific wands cast directly; flexible wands and staves remain manual |
 | Multiclass spellcasting archetypes | No | Only the primary class contributes caster progression |
 
 ## Findings
@@ -423,11 +432,11 @@ Fix: Ingest the structured primary-check skill and DC from the source data, then
 
 ### F12. Item spellcasting is not modeled (P2)
 
-Status: partly fixed in Sprint 10 and Sprint 11. Scrolls are castable from the sheet and consumed; generic Magic Wands are castable at their rank once per day and reset on rest. Specific wands and staves still use the generic item activation path.
+Status: partly fixed in Sprint 10, Sprint 11, and Sprint 12. Scrolls are castable from the sheet and consumed; generic Magic Wands are castable at their rank once per day; fixed-spell specific wands cast directly. Flexible wands and staves still use the generic item activation path.
 
-Impact: Scrolls and generic wands are spellcasting resources at the table; other magic items remain inventory entries.
+Impact: Scrolls, generic wands, and fixed-spell specific wands are spellcasting resources at the table; other magic items remain inventory entries.
 
-Fix: Scroll casting opens the spell picker at the scroll's rank, filters by the character's tradition, and consumes the scroll on confirmation. Generic wand casting uses the same picker, records a daily use, and resets it on a long rest. The pattern can be extended to specific wands and staff spell lists.
+Fix: Scroll casting opens the spell picker at the scroll's rank, filters by the character's tradition, and consumes the scroll on confirmation. Generic wand casting uses the same picker, records a daily use, and resets it on a long rest. Specific wands with a readable fixed spell cast directly. The pattern can be extended to staff spell lists and flexible wands.
 
 ### F13. Multiclass spellcasting archetypes are not modeled (P2)
 
@@ -597,8 +606,8 @@ Tasks:
    - Keep cost, secondary casters, and consequences manual but visible.
 
 3. **Item spellcasting**
-   - Cast from scrolls, wands, and staves with the correct charges and DC. (Scrolls implemented in Sprint 10; generic Magic Wands in Sprint 11.)
-   - Consume scrolls and track generic wand daily uses; staff charges and specific wands remain manual; respect daily preparations.
+   - Cast from scrolls, wands, and staves with the correct charges and DC. (Scrolls implemented in Sprint 10; generic Magic Wands in Sprint 11; fixed-spell specific wands in Sprint 12.)
+   - Consume scrolls and track wand daily uses; flexible wands, staff charges, and structured staff spell lists remain manual; respect daily preparations.
 
 4. **Spellbook and learning**
    - Add starting spellbook contents and two-spells-per-level accounting.

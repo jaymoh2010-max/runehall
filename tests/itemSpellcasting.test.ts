@@ -5,6 +5,7 @@ import {
   isMagicWand,
   isSpellScroll,
   scrollSpellRank,
+  specificWandSpell,
   wandSpellRank,
 } from "../src/shared/itemSpellcasting";
 import type { Equipment } from "../src/shared/types";
@@ -64,5 +65,53 @@ describe("wand spellcasting", () => {
     expect(isMagicWand(sword)).toBe(false);
     expect(wandSpellRank(sword)).toBeNull();
     expect(wandSpellRank(null)).toBeNull();
+  });
+});
+
+describe("specific wands", () => {
+  it("extracts fixed spells and their cast ranks", () => {
+    const fireballs = equipment.find(
+      (entry) => entry.name === "Wand of Smoldering Fireballs (3rd-Rank Spell)"
+    )!;
+    expect(specificWandSpell(fireballs)).toEqual({ name: "Fireball", rank: 3 });
+
+    const darkness = equipment.find(
+      (entry) => entry.name === "Wand of Hopeless Night (4th-Rank Spell)"
+    )!;
+    expect(specificWandSpell(darkness)).toEqual({ name: "Darkness", rank: 4 });
+
+    const chokingMist = equipment.find(
+      (entry) => entry.name === "Wand of Choking Mist (4th-Rank)"
+    )!;
+    expect(specificWandSpell(chokingMist)).toEqual({ name: "Cinder Swarm", rank: 4 });
+
+    const arboreal = equipment.find((entry) => entry.name === "Arboreal Wand (Rank 2)")!;
+    expect(specificWandSpell(arboreal)).toEqual({ name: "Heal", rank: 2 });
+
+    const splintered = equipment.find(
+      (entry) => entry.name === "Wand Of Splintered Sorrows (Rank 2)"
+    )!;
+    expect(specificWandSpell(splintered)).toEqual({ name: "Splinter Volley", rank: 2 });
+
+    const acid = equipment.find((entry) => entry.name === "Wand of Noisome Acid (2nd-Rank)")!;
+    expect(specificWandSpell(acid)).toEqual({ name: "Acid Grip", rank: 2 });
+  });
+
+  it("leaves flexible and ambiguous wands manual", () => {
+    const widening = equipment.find((entry) => entry.name === "Wand of Widening (1st-Rank Spell)")!;
+    expect(specificWandSpell(widening)).toBeNull();
+
+    const generic = equipment.find((entry) => entry.name === "Magic Wand (1st-Rank Spell)")!;
+    expect(specificWandSpell(generic)).toBeNull();
+
+    const cane = equipment.find((entry) => entry.name === "Wand Cane")!;
+    expect(specificWandSpell(cane)).toBeNull();
+
+    expect(specificWandSpell(null)).toBeNull();
+  });
+
+  it("returns a null rank when the name and prose do not state one", () => {
+    const caustic = equipment.find((entry) => entry.name === "Wand of Caustic Effluence")!;
+    expect(specificWandSpell(caustic)).toEqual({ name: "Grease", rank: null });
   });
 });

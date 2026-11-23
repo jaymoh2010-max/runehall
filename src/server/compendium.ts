@@ -28,6 +28,7 @@ import {
 import { selectedClassGrants } from "../shared/classGrants";
 import { APPARITION_BY_ID } from "../shared/apparitions";
 import { customItemToEquipment } from "../shared/inventory";
+import { specificWandSpell } from "../shared/itemSpellcasting";
 import {
   COMPENDIUM_KIND_ORDER,
   compendiumKindFromId,
@@ -661,7 +662,16 @@ export function contextForDraft(
   const equipmentMap: Record<string, Equipment> = {};
   for (const entry of draft.equipment) {
     const item = maps.equipment.get(entry.itemId);
-    if (item) equipmentMap[item.id] = item;
+    if (item) {
+      equipmentMap[item.id] = item;
+      // A fixed-spell wand needs its spell in the context even when the
+      // character does not know it from a class list.
+      const wand = specificWandSpell(item);
+      if (wand) {
+        const spell = spellByName.get(normalizedSpellName(wand.name));
+        if (spell) spellMap[spell.id] = spell;
+      }
+    }
     for (const runeId of entry.runes ?? []) {
       const rune = maps.equipment.get(runeId);
       if (rune) equipmentMap[rune.id] = rune;
