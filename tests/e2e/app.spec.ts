@@ -737,6 +737,21 @@ test("GM places a token, chats, rolls, and opens the scenes manager", async ({ p
     timeout: 15_000,
   });
 
+  const table = page.locator(".vtt");
+  await page.getByRole("button", { name: "Full screen", exact: true }).click();
+  await expect(table).toHaveClass(/is-fullscreen/);
+  await expect(page.locator("body")).toHaveClass(/table-fullscreen-active/);
+  await expect(page.getByRole("button", { name: "Exit full screen", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Scenes" }).click();
+  await expect(scenes).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(scenes).toBeHidden();
+  await expect(table).toHaveClass(/is-fullscreen/);
+  await page.keyboard.press("f");
+  await expect(table).not.toHaveClass(/is-fullscreen/);
+  await expect(page.locator("body")).not.toHaveClass(/table-fullscreen-active/);
+  await expect(page.getByRole("button", { name: "Full screen", exact: true })).toBeVisible();
+
   await page.getByRole("button", { name: "Scenes" }).click();
   await expect(scenes).toBeVisible();
   await scenes.getByRole("button", { name: "Edit" }).first().click();
