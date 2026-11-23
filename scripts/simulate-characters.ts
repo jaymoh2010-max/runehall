@@ -3,6 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   abilityMod,
+  animistApparitionLimit,
   automaticSkillRanks,
   baseAbilityScores,
   cantripLimitFor,
@@ -22,6 +23,7 @@ import {
   spellRepertoireLimits,
   spellSlotsFor,
 } from "../src/shared/rules";
+import { ANIMIST_APPARITIONS } from "../src/shared/apparitions";
 import { validateFormula } from "../src/shared/dice";
 import { automationForEquipment, automationForFeat } from "../src/shared/automation";
 import {
@@ -665,6 +667,13 @@ function buildDraftFrom(
   chooseBoosts(rng, draft, baseContext);
   chooseDeity(rng, draft, classData, forcedDeity);
   chooseGrantChoices(rng, draft, classData);
+  if (classData.name.toLowerCase() === "animist") {
+    const attuned = ANIMIST_APPARITIONS.slice(0, animistApparitionLimit(level)).map(
+      (entry) => entry.id
+    );
+    draft.spells.attunedApparitions = attuned;
+    draft.spells.primaryApparition = attuned[0] ?? null;
+  }
 
   const heritageSkill = heritageSkillChoice(heritage);
   if (heritage && heritageSkill) {

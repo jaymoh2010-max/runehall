@@ -23,6 +23,8 @@ Audit date: 2026-11-23
 - **Trained skill picks could become redundant.** Feats such as Hellspawn grant fixed skills
   after the initial skill selection. The simulator now rebalances free skill picks after
   feats are chosen.
+- **Animist attunement was missing.** After the Animist spellcasting split, the simulator now
+  attunes the required two/three/four apparitions at each level and sets a primary apparition.
 - **The character simulator is now reusable.** The deterministic level builder is exported,
   the CLI is entry-point guarded, and a focused unit test covers the previously failing
   classes.
@@ -35,7 +37,7 @@ Audit date: 2026-11-23
 | --- | --- |
 | `npm run check` | Pass |
 | `npm run smoke` | Pass |
-| `npm run e2e` | 29 passed, 0 skipped |
+| `npm run e2e` | 30 passed, 0 skipped |
 | `npm run simulate` | 1000 characters, 0 problems |
 | `npm run simulate:campaign` | 17 passed, 0 failed |
 | `npm run simulate:parties` | 22 checks passed, 0 failed; 29 classes across 7 campaigns |
