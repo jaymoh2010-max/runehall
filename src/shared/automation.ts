@@ -89,18 +89,11 @@ export function automationForFeat(feat: Feat): AutomationInfo {
       reason: "Choose the option in the builder; Runehall applies it to the sheet.",
     };
   }
-  const grant = featGrant(feat.id);
-  if (grant) {
-    return grant.repeatable
-      ? {
-          level: "partial",
-          reason:
-            "Choose one granted feat in the builder; additional repeatable picks remain manual.",
-        }
-      : {
-          level: "full",
-          reason: "Choose the granted feat in the builder; its effects apply to the sheet.",
-        };
+  if (featGrant(feat.id)) {
+    return {
+      level: "full",
+      reason: "Choose the granted feat in the builder; its effects apply to the sheet.",
+    };
   }
   if (MECHANICAL_TEXT.test(plainText(feat.description))) {
     return {

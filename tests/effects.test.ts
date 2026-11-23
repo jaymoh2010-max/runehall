@@ -180,13 +180,13 @@ describe("curated feat effects", () => {
     expect(automationForFeat(robustHealth).level).toBe("full");
   });
 
-  it("marks repeatable feat grants as partly automated", () => {
+  it("supports repeatable feat grants per selected instance", () => {
     expect(featGrant(generalTraining.id)).toMatchObject({
       category: "general",
       level: 1,
       repeatable: true,
     });
-    expect(automationForFeat(generalTraining).level).toBe("partial");
+    expect(automationForFeat(generalTraining).level).toBe("full");
   });
 
   it("applies curated senses and initiative", () => {

@@ -107,7 +107,13 @@ import {
 import { DeityPicker, EquipmentPicker, FeatPicker, SpellPicker } from "../pickers";
 import { ContentSourceToggle } from "../ContentSourceToggle";
 import { RunePicker } from "../RunePicker";
-import { featChoice, featGrant, WEAPON_PROFICIENCY_ID } from "../../../../shared/effects";
+import {
+  featChoice,
+  featGrant,
+  featGrantChoiceKey,
+  featGrantChoicePrefix,
+  WEAPON_PROFICIENCY_ID,
+} from "../../../../shared/effects";
 import {
   isCoreSource,
   rulesetContentMode,
@@ -150,11 +156,11 @@ export function FeatsStep({
   ]
     .map((id) => context.feats[id])
     .filter((feat): feat is Feat => Boolean(feat));
-  const grantEntry = selectedFeatList
-    .map((feat) => ({ feat, grant: featGrant(feat.id) }))
-    .find((entry) => entry.grant);
-  const grantFeatId = grantEntry?.feat.id ?? null;
-  const [grantOptions, setGrantOptions] = useState<Feat[]>([]);
+  const grantFeatIds = [
+    ...new Set(selectedFeatList.map((feat) => feat.id).filter((id) => Boolean(featGrant(id)))),
+  ];
+  const grantFeatKey = grantFeatIds.join(",");
+  const [grantOptions, setGrantOptions] = useState<Record<string, Feat[]>>({});
   const heritage = context.heritage;
   const heritageGrant = heritageFeatGrant(heritage);
   const heritageChoiceId = heritageChosenFeatId(draft, heritage) ?? "";
@@ -209,33 +215,38 @@ export function FeatsStep({
   ]);
 
   useEffect(() => {
-    if (!grantFeatId) {
-      setGrantOptions([]);
+    const grantIds = grantFeatKey ? grantFeatKey.split(",") : [];
+    if (!grantIds.length) {
+      setGrantOptions({});
       return;
     }
-    const grant = featGrant(grantFeatId);
-    if (!grant) return;
     let cancelled = false;
-    const params = new URLSearchParams();
-    params.set("category", grant.category);
-    params.set("levelMin", "1");
-    params.set("levelMax", String(grant.level));
-    params.set("limit", "200");
-    if (grant.category === "ancestry" && ancestryTrait) params.set("trait", ancestryTrait);
-    if (grant.category === "class" && classTrait) params.set("trait", classTrait);
-    if (!draft.includeLegacy) params.set("legacy", "0");
-    if (draft.contentMode === "core") params.set("core", "1");
-    api<{ items: Feat[] }>(`/api/compendium/feats?${params.toString()}`)
-      .then((result) => {
-        if (!cancelled) setGrantOptions(result.items);
-      })
-      .catch(() => {
-        if (!cancelled) setGrantOptions([]);
-      });
+    const load = async (grantFeatId: string): Promise<[string, Feat[]]> => {
+      const grant = featGrant(grantFeatId);
+      if (!grant) return [grantFeatId, []];
+      const params = new URLSearchParams();
+      params.set("category", grant.category);
+      params.set("levelMin", "1");
+      params.set("levelMax", String(grant.level));
+      params.set("limit", "200");
+      if (grant.category === "ancestry" && ancestryTrait) params.set("trait", ancestryTrait);
+      if (grant.category === "class" && classTrait) params.set("trait", classTrait);
+      if (!draft.includeLegacy) params.set("legacy", "0");
+      if (draft.contentMode === "core") params.set("core", "1");
+      try {
+        const result = await api<{ items: Feat[] }>(`/api/compendium/feats?${params.toString()}`);
+        return [grantFeatId, result.items];
+      } catch {
+        return [grantFeatId, []];
+      }
+    };
+    void Promise.all(grantIds.map(load)).then((entries) => {
+      if (!cancelled) setGrantOptions(Object.fromEntries(entries));
+    });
     return () => {
       cancelled = true;
     };
-  }, [grantFeatId, ancestryTrait, draft.includeLegacy, draft.contentMode]);
+  }, [grantFeatKey, ancestryTrait, classTrait, draft.includeLegacy, draft.contentMode]);
 
   return (
     <div className="step">
@@ -438,6 +449,12 @@ export function FeatsStep({
           const label = slot.freeArchetype
             ? "Free archetype feat"
             : `${slot.category === "class" ? "Class" : slot.category === "ancestry" ? "Ancestry" : slot.category === "skill" ? "Skill" : "General"} feat`;
+          const grant = feat ? featGrant(feat.id) : undefined;
+          const grantSlotKey = `${slot.freeArchetype ? "freeArchetype" : slot.category}:${slot.level}`;
+          const grantChoiceKey = feat && grant ? featGrantChoiceKey(feat.id, grantSlotKey) : "";
+          const grantChoice = feat
+            ? (draft.featChoices[grantChoiceKey]?.[0] ?? draft.featChoices[feat.id]?.[0] ?? "")
+            : "";
           return (
             <Card
               key={`${slot.freeArchetype ? "free" : slot.category}-${slot.level}`}
@@ -485,7 +502,10 @@ export function FeatsStep({
                             ...current,
                             feats: { ...current.feats, [key]: bucket },
                             featChoices: Object.fromEntries(
-                              Object.entries(current.featChoices).filter(([id]) => id !== feat.id)
+                              Object.entries(current.featChoices).filter(
+                                ([id]) =>
+                                  id !== feat.id && !id.startsWith(featGrantChoicePrefix(feat.id))
+                              )
                             ),
                           };
                         })
@@ -571,30 +591,30 @@ export function FeatsStep({
                       />
                     </Field>
                   ) : null}
-                  {grantFeatId === feat.id && grantEntry?.grant ? (
+                  {grant ? (
                     <Field
-                      label={grantEntry.grant.prompt}
+                      label={grant.prompt}
                       hint={
-                        grantEntry.grant.repeatable
-                          ? "Runehall applies one granted feat. Additional repeatable picks remain manual."
+                        grant.repeatable
+                          ? "Each selected instance chooses its own granted feat."
                           : "The granted feat's effects apply to your sheet."
                       }
                     >
                       <Select
-                        value={draft.featChoices[feat.id]?.[0] ?? ""}
+                        value={grantChoice}
                         onChange={(event) => {
                           const value = event.target.value;
                           update((current) => ({
                             ...current,
                             featChoices: {
                               ...current.featChoices,
-                              [feat.id]: value ? [value] : [],
+                              [grantChoiceKey]: value ? [value] : [],
                             },
                           }));
                         }}
                       >
                         <option value="">Choose…</option>
-                        {grantOptions
+                        {(grantOptions[feat.id] ?? [])
                           .filter((option) => option.id !== feat.id)
                           .map((option) => (
                             <option key={option.id} value={option.id}>

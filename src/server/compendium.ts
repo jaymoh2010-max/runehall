@@ -19,7 +19,7 @@ import type {
 } from "../shared/types";
 import type { DomainEntry } from "../shared/domains";
 import { isCoreSource } from "../shared/content";
-import { FEAT_GRANTS } from "../shared/effects";
+import { selectedFeatGrantInstances } from "../shared/effects";
 import {
   featAllowedByHeritageGrant,
   heritageChosenFeatId,
@@ -600,16 +600,14 @@ export function contextForDraft(
       if (feat) featMap[granted.id] = feat;
     }
   }
-  for (const [grantId, grant] of Object.entries(FEAT_GRANTS)) {
-    if (!featMap[grantId]) continue;
-    const chosenId = draft.featChoices[grantId]?.[0];
-    if (!chosenId) continue;
-    const feat = maps.feat.get(chosenId);
+  for (const instance of selectedFeatGrantInstances(draft)) {
+    if (!instance.choice) continue;
+    const feat = maps.feat.get(instance.choice);
     if (
       feat &&
-      feat.id !== grantId &&
-      feat.category === grant.category &&
-      feat.level <= grant.level
+      feat.id !== instance.featId &&
+      feat.category === instance.grant.category &&
+      feat.level <= instance.grant.level
     ) {
       featMap[feat.id] = feat;
     }

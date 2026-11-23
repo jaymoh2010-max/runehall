@@ -52,13 +52,12 @@ import { INVESTED_LIMIT, investedCount } from "./itemActivation";
 import { normalizeSustainedSpells } from "./sustain";
 import {
   FEAT_CHOICES,
-  FEAT_GRANTS,
-  GRANTED_FEAT_IDS,
   WEAPON_PROFICIENCY_ID,
   collectFeatChoiceEffects,
   collectFeatEffects,
   collectItemEffects,
   mergeEffects,
+  selectedFeatGrantInstances,
 } from "./effects";
 import {
   featAllowedByHeritageGrant,
@@ -3371,28 +3370,22 @@ export function computeCharacter(
   ) {
     issue("warning", "Weapon Proficiency: choose an advanced weapon.", "feats");
   }
-  for (const grantId of GRANTED_FEAT_IDS) {
-    if (activeFeatIds.includes(grantId) && !draft.featChoices[grantId]?.[0]?.trim()) {
-      const name = context.feats[grantId]?.name ?? "Feat";
-      issue("warning", `${name}: ${FEAT_GRANTS[grantId].prompt}.`, "feats");
+  for (const instance of selectedFeatGrantInstances(draft)) {
+    const name = context.feats[instance.featId]?.name ?? "Feat";
+    if (!instance.choice) {
+      issue("warning", `${name}: ${instance.grant.prompt}.`, "feats");
+      continue;
     }
-  }
-  const featInstances = [
-    ...Object.values(draft.feats.ancestry),
-    ...Object.values(draft.feats.class),
-    ...Object.values(draft.feats.skill),
-    ...Object.values(draft.feats.general),
-    ...Object.values(draft.feats.freeArchetype),
-    ...draft.feats.extras,
-  ];
-  for (const [grantId, grant] of Object.entries(FEAT_GRANTS)) {
-    if (!grant.repeatable) continue;
-    const count = featInstances.filter((id) => id === grantId).length;
-    if (count > 1) {
-      const name = context.feats[grantId]?.name ?? "Repeatable feat";
+    const chosen = context.feats[instance.choice];
+    if (
+      !chosen ||
+      chosen.id === instance.featId ||
+      chosen.category !== instance.grant.category ||
+      chosen.level > instance.grant.level
+    ) {
       issue(
         "warning",
-        `${name}: ${count} selections found. The builder applies one granted feat; choose the additional granted feats manually.`,
+        `${name}: the chosen granted feat is not valid for this selection.`,
         "feats"
       );
     }
@@ -4674,15 +4667,15 @@ export function computeCharacter(
     if (grantedFeats.some((feat) => feat.id === grant.id)) continue;
     grantedFeats.push({ name: grant.name, id: grant.id, source: grant.source ?? "Class choice" });
   }
-  for (const [grantId, grant] of Object.entries(FEAT_GRANTS)) {
-    if (!activeFeatIds.includes(grantId)) continue;
-    const chosenId = draft.featChoices[grantId]?.[0];
-    const feat = chosenId ? context.feats[chosenId] : null;
+  for (const instance of selectedFeatGrantInstances(draft)) {
+    if (!instance.choice) continue;
+    const feat = context.feats[instance.choice];
     if (
       feat &&
-      feat.id !== grantId &&
-      feat.category === grant.category &&
-      feat.level <= grant.level
+      feat.id !== instance.featId &&
+      feat.category === instance.grant.category &&
+      feat.level <= instance.grant.level &&
+      !grantedFeats.some((entry) => entry.id === feat.id)
     ) {
       grantedFeats.push({ name: feat.name, id: feat.id });
     }

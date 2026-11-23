@@ -1,4 +1,4 @@
-import type { AbilityKey, SaveKey, SkillId } from "./types";
+import type { AbilityKey, CharacterDraft, SaveKey, SkillId } from "./types";
 
 /**
  * Structured, curated character effects. The compendium does not carry rule
@@ -97,6 +97,49 @@ export const FEAT_GRANTS: Record<string, FeatGrantDefinition> = {
 
 export function featGrant(id: string): FeatGrantDefinition | undefined {
   return FEAT_GRANTS[id];
+}
+
+/** Stable choice key for one selected instance of a granting feat. */
+export function featGrantChoiceKey(featId: string, slotKey: string): string {
+  return `grant:${featId}:${slotKey}`;
+}
+
+export function featGrantChoicePrefix(featId: string): string {
+  return `grant:${featId}:`;
+}
+
+export interface FeatGrantInstance {
+  featId: string;
+  slotKey: string;
+  grant: FeatGrantDefinition;
+  choice: string | null;
+}
+
+/**
+ * All selected instances of feats that grant another feat. Legacy drafts stored
+ * a single choice under the feat id, so that key remains a fallback for the
+ * first instance.
+ */
+export function selectedFeatGrantInstances(
+  draft: Pick<CharacterDraft, "feats" | "featChoices">
+): FeatGrantInstance[] {
+  const out: FeatGrantInstance[] = [];
+  const add = (featId: string, slotKey: string) => {
+    const grant = FEAT_GRANTS[featId];
+    if (!grant) return;
+    const choice =
+      draft.featChoices[featGrantChoiceKey(featId, slotKey)]?.[0]?.trim() ||
+      draft.featChoices[featId]?.[0]?.trim() ||
+      null;
+    out.push({ featId, slotKey, grant, choice });
+  };
+  for (const bucket of ["ancestry", "class", "skill", "general", "freeArchetype"] as const) {
+    for (const [level, featId] of Object.entries(draft.feats[bucket])) {
+      add(featId, `${bucket}:${level}`);
+    }
+  }
+  draft.feats.extras.forEach((featId, index) => add(featId, `extras:${index}`));
+  return out;
 }
 
 export const GRANTED_FEAT_IDS = Object.keys(FEAT_GRANTS);

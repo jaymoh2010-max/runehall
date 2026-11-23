@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { contextForDraft } from "../src/server/compendium";
 import { computeCharacter } from "../src/shared/rules";
+import { featGrantChoiceKey } from "../src/shared/effects";
 import { buildSimulatedCharacter } from "../scripts/simulate-characters";
 
 const CASES = [
@@ -54,21 +55,30 @@ describe("deterministic character simulation build", () => {
     expect(applied.validation.filter((issue) => issue.severity === "error")).toHaveLength(0);
   });
 
-  it("warns when a repeatable feat grant is selected more than once", () => {
+  it("applies a separate granted feat for each repeatable selection", () => {
     const build = buildSimulatedCharacter({
       seed: 5152,
       className: "Fighter",
       level: 5,
       ancestryName: "Human",
     });
-    build.draft.feats.ancestry["1"] = "feat:D3SuA5MaKucO1flE";
-    build.draft.feats.ancestry["5"] = "feat:D3SuA5MaKucO1flE";
-    build.draft.featChoices["feat:D3SuA5MaKucO1flE"] = ["feat:Ux73dmoF8KnavyUD"];
-    const applied = computeCharacter(build.draft, contextForDraft(build.draft));
-    expect(
-      applied.validation.some(
-        (issue) => issue.severity === "warning" && issue.message.includes("selections found")
-      )
-    ).toBe(true);
+    const buildDraft = build.draft;
+    buildDraft.feats.ancestry["1"] = "feat:D3SuA5MaKucO1flE";
+    buildDraft.feats.ancestry["5"] = "feat:D3SuA5MaKucO1flE";
+    buildDraft.featChoices[featGrantChoiceKey("feat:D3SuA5MaKucO1flE", "ancestry:1")] = [
+      "feat:Ux73dmoF8KnavyUD",
+    ];
+    buildDraft.featChoices[featGrantChoiceKey("feat:D3SuA5MaKucO1flE", "ancestry:5")] = [
+      "feat:AmP0qu7c5dlBSath",
+    ];
+    const baselineDraft = { ...buildDraft, featChoices: {} };
+    const baseline = computeCharacter(baselineDraft, contextForDraft(baselineDraft));
+    const applied = computeCharacter(buildDraft, contextForDraft(buildDraft));
+    expect(applied.speed).toBe(baseline.speed + 5);
+    expect(applied.maxHp).toBe(baseline.maxHp + 5);
+    expect(applied.validation.filter((issue) => issue.severity === "error")).toHaveLength(0);
+    expect(applied.validation.some((issue) => issue.message.includes("selections found"))).toBe(
+      false
+    );
   });
 });
