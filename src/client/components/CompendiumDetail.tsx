@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Coins, Shield, Sparkles, Swords } from "lucide-react";
+import { Link } from "react-router-dom";
 import {
   ABILITY_LABELS,
   SIZES,
@@ -20,8 +21,11 @@ import {
   type Spell,
 } from "../../shared/types";
 import { titleCase, traitLabel, weaponDamageLabel } from "../../shared/rules";
+import type { DomainEntry } from "../../shared/domains";
+import { domainIdForName } from "../../shared/domains";
 import {
   COMPENDIUM_KIND_LABELS,
+  compendiumEntryPath,
   compendiumKindFromId,
   spellTraditionLabel,
   type CompendiumEntryKind,
@@ -39,6 +43,7 @@ export type CompendiumEntry =
   | Spell
   | Equipment
   | Deity
+  | DomainEntry
   | ConditionRef
   | ActionRef
   | Monster;
@@ -547,8 +552,30 @@ function renderBody(kind: CompendiumEntryKind, entry: CompendiumEntry): ReactNod
             <Meta label="Category">{titleCase(deity.category)}</Meta>
             <Meta label="Divine font">{deity.font.map(titleCase).join(", ")}</Meta>
             <Meta label="Skill">{deity.skill.map(titleCase).join(" or ")}</Meta>
-            <Meta label="Domains">{deity.domains.join(", ")}</Meta>
-            <Meta label="Alternate domains">{deity.alternateDomains.join(", ")}</Meta>
+            <Meta label="Domains">
+              {deity.domains.length
+                ? deity.domains.map((domain, index) => (
+                    <span key={domain}>
+                      {index > 0 ? ", " : ""}
+                      <Link to={compendiumEntryPath("domain", domainIdForName(domain))}>
+                        {titleCase(domain)}
+                      </Link>
+                    </span>
+                  ))
+                : "—"}
+            </Meta>
+            <Meta label="Alternate domains">
+              {deity.alternateDomains.length
+                ? deity.alternateDomains.map((domain, index) => (
+                    <span key={domain}>
+                      {index > 0 ? ", " : ""}
+                      <Link to={compendiumEntryPath("domain", domainIdForName(domain))}>
+                        {titleCase(domain)}
+                      </Link>
+                    </span>
+                  ))
+                : "—"}
+            </Meta>
             <Meta label="Favored weapon">{deity.weapons.map(titleCase).join(", ")}</Meta>
             <Meta label="Deity spells">
               {Object.entries(deity.spells)
@@ -558,6 +585,33 @@ function renderBody(kind: CompendiumEntryKind, entry: CompendiumEntry): ReactNod
             </Meta>
           </MetaGrid>
           <Description html={deity.description} />
+        </>
+      );
+    }
+
+    case "domain": {
+      const domain = entry as DomainEntry;
+      const spellRef = (spell: DomainEntry["domainSpell"]) =>
+        spell.id ? (
+          <Link to={compendiumEntryPath("spell", spell.id)}>{spell.name}</Link>
+        ) : (
+          spell.name || "—"
+        );
+      return (
+        <>
+          <MetaGrid>
+            <Meta label="Domain spell">{spellRef(domain.domainSpell)}</Meta>
+            <Meta label="Advanced domain spell">{spellRef(domain.advancedDomainSpell)}</Meta>
+            <Meta label="Deities">{domain.deities.join(", ") || "—"}</Meta>
+            <Meta label="Alternate deities">{domain.alternateDeities.join(", ") || "—"}</Meta>
+            <Meta label="Covenants">{domain.covenants.join(", ") || "—"}</Meta>
+            <Meta label="Alternate covenants">{domain.alternateCovenants.join(", ") || "—"}</Meta>
+            <Meta label="Pantheons">{domain.pantheons.join(", ") || "—"}</Meta>
+            <Meta label="Alternate pantheons">{domain.alternatePantheons.join(", ") || "—"}</Meta>
+            <Meta label="Oracle mysteries">{domain.mysteries.join(", ") || "—"}</Meta>
+            <Meta label="Legacy names">{domain.aliases.join(", ") || "—"}</Meta>
+          </MetaGrid>
+          <Description html={domain.description} />
         </>
       );
     }

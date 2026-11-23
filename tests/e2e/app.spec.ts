@@ -351,6 +351,13 @@ test("lazy library, compendium entry, rules, and account routes load", async ({ 
   await expect(page.getByPlaceholder(/Search spells/)).toHaveValue("Fireball");
   await expect(page.getByRole("heading", { name: "Fireball", level: 2 })).toBeVisible();
 
+  await page.getByRole("tab", { name: "Domains" }).click();
+  await expect(page).toHaveURL(/tab=domains/);
+  await page.getByPlaceholder(/Search domains/).fill("Air");
+  await page.getByRole("button", { name: /Air/ }).first().click();
+  await expect(page.getByRole("heading", { name: "Air", level: 2 })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Pushing Gust" })).toBeVisible();
+
   await page.goto("/rules");
   await expect(page.getByRole("heading", { name: "Rules at the table" })).toBeVisible();
   await page.getByRole("tab", { name: "Actions" }).click();

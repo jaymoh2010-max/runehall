@@ -50,7 +50,8 @@ The highest-impact corrections were:
 
 After regeneration the local compendium has **54 ancestries, 357 heritages,
 547 backgrounds, 29 classes, 881 class features, 6,486 feats, 2,036 spells,
-6,005 items, 483 deities, 43 conditions, 592 actions, and 2,384 creatures**.
+6,005 items, 483 deities, 61 domains, 43 conditions, 592 actions, and 2,384
+creatures**.
 
 ---
 
@@ -90,6 +91,7 @@ compendium-integrity tests, which parse roughly 30 MB of JSON on slower disks.
 | Spells | 2,036 | 174 rituals, 500 focus spells, 547 with structured damage |
 | Equipment | 6,005 | 1,031 weapons, 222 armor, 126 shields, 176 runes, 153 treasure |
 | Deities | 483 | 419 deities, 39 pantheons, 18 covenants, 7 philosophies |
+| Domains | 61 | Domain descriptions, initial/advanced spells, deity lists |
 | Conditions | 43 | The current remastered condition list |
 | Actions | 592 | Includes basic, offensive, defensive, and interaction actions |
 | Creatures | 2,384 | 1,736 remastered + 648 legacy/expansion creatures |
@@ -108,6 +110,9 @@ out of scope.
   raw `[damage-type]` annotations, and `@Macro[` artifacts.
 - Deity spell references are resolved to `spell:` IDs and names; the 7
   remaining entries with no spell list are philosophies.
+- Domain pages are ingested from the Foundry domains journal, link their
+  initial and advanced spells, and list primary and alternate deities,
+  covenants, pantheons, and oracle mysteries.
 - 189 equipment entries have no separate rules text (153 are treasure/gems;
   about 36 are mundane gear such as chalk, rations, and tents).
 - 51 creatures have no public description (mostly variant or adventure entries).
@@ -124,8 +129,6 @@ current data model or intentionally manual:
   ingested. The app has a separate GM hazard library on an unmerged branch, but
   not a compendium hazard browser.
 - **Traits** are labels only. There is no trait glossary or per-trait rules text.
-- **Domain descriptions** are not ingested. Deity pages list domains and their
-  initial domain spells, but there is no standalone domain reference page.
 - **Afflictions** are templates in the sheet; individual curse/disease statblocks
   are not part of the compendium.
 - **Adventure-path bestiaries** (thousands of creatures) are not loaded. The
@@ -227,6 +230,9 @@ current data model or intentionally manual:
 - **Deity spells** are normalized to local spell IDs/names and rendered on the
   deity page. Published lists for Dammar, Inna, and Tolte Coatl are filled in
   where Foundry omits them.
+- **Domains** are now a first-class compendium entry with descriptions,
+  initial/advanced domain spells, deity/pantheon/covenant lists, and links from
+  deity domain names.
 - **Psychic key ability** is published as Intelligence or Charisma.
 - **Legacy/expansion bestiaries** are ingested, and duplicates prefer Monster
   Core > NPC Core > other sources.

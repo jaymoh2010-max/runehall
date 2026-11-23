@@ -12,6 +12,7 @@ import type {
   Monster,
   Spell,
 } from "../src/shared/types";
+import type { DomainEntry } from "../src/shared/domains";
 
 function read<T>(file: string): T[] {
   return JSON.parse(fs.readFileSync(path.resolve("data", "compendium", file), "utf8")) as T[];
@@ -28,6 +29,7 @@ const feats = read<Feat>("feats.json");
 const spells = read<Spell>("spells.json");
 const equipment = read<Equipment>("equipment.json");
 const deities = read<Deity>("deities.json");
+const domains = read<DomainEntry>("domains.json");
 const monsters = read<Monster>("monsters.json");
 const classFeatures = read<{ name: string; description: string }>("classFeatures.json");
 const actions = read<{ name: string; description: string }>("actions.json");
@@ -49,6 +51,7 @@ describe("compendium data", () => {
       ["spells", spells],
       ["equipment", equipment],
       ["deities", deities],
+      ["domains", domains],
       ["monsters", monsters],
     ];
     for (const [key, items] of files) {
@@ -159,6 +162,18 @@ describe("compendium data", () => {
         }
       }
     }
+    const air = byName(domains, "Air");
+    expect(air.id).toBe("domain:air");
+    expect(air.domainSpell.name).toBe("Pushing Gust");
+    expect(air.advancedDomainSpell.name).toBe("Disperse into Air");
+    expect(air.deities).toContain("Gozreh");
+    expect(JSON.stringify(air)).not.toContain("Compendium.pf2e");
+    expect(byName(domains, "Nothingness").aliases).toContain("void");
+    for (const domain of domains) {
+      expect(domain.id.startsWith("domain:"), domain.name).toBe(true);
+      expect(domain.description.length, domain.name).toBeGreaterThan(0);
+    }
+
     for (const cls of classes) {
       for (const group of cls.choiceGroups) {
         for (const option of group.options) {

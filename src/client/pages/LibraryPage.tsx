@@ -1,7 +1,18 @@
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
-import { BookOpen, Dices, Search, Shield, Skull, Sparkles, Swords, X } from "lucide-react";
+import {
+  BookOpen,
+  Dices,
+  Landmark,
+  Search,
+  Shield,
+  Skull,
+  Sparkles,
+  Swords,
+  X,
+} from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import type { Deity, Equipment, Feat, Monster, Spell } from "../../shared/types";
+import type { DomainEntry } from "../../shared/domains";
 import {
   compendiumEntryPath,
   compendiumKindFromId,
@@ -25,7 +36,7 @@ import {
 import { CompendiumDetail } from "../components/CompendiumDetail";
 import { HoverCard } from "../components/HoverCard";
 
-type Tab = "feats" | "spells" | "items" | "bestiary" | "deities";
+type Tab = "feats" | "spells" | "items" | "bestiary" | "deities" | "domains";
 
 const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: "feats", label: "Feats", icon: <Swords size={15} /> },
@@ -33,9 +44,10 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: "items", label: "Equipment", icon: <Shield size={15} /> },
   { id: "bestiary", label: "Bestiary", icon: <Skull size={15} /> },
   { id: "deities", label: "Deities", icon: <BookOpen size={15} /> },
+  { id: "domains", label: "Domains", icon: <Landmark size={15} /> },
 ];
 
-type Entry = Feat | Spell | Equipment | Monster | Deity;
+type Entry = Feat | Spell | Equipment | Monster | Deity | DomainEntry;
 
 const TAB_KINDS: Record<Tab, CompendiumEntryKind> = {
   feats: "feat",
@@ -43,6 +55,7 @@ const TAB_KINDS: Record<Tab, CompendiumEntryKind> = {
   items: "equipment",
   bestiary: "monster",
   deities: "deity",
+  domains: "domain",
 };
 
 function entrySubtitle(item: Entry, tab: Tab): string {
@@ -62,6 +75,10 @@ function entrySubtitle(item: Entry, tab: Tab): string {
       return `Level ${(item as Monster).level} · ${(item as Monster).hp} HP · AC ${(item as Monster).ac}`;
     case "deity":
       return `${(item as Deity).domains.slice(0, 3).join(", ") || "Deity"} · ${(item as Deity).source}`;
+    case "domain": {
+      const domain = item as DomainEntry;
+      return `${domain.domainSpell.name || "Domain"} · ${domain.deities.length} deities`;
+    }
     default:
       return item.name;
   }
@@ -230,6 +247,8 @@ export function LibraryPage() {
         let url = "";
         if (tab === "deities") {
           url = `/api/compendium/deities?q=${encodeURIComponent(query)}&limit=200`;
+        } else if (tab === "domains") {
+          url = `/api/compendium/domains?q=${encodeURIComponent(query)}&limit=200`;
         } else {
           const params = new URLSearchParams();
           params.set("q", query);
@@ -332,7 +351,7 @@ export function LibraryPage() {
             </button>
           ) : null}
         </div>
-        {tab !== "deities" ? (
+        {tab !== "deities" && tab !== "domains" ? (
           <Toggle checked={legacy} onChange={setLegacy} label="Include legacy" />
         ) : null}
       </div>
