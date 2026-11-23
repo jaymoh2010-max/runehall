@@ -1,4 +1,10 @@
-import type { CharacterCurrency, CharacterDraft, CharacterEquipment } from "./types";
+import type {
+  CharacterCurrency,
+  CharacterCustomItem,
+  CharacterDraft,
+  CharacterEquipment,
+  Equipment,
+} from "./types";
 
 const MAX_ITEM_QUANTITY = 9999;
 
@@ -44,6 +50,38 @@ export function spendCurrency(
 
 export function addCurrency(currency: CharacterCurrency, amountCp: number): CharacterCurrency {
   return cpToCurrency(currencyToCp(currency) + Math.max(0, Math.floor(Number(amountCp) || 0)));
+}
+
+/**
+ * Split an award into whole copper pieces without losing or creating coins.
+ * Remainder copper goes to the earliest characters in the party.
+ */
+export function splitCurrencyEvenly(totalCp: number, count: number): number[] {
+  const total = Math.max(0, Math.floor(Number(totalCp) || 0));
+  const parts = Math.max(1, Math.floor(Number(count) || 1));
+  const base = Math.floor(total / parts);
+  const remainder = total % parts;
+  return Array.from({ length: parts }, (_value, index) => base + (index < remainder ? 1 : 0));
+}
+
+/** Represent a player-authored item as a harmless compendium-shaped item. */
+export function customItemToEquipment(item: CharacterCustomItem): Equipment {
+  return {
+    id: item.id,
+    name: item.name,
+    type: "custom",
+    level: 0,
+    price: { gp: 0, sp: 0, cp: 0, cpTotal: 0 },
+    bulk: 0,
+    rarity: "common",
+    traits: ["custom"],
+    usage: "",
+    description: item.description,
+    source: "Custom",
+    license: "",
+    remaster: true,
+    playtest: false,
+  };
 }
 
 /**

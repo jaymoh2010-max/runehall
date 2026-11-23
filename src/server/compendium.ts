@@ -26,6 +26,7 @@ import {
   heritageFeatGrant,
 } from "../shared/heritage";
 import { selectedClassGrants } from "../shared/classGrants";
+import { customItemToEquipment } from "../shared/inventory";
 import {
   COMPENDIUM_KIND_ORDER,
   compendiumKindFromId,
@@ -126,6 +127,7 @@ export interface SearchOptions {
   type?: string[];
   subcategory?: string[];
   usage?: string[];
+  runeOnly?: boolean;
   ritual?: boolean;
 }
 
@@ -251,6 +253,7 @@ export function searchEquipment(opts: SearchOptions) {
         item.weapon?.category ?? item.armor?.category ?? item.consumable?.category;
       if (!subcategory || !subcategories.includes(subcategory)) return false;
     }
+    if (opts.runeOnly && !item.usage.startsWith("etched-onto")) return false;
     if (usages.length && !usages.some((usage) => matchesUsage(item.usage, usage))) return false;
     if (opts.levelMin !== undefined && item.level < opts.levelMin) return false;
     if (opts.levelMax !== undefined && item.level > opts.levelMax) return false;
@@ -563,6 +566,9 @@ export function contextForDraft(
       const rune = maps.equipment.get(runeId);
       if (rune) equipmentMap[rune.id] = rune;
     }
+  }
+  for (const item of draft.customItems ?? []) {
+    equipmentMap[item.id] = customItemToEquipment(item);
   }
 
   const monsterMap: Record<string, Monster> = {};

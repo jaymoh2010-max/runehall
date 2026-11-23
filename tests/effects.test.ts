@@ -49,6 +49,9 @@ const clanPistolFeat = byName(feats, "Clan Pistol");
 const hellspawn = byName(feats, "Hellspawn");
 const diehard = byName(feats, "Diehard");
 const robustHealth = byName(feats, "Robust Health");
+const deepVision = byName(feats, "Deep Vision");
+const proximityAlert = byName(feats, "Proximity Alert");
+const visualFidelity = byName(feats, "Visual Fidelity");
 const nimbleElf = byName(feats, "Nimble Elf");
 const elvenInstincts = byName(feats, "Elven Instincts");
 const incredibleInvestiture = byName(feats, "Incredible Investiture");
@@ -173,6 +176,23 @@ describe("curated feat effects", () => {
   it("labels applied recovery feats as fully automated", () => {
     expect(automationForFeat(diehard).level).toBe("full");
     expect(automationForFeat(robustHealth).level).toBe("full");
+  });
+
+  it("applies curated senses and initiative", () => {
+    const baseline = computeCharacter(fighterDraft(), context({}));
+    const applied = computeCharacter(
+      fighterDraft(),
+      context({
+        [deepVision.id]: deepVision,
+        [visualFidelity.id]: visualFidelity,
+        [proximityAlert.id]: proximityAlert,
+      })
+    );
+    expect(applied.senses).toContain("darkvision");
+    expect(applied.senses).toContain("low-light vision");
+    expect(applied.initiative).toBe(baseline.initiative + 2);
+    expect(automationForFeat(deepVision).level).toBe("full");
+    expect(automationForFeat(proximityAlert).level).toBe("full");
   });
 
   it("labels curated feats with the right automation level", () => {
