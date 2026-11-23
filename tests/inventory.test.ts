@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { emptyCharacterDraft } from "../src/shared/rules";
+import { emptyCharacterDraft, normalizeCharacterDraft } from "../src/shared/rules";
 import {
   addCurrency,
   addItemToDraft,
   currencyToCp,
+  customItemToEquipment,
   removeItemQuantity,
   spendCurrency,
+  splitCurrencyEvenly,
 } from "../src/shared/inventory";
 import type { CharacterEquipment } from "../src/shared/types";
 
@@ -77,5 +79,46 @@ describe("character currency", () => {
   it("refuses to spend more than the purse holds", () => {
     expect(spendCurrency({ gp: 0, sp: 1, cp: 0 }, 11)).toBeNull();
     expect(spendCurrency({ gp: 0, sp: 1, cp: 0 }, 10)).toEqual({ gp: 0, sp: 0, cp: 0 });
+  });
+
+  it("splits party awards without losing or creating copper", () => {
+    expect(splitCurrencyEvenly(1000, 4)).toEqual([250, 250, 250, 250]);
+    expect(splitCurrencyEvenly(1001, 4)).toEqual([251, 250, 250, 250]);
+    expect(splitCurrencyEvenly(2, 4)).toEqual([1, 1, 0, 0]);
+    expect(splitCurrencyEvenly(1000, 4).reduce((sum, part) => sum + part, 0)).toBe(1000);
+  });
+
+  it("represents custom inventory items as harmless equipment entries", () => {
+    const item = customItemToEquipment({
+      id: "custom:keepsake",
+      name: "Family keepsake",
+      description: "A brass compass with a scratched lid.",
+    });
+    expect(item).toMatchObject({
+      id: "custom:keepsake",
+      name: "Family keepsake",
+      type: "custom",
+      level: 0,
+      price: { cpTotal: 0 },
+      bulk: 0,
+      description: "A brass compass with a scratched lid.",
+    });
+  });
+
+  it("keeps only valid, unique custom item definitions", () => {
+    const draft = normalizeCharacterDraft(
+      {
+        customItems: [
+          { id: "custom:compass", name: "Compass", description: "Brass and glass." },
+          { id: "feat:not-custom", name: "Impostor", description: "" },
+          { id: "custom:compass", name: "Duplicate", description: "" },
+          { id: "custom:blank", name: "   ", description: "No name" },
+        ],
+      },
+      "Custom Items"
+    );
+    expect(draft.customItems).toEqual([
+      { id: "custom:compass", name: "Compass", description: "Brass and glass." },
+    ]);
   });
 });

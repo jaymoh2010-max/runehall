@@ -124,6 +124,14 @@ describe("compendium search", () => {
           (item.armor?.category === "light" || item.armor?.category === "medium")
       )
     ).toBe(true);
+
+    const runes = searchEquipment({
+      runeOnly: true,
+      limit: 200,
+      includeLegacy: true,
+    });
+    expect(runes.total).toBeGreaterThan(100);
+    expect(runes.items.every((item) => item.usage.startsWith("etched-onto"))).toBe(true);
   });
 
   it("searches every compendium category from one query", () => {

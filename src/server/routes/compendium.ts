@@ -64,6 +64,7 @@ function parseSearch(query: Record<string, unknown>): SearchOptions {
     type: csv(query.type),
     subcategory: csv(query.subcategory),
     usage: csv(query.usage),
+    runeOnly: query.runeOnly === undefined ? undefined : bool(query.runeOnly, false),
     ritual: query.ritual === undefined ? undefined : bool(query.ritual, false),
   };
 }

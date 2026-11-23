@@ -36,6 +36,7 @@ import {
   formatCopper,
   removeItemQuantity,
   spendCurrency,
+  splitCurrencyEvenly,
 } from "../../shared/inventory";
 import { conditionNumericValue, conditionsFromSheet } from "../../shared/tokens";
 import { characterTokenTurnEffects } from "../../shared/characterTurnEffects";
@@ -1075,6 +1076,138 @@ export async function registerCharacterRoutes(app: FastifyInstance): Promise<voi
       }),
       costCp: mode === "buy" ? costCp : 0,
       mode,
+    });
+  });
+
+  app.post("/api/campaigns/:id/awards", async (request, reply) => {
+    if (!request.user) return reply.code(401).send({ error: "Sign in to continue." });
+    const actor = request.user;
+    const { id } = request.params as { id: string };
+    const campaign = getCampaign(id);
+    if (!campaign) return reply.code(404).send({ error: "Campaign not found." });
+    if (getCampaignRole(id, actor.id) !== "gm") {
+      return reply.code(403).send({ error: "Only the GM can award treasure." });
+    }
+
+    const body = (request.body ?? {}) as Record<string, unknown>;
+    const target = body.target === "character" ? "character" : "party";
+    const kind = body.kind === "item" ? "item" : "gold";
+    const rows = db
+      .prepare("SELECT * FROM characters WHERE campaign_id = ? ORDER BY created_at ASC, id ASC")
+      .all(id) as CharacterRow[];
+    if (!rows.length) {
+      return reply
+        .code(400)
+        .send({ error: "Add a character to the party before awarding treasure." });
+    }
+
+    let targets = rows;
+    if (target === "character") {
+      const characterId = safeString(body.characterId, "", 120);
+      const row = rows.find((entry) => entry.id === characterId);
+      if (!row) return reply.code(400).send({ error: "Choose a character in this campaign." });
+      targets = [row];
+    }
+
+    let amountCp = 0;
+    let awardedItem: { id: string; name: string } | null = null;
+    let quantity = 1;
+    if (kind === "gold") {
+      const raw = body.currency;
+      if (!raw || typeof raw !== "object") {
+        return reply.code(400).send({ error: "Enter a gold, silver, or copper amount." });
+      }
+      const currency = raw as Record<string, unknown>;
+      amountCp = currencyToCp({
+        gp: Number(currency.gp) || 0,
+        sp: Number(currency.sp) || 0,
+        cp: Number(currency.cp) || 0,
+      });
+      if (amountCp <= 0) {
+        return reply.code(400).send({ error: "Enter a gold, silver, or copper amount." });
+      }
+      if (amountCp > 10_000_000_000) {
+        return reply.code(400).send({ error: "That award is too large." });
+      }
+    } else {
+      const itemId = safeString(body.itemId, "", 120);
+      const item = equipment.find((entry) => entry.id === itemId) ?? null;
+      if (!item) return reply.code(404).send({ error: "That item is not in the compendium." });
+      awardedItem = { id: item.id, name: item.name };
+      quantity = Math.max(1, Math.min(999, Math.round(Number(body.quantity) || 1)));
+    }
+
+    const shares = kind === "gold" ? splitCurrencyEvenly(amountCp, targets.length) : [];
+    const updates: { row: CharacterRow; draft: CharacterDraft; summary: CharacterSummary }[] = [];
+    const updatedAt = now();
+    db.exec("BEGIN");
+    try {
+      targets.forEach((row, index) => {
+        const draft = parseDraft(parseJson(row.data, {}), row.name);
+        draft.wealthBudgetCp = null;
+        const nextDraft =
+          kind === "gold"
+            ? { ...draft, currency: addCurrency(draft.currency, shares[index] ?? 0) }
+            : addItemToDraft(draft, {
+                itemId: awardedItem!.id,
+                quantity,
+                equipped: false,
+                invested: false,
+                runes: [],
+              });
+        const summary = summarize(nextDraft);
+        db.prepare(
+          "UPDATE characters SET data = ?, summary = ?, updated_at = ?, revision = revision + 1 WHERE id = ?"
+        ).run(JSON.stringify(nextDraft), JSON.stringify(summary), updatedAt, row.id);
+        updates.push({ row, draft: nextDraft, summary });
+      });
+      db.exec("COMMIT");
+    } catch (error) {
+      db.exec("ROLLBACK");
+      throw error;
+    }
+
+    for (const update of updates) {
+      syncCharacterDraft(app, update.row, update.draft, update.summary);
+    }
+    touchCampaign(id);
+    const updatedCampaign = getCampaign(id);
+    if (updatedCampaign) broadcastCampaignSummary(app, updatedCampaign);
+
+    const characters = updates.map((update) => {
+      const updated = getCharacter(update.row.id)!;
+      const owner = getUser(updated.user_id);
+      return serializeCharacter(updated, owner?.display_name ?? "", {
+        canEdit: canEditCharacter(updated, actor.id),
+        canView: true,
+        canAdvance: canAdvanceCharacter(updated, actor.id),
+      });
+    });
+    const message =
+      kind === "gold"
+        ? target === "party"
+          ? `Awarded ${formatCopper(amountCp)} to the party, split across ${targets.length} character${targets.length === 1 ? "" : "s"}.`
+          : `Awarded ${formatCopper(amountCp)} to ${updates[0]?.draft.name ?? "the character"}.`
+        : target === "party"
+          ? `Awarded ${quantity}× ${awardedItem!.name} to each party member.`
+          : `Awarded ${quantity}× ${awardedItem!.name} to ${updates[0]?.draft.name ?? "the character"}.`;
+    logAudit({
+      action: "campaign.award_treasure",
+      actor,
+      targetType: "campaign",
+      targetId: id,
+      detail: message,
+      request,
+    });
+    return reply.code(201).send({
+      message,
+      characters,
+      target,
+      kind,
+      amountCp: kind === "gold" ? amountCp : 0,
+      eachAmountCp: kind === "gold" ? (shares[0] ?? 0) : 0,
+      quantity: kind === "item" ? quantity : 0,
+      itemId: awardedItem?.id ?? null,
     });
   });
 
