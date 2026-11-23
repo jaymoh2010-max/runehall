@@ -1,6 +1,7 @@
 import {
   casterInfo,
   divineFontInfo,
+  isCantripPrepared,
   isPreparedCasterClass,
   ordinarySpellSlotsFor,
   preparedEntries,
@@ -125,6 +126,7 @@ export function spellCastOptions(
   }
 
   if (spell.rank === 0) {
+    if (!isCantripPrepared(draft, context, spell.id)) return [];
     return [
       {
         rank: cantripCastRank(level),
@@ -322,6 +324,97 @@ export function castSpell(
     draft: { ...draft, spells },
     option: { ...option, remaining: Math.max(0, (option.remaining ?? 0) - 1) },
   };
+}
+
+/**
+ * Whether a previous cast can be undone. Restoring is intentionally narrower
+ * than casting: it only lowers counters that the cast path raises, so manually
+ * spent slot pips are never silently turned into unspent prepared copies.
+ */
+export function canRestoreSpellUse(
+  draft: CharacterDraft,
+  spell: Spell,
+  choice: SpellCastChoice,
+  opts: { focusPointsMax?: number } = {}
+): boolean {
+  if (choice.resource === "cantrip") return false;
+  if (choice.resource === "innate") {
+    return Math.max(0, Math.round(Number(draft.spells.innateUsed[spell.id]) || 0)) > 0;
+  }
+  if (choice.resource === "focus") {
+    const max = clampInt(opts.focusPointsMax ?? 0, 0, 3);
+    return clampInt(draft.play.focusPoints, 0, max) < max;
+  }
+  if (choice.resource === "font") {
+    const used = Math.max(0, Math.round(Number(draft.spells.divineFontUsed) || 0));
+    const spellUsed = Math.max(0, Math.round(Number(draft.spells.fontUsed[spell.id]) || 0));
+    return used > 0 || spellUsed > 0;
+  }
+  const key = String(choice.rank);
+  return Math.max(0, Math.round(Number(draft.spells.slotsUsed[key]) || 0)) > 0;
+}
+
+/**
+ * Undo one cast of a spell, lowering the same counters that `castSpell`
+ * raised. Returns null when there is nothing to restore.
+ */
+export function restoreSpellUse(
+  draft: CharacterDraft,
+  spell: Spell,
+  context: CharacterContext,
+  choice: SpellCastChoice,
+  opts: { focusPointsMax?: number } = {}
+): CharacterDraft | null {
+  if (!canRestoreSpellUse(draft, spell, choice, opts)) return null;
+
+  if (choice.resource === "innate") {
+    const used = Math.max(0, Math.round(Number(draft.spells.innateUsed[spell.id]) || 0));
+    return {
+      ...draft,
+      spells: {
+        ...draft.spells,
+        innateUsed: { ...draft.spells.innateUsed, [spell.id]: Math.max(0, used - 1) },
+      },
+    };
+  }
+
+  if (choice.resource === "focus") {
+    const max = clampInt(opts.focusPointsMax ?? 0, 0, 3);
+    const current = clampInt(draft.play.focusPoints, 0, max);
+    return {
+      ...draft,
+      play: { ...draft.play, focusPoints: Math.min(max, current + 1) },
+    };
+  }
+
+  if (choice.resource === "font") {
+    const used = Math.max(0, Math.round(Number(draft.spells.divineFontUsed) || 0));
+    const spellUsed = Math.max(0, Math.round(Number(draft.spells.fontUsed[spell.id]) || 0));
+    return {
+      ...draft,
+      spells: {
+        ...draft.spells,
+        divineFontUsed: Math.max(0, used - 1),
+        fontUsed: { ...draft.spells.fontUsed, [spell.id]: Math.max(0, spellUsed - 1) },
+      },
+    };
+  }
+
+  const key = String(choice.rank);
+  const used = Math.max(0, Math.round(Number(draft.spells.slotsUsed[key]) || 0));
+  const spells: CharacterDraft["spells"] = {
+    ...draft.spells,
+    slotsUsed: { ...draft.spells.slotsUsed, [key]: Math.max(0, used - 1) },
+  };
+  if (isPreparedCasterClass(context.classData?.name)) {
+    const copyKey = preparedUsedKey(choice.rank, spell.id);
+    const spent = Math.max(0, Math.round(Number(draft.spells.preparedUsed[copyKey]) || 0));
+    spells.preparedUsed = {
+      ...draft.spells.preparedUsed,
+      [copyKey]: Math.max(0, spent - 1),
+    };
+  }
+  return { ...draft, spells };
 }
 
 function parseFormula(formula: string): { dice: number; sides: number; flat: number } | null {

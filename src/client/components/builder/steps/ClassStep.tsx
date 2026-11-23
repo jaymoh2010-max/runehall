@@ -263,6 +263,7 @@ export function ClassStep({
                     known: [],
                     prepared: [],
                     preparedByRank: {},
+                    preparedCantrips: [],
                     focus: [],
                     slotsUsed: {},
                     divineFontUsed: 0,

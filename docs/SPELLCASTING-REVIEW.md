@@ -50,6 +50,18 @@ There are also several class-specific approximations:
 
 The recommended first sprint is therefore the **daily spellcasting loop**, not broad class automation. Once rest, pending preparations, prepared cantrips, and spell-use reconciliation are correct, every prepared class benefits immediately and the later class-specific work has a stable base.
 
+## Sprint 1 implementation status (2026-11-23)
+
+Sprint 1 is implemented:
+
+- Character sheets can take a long rest, preview the reset, and open daily preparations when the rest finishes.
+- `preparationsPending` is surfaced in the sheet, the builder, the party rail, the campaign party cards, and the dashboard character cards.
+- Prepared cantrips are a separate daily choice with class-specific known and prepared limits. Wizard curriculum cantrips get their extra slot; magus spellbooks can hold eight cantrips.
+- A Restore action undoes a cast's slot, font, focus, or innate use and keeps prepared-copy usage in sync.
+- The campaign party rest still sets the pending flag server-side. The client toast for that flow was deferred because `CampaignPage.tsx` is being edited by another session; the summary badges already surface the reminder.
+
+Remaining work stays in Sprint 2 and Sprint 3 below.
+
 ## Rules baseline
 
 ### Core spellcasting

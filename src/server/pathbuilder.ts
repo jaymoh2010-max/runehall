@@ -4,6 +4,7 @@ import {
   casterInfo,
   flattenPreparedByRank,
   flexibleBoosts,
+  isPreparedCasterClass,
   ordinarySpellSlotsFor,
 } from "../shared/rules";
 import { newId } from "./util";
@@ -696,6 +697,9 @@ export function importPathbuilder(
     }
   }
   draft.spells.cantrips = [...spellSets.cantrips];
+  draft.spells.preparedCantrips = isPreparedCasterClass(classData?.name)
+    ? [...spellSets.cantrips]
+    : null;
   draft.spells.known = [...spellSets.known];
   draft.spells.preparedByRank = preparedByRank;
   draft.spells.prepared = flattenPreparedByRank(preparedByRank);

@@ -1108,6 +1108,27 @@ test("builder completes a level-1 Wizard using granted curriculum spells", async
   await expect(page.getByRole("heading", { name: "E2E Wizard" })).toBeVisible();
   await page.getByRole("button", { name: "Spells", exact: true }).click();
   await expect(page.getByRole("link", { name: /Force Barrage/ })).toBeVisible();
+
+  await page.getByRole("button", { name: "Long rest" }).click();
+  const restDialog = page.getByRole("dialog", { name: "Take a long rest" });
+  await expect(restDialog).toBeVisible();
+  await restDialog.getByRole("button", { name: "Take long rest" }).click();
+
+  const prepDialog = page.getByRole("dialog", { name: "Daily preparations" });
+  await expect(prepDialog).toBeVisible({ timeout: 15_000 });
+  await prepDialog.getByLabel("Cantrip to prepare").selectOption({ label: "Shield · curriculum" });
+  await prepDialog.getByRole("button", { name: "Prepare selected cantrip" }).click();
+  await prepDialog.getByRole("button", { name: "Apply daily preparations" }).click();
+  await expect(prepDialog).toBeHidden({ timeout: 15_000 });
+  await expect(page.getByTestId("prep-pending-banner")).toHaveCount(0);
+
+  const preparedCantrip = page
+    .locator(".pb-spell-row")
+    .filter({ hasText: "Prepared cantrips" })
+    .filter({ hasText: "Shield" });
+  await expect(preparedCantrip).toBeVisible();
+  await preparedCantrip.getByRole("button", { name: "Cast" }).click();
+  await expect(page.getByText(/Cast Shield at rank 1/)).toBeVisible({ timeout: 15_000 });
 });
 
 test("builder grants a Cloistered Cleric domain focus spell", async ({ page }) => {

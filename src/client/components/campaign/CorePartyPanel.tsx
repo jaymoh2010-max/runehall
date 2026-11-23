@@ -41,6 +41,9 @@ export function CorePartyPanel({
                   {(character.summary?.validationErrors ?? 0) > 0 ? (
                     <Badge tone="red">Needs choices</Badge>
                   ) : null}
+                  {character.summary?.spellPreparationsPending ? (
+                    <Badge tone="gold">Prepare spells</Badge>
+                  ) : null}
                 </div>
                 <p className="tiny muted">
                   {character.summary

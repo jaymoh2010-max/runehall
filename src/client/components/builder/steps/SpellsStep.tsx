@@ -59,11 +59,14 @@ import {
 } from "../../../../shared/types";
 import {
   abilityMod,
+  addPreparedCantrip,
   addPreparedSpellCopy,
   applicableChoiceGroups,
+  canPrepareCantrip,
   canPrepareSpellAtRank,
   casterInfo,
   cantripLimitFor,
+  cantripPreparedLimitFor,
   classKeyOptions,
   computeCharacter,
   deityFontChoices,
@@ -78,8 +81,10 @@ import {
   isPreparedCasterClass,
   normalizeCharacterDraft,
   ordinaryPreparedLimitAt,
+  preparedCantripIds,
   preparedEntries,
   preparedRankSummaries,
+  removePreparedCantrip,
   removePreparedCopy,
   removePreparedSpellEverywhere,
   requiredExtraSkills,
@@ -121,6 +126,7 @@ import {
 import { DeityPicker, EquipmentPicker, FeatPicker, SpellPicker } from "../pickers";
 import { ContentSourceToggle } from "../ContentSourceToggle";
 import { RunePicker } from "../RunePicker";
+import { DailyPreparationsModal } from "../../DailyPreparationsModal";
 import {
   isCoreSource,
   rulesetContentMode,
@@ -140,6 +146,7 @@ function spellTestId(value: string): string {
 
 export function SpellsStep({ draft, update, derived, context, setStep, openPicker }: BuilderProps) {
   const [prepRanks, setPrepRanks] = useState<Record<string, number>>({});
+  const [prepOpen, setPrepOpen] = useState(false);
   const classData = context.classData;
   const caster = casterInfo(classData);
   const tradition = derived.casterTradition ?? draft.spells.tradition;
@@ -193,8 +200,21 @@ export function SpellsStep({ draft, update, derived, context, setStep, openPicke
   const wizardCurriculum = classData?.name.toLowerCase() === "wizard";
   const isFocusCaster = caster.progression === "focus";
   const repertoire = spellRepertoireLimits(classData, draft.level);
-  const cantripCap = cantripLimitFor(classData) ?? repertoire?.cantrips ?? null;
+  const knownCantripCap = cantripLimitFor(classData) ?? repertoire?.cantrips ?? null;
+  const preparedCantripCap = cantripPreparedLimitFor(classData);
   const isPreparedCaster = isPreparedCasterClass(classData?.name);
+  const cantripContext = { spells: context.spells, deity: context.deity, classData };
+  const preparedCantripList = preparedCantripIds(draft, cantripContext);
+  const preparedCantripSet = new Set(preparedCantripList);
+  const curriculumCantripIds = new Set(
+    derived.grantedSpells
+      .filter((spell) => spell.kind === "curriculum" && spell.rank === 0)
+      .map((spell) => spell.id)
+  );
+  const preparedCantripMax =
+    preparedCantripCap === null
+      ? null
+      : preparedCantripCap + (wizardCurriculum && curriculumCantripIds.size > 0 ? 1 : 0);
   const traditionMissing = Boolean(caster.traditionOptions) && !tradition;
   const preparedRows = preparedEntries(draft, {
     spells: context.spells,
@@ -237,21 +257,31 @@ export function SpellsStep({ draft, update, derived, context, setStep, openPicke
     update((current) => {
       const key = target;
       if (current.spells[key].includes(spell.id)) return current;
-      return {
+      let next: CharacterDraft = {
         ...current,
         spells: { ...current.spells, [key]: [...current.spells[key], spell.id] },
       };
+      if (target === "cantrips" && isPreparedCaster) {
+        if (canPrepareCantrip(next, cantripContext, spell)) {
+          next = addPreparedCantrip(next, cantripContext, spell.id);
+        }
+      }
+      return next;
     });
   const removeSpell = (id: string, target: "cantrips" | "known" | "focus" | "rituals" | "innate") =>
     update((current) => {
       const cleared = removePreparedSpellEverywhere(current, id);
-      return {
+      let next: CharacterDraft = {
         ...cleared,
         spells: {
           ...cleared.spells,
           [target]: cleared.spells[target].filter((s) => s !== id),
         },
       };
+      if (target === "cantrips") {
+        next = removePreparedCantrip(next, cantripContext, id);
+      }
+      return next;
     });
 
   const extraSpells = (
@@ -374,6 +404,16 @@ export function SpellsStep({ draft, update, derived, context, setStep, openPicke
       )
     );
 
+  const toggleCantripPreparation = (spell: Spell) =>
+    update((current) => {
+      const prepared = preparedCantripIds(current, cantripContext);
+      if (prepared.includes(spell.id)) {
+        return removePreparedCantrip(current, cantripContext, spell.id);
+      }
+      if (!canPrepareCantrip(current, cantripContext, spell)) return current;
+      return addPreparedCantrip(current, cantripContext, spell.id);
+    });
+
   const preparedGroupsAt = (rank: number) => {
     const groups = new Map<
       string,
@@ -486,6 +526,23 @@ export function SpellsStep({ draft, update, derived, context, setStep, openPicke
         title="What magic answers your call?"
         lede="Choose a tradition, learn cantrips and spells, and track your spell slots at the table. Full, bounded, psychic, and focus casters each use their own progression."
       />
+      {isPreparedCaster ? (
+        <div className="info-box">
+          <BookOpen size={16} />
+          <p>
+            {draft.spells.preparationsPending
+              ? "Long rest complete. Choose the spells and cantrips you have prepared today."
+              : "Prepared casters choose their ranked spells and cantrips during daily preparations."}
+          </p>
+          <Button
+            size="sm"
+            variant={draft.spells.preparationsPending ? "primary" : "secondary"}
+            onClick={() => setPrepOpen(true)}
+          >
+            Prepare today&apos;s spells
+          </Button>
+        </div>
+      ) : null}
       {traditionMissing ? (
         <div className="info-box">
           <CircleAlert size={16} />
@@ -549,7 +606,10 @@ export function SpellsStep({ draft, update, derived, context, setStep, openPicke
           <div className="row-between">
             <div>
               <h3>Spell slots</h3>
-              <p className="muted small">Click a pip to mark it spent. Reset between sessions.</p>
+              <p className="muted small">
+                Click a pip to mark it spent. Spell uses reset on a long rest or during daily
+                preparations.
+              </p>
             </div>
             <div className="row" style={{ gap: 6 }}>
               <Button
@@ -568,7 +628,7 @@ export function SpellsStep({ draft, update, derived, context, setStep, openPicke
                   }))
                 }
               >
-                Reset slots
+                Reset spell uses
               </Button>
               <Badge tone="blue">{isPreparedCaster ? "Prepared" : "Spontaneous"}</Badge>
               <Badge tone="gold">
@@ -748,14 +808,18 @@ export function SpellsStep({ draft, update, derived, context, setStep, openPicke
                 <h3>Cantrips</h3>
                 <p className="muted small">
                   {baseCantripCount}
-                  {cantripCap !== null ? ` / ${cantripCap}` : ""} chosen · rank 0
+                  {knownCantripCap !== null ? ` / ${knownCantripCap}` : ""} known
+                  {isPreparedCaster && preparedCantripMax !== null
+                    ? ` · ${preparedCantripList.length} / ${preparedCantripMax} prepared today`
+                    : " · rank 0"}
                 </p>
               </div>
               <Button
                 size="sm"
                 icon={<Plus size={14} />}
                 disabled={
-                  traditionMissing || (cantripCap !== null && baseCantripCount >= cantripCap)
+                  traditionMissing ||
+                  (knownCantripCap !== null && baseCantripCount >= knownCantripCap)
                 }
                 onClick={() => openPicker({ kind: "spell", rank: 0, target: "cantrips" })}
               >
@@ -763,37 +827,75 @@ export function SpellsStep({ draft, update, derived, context, setStep, openPicke
               </Button>
             </div>
             <div className="spell-chip-grid">
-              {cantrips.map((spell) => (
-                <div key={spell.id} className="spell-chip">
-                  <span>
-                    <strong>{spell.name}</strong>
-                    <span className="tiny muted"> · {spell.actions || "cast"}</span>
-                  </span>
-                  <button
-                    type="button"
-                    className="icon-btn"
-                    aria-label={`Remove ${spell.name}`}
-                    onClick={() => removeSpell(spell.id, "cantrips")}
-                  >
-                    <Minus size={13} />
-                  </button>
-                </div>
-              ))}
-              {grantedCantrips
-                .filter((spell) => !draft.spells.cantrips.includes(spell.id))
-                .map((spell) => (
-                  <div key={`granted-${spell.id}`} className="spell-chip">
+              {cantrips.map((spell) => {
+                const prepared = preparedCantripSet.has(spell.id);
+                return (
+                  <div key={spell.id} className="spell-chip">
                     <span>
                       <strong>{spell.name}</strong>
-                      <span className="tiny muted"> · granted cantrip</span>
+                      <span className="tiny muted"> · {spell.actions || "cast"}</span>
                     </span>
-                    <Tag tone="gold">Granted</Tag>
+                    {isPreparedCaster ? (
+                      <button
+                        type="button"
+                        className="icon-btn"
+                        aria-label={`${prepared ? "Unprepare" : "Prepare"} ${spell.name}`}
+                        aria-pressed={prepared}
+                        title={prepared ? "Prepared for today" : "Prepare for today"}
+                        onClick={() => toggleCantripPreparation(spell)}
+                      >
+                        {prepared ? <Check size={13} /> : <Plus size={13} />}
+                      </button>
+                    ) : null}
+                    <button
+                      type="button"
+                      className="icon-btn"
+                      aria-label={`Remove ${spell.name}`}
+                      onClick={() => removeSpell(spell.id, "cantrips")}
+                    >
+                      <Minus size={13} />
+                    </button>
                   </div>
-                ))}
+                );
+              })}
+              {grantedCantrips
+                .filter((spell) => !draft.spells.cantrips.includes(spell.id))
+                .map((spell) => {
+                  const prepared = preparedCantripSet.has(spell.id);
+                  return (
+                    <div key={`granted-${spell.id}`} className="spell-chip">
+                      <span>
+                        <strong>{spell.name}</strong>
+                        <span className="tiny muted"> · granted cantrip</span>
+                      </span>
+                      {isPreparedCaster ? (
+                        <button
+                          type="button"
+                          className="icon-btn"
+                          aria-label={`${prepared ? "Unprepare" : "Prepare"} ${spell.name}`}
+                          aria-pressed={prepared}
+                          title={prepared ? "Prepared for today" : "Prepare for today"}
+                          onClick={() => toggleCantripPreparation(spell)}
+                        >
+                          {prepared ? <Check size={13} /> : <Plus size={13} />}
+                        </button>
+                      ) : null}
+                      <Tag tone="gold">Granted</Tag>
+                    </div>
+                  );
+                })}
               {!cantrips.length && !grantedCantrips.length ? (
                 <p className="muted small">No cantrips selected yet.</p>
               ) : null}
             </div>
+            {isPreparedCaster ? (
+              <p className="tiny muted" style={{ marginTop: 8 }}>
+                Only cantrips marked as prepared are castable at the table.
+                {wizardCurriculum && curriculumCantripIds.size
+                  ? " One extra prepared cantrip may come from your curriculum."
+                  : ""}
+              </p>
+            ) : null}
           </Card>
 
           {isPreparedCaster ? (
@@ -1135,9 +1237,21 @@ export function SpellsStep({ draft, update, derived, context, setStep, openPicke
           lower-rank spell. Cleric divine font is counted separately: Heal/Harm copies prepared at
           the font rank fill font slots first, and extra copies use ordinary slots at that rank.
           Each duplicate uses a slot. Spontaneous repertoire limits are checked for bards, oracles,
-          sorcerers, and summoners. Slot pips are a table aid and reset between sessions.
+          sorcerers, and summoners. Prepared cantrips are chosen separately from ranked spells. Slot
+          pips are a table aid and reset on a long rest or during daily preparations.
         </p>
       </div>
+      <DailyPreparationsModal
+        open={prepOpen}
+        onClose={() => setPrepOpen(false)}
+        draft={draft}
+        context={context}
+        derived={derived}
+        onApply={(next) => {
+          update(() => next);
+          setPrepOpen(false);
+        }}
+      />
       <ValidationNote issues={issues} />
       <div className="step-actions">
         <Button variant="ghost" onClick={() => setStep("feats")}>

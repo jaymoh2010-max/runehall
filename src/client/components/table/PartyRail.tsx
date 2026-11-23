@@ -82,6 +82,7 @@ export function PartyRail({
                     </span>
                   </div>
                   {token ? <Tag tone="gold">On scene</Tag> : <Tag>Off scene</Tag>}
+                  {summary?.spellPreparationsPending ? <Tag tone="gold">Prepare spells</Tag> : null}
                 </div>
 
                 {summary ? (

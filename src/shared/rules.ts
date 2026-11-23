@@ -464,16 +464,158 @@ const CANTRIP_LIMITS: Record<string, number> = {
   // The wizard's spellbook starts with 10 cantrips and prepares five plus one
   // curriculum cantrip each day.
   wizard: 10,
-  magus: 5,
+  // A magus spellbook starts with eight cantrips and prepares five each day.
+  magus: 8,
   summoner: 5,
-  // Psychic gains three more psi cantrips from the conscious mind.
+  // Psychic gains three regular occult cantrips, plus three psi cantrips from
+  // the conscious mind.
   psychic: 3,
   animist: 4,
   necromancer: 5,
 };
 
+/** Cantrips a class can know or hold in its spellbook/repertoire. */
 export function cantripLimitFor(classData: ClassData | null | undefined): number | null {
   return CANTRIP_LIMITS[classData?.name.toLowerCase() ?? ""] ?? null;
+}
+
+/** Cantrips a prepared caster prepares each day. */
+const PREPARED_CANTRIP_LIMITS: Record<string, number> = {
+  cleric: 5,
+  druid: 5,
+  witch: 5,
+  wizard: 5,
+  magus: 5,
+  necromancer: 5,
+  animist: 4,
+};
+
+export function cantripPreparedLimitFor(classData: ClassData | null | undefined): number | null {
+  const name = classData?.name.toLowerCase() ?? "";
+  if (!isPreparedCasterClass(name)) return null;
+  return PREPARED_CANTRIP_LIMITS[name] ?? null;
+}
+
+type CantripContext = Pick<CharacterContext, "spells" | "deity" | "classData">;
+
+/**
+ * Cantrips this character can prepare from: the selected cantrip list plus
+ * cantrips granted by a class choice (for example a wizard curriculum cantrip
+ * or a bard muse cantrip).
+ */
+export function knownCantripIds(
+  draft: Pick<CharacterDraft, "spells">,
+  context: CantripContext
+): string[] {
+  const ids = new Set(draft.spells.cantrips);
+  for (const grant of selectedClassGrants(draft as CharacterDraft, context.classData, context.deity)
+    .spells) {
+    if (grant.rank === 0 && grant.kind !== "focus") ids.add(grant.id);
+  }
+  return [...ids];
+}
+
+/**
+ * Cantrips prepared for the day. Legacy drafts have no explicit prepared list;
+ * they fall back to every known cantrip until the player runs daily
+ * preparations, preserving old sheets.
+ */
+export function preparedCantripIds(
+  draft: Pick<CharacterDraft, "spells">,
+  context: CantripContext
+): string[] {
+  const known = knownCantripIds(draft, context);
+  if (!isPreparedCasterClass(context.classData?.name)) return known;
+  const prepared = draft.spells.preparedCantrips;
+  if (prepared === null || prepared === undefined) return known;
+  const knownSet = new Set(known);
+  return prepared.filter((id) => knownSet.has(id));
+}
+
+export function isCantripPrepared(
+  draft: Pick<CharacterDraft, "spells">,
+  context: CantripContext,
+  spellId: string
+): boolean {
+  if (!isPreparedCasterClass(context.classData?.name)) return true;
+  return preparedCantripIds(draft, context).includes(spellId);
+}
+
+/**
+ * Whether a prepared caster can add another copy of this cantrip today. The
+ * wizard's extra curriculum cantrip is allowed beyond the normal five; all
+ * other prepared classes are capped by PREPARED_CANTRIP_LIMITS.
+ */
+export function canPrepareCantrip(
+  draft: Pick<CharacterDraft, "spells">,
+  context: CantripContext,
+  spell: Pick<Spell, "id" | "rank">
+): boolean {
+  if (!isPreparedCasterClass(context.classData?.name)) return false;
+  if (spell.rank !== 0) return false;
+  const known = knownCantripIds(draft, context);
+  if (!known.includes(spell.id)) return false;
+  const current = preparedCantripIds(draft, context);
+  if (current.includes(spell.id)) return false;
+
+  const baseLimit = cantripPreparedLimitFor(context.classData) ?? 0;
+  if (current.length >= baseLimit) {
+    const curriculum = new Set(
+      selectedClassGrants(draft as CharacterDraft, context.classData, context.deity)
+        .spells.filter((grant) => grant.rank === 0 && grant.kind === "curriculum")
+        .map((grant) => grant.id)
+    );
+    const wizardExtra =
+      context.classData?.name.toLowerCase() === "wizard" &&
+      curriculum.size > 0 &&
+      curriculum.has(spell.id) &&
+      current.length < baseLimit + 1;
+    if (!wizardExtra) return false;
+  }
+  return true;
+}
+
+export function addPreparedCantrip(
+  draft: CharacterDraft,
+  context: CantripContext,
+  spellId: string
+): CharacterDraft {
+  const current = preparedCantripIds(draft, context);
+  if (current.includes(spellId)) return draft;
+  return {
+    ...draft,
+    spells: {
+      ...draft.spells,
+      preparedCantrips: [...current, spellId],
+    },
+  };
+}
+
+export function removePreparedCantrip(
+  draft: CharacterDraft,
+  context: CantripContext,
+  spellId: string
+): CharacterDraft {
+  const prepared = draft.spells.preparedCantrips;
+  if (prepared === null || prepared === undefined) {
+    const known = knownCantripIds(draft, context);
+    if (!known.includes(spellId)) return draft;
+    return {
+      ...draft,
+      spells: {
+        ...draft.spells,
+        preparedCantrips: known.filter((id) => id !== spellId),
+      },
+    };
+  }
+  if (!prepared.includes(spellId)) return draft;
+  return {
+    ...draft,
+    spells: {
+      ...draft.spells,
+      preparedCantrips: prepared.filter((id) => id !== spellId),
+    },
+  };
 }
 
 /** Heal/Harm are the only spells a cleric's divine font can prepare. */
@@ -969,6 +1111,7 @@ export function emptyCharacterDraft(name = "New Hero"): CharacterDraft {
       known: [],
       prepared: [],
       preparedByRank: {},
+      preparedCantrips: [],
       focus: [],
       divineFontUsed: 0,
       fontChoice: null,
@@ -1214,6 +1357,9 @@ export function normalizeCharacterDraft(input: unknown, fallbackName = "New Hero
       known: arr<string>(spells.known).filter((x) => typeof x === "string"),
       prepared: finalPrepared,
       preparedByRank,
+      preparedCantrips: Array.isArray(spells.preparedCantrips)
+        ? [...new Set(arr<string>(spells.preparedCantrips).filter((x) => typeof x === "string"))]
+        : null,
       focus: arr<string>(spells.focus).filter((x) => typeof x === "string"),
       signature: arr<string>(spells.signature).filter((x) => typeof x === "string"),
       rituals: [...new Set(arr<string>(spells.rituals).filter((x) => typeof x === "string"))].slice(
@@ -3243,6 +3389,67 @@ export function computeCharacter(
         "spells"
       );
     }
+    const preparedCantripLimit = cantripPreparedLimitFor(classData);
+    const preparedCantrips = draft.spells.preparedCantrips;
+    if (preparedCantripLimit !== null && preparedCantrips !== null && preparedCantrips.length) {
+      const uniquePrepared = new Set(preparedCantrips);
+      if (uniquePrepared.size !== preparedCantrips.length) {
+        issue("warning", "A prepared cantrip is listed more than once.", "spells");
+      }
+      const curriculumIds = new Set(
+        classGrants.spells
+          .filter((spell) => spell.rank === 0 && spell.kind === "curriculum")
+          .map((spell) => spell.id)
+      );
+      let total = 0;
+      let nonCurriculum = 0;
+      for (const spellId of uniquePrepared) {
+        const spell = context.spells[spellId];
+        if (!spell) {
+          issue("warning", "A prepared cantrip is missing from the compendium.", "spells");
+          continue;
+        }
+        if (spell.rank !== 0) {
+          issue(
+            "warning",
+            `${spell.name} is not a cantrip and cannot be prepared in a cantrip slot.`,
+            "spells"
+          );
+          continue;
+        }
+        if (!grantedKnownSpellIds.has(spellId) && !draft.spells.cantrips.includes(spellId)) {
+          issue(
+            "warning",
+            `${spell.name} is prepared but is not in this character's cantrip list.`,
+            "spells"
+          );
+          continue;
+        }
+        total += 1;
+        if (!curriculumIds.has(spellId)) nonCurriculum += 1;
+      }
+      const wizard = classData?.name.toLowerCase() === "wizard";
+      const maxPrepared = preparedCantripLimit + (wizard && curriculumIds.size > 0 ? 1 : 0);
+      if (total > maxPrepared) {
+        issue(
+          "error",
+          `${classData?.name ?? "This class"} has ${total} cantrips prepared but only ${maxPrepared} can be prepared each day.`,
+          "spells"
+        );
+      } else if (wizard && total > preparedCantripLimit && nonCurriculum > preparedCantripLimit) {
+        issue(
+          "error",
+          `Wizard: ${nonCurriculum} non-curriculum cantrips prepared; only ${preparedCantripLimit} ordinary cantrip slots are available. The extra cantrip must be a curriculum spell.`,
+          "spells"
+        );
+      } else if (
+        wizard &&
+        total > preparedCantripLimit &&
+        ![...uniquePrepared].some((spellId) => curriculumIds.has(spellId))
+      ) {
+        issue("error", "Wizard: the extra prepared cantrip must be a curriculum spell.", "spells");
+      }
+    }
   }
   for (const spellId of [...draft.spells.cantrips, ...draft.spells.known]) {
     const spell = context.spells[spellId];
@@ -3887,5 +4094,6 @@ export function characterSummary(draft: CharacterDraft, context: CharacterContex
     portraitUrl: draft.portraitUrl,
     validationErrors: derived.validation.filter((issue) => issue.severity === "error").length,
     validationWarnings: derived.validation.filter((issue) => issue.severity === "warning").length,
+    spellPreparationsPending: draft.spells.preparationsPending,
   };
 }

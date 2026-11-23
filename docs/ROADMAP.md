@@ -649,7 +649,8 @@ Acceptance: a GM can prepare a full session in Runehall and start it with one â€
 - [x] **Long rest and daily preparations**
   - Character sheets preview and apply an 8-hour long rest: heal CON modifier (minimum 1) Ã— level, clear temporary HP, reset spell slots, divine font, focus points, and shield, and remove rest-recoverable conditions.
   - Fatigued ends, doomed and drained decrease by 1, wounded ends at full HP, and dying/unconscious clear once HP is above 0.
-  - Prepared spells stay selected for review, and hero points and XP are untouched.
+  - Prepared spells and cantrips stay selected for review, and hero points and XP are untouched.
+  - Prepared casters see a pending-preparations banner and a daily preparations modal after resting; they choose ranked spells and prepared cantrips before confirming the day.
   - A rough-rest option halves natural healing, with a minimum of 1.
   - GMs can apply the same rest to the whole party from the Party tab, with linked tokens and summaries updated.
   - Covered by shared unit tests, the two-user smoke test, and the character-sheet browser flow.

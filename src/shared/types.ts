@@ -833,6 +833,12 @@ export interface CharacterDraft {
      * Empty/absent means legacy: infer ranks from each spell's base rank.
      */
     preparedByRank: PreparedSpellsByRank;
+    /**
+     * Cantrips prepared for the day by prepared casters. Cantrips remain
+     * castable at will once prepared. Null is a legacy draft and falls back to
+     * the known cantrip list; an empty array means no cantrips are prepared.
+     */
+    preparedCantrips: string[] | null;
     focus: string[];
     /** Divine font pips spent today (cleric heal/harm slots). */
     divineFontUsed: number;
@@ -903,6 +909,8 @@ export interface CharacterSummary {
   validationErrors?: number;
   /** Non-blocking builder review items. Older saved summaries may omit this. */
   validationWarnings?: number;
+  /** True after a rest until a prepared caster confirms today's spells. */
+  spellPreparationsPending?: boolean;
 }
 
 export interface CharacterRecord {

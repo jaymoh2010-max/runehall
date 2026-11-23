@@ -6,6 +6,7 @@ import {
   boundedCasterSlots,
   casterInfo,
   cantripLimitFor,
+  cantripPreparedLimitFor,
   automaticBonusProgression,
   characterSummary,
   checkFeatPrerequisite,
@@ -133,6 +134,11 @@ describe("PF2e character rules", () => {
     const readySummary = characterSummary(draft, context);
     expect(readySummary.validationErrors).toBe(0);
     expect(readySummary.initiative).toBe(computeCharacter(draft, context).initiative);
+    const pendingSummary = characterSummary(
+      { ...draft, spells: { ...draft.spells, preparationsPending: true } },
+      context
+    );
+    expect(pendingSummary.spellPreparationsPending).toBe(true);
   });
 
   it("blocks class feats that belong to another class", () => {
@@ -729,6 +735,10 @@ describe("PF2e character rules", () => {
     expect(cantripLimitFor(classes.find((entry) => entry.name === "Oracle"))).toBe(5);
     expect(cantripLimitFor(classes.find((entry) => entry.name === "Psychic"))).toBe(3);
     expect(cantripLimitFor(classes.find((entry) => entry.name === "Animist"))).toBe(4);
+    expect(cantripLimitFor(classes.find((entry) => entry.name === "Magus"))).toBe(8);
+    expect(cantripPreparedLimitFor(classes.find((entry) => entry.name === "Wizard"))).toBe(5);
+    expect(cantripPreparedLimitFor(classes.find((entry) => entry.name === "Magus"))).toBe(5);
+    expect(cantripPreparedLimitFor(classes.find((entry) => entry.name === "Sorcerer"))).toBeNull();
     const heal = spells.find((entry) => entry.name === "Heal")!;
     const fireball = spells.find((entry) => entry.name === "Fireball")!;
     const abadar = deities.find((entry) => entry.name === "Abadar")!;

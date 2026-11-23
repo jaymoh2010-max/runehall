@@ -3,10 +3,12 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   addSpellFormulas,
+  canRestoreSpellUse,
   cantripCastRank,
   castSpell,
   defaultSpellActions,
   focusCastRank,
+  restoreSpellUse,
   scaleSpellFormula,
   spellActionVariants,
   spellCastOptionAvailable,
@@ -178,6 +180,26 @@ describe("spell casting", () => {
     expect(castSpell(result!.draft, fireball, context, { rank: 3, resource: "slot" })).toBeNull();
   });
 
+  it("restores a spent prepared slot and copy", () => {
+    const draft = draftFor(wizard);
+    const context = contextFor(wizard, [fireball]);
+    draft.level = 5;
+    draft.spells.known = [fireball.id];
+    draft.spells.preparedByRank = { "3": [fireball.id] };
+    draft.spells.prepared = [fireball.id];
+
+    const cast = castSpell(draft, fireball, context, { rank: 3, resource: "slot" });
+    expect(cast).not.toBeNull();
+    expect(canRestoreSpellUse(cast!.draft, fireball, { rank: 3, resource: "slot" })).toBe(true);
+    const restored = restoreSpellUse(cast!.draft, fireball, context, {
+      rank: 3,
+      resource: "slot",
+    });
+    expect(restored?.spells.slotsUsed).toEqual({ "3": 0 });
+    expect(restored?.spells.preparedUsed).toEqual({ [`3:${fireball.id}`]: 0 });
+    expect(castSpell(restored!, fireball, context, { rank: 3, resource: "slot" })).not.toBeNull();
+  });
+
   it("only heightens spontaneous spells that are signatures", () => {
     const draft = draftFor(sorcerer);
     const context = contextFor(sorcerer, [fireball]);
@@ -264,6 +286,7 @@ describe("spell casting", () => {
     const context = contextFor(wizard, [telekineticProjectile]);
     draft.level = 5;
     draft.spells.cantrips = [telekineticProjectile.id];
+    draft.spells.preparedCantrips = [telekineticProjectile.id];
 
     const options = spellCastOptions(telekineticProjectile, draft, context);
     expect(options).toEqual([{ rank: 3, resource: "cantrip", remaining: null, label: "Cantrip" }]);

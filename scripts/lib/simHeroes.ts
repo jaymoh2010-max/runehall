@@ -10,6 +10,7 @@ import fs from "node:fs";
 import path from "node:path";
 import {
   cantripLimitFor,
+  cantripPreparedLimitFor,
   casterInfo,
   classKeyOptions,
   computeCharacter,
@@ -17,6 +18,7 @@ import {
   emptyCharacterDraft,
   flexibleBoosts,
   grantedTrainedSkills,
+  isPreparedCasterClass,
   ordinarySpellSlotsFor,
 } from "../../src/shared/rules";
 import { featAllowedByHeritageGrant, heritageFeatGrant } from "../../src/shared/heritage";
@@ -180,6 +182,10 @@ export function buildSimulatedHero(options: SimulatedHeroOptions): CharacterDraf
     const cantripLimit = cantripLimitFor(classData) ?? 0;
     for (const spell of pool.filter((spell) => spell.rank === 0).slice(0, cantripLimit)) {
       draft.spells.cantrips.push(spell.id);
+    }
+    if (isPreparedCasterClass(classData.name)) {
+      const preparedLimit = cantripPreparedLimitFor(classData) ?? draft.spells.cantrips.length;
+      draft.spells.preparedCantrips = draft.spells.cantrips.slice(0, preparedLimit);
     }
     const ordinary = ordinarySpellSlotsFor(1, caster.progression, classData.name) ?? [];
     for (let rank = 1; rank <= ordinary.length; rank += 1) {

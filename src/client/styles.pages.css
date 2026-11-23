@@ -10724,6 +10724,38 @@
 .pb-save.is-saving {
   color: var(--pb-orange-bright);
 }
+.pb-prep-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 14px;
+  padding: 12px 14px;
+  border: 1px solid rgba(232, 168, 74, 0.45);
+  border-radius: 6px;
+  background: rgba(232, 168, 74, 0.08);
+  color: var(--pb-text);
+}
+.pb-prep-banner > svg {
+  flex: none;
+  color: var(--pb-orange-bright);
+}
+.pb-prep-banner .grow {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.pb-prep-banner strong {
+  font-size: 0.86rem;
+}
+.pb-prep-banner span {
+  color: var(--pb-muted);
+  font-size: 0.74rem;
+}
+.pb-prep-actions {
+  margin: 2px 0 4px;
+  gap: 8px;
+}
 .pb-icon-button {
   display: inline-grid;
   place-items: center;

@@ -342,6 +342,9 @@ function chooseSpells(
     "wizard",
   ]);
   const prepared = preparedClasses.has(classTrait);
+  if (prepared) {
+    draft.spells.preparedCantrips = draft.spells.cantrips.slice(0, cantripLimit);
+  }
   const slots = spellSlotsFor(draft.level, caster.progression, classData.name) ?? [];
   // Clerics track divine font separately; only ordinary slots may hold
   // non-font preparations.

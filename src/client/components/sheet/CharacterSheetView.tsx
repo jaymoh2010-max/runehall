@@ -8,6 +8,7 @@ import {
   Dices,
   Heart,
   Minus,
+  Moon,
   Package,
   Pencil,
   Plus,
@@ -34,18 +35,29 @@ import type {
 } from "../../../shared/types";
 import {
   computeCharacter,
+  isPreparedCasterClass,
   normalizeCharacterDraft,
+  preparedCantripIds,
   signed,
   titleCase,
 } from "../../../shared/rules";
 import { currencyToCp } from "../../../shared/inventory";
 import { applyHpEditToDraft } from "../../../shared/damage";
 import { rollFormula } from "../../../shared/dice";
-import { castSpell, spellCastOptions, type SpellCastChoice } from "../../../shared/spellcasting";
+import type { LongRestResult } from "../../../shared/rest";
+import {
+  canRestoreSpellUse,
+  castSpell,
+  restoreSpellUse,
+  spellCastOptions,
+  type SpellCastChoice,
+} from "../../../shared/spellcasting";
 import { innateUsesRemaining } from "../../../shared/innate";
 import { api, formatCp } from "../../api";
 import { useConditionOptions } from "../../conditionOptions";
 import { errorMessage, useToasts } from "../../stores";
+import { DailyPreparationsModal } from "../DailyPreparationsModal";
+import { LongRestModal } from "../LongRestModal";
 
 const CharacterBuilderPage = lazy(() =>
   import("../../pages/CharacterBuilderPage").then((module) => ({
@@ -114,6 +126,8 @@ export function CharacterSheetView({
   const [tab, setTab] = useState<SheetTab>("weapons");
   const [showFullPlan, setShowFullPlan] = useState(false);
   const [builderOpen, setBuilderOpen] = useState(false);
+  const [restOpen, setRestOpen] = useState(false);
+  const [prepOpen, setPrepOpen] = useState(false);
   const [previewPath, setPreviewPath] = useState<string | null>(null);
   const [castChoices, setCastChoices] = useState<Record<string, string>>({});
   const [lastRoll, setLastRoll] = useState<LastRoll | null>(null);
@@ -504,13 +518,17 @@ export function CharacterSheetView({
 
   const spellEntries = useMemo(() => {
     if (!draft || !context) return [];
+    const preparedCaster = isPreparedCasterClass(context.classData?.name);
     const grantedGroups = (derived?.grantedSpells ?? []).map((spell) => ({
       label:
         spell.kind === "focus" ? "Focus" : spell.kind === "curriculum" ? "Curriculum" : "Granted",
       ids: [spell.id],
     }));
     const groups: { label: string; ids: string[] }[] = [
-      { label: "Cantrips", ids: draft.spells.cantrips },
+      {
+        label: preparedCaster ? "Prepared cantrips" : "Cantrips",
+        ids: preparedCantripIds(draft, context),
+      },
       { label: "Prepared", ids: draft.spells.prepared },
       { label: "Spells", ids: draft.spells.known },
       { label: "Focus", ids: draft.spells.focus },
@@ -671,6 +689,59 @@ export function CharacterSheetView({
     }
   };
 
+  const selectedChoiceFor = (
+    spell: Spell,
+    group: string,
+    options: ReturnType<typeof optionsForSpell>
+  ): SpellCastChoice | null => {
+    const key = `${group}:${spell.id}`;
+    const selected =
+      castChoices[key] ?? (options[0] ? `${options[0].rank}:${options[0].resource}` : "");
+    const [rankText, resource] = selected.split(":");
+    return resource
+      ? { rank: Number(rankText), resource: resource as SpellCastChoice["resource"] }
+      : null;
+  };
+
+  const restore = async (spell: Spell, group: string) => {
+    if (!canEdit || !context) return;
+    const currentDraft = draftRef.current;
+    if (!currentDraft) return;
+    const options = optionsForSpell(spell, group);
+    const choice = selectedChoiceFor(spell, group, options);
+    if (!choice) return;
+    const result = restoreSpellUse(currentDraft, spell, context, choice, {
+      focusPointsMax: derived?.focusPointsMax ?? 0,
+    });
+    if (!result) {
+      toast("There is no spent use to restore for that spell.", "info");
+      return;
+    }
+    const saved = await persist(result);
+    if (!saved) return;
+    toast(`Restored ${spell.name} at rank ${choice.rank}.`, "success");
+  };
+
+  const takeLongRest = async (result: LongRestResult) => {
+    const saved = await persist(result.draft);
+    if (!saved) return;
+    setRestOpen(false);
+    toast(
+      result.summary.healed > 0
+        ? `Long rest complete: +${result.summary.healed} HP, spell slots and focus reset.`
+        : "Long rest complete: spell slots and focus reset.",
+      "success"
+    );
+    if (preparedCaster) setPrepOpen(true);
+  };
+
+  const applyPreparations = async (next: CharacterDraft) => {
+    const saved = await persist(next);
+    if (!saved) return;
+    setPrepOpen(false);
+    toast("Daily preparations complete.", "success");
+  };
+
   const weaponNameHref = (attackId: string | null, name: string) =>
     attackId
       ? `/library/equipment/${attackId}`
@@ -698,6 +769,8 @@ export function CharacterSheetView({
   }
 
   const classData = context.classData ?? null;
+  const preparedCaster = isPreparedCasterClass(classData?.name);
+  const preparationsPending = preparedCaster && draft.spells.preparationsPending;
   const hpPercent = derived.maxHp > 0 ? (derived.currentHp / derived.maxHp) * 100 : 0;
   const selectedFeatIds = new Set(derived.selectedFeats.map((feat) => feat.id));
 
@@ -776,6 +849,11 @@ export function CharacterSheetView({
           <button type="button" className="pb-button" onClick={() => window.print()}>
             <Printer size={14} /> Print
           </button>
+          {canEdit ? (
+            <button type="button" className="pb-button" onClick={() => setRestOpen(true)}>
+              <Moon size={14} /> Long rest
+            </button>
+          ) : null}
           {canEdit ? (
             <button
               type="button"
@@ -906,6 +984,27 @@ export function CharacterSheetView({
               </span>
             </div>
           </div>
+
+          {preparationsPending ? (
+            <div className="pb-prep-banner" data-testid="prep-pending-banner">
+              <BookOpen size={18} />
+              <div className="grow">
+                <strong>Spell preparations pending</strong>
+                <span>
+                  Long rest complete. Choose the spells and cantrips you have prepared today.
+                </span>
+              </div>
+              {canEdit ? (
+                <button
+                  type="button"
+                  className="pb-small-button is-primary"
+                  onClick={() => setPrepOpen(true)}
+                >
+                  Prepare today&apos;s spells
+                </button>
+              ) : null}
+            </div>
+          ) : null}
 
           <div className="pb-abilities">
             <div>
@@ -1425,6 +1524,24 @@ export function CharacterSheetView({
                     ) : null}
                   </div>
                 </div>
+                {preparedCaster ? (
+                  <div className="row-between pb-prep-actions">
+                    <span className="tiny muted">
+                      {draft.spells.preparationsPending
+                        ? "Today's spells are not confirmed."
+                        : "Prepared spells can be changed during daily preparations."}
+                    </span>
+                    {canEdit ? (
+                      <button
+                        type="button"
+                        className="pb-small-button"
+                        onClick={() => setPrepOpen(true)}
+                      >
+                        <BookOpen size={12} /> Daily preparations
+                      </button>
+                    ) : null}
+                  </div>
+                ) : null}
                 <div className="pb-slot-list">
                   {(derived.spellSlots ?? []).map((slotTotal, index) => {
                     if (slotTotal <= 0) return null;
@@ -1556,7 +1673,22 @@ export function CharacterSheetView({
                     const key = `${group}:${id}`;
                     const selected =
                       castChoices[key] ??
-                      (available[0] ? `${available[0].rank}:${available[0].resource}` : "");
+                      (options[0] ? `${options[0].rank}:${options[0].resource}` : "");
+                    const [selectedRankText, selectedResource] = selected.split(":");
+                    const selectedChoice: SpellCastChoice | null = selectedResource
+                      ? {
+                          rank: Number(selectedRankText),
+                          resource: selectedResource as SpellCastChoice["resource"],
+                        }
+                      : null;
+                    const restorable = Boolean(
+                      canEdit &&
+                      spell &&
+                      selectedChoice &&
+                      canRestoreSpellUse(draft, spell, selectedChoice, {
+                        focusPointsMax: derived.focusPointsMax,
+                      })
+                    );
                     return (
                       <div className="pb-spell-row" key={`${group}-${id}-${index}`}>
                         <Link to={`/library/spell/${id}`}>
@@ -1615,6 +1747,15 @@ export function CharacterSheetView({
                               onClick={() => void cast(spell, group)}
                             >
                               Cast
+                            </button>
+                          ) : null}
+                          {restorable && spell ? (
+                            <button
+                              type="button"
+                              className="pb-small-button"
+                              onClick={() => void restore(spell, group)}
+                            >
+                              Restore
                             </button>
                           ) : null}
                         </div>
@@ -2059,6 +2200,22 @@ export function CharacterSheetView({
           </Suspense>
         </div>
       ) : null}
+      <LongRestModal
+        open={restOpen}
+        onClose={() => setRestOpen(false)}
+        draft={draft}
+        derived={derived}
+        preparedCaster={preparedCaster}
+        onRest={(result) => void takeLongRest(result)}
+      />
+      <DailyPreparationsModal
+        open={prepOpen}
+        onClose={() => setPrepOpen(false)}
+        draft={draft}
+        context={context}
+        derived={derived}
+        onApply={(next) => void applyPreparations(next)}
+      />
       <CompendiumPreviewModal
         href={previewPath}
         elevated={mode === "overlay"}

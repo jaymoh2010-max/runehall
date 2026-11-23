@@ -32,7 +32,7 @@ Four campaign sections:
 - A **Pathbuilder-style character sheet** that opens over the table from **My sheet**, a party avatar, or a linked token. It uses a compact three-column layout: build summary and a level-by-level character plan on the left, stats and skills in the center, and tabbed Weapons / Defense / Gear / Spells / Feats / Details / Status panels on the right.
 - The plan rail shows the current level by default and expands to all 20 levels, including feats, skill increases, ability boosts, and class features.
 - Click a skill, attack, spell, feat, or item **name** to open its compendium page. Click the **dice icon** to roll it into table chat.
-- Spellcasting tracks ordinary slots, divine font, and focus points by hand. **Cast** spends the selected slot and posts the spell to table chat.
+- Spellcasting tracks ordinary slots, divine font, focus points, prepared cantrips, and daily preparations by hand. **Cast** spends the selected slot and posts the spell to table chat. A long rest restores slots and focus, then prompts prepared casters to choose today's spells.
 - **Minimize** returns to the map without losing table state. Rolls from the sheet post to the same chat as the manual dice tray.
 - The bestiary palette for dragging monsters onto the map.
 - A shared soundtrack player with GM uploads and a bundled music library.
@@ -47,7 +47,7 @@ Four campaign sections:
 - Feat prerequisite checks and curated always-on effects for common feats and items.
 - Weapon, armor, and shield runes; bulk; wealth; inventory.
 - **Gear browser** in the sheet: search the item database, buy with coins, and equip or invest. The GM can enable free **Grant** access for players in campaign settings.
-- Prepared, spontaneous, focus, innate, and ritual spell tracking.
+- Prepared spells and cantrips, spontaneous, focus, innate, and ritual spell tracking.
 - Printable character sheet.
 - Pathbuilder 2e JSON import.
 - Sheet rolls post to chat. Conditions are tracked as labels and still feed the character math, but durations, persistent damage, afflictions, dying recovery, and other turn effects are **not automated**.

@@ -517,7 +517,12 @@ export function DashboardPage() {
                 <Link to={`/characters/${character.id}`} className="character-card-main">
                   <Avatar name={character.name} src={character.summary?.portraitUrl} size={54} />
                   <div className="character-card-copy">
-                    <h3>{character.name}</h3>
+                    <div className="row wrap" style={{ gap: 6 }}>
+                      <h3>{character.name}</h3>
+                      {character.summary?.spellPreparationsPending ? (
+                        <Badge tone="gold">Prepare spells</Badge>
+                      ) : null}
+                    </div>
                     <p>
                       {character.summary
                         ? `Level ${character.summary.level} ${character.summary.className || "Unfinished"}${character.summary.ancestry ? ` · ${character.summary.ancestry}` : ""}`
