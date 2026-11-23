@@ -41,16 +41,37 @@ function sorcererDraft(level: number) {
 }
 
 describe("spontaneous known-at-rank spells", () => {
-  it("offers only the ranks where a non-signature spell is known", () => {
+  it("offers higher-slot downcasts without heightening a non-signature spell", () => {
     const draft = sorcererDraft(9);
     draft.spells.known = [fireball.id];
     draft.spells.knownRanks = { [fireball.id]: [3, 5] };
     const context = contextForDraft(draft);
     expect(knownSpellRanks(draft, fireball)).toEqual([3, 5]);
-    expect(spellCastOptions(fireball, draft, context).map((option) => option.rank)).toEqual([3, 5]);
-    expect(spellCastOptions(fireball, draft, context).map((option) => option.label)).toEqual([
+    const options = spellCastOptions(fireball, draft, context);
+    expect(options.map((option) => option.rank)).toEqual([3, 4, 5]);
+    expect(options.map((option) => option.label)).toEqual([
       "Rank 3 slot",
+      "Rank 4 slot (cast at rank 3)",
       "Rank 5 slot",
+    ]);
+    expect(options[1]?.castRank).toBe(3);
+    expect(options.some((option) => option.rank === 5 && option.castRank === 3)).toBe(false);
+  });
+
+  it("offers every higher slot when only the base rank is known", () => {
+    const draft = sorcererDraft(9);
+    draft.spells.known = [fireball.id];
+    draft.spells.knownRanks = { [fireball.id]: [3] };
+    const context = contextForDraft(draft);
+    expect(
+      spellCastOptions(fireball, draft, context).map((option) => ({
+        rank: option.rank,
+        castRank: option.castRank ?? option.rank,
+      }))
+    ).toEqual([
+      { rank: 3, castRank: 3 },
+      { rank: 4, castRank: 3 },
+      { rank: 5, castRank: 3 },
     ]);
   });
 
@@ -88,6 +109,33 @@ describe("spontaneous known-at-rank spells", () => {
       resource: "slot",
     });
     expect(restored?.spells.slotsUsed).toEqual({ "5": 0 });
+  });
+
+  it("spends a higher slot for a downcast and restores it", () => {
+    const draft = sorcererDraft(9);
+    draft.spells.known = [fireball.id];
+    draft.spells.knownRanks = { [fireball.id]: [3, 5] };
+    const context = contextForDraft(draft);
+    const cast = castSpell(draft, fireball, context, {
+      rank: 4,
+      resource: "slot",
+      castRank: 3,
+    });
+    expect(cast?.draft.spells.slotsUsed).toEqual({ "4": 1 });
+    expect(cast?.option.castRank).toBe(3);
+    expect(
+      canRestoreSpellUse(cast!.draft, fireball, {
+        rank: 4,
+        resource: "slot",
+        castRank: 3,
+      })
+    ).toBe(true);
+    const restored = restoreSpellUse(cast!.draft, fireball, context, {
+      rank: 4,
+      resource: "slot",
+      castRank: 3,
+    });
+    expect(restored?.spells.slotsUsed).toEqual({ "4": 0 });
   });
 
   it("adds and removes individual rank copies with the last copy forgetting the spell", () => {

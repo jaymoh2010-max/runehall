@@ -1398,10 +1398,16 @@ test("builder learns a spontaneous spell at more than one rank", async ({ page }
   await page.getByRole("button", { name: "Spells", exact: true }).click();
   const fireball = page.locator(".pb-spell-row").filter({ hasText: "Fireball" }).first();
   const rankChoices = fireball.locator("select");
-  await expect(rankChoices.locator("option")).toHaveText(["Rank 3 · slot", "Rank 5 · slot"]);
-  await rankChoices.selectOption("5:slot");
+  await expect(rankChoices.locator('option[value="3:slot"]')).toHaveCount(1);
+  await expect(rankChoices.locator('option[value="5:slot"]')).toHaveCount(1);
+  await expect(rankChoices.locator('option[value="4:slot:3"]')).toHaveCount(1);
+  await expect(rankChoices.locator('option[value="6:slot:3"]')).toHaveCount(1);
+  await expect(rankChoices.locator('option[value="6:slot:5"]')).toHaveCount(1);
+  await rankChoices.selectOption("4:slot:3");
   await fireball.getByRole("button", { name: "Cast" }).click();
-  await expect(page.getByText(/Cast Fireball at rank 5/)).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText(/Cast Fireball at rank 3 using a rank 4 slot/)).toBeVisible({
+    timeout: 15_000,
+  });
   await expect(page.locator(".pb-save")).toHaveText("Saved");
 });
 

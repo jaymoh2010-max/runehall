@@ -92,6 +92,23 @@ const TABS: { id: SheetTab; label: string }[] = [
 ];
 
 const RANK_LABELS = ["U", "T", "E", "M", "L"];
+
+function castOptionValue(option: { rank: number; resource: string; castRank?: number }): string {
+  const suffix =
+    option.castRank !== undefined && option.castRank !== option.rank ? `:${option.castRank}` : "";
+  return `${option.rank}:${option.resource}${suffix}`;
+}
+
+function castChoiceFromValue(value: string): SpellCastChoice | null {
+  const [rankText, resource, castRankText] = value.split(":");
+  if (!resource) return null;
+  const castRank = Number(castRankText);
+  return {
+    rank: Number(rankText),
+    resource: resource as SpellCastChoice["resource"],
+    ...(castRankText && Number.isFinite(castRank) ? { castRank } : {}),
+  };
+}
 const ABILITY_LABELS: Record<AbilityKey, string> = {
   str: "STR",
   dex: "DEX",
@@ -968,12 +985,8 @@ export function CharacterSheetView({
     if (!currentDraft) return;
     const options = optionsForSpell(spell, group);
     const key = `${group}:${spell.id}`;
-    const selected =
-      castChoices[key] ?? (options[0] ? `${options[0].rank}:${options[0].resource}` : "");
-    const [rankText, resource] = selected.split(":");
-    const choice: SpellCastChoice | null = resource
-      ? { rank: Number(rankText), resource: resource as SpellCastChoice["resource"] }
-      : null;
+    const selected = castChoices[key] ?? (options[0] ? castOptionValue(options[0]) : "");
+    const choice = castChoiceFromValue(selected);
     if (!choice) {
       toast("No spell resource is available for that spell.", "error");
       return;
@@ -989,21 +1002,23 @@ export function CharacterSheetView({
       return;
     }
     const sustains = spellNeedsSustain(spell);
+    const effectiveRank = result.option.castRank ?? result.option.rank;
+    const downcast = effectiveRank !== result.option.rank;
     let nextDraft: CharacterDraft = result.draft;
     if (sustains) {
-      nextDraft = beginSustainedSpell(nextDraft, spell, result.option.rank).draft;
+      nextDraft = beginSustainedSpell(nextDraft, spell, effectiveRank).draft;
     }
     const saved = await persist(nextDraft);
     if (!saved) return;
     const amped = result.option.resource === "amp";
     toast(
-      `Cast ${spell.name} at rank ${result.option.rank}${amped ? " · amped" : ""}${sustains ? " · sustained" : ""}.`,
+      `Cast ${spell.name} at rank ${effectiveRank}${downcast ? ` using a rank ${result.option.rank} slot` : ""}${amped ? " · amped" : ""}${sustains ? " · sustained" : ""}.`,
       "success"
     );
     if (character?.campaignId) {
       getSocket().emit("chat:send", {
         campaignId: character.campaignId,
-        content: `${currentDraft.name} casts ${spell.name} at rank ${result.option.rank}${amped ? " (amped)" : ""} (${result.option.label}).`,
+        content: `${currentDraft.name} casts ${spell.name} at rank ${effectiveRank}${downcast ? ` using a rank ${result.option.rank} slot` : ""}${amped ? " (amped)" : ""} (${result.option.label}).`,
         visibility: "all",
       });
     }
@@ -1015,12 +1030,8 @@ export function CharacterSheetView({
     options: ReturnType<typeof optionsForSpell>
   ): SpellCastChoice | null => {
     const key = `${group}:${spell.id}`;
-    const selected =
-      castChoices[key] ?? (options[0] ? `${options[0].rank}:${options[0].resource}` : "");
-    const [rankText, resource] = selected.split(":");
-    return resource
-      ? { rank: Number(rankText), resource: resource as SpellCastChoice["resource"] }
-      : null;
+    const selected = castChoices[key] ?? (options[0] ? castOptionValue(options[0]) : "");
+    return castChoiceFromValue(selected);
   };
 
   const restore = async (spell: Spell, group: string) => {
@@ -2422,15 +2433,8 @@ export function CharacterSheetView({
                     );
                     const key = `${group}:${id}`;
                     const selected =
-                      castChoices[key] ??
-                      (options[0] ? `${options[0].rank}:${options[0].resource}` : "");
-                    const [selectedRankText, selectedResource] = selected.split(":");
-                    const selectedChoice: SpellCastChoice | null = selectedResource
-                      ? {
-                          rank: Number(selectedRankText),
-                          resource: selectedResource as SpellCastChoice["resource"],
-                        }
-                      : null;
+                      castChoices[key] ?? (options[0] ? castOptionValue(options[0]) : "");
+                    const selectedChoice = castChoiceFromValue(selected);
                     const restorable = Boolean(
                       canEdit &&
                       spell &&
@@ -2498,15 +2502,21 @@ export function CharacterSheetView({
                                 }))
                               }
                             >
-                              {options.map((option) => (
-                                <option
-                                  key={`${option.rank}-${option.resource}`}
-                                  value={`${option.rank}:${option.resource}`}
-                                >
-                                  Rank {option.rank} ·{" "}
-                                  {option.resource === "amp" ? "Amp (1 Focus)" : option.resource}
-                                </option>
-                              ))}
+                              {options.map((option) => {
+                                const effectiveRank = option.castRank ?? option.rank;
+                                return (
+                                  <option
+                                    key={`${option.rank}-${option.resource}-${effectiveRank}`}
+                                    value={castOptionValue(option)}
+                                  >
+                                    Rank {option.rank} ·{" "}
+                                    {option.resource === "amp" ? "Amp (1 Focus)" : option.resource}
+                                    {effectiveRank !== option.rank
+                                      ? ` · cast at rank ${effectiveRank}`
+                                      : ""}
+                                  </option>
+                                );
+                              })}
                             </select>
                           ) : null}
                           {canEdit && spell && group !== "Rituals" && available.length ? (
