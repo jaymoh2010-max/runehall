@@ -1,7 +1,12 @@
 import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { isSpellScroll, scrollSpellRank } from "../src/shared/itemSpellcasting";
+import {
+  isMagicWand,
+  isSpellScroll,
+  scrollSpellRank,
+  wandSpellRank,
+} from "../src/shared/itemSpellcasting";
 import type { Equipment } from "../src/shared/types";
 
 function read<T>(file: string): T[] {
@@ -36,5 +41,28 @@ describe("scroll spellcasting", () => {
     expect(isSpellScroll(sword)).toBe(false);
     expect(scrollSpellRank(sword)).toBeNull();
     expect(scrollSpellRank(null)).toBeNull();
+  });
+});
+
+describe("wand spellcasting", () => {
+  it("recognizes generic Magic Wands and their ranks", () => {
+    for (const rank of [1, 3, 5, 9]) {
+      const label = `${rank}${rank === 1 ? "st" : rank === 3 ? "rd" : "th"}-Rank Spell`;
+      const item = equipment.find((entry) => entry.name === `Magic Wand (${label})`)!;
+      expect(item, label).toBeTruthy();
+      expect(isMagicWand(item)).toBe(true);
+      expect(wandSpellRank(item)).toBe(rank);
+    }
+  });
+
+  it("leaves specific wands and other items to manual resolution", () => {
+    const specific = equipment.find((entry) => entry.name === "Wand of Caustic Effluence")!;
+    expect(isMagicWand(specific)).toBe(false);
+    expect(wandSpellRank(specific)).toBeNull();
+
+    const sword = equipment.find((entry) => entry.name === "Longsword")!;
+    expect(isMagicWand(sword)).toBe(false);
+    expect(wandSpellRank(sword)).toBeNull();
+    expect(wandSpellRank(null)).toBeNull();
   });
 });
