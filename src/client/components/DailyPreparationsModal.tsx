@@ -4,8 +4,10 @@ import type { CharacterContext, CharacterDraft, DerivedCharacter, Spell } from "
 import {
   addPreparedCantrip,
   addPreparedSpellCopy,
+  addStudiousSpell,
   canPrepareCantrip,
   canPrepareSpellAtRank,
+  canPrepareStudiousSpell,
   cantripPreparedLimitFor,
   computeCharacter,
   deityFontChoices,
@@ -17,9 +19,11 @@ import {
   preparedRankSummaries,
   removePreparedCantrip,
   removePreparedCopy,
+  removeStudiousSpell,
   type DivineFontChoice,
 } from "../../shared/rules";
 import { Button, Field, Modal, Select, Tag } from "./ui";
+import { AnimistApparitionsCard } from "./AnimistApparitionsCard";
 
 interface DailyPreparationsModalProps {
   open: boolean;
@@ -48,12 +52,14 @@ export function DailyPreparationsModal({
   const [working, setWorking] = useState<CharacterDraft | null>(draft);
   const [selected, setSelected] = useState<Record<number, string>>({});
   const [selectedCantrip, setSelectedCantrip] = useState("");
+  const [selectedStudious, setSelectedStudious] = useState("");
 
   useEffect(() => {
     if (!open) return;
     setWorking(draft);
     setSelected({});
     setSelectedCantrip("");
+    setSelectedStudious("");
   }, [open, draft]);
 
   const preparedRows = useMemo(
@@ -110,7 +116,9 @@ export function DailyPreparationsModal({
       (wizardExtra &&
         preparedCantrips.length > cantripLimit! &&
         !preparedCantrips.some((spell) => curriculumCantripIds.has(spell.id))));
-  const overCapacity = spellErrors.length > 0 || overCantripCapacity;
+  const studious = derived.studiousSlots;
+  const overStudious = Boolean(studious && working.spells.studiousPrepared.length > studious.count);
+  const overCapacity = spellErrors.length > 0 || overCantripCapacity || overStudious;
 
   const availableAtRank = (rank: number): Spell[] => {
     const ids = new Set<string>([
@@ -213,6 +221,8 @@ export function DailyPreparationsModal({
         preparedUsed: {},
         fontUsed: {},
         divineFontUsed: 0,
+        studiousUsed: {},
+        apparitionUsed: {},
       },
     });
   };
@@ -261,6 +271,11 @@ export function DailyPreparationsModal({
             </Button>
           </div>
         </div>
+        <AnimistApparitionsCard
+          draft={working}
+          context={context}
+          onChange={(updater) => setWorking((current) => (current ? updater(current) : current))}
+        />
         {fontSlots > 0 && fontChoices.length > 1 ? (
           <Field
             label="Divine font"
@@ -389,6 +404,112 @@ export function DailyPreparationsModal({
                   Clear cantrips
                 </Button>
               ) : null}
+            </div>
+          </section>
+        ) : null}
+        {studious ? (
+          <section
+            className="prepared-at-rank"
+            aria-labelledby="daily-studious-slots"
+            data-testid="daily-studious-slots"
+          >
+            <div className="prepared-at-rank-head">
+              <div>
+                <span id="daily-studious-slots" className="field-label">
+                  Studious slots
+                </span>
+                <p className="tiny muted" style={{ margin: "2px 0 0" }}>
+                  Rank {studious.rank} · {working.spells.studiousPrepared.length} / {studious.count}{" "}
+                  prepared
+                </p>
+              </div>
+              <Tag tone={working.spells.studiousPrepared.length ? "gold" : "blue"}>
+                {working.spells.studiousPrepared.length} / {studious.count}
+              </Tag>
+            </div>
+            <div className="chip-row">
+              {studious.spells
+                .map((spell) => ({
+                  spell,
+                  count: working.spells.studiousPrepared.filter((id) => id === spell.id).length,
+                }))
+                .filter((entry) => entry.count > 0)
+                .map(({ spell, count }) => (
+                  <div key={spell.id} className="prepared-chip">
+                    <strong>{spell.name}</strong>
+                    <span className="tiny muted"> · rank {spell.rank}</span>
+                    <div className="prepared-stepper">
+                      <button
+                        type="button"
+                        aria-label={`Remove studious ${spell.name}`}
+                        onClick={() =>
+                          setWorking((current) =>
+                            current
+                              ? removeStudiousSpell(current, context.classData, spell.id)
+                              : current
+                          )
+                        }
+                      >
+                        <Minus size={12} />
+                      </button>
+                      <span>{count}</span>
+                      <button
+                        type="button"
+                        aria-label={`Add studious ${spell.name}`}
+                        disabled={!canPrepareStudiousSpell(working, context.classData, spell.id)}
+                        onClick={() =>
+                          setWorking((current) =>
+                            current
+                              ? addStudiousSpell(current, context.classData, spell.id)
+                              : current
+                          )
+                        }
+                      >
+                        <Plus size={12} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              {!working.spells.studiousPrepared.length ? (
+                <p className="muted small">No studious spells prepared.</p>
+              ) : null}
+            </div>
+            <div className="prepared-adder">
+              <Select
+                aria-label="Studious spell to prepare"
+                value={selectedStudious}
+                onChange={(event) => setSelectedStudious(event.target.value)}
+              >
+                <option value="">Choose a studious spell…</option>
+                {studious.spells.map((spell) => {
+                  const room = canPrepareStudiousSpell(working, context.classData, spell.id);
+                  return (
+                    <option key={spell.id} value={spell.id} disabled={!room}>
+                      {spell.name} · rank {spell.rank}
+                      {!room ? " — full" : ""}
+                    </option>
+                  );
+                })}
+              </Select>
+              <Button
+                size="sm"
+                aria-label="Prepare selected studious spell"
+                disabled={
+                  !selectedStudious ||
+                  !canPrepareStudiousSpell(working, context.classData, selectedStudious)
+                }
+                onClick={() => {
+                  if (!selectedStudious) return;
+                  setWorking((current) =>
+                    current
+                      ? addStudiousSpell(current, context.classData, selectedStudious)
+                      : current
+                  );
+                  setSelectedStudious("");
+                }}
+              >
+                <Plus size={13} /> Prepare
+              </Button>
             </div>
           </section>
         ) : null}

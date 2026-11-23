@@ -1,16 +1,20 @@
 import {
+  animistApparitionInfo,
   casterInfo,
   divineFontInfo,
   isCantripPrepared,
   isPreparedCasterClass,
+  knownSpellRanks,
   ordinarySpellSlotsFor,
   preparedEntries,
   preparedUsedKey,
+  studiousSlotInfoFor,
 } from "./rules";
 import { consumeInnateUse } from "./innate";
 import type { CharacterContext, CharacterDraft, Spell } from "./types";
 
-export type SpellCastResource = "cantrip" | "focus" | "font" | "slot" | "innate";
+export type SpellCastResource =
+  "cantrip" | "focus" | "font" | "slot" | "innate" | "studious" | "apparition";
 
 export interface SpellCastOption {
   rank: number;
@@ -144,7 +148,8 @@ export function spellCastOptions(
   if (caster.progression === "none" || caster.progression === "focus") return [];
   const ordinary = ordinarySpellSlotsFor(level, caster.progression, context.classData?.name);
   if (!ordinary) return [];
-  const maxRank = ordinary.length;
+  const apparition = animistApparitionInfo(draft, context);
+  const maxRank = Math.max(ordinary.length, apparition?.slots.length ?? 0);
   if (spell.rank > maxRank) return [];
 
   const preparedCaster = isPreparedCasterClass(context.classData?.name);
@@ -159,9 +164,8 @@ export function spellCastOptions(
       deity: context.deity,
       classData: context.classData,
     }).filter(
-      (entry) => entry.id === spell.id && entry.rank >= spell.rank && entry.rank <= maxRank
+      (entry) => entry.id === spell.id && entry.rank >= spell.rank && entry.rank <= ordinary.length
     );
-    if (!entries.length) return [];
 
     const copiesByRank = new Map<number, { font: number; ordinary: number }>();
     for (const entry of entries) {
@@ -202,6 +206,36 @@ export function spellCastOptions(
       }
     }
 
+    const studious = studiousSlotInfoFor(draft, context.classData);
+    if (studious && draft.spells.studiousPrepared.includes(spell.id)) {
+      const copies = draft.spells.studiousPrepared.filter((id) => id === spell.id).length;
+      const spent = clampInt(draft.spells.studiousUsed[spell.id], 0, copies);
+      const totalUsed = Object.values(draft.spells.studiousUsed).reduce(
+        (total, value) => total + Math.max(0, Math.round(Number(value) || 0)),
+        0
+      );
+      options.push({
+        rank: studious.rank,
+        resource: "studious",
+        remaining: Math.max(0, Math.min(studious.count - totalUsed, copies - spent)),
+        label: "Studious slot",
+      });
+    }
+
+    if (apparition?.repertoire.some((entry) => entry.spell.id === spell.id)) {
+      for (let rank = spell.rank; rank <= apparition.slots.length; rank += 1) {
+        const slotCount = apparition.slots[rank - 1] ?? 0;
+        if (slotCount <= 0) continue;
+        const used = clampInt(draft.spells.apparitionUsed[String(rank)], 0, slotCount);
+        options.push({
+          rank,
+          resource: "apparition",
+          remaining: Math.max(0, slotCount - used),
+          label: "Apparition slot",
+        });
+      }
+    }
+
     return options.sort(
       (a, b) =>
         Number(spellCastOptionAvailable(b)) - Number(spellCastOptionAvailable(a)) ||
@@ -210,17 +244,17 @@ export function spellCastOptions(
     );
   }
 
-  // A spontaneous caster can only heighten a spell freely when it is one of
-  // their signature spells. A heightened copy learned at a higher rank is not
-  // modelled separately, so non-signature spells stay at their printed rank.
+  // A spontaneous caster can cast a spell at each rank where they learned it.
+  // Signature spells can be freely heightened to any available slot rank.
   const signature = new Set(draft.spells.signature ?? []);
-  const ranks: number[] = [spell.rank];
-  if (signature.has(spell.id)) {
-    for (let rank = spell.rank + 1; rank <= maxRank; rank += 1) ranks.push(rank);
+  const learnedRanks = knownSpellRanks(draft, spell);
+  const ranks = new Set<number>(learnedRanks);
+  if (signature.has(spell.id) && learnedRanks.length) {
+    for (let rank = Math.min(...learnedRanks); rank <= maxRank; rank += 1) ranks.add(rank);
   }
 
   const options: SpellCastOption[] = [];
-  for (const rank of ranks) {
+  for (const rank of [...ranks].filter((entry) => entry <= maxRank).sort((a, b) => a - b)) {
     const slotCount = ordinary[rank - 1] ?? 0;
     const used = clampInt(draft.spells.slotsUsed[String(rank)], 0, slotCount);
     options.push({
@@ -303,6 +337,50 @@ export function castSpell(
     };
   }
 
+  if (option.resource === "studious") {
+    const studious = studiousSlotInfoFor(draft, context.classData);
+    if (!studious) return null;
+    const copies = draft.spells.studiousPrepared.filter((id) => id === spell.id).length;
+    if (copies < 1) return null;
+    const spent = clampInt(draft.spells.studiousUsed[spell.id], 0, copies);
+    const totalUsed = Object.values(draft.spells.studiousUsed).reduce(
+      (total, value) => total + Math.max(0, Math.round(Number(value) || 0)),
+      0
+    );
+    if (spent >= copies || totalUsed >= studious.count) return null;
+    return {
+      draft: {
+        ...draft,
+        spells: {
+          ...draft.spells,
+          studiousUsed: { ...draft.spells.studiousUsed, [spell.id]: spent + 1 },
+        },
+      },
+      option: {
+        ...option,
+        remaining: Math.max(0, Math.min(studious.count - totalUsed - 1, copies - spent - 1)),
+      },
+    };
+  }
+
+  if (option.resource === "apparition") {
+    const slots = animistApparitionInfo(draft, context)?.slots ?? [];
+    const slotCount = slots[option.rank - 1] ?? 0;
+    const key = String(option.rank);
+    const used = clampInt(draft.spells.apparitionUsed[key], 0, slotCount);
+    if (slotCount <= 0 || used >= slotCount) return null;
+    return {
+      draft: {
+        ...draft,
+        spells: {
+          ...draft.spells,
+          apparitionUsed: { ...draft.spells.apparitionUsed, [key]: used + 1 },
+        },
+      },
+      option: { ...option, remaining: Math.max(0, slotCount - used - 1) },
+    };
+  }
+
   const key = String(option.rank);
   const used = Math.max(0, Math.round(Number(draft.spells.slotsUsed[key]) || 0));
   if (option.remaining !== null && option.remaining <= 0) return null;
@@ -353,6 +431,14 @@ export function canRestoreSpellUse(
     const spellUsed = Math.max(0, Math.round(Number(draft.spells.fontUsed[spell.id]) || 0));
     return used > 0 || spellUsed > 0;
   }
+  if (choice.resource === "studious") {
+    return Math.max(0, Math.round(Number(draft.spells.studiousUsed[spell.id]) || 0)) > 0;
+  }
+  if (choice.resource === "apparition") {
+    return (
+      Math.max(0, Math.round(Number(draft.spells.apparitionUsed[String(choice.rank)]) || 0)) > 0
+    );
+  }
   const key = String(choice.rank);
   return Math.max(0, Math.round(Number(draft.spells.slotsUsed[key]) || 0)) > 0;
 }
@@ -399,6 +485,29 @@ export function restoreSpellUse(
         ...draft.spells,
         divineFontUsed: Math.max(0, used - 1),
         fontUsed: { ...draft.spells.fontUsed, [spell.id]: Math.max(0, spellUsed - 1) },
+      },
+    };
+  }
+
+  if (choice.resource === "studious") {
+    const used = Math.max(0, Math.round(Number(draft.spells.studiousUsed[spell.id]) || 0));
+    return {
+      ...draft,
+      spells: {
+        ...draft.spells,
+        studiousUsed: { ...draft.spells.studiousUsed, [spell.id]: Math.max(0, used - 1) },
+      },
+    };
+  }
+
+  if (choice.resource === "apparition") {
+    const key = String(choice.rank);
+    const used = Math.max(0, Math.round(Number(draft.spells.apparitionUsed[key]) || 0));
+    return {
+      ...draft,
+      spells: {
+        ...draft.spells,
+        apparitionUsed: { ...draft.spells.apparitionUsed, [key]: Math.max(0, used - 1) },
       },
     };
   }

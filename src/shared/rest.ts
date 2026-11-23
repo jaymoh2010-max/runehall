@@ -170,6 +170,8 @@ export function applyLongRest(
         preparedUsed: {},
         fontUsed: {},
         innateUsed: {},
+        studiousUsed: {},
+        apparitionUsed: {},
         preparationsPending: options.preparedCaster === true,
       },
       play: {

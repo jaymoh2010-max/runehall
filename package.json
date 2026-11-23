@@ -15,6 +15,7 @@
     "simulate": "tsx scripts/simulate-characters.ts 1000 --matrix --content --options --prereqs",
     "simulate:exhaustive": "tsx scripts/simulate-characters.ts --full 200",
     "simulate:campaign": "tsx scripts/simulate-campaign.ts",
+    "simulate:parties": "tsx scripts/simulate-campaign-parties.ts",
     "backup": "node scripts/backup.mjs",
     "ship-backup": "node scripts/ship-backup.mjs",
     "restore": "node scripts/restore.mjs",

@@ -1,10 +1,21 @@
 import fs from "node:fs";
+import path from "node:path";
 import { expect, test, type Page } from "@playwright/test";
 import { currencyToCp } from "../../src/shared/inventory";
+import { emptyCharacterDraft } from "../../src/shared/rules";
 
 test.describe.configure({ mode: "serial" });
 
 const runId = Date.now().toString(36);
+const compendiumClasses = JSON.parse(
+  fs.readFileSync(path.resolve("data", "compendium", "classes.json"), "utf8")
+) as { id: string; name: string }[];
+const compendiumSpells = JSON.parse(
+  fs.readFileSync(path.resolve("data", "compendium", "spells.json"), "utf8")
+) as { id: string; name: string }[];
+const sorcererId = compendiumClasses.find((entry) => entry.name === "Sorcerer")!.id;
+const fireballId = compendiumSpells.find((entry) => entry.name === "Fireball")!.id;
+const elementBloodlineId = "cf:RXRnJcG4XSabZ35a";
 const admin = {
   username: `e2e_gm_${runId}`,
   displayName: "E2E GM",
@@ -46,12 +57,20 @@ async function signIn(page: Page, user: typeof admin): Promise<void> {
 }
 
 async function openNewCharacter(page: Page, name: string): Promise<void> {
+  await openNewCharacterInCampaign(page, name, campaignName);
+}
+
+async function openNewCharacterInCampaign(
+  page: Page,
+  name: string,
+  campaign: string
+): Promise<void> {
   await page.goto("/campaigns");
   await page.getByRole("button", { name: "New character" }).click();
   const dialog = page.getByRole("dialog", { name: "Forge a new hero" });
   await expect(dialog).toBeVisible();
   await dialog.getByLabel("Character name").fill(name);
-  await dialog.getByLabel("Campaign").selectOption({ label: campaignName });
+  await dialog.getByLabel("Campaign").selectOption({ label: campaign });
   await dialog.getByRole("button", { name: "Start building" }).click();
   await expect(page).toHaveURL(/\/characters\/[^/]+\/edit$/, { timeout: 15_000 });
   await expect(page.getByRole("heading", { name })).toBeVisible({ timeout: 15_000 });
@@ -1184,6 +1203,169 @@ test("builder completes a level-1 Cleric with split divine-font preparation", as
   await preparedHeal.getByRole("button", { name: "Cast" }).click();
   await expect(page.getByText(/Cast Heal at rank 1/)).toBeVisible({ timeout: 15_000 });
   await expect(fontRow).toContainText("3 / 4");
+  await expect(page.locator(".pb-save")).toHaveText("Saved");
+});
+
+test("builder splits animist prepared and apparition spellcasting", async ({ page }) => {
+  test.setTimeout(90_000);
+  await signIn(page, admin);
+  const expandedCampaign = `E2E Expanded ${runId}`;
+  const created = await page.request.post("/api/campaigns", {
+    data: { name: expandedCampaign, ruleset: "expanded" },
+  });
+  expect(created.ok()).toBe(true);
+  await openNewCharacterInCampaign(page, "E2E Animist", expandedCampaign);
+
+  await goToStep(page, "Ancestry");
+  await page.locator(".ancestry-grid .selection-card").filter({ hasText: "Human" }).first().click();
+  await goToStep(page, "Heritage");
+  await page
+    .locator(".selection-grid .selection-card")
+    .filter({ hasText: "Skilled Human" })
+    .click();
+  await goToStep(page, "Background");
+  await page
+    .locator(".selection-grid .selection-card")
+    .filter({ hasText: "Acolyte" })
+    .first()
+    .click();
+  await goToStep(page, "Class");
+  await page
+    .locator(".class-grid")
+    .getByRole("button", { name: /Animist/ })
+    .click();
+  await page
+    .locator(".choice-options")
+    .getByRole("button", { name: /Liturgist/ })
+    .click();
+
+  await goToStep(page, "Abilities");
+  await setBoost(page, "Ancestry boosts", ["wis", "con"]);
+  await setBoost(page, "Background boosts", ["wis", "con"]);
+  for (const [index, ability] of ["wis", "dex", "con", "cha"].entries()) {
+    await page.getByLabel(`Free boost ${index + 1}`).selectOption(ability);
+  }
+
+  await goToStep(page, "Skills");
+  await page
+    .locator(".skill-picker")
+    .filter({ hasText: "Skilled Human training" })
+    .getByRole("combobox")
+    .selectOption("stealth");
+  await trainClassSkills(page, ["Athletics", "Medicine"]);
+
+  await goToStep(page, "Feats");
+  await pickFeat(page, "Ancestry feat", "Haughty Obstinacy");
+
+  await goToStep(page, "Spells");
+  for (const cantrip of ["Guidance", "Light"]) {
+    await page.getByRole("button", { name: "Add cantrip" }).click();
+    await pickSpell(page, cantrip);
+  }
+  await expect(page.getByRole("button", { name: "Add cantrip" })).toBeDisabled();
+
+  const rankOne = page
+    .locator(".spell-section")
+    .filter({ has: page.getByRole("heading", { name: "Rank 1 prepared list" }) });
+  await rankOne.getByRole("button", { name: "Add rank 1 spell to spellbook" }).click();
+  await pickSpell(page, "Bless");
+  await rankOne.getByRole("button", { name: "Add rank 1 spell to spellbook" }).click();
+  await pickSpell(page, "Heal");
+  const blessRow = rankOne.getByRole("group", { name: "Bless spellbook row" });
+  await blessRow.getByRole("button", { name: "Prepare Bless at rank 1" }).click();
+  await expect(blessRow.getByRole("button", { name: "Prepare Bless at rank 1" })).toBeDisabled();
+
+  const apparitionSelect = page.getByLabel("Apparition to attune");
+  await apparitionSelect.selectOption({ label: "Witness to Ancient Battles" });
+  await expect(page.getByText("1 / 2 attuned")).toBeVisible({ timeout: 15_000 });
+  await apparitionSelect.selectOption({ label: "Steward of Stone and Fire" });
+  await expect(page.getByText("2 / 2 attuned")).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText(/Embodiment of Battle/).first()).toBeVisible();
+
+  await goToStep(page, "Gear");
+  await page.getByRole("button", { name: /Take .* as coins/ }).click();
+  await goToStep(page, "Review");
+  await expect(page.getByRole("heading", { name: "Your hero is ready" })).toBeVisible();
+
+  await page.getByRole("link", { name: "Open character sheet" }).click();
+  await expect(page).toHaveURL(/\/characters\/[^/]+$/, { timeout: 15_000 });
+  await expect(page.getByRole("heading", { name: "E2E Animist" })).toBeVisible();
+  await page.getByRole("button", { name: "Spells", exact: true }).click();
+  await expect(page.getByTestId("attuned-apparitions")).toContainText("Witness to Ancient Battles");
+  await expect(page.getByTestId("attuned-apparitions")).toContainText("Steward of Stone and Fire");
+  await expect(page.getByRole("link", { name: /Shield/ }).first()).toBeVisible();
+  await expect(page.getByRole("link", { name: /Sure Strike/ }).first()).toBeVisible();
+
+  const preparedSlot = page.locator(".pb-slot-row").filter({ hasText: "Rank 1" }).first();
+  const apparitionSlot = page.locator(".pb-slot-row").filter({ hasText: "Apparition rank 1" });
+  await expect(preparedSlot).toContainText("1 / 1");
+  await expect(apparitionSlot).toContainText("1 / 1");
+
+  const sureStrike = page
+    .locator(".pb-spell-row")
+    .filter({ hasText: "Apparition" })
+    .filter({ hasText: "Sure Strike" })
+    .first();
+  await sureStrike.getByRole("button", { name: "Cast" }).click();
+  await expect(page.getByText(/Cast Sure Strike at rank 1/)).toBeVisible({ timeout: 15_000 });
+  await expect(apparitionSlot).toContainText("0 / 1");
+  await expect(preparedSlot).toContainText("1 / 1");
+  await expect(page.locator(".pb-save")).toHaveText("Saved");
+});
+
+test("builder learns a spontaneous spell at more than one rank", async ({ page }) => {
+  test.setTimeout(60_000);
+  await signIn(page, admin);
+  const campaignId = campaignPath.split("/").pop();
+  const created = await page.request.post("/api/characters", {
+    data: { name: "E2E Ranked Sorcerer", campaignId },
+  });
+  expect(created.ok()).toBe(true);
+  const character = (await created.json()) as { character: { id: string } };
+  const draft = emptyCharacterDraft("E2E Ranked Sorcerer");
+  draft.level = 11;
+  draft.classId = sorcererId;
+  draft.keyAbility = "cha";
+  draft.spells.tradition = "primal";
+  draft.classChoices["cf:2goYo6VNbwC6aKF1:sorcerer-bloodline"] = [elementBloodlineId];
+  draft.spells.known = [fireballId];
+  draft.spells.knownRanks = { [fireballId]: [3, 5] };
+  const saved = await page.request.put(`/api/characters/${character.character.id}`, {
+    data: { data: draft, force: true },
+  });
+  expect(saved.ok()).toBe(true);
+
+  await page.goto(`/characters/${character.character.id}/edit`);
+  await expect(page.getByRole("heading", { name: "E2E Ranked Sorcerer" })).toBeVisible({
+    timeout: 15_000,
+  });
+  await goToStep(page, "Spells");
+
+  const rankThree = page
+    .locator(".spell-section")
+    .filter({ has: page.getByRole("heading", { name: "Rank 3 repertoire" }) });
+  const rankFive = page
+    .locator(".spell-section")
+    .filter({ has: page.getByRole("heading", { name: "Rank 5 repertoire" }) });
+  await expect(rankThree.getByText("Fireball")).toBeVisible();
+  await expect(rankFive.getByText("Fireball")).toBeVisible();
+
+  await rankFive.getByRole("button", { name: "Add rank 5 spell to repertoire" }).click();
+  await pickSpell(page, "Fear");
+  await expect(rankFive.getByText("Fear")).toBeVisible();
+  await expect(rankFive.getByText("base rank 1")).toBeVisible();
+
+  await page.goto(`/characters/${character.character.id}`);
+  await expect(page.getByRole("heading", { name: "E2E Ranked Sorcerer" })).toBeVisible({
+    timeout: 15_000,
+  });
+  await page.getByRole("button", { name: "Spells", exact: true }).click();
+  const fireball = page.locator(".pb-spell-row").filter({ hasText: "Fireball" }).first();
+  const rankChoices = fireball.locator("select");
+  await expect(rankChoices.locator("option")).toHaveText(["Rank 3 · slot", "Rank 5 · slot"]);
+  await rankChoices.selectOption("5:slot");
+  await fireball.getByRole("button", { name: "Cast" }).click();
+  await expect(page.getByText(/Cast Fireball at rank 5/)).toBeVisible({ timeout: 15_000 });
   await expect(page.locator(".pb-save")).toHaveText("Saved");
 });
 
