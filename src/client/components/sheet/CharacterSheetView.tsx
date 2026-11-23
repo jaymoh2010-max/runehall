@@ -43,6 +43,8 @@ import {
   titleCase,
 } from "../../../shared/rules";
 import { currencyToCp } from "../../../shared/inventory";
+import { scrollSpellRank } from "../../../shared/itemSpellcasting";
+import { SpellPicker } from "../builder/pickers";
 import { applyHpEditToDraft } from "../../../shared/damage";
 import { rollFormula } from "../../../shared/dice";
 import type { LongRestResult } from "../../../shared/rest";
@@ -383,6 +385,7 @@ export function CharacterSheetView({
   const [customItemDescription, setCustomItemDescription] = useState("");
   const [customItemQuantity, setCustomItemQuantity] = useState("1");
   const [customItemSaving, setCustomItemSaving] = useState(false);
+  const [scrollPick, setScrollPick] = useState<{ item: Equipment; rank: number } | null>(null);
   const characterRef = useRef<CharacterRecord | null>(null);
   const loadedCharacterIdRef = useRef<string | null>(null);
   const draftRef = useRef<CharacterDraft | null>(null);
@@ -838,6 +841,30 @@ export function CharacterSheetView({
     setCustomItemView(null);
     toast("Custom item removed.", "success");
     if (characterRef.current) await applyRecord(characterRef.current);
+  };
+
+  const castScroll = async (spell: Spell) => {
+    if (!canEdit || !scrollPick) return;
+    const { item, rank } = scrollPick;
+    setScrollPick(null);
+    const saved = await persist((currentDraft) => ({
+      ...currentDraft,
+      equipment: currentDraft.equipment.flatMap((entry) => {
+        if (entry.itemId !== item.id) return [entry];
+        if (entry.quantity <= 1) return [];
+        return [{ ...entry, quantity: entry.quantity - 1 }];
+      }),
+    }));
+    if (!saved) return;
+    toast(`Cast ${spell.name} from a scroll at rank ${rank}.`, "success");
+    const current = characterRef.current;
+    if (current?.campaignId) {
+      getSocket().emit("chat:send", {
+        campaignId: current.campaignId,
+        content: `${current.name} casts ${spell.name} at rank ${rank} from a scroll.`,
+        visibility: "all",
+      });
+    }
   };
 
   const spellEntries = useMemo(() => {
@@ -2081,6 +2108,25 @@ export function CharacterSheetView({
                                   </button>
                                 ) : (
                                   <>
+                                    {item &&
+                                    scrollSpellRank(item) &&
+                                    derived?.spellDc != null &&
+                                    derived.casterTradition ? (
+                                      <button
+                                        type="button"
+                                        className="pb-small-button"
+                                        disabled={!canEdit}
+                                        aria-label={`Cast spell from ${item.name}`}
+                                        onClick={() =>
+                                          setScrollPick({
+                                            item,
+                                            rank: scrollSpellRank(item)!,
+                                          })
+                                        }
+                                      >
+                                        Cast scroll
+                                      </button>
+                                    ) : null}
                                     {item?.price ? (
                                       <span>{formatCp(item.price.cpTotal)} each</span>
                                     ) : null}
@@ -3069,6 +3115,22 @@ export function CharacterSheetView({
           </Field>
         </div>
       </Modal>
+      {scrollPick ? (
+        <SpellPicker
+          open
+          onClose={() => setScrollPick(null)}
+          rank={scrollPick.rank}
+          tradition={derived.casterTradition}
+          classTrait={context.classData?.name.toLowerCase()}
+          expanded={draft.contentMode === "expanded"}
+          onExpandedChange={() => undefined}
+          contentModeLocked
+          legacyDefault={draft.includeLegacy}
+          legacyLocked
+          confirmLabel="Cast from scroll"
+          onSelect={(spell) => void castScroll(spell)}
+        />
+      ) : null}
       <Modal
         open={Boolean(customItemView)}
         onClose={() => setCustomItemView(null)}
