@@ -258,6 +258,18 @@ describe("curated feat effects", () => {
     expect(withFeat.speed).toBe(25);
   });
 
+  it("reduces one other Speed penalty with Unburdened Iron", () => {
+    const draft = wizardDraft();
+    draft.play.conditions = [{ name: "Encumbered", value: null, duration: null }];
+    const withoutFeat = computeCharacter(draft, wizardContext({}));
+    const withFeat = computeCharacter(
+      draft,
+      wizardContext({ [unburdenedIron.id]: unburdenedIron })
+    );
+    expect(withoutFeat.speed).toBe(15);
+    expect(withFeat.speed).toBe(20);
+  });
+
   it("applies a choice-driven feat to the chosen proficiency", () => {
     expect(featChoice(cannyAcumen.id)?.options.map((option) => option.id)).toContain("will");
     expect(collectFeatChoiceEffects({ [cannyAcumen.id]: ["will"] }, [cannyAcumen.id], 1)).toEqual({

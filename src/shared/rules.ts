@@ -3043,7 +3043,7 @@ export function computeCharacter(
     draft.play.shieldRaised && shield?.shield ? Math.abs(shield.shield.acBonus || 2) : 0;
   let ac: number;
   let speed = (ancestry?.speed ?? 25) + (featMods.speed ?? 0);
-  let speedPenalty = 0;
+  const speedPenalties: number[] = [];
   if (armor?.armor) {
     const armorCategory = armor.armor.category === "unarmored" ? "unarmored" : armor.armor.category;
     // Negative Dexterity still applies; only the armor's Dex cap limits it.
@@ -3062,7 +3062,8 @@ export function computeCharacter(
     // reduces the penalty by 5 feet (so full plate's -10 becomes -5).
     const armorSpeedPenalty = Math.min(0, armor.armor.speedPenalty || 0);
     if (!featMods.ignoreArmorSpeedPenalty) {
-      speedPenalty += meetsArmorStrength ? Math.min(0, armorSpeedPenalty + 5) : armorSpeedPenalty;
+      const adjusted = meetsArmorStrength ? Math.min(0, armorSpeedPenalty + 5) : armorSpeedPenalty;
+      if (adjusted) speedPenalties.push(adjusted);
     }
   } else {
     ac =
@@ -3072,12 +3073,17 @@ export function computeCharacter(
       proficiencyBonus(prof.defenses.unarmored ?? 0, draft.level) +
       shieldBonus;
   }
-  if (shield?.shield?.speedPenalty) speedPenalty += shield.shield.speedPenalty;
-  speedPenalty += conditionEffects.speed;
-  if (speedPenalty < 0 && featMods.speedPenaltyReduction) {
-    speedPenalty = Math.min(0, speedPenalty + featMods.speedPenaltyReduction);
+  if (shield?.shield?.speedPenalty) speedPenalties.push(shield.shield.speedPenalty);
+  if (conditionEffects.speed) speedPenalties.push(conditionEffects.speed);
+  // Unburdened Iron reduces one Speed penalty by 5 feet, not every penalty.
+  if (speedPenalties.length && featMods.speedPenaltyReduction) {
+    let index = 0;
+    for (let i = 1; i < speedPenalties.length; i++) {
+      if (speedPenalties[i] < speedPenalties[index]) index = i;
+    }
+    speedPenalties[index] = Math.min(0, speedPenalties[index] + featMods.speedPenaltyReduction);
   }
-  speed = Math.max(5, speed + speedPenalty);
+  speed = Math.max(5, speed + speedPenalties.reduce((sum, penalty) => sum + penalty, 0));
   ac += conditionEffects.ac;
 
   const saves: Record<SaveKey, number> = {
