@@ -282,6 +282,84 @@ export function searchMonsters(opts: SearchOptions) {
   return paginate(filtered, opts);
 }
 
+interface SearchableListEntry {
+  name: string;
+  traits?: string[];
+  source?: string;
+  remaster?: boolean;
+  rarity?: string;
+}
+
+function paginateOptional<T>(items: T[], opts: SearchOptions) {
+  if (opts.limit === undefined && opts.offset === undefined) {
+    return { items, total: items.length, next: null };
+  }
+  return paginate(items, opts);
+}
+
+function searchList<T extends SearchableListEntry>(
+  items: T[],
+  opts: SearchOptions,
+  levelOf?: (item: T) => number
+) {
+  const filtered = items.filter((item) => {
+    if (!opts.includeLegacy && item.remaster === false) return false;
+    if (opts.levelMin !== undefined && levelOf && levelOf(item) < opts.levelMin) return false;
+    if (opts.levelMax !== undefined && levelOf && levelOf(item) > opts.levelMax) return false;
+    if (opts.rarity?.length && !opts.rarity.includes(item.rarity ?? "")) return false;
+    if (!matchesTraits(item.traits ?? [], opts.traits?.length ? opts.traits : undefined))
+      return false;
+    if (!matchesText(`${item.name} ${(item.traits ?? []).join(" ")} ${item.source ?? ""}`, opts.q))
+      return false;
+    return true;
+  });
+  sortByRelevance(filtered, opts.q, (a, b) => {
+    if (levelOf) {
+      const byLevel = levelOf(a) - levelOf(b);
+      if (byLevel !== 0) return byLevel;
+    }
+    return a.name.localeCompare(b.name);
+  });
+  return paginateOptional(filtered, opts);
+}
+
+export function searchAncestries(opts: SearchOptions) {
+  return searchList(ancestries, opts);
+}
+
+export function searchHeritages(opts: SearchOptions & { ancestry?: string }) {
+  const ancestry = opts.ancestry?.trim().toLowerCase() ?? "";
+  const items = ancestry
+    ? heritages.filter(
+        (heritage) =>
+          heritage.versatile ||
+          heritage.ancestrySlug.toLowerCase() === ancestry ||
+          heritage.ancestry.toLowerCase() === ancestry
+      )
+    : heritages;
+  return searchList(items, opts);
+}
+
+export function searchBackgrounds(opts: SearchOptions) {
+  return searchList(backgrounds, opts);
+}
+
+export function searchClasses(opts: SearchOptions) {
+  return searchList(classes, opts);
+}
+
+export function searchClassFeatures(opts: SearchOptions) {
+  return searchList(classFeatures, opts, (feature) => feature.level);
+}
+
+export function searchConditions(opts: SearchOptions) {
+  return searchList(conditions, opts);
+}
+
+export function searchActions(opts: SearchOptions) {
+  return searchList(actions, opts);
+}
+
 export function searchDeities(q?: string, limit = 80) {
   const filtered = deities.filter((deity) =>
     matchesText(`${deity.name} ${deity.traits.join(" ")} ${deity.source}`, q)
@@ -615,6 +693,7 @@ export const compendiumCounts = {
   heritages: heritages.length,
   backgrounds: backgrounds.length,
   classes: classes.length,
+  classFeatures: classFeatures.length,
   feats: feats.length,
   spells: spells.length,
   equipment: equipment.length,

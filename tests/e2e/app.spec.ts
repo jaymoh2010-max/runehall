@@ -401,6 +401,22 @@ test("lazy library, compendium entry, rules, and account routes load", async ({ 
   await expect(page.getByRole("heading", { name: "Air", level: 2 })).toBeVisible();
   await expect(page.getByRole("link", { name: "Pushing Gust" })).toBeVisible();
 
+  await page.getByRole("tab", { name: "Classes" }).click();
+  await page.getByPlaceholder(/Search classes/).fill("Wizard");
+  await page
+    .getByRole("button", { name: /Wizard/ })
+    .first()
+    .click();
+  await expect(page.getByRole("heading", { name: "Wizard", level: 2 })).toBeVisible();
+
+  await page.getByRole("tab", { name: "Conditions" }).click();
+  await page.getByPlaceholder(/Search conditions/).fill("Frightened");
+  await page
+    .getByRole("button", { name: /Frightened/ })
+    .first()
+    .click();
+  await expect(page.getByRole("heading", { name: "Frightened", level: 2 })).toBeVisible();
+
   await page.goto("/rules");
   await expect(page.getByRole("heading", { name: "Rules at the table" })).toBeVisible();
   await page.getByRole("tab", { name: "Actions" }).click();
