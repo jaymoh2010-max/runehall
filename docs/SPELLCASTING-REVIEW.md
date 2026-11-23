@@ -2,7 +2,7 @@
 
 Date: 2026-11-23
 
-Status: review complete. Sprint 1 (the daily spellcasting loop), the class-grant portion of Sprint 2, the first table-magic pass of Sprint 3, the magus studious-slot pass of Sprint 4, the animist prepared/spontaneous split of Sprint 5, the spontaneous known-at-rank pass of Sprint 6, the psychic psi-amp pass of Sprint 7, the table Sustain-reminder pass of Sprint 8, and the higher-slot downcast pass of Sprint 9 were implemented on 2026-11-23. The findings below describe the pre-Sprint state; the implementation status sections record what changed, and the remaining class and table gaps stay in the backlog.
+Status: review complete. Sprint 1 (the daily spellcasting loop), the class-grant portion of Sprint 2, the first table-magic pass of Sprint 3, the magus studious-slot pass of Sprint 4, the animist prepared/spontaneous split of Sprint 5, the spontaneous known-at-rank pass of Sprint 6, the psychic psi-amp pass of Sprint 7, the table Sustain-reminder pass of Sprint 8, the higher-slot downcast pass of Sprint 9, and the scroll-spellcasting pass of Sprint 10 were implemented on 2026-11-23. The findings below describe the pre-Sprint state; the implementation status sections record what changed, and the remaining class and table gaps stay in the backlog.
 
 > **Follow-up (2026-11-23):** `docs/RULES-AUDIT.md` corrected two table errors
 > this review did not catch: bards use the 2/3 full-caster slot table (not the
@@ -156,6 +156,16 @@ Spontaneous higher-slot downcasting is implemented:
 - The sheet toast and chat log record the effective spell rank and the slot rank used.
 - Sustained spells started by a downcast record the effective rank.
 
+## Sprint 10 implementation status (2026-11-23)
+
+Scroll spellcasting is implemented:
+
+- Scrolls expose a **Cast scroll** action from the sheet's inventory.
+- The scroll picker is filtered to the scroll's rank and the character's spell list, so prepared and spontaneous casters can use spells outside their prepared list or repertoire.
+- Casting consumes one scroll and removes the item when the last copy is used.
+- Scroll casts use the character's spell DC/attack profile and post the spell name and rank to chat; they do not spend slots, focus, or prepared copies.
+- Wands and staves remain manual for now.
+
 ## Rules baseline
 
 ### Core spellcasting
@@ -231,7 +241,7 @@ Legend: Yes = modeled and usable; Partial = some support with known gaps; No = n
 | Rituals | Partial | Primary-check rolls work when the description names a known skill; missing data falls back to manual |
 | Sustained spells | Yes | Casting starts sustain, the sheet and table list active spells, Sustain/End actions are available, and Restore clears them |
 | Spellbook capacity and learning | No | No starting-spellbook or Learn a Spell accounting |
-| Item spellcasting | No | Scrolls are generic consumables; staves/wands do not cast spells |
+| Item spellcasting | Partial | Scrolls cast from the character's spell list, consume on use, and post to chat; wands and staves remain manual |
 | Multiclass spellcasting archetypes | No | Only the primary class contributes caster progression |
 
 ## Findings
@@ -402,11 +412,11 @@ Fix: Ingest the structured primary-check skill and DC from the source data, then
 
 ### F12. Item spellcasting is not modeled (P2)
 
-`src/shared/itemActivation.ts` handles consumables, wands, and staves generically. A scroll is consumed, a wand spends a charge, and a staff is manual. None of them cast the spell, use the character's spell DC, or present heightened options.
+Status: partly fixed in Sprint 10. Scrolls are castable from the sheet and consumed; wands and staves still use the generic item activation path.
 
 Impact: Scrolls, wands, and staves are inventory items rather than spellcasting resources.
 
-Fix: Model item spells with their own cast path and charges. This also gives spontaneous casters a way to use spells outside their repertoire, which is a core part of the item economy.
+Fix: Scroll casting now opens the spell picker at the scroll's rank, filters by the character's tradition, and consumes the scroll on confirmation. The same pattern can be extended to wand and staff spell lists.
 
 ### F13. Multiclass spellcasting archetypes are not modeled (P2)
 
@@ -576,7 +586,7 @@ Tasks:
    - Keep cost, secondary casters, and consequences manual but visible.
 
 3. **Item spellcasting**
-   - Cast from scrolls, wands, and staves with the correct charges and DC.
+   - Cast from scrolls, wands, and staves with the correct charges and DC. (Scrolls implemented in Sprint 10.)
    - Consume scrolls; track wand and staff charges; respect daily preparations.
 
 4. **Spellbook and learning**

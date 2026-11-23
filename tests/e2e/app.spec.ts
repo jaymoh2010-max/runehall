@@ -13,9 +13,15 @@ const compendiumClasses = JSON.parse(
 const compendiumSpells = JSON.parse(
   fs.readFileSync(path.resolve("data", "compendium", "spells.json"), "utf8")
 ) as { id: string; name: string }[];
+const compendiumEquipment = JSON.parse(
+  fs.readFileSync(path.resolve("data", "compendium", "equipment.json"), "utf8")
+) as { id: string; name: string }[];
 const sorcererId = compendiumClasses.find((entry) => entry.name === "Sorcerer")!.id;
 const psychicId = compendiumClasses.find((entry) => entry.name === "Psychic")!.id;
 const fireballId = compendiumSpells.find((entry) => entry.name === "Fireball")!.id;
+const scroll3Id = compendiumEquipment.find(
+  (entry) => entry.name === "Scroll of 3rd-rank Spell"
+)!.id;
 const elementBloodlineId = "cf:RXRnJcG4XSabZ35a";
 const admin = {
   username: `e2e_gm_${runId}`,
@@ -1366,6 +1372,13 @@ test("builder learns a spontaneous spell at more than one rank", async ({ page }
   draft.classChoices["cf:2goYo6VNbwC6aKF1:sorcerer-bloodline"] = [elementBloodlineId];
   draft.spells.known = [fireballId];
   draft.spells.knownRanks = { [fireballId]: [3, 5] };
+  draft.equipment.push({
+    itemId: scroll3Id,
+    quantity: 1,
+    equipped: false,
+    invested: false,
+    runes: [],
+  });
   const saved = await page.request.put(`/api/characters/${character.character.id}`, {
     data: { data: draft, force: true },
   });
@@ -1408,6 +1421,22 @@ test("builder learns a spontaneous spell at more than one rank", async ({ page }
   await expect(page.getByText(/Cast Fireball at rank 3 using a rank 4 slot/)).toBeVisible({
     timeout: 15_000,
   });
+  await page.getByRole("button", { name: "Gear", exact: true }).click();
+  const scrollRow = page
+    .locator(".pb-inventory-row")
+    .filter({ hasText: "Scroll of 3rd-rank Spell" });
+  await expect(scrollRow).toBeVisible();
+  await scrollRow.getByRole("button", { name: /Cast spell from/ }).click();
+  await page.getByPlaceholder(/Search spells/).fill("Fireball");
+  await page
+    .locator(".picker-item-name", { hasText: /^Fireball$/ })
+    .first()
+    .click();
+  await page.getByRole("button", { name: "Cast from scroll" }).click();
+  await expect(page.getByText(/Cast Fireball from a scroll at rank 3/)).toBeVisible({
+    timeout: 15_000,
+  });
+  await expect(scrollRow).toBeHidden({ timeout: 15_000 });
   await expect(page.locator(".pb-save")).toHaveText("Saved");
 });
 
