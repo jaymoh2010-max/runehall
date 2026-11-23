@@ -1,5 +1,23 @@
 import type { Equipment } from "./types";
 
+const MAGIC_WAND_NAME = /^Magic Wand \((\d+)(?:st|nd|rd|th)-Rank Spell\)$/i;
+
+/** Whether an inventory item is a generic Magic Wand with a ranked spell slot. */
+export function isMagicWand(item: Pick<Equipment, "name" | "traits"> | null | undefined): boolean {
+  return Boolean(item?.traits?.includes("wand") && MAGIC_WAND_NAME.test(item.name));
+}
+
+/** Rank of a generic Magic Wand, or null for specific wands. */
+export function wandSpellRank(
+  item: Pick<Equipment, "name" | "traits"> | null | undefined
+): number | null {
+  if (!item || !isMagicWand(item)) return null;
+  const match = item.name.match(MAGIC_WAND_NAME);
+  if (!match) return null;
+  const rank = Number(match[1]);
+  return Number.isInteger(rank) && rank >= 1 && rank <= 10 ? rank : null;
+}
+
 /** Whether an inventory item is a consumable spell scroll. */
 export function isSpellScroll(item: Pick<Equipment, "traits"> | null | undefined): boolean {
   return Boolean(item?.traits?.includes("scroll"));

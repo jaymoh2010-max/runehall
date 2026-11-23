@@ -43,7 +43,7 @@ import {
   titleCase,
 } from "../../../shared/rules";
 import { currencyToCp } from "../../../shared/inventory";
-import { scrollSpellRank } from "../../../shared/itemSpellcasting";
+import { scrollSpellRank, wandSpellRank } from "../../../shared/itemSpellcasting";
 import { SpellPicker } from "../builder/pickers";
 import { applyHpEditToDraft } from "../../../shared/damage";
 import { rollFormula } from "../../../shared/dice";
@@ -403,7 +403,11 @@ export function CharacterSheetView({
   const [customItemDescription, setCustomItemDescription] = useState("");
   const [customItemQuantity, setCustomItemQuantity] = useState("1");
   const [customItemSaving, setCustomItemSaving] = useState(false);
-  const [scrollPick, setScrollPick] = useState<{ item: Equipment; rank: number } | null>(null);
+  const [itemCast, setItemCast] = useState<{
+    item: Equipment;
+    rank: number;
+    kind: "scroll" | "wand";
+  } | null>(null);
   const characterRef = useRef<CharacterRecord | null>(null);
   const loadedCharacterIdRef = useRef<string | null>(null);
   const draftRef = useRef<CharacterDraft | null>(null);
@@ -861,10 +865,47 @@ export function CharacterSheetView({
     if (characterRef.current) await applyRecord(characterRef.current);
   };
 
-  const castScroll = async (spell: Spell) => {
-    if (!canEdit || !scrollPick) return;
-    const { item, rank } = scrollPick;
-    setScrollPick(null);
+  const castItemSpell = async (spell: Spell) => {
+    if (!canEdit || !itemCast) return;
+    const { item, rank, kind } = itemCast;
+    setItemCast(null);
+    if (kind === "wand") {
+      const entry = draftRef.current?.equipment.find((candidate) => candidate.itemId === item.id);
+      if (!entry) {
+        toast("That wand is no longer in the inventory.", "error");
+        return;
+      }
+      const max = Math.max(1, Math.round(entry.usesMax ?? 1));
+      const used = Math.max(0, Math.round(entry.usesUsed ?? 0));
+      if (used >= max) {
+        toast(`${item.name} has no uses left today.`, "error");
+        return;
+      }
+      const saved = await persist((currentDraft) => ({
+        ...currentDraft,
+        equipment: currentDraft.equipment.map((candidate) => {
+          if (candidate.itemId !== item.id) return candidate;
+          const candidateMax = Math.max(1, Math.round(candidate.usesMax ?? max));
+          const candidateUsed = Math.max(0, Math.round(candidate.usesUsed ?? 0));
+          return {
+            ...candidate,
+            usesUsed: Math.min(candidateMax, candidateUsed + 1),
+            usesMax: candidateMax,
+          };
+        }),
+      }));
+      if (!saved) return;
+      toast(`Cast ${spell.name} from a magic wand at rank ${rank}.`, "success");
+      const current = characterRef.current;
+      if (current?.campaignId) {
+        getSocket().emit("chat:send", {
+          campaignId: current.campaignId,
+          content: `${current.name} casts ${spell.name} at rank ${rank} from a magic wand.`,
+          visibility: "all",
+        });
+      }
+      return;
+    }
     const saved = await persist((currentDraft) => ({
       ...currentDraft,
       equipment: currentDraft.equipment.flatMap((entry) => {
@@ -2088,6 +2129,12 @@ export function CharacterSheetView({
                           const custom = entry.itemId.startsWith("custom:")
                             ? (customItemsById.get(entry.itemId) ?? null)
                             : null;
+                          const scrollRank = item ? scrollSpellRank(item) : null;
+                          const wandRank = item ? wandSpellRank(item) : null;
+                          const wandMax = Math.max(1, Math.round(entry.usesMax ?? 1));
+                          const wandUsed = Math.max(0, Math.round(entry.usesUsed ?? 0)) >= wandMax;
+                          const canCastItem =
+                            derived?.spellDc != null && Boolean(derived.casterTradition);
                           return (
                             <div className="pb-inventory-row" key={entry.itemId}>
                               {custom ? (
@@ -2126,23 +2173,43 @@ export function CharacterSheetView({
                                   </button>
                                 ) : (
                                   <>
-                                    {item &&
-                                    scrollSpellRank(item) &&
-                                    derived?.spellDc != null &&
-                                    derived.casterTradition ? (
+                                    {item && scrollRank && canCastItem ? (
                                       <button
                                         type="button"
                                         className="pb-small-button"
                                         disabled={!canEdit}
                                         aria-label={`Cast spell from ${item.name}`}
                                         onClick={() =>
-                                          setScrollPick({
+                                          setItemCast({
                                             item,
-                                            rank: scrollSpellRank(item)!,
+                                            rank: scrollRank,
+                                            kind: "scroll",
                                           })
                                         }
                                       >
                                         Cast scroll
+                                      </button>
+                                    ) : null}
+                                    {item && wandRank && canCastItem ? (
+                                      <button
+                                        type="button"
+                                        className="pb-small-button"
+                                        disabled={!canEdit || wandUsed}
+                                        aria-label={
+                                          wandUsed
+                                            ? `${item.name} is used today`
+                                            : `Cast spell from ${item.name}`
+                                        }
+                                        title="Magic wands have one cast per day; a long rest resets them."
+                                        onClick={() =>
+                                          setItemCast({
+                                            item,
+                                            rank: wandRank,
+                                            kind: "wand",
+                                          })
+                                        }
+                                      >
+                                        {wandUsed ? "Used today" : "Cast wand"}
                                       </button>
                                     ) : null}
                                     {item?.price ? (
@@ -3196,11 +3263,11 @@ export function CharacterSheetView({
           </Field>
         </div>
       </Modal>
-      {scrollPick ? (
+      {itemCast ? (
         <SpellPicker
           open
-          onClose={() => setScrollPick(null)}
-          rank={scrollPick.rank}
+          onClose={() => setItemCast(null)}
+          rank={itemCast.rank}
           tradition={derived.casterTradition}
           classTrait={context.classData?.name.toLowerCase()}
           expanded={draft.contentMode === "expanded"}
@@ -3208,8 +3275,8 @@ export function CharacterSheetView({
           contentModeLocked
           legacyDefault={draft.includeLegacy}
           legacyLocked
-          confirmLabel="Cast from scroll"
-          onSelect={(spell) => void castScroll(spell)}
+          confirmLabel={itemCast.kind === "wand" ? "Cast from wand" : "Cast from scroll"}
+          onSelect={(spell) => void castItemSpell(spell)}
         />
       ) : null}
       <Modal
