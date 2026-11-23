@@ -6,7 +6,7 @@ Runehall generates its local compendium from the [Foundry VTT PF2e system](https
 
 The generated files live in `data/compendium/`. They are committed/generated separately from the SQLite database so they can be rebuilt without touching user data.
 
-The generated compendium is currently tracked in Git so a fresh clone is runnable without a data download (about 28 MB). Re-running ingest replaces those files and can grow repository history; regenerate only when the source commit or normalization changes, or move the folder to Git LFS / a release artifact if history size becomes a problem.
+The generated compendium is currently tracked in Git so a fresh clone is runnable without a data download (about 40 MB). Re-running ingest replaces those files and can grow repository history; regenerate only when the source commit or normalization changes, or move the folder to Git LFS / a release artifact if history size becomes a problem.
 
 ### Packs used
 - `ancestries`, `heritages`, `ancestry-features`
@@ -19,6 +19,7 @@ The generated compendium is currently tracked in Git so a fresh clone is runnabl
 - `conditions`
 - `actions`
 - `pathfinder-monster-core`, `pathfinder-monster-core-2`, `pathfinder-npc-core`
+- legacy/expansion bestiaries: `pathfinder-bestiary`, `pathfinder-bestiary-2`, `pathfinder-bestiary-3`, `lost-omens-bestiary`, `npc-gallery`, `battlecry-bestiary`, `howl-of-the-wild-bestiary`, `book-of-the-dead-bestiary`, `rage-of-elements-bestiary`, `war-of-immortals-bestiary`
 - localization: `static/lang/en.json`, `re-en.json`, `action-en.json`
 
 ## Rebuild the data
@@ -45,6 +46,16 @@ git -C $cache sparse-checkout set `
   packs/pf2e/pathfinder-monster-core `
   packs/pf2e/pathfinder-monster-core-2 `
   packs/pf2e/pathfinder-npc-core `
+  packs/pf2e/pathfinder-bestiary `
+  packs/pf2e/pathfinder-bestiary-2 `
+  packs/pf2e/pathfinder-bestiary-3 `
+  packs/pf2e/lost-omens-bestiary `
+  packs/pf2e/npc-gallery `
+  packs/pf2e/battlecry-bestiary `
+  packs/pf2e/howl-of-the-wild-bestiary `
+  packs/pf2e/book-of-the-dead-bestiary `
+  packs/pf2e/rage-of-elements-bestiary `
+  packs/pf2e/war-of-immortals-bestiary `
   static/lang
 ```
 
@@ -57,7 +68,7 @@ npm run ingest
 The ingest records the source Git commit, a short ref, and whether the working tree was dirty in `data/compendium/manifest.json`. Use those fields to reproduce a known-good compendium later:
 
 ```bash
-git -C "$cache" checkout be611895ec16d4672f53d014527d9007b06cb409
+git -C "$cache" checkout a70593f7d52ba6357c3bdc05c09dcb9d4f2765dc
 npm run ingest
 ```
 
@@ -98,7 +109,8 @@ The verifier checks manifest counts, unique and prefixed IDs, required fields, c
 ## Normalization notes
 
 - **Descriptions are sanitized** with `sanitize-html`; only safe structural HTML is kept.
-- **Foundry inline macros** (`@UUID`, `@Localize`, `@Damage`, etc.) are converted to readable text or resolved through the English language packs. `@Embed` references are resolved against the loaded class-feature, feat, and equipment source items.
+- **Foundry inline macros** (`@UUID`, `@Localize`, `@Damage`, `@Check`, `@Template`, etc.) are converted to readable text or resolved through the English language packs. Nested macros such as `@Damage[4d6[fire]]` and `@Damage[(@actor.level)d6[bleed]]` use a balanced-bracket parser; actor- and level-dependent formulas fall back to the authored display label or the damage type instead of leaking raw `@actor.level` syntax. `@Embed` references are resolved against the loaded class-feature, feat, and equipment source items.
+- **Deity spell lists** are resolved from Foundry UUIDs to local `spell:` IDs and names, and are shown on the deity page.
 - **GM-facing rules text** is used as a fallback when a spell or item has an empty player-facing description. Those entries carry `gmDescription: true` and are labeled **GM source text** in the library.
 - **Rituals** are marked with `ritual: true`; they live in the spell pack but have no magical tradition.
 - **Source gaps remain visible.** Some generic gear, treasure, and a handful of creature entries have no separate rules text in the source export; the UI shows their structured statistics plus an explicit fallback instead of inventing rules text.

@@ -77,15 +77,18 @@ export function conditionModifiers(
   ) as Record<AbilityKey, number>;
 
   const saves: Record<SaveKey, number> = {
-    fortitude: -Math.max(statusAll, drained, fatigued, unconscious ? 4 : 0),
+    // Unconscious applies its -4 status penalty only to AC, Perception, and
+    // Reflex saves, not to Fortitude or Will.
+    fortitude: -Math.max(statusAll, drained, fatigued),
     reflex: -Math.max(statusAll, clumsy, fatigued, unconscious ? 4 : 0),
-    will: -Math.max(statusAll, stupefied, fatigued, unconscious ? 4 : 0),
+    will: -Math.max(statusAll, stupefied, fatigued),
   };
 
   // Frightened/sickened penalize all checks and DCs, which includes AC.
   const statusAc = Math.max(clumsy, fatigued, statusAll, unconscious ? 4 : 0);
   const offGuard =
     has("off-guard") ||
+    has("confused") ||
     has("prone") ||
     has("grabbed") ||
     has("restrained") ||
@@ -138,13 +141,18 @@ export function conditionModifiers(
   }
   if (fatigued) addNote("Fatigued", "−1 status penalty to AC and saving throws.");
   if (has("off-guard")) addNote("Off-Guard", "−2 circumstance penalty to AC.");
+  if (has("confused"))
+    addNote("Confused", "Off-guard (−2 AC); you can't Delay, Ready, or use reactions.");
   if (has("prone")) {
     addNote("Prone", "Off-guard (−2 AC); −2 circumstance penalty to attack rolls.");
   }
   if (has("grabbed")) addNote("Grabbed", "Off-guard (−2 AC); immobilized.");
   if (has("restrained")) addNote("Restrained", "Off-guard (−2 AC); immobilized.");
   if (has("blinded")) {
-    addNote("Blinded", "−4 status penalty to Perception; sight-based checks need a flat check.");
+    addNote(
+      "Blinded",
+      "−4 status penalty to Perception when vision is your only precise sense; normal terrain is difficult terrain."
+    );
   }
   if (unconscious) {
     addNote(
@@ -174,12 +182,14 @@ export function conditionModifiers(
       reflex: zero(saves.reflex),
       will: zero(saves.will),
     },
-    perception: zero(-Math.max(statusAll, blinded, unconscious ? 4 : 0)),
+    // Perception is a Wisdom-based check, so Stupefied also penalizes it.
+    perception: zero(-Math.max(statusAll, blinded, stupefied, unconscious ? 4 : 0)),
     allChecks: zero(-statusAll),
     checks: Object.fromEntries(
       ABILITY_CHECKS.map((ability) => [ability, zero(checks[ability])])
     ) as Record<AbilityKey, number>,
     attackCircumstance: has("prone") ? -2 : 0,
+    damage: zero(-enfeebled),
     maxHp: zero(-drained * Math.max(1, context.level)),
     speed: has("encumbered") ? -10 : 0,
     dying,

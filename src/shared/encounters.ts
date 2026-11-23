@@ -9,9 +9,8 @@ import type {
  * PF2e encounter math. Creatures are worth XP based on their level relative to
  * the party level, and the encounter budget scales with party size.
  *
- * The official table stops at party level -4 / +4. Creatures further than that
- * are counted at the nearest listed value so a legal number is always shown;
- * the encounter builder treats those edge cases as advisory rather than exact.
+ * The official table stops at party level -4 / +4. Creatures five or more
+ * levels below the party are worth 0 XP; creatures above +4 cap at 160 XP.
  */
 const CREATURE_XP_BY_LEVEL_DIFFERENCE: Record<number, number> = {
   [-4]: 10,
@@ -30,7 +29,7 @@ const DIFFICULTY_BUDGETS: Record<
   { base: number; perCharacter: number }
 > = {
   trivial: { base: 40, perCharacter: 10 },
-  low: { base: 60, perCharacter: 20 },
+  low: { base: 60, perCharacter: 15 },
   moderate: { base: 80, perCharacter: 20 },
   severe: { base: 120, perCharacter: 30 },
   extreme: { base: 160, perCharacter: 40 },
@@ -88,6 +87,9 @@ export function encounterWaveSummaries(
 /** XP a single creature contributes against the encounter budget. */
 export function creatureXp(creatureLevel: number, partyLevel: number): number {
   const difference = Math.round(creatureLevel) - clampPartyLevel(partyLevel);
+  // The official table ends at -4; creatures five or more levels below the
+  // party are worth no XP and do not count toward the encounter budget.
+  if (difference <= -5) return 0;
   if (difference <= -4) return CREATURE_XP_BY_LEVEL_DIFFERENCE[-4];
   if (difference >= 4) return CREATURE_XP_BY_LEVEL_DIFFERENCE[4];
   return CREATURE_XP_BY_LEVEL_DIFFERENCE[difference] ?? 40;

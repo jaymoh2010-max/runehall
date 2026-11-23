@@ -459,7 +459,8 @@ export interface Deity extends Publication {
   /** A deity grants one of these skills; some deities offer a choice. */
   skill: string[];
   weapons: string[];
-  spells: Record<string, unknown>;
+  /** Deity-granted cleric spells, keyed by spell rank. */
+  spells: Record<string, { id: string | null; name: string }>;
   sanctification: Record<string, unknown>;
   rarity: string;
   traits: string[];
@@ -592,6 +593,8 @@ export interface ConditionModifiers {
   checks: Record<AbilityKey, number>;
   /** Circumstance penalty to attack rolls, e.g. prone. */
   attackCircumstance: number;
+  /** Status penalty to Strength-based damage rolls, e.g. enfeebled. */
+  damage: number;
   maxHp: number;
   speed: number;
   dying: number;

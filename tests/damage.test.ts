@@ -158,7 +158,7 @@ describe("damage and dying", () => {
     ]);
   });
 
-  it("healing to full clears wounded", () => {
+  it("keeps wounded after healing to full until a rest or Treat Wounds", () => {
     const result = applyHealingToDraft(
       draftWith({
         hp: 18,
@@ -168,7 +168,9 @@ describe("damage and dying", () => {
       5
     );
     expect(result.draft.play.hp).toBe(20);
-    expect(result.draft.play.conditions).toEqual([]);
+    expect(result.draft.play.conditions).toEqual([
+      expect.objectContaining({ name: "Wounded", value: 1 }),
+    ]);
   });
 
   it("reconciles life conditions after an external HP edit", () => {
@@ -238,6 +240,43 @@ describe("damage and dying", () => {
     );
     expect(dead.draft.play.hp).toBe(0);
     expect(dead.dead).toBe(true);
+  });
+
+  it("uses dying 5 with Diehard", () => {
+    const draft = draftWith({ hp: 1 });
+    draft.feats.general = { "3": "feat:I0BhPWqYf1bbzEYg" };
+    const result = applyDamageToDraft(draft, 20, 1, { critical: true });
+    expect(result.dying).toBe(2);
+    expect(result.dead).toBe(false);
+    const dead = applyDyingRecovery(
+      {
+        ...result.draft,
+        play: { ...result.draft.play, conditions: [{ name: "Dying", value: 4, duration: null }] },
+      },
+      "failure"
+    );
+    expect(dead.dying).toBe(5);
+    expect(dead.dead).toBe(true);
+    expect(dead.draft.play.conditions.some((entry) => entry.name === "Doomed")).toBe(false);
+  });
+
+  it("applies massive damage as instant death", () => {
+    const result = applyDamageToDraft(draftWith({ hp: 20 }), 20, 40);
+    expect(result.dead).toBe(true);
+    expect(result.draft.play.hp).toBe(0);
+    expect(result.draft.play.conditions).toEqual(
+      expect.arrayContaining([expect.objectContaining({ name: "Dead" })])
+    );
+  });
+
+  it("does not apply dying or death to nonlethal damage", () => {
+    const result = applyDamageToDraft(draftWith({ hp: 5 }), 20, 20, { nonlethal: true });
+    expect(result.dead).toBe(false);
+    expect(result.dying).toBe(0);
+    expect(result.draft.play.conditions).toEqual(
+      expect.arrayContaining([expect.objectContaining({ name: "Unconscious" })])
+    );
+    expect(result.draft.play.conditions.some((entry) => entry.name === "Dying")).toBe(false);
   });
 
   it("reduces dying on a successful recovery check and keeps unconscious at 0 HP", () => {

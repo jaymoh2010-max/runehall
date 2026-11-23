@@ -186,7 +186,7 @@ tests/               Unit, smoke, integration, and browser tests
 docs/                Deployment, backup, data, and product notes
 ```
 
-See [docs/DEPLOY.md](docs/DEPLOY.md), [docs/BACKUP.md](docs/BACKUP.md), and [docs/DATA.md](docs/DATA.md) for operations and data details.
+See [docs/DEPLOY.md](docs/DEPLOY.md), [docs/BACKUP.md](docs/BACKUP.md), and [docs/DATA.md](docs/DATA.md) for operations and data details, and [docs/RULES-AUDIT.md](docs/RULES-AUDIT.md) for the current PF2e rules and compendium review.
 
 ---
 

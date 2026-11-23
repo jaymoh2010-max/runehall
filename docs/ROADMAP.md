@@ -319,7 +319,7 @@ Acceptance: a GM can prepare a full session in Runehall and start it with one â€
   - Documented restore drill covering database, uploads, audit entries, and handout images.
 - [x] **Compendium pinning**
   - Ingest records `sourceCommit`, `sourceRef`, and `sourceDirty` in `data/compendium/manifest.json`.
-  - Current data pinned to Foundry PF2e commit `be611895ec16d4672f53d014527d9007b06cb409`.
+  - Current data pinned to Foundry PF2e commit `a70593f7d52ba6357c3bdc05c09dcb9d4f2765dc`.
 - [ ] Postgres and object-storage adapters if the group grows beyond one machine.
 - [ ] Off-machine backup shipping built into the app (currently delegated to rsync/rclone/restic).
 

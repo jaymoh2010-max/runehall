@@ -323,7 +323,7 @@ Then complete the same checks for either flow:
 
 ## Compendium version pinning
 
-`npm run ingest` now records `sourceCommit`, `sourceRef`, and `sourceDirty` in `data/compendium/manifest.json`. The current shipped data is pinned to Foundry PF2e commit `be611895ec16d4672f53d014527d9007b06cb409`. Re-run ingest against that commit for a reproducible rebuild, and compare the manifest after upgrades.
+`npm run ingest` now records `sourceCommit`, `sourceRef`, and `sourceDirty` in `data/compendium/manifest.json`. The current shipped data is pinned to Foundry PF2e commit `a70593f7d52ba6357c3bdc05c09dcb9d4f2765dc`. Re-run ingest against that commit for a reproducible rebuild, and compare the manifest after upgrades.
 
 ## Known hosting gaps
 

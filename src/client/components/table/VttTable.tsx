@@ -308,7 +308,8 @@ export function VttTable({ initial, campaignId, user, isGm, active }: VttTablePr
     label: string,
     dc: number | null,
     gmOnly: boolean,
-    requestId?: string | null
+    requestId?: string | null,
+    upgradeSuccess?: boolean
   ) => {
     getSocket().emit(
       "dice:roll",
@@ -319,6 +320,7 @@ export function VttTable({ initial, campaignId, user, isGm, active }: VttTablePr
         dc,
         visibility: gmOnly ? "gm" : "all",
         requestId: requestId ?? null,
+        upgradeSuccess: upgradeSuccess === true,
       },
       (message) => {
         if (!message) toast("That roll could not be made. Check the formula.", "error");

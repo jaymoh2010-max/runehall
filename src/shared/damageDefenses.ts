@@ -64,19 +64,22 @@ function parseDefense(raw: unknown): DamageDefenseEntry | null {
   };
 }
 
+const PHYSICAL_DAMAGE = new Set(["bludgeoning", "piercing", "slashing"]);
+
 function matches(entry: DamageDefenseEntry, damageType: string, nonlethal: boolean): boolean {
-  if (entry.type === "all" || entry.type === "all damage") return true;
-  if (entry.type === "nonlethal" && nonlethal) return true;
+  if (entry.type === "all" || entry.type === "all damage" || entry.type === "all-damage")
+    return true;
+  if (entry.type === "physical") return PHYSICAL_DAMAGE.has(damageType);
+  if (entry.type === "nonlethal" || entry.type === "nonlethal-attacks") return nonlethal;
   return entry.type === damageType;
 }
 
 export function applyDamageDefenses(input: DamageDefenseInput): DamageDefenseResult {
   const amount = Math.max(0, Math.round(Number(input.amount) || 0));
   const damageType = normalizeType(input.damageType);
+  const nonlethal = Boolean(input.nonlethal);
   const notes: string[] = [];
-  if (!amount || !damageType || damageType === DEFAULT_DAMAGE_TYPE) {
-    return { amount, notes };
-  }
+  if (!amount) return { amount, notes };
 
   const immunities = (input.immunities ?? [])
     .map(parseDefense)
@@ -87,33 +90,29 @@ export function applyDamageDefenses(input: DamageDefenseInput): DamageDefenseRes
   const resistances = (input.resistances ?? [])
     .map(parseDefense)
     .filter((entry): entry is DamageDefenseEntry => Boolean(entry));
+  const applies = (entry: DamageDefenseEntry) =>
+    matches(entry, damageType, nonlethal) &&
+    !(damageType && entry.exceptions.includes(damageType)) &&
+    !(nonlethal && entry.exceptions.includes("nonlethal"));
 
-  if (
-    immunities.some(
-      (entry) =>
-        matches(entry, damageType, Boolean(input.nonlethal)) &&
-        !entry.exceptions.includes(damageType)
-    )
-  ) {
-    notes.push(`Immune to ${damageType}`);
+  const immunity = immunities.find(applies);
+  if (immunity) {
+    notes.push(`Immune to ${immunity.type}`);
     return { amount: 0, notes };
   }
 
-  const resistance = resistances
-    .filter((entry) => matches(entry, damageType, Boolean(input.nonlethal)))
-    .reduce((max, entry) => Math.max(max, entry.value), 0);
-  const weakness = weaknesses
-    .filter((entry) => matches(entry, damageType, Boolean(input.nonlethal)))
-    .reduce((max, entry) => Math.max(max, entry.value), 0);
+  const resistance = resistances.filter(applies).sort((a, b) => b.value - a.value)[0];
+  const weakness = weaknesses.filter(applies).sort((a, b) => b.value - a.value)[0];
 
+  // Player Core: apply weakness first, then resistance, then clamp at zero.
   let adjusted = amount;
-  if (resistance > 0) {
-    adjusted = Math.max(0, adjusted - resistance);
-    notes.push(`Resistance ${resistance} to ${damageType}`);
+  if (weakness && weakness.value > 0) {
+    adjusted += weakness.value;
+    notes.push(`Weakness ${weakness.value} to ${weakness.type}`);
   }
-  if (weakness > 0) {
-    adjusted += weakness;
-    notes.push(`Weakness ${weakness} to ${damageType}`);
+  if (resistance && resistance.value > 0) {
+    adjusted = Math.max(0, adjusted - resistance.value);
+    notes.push(`Resistance ${resistance.value} to ${resistance.type}`);
   }
   return { amount: adjusted, notes };
 }

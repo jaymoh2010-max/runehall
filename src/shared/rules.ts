@@ -340,6 +340,17 @@ export function fullCasterSlots(level: number): number[] {
 }
 
 /**
+ * Bards use the prepared full-caster slot progression (three slots per rank,
+ * two at 1st level) even though they cast spontaneously. They are not on the
+ * sorcerer/oracle four-slot table.
+ */
+export function bardSlots(level: number): number[] {
+  const safe = Math.max(1, Math.min(20, Math.floor(level || 1)));
+  if (safe >= 19) return [3, 3, 3, 3, 3, 3, 3, 3, 3, 1];
+  return fullCasterSlots(safe);
+}
+
+/**
  * Magus, summoner, and necromancer use the reduced bounded-caster table:
  * one slot of the highest rank at odd levels, two at even levels, and two
  * slots of every lower rank.
@@ -402,7 +413,9 @@ export function divineFontInfo(
   if (className?.toLowerCase() !== "cleric") return null;
   return {
     slots: level >= 15 ? 6 : level >= 5 ? 5 : 4,
-    rank: Math.min(9, Math.max(1, Math.ceil(level / 2))),
+    // The published cleric table moves divine font to 10th rank at 19th and
+    // 20th level, alongside the single miraculous spell slot.
+    rank: Math.min(10, Math.max(1, Math.ceil(level / 2))),
   };
 }
 
@@ -426,6 +439,8 @@ export function spellSlotsFor(
         return clericSlots(level);
       case "wizard":
         return wizardSlots(level);
+      case "bard":
+        return bardSlots(level);
       case "sorcerer":
       case "oracle":
         return spontaneousFullCasterSlots(level);
@@ -457,9 +472,13 @@ export function ordinarySpellSlotsFor(
 const CANTRIP_LIMITS: Record<string, number> = {
   cleric: 5,
   druid: 5,
+  // Bard composition cantrips are extra; these five are the occult cantrips
+  // chosen from the bard spell list.
   bard: 5,
   oracle: 5,
-  sorcerer: 5,
+  // A sorcerer's bloodline cantrip is one of the five cantrips they know, so
+  // only four are chosen from the spell list.
+  sorcerer: 4,
   witch: 5,
   // The wizard's spellbook starts with 10 cantrips and prepares five plus one
   // curriculum cantrip each day.
@@ -792,6 +811,8 @@ export function canPrepareSpellAtRank(
   if (!Number.isInteger(rank) || rank < Math.max(1, spell.rank) || rank > derived.maxSpellRank) {
     return false;
   }
+  // Cantrips and focus spells never occupy spell slots.
+  if (spell.rank === 0 || spell.traits.includes("focus")) return false;
   const entries = preparedEntries(draft, context);
   const summary = preparedRankSummaries(entries).get(rank);
   const totalCount = summary?.total ?? 0;
@@ -1517,10 +1538,12 @@ export function automaticBonusProgression(level: number): AutomaticBonusProgress
   return {
     attack: lvl >= 16 ? 3 : lvl >= 10 ? 2 : lvl >= 2 ? 1 : 0,
     damageDice: lvl >= 19 ? 4 : lvl >= 12 ? 3 : lvl >= 4 ? 2 : 1,
-    defense: lvl >= 15 ? 3 : lvl >= 9 ? 2 : lvl >= 3 ? 1 : 0,
-    saves: lvl >= 17 ? 3 : lvl >= 14 ? 2 : lvl >= 8 ? 1 : 0,
-    perception: lvl >= 18 ? 3 : lvl >= 11 ? 2 : lvl >= 5 ? 1 : 0,
-    skill: lvl >= 18 ? 3 : lvl >= 11 ? 2 : lvl >= 5 ? 1 : 0,
+    // GM Core table 4-11: defense 5/11/18, saves 8/14/20, Perception
+    // 7/13/19, and the first chosen skill's potency 3/9/17.
+    defense: lvl >= 18 ? 3 : lvl >= 11 ? 2 : lvl >= 5 ? 1 : 0,
+    saves: lvl >= 20 ? 3 : lvl >= 14 ? 2 : lvl >= 8 ? 1 : 0,
+    perception: lvl >= 19 ? 3 : lvl >= 13 ? 2 : lvl >= 7 ? 1 : 0,
+    skill: lvl >= 17 ? 3 : lvl >= 9 ? 2 : lvl >= 3 ? 1 : 0,
   };
 }
 
@@ -2120,12 +2143,31 @@ export function featAvailability(
  * spell each time they gain a spell slot, so the cumulative slots gained at a
  * rank are also the number of spells known at that rank.
  */
+export interface SpellRepertoireLimits {
+  cantrips: number;
+  ranks: number[];
+  /**
+   * Sorcerer bloodline gifts are part of the spells-known total, so they are
+   * subtracted when judging the player's own picks. Bard muse, oracle mystery,
+   * and psychic conscious-mind spells are extras and must not be subtracted.
+   */
+  subtractGranted: boolean;
+}
+
 export function spellRepertoireLimits(
   classData: ClassData | null | undefined,
   level: number
-): { cantrips: number; ranks: number[] } | null {
+): SpellRepertoireLimits | null {
   const name = classData?.name.toLowerCase();
   if (!name || !["bard", "oracle", "sorcerer", "summoner"].includes(name)) return null;
+  // Bards use the prepared full-caster table (3 slots per rank, 2 at 1st).
+  // The muse spell is an extra repertoire entry, not one of those slots.
+  if (name === "bard") {
+    const ranks = [...bardSlots(level)];
+    // Magnum Opus adds two 10th-rank spells to the repertoire.
+    if (level >= 19) ranks[9] = Math.max(ranks[9] ?? 0, 2);
+    return { cantrips: 5, ranks, subtractGranted: false };
+  }
   const bounded = name === "summoner";
   const ranks: number[] = [];
   let previous: number[] = [];
@@ -2140,12 +2182,13 @@ export function spellRepertoireLimits(
     }
     previous = slots;
   }
-  // Magnum Opus, Bloodline Paragon, and Oracular Clarity add two 10th-rank
-  // spells to the repertoire. One is already counted by the rank-10 slot.
-  if (level >= 19 && ["bard", "oracle", "sorcerer"].includes(name)) {
+  // Bloodline Paragon and Oracular Clarity add two 10th-rank spells to the
+  // repertoire. One is already counted by the rank-10 slot.
+  if (level >= 19 && ["oracle", "sorcerer"].includes(name)) {
     ranks[9] = Math.max(ranks[9] ?? 0, 2);
   }
-  return { cantrips: 5, ranks };
+  // Only the sorcerer's bloodline gifts are part of the base known total.
+  return { cantrips: 5, ranks, subtractGranted: name === "sorcerer" };
 }
 
 // ---------------------------------------------------------------------------
@@ -2414,30 +2457,53 @@ function weaponSpecializationBonus(features: { name: string }[], rank: number): 
 export function classSituationalDamage(
   classData: ClassData | null | undefined,
   level: number,
-  ranged: boolean
+  ranged: boolean,
+  details: {
+    weaponTraits?: string[];
+    unarmed?: boolean;
+    thrown?: boolean;
+    choices?: string[];
+  } = {}
 ): { formula: string; type: string; label: string }[] {
   const name = classData?.name.toLowerCase();
+  const traits = new Set((details.weaponTraits ?? []).map((trait) => trait.toLowerCase()));
+  const agileOrFinesse = details.unarmed || traits.has("agile") || traits.has("finesse");
   const out: { formula: string; type: string; label: string }[] = [];
   if (name === "rogue") {
-    const dice = level >= 17 ? 4 : level >= 11 ? 3 : level >= 5 ? 2 : 1;
-    out.push({ formula: `${dice}d6`, type: "precision", label: "Sneak Attack" });
+    // Ranged rogues can sneak attack with any ranged weapon. Thrown melee
+    // weapons still need agile or finesse.
+    const qualifies = ranged ? !details.thrown || agileOrFinesse : agileOrFinesse;
+    if (qualifies) {
+      const dice = level >= 17 ? 4 : level >= 11 ? 3 : level >= 5 ? 2 : 1;
+      out.push({ formula: `${dice}d6`, type: "precision", label: "Sneak Attack" });
+    }
   }
-  if (name === "swashbuckler") {
-    const dice = level >= 17 ? 4 : level >= 11 ? 3 : level >= 5 ? 2 : 1;
-    out.push({ formula: `${dice}d6`, type: "precision", label: "Precise Strike" });
+  if (name === "swashbuckler" && agileOrFinesse) {
+    const tier = level >= 17 ? 4 : level >= 13 ? 3 : level >= 9 ? 2 : level >= 5 ? 1 : 0;
+    out.push({
+      formula: `${2 + tier}`,
+      type: "precision",
+      label: tier ? `Precise Strike (+${tier})` : "Precise Strike",
+    });
+    out.push({
+      formula: `${2 + tier}d6`,
+      type: "precision",
+      label: "Precise Strike (finisher)",
+    });
   }
   if (name === "investigator") {
     const dice = level >= 17 ? 5 : level >= 13 ? 4 : level >= 9 ? 3 : level >= 5 ? 2 : 1;
     out.push({ formula: `${dice}d6`, type: "precision", label: "Strategic Strike" });
   }
   if (name === "barbarian" && !ranged) {
-    const bonus =
-      level >= 19 ? 12 : level >= 15 ? 8 : level >= 11 ? 6 : level >= 7 ? 4 : level >= 3 ? 3 : 2;
+    // Rage is a flat 2 damage; only agile weapons halve it. Instinct
+    // specialization and other class feats add their own damage separately.
+    const bonus = agileOrFinesse ? 1 : 2;
     out.push({ formula: `${bonus}`, type: "untyped", label: "Rage" });
   }
-  if (name === "ranger") {
-    const dice = level >= 11 ? "2d8" : "1d8";
-    out.push({ formula: dice, type: "precision", label: "Hunter's Edge" });
+  if (name === "ranger" && (details.choices ?? []).includes("Precision")) {
+    const dice = level >= 19 ? "3d8" : level >= 11 ? "2d8" : "1d8";
+    out.push({ formula: dice, type: "precision", label: "Hunter's Edge (precision)" });
   }
   return out;
 }
@@ -2463,7 +2529,12 @@ export function saveUpgradesFrom(names: string[]): Record<SaveKey, boolean> {
   return {
     fortitude: normalized.some((name) => /juggernaut\b/.test(name)),
     reflex: normalized.some((name) => /\bevasion\b/.test(name)),
-    will: false,
+    // Will-save success upgrades use several feature names across classes.
+    will: normalized.some((name) =>
+      /\b(resolve|resolute faith|majestic will|performer's heart|indomitable will|agile mind|wild willpower|unbreakable will)\b/.test(
+        name
+      )
+    ),
   };
 }
 
@@ -2547,10 +2618,13 @@ export function computeCharacter(
     .filter((x): x is { entry: (typeof draft.equipment)[number]; item: Equipment } =>
       Boolean(x.item)
     );
-  const bulkTotal = ownedEquipment.reduce(
-    (sum, { entry, item }) => sum + (item.bulk || 0) * entry.quantity,
-    0
-  );
+  const bulkTotal = ownedEquipment.reduce((sum, { entry, item }) => {
+    // Worn armor counts as 1 less Bulk (Player Core: "If you wear a suit of
+    // armor, its Bulk is reduced by 1").
+    const wornArmorReduction = entry.equipped && item.armor ? 1 : 0;
+    const unitBulk = Math.max(0, (item.bulk || 0) - wornArmorReduction);
+    return sum + unitBulk * entry.quantity;
+  }, 0);
   const capacity = 5 + abilityMods.str;
   const maxBulk = 10 + abilityMods.str;
   const carriesEncumberedCondition = draft.play.conditions.some(
@@ -2970,11 +3044,13 @@ export function computeCharacter(
       10 +
       dex +
       armor.armor.acBonus +
-      Math.max(armorRunes.armorPotency, abp.defense) +
+      Math.max(armorRunes.armorPotency, abp.defense, itemMods.acItemBonus ?? 0) +
       proficiencyBonus(prof.defenses[armorCategory] ?? 0, draft.level) +
-      shieldBonus +
-      (itemMods.acItemBonus ?? 0);
-    if (!meetsArmorStrength) speed += armor.armor.speedPenalty || 0;
+      shieldBonus;
+    // Armor speed penalties always apply. Meeting the Strength threshold
+    // reduces the penalty by 5 feet (so full plate's -10 becomes -5).
+    const armorSpeedPenalty = Math.min(0, armor.armor.speedPenalty || 0);
+    speed += meetsArmorStrength ? Math.min(0, armorSpeedPenalty + 5) : armorSpeedPenalty;
   } else {
     ac =
       10 +
@@ -2991,20 +3067,17 @@ export function computeCharacter(
     fortitude:
       proficiencyBonus(prof.fortitude, draft.level) +
       abilityMods.con +
-      Math.max(armorRunes.resilient, abp.saves) +
-      (itemMods.saveItemBonus?.fortitude ?? 0) +
+      Math.max(armorRunes.resilient, abp.saves, itemMods.saveItemBonus?.fortitude ?? 0) +
       conditionEffects.saves.fortitude,
     reflex:
       proficiencyBonus(prof.reflex, draft.level) +
       abilityMods.dex +
-      Math.max(armorRunes.resilient, abp.saves) +
-      (itemMods.saveItemBonus?.reflex ?? 0) +
+      Math.max(armorRunes.resilient, abp.saves, itemMods.saveItemBonus?.reflex ?? 0) +
       conditionEffects.saves.reflex,
     will:
       proficiencyBonus(prof.will, draft.level) +
       abilityMods.wis +
-      Math.max(armorRunes.resilient, abp.saves) +
-      (itemMods.saveItemBonus?.will ?? 0) +
+      Math.max(armorRunes.resilient, abp.saves, itemMods.saveItemBonus?.will ?? 0) +
       conditionEffects.saves.will,
   };
   const perception =
@@ -3131,13 +3204,25 @@ export function computeCharacter(
     const damageBase = `${damageDice}${weapon.damage.die}`;
     // Alchemical bombs have an item bonus to attack rolls but not to damage.
     const weaponDamageBonus = isBomb(item) ? 0 : weapon.bonus || 0;
+    const strengthBasedDamage = ranged
+      ? isThrown || item.traits.includes("propulsive")
+      : !(finesse && thief);
     const damageMod =
-      damageAbility + weaponDamageBonus + weaponSpecializationBonus(activeFeatures, rank);
+      damageAbility +
+      weaponDamageBonus +
+      weaponSpecializationBonus(activeFeatures, rank) +
+      (strengthBasedDamage ? conditionEffects.damage : 0);
     const damageFormula = damageMod === 0 ? damageBase : `${damageBase}${signed(damageMod)}`;
     const extraDamage = runes.property
       .map((rune) => propertyRuneDamage(rune))
       .filter((entry): entry is { formula: string; type: string; label: string } => Boolean(entry));
-    extraDamage.push(...classSituationalDamage(classData, draft.level, ranged));
+    extraDamage.push(
+      ...classSituationalDamage(classData, draft.level, ranged, {
+        weaponTraits: item.traits,
+        thrown: isThrown,
+        choices: chosenOptions.map((option) => option.name),
+      })
+    );
     const notes = [
       isThrown ? "Thrown" : ranged ? "Ranged" : "",
       finesse ? "Finesse" : "",
@@ -3174,7 +3259,8 @@ export function computeCharacter(
     abp.attack +
     conditionEffects.checks[fistAbilityKey] +
     conditionEffects.attackCircumstance;
-  const fistDamage = abilityMods.str + weaponSpecializationBonus(activeFeatures, fistRank);
+  const fistDamage =
+    abilityMods.str + weaponSpecializationBonus(activeFeatures, fistRank) + conditionEffects.damage;
   const unarmedBase = bumpDamageDice(
     classData?.name.toLowerCase() === "monk" ? monkUnarmedDamage(draft.level) : "1d4",
     abp.damageDice
@@ -3187,7 +3273,10 @@ export function computeCharacter(
     attackFormula: `1d20${signed(fistAttack)}`,
     damageFormula: fistDamage === 0 ? unarmedBase : `${unarmedBase}${signed(fistDamage)}`,
     damageType: "bludgeoning",
-    extraDamage: classSituationalDamage(classData, draft.level, false),
+    extraDamage: classSituationalDamage(classData, draft.level, false, {
+      unarmed: true,
+      choices: chosenOptions.map((option) => option.name),
+    }),
     traits: ["agile", "finesse", "nonlethal", "unarmed"],
     hands: 1,
     ranged: false,
@@ -3312,8 +3401,8 @@ export function computeCharacter(
       }
       if (spell.rank === 0 || spell.traits.includes("focus")) {
         issue(
-          "warning",
-          `${spell.name} is a cantrip or focus spell and does not occupy a prepared slot.`,
+          "error",
+          `${spell.name} is a cantrip or focus spell and cannot occupy a prepared slot. Remove it from the prepared list.`,
           "spells"
         );
       }
@@ -3406,10 +3495,14 @@ export function computeCharacter(
     const baseCantrips = draft.spells.cantrips.filter(
       (spellId) => !grantedKnownSpellIds.has(spellId)
     );
-    if (baseCantrips.length > repertoire.cantrips) {
+    // cantripLimitFor applies the class-specific chosen-cantrip cap (for
+    // example, a sorcerer's bloodline cantrip is one of their five known
+    // cantrips, while a bard's composition cantrip is extra).
+    const chosenCantripLimit = cantripLimitFor(classData) ?? repertoire.cantrips;
+    if (baseCantrips.length > chosenCantripLimit) {
       issue(
         "error",
-        `${classData?.name ?? "This class"} knows ${baseCantrips.length} cantrips but the repertoire allows ${repertoire.cantrips}.`,
+        `${classData?.name ?? "This class"} knows ${baseCantrips.length} cantrips but the repertoire allows ${chosenCantripLimit}.`,
         "spells"
       );
     }
@@ -3420,12 +3513,15 @@ export function computeCharacter(
       if (!spell) continue;
       knownByRank.set(spell.rank, (knownByRank.get(spell.rank) ?? 0) + 1);
     }
-    // The repertoire total includes class-granted spells such as a muse or
-    // bloodline spell. Subtract those before judging the player's own picks.
+    // Sorcerer bloodline gifts are part of the spells-known total. Other
+    // class-granted repertoire spells are extras and must not shrink the
+    // player's own choices.
     const grantedByRank = new Map<number, number>();
-    for (const spell of classGrants.spells) {
-      if (spell.kind === "focus" || spell.rank <= 0) continue;
-      grantedByRank.set(spell.rank, (grantedByRank.get(spell.rank) ?? 0) + 1);
+    if (repertoire.subtractGranted) {
+      for (const spell of classGrants.spells) {
+        if (spell.kind === "focus" || spell.rank <= 0) continue;
+        grantedByRank.set(spell.rank, (grantedByRank.get(spell.rank) ?? 0) + 1);
+      }
     }
     for (const [rank, count] of knownByRank) {
       const limit = Math.max(0, (repertoire.ranks[rank - 1] ?? 0) - (grantedByRank.get(rank) ?? 0));
@@ -3532,7 +3628,7 @@ export function computeCharacter(
       );
     }
   }
-  if (context.automaticBonusProgression && draft.level >= 5 && !draft.abpSkill) {
+  if (context.automaticBonusProgression && draft.level >= 3 && !draft.abpSkill) {
     issue("warning", "Choose a skill for Automatic Bonus Progression skill potency.", "feats");
   }
   if (context.automaticBonusProgression && draft.level >= 17 && !draft.abpApex) {
@@ -3670,11 +3766,18 @@ export function computeCharacter(
     draft.spells.focus.length > 0
       ? 1
       : 0;
-  if (
-    classData?.name.toLowerCase() === "necromancer" ||
-    classData?.name.toLowerCase() === "psychic"
-  ) {
+  const focusClassName = classData?.name.toLowerCase();
+  if (focusClassName === "necromancer" || focusClassName === "psychic") {
     focusPointsMax = Math.max(focusPointsMax, 2);
+  }
+  // Clarity of Focus raises the psychic's pool from 2 to 3 at 5th level.
+  if (focusClassName === "psychic" && draft.level >= 5) {
+    focusPointsMax = Math.max(focusPointsMax, 3);
+  }
+  // An animist starts with one Focus Point from their primary apparition's
+  // vessel spell even when the spell itself has not been picked manually.
+  if (focusClassName === "animist") {
+    focusPointsMax = Math.max(focusPointsMax, 1);
   }
   // A focus pool can hold one point per focus spell, up to 3. Count both
   // manually chosen and class-granted focus spells without double-counting.

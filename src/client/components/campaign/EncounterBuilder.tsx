@@ -702,8 +702,15 @@ export function EncounterBuilder({
                         )}
                       </div>
                       <p className="tiny muted">
-                        Each PC earns <strong>{budget.awardXp} XP</strong> if they overcome this
-                        encounter. Party-size adjustments change the budget, not the award.{" "}
+                        {budget.difficulty === "trivial" ? (
+                          <>Trivial encounters normally grant no XP.</>
+                        ) : (
+                          <>
+                            Each PC earns <strong>{budget.awardXp} XP</strong> if they overcome this
+                            encounter.
+                          </>
+                        )}{" "}
+                        Party-size adjustments change the budget, not the award.{" "}
                         {budget.nextThreshold
                           ? `${budget.nextThreshold - budget.awardXp} XP to the next tier.`
                           : "This fight is past the extreme budget."}

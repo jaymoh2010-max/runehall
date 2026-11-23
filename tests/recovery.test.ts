@@ -7,6 +7,7 @@ import {
   medicineRank,
   recoveryDcsForRank,
   recoveryHealingFormula,
+  stabilizeDc,
 } from "../src/shared/recovery";
 import type { DerivedCharacter } from "../src/shared/types";
 
@@ -50,14 +51,19 @@ describe("recovery DCs and healing", () => {
     expect(recoveryDcsForRank(2)).toEqual([15, 20]);
     expect(recoveryDcsForRank(3)).toEqual([15, 20, 30]);
     expect(recoveryDcsForRank(4)).toEqual([15, 20, 30, 40]);
-    expect(recoveryDcsForRank(4, "stabilize")).toEqual([15]);
+    expect(recoveryDcsForRank(4, "stabilize")).toEqual([]);
+    expect(stabilizeDc(2)).toBe(17);
   });
 
   it("uses the Treat Wounds healing table", () => {
     expect(recoveryHealingFormula(15)).toBe("2d8");
     expect(recoveryHealingFormula(20)).toBe("2d8+10");
-    expect(recoveryHealingFormula(30)).toBe("4d8+10");
-    expect(recoveryHealingFormula(40)).toBe("4d8+30");
+    expect(recoveryHealingFormula(30)).toBe("2d8+30");
+    expect(recoveryHealingFormula(40)).toBe("2d8+50");
+    expect(recoveryHealingFormula(15, true)).toBe("4d8");
+    expect(recoveryHealingFormula(20, true)).toBe("4d8+10");
+    expect(recoveryHealingFormula(30, true)).toBe("4d8+30");
+    expect(recoveryHealingFormula(40, true)).toBe("4d8+50");
     expect(recoveryHealingFormula(14)).toBeNull();
   });
 
@@ -91,14 +97,21 @@ describe("Treat Wounds", () => {
     expect(result.notes.join(" ")).toContain("immune");
   });
 
-  it("doubles healing on a critical success and adds Robust Health first", () => {
+  it("uses the rolled critical healing row and adds Robust Health once", () => {
     const result = apply(hero(10), {
       degree: "critical-success",
       healing: 10,
       robustHealth: true,
     });
-    expect(result.healed).toBe(30);
-    expect(result.draft.play.hp).toBe(40);
+    expect(result.healed).toBe(15);
+    expect(result.draft.play.hp).toBe(25);
+  });
+
+  it("removes wounded on a successful Treat Wounds", () => {
+    const draft = hero(20);
+    draft.play.conditions = [{ name: "Wounded", value: 2, duration: null }];
+    const result = apply(draft, { degree: "success", healing: 10 });
+    expect(result.draft.play.conditions.some((entry) => entry.name === "Wounded")).toBe(false);
   });
 
   it("deals 1d8 damage on a critical failure", () => {
@@ -145,7 +158,7 @@ describe("Battle Medicine", () => {
 });
 
 describe("Stabilize", () => {
-  it("ends dying while leaving the target unconscious at 0 HP", () => {
+  it("ends dying and increases wounded while leaving the target unconscious at 0 HP", () => {
     const result = apply(dyingHero(2), {
       activity: "stabilize",
       degree: "success",
@@ -153,17 +166,18 @@ describe("Stabilize", () => {
     expect(result.draft.play.hp).toBe(0);
     expect(result.draft.play.conditions.some((entry) => entry.name === "Dying")).toBe(false);
     expect(result.draft.play.conditions.some((entry) => entry.name === "Unconscious")).toBe(true);
-    expect(result.draft.play.conditions.some((entry) => entry.name === "Wounded")).toBe(true);
+    expect(result.draft.play.conditions.find((entry) => entry.name === "Wounded")?.value).toBe(2);
   });
 
-  it("restores 1 HP on a critical success", () => {
+  it("treats a critical success like a success (no 1 HP heal)", () => {
     const result = apply(dyingHero(1), {
       activity: "stabilize",
       degree: "critical-success",
     });
-    expect(result.draft.play.hp).toBe(1);
+    expect(result.draft.play.hp).toBe(0);
     expect(result.draft.play.conditions.some((entry) => entry.name === "Dying")).toBe(false);
-    expect(result.draft.play.conditions.some((entry) => entry.name === "Unconscious")).toBe(false);
+    expect(result.draft.play.conditions.some((entry) => entry.name === "Unconscious")).toBe(true);
+    expect(result.draft.play.conditions.find((entry) => entry.name === "Wounded")?.value).toBe(2);
   });
 
   it("increases dying on a critical failure and can kill at the threshold", () => {

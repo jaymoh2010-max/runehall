@@ -401,10 +401,26 @@ if (noTraditions.length) {
 }
 
 const unresolvedMacro = /@UUID|\[\[\/|@Damage|@Check|@Localize|@Compendium|\{[+-]\d+\}/;
+const expansionArtifacts = [
+  /\bcheck\s+(?:save|check)\b/i,
+  /\bcheck\s+saving throw\b/i,
+  /\bdamage\s+damage\b/i,
+  /\.(?:level|rank)\b/i,
+  /\b(?:floor|ceil)\s*\(\s*[@\d.(]/i,
+  /\[[a-z-]+(?:,[a-z-]+)*\]/i,
+  /@[A-Za-z]+\[/,
+];
 for (const file of files) {
   for (const item of data[file.key] ?? []) {
-    if (unresolvedMacro.test(JSON.stringify(item))) {
+    const serialized = JSON.stringify(item);
+    if (unresolvedMacro.test(serialized)) {
       fail(`${file.key} ${item.name}: unresolved Foundry inline macro`);
+    }
+    for (const artifact of expansionArtifacts) {
+      if (artifact.test(serialized)) {
+        fail(`${file.key} ${item.name}: malformed macro expansion (${artifact})`);
+        break;
+      }
     }
   }
 }

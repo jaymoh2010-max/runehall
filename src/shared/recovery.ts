@@ -1,4 +1,4 @@
-import { applyDamageToDraft, applyHealingToDraft } from "./damage";
+import { applyDamageToDraft, applyHealingToDraft, deathThresholdForDraft } from "./damage";
 import { conditionBaseName, conditionNumericValue } from "./tokens";
 import type {
   CharacterCondition,
@@ -38,30 +38,35 @@ export function medicineRank(derived: Pick<DerivedCharacter, "skills">): number 
 
 /**
  * A trained character may attempt the DC matching their rank or any lower DC.
- * Stabilize has a fixed DC 15 check.
+ * Stabilize is an untrained Medicine action whose DC depends on the target's
+ * dying value, so it is handled by stabilizeDc() instead of this rank ladder.
  */
 export function recoveryDcsForRank(
   rank: number,
   activity: RecoveryActivity = "treat-wounds"
 ): number[] {
+  if (activity === "stabilize") return [];
   if (Math.round(rank) < 1) return [];
-  if (activity === "stabilize") return [15];
   const safeRank = Math.min(4, Math.round(rank));
   return RECOVERY_DCS.slice(0, safeRank).map((dc) => Number(dc));
 }
 
-export function recoveryHealingFormula(dc: number): string | null {
-  if (dc >= 40) return "4d8+30";
-  if (dc >= 30) return "4d8+10";
-  if (dc >= 20) return "2d8+10";
-  if (dc >= 15) return "2d8";
-  return null;
+/** Administer First Aid (Stabilize): 5 + the recovery-roll DC (10 + dying). */
+export function stabilizeDc(dying: number): number {
+  const value = Math.max(0, Math.round(Number(dying) || 0));
+  return 15 + value;
 }
 
-export function recoveryHealingMultiplier(degree: DegreeOfSuccess): number {
-  if (degree === "critical-success") return 2;
-  if (degree === "success") return 1;
-  return 0;
+/**
+ * Treat Wounds and Battle Medicine healing. Critical success is a separate
+ * row in Player Core, not a doubled success row.
+ */
+export function recoveryHealingFormula(dc: number, critical = false): string | null {
+  if (dc >= 40) return critical ? "4d8+50" : "2d8+50";
+  if (dc >= 30) return critical ? "4d8+30" : "2d8+30";
+  if (dc >= 20) return critical ? "4d8+10" : "2d8+10";
+  if (dc >= 15) return critical ? "4d8" : "2d8";
+  return null;
 }
 
 export function hasRecoveryFeat(
@@ -164,11 +169,13 @@ export function applyRecoveryToDraft(options: {
       };
     }
     if (degree === "critical-failure") {
-      const doomed = conditionValue(draft.play.conditions, "doomed");
-      const deathThreshold = 4 - doomed;
+      const deathThreshold = deathThresholdForDraft(draft);
       const nextDying = dying + 1;
       if (nextDying >= deathThreshold) {
-        const conditions = upsertCondition(draft.play.conditions, "Dead", null);
+        const conditions = draft.play.conditions.filter(
+          (condition) => conditionBaseName(condition.name) !== "doomed"
+        );
+        conditions.push({ name: "Dead", value: null, duration: null });
         notes.push(`Stabilize critically failed: dying ${nextDying} reaches the death threshold.`);
         return {
           draft: withConditions(draft, conditions),
@@ -194,24 +201,20 @@ export function applyRecoveryToDraft(options: {
       };
     }
 
-    const withoutDying = removeCondition(draft.play.conditions, "dying");
-    if (degree === "critical-success") {
-      const healed = applyHealingToDraft(withConditions(draft, withoutDying), maxHp, 1);
-      notes.push("Stabilize critical success: dying ends and the target regains 1 HP.");
-      notes.push(...healed.notes);
-      return {
-        draft: withConditions(
-          healed.draft,
-          ensureUnconscious(healed.draft.play.conditions, healed.draft.play.hp ?? 0)
-        ),
-        healed: healed.healed,
-        damage: 0,
-        notes,
-      };
-    }
-    notes.push("Stabilize succeeded: dying ends; the target remains unconscious at 0 HP.");
+    // Administer First Aid has no separate critical-success effect. Losing
+    // the dying condition still increases wounded by 1, and the target stays
+    // unconscious at 0 HP.
+    let conditions = removeCondition(draft.play.conditions, "dying");
+    const wounded = conditionValue(draft.play.conditions, "wounded");
+    conditions = upsertCondition(conditions, "Wounded", wounded + 1);
+    conditions = ensureUnconscious(conditions, draft.play.hp ?? 0);
+    notes.push(
+      degree === "critical-success"
+        ? "Stabilize critical success: dying ends, wounded increases, and the target remains unconscious at 0 HP."
+        : "Stabilize succeeded: dying ends, wounded increases, and the target remains unconscious at 0 HP."
+    );
     return {
-      draft: withConditions(draft, ensureUnconscious(withoutDying, draft.play.hp ?? 0)),
+      draft: withConditions(draft, conditions),
       healed: 0,
       damage: 0,
       notes,
@@ -225,13 +228,17 @@ export function applyRecoveryToDraft(options: {
       ...working,
       play: { ...working.play, treatWoundsImmune: true },
     };
-    const multiplier = recoveryHealingMultiplier(degree);
-    if (multiplier > 0) {
+    if (degree === "critical-success" || degree === "success") {
       const robustBonus = robustHealth ? Math.max(1, Math.round(level)) : 0;
-      const amount = (rawHealing + robustBonus) * multiplier;
+      const amount = rawHealing + robustBonus;
       const healed = applyHealingToDraft(working, maxHp, amount);
+      // A successful Treat Wounds also ends the wounded condition.
+      const treated = withConditions(
+        healed.draft,
+        removeCondition(healed.draft.play.conditions, "wounded")
+      );
       notes.push(
-        `Treat Wounds ${degree === "critical-success" ? "critical success" : "success"}: ${amount} HP restored${robustHealth ? ` (includes +${Math.max(1, Math.round(level))} from Robust Health)` : ""}.`
+        `Treat Wounds ${degree === "critical-success" ? "critical success" : "success"}: ${amount} HP restored${robustHealth ? ` (includes +${Math.max(1, Math.round(level))} from Robust Health)` : ""}${conditionValue(draft.play.conditions, "wounded") > 0 ? "; wounded removed" : ""}.`
       );
       notes.push(...healed.notes);
       notes.push(
@@ -240,7 +247,7 @@ export function applyRecoveryToDraft(options: {
           : "Target is immune to further Treat Wounds for 1 hour."
       );
       return {
-        draft: healed.draft,
+        draft: treated,
         healed: healed.healed,
         damage: 0,
         notes,
@@ -284,10 +291,9 @@ export function applyRecoveryToDraft(options: {
       ].slice(0, 40),
     },
   };
-  const multiplier = recoveryHealingMultiplier(degree);
-  if (multiplier > 0) {
+  if (degree === "critical-success" || degree === "success") {
     const robustBonus = robustHealth ? Math.max(1, Math.round(level)) : 0;
-    const amount = (rawHealing + robustBonus) * multiplier;
+    const amount = rawHealing + robustBonus;
     const healed = applyHealingToDraft(working, maxHp, amount);
     notes.push(
       `Battle Medicine ${degree === "critical-success" ? "critical success" : "success"}: ${amount} HP restored${robustHealth ? ` (includes +${Math.max(1, Math.round(level))} from Robust Health)` : ""}.`
