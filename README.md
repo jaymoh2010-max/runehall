@@ -26,7 +26,7 @@ Four campaign sections:
 - Bestiary creatures get CC BY 3.0 archetype icons from Game-icons.net when no custom art is uploaded; see `public/tokens/creature/ATTRIBUTION.md`.
 - A compact token panel for HP, AC, conditions, visibility, locks, and sheet access. Creature HP/AC is GM-only; linked party characters keep their shared stats.
 - Condition fields autocomplete from the PF2e condition database.
-- **Manual initiative order**: a top-of-table bar shows the round, order, and current combatant. The GM rolls, adds combatants, reorders, and clears from a compact dropdown on the right; nothing ticks or resolves automatically.
+- **Manual initiative order**: a top-of-table bar shows the round, order, and current combatant. The GM rolls, adds combatants, ends the round, reorders the active combatant, and clears from a compact dropdown under the round marker; nothing ticks or resolves automatically.
 - Shared dice roller and persistent chat. Secret GM rolls and roll requests remain available.
 - Compact Pathbuilder-inspired dark/orange interface: slim top bar, dense panels, and orange action accents.
 - A **Pathbuilder-style character sheet** that opens over the table from **My sheet**, a party avatar, or a linked token. It uses a compact three-column layout: build summary and a level-by-level character plan on the left, stats and skills in the center, and tabbed Weapons / Defense / Gear / Spells / Feats / Details / Status panels on the right.

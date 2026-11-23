@@ -117,6 +117,7 @@ export function CoreToolbar({
       <div className="vtt-toolbar-center">
         {isGm ? (
           <>
+            <div className="toolbar-sep" />
             <Button
               size="sm"
               variant="ghost"

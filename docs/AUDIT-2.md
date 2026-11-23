@@ -21,7 +21,8 @@ A second pass over the manual-first table after the first audit remediation, foc
 - **The built-in map library uses open cartography.** The library now has 37 grid-aligned maps, mostly full colour, from Dyson Logos (CC BY 4.0), Free Fantasy Maps (CC BY 4.0), and mbround18 (CC BY-SA 4.0). Maps include grid sizes, offsets, thumbnails, credit lines, terrain filters, and Pathfinder adventure-theme tags. See `public/maps/ATTRIBUTION.md`.
 - **Players can pick or crop portraits.** The account page and character builder share a portrait picker with 35 built-in painted portraits and an upload flow that crops to a square and exports 512 × 512 WebP. Built-in art is CC BY 4.0 from Joseph Hewitt and CC BY 3.0 / CC BY-SA 3.0 from Justin Nichol / Flare. See `public/portraits/ATTRIBUTION.md`.
 - **GMs can use the portrait library for NPC and token art.** The NPC editor and the token quick panel both open the same picker, including upload-and-crop. The NPC route accepts built-in `/portraits/` URLs as well as uploads.
-- **The initiative bar sits at the top of the table.** Round, order, and turn controls now run across the top of the map. The GM's roll, add-combatant, and clear controls live in a compact dropdown on the far right so they are available without crowding the order.
+- **The initiative bar sits at the top of the table.** Round, current combatant, and the GM menu are stacked in a compact block under the round marker, leaving the full width for the order. The GM can roll, add a combatant, end the round manually, reorder the active combatant, or clear from that menu.
+- **The table toolbar wraps cleanly.** Scene controls, fog controls, and the sheet/presence controls now space themselves across the row and fall to a second row on narrow screens instead of crowding together.
 - **The token panel header uses generated creature art.** The 40px avatar now matches the token on the map.
 
 ## Verification

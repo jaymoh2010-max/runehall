@@ -619,6 +619,7 @@ export function VttTable({ initial, campaignId, user, isGm, active }: VttTablePr
             isGm={isGm}
             onRoll={rollInitiative}
             onClear={clearInitiative}
+            onEndRound={() => emitInitiative(initiative, round + 1, 0)}
             onRemove={(entryId) => getSocket().emit("initiative:remove", { campaignId, entryId })}
             onReroll={(entryId) => getSocket().emit("initiative:reroll", { campaignId, entryId })}
             onMove={moveInitiativeEntry}

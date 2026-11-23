@@ -676,11 +676,15 @@ test("GM places a token, chats, rolls, and opens the scenes manager", async ({ p
     timeout: 15_000,
   });
 
-  const initiativeControls = page.locator(".core-initiative-controls");
+  const initiativeControls = page.locator(".initiative-gm-menu");
   await initiativeControls.getByRole("button", { name: "GM", exact: true }).click();
   await page.getByRole("menuitem", { name: "Roll initiative" }).click();
   await expect(page.locator(".initiative-chip.is-active")).toBeVisible({ timeout: 15_000 });
   await expect(page.locator(".action-pip")).toHaveCount(0);
+  const roundBefore = Number((await page.locator(".initiative-round strong").textContent()) ?? "0");
+  await initiativeControls.getByRole("button", { name: "GM", exact: true }).click();
+  await page.getByRole("menuitem", { name: /End round/ }).click();
+  await expect(page.locator(".initiative-round strong")).toHaveText(String(roundBefore + 1));
 
   await page.getByRole("button", { name: /E2E Hero, character token/ }).click();
   const quickPanel = page.locator(".core-token-panel");

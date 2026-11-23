@@ -6514,12 +6514,13 @@
   padding: 30px;
 }
 .vtt-toolbar {
-  height: 46px;
+  min-height: 46px;
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   justify-content: space-between;
-  gap: 12px;
-  padding: 0 12px;
+  gap: 8px 14px;
+  padding: 6px 12px;
   border-bottom: 1px solid var(--line);
   background: #0d121a;
   flex: 0 0 auto;
@@ -6528,8 +6529,13 @@
 .vtt-toolbar-right {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 6px;
+  row-gap: 4px;
   min-width: 0;
+}
+.vtt-toolbar-right {
+  justify-content: flex-end;
 }
 .vtt-toolbar .btn.is-active {
   color: var(--gold-bright);
@@ -6583,6 +6589,8 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  min-width: 0;
+  max-width: 210px;
   color: var(--text-2);
   font-size: 0.86rem;
   padding: 0 8px;
@@ -7844,6 +7852,19 @@
   border-bottom: 1px solid var(--line);
   background: #0b1017;
   flex: 0 0 auto;
+}
+.initiative-round-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 0 0 auto;
+  min-width: 190px;
+}
+.initiative-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 .initiative-round {
   display: flex;
@@ -10264,7 +10285,7 @@
   grid-template-columns: minmax(0, 1fr);
 }
 .core-toolbar {
-  gap: 8px;
+  gap: 8px 10px;
 }
 .core-sheet-picker {
   width: 132px;
@@ -10275,7 +10296,9 @@
 .vtt-toolbar-center {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 6px;
+  row-gap: 4px;
   min-width: 0;
 }
 .core-toolbar .vtt-scene-label {
@@ -10287,11 +10310,13 @@
   padding: 4px 6px;
 }
 .core-toolbar .vtt-scene-label h2 {
+  overflow: hidden;
   margin: 0;
   font-family: var(--font-head);
   font-size: 0.8rem;
   font-weight: 600;
   color: var(--text);
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 .core-presence {
@@ -10504,7 +10529,8 @@
 .initiative-gm-menu-popover {
   position: absolute;
   top: calc(100% + 6px);
-  right: 0;
+  left: 0;
+  right: auto;
   z-index: 30;
   display: flex;
   flex-direction: column;
@@ -10580,7 +10606,12 @@
   width: 70px;
 }
 .core-initiative-current {
-  flex: 0 0 auto;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .core-audio {
