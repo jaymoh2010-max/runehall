@@ -53,6 +53,32 @@ A second pass over the manual-first table after the first audit remediation, foc
   are 24px, and scene tokens no longer advertise a right-click editor that is not wired up.
 - Bundled map, portrait, and creature-token credits are linked from `THIRD_PARTY_NOTICES.md`.
 
+## Character effect application review
+
+- **Selection is wired through.** `contextForDraft` resolves the selected ancestry, heritage,
+  background, class, deity, every feat slot, free-archetype feats, background and class-granted
+  feats, feat choices, equipment, runes, and companion statblocks. `computeCharacter` then applies
+  the curated effects to HP, Speed, initiative, skill ranks, proficiencies, Lore, senses, languages,
+  AC, saves, attacks, damage, and validation.
+- **Feats.** Curated always-on effects cover Toughness, Fleet, Incredible Initiative, Untrained
+  Improvisation, Armor Proficiency, Weapon Proficiency, Canny Acumen, Additional Lore, Nimble Elf,
+  Elven Instincts, Incredible Investiture, and Unburdened Iron. Natural Ambition and Ancestral
+  Paragon resolve their granted feat. Feats with conditional or activity-based text remain labelled
+  **Manual** or **Partly automated** in the builder.
+- **Items.** Base weapons, armor, shields, potency/striking/resilient/property runes, and curated
+  worn-item bonuses are applied. Invested magic items now require the **Invest** toggle before their
+  bonuses count, and the sheet warns when an equipped invested item is inactive. Item bonuses of the
+  same type no longer stack: armor potency, ABP defense, resilient runes, and item bonuses such as
+  Bands of Force use the highest value. Added static Athletics bonuses for Belt of Giant Strength and
+  the Strength/Hammers bracers.
+- **Conditions.** Frightened, sickened, clumsy, enfeebled, stupefied, drained, fatigued, off-guard,
+  prone, grabbed, restrained, blinded, confused, unconscious, encumbered, and the dying/wounded/doomed
+  track are applied to the derived sheet. Blinded now also applies off-guard. Deafened, fleeing,
+  dazzled, immobilized, action-loss conditions, and detection states are surfaced as notes.
+- **Coverage limit.** The compendium carries feat and item prose rather than Foundry rule elements, so
+  the long tail remains manual by design. The builder displays an automation badge on every feat and
+  item so the table knows which numbers are already on the sheet.
+
 ## Remaining opportunities
 
 - Token owner reassignment and temp-HP editing still use the character sheet rather than the token panel.

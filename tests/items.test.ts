@@ -34,7 +34,14 @@ const healerGloves = byName(equipment, "Healer's Gloves");
 const greaterHealerGloves = byName(equipment, "Healer's Gloves (Greater)");
 const demonMask = byName(equipment, "Demon Mask");
 const bandsOfForce = byName(equipment, "Bands of Force");
+const greaterBandsOfForce = byName(equipment, "Bands of Force (Greater)");
 const thirdEye = byName(equipment, "Amulet of the Third Eye");
+const beltOfStrength = byName(equipment, "Belt of Giant Strength");
+const bracersOfStrength = byName(equipment, "Bracers of Strength");
+const bracersOfHammers = byName(equipment, "Bracers of Hammers");
+const chainMail = byName(equipment, "Chain Mail");
+const armorPotency = byName(equipment, "Armor Potency (+1)");
+const resilient = byName(equipment, "Resilient");
 
 function fighterDraft(trainedSkills: string[], worn: Equipment[] = []) {
   const draft = emptyCharacterDraft("Items Fighter");
@@ -46,7 +53,12 @@ function fighterDraft(trainedSkills: string[], worn: Equipment[] = []) {
   draft.boosts.background = ["str", "con"];
   draft.boosts.free = ["str", "dex", "con", "wis"];
   draft.skills.trained = trainedSkills;
-  draft.equipment = worn.map((item) => ({ itemId: item.id, quantity: 1, equipped: true }));
+  draft.equipment = worn.map((item) => ({
+    itemId: item.id,
+    quantity: 1,
+    equipped: true,
+    invested: item.traits.includes("invested"),
+  }));
   return draft;
 }
 
@@ -84,8 +96,17 @@ describe("curated item effects", () => {
     expect(ITEM_EFFECTS[bandsOfForce.id]).toEqual({
       acItemBonus: 1,
       saveItemBonus: { fortitude: 1, reflex: 1, will: 1 },
+      notes: ["Acts as armor with a maximum Dexterity modifier of +5."],
     });
-    expect(ITEM_EFFECTS[thirdEye.id]).toEqual({ perceptionItemBonus: 2 });
+    expect(ITEM_EFFECTS[thirdEye.id]).toEqual({
+      perceptionItemBonus: 2,
+      notes: [
+        "Apex: when invested, increase your Wisdom modifier by 1 or to +4, whichever is higher.",
+      ],
+    });
+    for (const item of [beltOfStrength, bracersOfStrength, bracersOfHammers]) {
+      expect(ITEM_EFFECTS[item.id]).toMatchObject({ skillItemBonus: { athletics: 3 } });
+    }
   });
 
   it("labels curated items as partly automated", () => {
@@ -108,6 +129,48 @@ describe("curated item effects", () => {
     const baseline = computeCharacter(fighterDraft(["medicine"]), context([healerGloves]));
     const unequipped = computeCharacter(draft, context([healerGloves]));
     expect(skillMod(unequipped, "medicine")).toBe(skillMod(baseline, "medicine"));
+  });
+
+  it("does not apply an invested item before it is invested", () => {
+    const draft = fighterDraft(["medicine"]);
+    draft.equipment = [{ itemId: healerGloves.id, quantity: 1, equipped: true, invested: false }];
+    const baseline = computeCharacter(fighterDraft(["medicine"]), context([healerGloves]));
+    const notInvested = computeCharacter(draft, context([healerGloves]));
+    expect(skillMod(notInvested, "medicine")).toBe(skillMod(baseline, "medicine"));
+    expect(
+      notInvested.validation.some((validation) =>
+        validation.message.includes("equipped but not invested")
+      )
+    ).toBe(true);
+  });
+
+  it("uses the highest item bonus rather than stacking armor, runes, and worn items", () => {
+    const armorDraft = fighterDraft([]);
+    armorDraft.equipment = [
+      {
+        itemId: chainMail.id,
+        quantity: 1,
+        equipped: true,
+        invested: true,
+        runes: [armorPotency.id, resilient.id],
+      },
+    ];
+    const armorItems = [chainMail, armorPotency, resilient];
+    const armorOnly = computeCharacter(armorDraft, context(armorItems));
+
+    const bothDraft = fighterDraft([]);
+    bothDraft.equipment = [
+      ...armorDraft.equipment,
+      { itemId: greaterBandsOfForce.id, quantity: 1, equipped: true, invested: true },
+    ];
+    const both = computeCharacter(bothDraft, context([...armorItems, greaterBandsOfForce]));
+
+    // Chain mail with +1 potency is already a +5 item bonus to AC, so the
+    // bands' +2 cannot stack on top of it.
+    expect(both.ac).toBe(armorOnly.ac);
+    // Resilient gives +1 to saves and the greater bands give +2; the higher
+    // item bonus wins instead of adding to +3.
+    expect(both.saves.fortitude).toBe(armorOnly.saves.fortitude + 1);
   });
 
   it("applies greater skill items at +2", () => {

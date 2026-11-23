@@ -88,6 +88,7 @@ export function conditionModifiers(
   const statusAc = Math.max(clumsy, fatigued, statusAll, unconscious ? 4 : 0);
   const offGuard =
     has("off-guard") ||
+    has("blinded") ||
     has("confused") ||
     has("prone") ||
     has("grabbed") ||
@@ -151,7 +152,7 @@ export function conditionModifiers(
   if (has("blinded")) {
     addNote(
       "Blinded",
-      "−4 status penalty to Perception when vision is your only precise sense; normal terrain is difficult terrain."
+      "Off-guard (−2 AC); −4 status penalty to Perception when vision is your only precise sense; normal terrain is difficult terrain."
     );
   }
   if (unconscious) {
@@ -173,6 +174,19 @@ export function conditionModifiers(
   if (has("paralyzed")) addNote("Paralyzed", "Off-guard (−2 AC); you can't act.");
   if (has("petrified")) addNote("Petrified", "You can't act.");
   if (has("dead")) addNote("Dead", "This character is dead.");
+  if (has("confused"))
+    addNote("Confused", "You're off-guard and might attack the nearest creature.");
+  if (has("immobilized")) addNote("Immobilized", "You can't move.");
+  if (has("deafened")) {
+    addNote(
+      "Deafened",
+      "−2 status penalty to Perception checks involving hearing; automatically critically fail hearing-based Perception."
+    );
+  }
+  if (has("fleeing")) addNote("Fleeing", "You must run away and can't take other actions.");
+  if (has("dazzled")) {
+    addNote("Dazzled", "In bright light you're off-guard and treat creatures as concealed.");
+  }
 
   const zero = (value: number) => (value === 0 ? 0 : value);
   return {

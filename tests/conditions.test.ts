@@ -73,10 +73,12 @@ describe("condition modifiers", () => {
     expect(result.attackCircumstance).toBe(-2);
   });
 
-  it("applies blinded to Perception only", () => {
+  it("applies blinded as off-guard with a Perception penalty", () => {
     const result = conditionModifiers([condition("Blinded")], { level: 5 });
     expect(result.perception).toBe(-4);
+    expect(result.ac).toBe(-2);
     expect(result.saves.will).toBe(0);
+    expect(result.notes.some((note) => note.startsWith("Blinded:"))).toBe(true);
   });
 
   it("treats unconscious as AC/Reflex/Perception penalties plus incapacitation", () => {

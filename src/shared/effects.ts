@@ -39,6 +39,12 @@ export interface EffectModifiers {
   acItemBonus?: number;
   /** Proficiency-rank floors keyed by perception, fortitude, reflex, or will. */
   proficiencyRanks?: Record<string, number>;
+  /** Additional worn magic items that can be invested beyond the base limit. */
+  investedLimit?: number;
+  /** Ignore the Speed penalty from worn armor. */
+  ignoreArmorSpeedPenalty?: boolean;
+  /** Reduce one Speed penalty by this many feet. */
+  speedPenaltyReduction?: number;
   /** Train the next untrained armor category (Armor Proficiency). */
   armorProficiency?: boolean;
   /** Train martial weapons, or a chosen advanced weapon (Weapon Proficiency). */
@@ -113,6 +119,20 @@ export const FEAT_EFFECTS: Record<string, EffectModifiers> = {
       "Double HP from resting; reduce disease or poison stage by 2 on a success and 3 on a critical success (1/2 for virulent).",
     ],
   },
+  // Nimble Elf — +5 feet Speed.
+  "feat:kCO4r8NOm8E2T3eH": { speed: 5 },
+  // Elven Instincts — +2 circumstance bonus to Perception rolls for initiative.
+  "feat:4M36jGbeSDfZFM38": {
+    initiativeBonus: 2,
+    notes: ["Tie-breaking initiative against an opponent remains manual."],
+  },
+  // Incredible Investiture — increase the invested item limit from 10 to 12.
+  "feat:4vu6P3cYoOOeUbLK": { investedLimit: 2 },
+  // Unburdened Iron — ignore armor Speed penalties and reduce one other penalty by 5.
+  "feat:C1R4wd6G46CAVIn7": {
+    ignoreArmorSpeedPenalty: true,
+    speedPenaltyReduction: 5,
+  },
   // Breath Control — longer breath holding and a bonus against inhaled threats.
   "feat:aJUXbe9HJVvv0Mxa": {
     notes: [
@@ -146,21 +166,50 @@ export const ITEM_EFFECTS: Record<string, EffectModifiers> = {
   // Cloak of Elvenkind — +1 item bonus to Stealth.
   "item:MNBnZn0b80Q7yHJM": { skillItemBonus: { stealth: 1 } },
   // Amulet of the Third Eye — +2 item bonus to Perception.
-  "item:mNgScZVAq037JuNb": { perceptionItemBonus: 2 },
+  "item:mNgScZVAq037JuNb": {
+    perceptionItemBonus: 2,
+    notes: [
+      "Apex: when invested, increase your Wisdom modifier by 1 or to +4, whichever is higher.",
+    ],
+  },
   // Bands of Force — +1 item bonus to AC and saving throws.
   "item:02q8s6sSicMkhs1l": {
     acItemBonus: 1,
     saveItemBonus: { fortitude: 1, reflex: 1, will: 1 },
+    notes: ["Acts as armor with a maximum Dexterity modifier of +5."],
   },
   // Bands of Force (Greater) — +2 item bonus to AC and saving throws.
   "item:8mhSUxEvNuXDP8Ki": {
     acItemBonus: 2,
     saveItemBonus: { fortitude: 2, reflex: 2, will: 2 },
+    notes: ["Acts as armor with a maximum Dexterity modifier of +5."],
   },
   // Bands of Force (Major) — +3 item bonus to AC and saving throws.
   "item:rqJzQawe3CbXiWnG": {
     acItemBonus: 3,
     saveItemBonus: { fortitude: 3, reflex: 3, will: 3 },
+    notes: ["Acts as armor with a maximum Dexterity modifier of +5."],
+  },
+  // Belt of Giant Strength — +3 item bonus to Athletics.
+  "item:7utuH8VJjKEzKtNw": {
+    skillItemBonus: { athletics: 3 },
+    notes: [
+      "Apex: when invested, increase your Strength modifier by 1 or to +4, whichever is higher.",
+    ],
+  },
+  // Bracers of Strength — +3 item bonus to Athletics.
+  "item:WOiCJSS2MicKCMVs": {
+    skillItemBonus: { athletics: 3 },
+    notes: [
+      "Apex: when invested, increase your Strength modifier by 1 or to +4, whichever is higher.",
+    ],
+  },
+  // Bracers of Hammers — +3 item bonus to Athletics.
+  "item:tIta1GNQK6sSWnr6": {
+    skillItemBonus: { athletics: 3 },
+    notes: [
+      "Apex: when invested, increase your Strength modifier by 1 or to +4, whichever is higher. Disarm/Trip bonuses and damage remain manual.",
+    ],
   },
 };
 
@@ -289,6 +338,14 @@ export function mergeEffects(effects: (EffectModifiers | undefined)[]): EffectMo
     }
     if (effect.acItemBonus)
       merged.acItemBonus = Math.max(merged.acItemBonus ?? 0, effect.acItemBonus);
+    if (effect.investedLimit)
+      merged.investedLimit = (merged.investedLimit ?? 0) + effect.investedLimit;
+    if (effect.ignoreArmorSpeedPenalty) merged.ignoreArmorSpeedPenalty = true;
+    if (effect.speedPenaltyReduction)
+      merged.speedPenaltyReduction = Math.max(
+        merged.speedPenaltyReduction ?? 0,
+        effect.speedPenaltyReduction
+      );
     if (effect.proficiencyRanks) {
       merged.proficiencyRanks ??= {};
       for (const [key, rank] of Object.entries(effect.proficiencyRanks)) {
