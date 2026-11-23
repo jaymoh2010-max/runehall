@@ -7858,6 +7858,50 @@ body.table-fullscreen-active {
   background: #0b1017;
   flex: 0 0 auto;
 }
+.table-sustain-reminder {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--line);
+  background: linear-gradient(90deg, rgba(200, 169, 107, 0.14), rgba(200, 169, 107, 0.04));
+  color: var(--text);
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+}
+.table-sustain-reminder.is-acknowledged {
+  background: #0b1017;
+  opacity: 0.78;
+}
+.table-sustain-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--gold);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 600;
+}
+.table-sustain-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 6px 3px 9px;
+  border: 1px solid rgba(200, 169, 107, 0.45);
+  border-radius: 999px;
+  background: rgba(200, 169, 107, 0.1);
+  font-size: 0.7rem;
+}
+.table-sustain-chip em {
+  color: var(--muted);
+  font-size: 0.62rem;
+  font-style: normal;
+}
+.table-sustain-reminder .row {
+  margin-left: 0;
+}
 .initiative-round-block {
   display: flex;
   flex-direction: column;
