@@ -264,6 +264,8 @@ export function ClassStep({
                     prepared: [],
                     preparedByRank: {},
                     preparedCantrips: [],
+                    studiousPrepared: [],
+                    studiousUsed: {},
                     focus: [],
                     slotsUsed: {},
                     divineFontUsed: 0,

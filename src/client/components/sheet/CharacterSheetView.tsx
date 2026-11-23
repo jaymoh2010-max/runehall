@@ -2298,6 +2298,46 @@ export function CharacterSheetView({
                       </em>
                     </div>
                   ) : null}
+                  {derived.studiousSlots
+                    ? (() => {
+                        const studiousUsed = Object.values(draft.spells.studiousUsed).reduce(
+                          (total, value) => total + Math.max(0, Math.round(Number(value) || 0)),
+                          0
+                        );
+                        const used = Math.max(
+                          0,
+                          Math.min(derived.studiousSlots.count, studiousUsed)
+                        );
+                        const preparedNames = draft.spells.studiousPrepared
+                          .map(
+                            (id) =>
+                              derived.studiousSlots?.spells.find((spell) => spell.id === id)
+                                ?.name ?? id
+                          )
+                          .join(", ");
+                        return (
+                          <div
+                            className="pb-slot-row"
+                            title={`Studious spells: ${preparedNames || "none prepared"}`}
+                          >
+                            <span>Studious rank {derived.studiousSlots.rank}</span>
+                            <div className="pb-slot-pips">
+                              {Array.from({ length: derived.studiousSlots.count }).map(
+                                (_pip, pip) => (
+                                  <span
+                                    key={pip}
+                                    className={`pb-slot-pip ${used > pip ? "is-used" : ""}`}
+                                  />
+                                )
+                              )}
+                            </div>
+                            <em>
+                              {derived.studiousSlots.count - used} / {derived.studiousSlots.count}
+                            </em>
+                          </div>
+                        );
+                      })()
+                    : null}
                 </div>
 
                 {spellEntries.length ? (
