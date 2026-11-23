@@ -39,6 +39,9 @@ Audit date: 2026-11-23
 - **Apex item ability increases are applied.** Amulet of the Third Eye, Belt of Giant Strength,
   Bracers of Strength, and Bracers of Hammers now raise the selected ability modifier by 1 or to
   +4. Only one apex item applies, with a sheet warning when several are invested.
+- **Simulation gear scales with level.** Simulated level 20 characters now receive the highest
+  fundamental weapon and armor runes available at their level, so high-level AC and attack checks
+  exercise the real rune math instead of level-1 gear.
 - **The character simulator is now reusable.** The deterministic level builder is exported,
   the CLI is entry-point guarded, and a focused unit test covers the previously failing
   classes.

@@ -23,4 +23,19 @@ describe("deterministic character simulation build", () => {
     expect(derived.ac).toBeGreaterThanOrEqual(10);
     expect(derived.attacks.length).toBeGreaterThan(0);
   });
+
+  it("gives level 20 simulated characters fundamental runes", () => {
+    const build = buildSimulatedCharacter({ seed: 4242, className: "Fighter", level: 20 });
+    const weapon = build.draft.equipment.find(
+      (entry) => build.context.equipment[entry.itemId]?.weapon
+    );
+    const armor = build.draft.equipment.find(
+      (entry) => build.context.equipment[entry.itemId]?.armor
+    );
+    expect(weapon?.runes?.length ?? 0).toBeGreaterThan(0);
+    expect(armor?.runes?.length ?? 0).toBeGreaterThan(0);
+    const derived = computeCharacter(build.draft, contextForDraft(build.draft));
+    const weaponAttack = derived.attacks.find((attack) => attack.sourceItemId);
+    expect(weaponAttack?.damageFormula).toMatch(/[2-9]d/);
+  });
 });

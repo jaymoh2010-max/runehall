@@ -39,6 +39,7 @@ import {
 import { SKILLS, SKILL_BY_ID, type SkillId } from "../src/shared/types";
 import { activeGrantChoiceGroups, deitySupportsClass } from "../src/shared/classGrantChoices";
 import { selectedClassGrants } from "../src/shared/classGrants";
+import { attachRuneIds } from "../src/shared/runes";
 import type {
   Ancestry,
   Background,
@@ -538,6 +539,40 @@ function chooseEquipment(
     draft.equipment.push({ itemId: shield.id, quantity: 1, equipped: true });
     selectedEquipment.push(shield);
     context.equipment[shield.id] = shield;
+  }
+
+  // High-level builds need level-appropriate fundamental runes, otherwise
+  // level 20 AC and attack checks only exercise level 1 gear.
+  const bestRune = (matches: (name: string) => boolean): Equipment | null =>
+    equipment
+      .filter((item) => item.level > 0 && item.level <= draft.level && matches(item.name))
+      .sort((a, b) => b.level - a.level)[0] ?? null;
+  const addRune = (entry: (typeof draft.equipment)[number], rune: Equipment | null) => {
+    if (!rune) return;
+    entry.runes = attachRuneIds(entry.runes, rune, context.equipment);
+    context.equipment[rune.id] = rune;
+  };
+  const weaponEntry = draft.equipment.find((entry) => context.equipment[entry.itemId]?.weapon);
+  if (weaponEntry) {
+    addRune(
+      weaponEntry,
+      bestRune((name) => name.startsWith("Weapon Potency"))
+    );
+    addRune(
+      weaponEntry,
+      bestRune((name) => name === "Striking" || name.startsWith("Striking ("))
+    );
+  }
+  const armorEntry = draft.equipment.find((entry) => context.equipment[entry.itemId]?.armor);
+  if (armorEntry) {
+    addRune(
+      armorEntry,
+      bestRune((name) => name.startsWith("Armor Potency"))
+    );
+    addRune(
+      armorEntry,
+      bestRune((name) => name.startsWith("Resilient"))
+    );
   }
 }
 
