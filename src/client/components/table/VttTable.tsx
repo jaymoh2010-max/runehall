@@ -10,11 +10,13 @@ import type {
   Token,
 } from "../../../shared/types";
 import { suggestedTokenPosition } from "../../../shared/tokens";
+import { DRAWING_COLORS, DRAWING_WIDTHS } from "../../../shared/drawings";
 import { errorMessage, useToasts } from "../../stores";
 import { api } from "../../api";
 import { getSocket } from "../../socket";
 import { Button, EmptyState } from "../ui";
 import { SceneCanvas } from "./SceneCanvas";
+import type { DrawingTool } from "./DrawingToolbar";
 import { ChatPanel } from "./ChatPanel";
 import { InitiativeBar } from "./InitiativeBar";
 import { SustainReminder } from "./SustainReminder";
@@ -66,6 +68,9 @@ export function VttTable({ initial, campaignId, user, isGm, active }: VttTablePr
   const [fogBrush, setFogBrush] = useState<"reveal" | "hide" | null>(null);
   const [brushSize, setBrushSize] = useState(3);
   const [measureMode, setMeasureMode] = useState(false);
+  const [drawingTool, setDrawingTool] = useState<DrawingTool | null>(null);
+  const [drawingColor, setDrawingColor] = useState<string>(DRAWING_COLORS[0]);
+  const [drawingWidth, setDrawingWidth] = useState<number>(DRAWING_WIDTHS[1]);
   const [sceneManagerOpen, setSceneManagerOpen] = useState(false);
   const [editingScene, setEditingScene] = useState<Scene | null>(null);
   const [addTokenOpen, setAddTokenOpen] = useState(false);
@@ -459,6 +464,7 @@ export function VttTable({ initial, campaignId, user, isGm, active }: VttTablePr
       if (event.key === "Escape") {
         setFogBrush(null);
         setMeasureMode(false);
+        setDrawingTool(null);
         setSelectedTokenId(null);
         setSheetCharacterId(null);
         setFullscreenMode(false);
@@ -473,6 +479,21 @@ export function VttTable({ initial, campaignId, user, isGm, active }: VttTablePr
         event.preventDefault();
         setMeasureMode((current) => !current);
         setFogBrush(null);
+        setDrawingTool(null);
+        return;
+      }
+      if (key === "d") {
+        event.preventDefault();
+        setDrawingTool((current) => (current === "pen" ? null : "pen"));
+        setFogBrush(null);
+        setMeasureMode(false);
+        return;
+      }
+      if (key === "e") {
+        event.preventDefault();
+        setDrawingTool((current) => (current === "eraser" ? null : "eraser"));
+        setFogBrush(null);
+        setMeasureMode(false);
         return;
       }
       if (key === "c") {
@@ -598,11 +619,13 @@ export function VttTable({ initial, campaignId, user, isGm, active }: VttTablePr
           setBestiaryOpen((open) => !open);
           setFogBrush(null);
           setMeasureMode(false);
+          setDrawingTool(null);
         }}
         fogBrush={fogBrush}
         onFogBrush={(next) => {
           setFogBrush(next);
           setMeasureMode(false);
+          setDrawingTool(null);
         }}
         brushSize={brushSize}
         onBrushSize={setBrushSize}
@@ -610,6 +633,7 @@ export function VttTable({ initial, campaignId, user, isGm, active }: VttTablePr
         onMeasureMode={(next) => {
           setMeasureMode(next);
           setFogBrush(null);
+          setDrawingTool(null);
         }}
         connectionStatus={connectionStatus}
         presence={presence}
@@ -644,7 +668,7 @@ export function VttTable({ initial, campaignId, user, isGm, active }: VttTablePr
           />
         ) : null}
 
-        <div className="vtt-center">
+        <div className={`vtt-center ${bestiaryOpen ? "has-bestiary" : ""}`}>
           <InitiativeBar
             entries={initiative}
             round={round}
@@ -707,6 +731,46 @@ export function VttTable({ initial, campaignId, user, isGm, active }: VttTablePr
             templateSize={20}
             templateHidden={false}
             onTemplate={() => undefined}
+            drawingTool={drawingTool}
+            drawingColor={drawingColor}
+            drawingWidth={drawingWidth}
+            onDrawingToolChange={(next) => {
+              setDrawingTool(next);
+              if (next) {
+                setFogBrush(null);
+                setMeasureMode(false);
+              }
+            }}
+            onDrawingColorChange={setDrawingColor}
+            onDrawingWidthChange={setDrawingWidth}
+            onAddDrawing={(points, color, width) =>
+              getSocket().emit("drawing:add", {
+                campaignId,
+                sceneId: activeScene.id,
+                drawing: { points, color, width },
+              })
+            }
+            onEraseDrawing={(drawingId) =>
+              getSocket().emit("drawing:erase", {
+                campaignId,
+                sceneId: activeScene.id,
+                drawingId,
+              })
+            }
+            onClearMyDrawings={() =>
+              getSocket().emit("drawing:clear", {
+                campaignId,
+                sceneId: activeScene.id,
+                scope: "mine",
+              })
+            }
+            onClearAllDrawings={() =>
+              getSocket().emit("drawing:clear", {
+                campaignId,
+                sceneId: activeScene.id,
+                scope: "all",
+              })
+            }
           />
 
           {isGm && bestiaryOpen ? (

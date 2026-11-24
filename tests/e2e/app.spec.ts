@@ -1046,6 +1046,35 @@ test("GM places a token, chats, rolls, and opens the scenes manager", async ({ p
   await expect(page.getByRole("button", { name: "Upload audio" })).toBeVisible();
 });
 
+test("drawing tools add and erase shared map annotations", async ({ page }) => {
+  test.setTimeout(60_000);
+  await signIn(page, admin);
+  await page.goto(campaignPath);
+  await expect(page.locator(".scene-viewport")).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator(".core-connection")).toHaveClass(/is-online/, {
+    timeout: 15_000,
+  });
+
+  await page.getByRole("button", { name: "Draw on the map (D)" }).click();
+  const viewport = page.locator(".scene-viewport");
+  const box = await viewport.boundingBox();
+  expect(box).toBeTruthy();
+  const startX = box!.x + box!.width * 0.45;
+  const startY = box!.y + box!.height * 0.52;
+  await page.mouse.move(startX, startY);
+  await page.mouse.down();
+  await page.mouse.move(startX + 40, startY + 16, { steps: 8 });
+  await page.mouse.up();
+
+  const stroke = page.locator(".scene-drawing-svg polyline");
+  await expect(stroke).toHaveCount(1, { timeout: 10_000 });
+
+  await page.getByRole("button", { name: "Erase drawings (E)" }).click();
+  await page.mouse.click(startX + 20, startY + 8);
+  await expect(stroke).toHaveCount(0, { timeout: 10_000 });
+  await page.getByRole("button", { name: "Select and pan" }).click();
+});
+
 test("GM adds an elite monster token from the bestiary", async ({ page }) => {
   test.setTimeout(60_000);
   await signIn(page, admin);

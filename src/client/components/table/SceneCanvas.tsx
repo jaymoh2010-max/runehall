@@ -13,6 +13,7 @@ import type {
   CharacterRecord,
   Monster,
   Scene,
+  SceneDrawing,
   SceneProp,
   ScenePropLayer,
   Token,
@@ -20,6 +21,7 @@ import type {
   WallKind,
 } from "../../../shared/types";
 import type { PropPreset } from "../../../shared/props";
+import { canEraseDrawing, drawingHitByPoint, DRAWING_POINT_LIMIT } from "../../../shared/drawings";
 import { canSeeCreatureStats } from "../../../shared/tokenVisibility";
 import { creatureAvatarDataUrl } from "../../../shared/creatureAvatar";
 import { measureGridDistance } from "../../../shared/measurement";
@@ -33,6 +35,7 @@ import { evaluateCover } from "../../../shared/cover";
 import { loadExplored, saveExplored } from "./explored";
 import { initialsForName, Tag } from "../ui";
 import { HoverCard } from "../HoverCard";
+import { DrawingToolbar, type DrawingTool } from "./DrawingToolbar";
 import { BESTIARY_DRAG_TYPE, type BestiaryDragPayload } from "./bestiaryDrag";
 import {
   templateLabel,
@@ -86,6 +89,16 @@ interface SceneCanvasProps {
   templateSize: number;
   templateHidden: boolean;
   onTemplate: (template: AoeTemplate) => void;
+  drawingTool: DrawingTool | null;
+  drawingColor: string;
+  drawingWidth: number;
+  onDrawingToolChange: (tool: DrawingTool | null) => void;
+  onDrawingColorChange: (color: string) => void;
+  onDrawingWidthChange: (width: number) => void;
+  onAddDrawing: (points: number[], color: string, width: number) => void;
+  onEraseDrawing: (drawingId: string) => void;
+  onClearMyDrawings: () => void;
+  onClearAllDrawings: () => void;
 }
 
 interface Pan {
@@ -127,6 +140,16 @@ export function SceneCanvas({
   templateSize,
   templateHidden,
   onTemplate,
+  drawingTool,
+  drawingColor,
+  drawingWidth,
+  onDrawingToolChange,
+  onDrawingColorChange,
+  onDrawingWidthChange,
+  onAddDrawing,
+  onEraseDrawing,
+  onClearMyDrawings,
+  onClearAllDrawings,
 }: SceneCanvasProps) {
   const viewportRef = useRef<HTMLDivElement>(null);
   const surfaceRef = useRef<HTMLDivElement>(null);
@@ -188,9 +211,16 @@ export function SceneCanvas({
   const painting = useRef<{ mode: FogMode; cells: Set<string> } | null>(null);
   const fittedScene = useRef<string | null>(null);
   const dragTarget = useRef<{ tokenId: string; x: number; y: number } | null>(null);
+  const drawingPoints = useRef<number[] | null>(null);
+  const lastDrawingPoint = useRef<{ x: number; y: number } | null>(null);
+  const erasingDrawings = useRef(false);
+  const erasedDrawingIds = useRef<Set<string>>(new Set());
+  const [drawingPreview, setDrawingPreview] = useState<number[] | null>(null);
 
   const cols = Math.max(1, Math.ceil(scene.width / scene.gridSize));
   const rows = Math.max(1, Math.ceil(scene.height / scene.gridSize));
+  const drawings = scene.drawings ?? [];
+  const hasMineDrawings = drawings.some((drawing) => drawing.ownerId === userId);
   const portraitMap = useMemo(() => {
     const map = new Map<string, string | null>();
     for (const character of characters)
@@ -257,6 +287,14 @@ export function SceneCanvas({
       wallClickStart.current = null;
     }
   }, [wallMode]);
+
+  useEffect(() => {
+    drawingPoints.current = null;
+    lastDrawingPoint.current = null;
+    erasingDrawings.current = false;
+    erasedDrawingIds.current.clear();
+    setDrawingPreview(null);
+  }, [drawingTool, scene.id]);
 
   useEffect(() => {
     setExploredCells(loadExplored(scene, userId));
@@ -543,6 +581,85 @@ export function SceneCanvas({
       onDropMonster(payload.monster, count, x, y);
     } catch {
       // Ignore malformed drag payloads.
+    }
+  };
+
+  const normalizeDrawPoint = (clientX: number, clientY: number) => {
+    const point = scenePoint(clientX, clientY);
+    return {
+      x: Math.max(0, Math.min(scene.width, Math.round(point.x * 10) / 10)),
+      y: Math.max(0, Math.min(scene.height, Math.round(point.y * 10) / 10)),
+    };
+  };
+
+  const eraseDrawingAt = (x: number, y: number) => {
+    const tolerance = 10 / Math.max(zoom, 0.35);
+    const drawings = scene.drawings ?? [];
+    for (let index = drawings.length - 1; index >= 0; index--) {
+      const drawing = drawings[index];
+      if (!canEraseDrawing(drawing, userId, isGm)) continue;
+      if (erasedDrawingIds.current.has(drawing.id)) continue;
+      if (!drawingHitByPoint(drawing, x, y, tolerance)) continue;
+      erasedDrawingIds.current.add(drawing.id);
+      onEraseDrawing(drawing.id);
+      return;
+    }
+  };
+
+  const onDrawingPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (!drawingTool || event.button !== 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const point = normalizeDrawPoint(event.clientX, event.clientY);
+    event.currentTarget.setPointerCapture(event.pointerId);
+    if (drawingTool === "pen") {
+      drawingPoints.current = [point.x, point.y];
+      lastDrawingPoint.current = point;
+      setDrawingPreview([point.x, point.y]);
+      return;
+    }
+    erasingDrawings.current = true;
+    erasedDrawingIds.current.clear();
+    eraseDrawingAt(point.x, point.y);
+  };
+
+  const onDrawingPointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (drawingPoints.current) {
+      event.preventDefault();
+      event.stopPropagation();
+      const point = normalizeDrawPoint(event.clientX, event.clientY);
+      const last = lastDrawingPoint.current;
+      const threshold = 1.5 / Math.max(zoom, 0.25);
+      if (last && Math.hypot(point.x - last.x, point.y - last.y) < threshold) return;
+      const points = drawingPoints.current;
+      if (points.length >= DRAWING_POINT_LIMIT * 2) return;
+      points.push(point.x, point.y);
+      lastDrawingPoint.current = point;
+      setDrawingPreview([...points]);
+      return;
+    }
+    if (erasingDrawings.current) {
+      event.preventDefault();
+      event.stopPropagation();
+      const point = normalizeDrawPoint(event.clientX, event.clientY);
+      eraseDrawingAt(point.x, point.y);
+    }
+  };
+
+  const finishDrawing = (event: ReactPointerEvent<HTMLDivElement>, commit: boolean) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const points = drawingPoints.current;
+    drawingPoints.current = null;
+    lastDrawingPoint.current = null;
+    setDrawingPreview(null);
+    if (commit && points && points.length >= 2) {
+      onAddDrawing(points, drawingColor, drawingWidth);
+    }
+    erasingDrawings.current = false;
+    erasedDrawingIds.current.clear();
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
     }
   };
 
@@ -977,6 +1094,14 @@ export function SceneCanvas({
   const dragPosition = (token: Token) =>
     dragging?.positions[token.id] ?? { x: token.x, y: token.y };
 
+  const drawingPointString = (points: number[]) => {
+    const pairs: string[] = [];
+    for (let index = 0; index + 1 < points.length; index += 2) {
+      pairs.push(`${points[index]},${points[index + 1]}`);
+    }
+    return pairs.join(" ");
+  };
+
   const renderPropLayer = (layer: ScenePropLayer) => {
     const props = (scene.props ?? [])
       .filter((prop) => prop.layer === layer && (isGm || prop.visible))
@@ -1101,7 +1226,7 @@ export function SceneCanvas({
   return (
     <div
       ref={viewportRef}
-      className={`scene-viewport ${fogBrush ? "is-fogging" : ""} ${measureMode ? "is-measuring" : ""} ${wallMode ? "is-walling" : ""} ${propMode ? "is-propping" : ""} ${pendingProp ? "is-placing-prop" : ""} ${templateKind ? "is-templating" : ""}`}
+      className={`scene-viewport ${fogBrush ? "is-fogging" : ""} ${measureMode ? "is-measuring" : ""} ${wallMode ? "is-walling" : ""} ${propMode ? "is-propping" : ""} ${pendingProp ? "is-placing-prop" : ""} ${templateKind ? "is-templating" : ""} ${drawingTool ? "is-drawing" : ""} ${drawingTool === "eraser" ? "is-erasing" : ""}`}
       onPointerDown={onViewportPointerDown}
       onPointerMove={onViewportPointerMove}
       onPointerUp={onViewportPointerUp}
@@ -1472,7 +1597,87 @@ export function SceneCanvas({
             Moved {dragging.feet} ft · {dragging.squares} sq
           </div>
         ) : null}
+        <div
+          className={`scene-drawing-layer ${drawingTool ? "is-active" : ""}`}
+          onPointerDown={onDrawingPointerDown}
+          onPointerMove={onDrawingPointerMove}
+          onPointerUp={(event) => finishDrawing(event, true)}
+          onPointerCancel={(event) => finishDrawing(event, false)}
+          onContextMenu={(event) => {
+            if (!drawingTool) return;
+            event.preventDefault();
+            event.stopPropagation();
+          }}
+        >
+          <svg
+            className="scene-drawing-svg"
+            width={scene.width}
+            height={scene.height}
+            aria-hidden="true"
+          >
+            {drawings.map((drawing) =>
+              drawing.points.length === 2 ? (
+                <circle
+                  key={drawing.id}
+                  cx={drawing.points[0]}
+                  cy={drawing.points[1]}
+                  r={Math.max(1.5, drawing.width / 2)}
+                  fill={drawing.color}
+                  opacity={0.92}
+                >
+                  <title>{drawing.ownerName}</title>
+                </circle>
+              ) : (
+                <polyline
+                  key={drawing.id}
+                  points={drawingPointString(drawing.points)}
+                  fill="none"
+                  stroke={drawing.color}
+                  strokeWidth={drawing.width}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  opacity={0.92}
+                >
+                  <title>{drawing.ownerName}</title>
+                </polyline>
+              )
+            )}
+            {drawingPreview && drawingPreview.length === 2 ? (
+              <circle
+                cx={drawingPreview[0]}
+                cy={drawingPreview[1]}
+                r={Math.max(1.5, drawingWidth / 2)}
+                fill={drawingColor}
+                opacity={0.92}
+              />
+            ) : drawingPreview ? (
+              <polyline
+                points={drawingPointString(drawingPreview)}
+                fill="none"
+                stroke={drawingColor}
+                strokeWidth={drawingWidth}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                opacity={0.92}
+              />
+            ) : null}
+          </svg>
+        </div>
       </div>
+
+      <DrawingToolbar
+        isGm={isGm}
+        tool={drawingTool}
+        color={drawingColor}
+        width={drawingWidth}
+        hasMine={hasMineDrawings}
+        hasAny={drawings.length > 0}
+        onTool={onDrawingToolChange}
+        onColor={onDrawingColorChange}
+        onWidth={onDrawingWidthChange}
+        onClearMine={onClearMyDrawings}
+        onClearAll={onClearAllDrawings}
+      />
 
       <div className="scene-zoom" onPointerDown={(event) => event.stopPropagation()}>
         <button
@@ -1516,6 +1721,14 @@ export function SceneCanvas({
             door to hide · click a wall to hide/reveal · right-click to delete
           </Tag>
         ) : null}
+        {drawingTool ? (
+          <Tag tone="gold">
+            {drawingTool === "pen"
+              ? "Draw mode · drag to annotate"
+              : "Eraser · click a stroke to remove it"}{" "}
+            · Esc to stop
+          </Tag>
+        ) : null}
         {propMode ? (
           <Tag tone="gold">
             <Move size={11} />{" "}
@@ -1524,7 +1737,7 @@ export function SceneCanvas({
               : "Props · drag to move · click to select"}
           </Tag>
         ) : null}
-        {!fogBrush && !measureMode && !templateKind && !wallMode && !propMode ? (
+        {!fogBrush && !measureMode && !templateKind && !wallMode && !propMode && !drawingTool ? (
           <span>Drag to pan · Shift-drag to select · wheel to zoom · right-click to ping</span>
         ) : null}
       </div>

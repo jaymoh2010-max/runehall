@@ -948,4 +948,11 @@ export const migrations: Migration[] = [
       ALTER TABLE campaigns ADD COLUMN player_item_grant INTEGER NOT NULL DEFAULT 0;
     `,
   },
+  {
+    version: 57,
+    name: "scene_drawings",
+    sql: `
+      ALTER TABLE scenes ADD COLUMN drawings TEXT NOT NULL DEFAULT '[]';
+    `,
+  },
 ];

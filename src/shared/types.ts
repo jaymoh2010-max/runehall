@@ -1820,6 +1820,8 @@ export interface Scene {
   visionScope: PartyVisionScope;
   /** Decorative ground and overhead props placed by the GM. */
   props: SceneProp[];
+  /** Shared freehand annotations drawn on top of the map. */
+  drawings: SceneDrawing[];
   /** When enabled, every prop on the scene blocks token movement. */
   propCollision: boolean;
   /** When false, only the GM receives this scene and its tokens. */
@@ -1827,6 +1829,21 @@ export interface Scene {
   sortOrder: number;
   createdAt: number;
   updatedAt: number;
+}
+
+/** A shared freehand annotation on a scene. */
+export interface SceneDrawing {
+  id: string;
+  /** User who drew the stroke. The GM may erase any stroke. */
+  ownerId: string;
+  ownerName: string;
+  /** Flat scene-pixel coordinates: [x1, y1, x2, y2, ...]. */
+  points: number[];
+  /** CSS hex color. */
+  color: string;
+  /** Stroke width in scene pixels. */
+  width: number;
+  createdAt: number;
 }
 
 export interface TokenCondition {
@@ -2164,6 +2181,20 @@ export interface ClientToServerEvents {
   "template:clear": (payload: { campaignId: string; sceneId: string }) => void;
   "scene:walls": (payload: { campaignId: string; sceneId: string; walls: Wall[] }) => void;
   "scene:props": (payload: { campaignId: string; sceneId: string; props: SceneProp[] }) => void;
+  "drawing:add": (
+    payload: {
+      campaignId: string;
+      sceneId: string;
+      drawing: Pick<SceneDrawing, "points" | "color" | "width">;
+    },
+    ack?: (drawing: SceneDrawing | null) => void
+  ) => void;
+  "drawing:erase": (payload: { campaignId: string; sceneId: string; drawingId: string }) => void;
+  "drawing:clear": (payload: {
+    campaignId: string;
+    sceneId: string;
+    scope: "mine" | "all";
+  }) => void;
   "audio:update": (payload: {
     campaignId: string;
     trackId: string | null;
@@ -2235,6 +2266,7 @@ export interface ServerToClientEvents {
   "scene:templates": (payload: { sceneId: string; templates: AoeTemplate[] }) => void;
   "scene:walls": (payload: { sceneId: string; walls: Wall[] }) => void;
   "scene:props": (payload: { sceneId: string; props: SceneProp[] }) => void;
+  "scene:drawings": (payload: { sceneId: string; drawings: SceneDrawing[] }) => void;
   "audio:state": (payload: { campaignId: string; state: CampaignAudioState }) => void;
   "audio:tracks": (payload: { campaignId: string; tracks: CampaignAudioTrack[] }) => void;
   "chat:message": (message: ChatMessage) => void;

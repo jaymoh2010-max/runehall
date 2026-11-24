@@ -22,6 +22,7 @@ Four campaign sections:
 - Scene maps with grid calibration, pan/zoom, token drag, snap, and a live movement-distance readout while dragging.
 - Built-in maps plus custom uploads. The library has 37 grid-aligned colour and line-art maps from Dyson Logos, Free Fantasy Maps, and mbround18, with terrain and Pathfinder adventure-theme filters; see `public/maps/ATTRIBUTION.md`.
 - Fog of war, distance measuring, pointer pings, and player presence.
+- A shared freehand drawing layer with a compact sidebar, six colors, three brush widths, eraser support, and GM controls to erase or clear any player's annotations.
 - Tokens for party characters, monsters, and custom markers. Players can upload art for their own token; the GM can upload art for any token.
 - Bestiary creatures get CC BY 3.0 archetype icons from Game-icons.net when no custom art is uploaded; see `public/tokens/creature/ATTRIBUTION.md`.
 - A compact token panel for HP, AC, conditions, visibility, locks, and sheet access. Creature HP/AC is GM-only; linked party characters keep their shared stats.

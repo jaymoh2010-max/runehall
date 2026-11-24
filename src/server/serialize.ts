@@ -53,6 +53,7 @@ import {
 import { normalizeCampaignThreads } from "../shared/dashboard";
 import { normalizeWalls } from "../shared/walls";
 import { normalizeSceneProps } from "../shared/props";
+import { normalizeSceneDrawings } from "../shared/drawings";
 import {
   isSessionCheckinStatus,
   normalizeAttendanceStatus,
@@ -429,6 +430,7 @@ export function serializeScene(row: SceneRow): Scene {
     ambientLight: normalizeAmbientLight(row.ambient_light),
     visionScope: normalizePartyVisionScope(row.vision_scope),
     props: normalizeSceneProps(parseJson(row.props, [])),
+    drawings: normalizeSceneDrawings(parseJson(row.drawings, []), row.width, row.height),
     propCollision: Boolean(row.prop_collision),
     visible: row.visible === undefined ? true : Boolean(row.visible),
     sortOrder: row.sort_order,
