@@ -51,6 +51,10 @@ Audit date: 2026-11-23
   classes.
 - **New party simulator.** `npm run simulate:parties` runs seven campaigns with different
   class combinations through level 20 and checks server/local sheet parity at every level.
+- **Party heroes advance continuously.** Each simulated hero keeps its ancestry, heritage,
+  background, class, deity, early ability boosts, feats, skill picks, spells, and equipment
+  from level to level. Only the choices unlocked by the new level are filled in, and the
+  simulator asserts that the server round-trip preserves them.
 
 ## Results
 
@@ -78,7 +82,8 @@ Audit date: 2026-11-23
 
 - The long tail of feat and item automation is still manual or partly automated because the
   compendium ships prose rather than structured rule elements.
-- The party simulator rebuilds each complete sheet at every level to exercise all class
-  features and choices; it is not a narrative continuity test for a single saved build.
+- The party simulator advances one persistent build per hero from level 1 to 20. If a new
+  feat later grants training in a skill that already had an early skill increase, the
+  simulator retrains that increase rather than leaving an invalid sheet.
 - Companion statistics, bestiary-linked companion tokens, and automatic companion advancement
   remain manual.
