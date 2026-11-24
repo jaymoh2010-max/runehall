@@ -259,6 +259,7 @@ export interface SceneRow {
   ambient_light: string;
   vision_scope: string;
   props: string;
+  drawings: string;
   prop_collision: number;
   visible: number;
   sort_order: number;

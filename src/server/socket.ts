@@ -21,6 +21,12 @@ import {
 import { normalizeAoeTemplate, normalizeAoeTemplates } from "../shared/templates";
 import { normalizeWalls } from "../shared/walls";
 import { normalizeSceneProps } from "../shared/props";
+import {
+  canEraseDrawing,
+  DRAWING_LIMIT,
+  normalizeSceneDrawing,
+  normalizeSceneDrawings,
+} from "../shared/drawings";
 import { normalizeLightColor, normalizeTokenVisionMode } from "../shared/lighting";
 import { normalizeTokenTurnEffects } from "../shared/tokenTurnEffects";
 import { characterTokenTurnEffects } from "../shared/characterTurnEffects";
@@ -1176,6 +1182,118 @@ export function registerSocketServer(io: TypedServer): void {
           props: normalized.filter((prop) => prop.visible),
         });
       io.to(gmRoom(campaignId)).emit("scene:props", { sceneId, props: normalized });
+      touchCampaign(campaignId);
+    });
+
+    on("drawing:add", ({ campaignId, sceneId, drawing }, ack) => {
+      if (!getMembership(campaignId, socket.data.user.id)) {
+        sendError(socket, "You're not a member of that campaign.");
+        ack?.(null);
+        return;
+      }
+      const scene = sceneBelongs(sceneId, campaignId);
+      if (!scene) {
+        ack?.(null);
+        return;
+      }
+      const drawings = normalizeSceneDrawings(
+        parseJson(scene.drawings, []),
+        scene.width,
+        scene.height
+      );
+      if (drawings.length >= DRAWING_LIMIT) {
+        sendError(socket, "This scene has reached the drawing limit. Clear some drawings first.");
+        ack?.(null);
+        return;
+      }
+      const normalized = normalizeSceneDrawing(
+        {
+          ...drawing,
+          id: newId("drawing"),
+          ownerId: socket.data.user.id,
+          ownerName: socket.data.user.displayName,
+          createdAt: now(),
+        },
+        scene.width,
+        scene.height
+      );
+      if (!normalized) {
+        sendError(socket, "That drawing was invalid.");
+        ack?.(null);
+        return;
+      }
+      const next = [...drawings, normalized];
+      db.prepare("UPDATE scenes SET drawings = ?, updated_at = ? WHERE id = ?").run(
+        JSON.stringify(next),
+        now(),
+        sceneId
+      );
+      io.to(room(campaignId)).emit("scene:drawings", { sceneId, drawings: next });
+      touchCampaign(campaignId);
+      ack?.(normalized);
+    });
+
+    on("drawing:erase", ({ campaignId, sceneId, drawingId }) => {
+      if (!getMembership(campaignId, socket.data.user.id)) {
+        sendError(socket, "You're not a member of that campaign.");
+        return;
+      }
+      const scene = sceneBelongs(sceneId, campaignId);
+      if (!scene) return;
+      const drawings = normalizeSceneDrawings(
+        parseJson(scene.drawings, []),
+        scene.width,
+        scene.height
+      );
+      const target = drawings.find((drawing) => drawing.id === drawingId);
+      if (!target) return;
+      if (
+        !canEraseDrawing(
+          target,
+          socket.data.user.id,
+          getCampaignRole(campaignId, socket.data.user.id) === "gm"
+        )
+      ) {
+        sendError(socket, "You can only erase your own drawings.");
+        return;
+      }
+      const next = drawings.filter((drawing) => drawing.id !== drawingId);
+      db.prepare("UPDATE scenes SET drawings = ?, updated_at = ? WHERE id = ?").run(
+        JSON.stringify(next),
+        now(),
+        sceneId
+      );
+      io.to(room(campaignId)).emit("scene:drawings", { sceneId, drawings: next });
+      touchCampaign(campaignId);
+    });
+
+    on("drawing:clear", ({ campaignId, sceneId, scope }) => {
+      if (!getMembership(campaignId, socket.data.user.id)) {
+        sendError(socket, "You're not a member of that campaign.");
+        return;
+      }
+      const scene = sceneBelongs(sceneId, campaignId);
+      if (!scene) return;
+      const isGm = getCampaignRole(campaignId, socket.data.user.id) === "gm";
+      if (scope === "all" && !isGm) {
+        sendError(socket, "Only the GM can clear the whole drawing layer.");
+        return;
+      }
+      const drawings = normalizeSceneDrawings(
+        parseJson(scene.drawings, []),
+        scene.width,
+        scene.height
+      );
+      const next =
+        scope === "all"
+          ? []
+          : drawings.filter((drawing) => drawing.ownerId !== socket.data.user.id);
+      db.prepare("UPDATE scenes SET drawings = ?, updated_at = ? WHERE id = ?").run(
+        JSON.stringify(next),
+        now(),
+        sceneId
+      );
+      io.to(room(campaignId)).emit("scene:drawings", { sceneId, drawings: next });
       touchCampaign(campaignId);
     });
 

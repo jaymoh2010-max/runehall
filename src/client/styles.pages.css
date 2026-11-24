@@ -7505,6 +7505,123 @@ body.table-fullscreen-active {
 .scene-viewport.is-walling {
   cursor: crosshair;
 }
+.scene-viewport.is-drawing {
+  cursor: crosshair;
+}
+.scene-viewport.is-erasing .scene-drawing-layer.is-active {
+  cursor: cell;
+}
+.scene-drawing-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  pointer-events: none;
+}
+.scene-drawing-layer.is-active {
+  pointer-events: auto;
+  cursor: crosshair;
+}
+.scene-drawing-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+.scene-draw-tools {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  z-index: 12;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 5px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(10, 14, 21, 0.94);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+}
+.scene-draw-group,
+.scene-draw-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.scene-draw-tools .icon-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+}
+.scene-draw-tools .icon-btn.is-active {
+  background: rgba(232, 93, 22, 0.22);
+  color: var(--gold-bright);
+  box-shadow: inset 0 0 0 1px rgba(240, 217, 168, 0.24);
+}
+.scene-draw-tools .icon-btn:disabled {
+  opacity: 0.35;
+}
+.scene-draw-tools .scene-draw-clear-all:not(:disabled) {
+  color: #e88989;
+}
+.scene-draw-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--line);
+}
+.scene-draw-colors {
+  display: grid;
+  grid-template-columns: repeat(2, 13px);
+  gap: 4px;
+  justify-content: center;
+}
+.scene-draw-color {
+  width: 13px;
+  height: 13px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 50%;
+  cursor: pointer;
+}
+.scene-draw-color.is-active {
+  outline: 2px solid var(--gold-bright);
+  outline-offset: 1px;
+}
+.scene-draw-widths {
+  display: flex;
+  justify-content: center;
+  gap: 2px;
+}
+.scene-draw-width {
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: transparent;
+  cursor: pointer;
+}
+.scene-draw-width span {
+  display: block;
+  border-radius: 50%;
+  background: var(--muted);
+}
+.scene-draw-width.is-active {
+  border-color: rgba(240, 217, 168, 0.42);
+  background: rgba(232, 93, 22, 0.18);
+}
+.scene-draw-width.is-active span {
+  background: var(--gold-bright);
+}
+.vtt-center.has-bestiary .scene-draw-tools {
+  display: none;
+}
 .scene-surface {
   position: absolute;
   transform-origin: 0 0;

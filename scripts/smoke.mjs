@@ -1039,6 +1039,103 @@ async function main() {
   }
   log("GM props persist and players cannot replace scene props");
 
+  const playerDrawingEvent = waitForEvent(
+    gmSocket,
+    "scene:drawings",
+    (payload) =>
+      payload.sceneId === scene.id &&
+      payload.drawings?.some((drawing) => drawing.ownerId === player.id)
+  );
+  const playerDrawing = await emitAck(playerSocket, "drawing:add", {
+    campaignId: campaign.id,
+    sceneId: scene.id,
+    drawing: { points: [100, 100, 180, 140], color: "#7cc4ff", width: 6 },
+  });
+  await playerDrawingEvent;
+  if (
+    !playerDrawing ||
+    playerDrawing.ownerId !== player.id ||
+    playerDrawing.ownerName !== "Smoke Player"
+  ) {
+    throw new Error("Player drawing was not attributed to the player");
+  }
+
+  const gmDrawingEvent = waitForEvent(
+    playerSocket,
+    "scene:drawings",
+    (payload) =>
+      payload.sceneId === scene.id && payload.drawings?.some((drawing) => drawing.ownerId === gm.id)
+  );
+  const gmDrawing = await emitAck(gmSocket, "drawing:add", {
+    campaignId: campaign.id,
+    sceneId: scene.id,
+    drawing: { points: [220, 220, 300, 260], color: "#f4c96b", width: 4 },
+  });
+  if (!gmDrawing?.id) throw new Error("GM drawing was not acknowledged");
+  await gmDrawingEvent;
+
+  playerSocket.emit("drawing:erase", {
+    campaignId: campaign.id,
+    sceneId: scene.id,
+    drawingId: gmDrawing.id,
+  });
+  await delay(250);
+  const blockedEraseTable = await api(`/api/campaigns/${campaign.id}/table`, {
+    cookie: gmCookie,
+  });
+  const blockedEraseScene = blockedEraseTable.payload.scenes.find((entry) => entry.id === scene.id);
+  if (!blockedEraseScene?.drawings?.some((drawing) => drawing.id === gmDrawing.id)) {
+    throw new Error("A player erased another user's drawing");
+  }
+
+  const gmErasePlayerEvent = waitForEvent(
+    gmSocket,
+    "scene:drawings",
+    (payload) =>
+      payload.sceneId === scene.id &&
+      !payload.drawings?.some((drawing) => drawing.id === playerDrawing.id)
+  );
+  gmSocket.emit("drawing:erase", {
+    campaignId: campaign.id,
+    sceneId: scene.id,
+    drawingId: playerDrawing.id,
+  });
+  await gmErasePlayerEvent;
+
+  playerSocket.emit("drawing:clear", {
+    campaignId: campaign.id,
+    sceneId: scene.id,
+    scope: "all",
+  });
+  await delay(250);
+  const playerClearTable = await api(`/api/campaigns/${campaign.id}/table`, {
+    cookie: gmCookie,
+  });
+  const playerClearScene = playerClearTable.payload.scenes.find((entry) => entry.id === scene.id);
+  if (!playerClearScene?.drawings?.some((drawing) => drawing.id === gmDrawing.id)) {
+    throw new Error("A player cleared the whole drawing layer");
+  }
+
+  const drawingsCleared = waitForEvent(
+    gmSocket,
+    "scene:drawings",
+    (payload) => payload.sceneId === scene.id && payload.drawings?.length === 0
+  );
+  gmSocket.emit("drawing:clear", {
+    campaignId: campaign.id,
+    sceneId: scene.id,
+    scope: "all",
+  });
+  await drawingsCleared;
+  const drawingsTable = await api(`/api/campaigns/${campaign.id}/table`, {
+    cookie: gmCookie,
+  });
+  const drawingsScene = drawingsTable.payload.scenes.find((entry) => entry.id === scene.id);
+  if (drawingsScene?.drawings?.length !== 0) {
+    throw new Error("The GM could not clear the drawing layer");
+  }
+  log("shared drawings sync live and the GM can erase any player's drawing");
+
   let playerSawPrepScene = false;
   const onPrepScene = (created) => {
     if (created.name === "GM Prep Vault") playerSawPrepScene = true;

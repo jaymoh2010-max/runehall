@@ -56,6 +56,7 @@ import { normalizeTokenConditions } from "../shared/tokens";
 import { normalizeAoeTemplates } from "../shared/templates";
 import { normalizeWalls } from "../shared/walls";
 import { normalizeSceneProps } from "../shared/props";
+import { normalizeSceneDrawings } from "../shared/drawings";
 import {
   isSessionCheckinStatus,
   normalizeAttendanceStatus,
@@ -444,18 +445,20 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
       const oldId = text(scene.id, "", 120);
       if (!oldId) continue;
       const sceneId = newId("scene");
+      const sceneWidth = clamp(numberValue(scene.width, 1600, 100, 10_000), 100, 10_000);
+      const sceneHeight = clamp(numberValue(scene.height, 1000, 100, 10_000), 100, 10_000);
       db.prepare(
         `INSERT INTO scenes
-          (id, campaign_id, name, image_url, thumbnail_url, width, height, grid_size, grid_offset_x, grid_offset_y, fog_enabled, fog_revealed, templates, walls, los_enabled, wall_collision, ambient_light, vision_scope, props, prop_collision, visible, sort_order, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          (id, campaign_id, name, image_url, thumbnail_url, width, height, grid_size, grid_offset_x, grid_offset_y, fog_enabled, fog_revealed, templates, walls, los_enabled, wall_collision, ambient_light, vision_scope, props, drawings, prop_collision, visible, sort_order, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).run(
         sceneId,
         campaignId,
         text(scene.name, "Imported scene", 80),
         scene.imageUrl ? text(scene.imageUrl, "", 500) : null,
         scene.thumbnailUrl ? text(scene.thumbnailUrl, "", 500) : null,
-        clamp(numberValue(scene.width, 1600, 100, 10_000), 100, 10_000),
-        clamp(numberValue(scene.height, 1000, 100, 10_000), 100, 10_000),
+        sceneWidth,
+        sceneHeight,
         clamp(numberValue(scene.gridSize, 70, 20, 300), 20, 300),
         clamp(Number(scene.gridOffsetX) || 0, -300, 300),
         clamp(Number(scene.gridOffsetY) || 0, -300, 300),
@@ -474,6 +477,7 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
         normalizeAmbientLight(scene.ambientLight),
         normalizePartyVisionScope(scene.visionScope),
         JSON.stringify(normalizeSceneProps(scene.props)),
+        JSON.stringify(normalizeSceneDrawings(scene.drawings, sceneWidth, sceneHeight)),
         scene.propCollision === true ? 1 : 0,
         scene.visible === false ? 0 : 1,
         numberValue(scene.sortOrder, sceneMap.size),
