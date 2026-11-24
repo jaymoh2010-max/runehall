@@ -99,6 +99,7 @@ import {
   skillRankCap,
   spellRepertoireLimits,
   spellSlotsFor,
+  spellSourceLabel,
   startingWealthCp,
   titleCase,
   traitLabel,
@@ -219,11 +220,7 @@ export function SpellsStep({ draft, update, derived, context, setStep, openPicke
         .map((spell) => psiAmpFor(spell.id))
         .filter((amp): amp is PsiAmpInfo => Boolean(amp))
     : [];
-  const preparedListLabel = isAnimist
-    ? "prepared list"
-    : isPreparedCaster
-      ? "spellbook"
-      : "repertoire";
+  const preparedListLabel = isAnimist ? "prepared list" : spellSourceLabel(classData);
   const cantripContext = { spells: context.spells, deity: context.deity, classData };
   const preparedCantripList = preparedCantripIds(draft, cantripContext);
   const preparedCantripSet = new Set(preparedCantripList);
@@ -525,7 +522,7 @@ export function SpellsStep({ draft, update, derived, context, setStep, openPicke
       <div className="step">
         <StepHeading
           eyebrow="Step 08 · Spells"
-          title="No spellbook required."
+          title="No spellcasting preparation required."
           lede="Your class doesn't use spellcasting, though class features or archetypes may still grant magical tricks later."
         />
         <div className="info-box">
@@ -1098,9 +1095,7 @@ export function SpellsStep({ draft, update, derived, context, setStep, openPicke
                   <Button
                     size="sm"
                     icon={<Plus size={14} />}
-                    aria-label={`Add rank ${rank} spell to ${
-                      isPreparedCaster ? "spellbook" : "repertoire"
-                    }`}
+                    aria-label={`Add rank ${rank} spell to ${preparedListLabel}`}
                     disabled={
                       traditionMissing ||
                       Boolean(
@@ -1194,7 +1189,7 @@ export function SpellsStep({ draft, update, derived, context, setStep, openPicke
                         key={spell.id}
                         className="spell-row"
                         role="group"
-                        aria-label={`${spell.name} spellbook row`}
+                        aria-label={`${spell.name} ${preparedListLabel} row`}
                         data-testid={`spellbook-row-${spellTestId(spell.name)}`}
                       >
                         <div className="grow">
@@ -1285,7 +1280,7 @@ export function SpellsStep({ draft, update, derived, context, setStep, openPicke
                             aria-label={
                               isSpontaneousCaster
                                 ? `Remove ${spell.name} from rank ${rank}`
-                                : `Remove ${spell.name} from spellbook`
+                                : `Remove ${spell.name} from ${preparedListLabel}`
                             }
                             onClick={() =>
                               isSpontaneousCaster

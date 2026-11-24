@@ -1119,7 +1119,7 @@ test("builder completes a level-1 Fighter and reaches the sheet", async ({ page 
   );
 
   await goToStep(page, "Spells");
-  await expect(page.getByText("No spellbook required.")).toBeVisible();
+  await expect(page.getByText("No spellcasting preparation required.")).toBeVisible();
   await goToStep(page, "Gear");
   await page.getByRole("button", { name: /Take .* as coins/ }).click();
   await goToStep(page, "Review");
@@ -1216,18 +1216,18 @@ test("builder completes a level-1 Cleric with split divine-font preparation", as
 
   const rankOne = page
     .locator(".spell-section")
-    .filter({ has: page.getByRole("heading", { name: "Rank 1 spellbook" }) });
-  await rankOne.getByRole("button", { name: "Add rank 1 spell to spellbook" }).click();
+    .filter({ has: page.getByRole("heading", { name: "Rank 1 spell list" }) });
+  await rankOne.getByRole("button", { name: "Add rank 1 spell to spell list" }).click();
   await pickSpell(page, "Bless");
-  await rankOne.getByRole("button", { name: "Add rank 1 spell to spellbook" }).click();
+  await rankOne.getByRole("button", { name: "Add rank 1 spell to spell list" }).click();
   await pickSpell(page, "Heal");
 
-  const blessRow = rankOne.getByRole("group", { name: "Bless spellbook row" });
+  const blessRow = rankOne.getByRole("group", { name: "Bless spell list row" });
   await blessRow.getByRole("button", { name: "Prepare Bless at rank 1" }).click();
   await blessRow.getByRole("button", { name: "Prepare Bless at rank 1" }).click();
   await expect(blessRow.getByRole("button", { name: "Prepare Bless at rank 1" })).toBeDisabled();
 
-  const healRow = rankOne.getByRole("group", { name: "Heal spellbook row" });
+  const healRow = rankOne.getByRole("group", { name: "Heal spell list row" });
   for (let index = 0; index < 4; index += 1) {
     await healRow.getByRole("button", { name: "Prepare Heal at rank 1" }).click();
   }
@@ -1373,11 +1373,11 @@ test("builder splits animist prepared and apparition spellcasting", async ({ pag
   const rankOne = page
     .locator(".spell-section")
     .filter({ has: page.getByRole("heading", { name: "Rank 1 prepared list" }) });
-  await rankOne.getByRole("button", { name: "Add rank 1 spell to spellbook" }).click();
+  await rankOne.getByRole("button", { name: "Add rank 1 spell to prepared list" }).click();
   await pickSpell(page, "Bless");
-  await rankOne.getByRole("button", { name: "Add rank 1 spell to spellbook" }).click();
+  await rankOne.getByRole("button", { name: "Add rank 1 spell to prepared list" }).click();
   await pickSpell(page, "Heal");
-  const blessRow = rankOne.getByRole("group", { name: "Bless spellbook row" });
+  const blessRow = rankOne.getByRole("group", { name: "Bless prepared list row" });
   await blessRow.getByRole("button", { name: "Prepare Bless at rank 1" }).click();
   await expect(blessRow.getByRole("button", { name: "Prepare Bless at rank 1" })).toBeDisabled();
 

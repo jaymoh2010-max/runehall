@@ -32,6 +32,7 @@ import {
   saveUpgradesFrom,
   spellRepertoireLimits,
   spellSlotsFor,
+  spellSourceLabel,
 } from "../src/shared/rules";
 import type {
   Ancestry,
@@ -455,6 +456,21 @@ describe("PF2e character rules", () => {
       "spell:a": "religion",
       "spell:c": "occultism",
     });
+  });
+
+  it("labels prepared spell sources by class", () => {
+    const byName = (name: string) => classes.find((entry) => entry.name === name)!;
+    expect(spellSourceLabel(byName("Wizard"))).toBe("spellbook");
+    expect(spellSourceLabel(byName("Magus"))).toBe("spellbook");
+    expect(spellSourceLabel(byName("Witch"))).toBe("familiar");
+    expect(spellSourceLabel(byName("Necromancer"))).toBe("dirge");
+    expect(spellSourceLabel(byName("Cleric"))).toBe("spell list");
+    expect(spellSourceLabel(byName("Druid"))).toBe("spell list");
+    expect(spellSourceLabel(byName("Animist"))).toBe("spell list");
+    expect(spellSourceLabel(byName("Sorcerer"))).toBe("repertoire");
+    expect(spellSourceLabel(byName("Champion"))).toBe("focus spells");
+    expect(spellSourceLabel(byName("Fighter"))).toBe("spells");
+    expect(spellSourceLabel(null)).toBe("spells");
   });
 
   it("derives Evasion and Juggernaut save upgrades from feature names", () => {
