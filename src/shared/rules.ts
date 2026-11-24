@@ -1699,6 +1699,7 @@ export function normalizeCharacterDraft(input: unknown, fallbackName = "New Hero
     invested: boolean;
     usesUsed: number;
     usesMax?: number;
+    usesKind?: "daily" | "charges";
     runes: string[];
   };
   const equipmentMap = new Map<string, NormalizedEquipment>();
@@ -1720,6 +1721,9 @@ export function normalizeCharacterDraft(input: unknown, fallbackName = "New Hero
       if (typeof item.usesMax === "number" && Number.isFinite(item.usesMax)) {
         existing.usesMax = Math.max(0, Math.min(999, Math.floor(item.usesMax)));
       }
+      if (item.usesKind === "daily" || item.usesKind === "charges") {
+        existing.usesKind = item.usesKind;
+      }
       existing.runes = [...new Set([...existing.runes, ...runes])].slice(0, 12);
     } else {
       equipmentMap.set(itemId, {
@@ -1730,6 +1734,9 @@ export function normalizeCharacterDraft(input: unknown, fallbackName = "New Hero
         usesUsed: Math.max(0, Math.min(999, Math.floor(num(item.usesUsed, 0)))),
         ...(typeof item.usesMax === "number" && Number.isFinite(item.usesMax)
           ? { usesMax: Math.max(0, Math.min(999, Math.floor(item.usesMax))) }
+          : {}),
+        ...(item.usesKind === "daily" || item.usesKind === "charges"
+          ? { usesKind: item.usesKind as "daily" | "charges" }
           : {}),
         runes,
       });

@@ -175,6 +175,22 @@ describe("using and activating items", () => {
     expect(reset.equipment[0].usesUsed).toBe(0);
     expect(reset).not.toBe(draft);
   });
+
+  it("empties charged staff pools after a rest", () => {
+    const draft = draftWith([
+      {
+        itemId: "item:staff",
+        quantity: 1,
+        equipped: true,
+        usesKind: "charges",
+        usesMax: 3,
+        usesUsed: 1,
+      },
+    ]);
+    const reset = resetItemUses(draft);
+    expect(reset.equipment[0].usesUsed).toBe(3);
+    expect(reset.equipment[0].usesMax).toBe(3);
+  });
 });
 
 describe("invested items", () => {

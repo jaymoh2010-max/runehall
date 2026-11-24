@@ -7,6 +7,7 @@ import {
   isSpellScroll,
   scrollSpellRank,
   specificWandSpell,
+  staffSpells,
   wandSpellRank,
 } from "../src/shared/itemSpellcasting";
 import type { Equipment } from "../src/shared/types";
@@ -135,9 +136,9 @@ describe("flexible wands", () => {
     }
   });
 
-  it("leaves trait-restricted flexible wands manual", () => {
+  it("recognizes trait-restricted Cyrusian wands as flexible", () => {
     const cyrusian = equipment.find((entry) => entry.name === "Cyrusian Wand (1st-Rank Spell)")!;
-    expect(flexibleWandRank(cyrusian)).toBeNull();
+    expect(flexibleWandRank(cyrusian)).toBe(1);
     expect(specificWandSpell(cyrusian)).toBeNull();
   });
 
@@ -153,5 +154,41 @@ describe("flexible wands", () => {
     const cane = equipment.find((entry) => entry.name === "Wand Cane")!;
     expect(flexibleWandRank(cane)).toBeNull();
     expect(flexibleWandRank(null)).toBeNull();
+  });
+});
+
+describe("staff spell lists", () => {
+  it("reads cantrips and ranked spells from a staff", () => {
+    const healing = equipment.find((entry) => entry.name === "Staff of Healing")!;
+    expect(staffSpells(healing)).toEqual([
+      { name: "Stabilize", rank: 0 },
+      { name: "Heal", rank: 1 },
+    ]);
+
+    const fire = equipment.find((entry) => entry.name === "Staff of Fire")!;
+    expect(staffSpells(fire)).toEqual([
+      { name: "Ignition", rank: 0 },
+      { name: "Breathe Fire", rank: 1 },
+    ]);
+  });
+
+  it("splits multiple spells listed at one rank", () => {
+    const wanderer = equipment.find((entry) => entry.name === "Wanderer’s Staff")!;
+    expect(staffSpells(wanderer)).toEqual([
+      { name: "Know the Way", rank: 0 },
+      { name: "Alarm", rank: 1 },
+      { name: "Breadcrumbs", rank: 1 },
+      { name: "Create Food", rank: 2 },
+      { name: "Environmental Endurance", rank: 2 },
+      { name: "Marvelous Mount", rank: 2 },
+    ]);
+  });
+
+  it("returns no list for non-staff items or staves without embedded spells", () => {
+    const sword = equipment.find((entry) => entry.name === "Longsword")!;
+    expect(staffSpells(sword)).toEqual([]);
+    const listless = equipment.find((entry) => entry.name === "Bounty's Light")!;
+    expect(staffSpells(listless)).toEqual([]);
+    expect(staffSpells(null)).toEqual([]);
   });
 });

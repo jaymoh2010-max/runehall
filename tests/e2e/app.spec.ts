@@ -41,6 +41,7 @@ const lightningWandId = compendiumEquipment.find(
 const wideningWandId = compendiumEquipment.find(
   (entry) => entry.name === "Wand of Widening (1st-Rank Spell)"
 )!.id;
+const healingStaffId = compendiumEquipment.find((entry) => entry.name === "Staff of Healing")!.id;
 const elementBloodlineId = "cf:RXRnJcG4XSabZ35a";
 const admin = {
   username: `e2e_gm_${runId}`,
@@ -1463,6 +1464,13 @@ test("builder learns a spontaneous spell at more than one rank", async ({ page }
     invested: false,
     runes: [],
   });
+  draft.equipment.push({
+    itemId: healingStaffId,
+    quantity: 1,
+    equipped: true,
+    invested: false,
+    runes: [],
+  });
   const saved = await page.request.put(`/api/characters/${character.character.id}`, {
     data: { data: draft, force: true },
   });
@@ -1560,6 +1568,19 @@ test("builder learns a spontaneous spell at more than one rank", async ({ page }
     page.getByText(/Cast Grease from Wand of Widening \(1st-Rank Spell\) at rank 1/)
   ).toBeVisible({ timeout: 15_000 });
   await expect(flexibleWandRow.getByRole("button", { name: /used today/i })).toBeDisabled();
+  const staffRow = page.locator(".pb-inventory-row").filter({ hasText: "Staff of Healing" });
+  await expect(staffRow).toBeVisible();
+  await staffRow.getByRole("button", { name: "Charge Staff of Healing" }).click();
+  await page.getByRole("button", { name: "Expend rank 1" }).click();
+  await expect(page.getByText(/Charged Staff of Healing with 1 charge/)).toBeVisible({
+    timeout: 15_000,
+  });
+  await staffRow.getByRole("button", { name: "Cast spell from Staff of Healing" }).click();
+  await page.getByRole("button", { name: /^Heal · 1 charge$/ }).click();
+  await expect(page.getByText(/Cast Heal from Staff of Healing using 1 charge/)).toBeVisible({
+    timeout: 15_000,
+  });
+  await expect(staffRow).toContainText("0 / 1 charges");
   await expect(page.locator(".pb-save")).toHaveText("Saved");
 
   await page.reload();

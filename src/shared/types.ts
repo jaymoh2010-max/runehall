@@ -604,6 +604,11 @@ export interface CharacterEquipment {
   usesUsed?: number;
   /** Optional manual charge cap; otherwise derived from the item's activation. */
   usesMax?: number;
+  /**
+   * How usesUsed/usesMax are interpreted. Charged staff pools are emptied on a
+   * long rest, while daily item uses refill.
+   */
+  usesKind?: "daily" | "charges";
   /** Equipment IDs for runes etched onto this weapon, armor, or shield. */
   runes?: string[];
 }

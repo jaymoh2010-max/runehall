@@ -28,7 +28,7 @@ import {
 import { selectedClassGrants } from "../shared/classGrants";
 import { APPARITION_BY_ID } from "../shared/apparitions";
 import { customItemToEquipment } from "../shared/inventory";
-import { specificWandSpell } from "../shared/itemSpellcasting";
+import { specificWandSpell, staffSpells } from "../shared/itemSpellcasting";
 import {
   COMPENDIUM_KIND_ORDER,
   compendiumKindFromId,
@@ -669,6 +669,10 @@ export function contextForDraft(
       const wand = specificWandSpell(item);
       if (wand) {
         const spell = spellByName.get(normalizedSpellName(wand.name));
+        if (spell) spellMap[spell.id] = spell;
+      }
+      for (const staffSpell of staffSpells(item)) {
+        const spell = spellByName.get(normalizedSpellName(staffSpell.name));
         if (spell) spellMap[spell.id] = spell;
       }
     }
