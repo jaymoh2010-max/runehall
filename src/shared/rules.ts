@@ -117,6 +117,23 @@ export function isPreparedCasterClass(className?: string): boolean {
   return PREPARED_CASTER_CLASSES.has(className?.toLowerCase() ?? "");
 }
 
+/**
+ * What a class calls its source of ordinary spells. Prepared classes do not
+ * all use a spellbook: witches use a familiar, necromancers a dirge, and
+ * clerics/druids/animists prepare from a class spell list.
+ */
+export function spellSourceLabel(classData: ClassData | null | undefined): string {
+  const name = classData?.name.toLowerCase() ?? "";
+  if (name === "wizard" || name === "magus") return "spellbook";
+  if (name === "witch") return "familiar";
+  if (name === "necromancer") return "dirge";
+  if (isPreparedCasterClass(name)) return "spell list";
+  const caster = casterInfo(classData);
+  if (caster.progression === "focus") return "focus spells";
+  if (caster.progression === "none") return "spells";
+  return "repertoire";
+}
+
 interface CasterInfo {
   progression: CasterProgression;
   tradition: SpellTradition | null;

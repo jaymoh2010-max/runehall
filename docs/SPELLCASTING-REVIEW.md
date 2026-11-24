@@ -2,7 +2,7 @@
 
 Date: 2026-11-23
 
-Status: review complete. Sprint 1 (the daily spellcasting loop), the class-grant portion of Sprint 2, the first table-magic pass of Sprint 3, the magus studious-slot pass of Sprint 4, the animist prepared/spontaneous split of Sprint 5, the spontaneous known-at-rank pass of Sprint 6, the psychic psi-amp pass of Sprint 7, the table Sustain-reminder pass of Sprint 8, the higher-slot downcast pass of Sprint 9, the scroll-spellcasting pass of Sprint 10, the Magic Wand spellcasting pass of Sprint 11, the fixed-spell specific-wand pass of Sprint 12, the expanded/advanced domain pass of Sprint 13, the flexible-wand pass of Sprint 14, the staff/trait-restricted wand pass of Sprint 15, and the ritual-detail pass of Sprint 16 were implemented on 2026-11-23 through 2026-11-24. The findings below describe the pre-Sprint state; the implementation status sections record what changed, and the remaining class and table gaps stay in the backlog.
+Status: review complete. Sprint 1 (the daily spellcasting loop), the class-grant portion of Sprint 2, the first table-magic pass of Sprint 3, the magus studious-slot pass of Sprint 4, the animist prepared/spontaneous split of Sprint 5, the spontaneous known-at-rank pass of Sprint 6, the psychic psi-amp pass of Sprint 7, the table Sustain-reminder pass of Sprint 8, the higher-slot downcast pass of Sprint 9, the scroll-spellcasting pass of Sprint 10, the Magic Wand spellcasting pass of Sprint 11, the fixed-spell specific-wand pass of Sprint 12, the expanded/advanced domain pass of Sprint 13, the flexible-wand pass of Sprint 14, the staff/trait-restricted wand pass of Sprint 15, the ritual-detail pass of Sprint 16, and the spell-source label pass of Sprint 17 were implemented on 2026-11-23 through 2026-11-24. The findings below describe the pre-Sprint state; the implementation status sections record what changed, and the remaining class and table gaps stay in the backlog.
 
 > **Follow-up (2026-11-23):** `docs/RULES-AUDIT.md` corrected two table errors
 > this review did not catch: bards use the 2/3 full-caster slot table (not the
@@ -224,6 +224,16 @@ Ritual detail cards are implemented:
 - Manual primary-check choices persist on the character and are used by the ritual's **Primary check** roll.
 - The sheet can therefore resolve rituals whose generated data omits the primary-check skill.
 
+## Sprint 17 implementation status (2026-11-24)
+
+Prepared spell-source labels are implemented:
+
+- Wizards and magi see **spellbook**, witches see **familiar**, and necromancers see **dirge**.
+- Clerics, druids, and animists see **spell list** instead of a spellbook label.
+- Spontaneous casters keep **repertoire**, focus-only classes use **focus spells**, and non-casters use **spells**.
+- Builder headings, add/remove labels, and daily-preparation empty states use the correct source name.
+- The underlying `spells.known` list is still shared by prepared and spontaneous casters; a full spellbook/known split and Learn a Spell accounting remain open.
+
 ## Rules baseline
 
 ### Core spellcasting
@@ -284,6 +294,7 @@ Legend: Yes = modeled and usable; Partial = some support with known gaps; No = n
 | Divine font | Yes | Rank, slot count, dual-font choice, separate usage |
 | Wizard curriculum | Partial | Extra slot and rank-1 validation; higher-rank curriculum lists remain manual |
 | Prepared cantrips | Yes | Daily prepared list, class caps, and the wizard curriculum extra |
+| Spell source presentation | Partial | Class-specific spellbook/familiar/dirge/spell-list/repertoire labels; full spellbook/known data split and Learn a Spell remain open |
 | Spontaneous repertoire limits | Yes | Bard, oracle, sorcerer, summoner, and psychic; rank copies count against each learned rank |
 | Spontaneous heightening by learned rank | Yes | Known ranks are tracked; signature spells heighten upward and non-signature spells can downcast from higher slots |
 | Signature spells | Yes | One per rank, level 3 gate, validation |
@@ -373,13 +384,13 @@ Fix: Split `cantripKnownLimitFor(classData)` from `cantripPreparedLimitFor(class
 
 ### F5. Spellbook, known list, and repertoire are one data field (P1)
 
-Status: partly addressed in Sprint 1 (prepared cantrips and class-specific cap labels); the full spellbook/known split remains open.
+Status: partly addressed in Sprint 1 and Sprint 17. Prepared cantrips are separate, and the builder now uses class-specific spellbook/familiar/dirge/spell-list labels. The data model still shares `spells.known` for the spellbook and repertoire, and Learn a Spell accounting remains open.
 
 Evidence:
 
 - `draft.spells.known` is used for both a prepared caster's spellbook and a spontaneous caster's repertoire.
 - The builder switches the label between "spellbook" and "repertoire" but not the behavior (`SpellsStep.tsx`).
-- Cleric, druid, and animist also see "spellbook" labels even though they prepare from a class spell list, not a book.
+- Cleric, druid, and animist also see "spellbook" labels even though they prepare from a class spell list, not a book. (Fixed in Sprint 17.)
 - There is no spellbook capacity check for wizard, magus, witch, or necromancer.
 
 Impact: The data model cannot distinguish "in my book" from "I can prepare this today", and class-specific spellbook rules (starting contents, two spells per level, Learn a Spell, familiar) are not enforceable.

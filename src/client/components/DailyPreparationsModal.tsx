@@ -20,6 +20,7 @@ import {
   removePreparedCantrip,
   removePreparedCopy,
   removeStudiousSpell,
+  spellSourceLabel,
   type DivineFontChoice,
 } from "../../shared/rules";
 import { Button, Field, Modal, Select, Tag } from "./ui";
@@ -616,7 +617,8 @@ export function DailyPreparationsModal({
                 </div>
               ) : (
                 <p className="tiny muted">
-                  No eligible spells in the spellbook. Add spells from Edit character first.
+                  No eligible spells in the {spellSourceLabel(classData)}. Add spells from Edit
+                  character first.
                 </p>
               )}
             </section>
