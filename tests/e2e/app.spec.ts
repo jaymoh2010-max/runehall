@@ -38,6 +38,9 @@ const wand3Id = compendiumEquipment.find(
 const lightningWandId = compendiumEquipment.find(
   (entry) => entry.name === "Wand of Crackling Lightning (3rd-Rank Spell)"
 )!.id;
+const wideningWandId = compendiumEquipment.find(
+  (entry) => entry.name === "Wand of Widening (1st-Rank Spell)"
+)!.id;
 const elementBloodlineId = "cf:RXRnJcG4XSabZ35a";
 const admin = {
   username: `e2e_gm_${runId}`,
@@ -1453,6 +1456,13 @@ test("builder learns a spontaneous spell at more than one rank", async ({ page }
     invested: false,
     runes: [],
   });
+  draft.equipment.push({
+    itemId: wideningWandId,
+    quantity: 1,
+    equipped: true,
+    invested: false,
+    runes: [],
+  });
   const saved = await page.request.put(`/api/characters/${character.character.id}`, {
     data: { data: draft, force: true },
   });
@@ -1535,6 +1545,21 @@ test("builder learns a spontaneous spell at more than one rank", async ({ page }
     timeout: 15_000,
   });
   await expect(fixedWandRow.getByRole("button", { name: /used today/i })).toBeDisabled();
+  const flexibleWandRow = page
+    .locator(".pb-inventory-row")
+    .filter({ hasText: "Wand of Widening (1st-Rank Spell)" });
+  await expect(flexibleWandRow).toBeVisible();
+  await flexibleWandRow.getByRole("button", { name: /Cast spell from/ }).click();
+  await page.getByPlaceholder(/Search spells/).fill("Grease");
+  await page
+    .locator(".picker-item-name", { hasText: /^Grease$/ })
+    .first()
+    .click();
+  await page.getByRole("button", { name: "Cast from wand" }).click();
+  await expect(
+    page.getByText(/Cast Grease from Wand of Widening \(1st-Rank Spell\) at rank 1/)
+  ).toBeVisible({ timeout: 15_000 });
+  await expect(flexibleWandRow.getByRole("button", { name: /used today/i })).toBeDisabled();
   await expect(page.locator(".pb-save")).toHaveText("Saved");
 
   await page.reload();

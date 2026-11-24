@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
+  flexibleWandRank,
   isMagicWand,
   isSpellScroll,
   scrollSpellRank,
@@ -113,5 +114,44 @@ describe("specific wands", () => {
   it("returns a null rank when the name and prose do not state one", () => {
     const caustic = equipment.find((entry) => entry.name === "Wand of Caustic Effluence")!;
     expect(specificWandSpell(caustic)).toEqual({ name: "Grease", rank: null });
+  });
+});
+
+describe("flexible wands", () => {
+  it("recognizes wands that cast a chosen spell at a listed rank", () => {
+    const cases: [string, number][] = [
+      ["Wand of Continuation (3rd-Rank Spell)", 3],
+      ["Wand of Hybrid Form (2nd-rank)", 2],
+      ["Wand of Legerdemain (1st-rank)", 1],
+      ["Wand of Mercy (9th-rank)", 9],
+      ["Wand of Reaching (5th-Rank)", 5],
+      ["Wand of Widening (1st-Rank Spell)", 1],
+    ];
+    for (const [name, rank] of cases) {
+      const item = equipment.find((entry) => entry.name === name)!;
+      expect(item, name).toBeTruthy();
+      expect(flexibleWandRank(item), name).toBe(rank);
+      expect(specificWandSpell(item), name).toBeNull();
+    }
+  });
+
+  it("leaves trait-restricted flexible wands manual", () => {
+    const cyrusian = equipment.find((entry) => entry.name === "Cyrusian Wand (1st-Rank Spell)")!;
+    expect(flexibleWandRank(cyrusian)).toBeNull();
+    expect(specificWandSpell(cyrusian)).toBeNull();
+  });
+
+  it("does not treat fixed or generic wands as flexible", () => {
+    const fireballs = equipment.find(
+      (entry) => entry.name === "Wand of Smoldering Fireballs (3rd-Rank Spell)"
+    )!;
+    expect(flexibleWandRank(fireballs)).toBeNull();
+
+    const generic = equipment.find((entry) => entry.name === "Magic Wand (1st-Rank Spell)")!;
+    expect(flexibleWandRank(generic)).toBeNull();
+
+    const cane = equipment.find((entry) => entry.name === "Wand Cane")!;
+    expect(flexibleWandRank(cane)).toBeNull();
+    expect(flexibleWandRank(null)).toBeNull();
   });
 });

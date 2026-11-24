@@ -2,7 +2,7 @@
 
 Date: 2026-11-23
 
-Status: review complete. Sprint 1 (the daily spellcasting loop), the class-grant portion of Sprint 2, the first table-magic pass of Sprint 3, the magus studious-slot pass of Sprint 4, the animist prepared/spontaneous split of Sprint 5, the spontaneous known-at-rank pass of Sprint 6, the psychic psi-amp pass of Sprint 7, the table Sustain-reminder pass of Sprint 8, the higher-slot downcast pass of Sprint 9, the scroll-spellcasting pass of Sprint 10, the Magic Wand spellcasting pass of Sprint 11, the fixed-spell specific-wand pass of Sprint 12, and the expanded/advanced domain pass of Sprint 13 were implemented on 2026-11-23. The findings below describe the pre-Sprint state; the implementation status sections record what changed, and the remaining class and table gaps stay in the backlog.
+Status: review complete. Sprint 1 (the daily spellcasting loop), the class-grant portion of Sprint 2, the first table-magic pass of Sprint 3, the magus studious-slot pass of Sprint 4, the animist prepared/spontaneous split of Sprint 5, the spontaneous known-at-rank pass of Sprint 6, the psychic psi-amp pass of Sprint 7, the table Sustain-reminder pass of Sprint 8, the higher-slot downcast pass of Sprint 9, the scroll-spellcasting pass of Sprint 10, the Magic Wand spellcasting pass of Sprint 11, the fixed-spell specific-wand pass of Sprint 12, the expanded/advanced domain pass of Sprint 13, and the flexible-wand pass of Sprint 14 were implemented on 2026-11-23. The findings below describe the pre-Sprint state; the implementation status sections record what changed, and the remaining class and table gaps stay in the backlog.
 
 > **Follow-up (2026-11-23):** `docs/RULES-AUDIT.md` corrected two table errors
 > this review did not catch: bards use the 2/3 full-caster slot table (not the
@@ -196,6 +196,14 @@ The cleric domain chain is implemented:
 - The Class step shows the new choice groups automatically, and the focus pool grows with the additional focus spells.
 - Later domain feats, repeated Advanced Domain picks, and oracle Domain Acumen/Fluency remain manual.
 
+## Sprint 14 implementation status (2026-11-23)
+
+Flexible wands are implemented:
+
+- Wands whose prose says the wielder casts a chosen spell at a listed rank, such as a **Wand of Widening** or **Wand of Reaching**, expose the wand spell picker at that rank.
+- Casting records the wand's daily use and posts to chat, with a reminder to apply the wand's own effect; the effect itself stays manual.
+- Trait-restricted **Cyrusian wands** and staves remain manual.
+
 ## Rules baseline
 
 ### Core spellcasting
@@ -272,7 +280,7 @@ Legend: Yes = modeled and usable; Partial = some support with known gaps; No = n
 | Rituals | Partial | Primary-check rolls work when the description names a known skill; missing data falls back to manual |
 | Sustained spells | Yes | Casting starts sustain, the sheet and table list active spells, Sustain/End actions are available, and Restore clears them |
 | Spellbook capacity and learning | No | No starting-spellbook or Learn a Spell accounting |
-| Item spellcasting | Partial | Scrolls cast from the character's spell list and consume on use; generic Magic Wands cast at their rank once per day; fixed-spell specific wands cast directly; flexible wands and staves remain manual |
+| Item spellcasting | Partial | Scrolls cast from the character's spell list and consume on use; generic Magic Wands cast at their rank once per day; fixed-spell specific wands cast directly; flexible wands cast a chosen spell at their listed rank with the effect left manual; trait-restricted wands and staves remain manual |
 | Multiclass spellcasting archetypes | No | Only the primary class contributes caster progression |
 
 ## Findings
@@ -443,11 +451,11 @@ Fix: Ingest the structured primary-check skill and DC from the source data, then
 
 ### F12. Item spellcasting is not modeled (P2)
 
-Status: partly fixed in Sprint 10, Sprint 11, and Sprint 12. Scrolls are castable from the sheet and consumed; generic Magic Wands are castable at their rank once per day; fixed-spell specific wands cast directly. Flexible wands and staves still use the generic item activation path.
+Status: partly fixed in Sprint 10, Sprint 11, Sprint 12, and Sprint 14. Scrolls are castable from the sheet and consumed; generic Magic Wands are castable at their rank once per day; fixed-spell specific wands cast directly; flexible wands use the wand picker and leave their special effect manual. Trait-restricted wands and staves still use the generic item activation path.
 
-Impact: Scrolls, generic wands, and fixed-spell specific wands are spellcasting resources at the table; other magic items remain inventory entries.
+Impact: Scrolls, generic wands, fixed-spell wands, and flexible wands are spellcasting resources at the table; other magic items remain inventory entries.
 
-Fix: Scroll casting opens the spell picker at the scroll's rank, filters by the character's tradition, and consumes the scroll on confirmation. Generic wand casting uses the same picker, records a daily use, and resets it on a long rest. Specific wands with a readable fixed spell cast directly. The pattern can be extended to staff spell lists and flexible wands.
+Fix: Scroll casting opens the spell picker at the scroll's rank, filters by the character's tradition, and consumes the scroll on confirmation. Generic wand casting uses the same picker, records a daily use, and resets it on a long rest. Specific wands with a readable fixed spell cast directly, and flexible wands open the picker at their listed rank. The pattern can be extended to staff spell lists and trait-restricted wands.
 
 ### F13. Multiclass spellcasting archetypes are not modeled (P2)
 
@@ -617,8 +625,8 @@ Tasks:
    - Keep cost, secondary casters, and consequences manual but visible.
 
 3. **Item spellcasting**
-   - Cast from scrolls, wands, and staves with the correct charges and DC. (Scrolls implemented in Sprint 10; generic Magic Wands in Sprint 11; fixed-spell specific wands in Sprint 12.)
-   - Consume scrolls and track wand daily uses; flexible wands, staff charges, and structured staff spell lists remain manual; respect daily preparations.
+   - Cast from scrolls, wands, and staves with the correct charges and DC. (Scrolls implemented in Sprint 10; generic Magic Wands in Sprint 11; fixed-spell specific wands in Sprint 12; flexible wands in Sprint 14.)
+   - Consume scrolls and track wand daily uses; trait-restricted wands, staff charges, and structured staff spell lists remain manual; respect daily preparations.
 
 4. **Spellbook and learning**
    - Add starting spellbook contents and two-spells-per-level accounting.
