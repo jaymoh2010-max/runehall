@@ -926,6 +926,8 @@ export interface CharacterDraft {
     signature: string[];
     /** Rituals known or prepared for downtime play. */
     rituals: string[];
+    /** Manual primary-check skill overrides for rituals, keyed by spell id. */
+    ritualSkills?: Record<string, string>;
     /** Innate spells granted by ancestry, heritage, feats, or items. */
     innate: string[];
     /** Innate spell uses spent today, keyed by spell id. */

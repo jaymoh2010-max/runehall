@@ -1874,6 +1874,11 @@ export function normalizeCharacterDraft(input: unknown, fallbackName = "New Hero
         0,
         80
       ),
+      ritualSkills: Object.fromEntries(
+        Object.entries(obj(spells.ritualSkills))
+          .filter(([, value]) => typeof value === "string" && value.trim())
+          .map(([key, value]) => [key.slice(0, 120), String(value).trim().slice(0, 120)])
+      ) as Record<string, string>,
       innate: [...new Set(arr<string>(spells.innate).filter((x) => typeof x === "string"))].slice(
         0,
         80

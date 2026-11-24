@@ -2,7 +2,7 @@
 
 Date: 2026-11-23
 
-Status: review complete. Sprint 1 (the daily spellcasting loop), the class-grant portion of Sprint 2, the first table-magic pass of Sprint 3, the magus studious-slot pass of Sprint 4, the animist prepared/spontaneous split of Sprint 5, the spontaneous known-at-rank pass of Sprint 6, the psychic psi-amp pass of Sprint 7, the table Sustain-reminder pass of Sprint 8, the higher-slot downcast pass of Sprint 9, the scroll-spellcasting pass of Sprint 10, the Magic Wand spellcasting pass of Sprint 11, the fixed-spell specific-wand pass of Sprint 12, the expanded/advanced domain pass of Sprint 13, the flexible-wand pass of Sprint 14, and the staff/trait-restricted wand pass of Sprint 15 were implemented on 2026-11-23 through 2026-11-24. The findings below describe the pre-Sprint state; the implementation status sections record what changed, and the remaining class and table gaps stay in the backlog.
+Status: review complete. Sprint 1 (the daily spellcasting loop), the class-grant portion of Sprint 2, the first table-magic pass of Sprint 3, the magus studious-slot pass of Sprint 4, the animist prepared/spontaneous split of Sprint 5, the spontaneous known-at-rank pass of Sprint 6, the psychic psi-amp pass of Sprint 7, the table Sustain-reminder pass of Sprint 8, the higher-slot downcast pass of Sprint 9, the scroll-spellcasting pass of Sprint 10, the Magic Wand spellcasting pass of Sprint 11, the fixed-spell specific-wand pass of Sprint 12, the expanded/advanced domain pass of Sprint 13, the flexible-wand pass of Sprint 14, the staff/trait-restricted wand pass of Sprint 15, and the ritual-detail pass of Sprint 16 were implemented on 2026-11-23 through 2026-11-24. The findings below describe the pre-Sprint state; the implementation status sections record what changed, and the remaining class and table gaps stay in the backlog.
 
 > **Follow-up (2026-11-23):** `docs/RULES-AUDIT.md` corrected two table errors
 > this review did not catch: bards use the 2/3 full-caster slot table (not the
@@ -215,6 +215,15 @@ Staff spellcasting and trait-restricted wands are implemented:
 - **Cyrusian wands** now use the wand picker filtered to illusion spells.
 - Staves with no readable spell list and casting a staff spell with a spell slot instead of charges remain manual.
 
+## Sprint 16 implementation status (2026-11-24)
+
+Ritual detail cards are implemented:
+
+- Ritual rows expose a **Details** action with the ritual's rank, action time, cost, requirements, and full rules text.
+- The card shows the primary-check skill detected from the prose and lets the player override it with any trained skill or lore.
+- Manual primary-check choices persist on the character and are used by the ritual's **Primary check** roll.
+- The sheet can therefore resolve rituals whose generated data omits the primary-check skill.
+
 ## Rules baseline
 
 ### Core spellcasting
@@ -288,7 +297,7 @@ Legend: Yes = modeled and usable; Partial = some support with known gaps; No = n
 | Summoner link spells | Yes | Evolution Surge and Boost Eidolon granted; eidolon actions remain manual |
 | Magus studious slots | Yes | Two special slots at 7th, rank 3 at 11th, rank 4 at 13th; hybrid-study list and preparation UI |
 | Animist prepared/spontaneous split | Yes | Prepared animist slots and spontaneous apparition slots, attunement, repertoire, and vessel focus spells |
-| Rituals | Partial | Primary-check rolls work when the description names a known skill; missing data falls back to manual |
+| Rituals | Partial | Primary-check rolls work, with a detail card and a manual skill override when the data omits the check; cost and outcome guidance remain prose |
 | Sustained spells | Yes | Casting starts sustain, the sheet and table list active spells, Sustain/End actions are available, and Restore clears them |
 | Spellbook capacity and learning | No | No starting-spellbook or Learn a Spell accounting |
 | Item spellcasting | Partial | Scrolls cast from the character's spell list and consume on use; generic Magic Wands cast at their rank once per day; fixed-spell specific wands cast directly; flexible wands cast a chosen spell at their listed rank; staves track parsed spell lists and charge pools; casting a staff spell with a slot and staves without readable lists remain manual |
@@ -452,13 +461,13 @@ Fix: The table reminder now appears below the initiative bar for an active chara
 
 ### F11. Rituals are a stub (P2)
 
-Status: partly fixed in Sprint 3. Ritual rows expose a Primary check action; generated data is incomplete.
+Status: partly fixed in Sprint 3 and Sprint 16. Ritual rows expose a Details card and a Primary check action. The card shows the detected primary skill and lets the player override it when the data is incomplete.
 
-`src/shared/ritual.ts` derives a primary-check skill from ritual prose, and the sheet now uses it. Generated descriptions often omit the primary-check skill, so those rituals explicitly fall back to manual resolution. The sheet still leaves cost, secondary casters, and outcomes to the table.
+`src/shared/ritual.ts` derives a primary-check skill from ritual prose, and the sheet now uses it. Generated descriptions often omit the primary-check skill; the detail card lets the player choose one manually and still roll from the sheet. Cost, secondary casters, and outcomes remain prose.
 
-Impact: Rituals with a readable skill can be rolled directly; the rest are a link plus a manual note.
+Impact: Any ritual can be given a usable primary check at the table; structured automation still depends on better source data.
 
-Fix: Ingest the structured primary-check skill and DC from the source data, then show a ritual detail card with cost, secondary casters, and degree-of-success guidance.
+Fix: Ingest the structured primary-check skill and DC from the source data, then replace the manual override with automatic defaults. Keep the detail card as the table-facing reference.
 
 ### F12. Item spellcasting is not modeled (P2)
 
@@ -632,8 +641,8 @@ Tasks:
    - Clear sustained spells on rest (already done in `applyLongRest`).
 
 2. **Rituals**
-   - Add a ritual workflow that reads the primary check, rolls the chosen skill, and posts the result.
-   - Keep cost, secondary casters, and consequences manual but visible.
+   - Add a ritual workflow that reads the primary check, rolls the chosen skill, and posts the result. (Implemented in Sprint 3 and Sprint 16.)
+   - Keep cost, secondary casters, and consequences manual but visible in the detail card.
 
 3. **Item spellcasting**
    - Cast from scrolls, wands, and staves with the correct charges and DC. (Scrolls implemented in Sprint 10; generic Magic Wands in Sprint 11; fixed-spell specific wands in Sprint 12; flexible wands in Sprint 14; staves in Sprint 15.)

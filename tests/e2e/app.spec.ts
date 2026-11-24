@@ -1689,6 +1689,14 @@ test("sheet tracks rituals and innate spells", async ({ page }) => {
   const ritualRow = page.locator(".pb-spell-row").filter({ hasText: "Angelic Messenger" });
   await expect(ritualRow).toBeVisible();
   await expect(ritualRow).toContainText("Rituals");
+  await ritualRow.getByRole("button", { name: "Details" }).click();
+  await expect(page.getByRole("heading", { name: "Angelic Messenger" })).toBeVisible();
+  await page.getByLabel(/Primary check/).selectOption("religion");
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".pb-save")).toHaveText("Saved");
+  await ritualRow.getByRole("button", { name: "Details" }).click();
+  await expect(page.getByLabel(/Primary check/)).toHaveValue("religion");
+  await page.keyboard.press("Escape");
   const innateRow = page
     .locator(".pb-spell-row")
     .filter({ hasText: "Detect Magic" })
