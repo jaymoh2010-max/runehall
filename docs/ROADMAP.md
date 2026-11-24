@@ -195,6 +195,7 @@ The character builder is already good enough for a core campaign at low levels. 
    - Focus-only classes get their own spell attack/DC, innate spells use a separate Charisma-based profile, and the sheet uses the correct source per spell row.
    - Class grants cover psychic conscious minds and psi cantrips, necromancer grave spells, summoner link spells, and cleric deity spells.
    - Cleric domains cover Domain Initiate, Expanded Domain Initiate, and repeated Advanced Domain picks, including alternate domains and rank-4 advanced focus spells.
+   - Oracle mystery domains cover Domain Acumen and Domain Fluency, limited to the domains associated with the chosen mystery.
    - Prepared casters use class-specific source labels: spellbook for wizard/magus, familiar for witch, dirge for necromancer, and spell list for cleric/druid/animist; spontaneous casters keep repertoire.
    - Sustained spells are recorded when cast, listed on the sheet, and can be ended; ritual rows open a detail card with cost, requirements, full text, and a primary-check skill override, then roll the chosen skill.
    - Magus studious slots scale at 7th/11th/13th level; the builder and daily preparations only allow Gecko Grip, Haste, Fly, and the chosen hybrid study's studious spells.

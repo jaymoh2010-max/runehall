@@ -41,7 +41,7 @@ export interface GrantChoiceGroup {
   /** Shown when no legal option exists yet, e.g. before a deity is chosen. */
   emptyHint?: string;
   /** Restrict domain options to alternate or already-initialized domains. */
-  domainScope?: "alternate" | "advanced";
+  domainScope?: "alternate" | "advanced" | "mysteryInitial" | "mysteryAdvanced";
   /** Expand the number of picks to the number of times this feat is selected. */
   countFromFeat?: string;
   options: GrantChoiceOption[];
@@ -75,6 +75,8 @@ export const GRANT_CHOICE_KEYS = {
   runelordSin: "grant:runelord-sin",
   witchHex: "grant:witch-hex",
   oracleMystery: "grant:oracle-mystery",
+  oracleDomainAcumen: "grant:oracle-domain-acumen",
+  oracleDomainFluency: "grant:oracle-domain-fluency",
 } as const;
 
 const DOMAIN_NAMES: Record<string, string> = {
@@ -294,6 +296,20 @@ export const DOMAIN_ADVANCED_SPELLS: Record<string, DomainSpell> = {
 export function domainAdvancedSpell(raw: string): DomainSpell | undefined {
   return DOMAIN_ADVANCED_SPELLS[canonicalDomainKey(raw)];
 }
+
+const ORACLE_MYSTERY_DOMAINS: Record<string, string[]> = {
+  ancestors: ["death", "duty", "family", "soul"],
+  ashes: ["destruction", "dust", "fire", "nothingness"],
+  battle: ["destruction", "might", "perfection", "zeal"],
+  blight: ["death", "decay", "disorientation", "plague"],
+  bones: ["death", "decay", "undeath", "vigil"],
+  cosmos: ["darkness", "moon", "nothingness", "star"],
+  flames: ["dust", "fire", "star", "sun"],
+  life: ["death", "healing", "pain", "soul"],
+  lore: ["knowledge", "magic", "secrecy", "truth"],
+  tempest: ["air", "cold", "lightning", "water"],
+  time: ["change", "fate", "nothingness", "time"],
+};
 
 function domainOption(domain: string): GrantChoiceOption {
   const spell = DOMAIN_SPELLS[domain];
@@ -639,6 +655,29 @@ export const GRANT_CHOICE_GROUPS: GrantChoiceGroup[] = [
     baseGrant: { focusPoints: 1 },
     options: ORACLE_REVELATION_OPTIONS,
   },
+  {
+    key: GRANT_CHOICE_KEYS.oracleDomainAcumen,
+    prompt: "Domain Acumen: choose a domain tied to your mystery.",
+    chooseLabel: "domain",
+    count: 1,
+    minLevel: 2,
+    source: { kind: "feat", featId: "feat:qmFWCHOuubEl7VpX" },
+    domainScope: "mysteryInitial",
+    countFromFeat: "feat:qmFWCHOuubEl7VpX",
+    emptyHint: "Choose a domain associated with your oracle mystery that you do not already have.",
+    options: Object.keys(DOMAIN_SPELLS).map(domainOption),
+  },
+  {
+    key: GRANT_CHOICE_KEYS.oracleDomainFluency,
+    prompt: "Domain Fluency: choose an advanced domain spell tied to your mystery.",
+    chooseLabel: "advanced domain",
+    count: 1,
+    minLevel: 12,
+    source: { kind: "feat", featId: "feat:ENoRkTXtdfsbs98S" },
+    domainScope: "mysteryAdvanced",
+    emptyHint: "Choose an initial mystery domain spell first.",
+    options: Object.keys(DOMAIN_ADVANCED_SPELLS).map(advancedDomainOption),
+  },
 ];
 
 export function activeGrantChoiceGroups(
@@ -667,13 +706,20 @@ export function activeGrantChoiceGroups(
   ];
   const activeFeatIds = new Set(selectedFeatIds);
   const featCount = (id: string) => selectedFeatIds.filter((selected) => selected === id).length;
+  const mysteryGroup = classData.choiceGroups.find((group) => group.tag === "oracle-mystery");
+  const mysteryPick = mysteryGroup ? (draft.classChoices[mysteryGroup.key] ?? [])[0] : undefined;
+  const mysteryName = mysteryGroup?.options.find((option) => option.id === mysteryPick)?.name;
+  const mysteryDomains = new Set(
+    (ORACLE_MYSTERY_DOMAINS[mysteryName?.toLowerCase() ?? ""] ?? []).map(canonicalDomainKey)
+  );
   const sourceActive = (source: GrantChoiceSource) => {
     if (source.kind === "feat") return activeFeatIds.has(source.featId);
     if (source.kind === "class-option") return selectedOptionIds.has(source.optionId);
     return selectedTags.has(source.tag);
   };
-  const optionAllowed = (option: GrantChoiceOption) => {
+  const optionAllowed = (option: GrantChoiceOption, group: GrantChoiceGroup) => {
     if (option.domain) {
+      if (group.domainScope?.startsWith("mystery")) return true;
       if (!deity) return false;
       const domains = new Set(
         [...(deity.domains ?? []), ...(deity.alternateDomains ?? [])].map(canonicalDomainKey)
@@ -690,9 +736,15 @@ export function activeGrantChoiceGroups(
       .filter((id) => id.startsWith("domain:"))
       .map((id) => canonicalDomainKey(id.slice("domain:".length)))
   );
+  const expandedInitialDomains = new Set(
+    (draft.grantChoices[GRANT_CHOICE_KEYS.clericExpandedDomain] ?? [])
+      .filter((id) => id.startsWith("domain:"))
+      .map((id) => canonicalDomainKey(id.slice("domain:".length)))
+  );
+  const preExistingDomains = new Set([...initialDomains, ...expandedInitialDomains]);
   const initializedDomains = new Set([
-    ...initialDomains,
-    ...(draft.grantChoices[GRANT_CHOICE_KEYS.clericExpandedDomain] ?? [])
+    ...preExistingDomains,
+    ...(draft.grantChoices[GRANT_CHOICE_KEYS.oracleDomainAcumen] ?? [])
       .filter((id) => id.startsWith("domain:"))
       .map((id) => canonicalDomainKey(id.slice("domain:".length))),
   ]);
@@ -700,7 +752,7 @@ export function activeGrantChoiceGroups(
 
   return GRANT_CHOICE_GROUPS.flatMap((group) => {
     if (group.minLevel > draft.level || !sourceActive(group.source)) return [];
-    let options = group.options.filter(optionAllowed);
+    let options = group.options.filter((option) => optionAllowed(option, group));
     if (group.domainScope === "alternate") {
       options = options.filter(
         (option) =>
@@ -712,6 +764,22 @@ export function activeGrantChoiceGroups(
     if (group.domainScope === "advanced") {
       options = options.filter(
         (option) => option.domain && initializedDomains.has(canonicalDomainKey(option.domain))
+      );
+    }
+    if (group.domainScope === "mysteryInitial") {
+      options = options.filter(
+        (option) =>
+          option.domain &&
+          mysteryDomains.has(canonicalDomainKey(option.domain)) &&
+          !preExistingDomains.has(canonicalDomainKey(option.domain))
+      );
+    }
+    if (group.domainScope === "mysteryAdvanced") {
+      options = options.filter(
+        (option) =>
+          option.domain &&
+          mysteryDomains.has(canonicalDomainKey(option.domain)) &&
+          initializedDomains.has(canonicalDomainKey(option.domain))
       );
     }
     if (!options.length && !group.emptyHint) return [];

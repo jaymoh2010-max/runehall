@@ -38,6 +38,7 @@ const cleric = byName(classes, "Cleric");
 const champion = byName(classes, "Champion");
 const sorcerer = byName(classes, "Sorcerer");
 const wizard = byName(classes, "Wizard");
+const oracle = byName(classes, "Oracle");
 const abadar = byName(deities, "Abadar");
 const iomedae = byName(deities, "Iomedae");
 const asmodeus = byName(deities, "Asmodeus");
@@ -255,6 +256,49 @@ describe("free class grant choices", () => {
       ])
     );
     expect(derived.focusPointsMax).toBe(3);
+  });
+
+  it("grants oracle Domain Acumen from a mystery-linked domain", () => {
+    const draft = draftFor(oracle);
+    draft.level = 2;
+    draft.classChoices["cf:PRJYLksQEwT39bTl:oracle-mystery"] = ["cf:RI2EMRBBPNSoTJXu"];
+    draft.feats.class["2"] = "feat:qmFWCHOuubEl7VpX";
+
+    const group = groupFor(draft, oracle, null, GRANT_CHOICE_KEYS.oracleDomainAcumen);
+    expect(group).toBeDefined();
+    expect(group!.options.map((option) => option.domain)).toEqual(
+      expect.arrayContaining(["darkness", "moon", "nothingness", "star"])
+    );
+    expect(group!.options.some((option) => option.domain === "fire")).toBe(false);
+
+    draft.grantChoices[GRANT_CHOICE_KEYS.oracleDomainAcumen] = ["domain:moon"];
+    const derived = computeCharacter(draft, contextForDraft(draft));
+    expect(derived.grantedSpells).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: "Moonbeam", kind: "focus", rank: 1 }),
+      ])
+    );
+  });
+
+  it("grants oracle Domain Fluency from an initialized mystery domain", () => {
+    const draft = draftFor(oracle);
+    draft.level = 12;
+    draft.classChoices["cf:PRJYLksQEwT39bTl:oracle-mystery"] = ["cf:RI2EMRBBPNSoTJXu"];
+    draft.feats.class["2"] = "feat:qmFWCHOuubEl7VpX";
+    draft.feats.class["12"] = "feat:ENoRkTXtdfsbs98S";
+    draft.grantChoices[GRANT_CHOICE_KEYS.oracleDomainAcumen] = ["domain:moon"];
+
+    const group = groupFor(draft, oracle, null, GRANT_CHOICE_KEYS.oracleDomainFluency);
+    expect(group).toBeDefined();
+    expect(group!.options.map((option) => option.domain)).toEqual(["moon"]);
+
+    draft.grantChoices[GRANT_CHOICE_KEYS.oracleDomainFluency] = ["advanced-domain:moon"];
+    const derived = computeCharacter(draft, contextForDraft(draft));
+    expect(derived.grantedSpells).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: "Touch of the Moon", kind: "focus", rank: 4 }),
+      ])
+    );
   });
 
   it("activates Domain Initiate chosen through Natural Ambition", () => {
