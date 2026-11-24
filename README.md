@@ -161,7 +161,7 @@ npm run verify:data  # compendium and SQLite integrity
 | `npm run simulate` | Generate characters across classes, levels, and options |
 | `npm run simulate:exhaustive` | Run the exhaustive class/ancestry/heritage/background/deity/subclass builder matrix |
 | `npm run simulate:campaign` | Run two isolated 1-20 campaign simulations through the API and sockets |
-| `npm run simulate:parties` | Run seven class-combination campaigns from level 1 to 20 through the API |
+| `npm run simulate:parties` | Advance seven class-combination campaigns from level 1 to 20 through the API |
 | `npm run backup` | Snapshot SQLite + uploaded assets into `backups/` |
 | `npm run restore -- --from <dir> --yes` | Restore a backup (server must be stopped) |
 | `npm run reset-password -- --username <name>` | Issue a temporary password |

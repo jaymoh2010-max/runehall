@@ -40,6 +40,7 @@ import { SKILLS, SKILL_BY_ID, type SkillId } from "../src/shared/types";
 import { activeGrantChoiceGroups, deitySupportsClass } from "../src/shared/classGrantChoices";
 import { selectedClassGrants } from "../src/shared/classGrants";
 import { attachRuneIds } from "../src/shared/runes";
+import { contextForDraft } from "../src/server/compendium";
 import type {
   Ancestry,
   Background,
@@ -72,6 +73,7 @@ const remasterClasses = classes.filter((entry) => entry.remaster);
 const remasterFeats = feats.filter((entry) => entry.remaster);
 const remasterSpells = spells.filter((entry) => entry.remaster);
 const featNames = feats.map((entry) => entry.name.toLowerCase());
+const spellById = new Map(spells.map((spell) => [spell.id, spell]));
 
 // Automation gap tally across every simulated selection, so the most common
 // "manual" options stay visible to the developer.
@@ -148,17 +150,25 @@ function chooseClassChoices(
   classData: ClassData,
   forcedChoice?: { groupKey: string; optionId: string }
 ) {
-  draft.classChoices = {};
+  const next: Record<string, string[]> = { ...draft.classChoices };
   for (const group of classData.choiceGroups) {
     if ((group.sourceFeature?.level ?? 0) > draft.level) continue;
+    const existing = next[group.key] ?? [];
+    if (
+      existing.length === group.count &&
+      existing.every((id) => group.options.some((option) => option.id === id))
+    ) {
+      continue;
+    }
     const options = sample(rng, group.options, group.count);
     const ids = options.map((option) => option.id);
     if (forcedChoice?.groupKey === group.key && !ids.includes(forcedChoice.optionId)) {
       if (ids.length >= group.count) ids[0] = forcedChoice.optionId;
       else ids.push(forcedChoice.optionId);
     }
-    draft.classChoices[group.key] = ids;
+    next[group.key] = ids;
   }
+  draft.classChoices = next;
 }
 
 function chooseGrantChoices(rng: () => number, draft: CharacterDraft, classData: ClassData) {
@@ -166,16 +176,20 @@ function chooseGrantChoices(rng: () => number, draft: CharacterDraft, classData:
   const featIds = selectedClassGrants(draft, classData, deity).feats.map((feat) => feat.id);
   for (const group of activeGrantChoiceGroups(draft, classData, deity, featIds)) {
     if (!group.options.length) continue;
-    const existing = draft.grantChoices[group.key];
-    if (
-      existing?.length === group.count &&
-      existing.every((id) => group.options.some((option) => option.id === id))
-    ) {
+    const existing = (draft.grantChoices[group.key] ?? []).filter((id) =>
+      group.options.some((option) => option.id === id)
+    );
+    if (existing.length >= group.count) {
+      draft.grantChoices[group.key] = existing.slice(0, group.count);
       continue;
     }
-    draft.grantChoices[group.key] = sample(rng, group.options, group.count).map(
-      (option) => option.id
-    );
+    const remaining = group.options.filter((option) => !existing.includes(option.id));
+    const additions = sample(
+      rng,
+      remaining,
+      Math.min(remaining.length, group.count - existing.length)
+    ).map((option) => option.id);
+    draft.grantChoices[group.key] = [...existing, ...additions].slice(0, group.count);
   }
 }
 
@@ -245,7 +259,12 @@ function chooseSkills(rng: () => number, draft: CharacterDraft, context: Charact
   draft.skills.trained = sample(rng, candidates, Math.min(required, candidates.length));
 }
 
-function chooseSkillIncreases(rng: () => number, draft: CharacterDraft, context: CharacterContext) {
+function chooseSkillIncreases(
+  rng: () => number,
+  draft: CharacterDraft,
+  context: CharacterContext,
+  preserveExisting = false
+) {
   const classData = context.classData!;
   const fixed = grantedTrainedSkills(draft, context);
   const ranks: Record<string, number> = {};
@@ -257,15 +276,26 @@ function chooseSkillIncreases(rng: () => number, draft: CharacterDraft, context:
     if (skill in ranks) ranks[skill] = Math.max(ranks[skill], rank);
   }
 
-  draft.skills.increases = {};
+  const next: Record<string, string> = preserveExisting ? { ...draft.skills.increases } : {};
   for (const level of classData.skillIncreaseLevels.filter((entry) => entry <= draft.level)) {
     const cap = skillRankCap(level);
-    const options = SKILLS.map((skill) => skill.id).filter((id) => (ranks[id] ?? 0) < cap);
-    if (!options.length) continue;
-    const choice = pick(rng, options);
-    draft.skills.increases[String(level)] = choice;
+    const existing = preserveExisting ? next[String(level)] : undefined;
+    let choice =
+      existing && (ranks[existing] ?? 0) < cap && SKILL_BY_ID[existing as SkillId]
+        ? existing
+        : undefined;
+    if (!choice) {
+      const options = SKILLS.map((skill) => skill.id).filter((id) => (ranks[id] ?? 0) < cap);
+      if (!options.length) {
+        delete next[String(level)];
+        continue;
+      }
+      choice = pick(rng, options);
+      next[String(level)] = choice;
+    }
     ranks[choice] = Math.min(4, (ranks[choice] ?? 0) + 1);
   }
+  draft.skills.increases = next;
 }
 
 /**
@@ -291,9 +321,15 @@ function rebalanceTrainedSkills(
       draft.skills.trained.filter((skill) => SKILL_BY_ID[skill as SkillId] && !fixed.has(skill))
     ),
   ];
-  const candidates = SKILLS.map((skill) => skill.id).filter(
+  const increasedSkills = new Set(Object.values(draft.skills.increases));
+  const available = SKILLS.map((skill) => skill.id).filter(
     (id) => !fixed.has(id) && !selected.includes(id)
   );
+  // When a milestone ability boost raises Intelligence, the builder asks for an
+  // extra trained skill. Avoid skills that already have a recorded skill
+  // increase: training one now would invalidate that earlier choice.
+  const preferred = available.filter((id) => !increasedSkills.has(id));
+  const candidates = preferred.length ? preferred : available;
   while (selected.length < required && candidates.length) {
     const choice = candidates.splice(Math.floor(rng() * candidates.length), 1)[0];
     selected.push(choice);
@@ -328,11 +364,14 @@ function chooseFeats(
   rng: () => number,
   draft: CharacterDraft,
   context: CharacterContext,
-  selectedFeats: Feat[]
+  selectedFeats: Feat[],
+  fillEmptyOnly = false
 ) {
   const classData = context.classData!;
   const slots = featSlotsFor(classData, draft.level);
   for (const slot of slots) {
+    const key = String(slot.level);
+    if (fillEmptyOnly && draft.feats[slot.category][key]) continue;
     const derived = computeCharacter(draft, context);
     const candidatePool = (remasterFeats.length ? remasterFeats : feats).filter((feat) => {
       if (feat.level > slot.level) return false;
@@ -343,7 +382,7 @@ function chooseFeats(
     });
     if (!candidatePool.length) continue;
     const feat = pick(rng, candidatePool);
-    draft.feats[slot.category][String(slot.level)] = feat.id;
+    draft.feats[slot.category][key] = feat.id;
     selectedFeats.push(feat);
     context.feats[feat.id] = feat;
   }
@@ -484,6 +523,42 @@ function chooseSpells(
   }
 }
 
+function upgradeFundamentalRunes(draft: CharacterDraft, context: CharacterContext) {
+  // High-level builds need level-appropriate fundamental runes, otherwise
+  // level 20 AC and attack checks only exercise level 1 gear.
+  const bestRune = (matches: (name: string) => boolean): Equipment | null =>
+    equipment
+      .filter((item) => item.level > 0 && item.level <= draft.level && matches(item.name))
+      .sort((a, b) => b.level - a.level)[0] ?? null;
+  const addRune = (entry: (typeof draft.equipment)[number], rune: Equipment | null) => {
+    if (!rune) return;
+    entry.runes = attachRuneIds(entry.runes, rune, context.equipment);
+    context.equipment[rune.id] = rune;
+  };
+  const weaponEntry = draft.equipment.find((entry) => context.equipment[entry.itemId]?.weapon);
+  if (weaponEntry) {
+    addRune(
+      weaponEntry,
+      bestRune((name) => name.startsWith("Weapon Potency"))
+    );
+    addRune(
+      weaponEntry,
+      bestRune((name) => name === "Striking" || name.startsWith("Striking ("))
+    );
+  }
+  const armorEntry = draft.equipment.find((entry) => context.equipment[entry.itemId]?.armor);
+  if (armorEntry) {
+    addRune(
+      armorEntry,
+      bestRune((name) => name.startsWith("Armor Potency"))
+    );
+    addRune(
+      armorEntry,
+      bestRune((name) => name.startsWith("Resilient"))
+    );
+  }
+}
+
 function chooseEquipment(
   rng: () => number,
   draft: CharacterDraft,
@@ -541,39 +616,7 @@ function chooseEquipment(
     context.equipment[shield.id] = shield;
   }
 
-  // High-level builds need level-appropriate fundamental runes, otherwise
-  // level 20 AC and attack checks only exercise level 1 gear.
-  const bestRune = (matches: (name: string) => boolean): Equipment | null =>
-    equipment
-      .filter((item) => item.level > 0 && item.level <= draft.level && matches(item.name))
-      .sort((a, b) => b.level - a.level)[0] ?? null;
-  const addRune = (entry: (typeof draft.equipment)[number], rune: Equipment | null) => {
-    if (!rune) return;
-    entry.runes = attachRuneIds(entry.runes, rune, context.equipment);
-    context.equipment[rune.id] = rune;
-  };
-  const weaponEntry = draft.equipment.find((entry) => context.equipment[entry.itemId]?.weapon);
-  if (weaponEntry) {
-    addRune(
-      weaponEntry,
-      bestRune((name) => name.startsWith("Weapon Potency"))
-    );
-    addRune(
-      weaponEntry,
-      bestRune((name) => name === "Striking" || name.startsWith("Striking ("))
-    );
-  }
-  const armorEntry = draft.equipment.find((entry) => context.equipment[entry.itemId]?.armor);
-  if (armorEntry) {
-    addRune(
-      armorEntry,
-      bestRune((name) => name.startsWith("Armor Potency"))
-    );
-    addRune(
-      armorEntry,
-      bestRune((name) => name.startsWith("Resilient"))
-    );
-  }
+  upgradeFundamentalRunes(draft, context);
 }
 
 function diffObjects(a: unknown, b: unknown, prefix = ""): string[] {
@@ -771,6 +814,10 @@ export interface SimulatedCharacterBuild {
   selectedFeats: Feat[];
   selectedSpells: Spell[];
   selectedEquipment: Equipment[];
+  /** How the build was produced when advancing through a campaign. */
+  source?: "fresh" | "advanced" | "fallback";
+  /** Validation errors that forced a fallback rebuild, for reports. */
+  fallbackReason?: string;
 }
 
 export interface SimulatedCharacterOptions {
@@ -812,7 +859,7 @@ export function buildSimulatedCharacter(
       ? (deities.find((entry) => entry.name.toLowerCase() === options.deityName!.toLowerCase()) ??
         null)
       : undefined;
-  return buildDraftFrom(
+  const build = buildDraftFrom(
     options.seed,
     classData,
     options.level,
@@ -822,6 +869,328 @@ export function buildSimulatedCharacter(
     heritage,
     deity
   );
+  return { ...build, source: "fresh" };
+}
+
+function advanceSpells(
+  rng: () => number,
+  draft: CharacterDraft,
+  context: CharacterContext,
+  selectedSpells: Spell[]
+) {
+  const classData = context.classData!;
+  const caster = casterInfo(classData);
+  if (caster.progression === "none") return;
+
+  const classTrait = classData.name.toLowerCase();
+  const poolSource = remasterSpells.length ? remasterSpells : spells;
+  const focusPool = poolSource.filter(
+    (spell) =>
+      spell.traits.includes("focus") &&
+      (spell.traits.includes(classTrait) || spell.traits.includes("focus"))
+  );
+  if (caster.progression === "focus") {
+    if (!draft.spells.focus.length) {
+      for (const spell of sample(rng, focusPool, 1)) {
+        draft.spells.focus.push(spell.id);
+        selectedSpells.push(spell);
+        context.spells[spell.id] = spell;
+      }
+    }
+    return;
+  }
+
+  const tradition =
+    draft.spells.tradition ??
+    caster.tradition ??
+    (caster.traditionOptions ? pick(rng, caster.traditionOptions) : null);
+  draft.spells.tradition = tradition;
+  const pool = poolSource.filter((spell) => !tradition || spell.traditions.includes(tradition));
+  const maxRank = spellSlotsFor(draft.level, caster.progression, classData.name)?.length ?? 0;
+  if (!maxRank) return;
+
+  const repertoire = spellRepertoireLimits(classData, draft.level);
+  const cantripLimit = cantripLimitFor(classData) ?? repertoire?.cantrips ?? 5;
+  const existingCantrips = new Set(draft.spells.cantrips);
+  for (const spell of sample(
+    rng,
+    pool.filter((spell) => spell.rank === 0 && !existingCantrips.has(spell.id)),
+    Math.max(0, cantripLimit - draft.spells.cantrips.length)
+  )) {
+    draft.spells.cantrips.push(spell.id);
+    selectedSpells.push(spell);
+    context.spells[spell.id] = spell;
+  }
+
+  const preparedClasses = new Set([
+    "animist",
+    "cleric",
+    "druid",
+    "magus",
+    "necromancer",
+    "witch",
+    "wizard",
+  ]);
+  const prepared = preparedClasses.has(classTrait);
+  const slots = spellSlotsFor(draft.level, caster.progression, classData.name) ?? [];
+  // Clerics track divine font separately; only ordinary slots may hold
+  // non-font preparations.
+  const ordinarySlots =
+    ordinarySpellSlotsFor(draft.level, caster.progression, classData.name) ?? slots;
+  const font = divineFontInfo(draft.level, classData.name);
+  const classGrantSpells = selectedClassGrants(draft, classData, context.deity).spells;
+  const grantedIds = new Set(classGrantSpells.map((spell) => spell.id));
+  const subtractGranted = Boolean(repertoire?.subtractGranted);
+  const grantedByRank = new Map<number, number>();
+  if (subtractGranted) {
+    for (const spell of classGrantSpells) {
+      if (spell.kind === "focus" || spell.rank <= 0) continue;
+      grantedByRank.set(spell.rank, (grantedByRank.get(spell.rank) ?? 0) + 1);
+    }
+  }
+
+  const known = new Set(draft.spells.known);
+  const rankOf = (id: string) => spellById.get(id)?.rank ?? 0;
+  const selectable = (spell: Spell) =>
+    !known.has(spell.id) && !(subtractGranted && grantedIds.has(spell.id));
+
+  for (let rank = 1; rank <= maxRank; rank++) {
+    const slotLimit = ordinarySlots[rank - 1] ?? 0;
+    const repertoireLimit = repertoire?.ranks[rank - 1] ?? (prepared ? Math.max(1, slotLimit) : 1);
+    const limit = Math.max(0, repertoireLimit - (grantedByRank.get(rank) ?? 0));
+    const existingAtRank = [...known].filter(
+      (id) =>
+        rankOf(id) === rank &&
+        !spellById.get(id)?.traits.includes("focus") &&
+        !(subtractGranted && grantedIds.has(id))
+    ).length;
+    const needed = Math.max(0, limit - existingAtRank);
+    if (!needed) continue;
+    const exact = pool.filter((spell) => spell.rank === rank && selectable(spell));
+    const lower = pool.filter((spell) => spell.rank > 0 && spell.rank < rank && selectable(spell));
+    const rankPool = exact.length ? exact : lower;
+    if (!rankPool.length) continue;
+    const curriculumAtRank: Spell[] = [];
+    for (const granted of classGrantSpells) {
+      if (granted.kind !== "curriculum" || granted.rank !== rank) continue;
+      const spell = pool.find((candidate) => candidate.id === granted.id);
+      if (spell && !known.has(spell.id)) curriculumAtRank.push(spell);
+    }
+    const forced = curriculumAtRank.length ? pick(rng, curriculumAtRank) : null;
+    const chosen = [
+      ...(forced ? [forced] : []),
+      ...sample(
+        rng,
+        rankPool.filter((spell) => spell.id !== forced?.id),
+        Math.max(0, needed - (forced ? 1 : 0))
+      ),
+    ];
+    for (const spell of chosen) {
+      if (known.has(spell.id)) continue;
+      draft.spells.known.push(spell.id);
+      known.add(spell.id);
+      selectedSpells.push(spell);
+      context.spells[spell.id] = spell;
+    }
+  }
+
+  if (prepared) {
+    const preparedLimit = cantripPreparedLimitFor(classData) ?? cantripLimit;
+    const currentCantrips = (draft.spells.preparedCantrips ?? []).filter((id) =>
+      draft.spells.cantrips.includes(id)
+    );
+    for (const id of draft.spells.cantrips) {
+      if (currentCantrips.length >= preparedLimit) break;
+      if (!currentCantrips.includes(id)) currentCantrips.push(id);
+    }
+    draft.spells.preparedCantrips = currentCantrips;
+  }
+
+  let fontSpell: Spell | null = null;
+  if (prepared && font) {
+    const deity = context.deity;
+    const fontNames = (deity?.font?.length ? deity.font : ["heal", "harm"]).map((name) =>
+      name.toLowerCase()
+    );
+    const storedFont = draft.spells.fontChoice;
+    fontSpell = storedFont
+      ? (pool.find((spell) => spell.name.trim().toLowerCase() === storedFont) ?? null)
+      : null;
+    fontSpell ??=
+      pool.find((spell) => fontNames.includes(spell.name.toLowerCase())) ??
+      pool.find((spell) => spell.name === "Heal") ??
+      pool.find((spell) => spell.name === "Harm") ??
+      null;
+    if (fontSpell) {
+      const lower = fontSpell.name.trim().toLowerCase();
+      if (lower === "heal" || lower === "harm") {
+        draft.spells.fontChoice ??= lower;
+      }
+      if (!draft.spells.known.includes(fontSpell.id)) {
+        draft.spells.known.push(fontSpell.id);
+        selectedSpells.push(fontSpell);
+        context.spells[fontSpell.id] = fontSpell;
+      }
+    }
+  }
+
+  if (prepared) {
+    const previousByRank = draft.spells.preparedByRank ?? {};
+    const byRank: Record<string, string[]> = {};
+    const knownIds = [...draft.spells.known];
+    for (let rank = 1; rank <= maxRank; rank++) {
+      const slotLimit = ordinarySlots[rank - 1] ?? 0;
+      if (!slotLimit) continue;
+      const eligible = knownIds.filter((id) => {
+        const spell = spellById.get(id);
+        if (!spell || spell.rank <= 0 || spell.rank > rank) return false;
+        if (spell.traits.includes("focus")) return false;
+        if (font && fontSpell && rank === font.rank && id === fontSpell.id) return false;
+        return true;
+      });
+      const ordered = [
+        ...eligible.filter((id) => rankOf(id) === rank),
+        ...eligible.filter((id) => rankOf(id) < rank),
+      ];
+      const picks: string[] = [];
+      for (const id of previousByRank[String(rank)] ?? []) {
+        if (picks.length >= slotLimit) break;
+        if (ordered.includes(id) && !picks.includes(id)) picks.push(id);
+      }
+      for (const id of ordered) {
+        if (picks.length >= slotLimit) break;
+        if (!picks.includes(id)) picks.push(id);
+      }
+      if (picks.length) byRank[String(rank)] = picks;
+    }
+    if (font && fontSpell) {
+      const key = String(font.rank);
+      const ordinary = (byRank[key] ?? []).filter((id) => id !== fontSpell!.id);
+      byRank[key] = [...ordinary, ...Array.from({ length: font.slots }, () => fontSpell!.id)];
+    }
+    draft.spells.preparedByRank = byRank;
+    draft.spells.prepared = Object.keys(byRank)
+      .map(Number)
+      .sort((a, b) => a - b)
+      .flatMap((rank) => byRank[String(rank)] ?? []);
+  }
+}
+
+export interface AdvanceSimulatedCharacterOptions {
+  previous: SimulatedCharacterBuild;
+  level: number;
+  seed?: number;
+}
+
+function validationErrors(draft: CharacterDraft, context: CharacterContext): string[] {
+  return computeCharacter(draft, context)
+    .validation.filter((issue) => issue.severity === "error")
+    .map((issue) => issue.message);
+}
+
+/**
+ * Advance a simulated character one or more levels without rerolling its
+ * identity or earlier selections. New class choices, feats, skill increases,
+ * spells, ability boosts, and fundamental runes are filled in for the levels
+ * that just became available. If the result is invalid, the caller gets a
+ * fresh level-appropriate build as a safety net.
+ */
+export function advanceSimulatedCharacter(
+  options: AdvanceSimulatedCharacterOptions
+): SimulatedCharacterBuild {
+  const { previous, level } = options;
+  const fromLevel = previous.draft.level;
+  if (!Number.isInteger(level) || level < 1 || level > 20) {
+    throw new Error(`Invalid level: ${level}`);
+  }
+  if (level <= fromLevel) {
+    throw new Error(`Advancement must move forward from level ${fromLevel} to ${level}`);
+  }
+
+  const draft = structuredClone(previous.draft);
+  draft.level = level;
+  const classData = classes.find((entry) => entry.id === draft.classId);
+  if (!classData) throw new Error(`Unknown class id: ${draft.classId}`);
+  const seed = options.seed ?? 0;
+  const rng = mulberry32((seed + level * 10_007) >>> 0);
+
+  for (const milestone of [5, 10, 15, 20]) {
+    if (milestone <= fromLevel || milestone > level) continue;
+    if ((draft.boosts.levels[String(milestone)] ?? []).length) continue;
+    const abilities = ["str", "dex", "con", "int", "wis", "cha"];
+    draft.boosts.levels[String(milestone)] = sample(
+      rng,
+      abilities,
+      4
+    ) as CharacterDraft["boosts"]["levels"][string];
+  }
+
+  chooseClassChoices(rng, draft, classData);
+  if (classData.name.toLowerCase() === "animist") {
+    const limit = animistApparitionLimit(level);
+    const current = draft.spells.attunedApparitions
+      .filter((id) => ANIMIST_APPARITIONS.some((entry) => entry.id === id))
+      .slice(0, limit);
+    for (const entry of ANIMIST_APPARITIONS) {
+      if (current.length >= limit) break;
+      if (!current.includes(entry.id)) current.push(entry.id);
+    }
+    draft.spells.attunedApparitions = current;
+    if (!draft.spells.primaryApparition || !current.includes(draft.spells.primaryApparition)) {
+      draft.spells.primaryApparition = current[0] ?? null;
+    }
+  }
+
+  let context = contextForDraft(draft);
+  chooseGrantChoices(rng, draft, classData);
+  context = contextForDraft(draft);
+
+  const selectedFeats = Object.values(context.feats);
+  chooseFeats(rng, draft, context, selectedFeats, true);
+  chooseGrantChoices(rng, draft, classData);
+  context = contextForDraft(draft);
+  rebalanceTrainedSkills(rng, draft, context);
+  chooseSkillIncreases(rng, draft, context, true);
+
+  const selectedSpells = Object.values(context.spells);
+  advanceSpells(rng, draft, context, selectedSpells);
+  context = contextForDraft(draft);
+
+  upgradeFundamentalRunes(draft, context);
+  context = contextForDraft(draft);
+
+  const build: SimulatedCharacterBuild = {
+    draft,
+    context,
+    selectedFeats: Object.values(context.feats),
+    selectedSpells: Object.values(context.spells),
+    selectedEquipment: Object.values(context.equipment),
+    source: "advanced",
+  };
+  const errors = validationErrors(draft, context);
+  if (!errors.length) return build;
+
+  const ancestry = context.ancestry ?? null;
+  const background = context.background ?? null;
+  if (!ancestry || !background) {
+    throw new Error(`Cannot rebuild ${draft.name}: missing ancestry or background`);
+  }
+  const fresh = buildDraftFrom(
+    seed,
+    classData,
+    level,
+    ancestry,
+    background,
+    undefined,
+    context.heritage,
+    context.deity
+  );
+  fresh.draft.name = previous.draft.name;
+  return {
+    ...fresh,
+    source: "fallback",
+    fallbackReason: errors.slice(0, 3).join("; "),
+  };
 }
 
 function simulate(

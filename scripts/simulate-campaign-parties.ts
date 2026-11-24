@@ -18,9 +18,13 @@ import fs from "node:fs";
 import net from "node:net";
 import path from "node:path";
 import { io, type Socket } from "socket.io-client";
-import { computeCharacter } from "../src/shared/rules";
+import { computeCharacter, grantedTrainedSkills } from "../src/shared/rules";
 import { contextForDraft } from "../src/server/compendium";
-import { buildSimulatedCharacter } from "./simulate-characters";
+import {
+  advanceSimulatedCharacter,
+  buildSimulatedCharacter,
+  type SimulatedCharacterBuild,
+} from "./simulate-characters";
 import type { CharacterDraft } from "../src/shared/types";
 
 type Json = Record<string, any>;
@@ -289,20 +293,91 @@ interface HeroSim {
   backgroundName: string;
   heritageName: string | null;
   deityName: string | null;
+  build: SimulatedCharacterBuild;
 }
 
-function buildForHero(hero: HeroSim, level: number) {
-  const build = buildSimulatedCharacter({
-    seed: hero.seed,
-    className: hero.className,
+function advanceForHero(hero: HeroSim, level: number): SimulatedCharacterBuild {
+  const build = advanceSimulatedCharacter({
+    previous: hero.build,
     level,
-    ancestryName: hero.ancestryName,
-    backgroundName: hero.backgroundName,
-    heritageName: hero.heritageName ?? undefined,
-    deityName: hero.deityName ?? undefined,
+    seed: hero.seed,
   });
   build.draft.name = hero.name;
   return build;
+}
+
+function assertPreservedChoices(
+  previous: CharacterDraft,
+  saved: CharacterDraft,
+  label: string
+): void {
+  for (const key of [
+    "ancestryId",
+    "heritageId",
+    "backgroundId",
+    "classId",
+    "deityId",
+    "deitySkill",
+    "backgroundFeat",
+    "keyAbility",
+  ] as const) {
+    assertEqual(saved[key], previous[key], `${label} preserved ${key}`);
+  }
+  for (const key of ["ancestry", "background", "free"] as const) {
+    assertEqual(
+      JSON.stringify(saved.boosts[key]),
+      JSON.stringify(previous.boosts[key]),
+      `${label} preserved ${key} boosts`
+    );
+  }
+  for (const category of ["ancestry", "class", "skill", "general", "freeArchetype"] as const) {
+    for (const [slot, featId] of Object.entries(previous.feats[category])) {
+      assertEqual(
+        saved.feats[category][slot],
+        featId,
+        `${label} preserved ${category} feat at level ${slot}`
+      );
+    }
+  }
+  for (const [group, ids] of Object.entries(previous.classChoices)) {
+    assertEqual(
+      JSON.stringify(saved.classChoices[group] ?? []),
+      JSON.stringify(ids),
+      `${label} preserved class choice ${group}`
+    );
+  }
+  for (const [group, ids] of Object.entries(previous.grantChoices)) {
+    for (const id of ids) {
+      assert(
+        (saved.grantChoices[group] ?? []).includes(id),
+        `${label} lost grant choice ${group}:${id}`
+      );
+    }
+  }
+  for (const id of previous.spells.cantrips) {
+    assert(saved.spells.cantrips.includes(id), `${label} lost cantrip ${id}`);
+  }
+  for (const id of previous.spells.known) {
+    assert(saved.spells.known.includes(id), `${label} lost known spell ${id}`);
+  }
+  for (const id of previous.spells.focus) {
+    assert(saved.spells.focus.includes(id), `${label} lost focus spell ${id}`);
+  }
+  for (const entry of previous.equipment) {
+    assert(
+      saved.equipment.some((candidate) => candidate.itemId === entry.itemId),
+      `${label} lost equipment ${entry.itemId}`
+    );
+  }
+  const fixedSkills = grantedTrainedSkills(saved, contextForDraft(saved));
+  for (const [slot, skill] of Object.entries(previous.skills.increases)) {
+    const savedSkill = saved.skills.increases[slot];
+    if (savedSkill === skill) continue;
+    assert(
+      fixedSkills.has(skill),
+      `${label} moved the level ${slot} skill increase from ${skill} to ${savedSkill}`
+    );
+  }
 }
 
 function assertFiniteSheet(derived: ReturnType<typeof computeCharacter>, label: string): void {
@@ -392,6 +467,7 @@ async function runParty(gm: Account, players: Account[], party: Party, index: nu
       backgroundName: levelOneBuild.context.background?.name ?? "Warrior",
       heritageName: levelOneBuild.context.heritage?.name ?? null,
       deityName: levelOneBuild.context.deity?.name ?? null,
+      build: levelOneBuild,
     });
   }
 
@@ -406,7 +482,9 @@ async function runParty(gm: Account, players: Account[], party: Party, index: nu
     }
   });
 
-  await check(party.name, "levels 1-20 keep server and local sheets in sync", async () => {
+  let advancedLevels = 0;
+  let rebuiltLevels = 0;
+  await check(party.name, "levels 1-20 advance continuously and stay in sync", async () => {
     for (let level = 1; level <= 20; level++) {
       if (level > 1) {
         const leveled = await api(`/api/campaigns/${campaignId}/level-up`, {
@@ -419,9 +497,23 @@ async function runParty(gm: Account, players: Account[], party: Party, index: nu
       }
 
       const table = await getTable(campaignId, gm.cookie);
-      const builds = new Map<string, ReturnType<typeof buildSimulatedCharacter>>();
+      const builds = new Map<string, SimulatedCharacterBuild>();
+      const previousBuilds = new Map<string, CharacterDraft>();
       for (const hero of heroes) {
-        const build = buildForHero(hero, level);
+        let build: SimulatedCharacterBuild;
+        if (level === 1) {
+          build = hero.build;
+        } else {
+          previousBuilds.set(hero.characterId, structuredClone(hero.build.draft));
+          build = advanceForHero(hero, level);
+          hero.build = build;
+          if (build.source === "advanced") advancedLevels++;
+          else rebuiltLevels++;
+          assert(
+            build.source === "advanced",
+            `${hero.name} L${level} needed a fallback rebuild: ${build.fallbackReason ?? build.source}`
+          );
+        }
         builds.set(hero.characterId, build);
         if (level > 1) {
           const current = characterFor(table, hero.characterId);
@@ -440,6 +532,10 @@ async function runParty(gm: Account, players: Account[], party: Party, index: nu
         const savedDraft = saved.data as CharacterDraft;
         assertEqual(savedDraft.level, level, `${hero.name} saved level`);
         assertEqual(savedDraft.classId, build.draft.classId, `${hero.name} saved class`);
+        const previousDraft = previousBuilds.get(hero.characterId);
+        if (previousDraft) {
+          assertPreservedChoices(previousDraft, savedDraft, `${hero.name} L${level}`);
+        }
         const derived = computeCharacter(savedDraft, contextForDraft(savedDraft));
         const summary = summaryFor(after, hero.characterId);
         const label = `${hero.name} L${level}`;
@@ -465,6 +561,8 @@ async function runParty(gm: Account, players: Account[], party: Party, index: nu
     assertEqual(capped.payload.leveled, 0, "Level 20 cap: no characters advanced");
     assertEqual(capped.payload.atMaxLevel, heroes.length, "Level 20 cap: party counted");
   });
+  metric(`${party.name}.advancedLevels`, advancedLevels);
+  metric(`${party.name}.rebuiltLevels`, rebuiltLevels);
 
   await check(party.name, "level 20 sheets and tokens have matching HP and AC", async () => {
     const gmSocket = await connectSocket(gm.cookie);
