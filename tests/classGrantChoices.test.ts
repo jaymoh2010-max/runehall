@@ -6,6 +6,7 @@ import {
   activeGrantChoiceGroups,
   canonicalDomainKey,
   deitySupportsClass,
+  DOMAIN_ADVANCED_SPELLS,
   DOMAIN_SPELLS,
   GRANT_CHOICE_KEYS,
 } from "../src/shared/classGrantChoices";
@@ -104,6 +105,23 @@ describe("free class grant choices", () => {
     }
   });
 
+  it("maps every deity domain to an advanced cleric focus spell", () => {
+    const domains = read<{
+      id: string;
+      advancedDomainSpell: { id: string; name: string };
+    }>("domains.json");
+    for (const domain of domains) {
+      const key = canonicalDomainKey(domain.id.replace(/^domain:/, ""));
+      const entry = DOMAIN_ADVANCED_SPELLS[key];
+      expect(entry, key).toBeDefined();
+      expect(entry).toEqual(domain.advancedDomainSpell);
+      const spell = spells.find((candidate) => candidate.id === entry.id);
+      expect(spell, `${key}: ${entry.id}`).toBeTruthy();
+      expect(spell!.name).toBe(entry.name);
+      expect(spell!.traits).toEqual(expect.arrayContaining(["cleric", "focus"]));
+    }
+  });
+
   it("resolves the legacy domain aliases", () => {
     expect(canonicalDomainKey("delirium")).toBe("disorientation");
     expect(canonicalDomainKey("void")).toBe("nothingness");
@@ -138,6 +156,73 @@ describe("free class grant choices", () => {
     );
     expect(context.spells["spell:yH13KXUK2x093NUv"]?.name).toBe("Face in the Crowd");
     expect(derived.focusPointsMax).toBe(1);
+  });
+
+  it("grants an alternate domain spell through Expanded Domain Initiate", () => {
+    const draft = draftFor(cleric);
+    draft.level = 4;
+    chooseTag(draft, cleric, "cleric-doctrine", "cf:ZZzLMOUAtBVgV1DF");
+    draft.deityId = abadar.id;
+    draft.feats.class["4"] = "feat:vQ4DNfpktmaqdgdM";
+
+    const group = groupFor(draft, cleric, abadar, GRANT_CHOICE_KEYS.clericExpandedDomain);
+    expect(group).toBeDefined();
+    expect(group!.options.map((option) => option.domain)).toEqual(
+      expect.arrayContaining(["creation", "duty", "metal", "toil"])
+    );
+    expect(group!.options.some((option) => option.domain === "cities")).toBe(false);
+
+    draft.grantChoices[GRANT_CHOICE_KEYS.clericExpandedDomain] = ["domain:creation"];
+    const derived = computeCharacter(draft, contextForDraft(draft));
+    expect(derived.grantedSpells).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: "Creative Splash",
+          kind: "focus",
+          rank: 1,
+        }),
+      ])
+    );
+  });
+
+  it("grants an advanced domain spell through Advanced Domain", () => {
+    const draft = draftFor(cleric);
+    draft.level = 8;
+    chooseTag(draft, cleric, "cleric-doctrine", "cf:ZZzLMOUAtBVgV1DF");
+    draft.deityId = abadar.id;
+    draft.feats.class["2"] = "feat:hT4INKGtly4QY8KN";
+    draft.grantChoices[GRANT_CHOICE_KEYS.clericDomain] = ["domain:cities"];
+    draft.feats.class["8"] = "feat:uR44wELN9OlU68cL";
+
+    const group = groupFor(draft, cleric, abadar, GRANT_CHOICE_KEYS.clericAdvancedDomain);
+    expect(group).toBeDefined();
+    expect(group!.options.map((option) => option.domain)).toEqual(["cities"]);
+
+    draft.grantChoices[GRANT_CHOICE_KEYS.clericAdvancedDomain] = ["advanced-domain:cities"];
+    const derived = computeCharacter(draft, contextForDraft(draft));
+    expect(derived.grantedSpells).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: "Pulse of Civilization",
+          kind: "focus",
+          rank: 4,
+        }),
+      ])
+    );
+    expect(derived.focusPointsMax).toBe(2);
+  });
+
+  it("hides advanced domain options until an initial domain is chosen", () => {
+    const draft = draftFor(cleric);
+    draft.level = 8;
+    chooseTag(draft, cleric, "cleric-doctrine", "cf:ZZzLMOUAtBVgV1DF");
+    draft.deityId = abadar.id;
+    draft.feats.class["8"] = "feat:uR44wELN9OlU68cL";
+
+    const group = groupFor(draft, cleric, abadar, GRANT_CHOICE_KEYS.clericAdvancedDomain);
+    expect(group).toBeDefined();
+    expect(group!.options).toHaveLength(0);
+    expect(group!.emptyHint).toMatch(/Domain Initiate/i);
   });
 
   it("activates Domain Initiate chosen through Natural Ambition", () => {

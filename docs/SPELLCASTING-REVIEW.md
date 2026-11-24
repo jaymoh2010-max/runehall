@@ -2,7 +2,7 @@
 
 Date: 2026-11-23
 
-Status: review complete. Sprint 1 (the daily spellcasting loop), the class-grant portion of Sprint 2, the first table-magic pass of Sprint 3, the magus studious-slot pass of Sprint 4, the animist prepared/spontaneous split of Sprint 5, the spontaneous known-at-rank pass of Sprint 6, the psychic psi-amp pass of Sprint 7, the table Sustain-reminder pass of Sprint 8, the higher-slot downcast pass of Sprint 9, the scroll-spellcasting pass of Sprint 10, the Magic Wand spellcasting pass of Sprint 11, and the fixed-spell specific-wand pass of Sprint 12 were implemented on 2026-11-23. The findings below describe the pre-Sprint state; the implementation status sections record what changed, and the remaining class and table gaps stay in the backlog.
+Status: review complete. Sprint 1 (the daily spellcasting loop), the class-grant portion of Sprint 2, the first table-magic pass of Sprint 3, the magus studious-slot pass of Sprint 4, the animist prepared/spontaneous split of Sprint 5, the spontaneous known-at-rank pass of Sprint 6, the psychic psi-amp pass of Sprint 7, the table Sustain-reminder pass of Sprint 8, the higher-slot downcast pass of Sprint 9, the scroll-spellcasting pass of Sprint 10, the Magic Wand spellcasting pass of Sprint 11, the fixed-spell specific-wand pass of Sprint 12, and the expanded/advanced domain pass of Sprint 13 were implemented on 2026-11-23. The findings below describe the pre-Sprint state; the implementation status sections record what changed, and the remaining class and table gaps stay in the backlog.
 
 > **Follow-up (2026-11-23):** `docs/RULES-AUDIT.md` corrected two table errors
 > this review did not catch: bards use the 2/3 full-caster slot table (not the
@@ -186,6 +186,16 @@ Fixed-spell specific wands are implemented:
 - Fixed-spell wands share the generic wand daily-use tracker and chat output; a long rest resets them.
 - The fixed spell must be on the character's spell list. Flexible wands that let the wielder choose or adjust an arbitrary spell, wands whose spell cannot be read from the data, and staves remain manual.
 
+## Sprint 13 implementation status (2026-11-23)
+
+The cleric domain chain is implemented:
+
+- **Domain Initiate** grants the chosen domain's initial focus spell, limited to the deity's domains and alternate domains.
+- **Expanded Domain Initiate** appears at 4th level and grants an initial spell from one of the deity's alternate domains.
+- **Advanced Domain** appears at 8th level and grants a rank-4 advanced focus spell from a domain the character already has an initial spell for.
+- The Class step shows the new choice groups automatically, and the focus pool grows with the additional focus spells.
+- Later domain feats, repeated Advanced Domain picks, and oracle Domain Acumen/Fluency remain manual.
+
 ## Rules baseline
 
 ### Core spellcasting
@@ -253,6 +263,7 @@ Legend: Yes = modeled and usable; Partial = some support with known gaps; No = n
 | Focus spells from feats/archetypes | Partial | Manual focus list; no automatic grants or pool changes |
 | Innate spells and uses | Partial | Uses and casting work; innate attack/DC is derived separately |
 | Cleric deity spells | Yes | Deity spells are offered to prepare; higher-rank deity spells appear as level permits |
+| Cleric domains | Partial | Domain Initiate, Expanded Domain Initiate, and Advanced Domain grant focus spells from the deity's domains; later domain feats and repeated Advanced Domain picks remain manual |
 | Psychic conscious minds | Partial | 1st-rank spell, psi cantrips, and amp casting are granted; higher-level unique cantrips remain manual |
 | Necromancer grave spells | Partial | Necrotic Bomb and grim fascination spells granted; thralls and effects manual |
 | Summoner link spells | Yes | Evolution Surge and Boost Eidolon granted; eidolon actions remain manual |
@@ -349,7 +360,7 @@ Fix: At minimum, introduce labels by class (`spellbook`, `familiar`, `dirge`, `s
 
 ### F6. Several class resources are missing or hard-coded (P1)
 
-Status: partly fixed in Sprint 2, Sprint 4, Sprint 5, and Sprint 7. Psychic, necromancer, summoner, cleric deity spells, magus studious slots, the animist prepared/spontaneous split, and psychic psi amps are now granted or tracked.
+Status: partly fixed in Sprint 2, Sprint 4, Sprint 5, Sprint 7, and Sprint 13. Psychic, necromancer, summoner, cleric deity spells and domains, magus studious slots, the animist prepared/spontaneous split, and psychic psi amps are now granted or tracked.
 
 - **Psychic**: repertoire limits, conscious-mind 1st-rank spells, psi cantrips, and amp casting are granted; amps spend focus and show their summaries in the builder and sheet. Higher-level unique psi cantrips remain manual.
 - **Necromancer**: Necrotic Bomb, grim fascination grave spells, and the focus pool are granted. Thralls and full grave-spell effects remain manual.
@@ -358,7 +369,7 @@ Status: partly fixed in Sprint 2, Sprint 4, Sprint 5, and Sprint 7. Psychic, nec
 - **Animist**: prepared animist slots and spontaneous apparition slots are separate. Attuned apparitions supply a curated repertoire, the primary apparition grants its vessel focus spell, and apparition slots reset during daily preparations. Invocations and wandering-feat retraining remain manual.
 - **Wizard**: higher-rank curriculum spells are not granted, so the extra slot is effectively unrestricted at those ranks.
 - **Sorcerer/oracle**: higher-rank bloodline/mystery gifts remain manual.
-- **Cleric**: deity spells are resolved and offered through the normal preparation workflow.
+- **Cleric**: deity spells are resolved and offered through the normal preparation workflow. Domain Initiate, Expanded Domain Initiate, and Advanced Domain grant their domain focus spells; later domain feats and repeated Advanced Domain picks remain manual.
 
 Impact: These classes are usable only with manual bookkeeping. The most visible remaining class gaps are higher-level class-specific gifts and item spellcasting.
 

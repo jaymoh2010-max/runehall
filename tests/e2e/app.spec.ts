@@ -16,9 +16,19 @@ const compendiumSpells = JSON.parse(
 const compendiumEquipment = JSON.parse(
   fs.readFileSync(path.resolve("data", "compendium", "equipment.json"), "utf8")
 ) as { id: string; name: string }[];
+const compendiumDeities = JSON.parse(
+  fs.readFileSync(path.resolve("data", "compendium", "deities.json"), "utf8")
+) as { id: string; name: string }[];
+const compendiumFeats = JSON.parse(
+  fs.readFileSync(path.resolve("data", "compendium", "feats.json"), "utf8")
+) as { id: string; name: string }[];
 const sorcererId = compendiumClasses.find((entry) => entry.name === "Sorcerer")!.id;
+const clericId = compendiumClasses.find((entry) => entry.name === "Cleric")!.id;
 const psychicId = compendiumClasses.find((entry) => entry.name === "Psychic")!.id;
 const fireballId = compendiumSpells.find((entry) => entry.name === "Fireball")!.id;
+const abadarId = compendiumDeities.find((entry) => entry.name === "Abadar")!.id;
+const domainInitiateId = compendiumFeats.find((entry) => entry.name === "Domain Initiate")!.id;
+const advancedDomainId = compendiumFeats.find((entry) => entry.name === "Advanced Domain")!.id;
 const scroll3Id = compendiumEquipment.find(
   (entry) => entry.name === "Scroll of 3rd-rank Spell"
 )!.id;
@@ -1251,6 +1261,50 @@ test("builder completes a level-1 Cleric with split divine-font preparation", as
   await preparedHeal.getByRole("button", { name: "Cast" }).click();
   await expect(page.getByText(/Cast Heal at rank 1/)).toBeVisible({ timeout: 15_000 });
   await expect(fontRow).toContainText("3 / 4");
+  await expect(page.locator(".pb-save")).toHaveText("Saved");
+});
+
+test("builder grants advanced domain spells for clerics", async ({ page }) => {
+  test.setTimeout(60_000);
+  await signIn(page, admin);
+  const campaignId = campaignPath.split("/").pop();
+  const created = await page.request.post("/api/characters", {
+    data: { name: "E2E Domain Cleric", campaignId },
+  });
+  expect(created.ok()).toBe(true);
+  const character = (await created.json()) as { character: { id: string } };
+  const draft = emptyCharacterDraft("E2E Domain Cleric");
+  draft.level = 8;
+  draft.classId = clericId;
+  draft.keyAbility = "wis";
+  draft.deityId = abadarId;
+  draft.feats.class["2"] = domainInitiateId;
+  draft.feats.class["8"] = advancedDomainId;
+  draft.grantChoices["grant:cleric-domain"] = ["domain:cities"];
+  const saved = await page.request.put(`/api/characters/${character.character.id}`, {
+    data: { data: draft, force: true },
+  });
+  expect(saved.ok()).toBe(true);
+
+  await page.goto(`/characters/${character.character.id}/edit`);
+  await expect(page.getByRole("heading", { name: "E2E Domain Cleric" })).toBeVisible({
+    timeout: 15_000,
+  });
+  await goToStep(page, "Class");
+  const advancedDomain = page
+    .locator(".choice-group")
+    .filter({ hasText: "Advanced Domain: choose an advanced domain spell." });
+  await expect(advancedDomain).toBeVisible();
+  await advancedDomain.getByRole("button", { name: /Cities Advanced Domain/ }).click();
+
+  await page.goto(`/characters/${character.character.id}`);
+  await expect(page.getByRole("heading", { name: "E2E Domain Cleric" })).toBeVisible({
+    timeout: 15_000,
+  });
+  await page.getByRole("button", { name: "Spells", exact: true }).click();
+  await expect(page.getByText("Pulse of Civilization").first()).toBeVisible({
+    timeout: 15_000,
+  });
   await expect(page.locator(".pb-save")).toHaveText("Saved");
 });
 

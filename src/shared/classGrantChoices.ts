@@ -40,6 +40,8 @@ export interface GrantChoiceGroup {
   baseGrant?: ClassGrant;
   /** Shown when no legal option exists yet, e.g. before a deity is chosen. */
   emptyHint?: string;
+  /** Restrict domain options to alternate or already-initialized domains. */
+  domainScope?: "alternate" | "advanced";
   options: GrantChoiceOption[];
 }
 
@@ -64,6 +66,8 @@ export function deitySupportsClass(
 
 export const GRANT_CHOICE_KEYS = {
   clericDomain: "grant:cleric-domain",
+  clericExpandedDomain: "grant:cleric-expanded-domain",
+  clericAdvancedDomain: "grant:cleric-advanced-domain",
   championDevotion: "grant:champion-devotion",
   sorcererElement: "grant:sorcerer-element",
   runelordSin: "grant:runelord-sin",
@@ -220,6 +224,75 @@ export const DOMAIN_SPELLS: Record<string, DomainSpell> = {
   zeal: { id: "spell:W37iBXLsY2trJ1rS", name: "Weapon Surge" },
 };
 
+/** Advanced domain spells granted by Advanced Domain and Domain Fluency. */
+export const DOMAIN_ADVANCED_SPELLS: Record<string, DomainSpell> = {
+  abomination: { id: "spell:0qA4MfMkFklOz2Lk", name: "Fearful Feast" },
+  air: { id: "spell:L8pzCOi7Jzx5ALs9", name: "Disperse into Air" },
+  ambition: { id: "spell:NOB92Wpn7jXvtyVW", name: "Competitive Edge" },
+  change: { id: "spell:GoKkejPj5yWJPIPK", name: "Adaptive Ablation" },
+  cities: { id: "spell:ivKnEtI1z4UqEKIA", name: "Pulse of Civilization" },
+  cold: { id: "spell:wjJW9hWY5CkkMvY5", name: "Diamond Dust" },
+  confidence: { id: "spell:J8pL8yTshga8QOk8", name: "Delusional Pride" },
+  creation: { id: "spell:eb4FXf62NYArTqek", name: "Artistic Flourish" },
+  darkness: { id: "spell:2WNFbvToMsEGxmeK", name: "Darkened Sight" },
+  death: { id: "spell:J5MNC4xq3CHH31qT", name: "Eradicate Undeath" },
+  decay: { id: "spell:2RhZkHNv8ajq0yLq", name: "Fallow Field" },
+  destruction: { id: "spell:7d4DUTDIlzDa8OvX", name: "Destructive Aura" },
+  disorientation: { id: "spell:HisaZTk67YAxLGBq", name: "Ephemeral Hazards" },
+  dragon: { id: "spell:FSu6ZKxr3xdS75wq", name: "Roar of the Dragon" },
+  dreams: { id: "spell:PztLrElcZfLwRnEq", name: "Dreamer's Call" },
+  dust: { id: "spell:K1wmI4qPmRhFczmy", name: "Dust Storm" },
+  duty: { id: "spell:caehfpQz7yp9yNzz", name: "Dutiful Challenge" },
+  earth: { id: "spell:cBUuG1yJHGeKffpg", name: "Localized Quake" },
+  family: { id: "spell:tYLBjOTvBVn9JtRb", name: "Unity" },
+  fate: { id: "spell:GqvKSxzN7A7kuFk4", name: "Tempt Fate" },
+  fire: { id: "spell:y7Tusv3CieZktkkV", name: "Flame Barrier" },
+  freedom: { id: "spell:2jB9eyX7YekwoCvA", name: "Word of Freedom" },
+  glyph: { id: "spell:vhe9DduqaivMs8FV", name: "Ghostly Transcription" },
+  healing: { id: "spell:4nHYSMHito1GUXlm", name: "Rebuke Death" },
+  indulgence: { id: "spell:ZeHeNQ5BNq6m5F1j", name: "Take its Course" },
+  introspection: { id: "spell:VGK9s6LCMMS027zP", name: "Confront Selves" },
+  knowledge: { id: "spell:l6zjNysNedpJcmDT", name: "Know the Enemy" },
+  lightning: { id: "spell:VUwpDY4Z91s9QCg0", name: "Bottle the Storm" },
+  luck: { id: "spell:7OwZHalOdRCRnFmZ", name: "Lucky Break" },
+  magic: { id: "spell:2SYq0ZTsOtJEigFx", name: "Mystic Beacon" },
+  metal: { id: "spell:pZBovpzdBNLQQQmE", name: "Repel Metal" },
+  might: { id: "spell:eG1fBodYwolaXK98", name: "Enduring Might" },
+  moon: { id: "spell:oXCwHBeDja4e0Mx0", name: "Touch of the Moon" },
+  naga: { id: "spell:jLc8tHSNeXm0RvMQ", name: "Show the Path" },
+  nature: { id: "spell:vSSKyUdrHu86E5Gk", name: "Nature's Bounty" },
+  nightmares: { id: "spell:skvgOWNTitLehL0b", name: "Shared Nightmare" },
+  nothingness: { id: "spell:iMmexY6ZosLS4I5R", name: "Door to Beyond" },
+  pain: { id: "spell:SSsUC7rZo0CwayPn", name: "Retributive Pain" },
+  passion: { id: "spell:jJphHQlENHFlSElH", name: "Captivating Adoration" },
+  perfection: { id: "spell:8ifpNZkaxrbs3dBJ", name: "Perfected Body" },
+  plague: { id: "spell:6nTBr5XNuKOuPM5m", name: "Foul Miasma" },
+  protection: { id: "spell:DH9Y3RQGWO0GzXGU", name: "Protector's Sphere" },
+  repose: { id: "spell:yY1H5zhO5dHmD8lz", name: "Font of Serenity" },
+  secrecy: { id: "spell:OsrtOeG0TvDNnEFH", name: "Safeguard Secret" },
+  sorrow: { id: "spell:eCniO6INHNfc9Svr", name: "Overflowing Sorrow" },
+  soul: { id: "spell:QE9f3OxvvBThymD4", name: "Ectoplasmic Interstice" },
+  star: { id: "spell:KG7amdeXWc7MjGXe", name: "Asterism" },
+  sun: { id: "spell:8XuNn0h0rHE24m3B", name: "Vital Luminance" },
+  swarm: { id: "spell:Pd2M1XY8EXrSfWgJ", name: "Swarm Form" },
+  time: { id: "spell:cOwSsSXRsBaXUvlr", name: "Stasis" },
+  toil: { id: "spell:gzvRDpM6EvcfYHeu", name: "Tireless Worker" },
+  travel: { id: "spell:LrhTFHUtSS9ahogL", name: "Traveler's Transit" },
+  trickery: { id: "spell:ZhLYJlOZzUB1OKoe", name: "Trickster's Twin" },
+  truth: { id: "spell:ZjbVgIIqMstmdkqP", name: "Glimpse the Truth" },
+  tyranny: { id: "spell:4DaHIgtMBTyxebY3", name: "Commanding Lash" },
+  undeath: { id: "spell:qzsQmpiQodHBBWYI", name: "Malignant Sustenance" },
+  vigil: { id: "spell:nrW6lGV4xDMqLS3P", name: "Remember the Lost" },
+  water: { id: "spell:K4LXpaBWrGy6jIER", name: "Downpour" },
+  wealth: { id: "spell:APTMURAW1N0Wpk4w", name: "Precious Metals" },
+  wood: { id: "spell:Up4zLmZDgciUDpIv", name: "Wood Walk" },
+  zeal: { id: "spell:I8CPe9Pp7GABqOyB", name: "Zeal for Battle" },
+};
+
+export function domainAdvancedSpell(raw: string): DomainSpell | undefined {
+  return DOMAIN_ADVANCED_SPELLS[canonicalDomainKey(raw)];
+}
+
 function domainOption(domain: string): GrantChoiceOption {
   const spell = DOMAIN_SPELLS[domain];
   return {
@@ -227,6 +300,17 @@ function domainOption(domain: string): GrantChoiceOption {
     name: `${DOMAIN_NAMES[domain] ?? domain} Domain`,
     domain,
     grant: { spells: [focus(spell.id, spell.name)], focusPoints: 1 },
+    hint: spell.name,
+  };
+}
+
+function advancedDomainOption(domain: string): GrantChoiceOption {
+  const spell = DOMAIN_ADVANCED_SPELLS[domain];
+  return {
+    id: `advanced-domain:${domain}`,
+    name: `${DOMAIN_NAMES[domain] ?? domain} Advanced Domain`,
+    domain,
+    grant: { spells: [{ id: spell.id, name: spell.name, rank: 4, kind: "focus" }] },
     hint: spell.name,
   };
 }
@@ -482,6 +566,28 @@ export const GRANT_CHOICE_GROUPS: GrantChoiceGroup[] = [
     options: Object.keys(DOMAIN_SPELLS).map(domainOption),
   },
   {
+    key: GRANT_CHOICE_KEYS.clericExpandedDomain,
+    prompt: "Expanded Domain Initiate: choose an alternate domain.",
+    chooseLabel: "alternate domain",
+    count: 1,
+    minLevel: 4,
+    source: { kind: "feat", featId: "feat:vQ4DNfpktmaqdgdM" },
+    domainScope: "alternate",
+    emptyHint: "Choose a deity with an alternate domain that you do not already have.",
+    options: Object.keys(DOMAIN_SPELLS).map(domainOption),
+  },
+  {
+    key: GRANT_CHOICE_KEYS.clericAdvancedDomain,
+    prompt: "Advanced Domain: choose an advanced domain spell.",
+    chooseLabel: "advanced domain",
+    count: 1,
+    minLevel: 8,
+    source: { kind: "feat", featId: "feat:uR44wELN9OlU68cL" },
+    domainScope: "advanced",
+    emptyHint: "Choose Domain Initiate and one of your deity's domains first.",
+    options: Object.keys(DOMAIN_ADVANCED_SPELLS).map(advancedDomainOption),
+  },
+  {
     key: GRANT_CHOICE_KEYS.championDevotion,
     prompt: "Choose your devotion spell.",
     chooseLabel: "devotion spell",
@@ -574,10 +680,35 @@ export function activeGrantChoiceGroups(
     }
     return true;
   };
+  const initialDomains = new Set(
+    (draft.grantChoices[GRANT_CHOICE_KEYS.clericDomain] ?? [])
+      .filter((id) => id.startsWith("domain:"))
+      .map((id) => canonicalDomainKey(id.slice("domain:".length)))
+  );
+  const initializedDomains = new Set([
+    ...initialDomains,
+    ...(draft.grantChoices[GRANT_CHOICE_KEYS.clericExpandedDomain] ?? [])
+      .filter((id) => id.startsWith("domain:"))
+      .map((id) => canonicalDomainKey(id.slice("domain:".length))),
+  ]);
+  const alternateDomains = new Set((deity?.alternateDomains ?? []).map(canonicalDomainKey));
 
   return GRANT_CHOICE_GROUPS.flatMap((group) => {
     if (group.minLevel > draft.level || !sourceActive(group.source)) return [];
-    const options = group.options.filter(optionAllowed);
+    let options = group.options.filter(optionAllowed);
+    if (group.domainScope === "alternate") {
+      options = options.filter(
+        (option) =>
+          option.domain &&
+          alternateDomains.has(canonicalDomainKey(option.domain)) &&
+          !initialDomains.has(canonicalDomainKey(option.domain))
+      );
+    }
+    if (group.domainScope === "advanced") {
+      options = options.filter(
+        (option) => option.domain && initializedDomains.has(canonicalDomainKey(option.domain))
+      );
+    }
     if (!options.length && !group.emptyHint) return [];
     return [{ ...group, options }];
   });
