@@ -45,11 +45,10 @@ function normalizeWandRank(value: string | undefined | null): number | null {
 }
 
 /**
- * The fixed spell inside a specific wand, parsed from prose such as
- * "You cast Fireball at 3rd-rank." Wands that let the wielder choose the spell
- * or modify an arbitrary spell return null and stay manual.
+ * The spell phrase inside a specific wand, parsed from prose such as
+ * "You cast Fireball at 3rd-rank" or "You Cast the Spell".
  */
-export function specificWandSpell(
+function parseWandCast(
   item: Pick<Equipment, "name" | "traits" | "description"> | null | undefined
 ): SpecificWandSpell | null {
   if (!item || !item.traits?.includes("wand") || isMagicWand(item)) return null;
@@ -62,13 +61,46 @@ export function specificWandSpell(
     .replace(/\s+of the indicated (?:level|rank).*$/i, "")
     .replace(/\s+but\b.*$/i, "")
     .trim();
-  if (!name || /^(?:the|a|an)?\s*spell\b|^its\s+spell\b/i.test(name)) return null;
+  if (!name) return null;
   const rank =
     normalizeWandRank(item.name.match(WAND_RANK_NAME)?.[1]) ??
     normalizeWandRank(item.name.match(WAND_RANK_LABEL)?.[1]) ??
     normalizeWandRank(match[1]) ??
     normalizeWandRank(text.match(WAND_RANK_TEXT)?.[1]);
   return { name, rank };
+}
+
+function isFlexibleWandSpell(name: string): boolean {
+  return /^(?:the|a|an)?\s*spell\b|^its\s+spell\b/i.test(name);
+}
+
+/**
+ * The fixed spell inside a specific wand, parsed from prose such as
+ * "You cast Fireball at 3rd-rank." Wands that let the wielder choose the spell
+ * or modify an arbitrary spell return null and stay manual.
+ */
+export function specificWandSpell(
+  item: Pick<Equipment, "name" | "traits" | "description"> | null | undefined
+): SpecificWandSpell | null {
+  const cast = parseWandCast(item);
+  if (!cast || isFlexibleWandSpell(cast.name)) return null;
+  return cast;
+}
+
+/**
+ * Rank of a flexible wand that casts a spell chosen when the wand was made,
+ * such as a Wand of Widening. The sheet uses the generic wand picker for these
+ * and surfaces the wand's own effect as manual resolution.
+ */
+export function flexibleWandRank(
+  item: Pick<Equipment, "name" | "traits" | "description"> | null | undefined
+): number | null {
+  const cast = parseWandCast(item);
+  if (!cast || !isFlexibleWandSpell(cast.name)) return null;
+  // Cyrusian wands restrict their stored spell to arcane illusions, which the
+  // generic picker cannot express, so leave them manual for now.
+  if (/\bonly ever contains\b/i.test(plainText(item?.description))) return null;
+  return cast.rank;
 }
 
 /** Whether an inventory item is a consumable spell scroll. */

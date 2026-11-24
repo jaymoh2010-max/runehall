@@ -44,6 +44,7 @@ import {
 } from "../../../shared/rules";
 import { currencyToCp } from "../../../shared/inventory";
 import {
+  flexibleWandRank,
   scrollSpellRank,
   specificWandSpell,
   wandSpellRank,
@@ -877,7 +878,12 @@ export function CharacterSheetView({
     if (characterRef.current) await applyRecord(characterRef.current);
   };
 
-  const castWandSpell = async (item: Equipment, rank: number, spell: Spell) => {
+  const castWandSpell = async (
+    item: Equipment,
+    rank: number,
+    spell: Spell,
+    options: { flexible?: boolean } = {}
+  ) => {
     if (!canEdit) return;
     const entry = draftRef.current?.equipment.find((candidate) => candidate.itemId === item.id);
     if (!entry) {
@@ -904,12 +910,19 @@ export function CharacterSheetView({
       }),
     }));
     if (!saved) return;
-    toast(`Cast ${spell.name} from a magic wand at rank ${rank}.`, "success");
+    toast(
+      options.flexible
+        ? `Cast ${spell.name} from ${item.name} at rank ${rank}. Apply the wand's effect.`
+        : `Cast ${spell.name} from a magic wand at rank ${rank}.`,
+      "success"
+    );
     const current = characterRef.current;
     if (current?.campaignId) {
       getSocket().emit("chat:send", {
         campaignId: current.campaignId,
-        content: `${current.name} casts ${spell.name} at rank ${rank} from a magic wand.`,
+        content: options.flexible
+          ? `${current.name} casts ${spell.name} at rank ${rank} from ${item.name}; apply the wand's effect.`
+          : `${current.name} casts ${spell.name} at rank ${rank} from a magic wand.`,
         visibility: "all",
       });
     }
@@ -920,7 +933,7 @@ export function CharacterSheetView({
     const { item, rank, kind } = itemCast;
     setItemCast(null);
     if (kind === "wand") {
-      await castWandSpell(item, rank, spell);
+      await castWandSpell(item, rank, spell, { flexible: flexibleWandRank(item) != null });
       return;
     }
     const saved = await persist((currentDraft) => ({
@@ -2148,6 +2161,7 @@ export function CharacterSheetView({
                             : null;
                           const scrollRank = item ? scrollSpellRank(item) : null;
                           const wandRank = item ? wandSpellRank(item) : null;
+                          const flexibleRank = item ? flexibleWandRank(item) : null;
                           const wandMax = Math.max(1, Math.round(entry.usesMax ?? 1));
                           const wandUsed = Math.max(0, Math.round(entry.usesUsed ?? 0)) >= wandMax;
                           const canCastItem =
@@ -2238,6 +2252,28 @@ export function CharacterSheetView({
                                           setItemCast({
                                             item,
                                             rank: wandRank,
+                                            kind: "wand",
+                                          })
+                                        }
+                                      >
+                                        {wandUsed ? "Used today" : "Cast wand"}
+                                      </button>
+                                    ) : null}
+                                    {item && flexibleRank && canCastItem ? (
+                                      <button
+                                        type="button"
+                                        className="pb-small-button"
+                                        disabled={!canEdit || wandUsed}
+                                        aria-label={
+                                          wandUsed
+                                            ? `${item.name} is used today`
+                                            : `Cast spell from ${item.name}`
+                                        }
+                                        title="This wand holds a chosen spell. Apply the wand's effect when you cast it."
+                                        onClick={() =>
+                                          setItemCast({
+                                            item,
+                                            rank: flexibleRank,
                                             kind: "wand",
                                           })
                                         }
