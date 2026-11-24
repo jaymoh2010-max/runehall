@@ -440,6 +440,23 @@ describe("PF2e character rules", () => {
     expect(draft.grantChoices["grant:cleric-domain"]).toEqual([]);
   });
 
+  it("normalizes ritual primary-check overrides", () => {
+    const draft = normalizeCharacterDraft({
+      name: "Ritualist",
+      spells: {
+        ritualSkills: {
+          "spell:a": "religion",
+          "spell:b": 7,
+          "spell:c": "  occultism  ",
+        },
+      },
+    });
+    expect(draft.spells.ritualSkills).toEqual({
+      "spell:a": "religion",
+      "spell:c": "occultism",
+    });
+  });
+
   it("derives Evasion and Juggernaut save upgrades from feature names", () => {
     expect(saveUpgradesFrom(["Evasion"])).toEqual({
       fortitude: false,

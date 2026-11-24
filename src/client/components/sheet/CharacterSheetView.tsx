@@ -91,6 +91,7 @@ import {
   Input,
   Modal,
   RichText,
+  Select,
   Spinner,
   Tag,
   Textarea,
@@ -419,6 +420,7 @@ export function CharacterSheetView({
     spells: { spell: Spell; rank: number }[];
   } | null>(null);
   const [staffCharge, setStaffCharge] = useState<Equipment | null>(null);
+  const [ritualView, setRitualView] = useState<Spell | null>(null);
   const characterRef = useRef<CharacterRecord | null>(null);
   const loadedCharacterIdRef = useRef<string | null>(null);
   const draftRef = useRef<CharacterDraft | null>(null);
@@ -1294,7 +1296,9 @@ export function CharacterSheetView({
   };
 
   const rollRitual = (spell: Spell) => {
-    const primary = ritualPrimarySkillName(spell.description);
+    const primary =
+      draftRef.current?.spells.ritualSkills?.[spell.id] ??
+      ritualPrimarySkillName(spell.description);
     if (!primary) {
       toast("This ritual has no readable primary check; resolve it manually.", "info");
       return;
@@ -1309,6 +1313,19 @@ export function CharacterSheetView({
       return;
     }
     postRoll(`1d20${signed(mod)}`, `${spell.name} primary check (${titleCase(primary)})`);
+  };
+
+  const setRitualSkill = async (spellId: string, skill: string) => {
+    if (!canEdit) return;
+    await persist((currentDraft) => {
+      const ritualSkills = { ...(currentDraft.spells.ritualSkills ?? {}) };
+      if (skill) ritualSkills[spellId] = skill;
+      else delete ritualSkills[spellId];
+      return {
+        ...currentDraft,
+        spells: { ...currentDraft.spells, ritualSkills },
+      };
+    });
   };
 
   const takeLongRest = async (result: LongRestResult) => {
@@ -2892,13 +2909,22 @@ export function CharacterSheetView({
                             </button>
                           ) : null}
                           {canEdit && spell && group === "Rituals" ? (
-                            <button
-                              type="button"
-                              className="pb-small-button"
-                              onClick={() => rollRitual(spell)}
-                            >
-                              Primary check
-                            </button>
+                            <>
+                              <button
+                                type="button"
+                                className="pb-small-button"
+                                onClick={() => setRitualView(spell)}
+                              >
+                                Details
+                              </button>
+                              <button
+                                type="button"
+                                className="pb-small-button"
+                                onClick={() => rollRitual(spell)}
+                              >
+                                Primary check
+                              </button>
+                            </>
                           ) : null}
                         </div>
                       </div>
@@ -3577,6 +3603,87 @@ export function CharacterSheetView({
               </Button>
             </div>
           </div>
+        </Modal>
+      ) : null}
+      {ritualView ? (
+        <Modal
+          open
+          onClose={() => setRitualView(null)}
+          title={ritualView.name}
+          subtitle={`Ritual · Rank ${ritualView.rank}`}
+          elevated={mode === "overlay"}
+          wide
+          footer={
+            <Button variant="ghost" onClick={() => setRitualView(null)}>
+              Close
+            </Button>
+          }
+        >
+          {(() => {
+            const detected = ritualPrimarySkillName(ritualView.description);
+            const selected = draft.spells.ritualSkills?.[ritualView.id] ?? "";
+            const seen = new Set<string>();
+            const options = [
+              ...(derived?.skills ?? []).map((skill) => ({
+                value: skill.id,
+                label: skill.name,
+              })),
+              ...(derived?.lore ?? []).map((lore) => ({
+                value: lore.name,
+                label: lore.name,
+              })),
+            ].filter((option) => {
+              if (seen.has(option.value)) return false;
+              seen.add(option.value);
+              return true;
+            });
+            return (
+              <div className="stack">
+                <div className="chip-row">
+                  <Tag>Rank {ritualView.rank}</Tag>
+                  {ritualView.actions ? <Tag>{ritualView.actions}</Tag> : null}
+                </div>
+                {ritualView.cost ? (
+                  <p>
+                    <strong>Cost</strong> {ritualView.cost}
+                  </p>
+                ) : null}
+                {ritualView.requirements ? (
+                  <p>
+                    <strong>Requirements</strong> {ritualView.requirements}
+                  </p>
+                ) : null}
+                <Field
+                  label="Primary check"
+                  hint={
+                    detected
+                      ? `Detected from the ritual text: ${titleCase(detected)}.`
+                      : "The data does not name a primary check. Choose one manually."
+                  }
+                >
+                  <Select
+                    value={selected}
+                    onChange={(event) => void setRitualSkill(ritualView.id, event.target.value)}
+                  >
+                    <option value="">
+                      {detected ? `Use detected: ${titleCase(detected)}` : "Choose a skill…"}
+                    </option>
+                    {options.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
+                <div>
+                  <Button size="sm" onClick={() => rollRitual(ritualView)}>
+                    Roll primary check
+                  </Button>
+                </div>
+                <RichText html={ritualView.description} />
+              </div>
+            );
+          })()}
         </Modal>
       ) : null}
       <Modal
