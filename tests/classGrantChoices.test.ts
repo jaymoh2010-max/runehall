@@ -225,6 +225,38 @@ describe("free class grant choices", () => {
     expect(group!.emptyHint).toMatch(/Domain Initiate/i);
   });
 
+  it("allows repeated Advanced Domain picks for multiple initialized domains", () => {
+    const draft = draftFor(cleric);
+    draft.level = 10;
+    chooseTag(draft, cleric, "cleric-doctrine", "cf:ZZzLMOUAtBVgV1DF");
+    draft.deityId = abadar.id;
+    draft.feats.class["4"] = "feat:vQ4DNfpktmaqdgdM";
+    draft.feats.class["8"] = "feat:uR44wELN9OlU68cL";
+    draft.feats.class["10"] = "feat:uR44wELN9OlU68cL";
+    draft.grantChoices[GRANT_CHOICE_KEYS.clericDomain] = ["domain:cities"];
+    draft.grantChoices[GRANT_CHOICE_KEYS.clericExpandedDomain] = ["domain:earth"];
+
+    const group = groupFor(draft, cleric, abadar, GRANT_CHOICE_KEYS.clericAdvancedDomain);
+    expect(group).toBeDefined();
+    expect(group!.count).toBe(2);
+    expect(group!.options.map((option) => option.domain)).toEqual(
+      expect.arrayContaining(["cities", "earth"])
+    );
+
+    draft.grantChoices[GRANT_CHOICE_KEYS.clericAdvancedDomain] = [
+      "advanced-domain:cities",
+      "advanced-domain:earth",
+    ];
+    const derived = computeCharacter(draft, contextForDraft(draft));
+    expect(derived.grantedSpells).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: "Pulse of Civilization", kind: "focus" }),
+        expect.objectContaining({ name: "Localized Quake", kind: "focus" }),
+      ])
+    );
+    expect(derived.focusPointsMax).toBe(3);
+  });
+
   it("activates Domain Initiate chosen through Natural Ambition", () => {
     const draft = draftFor(cleric);
     chooseTag(draft, cleric, "cleric-doctrine", "cf:0Aocw3igLwna9cjp");

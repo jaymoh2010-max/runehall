@@ -2,7 +2,7 @@
 
 Date: 2026-11-23
 
-Status: review complete. Sprint 1 (the daily spellcasting loop), the class-grant portion of Sprint 2, the first table-magic pass of Sprint 3, the magus studious-slot pass of Sprint 4, the animist prepared/spontaneous split of Sprint 5, the spontaneous known-at-rank pass of Sprint 6, the psychic psi-amp pass of Sprint 7, the table Sustain-reminder pass of Sprint 8, the higher-slot downcast pass of Sprint 9, the scroll-spellcasting pass of Sprint 10, the Magic Wand spellcasting pass of Sprint 11, the fixed-spell specific-wand pass of Sprint 12, the expanded/advanced domain pass of Sprint 13, the flexible-wand pass of Sprint 14, the staff/trait-restricted wand pass of Sprint 15, the ritual-detail pass of Sprint 16, and the spell-source label pass of Sprint 17 were implemented on 2026-11-23 through 2026-11-24. The findings below describe the pre-Sprint state; the implementation status sections record what changed, and the remaining class and table gaps stay in the backlog.
+Status: review complete. Sprint 1 (the daily spellcasting loop), the class-grant portion of Sprint 2, the first table-magic pass of Sprint 3, the magus studious-slot pass of Sprint 4, the animist prepared/spontaneous split of Sprint 5, the spontaneous known-at-rank pass of Sprint 6, the psychic psi-amp pass of Sprint 7, the table Sustain-reminder pass of Sprint 8, the higher-slot downcast pass of Sprint 9, the scroll-spellcasting pass of Sprint 10, the Magic Wand spellcasting pass of Sprint 11, the fixed-spell specific-wand pass of Sprint 12, the expanded/advanced domain pass of Sprint 13, the flexible-wand pass of Sprint 14, the staff/trait-restricted wand pass of Sprint 15, the ritual-detail pass of Sprint 16, the spell-source label pass of Sprint 17, and the staff-slot/repeated-domain pass of Sprint 18 were implemented on 2026-11-23 through 2026-11-24. The findings below describe the pre-Sprint state; the implementation status sections record what changed, and the remaining class and table gaps stay in the backlog.
 
 > **Follow-up (2026-11-23):** `docs/RULES-AUDIT.md` corrected two table errors
 > this review did not catch: bards use the 2/3 full-caster slot table (not the
@@ -234,6 +234,15 @@ Prepared spell-source labels are implemented:
 - Builder headings, add/remove labels, and daily-preparation empty states use the correct source name.
 - The underlying `spells.known` list is still shared by prepared and spontaneous casters; a full spellbook/known split and Learn a Spell accounting remain open.
 
+## Sprint 18 implementation status (2026-11-24)
+
+Staff slot-casting and repeated Advanced Domain picks are implemented:
+
+- Staff spell rows offer a **Slot** action that spends a normal spell slot of the spell's rank instead of charges.
+- The sheet checks ordinary slot capacity, excluding divine font, and records the spent slot in the normal slot pips.
+- Advanced Domain can be selected more than once; the choice group expands to one advanced-domain pick per selected copy of the feat.
+- Advanced-domain options remain limited to domains the character already has an initial spell for, so multiple picks require Expanded Domain Initiate or another initial-domain source.
+
 ## Rules baseline
 
 ### Core spellcasting
@@ -311,7 +320,7 @@ Legend: Yes = modeled and usable; Partial = some support with known gaps; No = n
 | Rituals | Partial | Primary-check rolls work, with a detail card and a manual skill override when the data omits the check; cost and outcome guidance remain prose |
 | Sustained spells | Yes | Casting starts sustain, the sheet and table list active spells, Sustain/End actions are available, and Restore clears them |
 | Spellbook capacity and learning | No | No starting-spellbook or Learn a Spell accounting |
-| Item spellcasting | Partial | Scrolls cast from the character's spell list and consume on use; generic Magic Wands cast at their rank once per day; fixed-spell specific wands cast directly; flexible wands cast a chosen spell at their listed rank; staves track parsed spell lists and charge pools; casting a staff spell with a slot and staves without readable lists remain manual |
+| Item spellcasting | Partial | Scrolls cast from the character's spell list and consume on use; generic Magic Wands cast at their rank once per day; fixed-spell specific wands cast directly; flexible wands cast a chosen spell at their listed rank; staves track parsed spell lists, charge pools, and spell-slot casting; staves without readable lists remain manual |
 | Multiclass spellcasting archetypes | No | Only the primary class contributes caster progression |
 
 ## Findings
@@ -408,7 +417,7 @@ Status: partly fixed in Sprint 2, Sprint 4, Sprint 5, Sprint 7, and Sprint 13. P
 - **Animist**: prepared animist slots and spontaneous apparition slots are separate. Attuned apparitions supply a curated repertoire, the primary apparition grants its vessel focus spell, and apparition slots reset during daily preparations. Invocations and wandering-feat retraining remain manual.
 - **Wizard**: higher-rank curriculum spells are not granted, so the extra slot is effectively unrestricted at those ranks.
 - **Sorcerer/oracle**: higher-rank bloodline/mystery gifts remain manual.
-- **Cleric**: deity spells are resolved and offered through the normal preparation workflow. Domain Initiate, Expanded Domain Initiate, and Advanced Domain grant their domain focus spells; later domain feats and repeated Advanced Domain picks remain manual.
+- **Cleric**: deity spells are resolved and offered through the normal preparation workflow. Domain Initiate, Expanded Domain Initiate, and Advanced Domain grant their domain focus spells; repeated Advanced Domain picks are supported, while later domain feats remain manual.
 
 Impact: These classes are usable only with manual bookkeeping. The most visible remaining class gaps are higher-level class-specific gifts and item spellcasting.
 
@@ -482,11 +491,11 @@ Fix: Ingest the structured primary-check skill and DC from the source data, then
 
 ### F12. Item spellcasting is not modeled (P2)
 
-Status: partly fixed in Sprint 10, Sprint 11, Sprint 12, Sprint 14, and Sprint 15. Scrolls are castable from the sheet and consumed; generic Magic Wands are castable at their rank once per day; fixed-spell specific wands cast directly; flexible wands use the wand picker; staves track parsed spell lists and charge pools. Casting a staff spell with a slot instead of charges and staves without readable lists remain manual.
+Status: partly fixed in Sprint 10, Sprint 11, Sprint 12, Sprint 14, Sprint 15, and Sprint 18. Scrolls are castable from the sheet and consumed; generic Magic Wands are castable at their rank once per day; fixed-spell specific wands cast directly; flexible wands use the wand picker; staves track parsed spell lists, charge pools, and spell-slot casting. Staves without readable lists remain manual.
 
 Impact: Scrolls, wands, and most staves are spellcasting resources at the table; other magic items remain inventory entries.
 
-Fix: Scroll casting opens the spell picker at the scroll's rank, filters by the character's tradition, and consumes the scroll on confirmation. Generic wand casting uses the same picker, records a daily use, and resets it on a long rest. Specific wands with a readable fixed spell cast directly, flexible wands open the picker at their listed rank, and staves expose their parsed spell list with a manual charge pool. The remaining item work is slot-casting from staves and the two staves without a readable list.
+Fix: Scroll casting opens the spell picker at the scroll's rank, filters by the character's tradition, and consumes the scroll on confirmation. Generic wand casting uses the same picker, records a daily use, and resets it on a long rest. Specific wands with a readable fixed spell cast directly, flexible wands open the picker at their listed rank, and staves expose their parsed spell list with charge and slot casting. The remaining item work is the two staves without a readable list.
 
 ### F13. Multiclass spellcasting archetypes are not modeled (P2)
 
@@ -657,7 +666,7 @@ Tasks:
 
 3. **Item spellcasting**
    - Cast from scrolls, wands, and staves with the correct charges and DC. (Scrolls implemented in Sprint 10; generic Magic Wands in Sprint 11; fixed-spell specific wands in Sprint 12; flexible wands in Sprint 14; staves in Sprint 15.)
-   - Consume scrolls and track wand daily uses and staff charge pools; casting a staff spell with a slot, staves without readable lists, and fine-grained staff special effects remain manual; respect daily preparations.
+   - Consume scrolls and track wand daily uses and staff charge pools; staves without readable lists and fine-grained staff special effects remain manual; respect daily preparations.
 
 4. **Spellbook and learning**
    - Add starting spellbook contents and two-spells-per-level accounting.

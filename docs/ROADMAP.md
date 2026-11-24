@@ -194,7 +194,7 @@ The character builder is already good enough for a core campaign at low levels. 
    - Character sheets take a long rest, preview the reset, and open daily preparations; prepared casters choose ranked spells and prepared cantrips, with pending reminders in the sheet, builder, party rail, dashboard, and campaign party cards.
    - Focus-only classes get their own spell attack/DC, innate spells use a separate Charisma-based profile, and the sheet uses the correct source per spell row.
    - Class grants cover psychic conscious minds and psi cantrips, necromancer grave spells, summoner link spells, and cleric deity spells.
-   - Cleric domains cover Domain Initiate, Expanded Domain Initiate, and Advanced Domain, including alternate domains and rank-4 advanced focus spells.
+   - Cleric domains cover Domain Initiate, Expanded Domain Initiate, and repeated Advanced Domain picks, including alternate domains and rank-4 advanced focus spells.
    - Prepared casters use class-specific source labels: spellbook for wizard/magus, familiar for witch, dirge for necromancer, and spell list for cleric/druid/animist; spontaneous casters keep repertoire.
    - Sustained spells are recorded when cast, listed on the sheet, and can be ended; ritual rows open a detail card with cost, requirements, full text, and a primary-check skill override, then roll the chosen skill.
    - Magus studious slots scale at 7th/11th/13th level; the builder and daily preparations only allow Gecko Grip, Haste, Fly, and the chosen hybrid study's studious spells.
@@ -204,9 +204,9 @@ The character builder is already good enough for a core campaign at low levels. 
    - The table shows a turn-start Sustain reminder for the active character, with a one-click Sustain acknowledgement and per-spell End.
    - Scrolls expose a Cast scroll action that filters by the character's spell list and consumes the scroll.
    - Generic Magic Wands expose a Cast wand action that filters by the wand's rank and records one daily use until a long rest; fixed-spell specific wands cast directly; flexible wands open the picker at their listed rank with the special effect left manual; Cyrusian wands filter to illusions.
-   - Staves expose parsed spell lists and a manual charge pool, charge in daily preparations, spend charges by spell rank, and empty on a long rest; slot-casting from a staff and staves without readable lists remain manual.
+   - Staves expose parsed spell lists and a manual charge pool, charge in daily preparations, spend charges by spell rank, can spend a spell slot instead of charges, and empty on a long rest; staves without readable lists remain manual.
    - Verified in-browser: a wizard with four rank-1 slots showed 4/4 prepared and disabled a fifth preparation; an animist cast Sure Strike from an apparition slot while the prepared rank-1 slot stayed full; a sorcerer learned Fireball at ranks 3 and 5, downcast it from a rank-4 slot, cast it from a rank-3 scroll that was consumed, cast it from a generic rank-3 wand that showed Used today, cast Lightning Bolt directly from a specific rank-3 wand, cast Grease from a flexible rank-1 wand, and charged and cast Heal from a Staff of Healing; a psychic amped Telekinetic Projectile and spent one focus point; a sustained Flaming Sphere produced a table reminder and ended cleanly.
-   - Remaining: later domain feats and repeated Advanced Domain picks, devotion spells, variable bloodline gifts, curriculum variants, slot-casting from staves, structured ritual source data, a full spellbook/known split with Learn a Spell accounting, and multiclass archetype casting.
+   - Remaining: later domain feats, devotion spells, variable bloodline gifts, curriculum variants, structured ritual source data, a full spellbook/known split with Learn a Spell accounting, and multiclass archetype casting.
 
 7. **Companions and print (manual roster complete)**
    - Animal companions, familiars, eidolons, and summons can be recorded with name, kind, level, HP, AC, and attack notes.

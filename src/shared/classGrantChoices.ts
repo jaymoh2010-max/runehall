@@ -42,6 +42,8 @@ export interface GrantChoiceGroup {
   emptyHint?: string;
   /** Restrict domain options to alternate or already-initialized domains. */
   domainScope?: "alternate" | "advanced";
+  /** Expand the number of picks to the number of times this feat is selected. */
+  countFromFeat?: string;
   options: GrantChoiceOption[];
 }
 
@@ -584,6 +586,7 @@ export const GRANT_CHOICE_GROUPS: GrantChoiceGroup[] = [
     minLevel: 8,
     source: { kind: "feat", featId: "feat:uR44wELN9OlU68cL" },
     domainScope: "advanced",
+    countFromFeat: "feat:uR44wELN9OlU68cL",
     emptyHint: "Choose Domain Initiate and one of your deity's domains first.",
     options: Object.keys(DOMAIN_ADVANCED_SPELLS).map(advancedDomainOption),
   },
@@ -652,7 +655,7 @@ export function activeGrantChoiceGroups(
     if (picks.length) selectedTags.add(group.tag);
     for (const id of picks) selectedOptionIds.add(id);
   }
-  const activeFeatIds = new Set<string>([
+  const selectedFeatIds = [
     ...Object.values(draft.feats.ancestry),
     ...Object.values(draft.feats.class),
     ...Object.values(draft.feats.skill),
@@ -661,7 +664,9 @@ export function activeGrantChoiceGroups(
     ...Object.values(draft.featChoices).flat(),
     ...(draft.backgroundFeat ? [draft.backgroundFeat] : []),
     ...extraFeatIds,
-  ]);
+  ];
+  const activeFeatIds = new Set(selectedFeatIds);
+  const featCount = (id: string) => selectedFeatIds.filter((selected) => selected === id).length;
   const sourceActive = (source: GrantChoiceSource) => {
     if (source.kind === "feat") return activeFeatIds.has(source.featId);
     if (source.kind === "class-option") return selectedOptionIds.has(source.optionId);
@@ -710,6 +715,9 @@ export function activeGrantChoiceGroups(
       );
     }
     if (!options.length && !group.emptyHint) return [];
-    return [{ ...group, options }];
+    const count = group.countFromFeat
+      ? Math.max(group.count, featCount(group.countFromFeat))
+      : group.count;
+    return [{ ...group, count, options }];
   });
 }
