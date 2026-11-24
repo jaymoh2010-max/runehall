@@ -47,6 +47,7 @@ import {
   flexibleWandRank,
   scrollSpellRank,
   specificWandSpell,
+  staffSpells,
   wandSpellRank,
 } from "../../../shared/itemSpellcasting";
 import { SpellPicker } from "../builder/pickers";
@@ -413,6 +414,11 @@ export function CharacterSheetView({
     rank: number;
     kind: "scroll" | "wand";
   } | null>(null);
+  const [staffCast, setStaffCast] = useState<{
+    item: Equipment;
+    spells: { spell: Spell; rank: number }[];
+  } | null>(null);
+  const [staffCharge, setStaffCharge] = useState<Equipment | null>(null);
   const characterRef = useRef<CharacterRecord | null>(null);
   const loadedCharacterIdRef = useRef<string | null>(null);
   const draftRef = useRef<CharacterDraft | null>(null);
@@ -954,6 +960,86 @@ export function CharacterSheetView({
         visibility: "all",
       });
     }
+  };
+
+  const castStaffSpell = async (item: Equipment, spell: Spell, rank: number) => {
+    if (!canEdit) return;
+    const entry = draftRef.current?.equipment.find((candidate) => candidate.itemId === item.id);
+    if (!entry) {
+      toast("That staff is no longer in the inventory.", "error");
+      return;
+    }
+    const max = Math.max(0, Math.round(entry.usesMax ?? 0));
+    const used = Math.max(0, Math.round(entry.usesUsed ?? 0));
+    const remaining = Math.max(0, max - used);
+    if (rank > remaining) {
+      toast(
+        `${item.name} needs ${rank} charge${rank === 1 ? "" : "s"} but has ${remaining}. Charge it during daily preparations.`,
+        "error"
+      );
+      return;
+    }
+    const saved = await persist((currentDraft) => ({
+      ...currentDraft,
+      equipment: currentDraft.equipment.map((candidate) => {
+        if (candidate.itemId !== item.id) return candidate;
+        const candidateMax = Math.max(0, Math.round(candidate.usesMax ?? max));
+        const candidateUsed = Math.max(0, Math.round(candidate.usesUsed ?? used));
+        return {
+          ...candidate,
+          usesKind: "charges",
+          usesMax: candidateMax,
+          usesUsed: Math.min(candidateMax, candidateUsed + rank),
+        };
+      }),
+    }));
+    if (!saved) return;
+    setStaffCast(null);
+    const after = Math.max(0, remaining - rank);
+    toast(
+      rank
+        ? `Cast ${spell.name} from ${item.name} using ${rank} charge${rank === 1 ? "" : "s"} (${after} left).`
+        : `Cast ${spell.name} from ${item.name}.`,
+      "success"
+    );
+    const current = characterRef.current;
+    if (current?.campaignId) {
+      getSocket().emit("chat:send", {
+        campaignId: current.campaignId,
+        content: rank
+          ? `${current.name} casts ${spell.name} from ${item.name} using ${rank} charge${rank === 1 ? "" : "s"}.`
+          : `${current.name} casts ${spell.name} from ${item.name}.`,
+        visibility: "all",
+      });
+    }
+  };
+
+  const chargeStaff = async (item: Equipment, rank: number) => {
+    if (!canEdit) return;
+    const max = Math.max(0, Math.min(5, Math.round(rank)));
+    const saved = await persist((currentDraft) => ({
+      ...currentDraft,
+      equipment: currentDraft.equipment.map((candidate) =>
+        candidate.itemId === item.id
+          ? { ...candidate, usesKind: "charges", usesMax: max, usesUsed: 0 }
+          : candidate
+      ),
+    }));
+    if (!saved) return;
+    setStaffCharge(null);
+    toast(
+      max
+        ? `Charged ${item.name} with ${max} charge${max === 1 ? "" : "s"}. Mark the spent spell slot manually.`
+        : `Cleared ${item.name} charges.`,
+      "success"
+    );
+  };
+
+  const staffPool = (item: Equipment): { max: number; remaining: number } => {
+    const entry = draft?.equipment.find((candidate) => candidate.itemId === item.id);
+    const max = Math.max(0, Math.round(entry?.usesMax ?? 0));
+    const used = Math.max(0, Math.round(entry?.usesUsed ?? 0));
+    return { max, remaining: Math.max(0, max - used) };
   };
 
   const spellEntries = useMemo(() => {
@@ -2162,6 +2248,17 @@ export function CharacterSheetView({
                           const scrollRank = item ? scrollSpellRank(item) : null;
                           const wandRank = item ? wandSpellRank(item) : null;
                           const flexibleRank = item ? flexibleWandRank(item) : null;
+                          const staffEntries = item
+                            ? staffSpells(item).flatMap((staffSpell) => {
+                                const spell = spellsByName.get(staffSpell.name.toLowerCase());
+                                return spell ? [{ spell, rank: staffSpell.rank }] : [];
+                              })
+                            : [];
+                          const staffMax = Math.max(0, Math.round(entry.usesMax ?? 0));
+                          const staffRemaining = Math.max(
+                            0,
+                            staffMax - Math.max(0, Math.round(entry.usesUsed ?? 0))
+                          );
                           const wandMax = Math.max(1, Math.round(entry.usesMax ?? 1));
                           const wandUsed = Math.max(0, Math.round(entry.usesUsed ?? 0)) >= wandMax;
                           const canCastItem =
@@ -2301,6 +2398,33 @@ export function CharacterSheetView({
                                       >
                                         {wandUsed ? "Used today" : "Cast wand"}
                                       </button>
+                                    ) : null}
+                                    {item && staffEntries.length && canCastItem ? (
+                                      <>
+                                        <span className="tiny muted">
+                                          {staffRemaining} / {staffMax} charges
+                                        </span>
+                                        <button
+                                          type="button"
+                                          className="pb-small-button"
+                                          disabled={!canEdit}
+                                          aria-label={`Charge ${item.name}`}
+                                          onClick={() => setStaffCharge(item)}
+                                        >
+                                          Charge
+                                        </button>
+                                        <button
+                                          type="button"
+                                          className="pb-small-button"
+                                          disabled={!canEdit}
+                                          aria-label={`Cast spell from ${item.name}`}
+                                          onClick={() =>
+                                            setStaffCast({ item, spells: staffEntries })
+                                          }
+                                        >
+                                          Cast staff
+                                        </button>
+                                      </>
                                     ) : null}
                                     {item?.price ? (
                                       <span>{formatCp(item.price.cpTotal)} each</span>
@@ -3365,9 +3489,95 @@ export function CharacterSheetView({
           contentModeLocked
           legacyDefault={draft.includeLegacy}
           legacyLocked
+          requiredTrait={itemCast.item.name.startsWith("Cyrusian Wand") ? "illusion" : undefined}
           confirmLabel={itemCast.kind === "wand" ? "Cast from wand" : "Cast from scroll"}
           onSelect={(spell) => void castItemSpell(spell)}
         />
+      ) : null}
+      {staffCast ? (
+        <Modal
+          open
+          onClose={() => setStaffCast(null)}
+          title={staffCast.item.name}
+          subtitle="Cast a spell from the staff"
+          elevated={mode === "overlay"}
+          footer={
+            <Button variant="ghost" onClick={() => setStaffCast(null)}>
+              Close
+            </Button>
+          }
+        >
+          {(() => {
+            const pool = staffPool(staffCast.item);
+            const ranks = [...new Set(staffCast.spells.map((entry) => entry.rank))].sort(
+              (left, right) => left - right
+            );
+            return (
+              <div className="stack">
+                <p className="muted small">
+                  {pool.remaining} / {pool.max} charges. Cantrips are free; ranked spells cost
+                  charges equal to their rank.
+                </p>
+                {ranks.map((rank) => (
+                  <div key={rank}>
+                    <h4>{rank === 0 ? "Cantrips" : `Rank ${rank}`}</h4>
+                    <div className="chip-row">
+                      {staffCast.spells
+                        .filter((entry) => entry.rank === rank)
+                        .map(({ spell, rank: spellRank }) => (
+                          <Button
+                            key={`${spell.id}:${spellRank}`}
+                            size="sm"
+                            disabled={!canEdit || spellRank > pool.remaining}
+                            onClick={() => void castStaffSpell(staffCast.item, spell, spellRank)}
+                          >
+                            {spell.name}
+                            {spellRank ? ` · ${spellRank} charge${spellRank === 1 ? "" : "s"}` : ""}
+                          </Button>
+                        ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+        </Modal>
+      ) : null}
+      {staffCharge ? (
+        <Modal
+          open
+          onClose={() => setStaffCharge(null)}
+          title={`Charge ${staffCharge.name}`}
+          subtitle="Expend a spell slot during daily preparations"
+          elevated={mode === "overlay"}
+          footer={
+            <Button variant="ghost" onClick={() => setStaffCharge(null)}>
+              Close
+            </Button>
+          }
+        >
+          <div className="stack">
+            <p className="muted small">
+              A staff holds up to 5 charges. Choose the rank of the spell slot you expend; mark the
+              slot manually if your table tracks it.
+            </p>
+            <div className="chip-row">
+              {Array.from(
+                { length: Math.min(5, Math.max(0, derived.maxSpellRank)) },
+                (_, index) => index + 1
+              ).map((rank) => (
+                <Button key={rank} size="sm" onClick={() => void chargeStaff(staffCharge, rank)}>
+                  Expend rank {rank}
+                </Button>
+              ))}
+            </div>
+            <div>
+              <Button variant="ghost" size="sm" onClick={() => void chargeStaff(staffCharge, 0)}>
+                Clear charges
+              </Button>
+            </div>
+          </div>
+        </Modal>
       ) : null}
       <Modal
         open={Boolean(customItemView)}

@@ -97,10 +97,50 @@ export function flexibleWandRank(
 ): number | null {
   const cast = parseWandCast(item);
   if (!cast || !isFlexibleWandSpell(cast.name)) return null;
-  // Cyrusian wands restrict their stored spell to arcane illusions, which the
-  // generic picker cannot express, so leave them manual for now.
-  if (/\bonly ever contains\b/i.test(plainText(item?.description))) return null;
   return cast.rank;
+}
+
+export interface StaffSpell {
+  name: string;
+  rank: number;
+}
+
+const STAFF_LIST_ITEM = /<li>\s*(?:<p>)?\s*<strong>([^<]+)<\/strong>([\s\S]*?)<\/li>/gi;
+
+function staffRank(label: string): number | null {
+  const value = label.trim();
+  if (/^cantrips?$/i.test(value)) return 0;
+  const match = value.match(/^(\d+)(?:st|nd|rd|th)$/i);
+  if (!match) return null;
+  const rank = Number(match[1]);
+  return Number.isInteger(rank) && rank >= 1 && rank <= 10 ? rank : null;
+}
+
+/** Spells listed in a staff's activation block, grouped by their staff rank. */
+export function staffSpells(
+  item: Pick<Equipment, "traits" | "description"> | null | undefined
+): StaffSpell[] {
+  if (!item?.traits?.includes("staff")) return [];
+  const text = String(item.description ?? "");
+  const seen = new Set<string>();
+  const spells: StaffSpell[] = [];
+  for (const match of text.matchAll(STAFF_LIST_ITEM)) {
+    const rank = staffRank(match[1]);
+    if (rank === null) continue;
+    for (const rawName of match[2].split(/,|\s+or\s+/i)) {
+      const name = rawName
+        .replace(/<[^>]+>/g, " ")
+        .replace(/&nbsp;|&#160;/gi, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+      if (!name) continue;
+      const key = `${rank}:${name.toLowerCase()}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      spells.push({ name, rank });
+    }
+  }
+  return spells;
 }
 
 /** Whether an inventory item is a consumable spell scroll. */

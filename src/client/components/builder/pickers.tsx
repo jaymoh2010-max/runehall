@@ -491,6 +491,7 @@ export function SpellPicker({
   legacyLocked,
   onLegacyChange,
   excludeIds,
+  requiredTrait,
   confirmLabel,
   onSelect,
 }: PickerBase & {
@@ -507,6 +508,8 @@ export function SpellPicker({
   legacyLocked?: boolean;
   onLegacyChange?: (value: boolean) => void;
   excludeIds?: string[];
+  /** Restrict results to spells carrying this trait (for example, illusion). */
+  requiredTrait?: string;
   confirmLabel?: string;
   onSelect: (spell: Spell) => void;
 }) {
@@ -544,14 +547,31 @@ export function SpellPicker({
   if (query.trim()) params.set("q", query.trim());
   if (psychicCantrips) {
     params.set("traitAll", "psychic");
-  } else if (focus) {
-    params.set("traitAll", [classTrait, "focus"].filter(Boolean).join(","));
+  } else {
+    const traits = [
+      focus ? classTrait : null,
+      focus ? "focus" : null,
+      requiredTrait ?? null,
+    ].filter((trait): trait is string => Boolean(trait));
+    if (traits.length) params.set("traitAll", traits.join(","));
   }
 
   const { items, total, next, loading, error, offset, setOffset } = useSearch<Spell>(
     open,
     `/api/compendium/spells?${params.toString()}`,
-    [query, legacy, expanded, recommended, rank, maxRank, tradition, focus, ritual, classTrait]
+    [
+      query,
+      legacy,
+      expanded,
+      recommended,
+      rank,
+      maxRank,
+      tradition,
+      focus,
+      ritual,
+      classTrait,
+      requiredTrait,
+    ]
   );
 
   const excluded = new Set(excludeIds ?? []);

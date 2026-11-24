@@ -223,14 +223,20 @@ export function activateItemOnDraft(
   };
 }
 
-/** Daily preparations reset per-day item uses. */
+/** Daily preparations reset per-day item uses and empty charged staff pools. */
 export function resetItemUses(draft: CharacterDraft): CharacterDraft {
-  if (!draft.equipment.some((entry) => (entry.usesUsed ?? 0) > 0)) return draft;
+  if (!draft.equipment.some((entry) => (entry.usesUsed ?? 0) > 0 || entry.usesKind === "charges")) {
+    return draft;
+  }
   return {
     ...draft,
-    equipment: draft.equipment.map((entry) =>
-      (entry.usesUsed ?? 0) > 0 ? { ...entry, usesUsed: 0 } : entry
-    ),
+    equipment: draft.equipment.map((entry) => {
+      if (entry.usesKind === "charges") {
+        const max = Math.max(0, Math.round(entry.usesMax ?? 0));
+        return entry.usesUsed === max ? entry : { ...entry, usesUsed: max };
+      }
+      return (entry.usesUsed ?? 0) > 0 ? { ...entry, usesUsed: 0 } : entry;
+    }),
   };
 }
 
