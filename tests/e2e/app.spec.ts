@@ -1610,6 +1610,12 @@ test("builder learns a spontaneous spell at more than one rank", async ({ page }
     timeout: 15_000,
   });
   await expect(staffRow).toContainText("0 / 1 charges");
+  await staffRow.getByRole("button", { name: "Cast spell from Staff of Healing" }).click();
+  await page.getByRole("button", { name: "Slot", exact: true }).click();
+  await expect(
+    page.getByText(/Cast Heal from Staff of Healing using a rank 1 spell slot/)
+  ).toBeVisible({ timeout: 15_000 });
+  await expect(staffRow).toContainText("0 / 1 charges");
   await expect(page.locator(".pb-save")).toHaveText("Saved");
 
   await page.reload();

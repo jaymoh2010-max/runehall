@@ -1037,6 +1037,47 @@ export function CharacterSheetView({
     );
   };
 
+  const staffSlotRemaining = (rank: number): number => {
+    const total = Math.max(0, Math.round(derived?.spellSlots?.[rank - 1] ?? 0));
+    const font =
+      rank === derived?.divineFontRank ? Math.max(0, Math.round(derived?.divineFontSlots ?? 0)) : 0;
+    const used = Math.max(0, Math.round(Number(draft?.spells.slotsUsed[String(rank)] ?? 0)));
+    return Math.max(0, total - font - used);
+  };
+
+  const castStaffSpellWithSlot = async (item: Equipment, spell: Spell, rank: number) => {
+    if (!canEdit || rank < 1) return;
+    if (staffSlotRemaining(rank) <= 0) {
+      toast(`No rank ${rank} spell slot remains.`, "error");
+      return;
+    }
+    const used = Math.max(
+      0,
+      Math.round(Number(draftRef.current?.spells.slotsUsed[String(rank)] ?? 0))
+    );
+    const saved = await persist((currentDraft) => ({
+      ...currentDraft,
+      spells: {
+        ...currentDraft.spells,
+        slotsUsed: {
+          ...currentDraft.spells.slotsUsed,
+          [String(rank)]: used + 1,
+        },
+      },
+    }));
+    if (!saved) return;
+    setStaffCast(null);
+    toast(`Cast ${spell.name} from ${item.name} using a rank ${rank} spell slot.`, "success");
+    const current = characterRef.current;
+    if (current?.campaignId) {
+      getSocket().emit("chat:send", {
+        campaignId: current.campaignId,
+        content: `${current.name} casts ${spell.name} from ${item.name} using a rank ${rank} spell slot.`,
+        visibility: "all",
+      });
+    }
+  };
+
   const staffPool = (item: Equipment): { max: number; remaining: number } => {
     const entry = draft?.equipment.find((candidate) => candidate.itemId === item.id);
     const max = Math.max(0, Math.round(entry?.usesMax ?? 0));
@@ -3542,7 +3583,7 @@ export function CharacterSheetView({
               <div className="stack">
                 <p className="muted small">
                   {pool.remaining} / {pool.max} charges. Cantrips are free; ranked spells cost
-                  charges equal to their rank.
+                  charges equal to their rank or one spell slot of that rank.
                 </p>
                 {ranks.map((rank) => (
                   <div key={rank}>
@@ -3551,15 +3592,34 @@ export function CharacterSheetView({
                       {staffCast.spells
                         .filter((entry) => entry.rank === rank)
                         .map(({ spell, rank: spellRank }) => (
-                          <Button
+                          <span
                             key={`${spell.id}:${spellRank}`}
-                            size="sm"
-                            disabled={!canEdit || spellRank > pool.remaining}
-                            onClick={() => void castStaffSpell(staffCast.item, spell, spellRank)}
+                            style={{ display: "inline-flex", gap: 4 }}
                           >
-                            {spell.name}
-                            {spellRank ? ` · ${spellRank} charge${spellRank === 1 ? "" : "s"}` : ""}
-                          </Button>
+                            <Button
+                              size="sm"
+                              disabled={!canEdit || spellRank > pool.remaining}
+                              onClick={() => void castStaffSpell(staffCast.item, spell, spellRank)}
+                            >
+                              {spell.name}
+                              {spellRank
+                                ? ` · ${spellRank} charge${spellRank === 1 ? "" : "s"}`
+                                : ""}
+                            </Button>
+                            {spellRank ? (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                disabled={!canEdit || staffSlotRemaining(spellRank) <= 0}
+                                title={`Use a rank ${spellRank} spell slot`}
+                                onClick={() =>
+                                  void castStaffSpellWithSlot(staffCast.item, spell, spellRank)
+                                }
+                              >
+                                Slot
+                              </Button>
+                            ) : null}
+                          </span>
                         ))}
                     </div>
                   </div>
