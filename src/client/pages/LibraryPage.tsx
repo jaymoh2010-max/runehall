@@ -135,7 +135,11 @@ function entrySubtitle(item: Entry, tab: Tab): string {
   switch (kind) {
     case "ancestry": {
       const ancestry = item as Ancestry;
-      return `${ancestry.hp} HP · ${ancestry.size} · ${ancestry.vision}`;
+      const hp = ancestry.hpBySize
+        ? `${Math.min(...Object.values(ancestry.hpBySize))}-${Math.max(...Object.values(ancestry.hpBySize))}`
+        : ancestry.hp;
+      const size = ancestry.sizeChoices ? "variable size" : ancestry.size;
+      return `${hp} HP · ${size} · ${ancestry.vision}`;
     }
     case "heritage": {
       const heritage = item as Heritage;

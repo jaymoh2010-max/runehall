@@ -245,6 +245,12 @@ export function HeritageStep({
                   </p>
                 </div>
                 <div className="chip-row">
+                  {selected.speeds?.base ? <Tag tone="gold">{selected.speeds.base} ft.</Tag> : null}
+                  {(selected.speeds?.other ?? []).map((entry) => (
+                    <Tag key={entry.type} tone="gold">
+                      {titleCase(entry.type)} {entry.value} ft.
+                    </Tag>
+                  ))}
                   {selected.traits.map((trait) => (
                     <Tag key={trait}>{traitLabel(trait)}</Tag>
                   ))}

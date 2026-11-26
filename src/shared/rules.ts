@@ -1521,6 +1521,7 @@ export function emptyCharacterDraft(name = "New Hero"): CharacterDraft {
     contentMode: "core",
     includeLegacy: false,
     ancestryId: null,
+    ancestrySize: null,
     heritageId: null,
     backgroundId: null,
     classId: null,
@@ -1540,6 +1541,7 @@ export function emptyCharacterDraft(name = "New Hero"): CharacterDraft {
       increases: {},
       lore: [],
       background: [],
+      classSkills: [],
       backgroundLore: [],
     },
     abpSkill: null,
@@ -1792,6 +1794,7 @@ export function normalizeCharacterDraft(input: unknown, fallbackName = "New Hero
     contentMode: raw.contentMode === "expanded" ? "expanded" : "core",
     includeLegacy: raw.includeLegacy === true,
     ancestryId: typeof raw.ancestryId === "string" ? raw.ancestryId : null,
+    ancestrySize: typeof raw.ancestrySize === "string" ? raw.ancestrySize : null,
     heritageId: typeof raw.heritageId === "string" ? raw.heritageId : null,
     backgroundId: typeof raw.backgroundId === "string" ? raw.backgroundId : null,
     classId: typeof raw.classId === "string" ? raw.classId : null,
@@ -1819,6 +1822,7 @@ export function normalizeCharacterDraft(input: unknown, fallbackName = "New Hero
       increases,
       lore: arr<string>(skills.lore).filter((x) => typeof x === "string"),
       background: arr<string>(skills.background).filter((x) => typeof x === "string"),
+      classSkills: arr<string>(skills.classSkills).filter((x) => typeof x === "string"),
       backgroundLore: arr<string>(skills.backgroundLore).filter((x) => typeof x === "string"),
     },
     feats: {
@@ -2150,6 +2154,12 @@ export function grantedTrainedSkills(
   const out = new Set<string>();
   for (const skill of context.background?.trainedSkills ?? []) out.add(skill);
   for (const skill of context.classData?.trainedSkills.value ?? []) out.add(skill);
+  const classSkillOptions = new Set(
+    (context.classData?.skillChoices ?? []).flatMap((choice) => choice.options)
+  );
+  for (const skill of draft.skills.classSkills ?? []) {
+    if (classSkillOptions.has(skill)) out.add(skill);
+  }
 
   for (const option of selectedChoiceOptions(draft, context.classData)) {
     for (const skill of option.trainedSkills ?? []) out.add(skill);
@@ -3382,6 +3392,11 @@ export function computeCharacter(
 
   // --- Core selections -----------------------------------------------------
   if (!ancestry) issue("error", "Choose an ancestry.", "ancestry");
+  if (ancestry?.sizeChoices?.length) {
+    if (!draft.ancestrySize || !ancestry.sizeChoices.includes(draft.ancestrySize)) {
+      issue("error", `${ancestry.name}: choose your size.`, "ancestry");
+    }
+  }
   if (ancestry && !draft.heritageId) issue("error", "Choose a heritage.", "heritage");
   if (!background) issue("error", "Choose a background.", "background");
   if (!classData) issue("error", "Choose a class.", "class");
@@ -3569,6 +3584,14 @@ export function computeCharacter(
         `Choose your starting feat for ${background?.name ?? "your background"}.`,
         "background"
       );
+    }
+  }
+  for (const choice of classData?.skillChoices ?? []) {
+    const selected = (draft.skills.classSkills ?? []).filter((skill) =>
+      choice.options.includes(skill)
+    );
+    if (selected.length < choice.count) {
+      issue("error", `${classData?.name}: ${choice.prompt}.`, "skills");
     }
   }
   const extraRequired = classData ? requiredExtraSkills(draft, context) : 0;
@@ -3763,7 +3786,10 @@ export function computeCharacter(
 
   // --- HP / AC / saves -----------------------------------------------------
   const conMod = abilityMods.con;
-  const ancestryHp = ancestry?.hp ?? 0;
+  const ancestryHp =
+    (draft.ancestrySize ? ancestry?.hpBySize?.[draft.ancestrySize] : undefined) ??
+    ancestry?.hp ??
+    0;
   const classHp = classData?.hp ?? 0;
   const perLevel = Math.max(1, classHp + conMod);
   const maxHp = Math.max(
@@ -3809,7 +3835,7 @@ export function computeCharacter(
   const shieldBonus =
     draft.play.shieldRaised && shield?.shield ? Math.abs(shield.shield.acBonus || 2) : 0;
   let ac: number;
-  let speed = (ancestry?.speed ?? 25) + (featMods.speed ?? 0);
+  let speed = (context.heritage?.speeds?.base ?? (ancestry?.speed || 25)) + (featMods.speed ?? 0);
   const speedPenalties: number[] = [];
   if (armor?.armor) {
     const armorCategory = armor.armor.category === "unarmored" ? "unarmored" : armor.armor.category;
@@ -4975,7 +5001,12 @@ export function computeCharacter(
     shieldBonus,
     shield: shieldInfo,
     speed,
-    otherSpeeds: ancestry?.otherSpeeds ?? [],
+    otherSpeeds: (() => {
+      const merged = new Map<string, { type: string; value: number }>();
+      for (const entry of ancestry?.otherSpeeds ?? []) merged.set(entry.type, entry);
+      for (const entry of context.heritage?.speeds?.other ?? []) merged.set(entry.type, entry);
+      return [...merged.values()];
+    })(),
     perception,
     initiative,
     saves,
@@ -4997,7 +5028,7 @@ export function computeCharacter(
     divineFontSlots,
     divineFontRank,
     focusPointsMax,
-    size: ancestry?.size ?? "med",
+    size: draft.ancestrySize ?? ancestry?.size ?? "med",
     languages,
     senses,
     notes,

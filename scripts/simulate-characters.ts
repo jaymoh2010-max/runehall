@@ -150,6 +150,18 @@ function chooseClassChoices(
   classData: ClassData,
   forcedChoice?: { groupKey: string; optionId: string }
 ) {
+  const existingClassSkills = [...new Set(draft.skills.classSkills ?? [])];
+  draft.skills.classSkills = (classData.skillChoices ?? []).flatMap((group) => {
+    const picks = existingClassSkills
+      .filter((skill) => group.options.includes(skill))
+      .slice(0, group.count);
+    while (picks.length < group.count) {
+      const remaining = group.options.filter((option) => !picks.includes(option));
+      if (!remaining.length) break;
+      picks.push(pick(rng, remaining));
+    }
+    return picks;
+  });
   const next: Record<string, string[]> = { ...draft.classChoices };
   for (const group of classData.choiceGroups) {
     if ((group.sourceFeature?.level ?? 0) > draft.level) continue;

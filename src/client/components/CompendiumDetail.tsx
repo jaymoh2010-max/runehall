@@ -249,9 +249,17 @@ function renderBody(kind: CompendiumEntryKind, entry: CompendiumEntry): ReactNod
       return (
         <>
           <MetaGrid>
-            <Meta label="Hit points">{ancestry.hp}</Meta>
-            <Meta label="Size">{SIZES[ancestry.size] ?? ancestry.size}</Meta>
-            <Meta label="Speed">{ancestry.speed} ft.</Meta>
+            <Meta label="Hit points">
+              {ancestry.hpBySize
+                ? `${Math.min(...Object.values(ancestry.hpBySize))}–${Math.max(...Object.values(ancestry.hpBySize))}`
+                : ancestry.hp}
+            </Meta>
+            <Meta label="Size">
+              {ancestry.sizeChoices
+                ? ancestry.sizeChoices.map((size) => SIZES[size] ?? size).join(", ")
+                : (SIZES[ancestry.size] ?? ancestry.size)}
+            </Meta>
+            <Meta label="Speed">{ancestry.speedNote || `${ancestry.speed} ft.`}</Meta>
             <Meta label="Vision">{VISION_LABELS[ancestry.vision] ?? ancestry.vision}</Meta>
           </MetaGrid>
           <div className="compendium-facts">
@@ -318,6 +326,16 @@ function renderBody(kind: CompendiumEntryKind, entry: CompendiumEntry): ReactNod
           <MetaGrid>
             <Meta label="Ancestry">{heritage.ancestry || "Versatile"}</Meta>
             <Meta label="Versatile">{heritage.versatile ? "Yes" : "No"}</Meta>
+            {heritage.speeds?.base ? (
+              <Meta label="Speed">
+                {heritage.speeds.base} ft.
+                {(heritage.speeds.other ?? []).length
+                  ? ` · ${(heritage.speeds.other ?? [])
+                      .map((speed) => `${speed.value} ft. ${speed.type}`)
+                      .join(", ")}`
+                  : ""}
+              </Meta>
+            ) : null}
           </MetaGrid>
           <Description html={heritage.description} />
         </>
@@ -389,6 +407,13 @@ function renderBody(kind: CompendiumEntryKind, entry: CompendiumEntry): ReactNod
               {cls.trainedSkills.value.map(titleCase).join(", ")}
               {cls.trainedSkills.additional ? ` + ${cls.trainedSkills.additional}` : ""}
             </Meta>
+            {cls.skillChoices?.length ? (
+              <Meta label="Skill choices">
+                {cls.skillChoices
+                  .map((choice) => choice.options.map(titleCase).join(" or "))
+                  .join("; ")}
+              </Meta>
+            ) : null}
             <Meta label="Spellcasting">{cls.spellcasting ? "Yes" : "No"}</Meta>
           </MetaGrid>
           <Description html={cls.description} />
@@ -577,6 +602,18 @@ function renderBody(kind: CompendiumEntryKind, entry: CompendiumEntry): ReactNod
                 : "—"}
             </Meta>
             <Meta label="Favored weapon">{deity.weapons.map(titleCase).join(", ")}</Meta>
+            <Meta label="Sanctification">
+              {(() => {
+                const sanctification = deity.sanctification ?? {};
+                const what = Array.isArray(sanctification.what)
+                  ? sanctification.what.map(titleCase).join(" or ")
+                  : "";
+                const base = what
+                  ? `${sanctification.modal === "must" ? "Must choose" : "Can choose"} ${what}`
+                  : "None";
+                return deity.sanctificationNote ? `${base} (${deity.sanctificationNote})` : base;
+              })()}
+            </Meta>
             <Meta label="Deity spells">
               {Object.entries(deity.spells)
                 .sort(([a], [b]) => Number(a) - Number(b))

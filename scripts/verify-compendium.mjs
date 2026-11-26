@@ -344,6 +344,19 @@ for (const cls of data.classes ?? []) {
   for (const skill of cls.trainedSkills?.value ?? []) {
     if (!skillIds.has(skill)) fail(`class ${cls.name}: unknown trained skill "${skill}"`);
   }
+  for (const choice of cls.skillChoices ?? []) {
+    if (!Array.isArray(choice.options) || !choice.options.length) {
+      fail(`class ${cls.name}: skill choice has no options`);
+      continue;
+    }
+    for (const skill of choice.options) {
+      if (!skillIds.has(skill))
+        fail(`class ${cls.name}/${choice.prompt}: unknown skill choice "${skill}"`);
+    }
+    if (!Number.isFinite(choice.count) || choice.count < 1) {
+      fail(`class ${cls.name}/${choice.prompt}: invalid choice count`);
+    }
+  }
   for (const group of cls.choiceGroups ?? []) {
     for (const option of group.options ?? []) {
       for (const skill of option.trainedSkills ?? []) {
@@ -358,8 +371,41 @@ for (const cls of data.classes ?? []) {
 for (const ancestry of data.ancestries ?? []) {
   if (!Number.isFinite(ancestry.hp) || ancestry.hp <= 0)
     fail(`ancestry ${ancestry.name}: invalid HP`);
-  if (!Number.isFinite(ancestry.speed) || ancestry.speed <= 0)
+  if (
+    !Number.isFinite(ancestry.speed) ||
+    ancestry.speed < 0 ||
+    (ancestry.speed === 0 && !ancestry.speedNote)
+  )
     fail(`ancestry ${ancestry.name}: invalid speed`);
+  if (ancestry.sizeChoices) {
+    if (!Array.isArray(ancestry.sizeChoices) || !ancestry.sizeChoices.length) {
+      fail(`ancestry ${ancestry.name}: sizeChoices must be a non-empty array`);
+    } else {
+      for (const size of ancestry.sizeChoices) {
+        if (!["tiny", "sm", "med", "lg", "huge", "grg"].includes(size)) {
+          fail(`ancestry ${ancestry.name}: unknown size choice "${size}"`);
+        }
+        if (
+          ancestry.hpBySize &&
+          (!Number.isFinite(ancestry.hpBySize[size]) || ancestry.hpBySize[size] <= 0)
+        ) {
+          fail(`ancestry ${ancestry.name}: missing HP for size "${size}"`);
+        }
+      }
+    }
+  }
+}
+for (const heritage of data.heritages ?? []) {
+  const speeds = heritage.speeds;
+  if (!speeds) continue;
+  if (speeds.base != null && (!Number.isFinite(speeds.base) || speeds.base < 0)) {
+    fail(`heritage ${heritage.name}: invalid base speed`);
+  }
+  for (const speed of speeds.other ?? []) {
+    if (!speed?.type || !Number.isFinite(speed.value) || speed.value <= 0) {
+      fail(`heritage ${heritage.name}: invalid other speed`);
+    }
+  }
 }
 for (const cls of data.classes ?? []) {
   if (!Number.isFinite(cls.hp) || cls.hp <= 0) fail(`class ${cls.name}: invalid HP`);

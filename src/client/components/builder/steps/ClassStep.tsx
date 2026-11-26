@@ -228,6 +228,7 @@ export function ClassStep({
                 Object.keys(draft.classChoices).length ? "class choices" : null,
                 Object.keys(draft.grantChoices).length ? "class option choices" : null,
                 draft.deityId || draft.deitySkill ? "deity" : null,
+                draft.skills.classSkills.length ? "class skill choices" : null,
                 Object.keys(draft.feats.class).length ? "class feats" : null,
                 draft.spells.tradition ||
                 draft.spells.cantrips.length ||
@@ -280,6 +281,7 @@ export function ClassStep({
                     preparationsPending: false,
                   },
                   feats: { ...current.feats, class: {} },
+                  skills: { ...current.skills, classSkills: [] },
                 };
               });
             }}
@@ -342,6 +344,11 @@ export function ClassStep({
                     {selected.trainedSkills.value.map(titleCase).join(", ") || "—"} +{" "}
                     {selected.trainedSkills.additional} choice
                     {selected.trainedSkills.additional === 1 ? "" : "s"}
+                    {selected.skillChoices?.length
+                      ? ` · ${selected.skillChoices
+                          .map((choice) => choice.options.map(titleCase).join(" or "))
+                          .join("; ")}`
+                      : ""}
                   </strong>
                 </div>
                 <div>

@@ -68,6 +68,10 @@ export const DEITY_OVERRIDES = {
   Elion: { domains: ["cities", "family", "nature", "travel"] },
   "Essence Dancers": { sanctification: {} },
   Husk: { sanctification: { modal: "must", what: ["unholy"] } },
+  "Hei Feng": {
+    sanctification: { modal: "can", what: ["unholy", "holy"] },
+    sanctificationNote: "Can choose holy only if you are a tengu.",
+  },
   "Immaculate Growth": { sanctification: { modal: "can", what: ["holy"] } },
   Imot: { font: ["harm"] },
   Ketephys: { font: ["heal"] },
@@ -119,16 +123,88 @@ export const DEITY_OVERRIDES = {
   "Conqueror Worm": { alternateDomains: [] },
 };
 
+/** Class training choices the Foundry export encodes only as ChoiceSet rules. */
+export const CLASS_OVERRIDES = {
+  Fighter: {
+    skillChoices: [
+      { prompt: "Choose Acrobatics or Athletics", options: ["acrobatics", "athletics"], count: 1 },
+    ],
+  },
+  Runesmith: {
+    skillChoices: [
+      {
+        prompt: "Choose Arcana, Nature, Occultism, or Religion",
+        options: ["arcana", "nature", "occultism", "religion"],
+        count: 1,
+      },
+    ],
+  },
+};
+
 /** Ancestry fields the Foundry export omits. */
 export const ANCESTRY_OVERRIDES = {
+  "Awakened Animal": {
+    hpBySize: { tiny: 6, sm: 6, med: 8, lg: 10 },
+    sizeChoices: ["tiny", "sm", "med", "lg"],
+    speed: 0,
+    speedNote: "Determined by heritage",
+  },
   Kashrishi: { languages: ["common", "kashrishi"] },
   Dragonet: { traits: ["dragon", "dragonet"] },
   Fleshwarp: { traits: ["aberration", "fleshwarp", "humanoid"] },
   Poppet: { traits: ["construct", "humanoid", "poppet"] },
 };
 
+/** Heritage speed data that the Foundry export leaves only in prose. */
+export const HERITAGE_OVERRIDES = {
+  "Climbing Animal": { speeds: { base: 20, other: [{ type: "climb", value: 20 }] } },
+  "Flying Animal": { speeds: { base: 20, other: [] } },
+  "Running Animal": { speeds: { base: 30, other: [] } },
+  "Swimming Animal": { speeds: { base: 20, other: [{ type: "swim", value: 20 }] } },
+};
+
 /** Background choices that exist only in the published prose. */
+/** Background choices that exist only in the published prose. */
+export function addProseLoreChoices(backgrounds) {
+  for (const background of backgrounds) {
+    if ((background.lore ?? []).length || (background.loreChoices ?? []).length) continue;
+    const text = String(background.description ?? "")
+      .replace(/<[^>]+>/g, " ")
+      .replace(/&[a-z]+;/gi, " ")
+      .replace(/\s+/g, " ");
+    if (!/\blore\b/i.test(text)) continue;
+    const loreSentences = text
+      .split(/(?<=[.!?])\s+/)
+      .filter((sentence) => /\blore\b/i.test(sentence));
+    const generic = loreSentences.some((sentence) =>
+      /such as|related to|of your choice|for your|associated with|\ba lore skill\b|any lore/i.test(
+        sentence
+      )
+    );
+    const names = [
+      ...new Set(
+        [...text.matchAll(/\b([A-Z][A-Za-z'’]+(?:\s+[A-Z][A-Za-z'’]+){0,2})\s+Lore\b/g)]
+          .map((match) => match[0].replace(/\s+/g, " ").trim())
+          .filter((name) => !/^(a|an|the|any|one|your|this|that|such|specific)\b/i.test(name))
+      ),
+    ];
+    background.loreChoices =
+      generic || names.length === 0
+        ? [{ prompt: "Choose a Lore skill", options: [], count: 1 }]
+        : [
+            {
+              prompt: names.length === 1 ? `Choose ${names[0]}` : `Choose ${names.join(" or ")}`,
+              options: names,
+              count: 1,
+            },
+          ];
+  }
+  return backgrounds;
+}
+
 export const BACKGROUND_OVERRIDES = {
+  "Bachuan Revolutionary": { lore: ["Law Lore"] },
+  "Bekyar Restorer": { lore: ["Abyss Lore"] },
   Noble: {
     loreChoices: [
       {
@@ -180,6 +256,22 @@ export const BACKGROUND_OVERRIDES = {
   },
 };
 
+/** Creature entries with confirmed transcription errors in the Foundry export. */
+export const MONSTER_OVERRIDES = {
+  "Totum Font": { hp: 325 },
+  Adlet: { level: 9 },
+  Zebub: { hp: 45 },
+  "Oread Guard": {
+    ac: 17,
+    fortitude: 7,
+    hp: 20,
+    perception: 7,
+    reflex: 6,
+    skills: { society: { base: 3 } },
+    will: 5,
+  },
+};
+
 /** Equipment bulk/trait values corrected against the published item pages. */
 export const EQUIPMENT_OVERRIDES = {
   Switchscythe: { bulk: 2 },
@@ -212,6 +304,7 @@ export function applyNameOverrides(items, overrides) {
     if (override.weapon && item.weapon) merged.weapon = { ...item.weapon, ...override.weapon };
     if (override.armor && item.armor) merged.armor = { ...item.armor, ...override.armor };
     if (override.shield && item.shield) merged.shield = { ...item.shield, ...override.shield };
+    if (override.skills && item.skills) merged.skills = { ...item.skills, ...override.skills };
     return merged;
   });
 }

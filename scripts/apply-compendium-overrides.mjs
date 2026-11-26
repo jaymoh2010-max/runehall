@@ -10,9 +10,13 @@ import path from "node:path";
 import {
   ANCESTRY_OVERRIDES,
   BACKGROUND_OVERRIDES,
+  CLASS_OVERRIDES,
   DEITY_OVERRIDES,
   EQUIPMENT_OVERRIDES,
+  HERITAGE_OVERRIDES,
+  MONSTER_OVERRIDES,
   SPELL_OVERRIDES,
+  addProseLoreChoices,
   applyNameOverrides,
   normalizeDeityWeapons,
   normalizeMonsterAttackTypes,
@@ -30,7 +34,12 @@ function save(name, data) {
 }
 
 save("ancestries.json", applyNameOverrides(load("ancestries.json"), ANCESTRY_OVERRIDES));
-save("backgrounds.json", applyNameOverrides(load("backgrounds.json"), BACKGROUND_OVERRIDES));
+save("heritages.json", applyNameOverrides(load("heritages.json"), HERITAGE_OVERRIDES));
+save(
+  "backgrounds.json",
+  addProseLoreChoices(applyNameOverrides(load("backgrounds.json"), BACKGROUND_OVERRIDES))
+);
+save("classes.json", applyNameOverrides(load("classes.json"), CLASS_OVERRIDES));
 save("spells.json", applyNameOverrides(load("spells.json"), SPELL_OVERRIDES));
 const equipment = applyNameOverrides(load("equipment.json"), EQUIPMENT_OVERRIDES);
 save("equipment.json", equipment);
@@ -38,4 +47,7 @@ save(
   "deities.json",
   applyNameOverrides(normalizeDeityWeapons(load("deities.json"), equipment), DEITY_OVERRIDES)
 );
-save("monsters.json", normalizeMonsterAttackTypes(load("monsters.json")));
+save(
+  "monsters.json",
+  applyNameOverrides(normalizeMonsterAttackTypes(load("monsters.json")), MONSTER_OVERRIDES)
+);

@@ -131,6 +131,15 @@ export function SkillsStep({ draft, update, derived, context, setStep }: Builder
   const heritage = context.heritage;
   const heritageSkill = heritageSkillChoice(heritage);
   const heritageSkillId = heritage?.id ? (draft.featChoices[heritage.id]?.[0] ?? "") : "";
+  let classChoiceOffset = 0;
+  const classSkillRows = (classData?.skillChoices ?? []).flatMap((choice) =>
+    Array.from({ length: choice.count }, (_, position) => ({
+      ...choice,
+      index: classChoiceOffset++,
+      position,
+    }))
+  );
+  const chosenClassSkills = new Set(draft.skills.classSkills.filter(Boolean));
 
   const toggleTrained = (skill: SkillId) =>
     update((current) => {
@@ -229,6 +238,48 @@ export function SkillsStep({ draft, update, derived, context, setStep }: Builder
           </Select>
         </Card>
       ) : null}
+      {classSkillRows.map((choice) => {
+        const value = draft.skills.classSkills[choice.index] ?? "";
+        const setClassSkill = (nextValue: string) =>
+          update((current) => {
+            const next = [...current.skills.classSkills];
+            next[choice.index] = nextValue;
+            return {
+              ...current,
+              skills: {
+                ...current.skills,
+                classSkills: next,
+                trained: current.skills.trained.filter((skill) => skill !== nextValue),
+              },
+            };
+          });
+        return (
+          <Card className="skill-picker" key={`${choice.prompt}-${choice.index}`}>
+            <div className="skill-picker-head">
+              <div>
+                <h3>{classData?.name} training</h3>
+                <p className="muted small">
+                  {choice.prompt}. This training is automatic and does not use an additional skill
+                  choice.
+                </p>
+              </div>
+              <Badge tone={value ? "green" : "gold"}>{value ? "Chosen" : "Required"}</Badge>
+            </div>
+            <Select value={value} onChange={(event) => setClassSkill(event.target.value)}>
+              <option value="">Choose…</option>
+              {choice.options
+                .filter(
+                  (skill) => skill === value || (!fixed.has(skill) && !chosenClassSkills.has(skill))
+                )
+                .map((skill) => (
+                  <option key={skill} value={skill}>
+                    {SKILL_BY_ID[skill as SkillId]?.name ?? titleCase(skill)}
+                  </option>
+                ))}
+            </Select>
+          </Card>
+        );
+      })}
       <Card className="skill-picker">
         <div className="skill-picker-head">
           <div>

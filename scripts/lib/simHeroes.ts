@@ -85,9 +85,13 @@ export function buildSimulatedHero(options: SimulatedHeroOptions): CharacterDraf
   draft.includeLegacy = false;
   draft.level = 1;
   draft.ancestryId = ancestry.id;
+  draft.ancestrySize = ancestry.sizeChoices?.[0] ?? null;
   draft.heritageId = heritage?.id ?? null;
   draft.backgroundId = background.id;
   draft.classId = classData.id;
+  draft.skills.classSkills = (classData.skillChoices ?? []).flatMap((group) =>
+    group.options.slice(0, group.count)
+  );
 
   if (heritage?.name === "Skilled Human") {
     draft.featChoices[heritage.id] = ["stealth"];
