@@ -258,6 +258,37 @@ describe("free class grant choices", () => {
     expect(derived.focusPointsMax).toBe(3);
   });
 
+  it("grants Domain Spirit and Advanced Domain Spirit focus spells", () => {
+    const draft = draftFor(cleric);
+    draft.level = 10;
+    draft.feats.class["2"] = "feat:H8w717IWBRyg8ugO";
+    draft.feats.class["6"] = "feat:DjRkD92AyHNMHOK8";
+    draft.feats.class["10"] = "feat:053lglnu0gsC6S2N";
+
+    const initial = groupFor(draft, cleric, null, GRANT_CHOICE_KEYS.domainSpirit);
+    expect(initial).toBeDefined();
+    expect(initial!.options.map((option) => option.name)).toContain("Healing Domain");
+
+    const advancedBefore = groupFor(draft, cleric, null, GRANT_CHOICE_KEYS.domainSpiritAdvanced);
+    expect(advancedBefore).toBeDefined();
+    expect(advancedBefore!.options).toHaveLength(0);
+
+    draft.grantChoices[GRANT_CHOICE_KEYS.domainSpirit] = ["domain:healing"];
+    const advanced = groupFor(draft, cleric, null, GRANT_CHOICE_KEYS.domainSpiritAdvanced);
+    expect(advanced!.options.map((option) => option.name)).toEqual(["Healing Advanced Domain"]);
+
+    draft.grantChoices[GRANT_CHOICE_KEYS.domainSpiritAdvanced] = ["advanced-domain:healing"];
+    const derived = computeCharacter(draft, contextForDraft(draft));
+    expect(derived.grantedSpells).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: "Healer's Blessing", kind: "focus", rank: 1 }),
+        expect.objectContaining({ name: "Rebuke Death", kind: "focus", rank: 4 }),
+      ])
+    );
+    expect(derived.focusPointsMax).toBe(2);
+    expect(derived.notes.join(" ")).toMatch(/Domain Spirit.*table decisions/i);
+  });
+
   it("grants oracle Domain Acumen from a mystery-linked domain", () => {
     const draft = draftFor(oracle);
     draft.level = 2;
