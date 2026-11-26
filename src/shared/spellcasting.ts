@@ -109,6 +109,7 @@ export function spellCastOptions(
     focusPointsMax?: number;
     innate?: boolean;
     innateRemaining?: number | null;
+    multiclass?: boolean;
   } = {}
 ): SpellCastOption[] {
   if (spell.ritual) return [];
@@ -142,7 +143,7 @@ export function spellCastOptions(
   }
 
   if (spell.rank === 0) {
-    if (!isCantripPrepared(draft, context, spell.id)) return [];
+    if (!opts.multiclass && !isCantripPrepared(draft, context, spell.id)) return [];
     const options: SpellCastOption[] = [
       {
         rank: cantripCastRank(level),
@@ -320,6 +321,7 @@ export function castSpell(
     focusPointsMax?: number;
     innate?: boolean;
     innateRemaining?: number | null;
+    multiclass?: boolean;
   } = {}
 ): SpellCastResult | null {
   const option = spellCastOptions(spell, draft, context, opts).find(

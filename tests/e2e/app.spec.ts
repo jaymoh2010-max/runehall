@@ -24,8 +24,11 @@ const compendiumFeats = JSON.parse(
 ) as { id: string; name: string }[];
 const sorcererId = compendiumClasses.find((entry) => entry.name === "Sorcerer")!.id;
 const clericId = compendiumClasses.find((entry) => entry.name === "Cleric")!.id;
+const fighterId = compendiumClasses.find((entry) => entry.name === "Fighter")!.id;
 const psychicId = compendiumClasses.find((entry) => entry.name === "Psychic")!.id;
 const fireballId = compendiumSpells.find((entry) => entry.name === "Fireball")!.id;
+const shieldId = compendiumSpells.find((entry) => entry.name === "Shield")!.id;
+const wizardDedicationId = "feat:oQ6EZRFXbHWCx08C";
 const abadarId = compendiumDeities.find((entry) => entry.name === "Abadar")!.id;
 const domainInitiateId = compendiumFeats.find((entry) => entry.name === "Domain Initiate")!.id;
 const advancedDomainId = compendiumFeats.find((entry) => entry.name === "Advanced Domain")!.id;
@@ -1956,6 +1959,40 @@ test("builder completes a level-1 Wizard using granted curriculum spells", async
   await expect(preparedCantrip).toBeVisible();
   await preparedCantrip.getByRole("button", { name: "Cast" }).click();
   await expect(page.getByText(/Cast Shield at rank 1/)).toBeVisible({ timeout: 15_000 });
+});
+
+test("sheet casts a dedication cantrip from a multiclass archetype", async ({ page }) => {
+  test.setTimeout(60_000);
+  await signIn(page, admin);
+  const campaignId = campaignPath.split("/").pop();
+  const created = await page.request.post("/api/characters", {
+    data: { name: "E2E Dedicated Fighter", campaignId },
+  });
+  expect(created.ok()).toBe(true);
+  const character = (await created.json()) as { character: { id: string } };
+  const draft = emptyCharacterDraft("E2E Dedicated Fighter");
+  draft.level = 2;
+  draft.classId = fighterId;
+  draft.keyAbility = "str";
+  draft.feats.class["2"] = wizardDedicationId;
+  draft.spells.multiclassCantrips = [shieldId];
+  const saved = await page.request.put(`/api/characters/${character.character.id}`, {
+    data: { data: draft, force: true },
+  });
+  expect(saved.ok()).toBe(true);
+
+  await page.goto(`/characters/${character.character.id}`);
+  await expect(page.getByRole("heading", { name: "E2E Dedicated Fighter" })).toBeVisible({
+    timeout: 15_000,
+  });
+  await page.getByRole("button", { name: "Spells", exact: true }).click();
+  const row = page
+    .locator(".pb-spell-row")
+    .filter({ hasText: "Shield" })
+    .filter({ hasText: "Multiclass" });
+  await expect(row).toBeVisible();
+  await row.getByRole("button", { name: "Cast" }).click();
+  await expect(page.getByText(/Cast Shield/)).toBeVisible({ timeout: 15_000 });
 });
 
 test("builder grants a Cloistered Cleric domain focus spell", async ({ page }) => {

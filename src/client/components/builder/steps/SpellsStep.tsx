@@ -156,10 +156,14 @@ export function SpellsStep({ draft, update, derived, context, setStep, openPicke
   const [prepRanks, setPrepRanks] = useState<Record<string, number>>({});
   const [prepOpen, setPrepOpen] = useState(false);
   const [studiousChoice, setStudiousChoice] = useState("");
+  const [multiclassPickerOpen, setMulticlassPickerOpen] = useState(false);
   const classData = context.classData;
   const caster = casterInfo(classData);
   const tradition = derived.casterTradition ?? draft.spells.tradition;
   const cantrips = draft.spells.cantrips
+    .map((id) => context.spells[id])
+    .filter((spell): spell is Spell => Boolean(spell));
+  const multiclassCantrips = draft.spells.multiclassCantrips
     .map((id) => context.spells[id])
     .filter((spell): spell is Spell => Boolean(spell));
   const known = draft.spells.known
@@ -960,6 +964,65 @@ export function SpellsStep({ draft, update, derived, context, setStep, openPicke
             ) : null}
           </Card>
 
+          {derived.multiclassCaster ? (
+            <Card className="spell-section" data-testid="multiclass-cantrips">
+              <div className="row-between">
+                <div>
+                  <h3>{derived.multiclassCaster.className} Dedication cantrips</h3>
+                  <p className="muted small">
+                    Choose up to {derived.multiclassCaster.cantripLimit}{" "}
+                    {derived.multiclassCaster.tradition} cantrip
+                    {derived.multiclassCaster.cantripLimit === 1 ? "" : "s"} from the dedication.
+                  </p>
+                </div>
+                <Badge
+                  tone={
+                    multiclassCantrips.length >= derived.multiclassCaster.cantripLimit
+                      ? "green"
+                      : "gold"
+                  }
+                >
+                  {multiclassCantrips.length} / {derived.multiclassCaster.cantripLimit}
+                </Badge>
+              </div>
+              <div className="chip-row">
+                {multiclassCantrips.map((spell) => (
+                  <span className="chip" key={spell.id}>
+                    {spell.name}
+                    <button
+                      type="button"
+                      className="chip-remove"
+                      aria-label={`Remove ${spell.name} from dedication cantrips`}
+                      onClick={() =>
+                        update((current) => ({
+                          ...current,
+                          spells: {
+                            ...current.spells,
+                            multiclassCantrips: current.spells.multiclassCantrips.filter(
+                              (id) => id !== spell.id
+                            ),
+                          },
+                        }))
+                      }
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  </span>
+                ))}
+              </div>
+              <div style={{ marginTop: 8 }}>
+                <Button
+                  size="sm"
+                  icon={<Plus size={13} />}
+                  disabled={multiclassCantrips.length >= derived.multiclassCaster.cantripLimit}
+                  onClick={() => setMulticlassPickerOpen(true)}
+                >
+                  Add dedication cantrip
+                </Button>
+              </div>
+            </Card>
+          ) : null}
+
           {derived.studiousSlots ? (
             <Card className="spell-section" data-testid="studious-slots">
               <div className="row-between">
@@ -1408,6 +1471,43 @@ export function SpellsStep({ draft, update, derived, context, setStep, openPicke
         </div>
       </Card>
       {extraSpells}
+      {derived.multiclassCaster ? (
+        <SpellPicker
+          open={multiclassPickerOpen}
+          onClose={() => setMulticlassPickerOpen(false)}
+          rank={0}
+          tradition={derived.multiclassCaster.tradition}
+          classTrait={derived.multiclassCaster.className.toLowerCase()}
+          expanded={draft.contentMode === "expanded"}
+          onExpandedChange={() => undefined}
+          contentModeLocked
+          legacyDefault={draft.includeLegacy}
+          legacyLocked
+          excludeIds={[
+            ...draft.spells.cantrips,
+            ...draft.spells.multiclassCantrips,
+            ...derived.grantedSpells.map((spell) => spell.id),
+          ]}
+          onSelect={(spell) => {
+            update((current) => {
+              if (current.spells.multiclassCantrips.includes(spell.id)) return current;
+              if (
+                current.spells.multiclassCantrips.length >= derived.multiclassCaster!.cantripLimit
+              ) {
+                return current;
+              }
+              return {
+                ...current,
+                spells: {
+                  ...current.spells,
+                  multiclassCantrips: [...current.spells.multiclassCantrips, spell.id],
+                },
+              };
+            });
+            setMulticlassPickerOpen(false);
+          }}
+        />
+      ) : null}
       <div className="info-box">
         <BookOpen size={16} />
         <p>
