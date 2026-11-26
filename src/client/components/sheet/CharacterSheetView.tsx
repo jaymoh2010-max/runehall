@@ -1153,6 +1153,7 @@ export function CharacterSheetView({
         ids: (derived?.animistApparitions?.repertoire ?? []).map((entry) => entry.spell.id),
       },
       { label: "Spells", ids: draft.spells.known },
+      { label: "Multiclass", ids: draft.spells.multiclassCantrips },
       { label: "Focus", ids: draft.spells.focus },
       { label: "Innate", ids: draft.spells.innate },
       { label: "Rituals", ids: draft.spells.rituals },
@@ -1290,6 +1291,7 @@ export function CharacterSheetView({
       focusPointsMax: derived?.focusPointsMax ?? 0,
       innate: group === "Innate",
       innateRemaining: group === "Innate" ? innateUsesRemaining(currentDraft, spell) : undefined,
+      multiclass: group === "Multiclass",
     });
     if (!result) {
       toast("That spell has no uses left at the selected rank.", "error");
@@ -1512,6 +1514,12 @@ export function CharacterSheetView({
     }
     if (group === "Innate") {
       return { attack: derived.innateSpellAttack, dc: derived.innateSpellDc };
+    }
+    if (group === "Multiclass") {
+      return {
+        attack: derived.multiclassCaster?.spellAttack ?? derived.spellAttack,
+        dc: derived.multiclassCaster?.spellDc ?? derived.spellDc,
+      };
     }
     return { attack: derived.spellAttack, dc: derived.spellDc };
   };

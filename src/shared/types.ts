@@ -928,6 +928,8 @@ export interface CharacterDraft {
     rituals: string[];
     /** Manual primary-check skill overrides for rituals, keyed by spell id. */
     ritualSkills?: Record<string, string>;
+    /** Cantrips granted by a spellcasting archetype dedication. */
+    multiclassCantrips: string[];
     /** Innate spells granted by ancestry, heritage, feats, or items. */
     innate: string[];
     /** Innate spell uses spent today, keyed by spell id. */
@@ -1152,6 +1154,16 @@ export interface DerivedCharacter {
   grantedSpells: ClassGrantSpell[];
   casterTradition: SpellTradition | null;
   casterProgression: CasterProgression;
+  /** Spellcasting archetype dedication profile, including its own cantrips and DC. */
+  multiclassCaster?: {
+    featId: string;
+    className: string;
+    tradition: SpellTradition;
+    ability: AbilityKey;
+    cantripLimit: number;
+    spellDc: number;
+    spellAttack: number;
+  } | null;
   maxSpellRank: number;
   validation: ValidationIssue[];
   /** Condition math already folded into AC, saves, checks, DCs, HP, and Speed. */
