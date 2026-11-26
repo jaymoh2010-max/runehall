@@ -898,6 +898,39 @@ export function CharacterSheetView({
     if (characterRef.current) await applyRecord(characterRef.current);
   };
 
+  const openAreaPlacement = (spell: Spell, rank: number): void => {
+    const scaled = spellDamageAtRank(spell, rank);
+    const area = parseSpellArea(spell.area, scaled.areaDelta ?? 0);
+    if (!area) return;
+    const current = characterRef.current;
+    const damage = scaled.parts.map((part) => `${part.formula} ${part.type}`).join(" + ");
+    const save = spell.defense?.save
+      ? `${spell.defense.save.slice(0, 1).toUpperCase()}${spell.defense.save.slice(1).toLowerCase()}`
+      : "";
+    const effect = [
+      save ? `${save}${derived?.spellDc ? ` DC ${derived.spellDc}` : ""}` : "",
+      damage ? `${damage} damage` : "",
+      spell.duration ? `Duration ${spell.duration}` : "",
+    ]
+      .filter(Boolean)
+      .join(" · ");
+    if (onCastArea && current) {
+      onCastArea({
+        characterId: current.id,
+        characterName: current.name,
+        label: spell.name,
+        kind: area.kind,
+        size: area.size,
+        color: spellAreaColor(spell),
+        spellId: spell.id,
+        durationRounds: spellDurationRounds(spell.duration),
+        effect,
+      });
+    } else {
+      toast(`Open the table to place ${spell.name}'s ${area.size}-ft. ${area.kind}.`, "info");
+    }
+  };
+
   const castWandSpell = async (
     item: Equipment,
     rank: number,
@@ -946,6 +979,7 @@ export function CharacterSheetView({
         visibility: "all",
       });
     }
+    openAreaPlacement(spell, rank);
   };
 
   const castItemSpell = async (spell: Spell) => {
@@ -974,6 +1008,7 @@ export function CharacterSheetView({
         visibility: "all",
       });
     }
+    openAreaPlacement(spell, rank);
   };
 
   const castStaffSpell = async (item: Equipment, spell: Spell, rank: number) => {
@@ -1026,6 +1061,7 @@ export function CharacterSheetView({
         visibility: "all",
       });
     }
+    openAreaPlacement(spell, rank);
   };
 
   const chargeStaff = async (item: Equipment, rank: number) => {
@@ -1088,6 +1124,7 @@ export function CharacterSheetView({
         visibility: "all",
       });
     }
+    openAreaPlacement(spell, rank);
   };
 
   const staffPool = (item: Equipment): { max: number; remaining: number } => {
@@ -1279,38 +1316,7 @@ export function CharacterSheetView({
         visibility: "all",
       });
     }
-    const area = parseSpellArea(spell.area, spellDamageAtRank(spell, effectiveRank).areaDelta ?? 0);
-    if (area) {
-      const damage = spellDamageAtRank(spell, effectiveRank)
-        .parts.map((part) => `${part.formula} ${part.type}`)
-        .join(" + ");
-      const save = spell.defense?.save
-        ? `${spell.defense.save.slice(0, 1).toUpperCase()}${spell.defense.save.slice(1).toLowerCase()}`
-        : "";
-      const dc = derived?.spellDc;
-      const effect = [
-        save ? `${save}${dc ? ` DC ${dc}` : ""}` : "",
-        damage ? `${damage} damage` : "",
-        spell.duration ? `Duration ${spell.duration}` : "",
-      ]
-        .filter(Boolean)
-        .join(" · ");
-      if (onCastArea && character) {
-        onCastArea({
-          characterId: character.id,
-          characterName: currentDraft.name,
-          label: spell.name,
-          kind: area.kind,
-          size: area.size,
-          color: spellAreaColor(spell),
-          spellId: spell.id,
-          durationRounds: spellDurationRounds(spell.duration),
-          effect,
-        });
-      } else {
-        toast(`Open the table to place ${spell.name}'s ${area.size}-ft. ${area.kind}.`, "info");
-      }
-    }
+    openAreaPlacement(spell, effectiveRank);
   };
 
   const selectedChoiceFor = (
