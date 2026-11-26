@@ -1747,6 +1747,11 @@ test("builder learns a spontaneous spell at more than one rank", async ({ page }
   await expect(flexibleWandRow.getByRole("button", { name: /used today/i })).toBeDisabled();
   const staffRow = page.locator(".pb-inventory-row").filter({ hasText: "Staff of Healing" });
   await expect(staffRow).toBeVisible();
+  await staffRow.getByRole("button", { name: "View Staff of Healing effects" }).click();
+  const staffEffects = page.getByRole("dialog", { name: "Staff of Healing effects" });
+  await expect(staffEffects).toContainText("+1 item bonus to the Hit Points");
+  await page.keyboard.press("Escape");
+  await expect(staffEffects).toBeHidden();
   await staffRow.getByRole("button", { name: "Charge Staff of Healing" }).click();
   await page.getByRole("button", { name: "Expend rank 1" }).click();
   await expect(page.getByText(/Charged Staff of Healing with 1 charge/)).toBeVisible({

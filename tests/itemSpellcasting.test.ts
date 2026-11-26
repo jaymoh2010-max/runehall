@@ -8,6 +8,7 @@ import {
   scrollSpellRank,
   specificWandSpell,
   staffSpells,
+  staffSpecialEffect,
   wandSpellRank,
 } from "../src/shared/itemSpellcasting";
 import type { Equipment } from "../src/shared/types";
@@ -212,5 +213,20 @@ describe("staff spell lists", () => {
     const sword = equipment.find((entry) => entry.name === "Longsword")!;
     expect(staffSpells(sword)).toEqual([]);
     expect(staffSpells(null)).toEqual([]);
+  });
+
+  it("extracts non-spell staff effects for the sheet", () => {
+    const healing = equipment.find((entry) => entry.name === "Staff of Healing")!;
+    expect(staffSpecialEffect(healing)).toContain("+1 item bonus to the Hit Points");
+    expect(staffSpecialEffect(healing)).toContain("heal");
+
+    const magi = equipment.find((entry) => entry.name === "Staff of the Magi")!;
+    expect(staffSpecialEffect(magi)).toContain(
+      "circumstance bonus to saving throws against spells"
+    );
+
+    const sword = equipment.find((entry) => entry.name === "Longsword")!;
+    expect(staffSpecialEffect(sword)).toBeNull();
+    expect(staffSpecialEffect(null)).toBeNull();
   });
 });

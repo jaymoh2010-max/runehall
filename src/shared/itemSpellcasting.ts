@@ -190,6 +190,21 @@ export function staffSpells(
   return spells;
 }
 
+/**
+ * The non-spell special text on a staff, taken from the prose before its
+ * Activate block. This keeps unique bonuses and triggered effects visible at
+ * the table without pretending to automate them.
+ */
+export function staffSpecialEffect(
+  item: Pick<Equipment, "name" | "traits" | "description"> | null | undefined
+): string | null {
+  if (!item || !staffSpells(item).length) return null;
+  const text = plainText(item.description);
+  const activate = text.search(/\bActivate\b/i);
+  const before = (activate >= 0 ? text.slice(0, activate) : text).trim();
+  return before ? before.slice(0, 700) : null;
+}
+
 /** Whether an inventory item is a consumable spell scroll. */
 export function isSpellScroll(item: Pick<Equipment, "traits"> | null | undefined): boolean {
   return Boolean(item?.traits?.includes("scroll"));
