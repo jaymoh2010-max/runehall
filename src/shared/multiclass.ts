@@ -3,7 +3,9 @@ import type { AbilityKey, SpellTradition } from "./types";
 export interface MulticlassDedication {
   featId: string;
   className: string;
-  tradition: SpellTradition;
+  tradition: SpellTradition | null;
+  /** True when the tradition comes from a bloodline, patron, or eidolon choice. */
+  variableTradition?: boolean;
   ability: AbilityKey;
   cantripLimit: number;
   basicFeatId: string;
@@ -99,6 +101,36 @@ const DEDICATIONS: Record<string, DedicationData> = {
     basicFeatId: "feat:l64p70oQ6a3AtMq9",
     expertFeatId: "feat:UrFeYPLjbWNYMpYA",
     masterFeatId: "feat:WXEOriht1LBz55R0",
+  },
+  "feat:5UQagWB13Z8xR5Z6": {
+    className: "Sorcerer",
+    tradition: null,
+    variableTradition: true,
+    ability: "cha",
+    cantripLimit: 2,
+    basicFeatId: "feat:AvfswILmh3BwNbyR",
+    expertFeatId: "feat:1k5PZAYth8u4Fqyr",
+    masterFeatId: "feat:phD0PbElkEeldZ2U",
+  },
+  "feat:y0vdu6DGhKKElmE6": {
+    className: "Witch",
+    tradition: null,
+    variableTradition: true,
+    ability: "int",
+    cantripLimit: 2,
+    basicFeatId: "feat:nU5Pow4HMzoDHa8Z",
+    expertFeatId: "feat:x7vMKBSrxXmfs5C2",
+    masterFeatId: "feat:i7ibUqJCl1GXRFEa",
+  },
+  "feat:SwzPqEsLzZpNufvm": {
+    className: "Summoner",
+    tradition: null,
+    variableTradition: true,
+    ability: "cha",
+    cantripLimit: 2,
+    basicFeatId: "feat:YY7wmYQ9ccAO8fut",
+    expertFeatId: "feat:s6y6JzPW2K8k4m8k",
+    masterFeatId: "feat:kPsJIz19viZy8YjO",
   },
 };
 

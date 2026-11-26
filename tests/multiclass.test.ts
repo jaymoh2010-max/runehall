@@ -29,6 +29,11 @@ describe("multiclass dedication cantrips", () => {
       className: "Psychic",
       cantripLimit: 1,
     });
+    expect(multiclassDedicationFor(["feat:5UQagWB13Z8xR5Z6"])).toMatchObject({
+      className: "Sorcerer",
+      tradition: null,
+      variableTradition: true,
+    });
     expect(multiclassDedicationFor(["feat:unknown"])).toBeNull();
   });
 
@@ -65,5 +70,20 @@ describe("multiclass dedication cantrips", () => {
     });
     expect(derived.multiclassCaster?.spellDc).toBeTypeOf("number");
     expect(derived.multiclassCaster?.spellAttack).toBeTypeOf("number");
+  });
+
+  it("uses the chosen tradition for a variable-tradition dedication", () => {
+    const draft = emptyCharacterDraft("Dedicated Sorcerer");
+    draft.classId = fighter.id;
+    draft.keyAbility = "str";
+    draft.level = 2;
+    draft.feats.class["2"] = "feat:5UQagWB13Z8xR5Z6";
+    draft.spells.multiclassTradition = "occult";
+    const derived = computeCharacter(draft, contextForDraft(draft));
+    expect(derived.multiclassCaster).toMatchObject({
+      className: "Sorcerer",
+      tradition: "occult",
+      variableTradition: true,
+    });
   });
 });

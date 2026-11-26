@@ -1579,6 +1579,7 @@ export function emptyCharacterDraft(name = "New Hero"): CharacterDraft {
       multiclassCantrips: [],
       multiclassSpells: [],
       multiclassSlotsUsed: {},
+      multiclassTradition: null,
       innate: [],
       innateUsed: {},
       preparationsPending: false,
@@ -1915,6 +1916,13 @@ export function normalizeCharacterDraft(input: unknown, fallbackName = "New Hero
           .filter(([, value]) => typeof value === "number" && Number.isFinite(value))
           .map(([key, value]) => [key, Math.max(0, Math.min(20, Math.floor(value as number)))])
       ) as Record<string, number>,
+      multiclassTradition:
+        spells.multiclassTradition === "arcane" ||
+        spells.multiclassTradition === "divine" ||
+        spells.multiclassTradition === "occult" ||
+        spells.multiclassTradition === "primal"
+          ? spells.multiclassTradition
+          : null,
       innate: [...new Set(arr<string>(spells.innate).filter((x) => typeof x === "string"))].slice(
         0,
         80
@@ -3880,6 +3888,9 @@ export function computeCharacter(
   ];
   const multiclassFeatSet = new Set(multiclassFeatIds);
   const multiclass = multiclassDedicationFor(multiclassFeatIds);
+  const multiclassTradition = multiclass
+    ? (multiclass.tradition ?? draft.spells.multiclassTradition)
+    : null;
   const multiclassSlots = multiclass
     ? multiclassSlotCounts(draft.level, {
         basic: multiclassFeatSet.has(multiclass.basicFeatId),
@@ -4283,6 +4294,13 @@ export function computeCharacter(
     }
   }
   if (multiclass) {
+    if (multiclass.variableTradition && !multiclassTradition) {
+      issue(
+        "warning",
+        `Choose the tradition granted by the ${multiclass.className} Dedication.`,
+        "spells"
+      );
+    }
     if (draft.spells.multiclassCantrips.length > multiclass.cantripLimit) {
       issue(
         "warning",
@@ -4300,10 +4318,14 @@ export function computeCharacter(
         issue("warning", `${spell.name} is not a cantrip.`, "spells");
         continue;
       }
-      if (spell.traditions.length && !spell.traditions.includes(multiclass.tradition)) {
+      if (
+        spell.traditions.length &&
+        multiclassTradition &&
+        !spell.traditions.includes(multiclassTradition)
+      ) {
         issue(
           "warning",
-          `${spell.name} is not a ${multiclass.tradition} cantrip for the ${multiclass.className} Dedication.`,
+          `${spell.name} is not a ${multiclassTradition} cantrip for the ${multiclass.className} Dedication.`,
           "spells"
         );
       }
@@ -4318,10 +4340,14 @@ export function computeCharacter(
         issue("warning", `${spell.name} is a cantrip, not a ranked dedication spell.`, "spells");
         continue;
       }
-      if (spell.traditions.length && !spell.traditions.includes(multiclass.tradition)) {
+      if (
+        spell.traditions.length &&
+        multiclassTradition &&
+        !spell.traditions.includes(multiclassTradition)
+      ) {
         issue(
           "warning",
-          `${spell.name} is not a ${multiclass.tradition} spell for the ${multiclass.className} Dedication.`,
+          `${spell.name} is not a ${multiclassTradition} spell for the ${multiclass.className} Dedication.`,
           "spells"
         );
       }
@@ -4979,6 +5005,7 @@ export function computeCharacter(
       multiclass && multiclassSpellDc !== null && multiclassSpellAttack !== null
         ? {
             ...multiclass,
+            tradition: multiclassTradition,
             spellSlots: multiclassSlots,
             spellDc: multiclassSpellDc,
             spellAttack: multiclassSpellAttack,
