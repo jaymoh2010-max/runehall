@@ -72,7 +72,7 @@ import {
 } from "../../../shared/templates";
 import { innateUsesRemaining } from "../../../shared/innate";
 import { psiAmpFor } from "../../../shared/psiAmps";
-import { ritualPrimarySkillName } from "../../../shared/ritual";
+import { ritualPrimaryCheckInfo, ritualPrimarySkillNames } from "../../../shared/ritual";
 import {
   beginSustainedSpell,
   endSustainedSpell,
@@ -1420,13 +1420,19 @@ export function CharacterSheetView({
   };
 
   const rollRitual = (spell: Spell) => {
-    const primary =
-      draftRef.current?.spells.ritualSkills?.[spell.id] ??
-      ritualPrimarySkillName(spell.description);
-    if (!primary) {
+    const override = draftRef.current?.spells.ritualSkills?.[spell.id];
+    const candidates = override
+      ? [override]
+      : ritualPrimarySkillNames(spell.description, spell.ritualData);
+    if (!candidates.length) {
       toast("This ritual has no readable primary check; resolve it manually.", "info");
       return;
     }
+    const hasSkill = (primary: string) =>
+      (derived?.skills ?? []).some(
+        (entry) => entry.id.toLowerCase() === primary || entry.name.toLowerCase() === primary
+      ) || (derived?.lore ?? []).some((entry) => entry.name.toLowerCase() === primary);
+    const primary = candidates.find(hasSkill) ?? candidates[0];
     const skill = (derived?.skills ?? []).find(
       (entry) => entry.id.toLowerCase() === primary || entry.name.toLowerCase() === primary
     );
@@ -3850,7 +3856,8 @@ export function CharacterSheetView({
           }
         >
           {(() => {
-            const detected = ritualPrimarySkillName(ritualView.description);
+            const primary = ritualPrimaryCheckInfo(ritualView.description, ritualView.ritualData);
+            const detected = primary?.skills[0] ?? null;
             const selected = draft.spells.ritualSkills?.[ritualView.id] ?? "";
             const seen = new Set<string>();
             const options = [
@@ -3883,11 +3890,24 @@ export function CharacterSheetView({
                     <strong>Requirements</strong> {ritualView.requirements}
                   </p>
                 ) : null}
+                {primary ? (
+                  <p>
+                    <strong>Primary check</strong> {primary.text}
+                  </p>
+                ) : null}
+                {ritualView.ritualData?.secondaryCasters ? (
+                  <p>
+                    <strong>Secondary casters</strong> {ritualView.ritualData.secondaryCasters}
+                    {ritualView.ritualData.secondaryChecks
+                      ? ` — ${ritualView.ritualData.secondaryChecks}`
+                      : ""}
+                  </p>
+                ) : null}
                 <Field
                   label="Primary check"
                   hint={
-                    detected
-                      ? `Detected from the ritual text: ${titleCase(detected)}.`
+                    primary
+                      ? `${primary.structured ? "Compendium" : "Detected"} primary check: ${primary.text}.`
                       : "The data does not name a primary check. Choose one manually."
                   }
                 >
@@ -3896,7 +3916,11 @@ export function CharacterSheetView({
                     onChange={(event) => void setRitualSkill(ritualView.id, event.target.value)}
                   >
                     <option value="">
-                      {detected ? `Use detected: ${titleCase(detected)}` : "Choose a skill…"}
+                      {primary && primary.skills.length > 1
+                        ? `Choose one of: ${primary.skills.map(titleCase).join(", ")}`
+                        : detected
+                          ? `Use detected: ${titleCase(detected)}`
+                          : "Choose a skill…"}
                     </option>
                     {options.map((option) => (
                       <option key={option.value} value={option.value}>

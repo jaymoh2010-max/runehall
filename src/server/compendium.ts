@@ -15,6 +15,7 @@ import type {
   Feat,
   Heritage,
   Monster,
+  RitualData,
   Spell,
 } from "../shared/types";
 import type { DomainEntry } from "../shared/domains";
@@ -73,6 +74,17 @@ function readArray<T>(file: string): T[] {
   }
 }
 
+function readObject<T>(file: string): Record<string, T> {
+  const full = path.join(compendiumDir, file);
+  if (!fs.existsSync(full)) return {};
+  try {
+    return JSON.parse(fs.readFileSync(full, "utf8")) as Record<string, T>;
+  } catch (error) {
+    console.error(`Failed to read ${full}`, error);
+    return {};
+  }
+}
+
 export const ancestries = readArray<Ancestry>("ancestries.json");
 export const heritages = readArray<Heritage>("heritages.json");
 export const backgrounds = readArray<Background>("backgrounds.json");
@@ -80,6 +92,11 @@ export const classes = readArray<ClassData>("classes.json");
 export const classFeatures = readArray<ClassFeature>("classFeatures.json");
 export const feats = readArray<Feat>("feats.json");
 export const spells = readArray<Spell>("spells.json");
+const ritualData = readObject<RitualData>("ritualData.json");
+for (const spell of spells) {
+  const checks = ritualData[spell.id];
+  if (checks) spell.ritualData = checks;
+}
 export const equipment = readArray<Equipment>("equipment.json");
 export const deities = readArray<Deity>("deities.json");
 export const domains = readArray<DomainEntry>("domains.json");

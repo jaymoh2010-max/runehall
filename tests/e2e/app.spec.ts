@@ -1808,7 +1808,7 @@ test("sheet tracks rituals and innate spells", async ({ page }) => {
   const draft = structuredClone(record.character.data) as {
     spells: { rituals: string[]; innate: string[]; innateUsed: Record<string, number> };
   };
-  draft.spells.rituals = ["spell:joEruBVz31Uxczzq"];
+  draft.spells.rituals = ["spell:joEruBVz31Uxczzq", "spell:kqhPt9344UkcGVYO"];
   draft.spells.innate = ["spell:gpzpAAAJ1Lza2JVl"];
   draft.spells.innateUsed = {};
   const saved = await page.request.put(`/api/characters/${cleric!.id}`, {
@@ -1826,11 +1826,22 @@ test("sheet tracks rituals and innate spells", async ({ page }) => {
   await expect(ritualRow).toContainText("Rituals");
   await ritualRow.getByRole("button", { name: "Details" }).click();
   await expect(page.getByRole("heading", { name: "Angelic Messenger" })).toBeVisible();
+  await expect(page.getByText("Religion (expert; you must be an angel)").first()).toBeVisible();
   await page.getByLabel(/Primary check/).selectOption("religion");
   await page.keyboard.press("Escape");
   await expect(page.locator(".pb-save")).toHaveText("Saved");
   await ritualRow.getByRole("button", { name: "Details" }).click();
   await expect(page.getByLabel(/Primary check/)).toHaveValue("religion");
+  await page.keyboard.press("Escape");
+
+  const resurrectRow = page.locator(".pb-spell-row").filter({ hasText: "Resurrect" });
+  await expect(resurrectRow).toBeVisible();
+  await resurrectRow.getByRole("button", { name: "Details" }).click();
+  await expect(page.getByRole("heading", { name: "Resurrect" })).toBeVisible();
+  await expect(page.getByText("Religion (expert)").first()).toBeVisible();
+  const secondary = page.locator("p").filter({ hasText: /Secondary casters/ }).first();
+  await expect(secondary).toContainText("2");
+  await expect(secondary).toContainText("Medicine, Society");
   await page.keyboard.press("Escape");
   const innateRow = page
     .locator(".pb-spell-row")

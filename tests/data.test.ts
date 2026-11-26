@@ -10,6 +10,7 @@ import type {
   Feat,
   Heritage,
   Monster,
+  RitualData,
   Spell,
 } from "../src/shared/types";
 import type { DomainEntry } from "../src/shared/domains";
@@ -33,6 +34,9 @@ const domains = read<DomainEntry>("domains.json");
 const monsters = read<Monster>("monsters.json");
 const classFeatures = read<{ name: string; description: string }>("classFeatures.json");
 const actions = read<{ name: string; description: string }>("actions.json");
+const ritualChecks = JSON.parse(
+  fs.readFileSync(path.resolve("data", "compendium", "ritualData.json"), "utf8")
+) as Record<string, RitualData>;
 
 const byName = <T extends { name: string }>(items: T[], name: string): T => {
   const found = items.find((item) => item.name === name);
@@ -185,6 +189,32 @@ describe("compendium data", () => {
     const gmItem = byName(equipment, "Alisendra's Fan");
     expect(gmItem.gmDescription).toBe(true);
     expect(gmItem.description.length).toBeGreaterThan(100);
+  });
+
+  it("includes structured ritual checks for the rituals that have them", () => {
+    const createUndead = byName(spells, "Create Undead");
+    expect(ritualChecks[createUndead.id]).toMatchObject({
+      primaryCheck: expect.stringContaining("Arcana"),
+      secondaryCasters: 1,
+      secondaryChecks: "Religion",
+    });
+    const resurrect = byName(spells, "Resurrect");
+    expect(ritualChecks[resurrect.id]).toMatchObject({
+      primaryCheck: "Religion (expert)",
+      secondaryCasters: 2,
+      secondaryChecks: "Medicine, Society",
+    });
+
+    const spellById = new Map(spells.map((spell) => [spell.id, spell]));
+    for (const [id, entry] of Object.entries(ritualChecks)) {
+      const spell = spellById.get(id);
+      expect(spell, id).toBeDefined();
+      expect(spell!.ritual, id).toBe(true);
+      expect(entry.primaryCheck.trim().length, id).toBeGreaterThan(0);
+      expect(Number.isInteger(entry.secondaryCasters), id).toBe(true);
+      expect(entry.secondaryCasters, id).toBeGreaterThanOrEqual(0);
+    }
+    expect(Object.keys(ritualChecks).length).toBeGreaterThan(150);
   });
 
   it("normalizes deity domains, alternate domains, and skill choices", () => {
