@@ -79,7 +79,7 @@ import {
   spellNeedsSustain,
   sustainedSpellFor,
 } from "../../../shared/sustain";
-import { api, formatCp } from "../../api";
+import { api, ApiError, formatCp } from "../../api";
 import { useConditionOptions } from "../../conditionOptions";
 import { errorMessage, useToasts } from "../../stores";
 import { DailyPreparationsModal } from "../DailyPreparationsModal";
@@ -402,16 +402,19 @@ export function CharacterSheetView({
   });
   const [detailsSaving, setDetailsSaving] = useState(false);
   const [detailsDirty, setDetailsDirty] = useState(false);
+  const [conflict, setConflict] = useState<CharacterRecord | null>(null);
+  const [saveError, setSaveError] = useState("");
+  const hasUnsavedChanges = detailsDirty || Boolean(saveError) || Boolean(conflict);
 
   useEffect(() => {
-    if (!detailsDirty) return;
+    if (!hasUnsavedChanges) return;
     const warn = (event: BeforeUnloadEvent) => {
       event.preventDefault();
       event.returnValue = "";
     };
     window.addEventListener("beforeunload", warn);
     return () => window.removeEventListener("beforeunload", warn);
-  }, [detailsDirty]);
+  }, [hasUnsavedChanges]);
   const [sheetDc, setSheetDc] = useState("");
   const [sheetSecret, setSheetSecret] = useState(false);
   const [itemQuery, setItemQuery] = useState("");
@@ -450,7 +453,34 @@ export function CharacterSheetView({
   const savingRef = useRef(false);
   const pendingDraftRef = useRef<CharacterDraft | null>(null);
   const saveWaitersRef = useRef<Array<(ok: boolean) => void>>([]);
+  const conflictDraftRef = useRef<CharacterDraft | null>(null);
+  const forceSaveRef = useRef(false);
   const canEdit = Boolean(character?.permissions?.canEdit);
+
+  const requestClose = useCallback(() => {
+    if (!onClose) return;
+    if (hasUnsavedChanges && !window.confirm("Discard unsaved character changes?")) return;
+    onClose();
+  }, [hasUnsavedChanges, onClose]);
+
+  useEffect(() => {
+    if (mode !== "overlay" || !onClose) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || event.defaultPrevented) return;
+      const target = event.target as HTMLElement | null;
+      if (
+        target?.closest("input, textarea, select, [contenteditable='true'], .modal-backdrop") ||
+        document.querySelector(".modal-backdrop")
+      ) {
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      requestClose();
+    };
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => window.removeEventListener("keydown", onKeyDown, true);
+  }, [mode, onClose, requestClose]);
 
   const applyRecord = useCallback(async (record: CharacterRecord) => {
     const normalized = normalizeCharacterDraft(record.data, record.name);
@@ -545,14 +575,21 @@ export function CharacterSheetView({
     const socket = getSocket();
     const leave = mode === "page" && !onRoll ? joinCampaign(campaignId) : () => undefined;
     const onCharacterUpdated = (payload: { characterId: string }) => {
-      if (payload.characterId === characterId && !savingRef.current) void load({ silent: true });
+      if (
+        payload.characterId === characterId &&
+        !savingRef.current &&
+        !pendingDraftRef.current &&
+        !conflict
+      ) {
+        void load({ silent: true });
+      }
     };
     socket.on("character:updated", onCharacterUpdated);
     return () => {
       socket.off("character:updated", onCharacterUpdated);
       leave();
     };
-  }, [character?.campaignId, characterId, load, mode, onRoll]);
+  }, [character?.campaignId, characterId, conflict, load, mode, onRoll]);
 
   useEffect(() => {
     if (tab !== "gear") return;
@@ -718,11 +755,15 @@ export function CharacterSheetView({
         pendingDraftRef.current = null;
         const current: CharacterRecord | null = characterRef.current;
         if (!current) break;
+        const force = forceSaveRef.current;
+        forceSaveRef.current = false;
         const result: { character: CharacterRecord } = await api<{ character: CharacterRecord }>(
           `/api/characters/${current.id}`,
           {
             method: "PUT",
-            body: { data: draftToSave, expectedRevision: current.revision },
+            body: force
+              ? { data: draftToSave, force: true }
+              : { data: draftToSave, expectedRevision: current.revision },
           }
         );
         characterRef.current = result.character;
@@ -734,12 +775,25 @@ export function CharacterSheetView({
           setDerived(computeCharacter(saved, context));
         }
       }
+      setSaveError("");
       toast("Saved.", "success");
     } catch (err) {
-      pendingDraftRef.current = null;
       succeeded = false;
-      toast(errorMessage(err), "error");
-      await load({ silent: true });
+      const payload =
+        err instanceof ApiError && err.status === 409
+          ? (err.payload as { character?: CharacterRecord } | null)
+          : null;
+      if (payload?.character) {
+        conflictDraftRef.current = draftRef.current;
+        pendingDraftRef.current = null;
+        setSaveError("");
+        setConflict(payload.character);
+        toast("This sheet changed elsewhere. Choose which version to keep.", "info");
+      } else {
+        pendingDraftRef.current = draftRef.current;
+        setSaveError(errorMessage(err));
+        toast(errorMessage(err), "error");
+      }
     } finally {
       savingRef.current = false;
       setSaving(false);
@@ -747,6 +801,40 @@ export function CharacterSheetView({
       for (const resolve of waiters) resolve(succeeded);
     }
     return succeeded;
+  };
+
+  const applyServerVersion = async () => {
+    if (!conflict) return;
+    const server = conflict;
+    conflictDraftRef.current = null;
+    pendingDraftRef.current = null;
+    forceSaveRef.current = false;
+    setConflict(null);
+    setSaveError("");
+    setDetailsDirty(false);
+    try {
+      await applyRecord(server);
+    } catch (err) {
+      setSaveError(errorMessage(err));
+      toast(errorMessage(err), "error");
+    }
+  };
+
+  const keepLocalVersion = async () => {
+    const localDraft = conflictDraftRef.current ?? draftRef.current;
+    conflictDraftRef.current = null;
+    pendingDraftRef.current = null;
+    setConflict(null);
+    setSaveError("");
+    if (!localDraft) return;
+    forceSaveRef.current = true;
+    await persist(localDraft);
+  };
+
+  const retrySave = () => {
+    const current = draftRef.current;
+    if (!current) return;
+    void persist(current);
   };
 
   const changeHp = (value: number) => {
@@ -1575,6 +1663,9 @@ export function CharacterSheetView({
   return (
     <div
       className={mode === "overlay" ? "pb-sheet-overlay" : "pb-sheet-page"}
+      role={mode === "overlay" ? "dialog" : undefined}
+      aria-modal={mode === "overlay" ? true : undefined}
+      aria-label={mode === "overlay" ? "Character sheet" : undefined}
       onClickCapture={(event) => {
         const anchor = (event.target as HTMLElement | null)?.closest("a");
         if (!anchor) return;
@@ -1599,10 +1690,7 @@ export function CharacterSheetView({
               type="button"
               className="pb-icon-button"
               aria-label="Minimize sheet"
-              onClick={() => {
-                if (detailsDirty && !window.confirm("Discard unsaved character details?")) return;
-                onClose();
-              }}
+              onClick={requestClose}
             >
               <ChevronDown size={18} />
             </button>
@@ -1621,9 +1709,17 @@ export function CharacterSheetView({
               {classData?.name ?? "Unfinished"} {draft.level}
             </span>
           </div>
-          <span className={`pb-save ${saving ? "is-saving" : ""}`}>
-            {saving ? "Saving…" : "Saved"}
+          <span
+            className={`pb-save ${saving ? "is-saving" : saveError ? "is-error" : ""}`}
+            title={saveError || undefined}
+          >
+            {saving ? "Saving…" : saveError ? "Not saved" : "Saved"}
           </span>
+          {saveError ? (
+            <button type="button" className="pb-button" onClick={retrySave}>
+              Retry
+            </button>
+          ) : null}
         </div>
         <div className="pb-topbar-right">
           <div className="pb-dc-control">
@@ -1669,10 +1765,7 @@ export function CharacterSheetView({
               type="button"
               className="pb-icon-button"
               aria-label="Close sheet"
-              onClick={() => {
-                if (detailsDirty && !window.confirm("Discard unsaved character details?")) return;
-                onClose();
-              }}
+              onClick={requestClose}
             >
               <X size={18} />
             </button>
@@ -3966,6 +4059,34 @@ export function CharacterSheetView({
       >
         <p className="custom-item-description">
           {customItemView?.description || "No description recorded."}
+        </p>
+      </Modal>
+      <Modal
+        open={Boolean(conflict)}
+        onClose={() => undefined}
+        closeOnBackdrop={false}
+        title="This sheet changed elsewhere"
+        subtitle="Another tab, device, or the GM saved this character while you were editing."
+        elevated={mode === "overlay"}
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => void applyServerVersion()}>
+              Reload their version
+            </Button>
+            <Button
+              variant="primary"
+              icon={<CircleAlert size={15} />}
+              onClick={() => void keepLocalVersion()}
+            >
+              Keep my changes
+            </Button>
+          </>
+        }
+      >
+        <p className="muted small">
+          Reloading replaces your unsaved edits with the version saved{" "}
+          {conflict ? new Date(conflict.updatedAt).toLocaleString() : "on the server"}. Keeping your
+          changes overwrites that newer save.
         </p>
       </Modal>
       <CompendiumPreviewModal

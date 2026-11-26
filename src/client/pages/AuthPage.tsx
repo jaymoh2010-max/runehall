@@ -46,6 +46,11 @@ export function AuthPage({ mode }: { mode: "login" | "register" }) {
 
   if (ready && user) return <Navigate to={from} replace />;
 
+  const bootstrapBlocked =
+    isRegister &&
+    registration?.bootstrap === true &&
+    !registration.canRegister &&
+    !registration.bootstrapTokenConfigured;
   const registrationClosed = isRegister && registration !== null && !registration.canRegister;
 
   const submit = async (event: FormEvent) => {
@@ -112,21 +117,29 @@ export function AuthPage({ mode }: { mode: "login" | "register" }) {
           <h2 style={{ marginTop: 8 }}>{isRegister ? "Join the hall" : "Sign in to Runehall"}</h2>
           <p className="auth-sub">
             {isRegister
-              ? registration?.bootstrap
-                ? "This is the first account on this hall. It becomes the instance administrator."
-                : registration && !registration.canRegister
-                  ? "This hall is not accepting new accounts right now."
-                  : registration?.inviteRequired
-                    ? "Registration is invite-only. Enter the code the host gave you."
-                    : "One account covers every campaign, character, and table you share."
+              ? bootstrapBlocked
+                ? "This hall is waiting for the host to finish setup."
+                : registration?.bootstrap
+                  ? "This is the first account on this hall. It becomes the instance administrator."
+                  : registration && !registration.canRegister
+                    ? "This hall is not accepting new accounts right now."
+                    : registration?.inviteRequired
+                      ? "Registration is invite-only. Enter the code the host gave you."
+                      : "One account covers every campaign, character, and table you share."
               : "Pick up where your party left off."}
           </p>
 
           {registrationClosed ? (
             <div className="auth-closed">
-              <div className="auth-error">Registration is closed on this hall.</div>
+              <div className="auth-error">
+                {bootstrapBlocked
+                  ? "The host must set BOOTSTRAP_TOKEN before the first account can be created."
+                  : "Registration is closed on this hall."}
+              </div>
               <p className="muted small">
-                Ask the host to reopen registration, or sign in with an existing account.
+                {bootstrapBlocked
+                  ? "Set BOOTSTRAP_TOKEN on the server, restart Runehall, then reload this page."
+                  : "Ask the host to reopen registration, or sign in with an existing account."}
               </p>
               <Link to="/login" className="btn btn-secondary btn-md" style={{ marginTop: 12 }}>
                 <span>Go to sign in</span>

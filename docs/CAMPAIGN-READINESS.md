@@ -25,8 +25,8 @@ The rest of this document records what is verified and what remains manual, so a
 | Check | Result |
 | --- | --- |
 | `npm run check` | Typecheck, lint, formatting, unit tests, production build, and bundle budget pass |
-| Unit tests | 767 passing |
-| `npm run e2e` | 37 passing browser scenarios |
+| Unit tests | 772 passing |
+| `npm run e2e` | 38 passing browser scenarios |
 | `npm run smoke` | End-to-end smoke suite passes |
 | `npm run simulate` | 2,337 characters, 145 class/level matrix builds, 578 option builds, 38 ancestries × 269 backgrounds; 0 problems |
 | `npm run simulate:feats` | 144,565 class/feat combinations checked; 39,166 accessible feats reflected on the sheet; 0 failures |
@@ -74,7 +74,7 @@ The campaign simulation exercises two complete 1-20 campaigns per run, one XP an
 - Local accounts with scrypt hashes and HTTP-only session cookies.
 - Session metadata (device, IP, last seen), per-device sign-out, and “sign out other devices”.
 - Administrator account moderation: suspend/restore, revoke sessions, and promote/demote administrators with last-admin safeguards. Suspension revokes sessions and disconnects live sockets.
-- Registration modes, single-use invite codes, expiry, revocation, and a pending-invite cap.
+- Registration modes, a production `BOOTSTRAP_TOKEN` gate for the first administrator, single-use invite codes, expiry, revocation, and a pending-invite cap.
 - Audit log with retention controls and CSV export.
 - Backup staging publishes a completed archive with a single rename, so interrupted backups are not mistaken for valid ones.
 - Compendium version metadata is exposed by `/api/health` and recorded in campaign archives.

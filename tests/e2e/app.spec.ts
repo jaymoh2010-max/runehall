@@ -69,9 +69,14 @@ let campaignPath = "";
 let inviteCode = "";
 let fighterSheetPath = "";
 
-async function register(page: Page, user: typeof admin): Promise<void> {
+async function register(page: Page, user: typeof admin, bootstrapToken?: string): Promise<void> {
   await page.goto("/register");
   await expect(page.getByRole("heading", { name: "Join the hall" })).toBeVisible();
+  if (bootstrapToken) {
+    const tokenField = page.getByLabel("Bootstrap token");
+    await expect(tokenField).toBeVisible();
+    await tokenField.fill(bootstrapToken);
+  }
   await page.getByLabel("Username").fill(user.username);
   await page.getByLabel("Display name").fill(user.displayName);
   await page.getByLabel(/^Password/).fill(user.password);
@@ -155,7 +160,7 @@ async function trainClassSkills(page: Page, skills: string[]): Promise<void> {
 }
 
 test("first account becomes the administrator and opens Hall controls", async ({ page }) => {
-  await register(page, admin);
+  await register(page, admin, "e2e-bootstrap-token");
   await expect(page.getByRole("heading", { name: "My Campaigns" })).toBeVisible();
 
   await page.getByRole("link", { name: "Admin" }).click();
@@ -368,6 +373,50 @@ test("GM creates a campaign and builds a character through the lazy routes", asy
   await expect(page.getByLabel("Character name")).toBeVisible({ timeout: 15_000 });
   await page.getByRole("button", { name: "Back to sheet" }).click();
   await expect(page.locator(".pb-sheet-page")).toBeVisible({ timeout: 15_000 });
+});
+
+test("sheet keeps local edits when another save wins the revision race", async ({ page }) => {
+  test.setTimeout(60_000);
+  await signIn(page, admin);
+  await page.routeWebSocket(/socket\.io/, (socket) => socket.close());
+
+  const campaignId = campaignPath.split("/").pop();
+  const list = await page.request.get(`/api/characters?campaignId=${campaignId}`);
+  const characters = (await list.json()) as {
+    characters: { id: string; name: string }[];
+  };
+  const hero = characters.characters.find((entry) => entry.name === "E2E Hero");
+  expect(hero).toBeTruthy();
+
+  await page.goto(`/characters/${hero!.id}`);
+  await expect(page.locator(".pb-sheet-page")).toBeVisible({ timeout: 15_000 });
+
+  const before = await page.request.get(`/api/characters/${hero!.id}`);
+  const record = (await before.json()).character as {
+    revision: number;
+    data: { details: { notes: string } };
+  };
+  const serverData = {
+    ...record.data,
+    details: { ...record.data.details, notes: "Server note" },
+  };
+  const serverSave = await page.request.put(`/api/characters/${hero!.id}`, {
+    data: { data: serverData, expectedRevision: record.revision },
+  });
+  expect(serverSave.ok()).toBe(true);
+
+  await page.getByRole("button", { name: "Details", exact: true }).click();
+  await page.getByLabel("Notes").fill("Local note");
+  await page.getByRole("button", { name: "Save details" }).click();
+
+  const conflictDialog = page.getByRole("dialog", { name: "This sheet changed elsewhere" });
+  await expect(conflictDialog).toBeVisible({ timeout: 15_000 });
+  await conflictDialog.getByRole("button", { name: "Keep my changes" }).click();
+  await expect(page.getByText("Saved.")).toBeVisible({ timeout: 15_000 });
+
+  const after = await page.request.get(`/api/characters/${hero!.id}`);
+  const saved = (await after.json()).character as { data: { details: { notes: string } } };
+  expect(saved.data.details.notes).toBe("Local note");
 });
 
 test("sheet item browser filters by category, subtype, and level", async ({ page }) => {

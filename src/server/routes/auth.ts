@@ -55,13 +55,18 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
       }
 
       const status = registrationStatus();
+      if (status.bootstrap && !status.canRegister) {
+        return reply.code(403).send({
+          error: "The host must set BOOTSTRAP_TOKEN before creating the first account.",
+        });
+      }
       if (!status.canRegister) {
         return reply.code(403).send({
           error: "Registration is closed. Ask the host for an account.",
         });
       }
-      const bootstrapToken = (process.env.BOOTSTRAP_TOKEN ?? "").trim();
-      if (status.bootstrap && bootstrapToken) {
+      if (status.bootstrap && status.bootstrapTokenRequired) {
+        const bootstrapToken = (process.env.BOOTSTRAP_TOKEN ?? "").trim();
         const provided = safeString(body.bootstrapToken, "", 200);
         if (!safeEqualText(provided, bootstrapToken)) {
           return reply

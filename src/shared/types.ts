@@ -2147,8 +2147,10 @@ export interface RegistrationStatus {
   mode: RegistrationMode;
   bootstrap: boolean;
   inviteRequired: boolean;
-  /** Set when the host configured BOOTSTRAP_TOKEN for the first account. */
+  /** The first account must include the host's BOOTSTRAP_TOKEN. */
   bootstrapTokenRequired: boolean;
+  /** Whether the host has actually configured BOOTSTRAP_TOKEN. */
+  bootstrapTokenConfigured: boolean;
   canRegister: boolean;
   userCount: number;
 }
