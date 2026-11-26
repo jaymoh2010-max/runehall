@@ -149,6 +149,10 @@ describe("compendium search", () => {
       ["Frightened", "condition"],
       ["A Challenge for Heroes", "action"],
       ["Goblin Warrior", "monster"],
+      ["Armageddon Orb", "hazard"],
+      ["Airship", "vehicle"],
+      ["Absorb Familiar", "familiarAbility"],
+      ["Abadar - Major Boon", "boonCurse"],
     ];
     for (const [query, kind] of cases) {
       const result = globalSearch(query, 60);

@@ -1,7 +1,10 @@
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import {
+  AlertTriangle,
   BookOpen,
+  Cat,
   Dices,
+  Gift,
   GitBranch,
   GraduationCap,
   HeartPulse,
@@ -13,6 +16,7 @@ import {
   Skull,
   Sparkles,
   Swords,
+  Truck,
   Users,
   X,
   Zap,
@@ -31,6 +35,10 @@ import type {
   Heritage,
   Monster,
   Spell,
+  Hazard,
+  Vehicle,
+  FamiliarAbility,
+  BoonCurse,
 } from "../../shared/types";
 import type { DomainEntry } from "../../shared/domains";
 import {
@@ -69,7 +77,11 @@ type Tab =
   | "deities"
   | "domains"
   | "conditions"
-  | "actions";
+  | "actions"
+  | "hazards"
+  | "vehicles"
+  | "familiarAbilities"
+  | "boonsAndCurses";
 
 const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: "ancestries", label: "Ancestries", icon: <Users size={15} /> },
@@ -85,6 +97,10 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: "domains", label: "Domains", icon: <Landmark size={15} /> },
   { id: "conditions", label: "Conditions", icon: <HeartPulse size={15} /> },
   { id: "actions", label: "Actions", icon: <Zap size={15} /> },
+  { id: "hazards", label: "Hazards", icon: <AlertTriangle size={15} /> },
+  { id: "vehicles", label: "Vehicles", icon: <Truck size={15} /> },
+  { id: "familiarAbilities", label: "Familiars", icon: <Cat size={15} /> },
+  { id: "boonsAndCurses", label: "Boons & Curses", icon: <Gift size={15} /> },
 ];
 
 type Entry =
@@ -100,7 +116,11 @@ type Entry =
   | Deity
   | DomainEntry
   | ConditionRef
-  | ActionRef;
+  | ActionRef
+  | Hazard
+  | Vehicle
+  | FamiliarAbility
+  | BoonCurse;
 
 const TAB_KINDS: Record<Tab, CompendiumEntryKind> = {
   ancestries: "ancestry",
@@ -116,6 +136,10 @@ const TAB_KINDS: Record<Tab, CompendiumEntryKind> = {
   domains: "domain",
   conditions: "condition",
   actions: "action",
+  hazards: "hazard",
+  vehicles: "vehicle",
+  familiarAbilities: "familiarAbility",
+  boonsAndCurses: "boonCurse",
 };
 
 const TAB_ROUTES: Partial<Record<Tab, string>> = {
@@ -126,6 +150,10 @@ const TAB_ROUTES: Partial<Record<Tab, string>> = {
   classFeatures: "/api/compendium/class-features",
   conditions: "/api/compendium/conditions",
   actions: "/api/compendium/actions",
+  hazards: "/api/compendium/hazards",
+  vehicles: "/api/compendium/vehicles",
+  familiarAbilities: "/api/compendium/familiar-abilities",
+  boonsAndCurses: "/api/compendium/boons-and-curses",
 };
 
 function entrySubtitle(item: Entry, tab: Tab): string {
@@ -178,6 +206,20 @@ function entrySubtitle(item: Entry, tab: Tab): string {
     case "action": {
       const action = item as ActionRef;
       return `${action.category} · ${action.actionType ?? "Action"}`;
+    }
+    case "hazard": {
+      const hazard = item as Hazard;
+      return `Level ${hazard.level} · ${hazard.complexity} hazard`;
+    }
+    case "vehicle": {
+      const vehicle = item as Vehicle;
+      return `Level ${vehicle.level} · ${vehicle.hp} HP · AC ${vehicle.ac}`;
+    }
+    case "familiarAbility":
+      return (item as FamiliarAbility).source;
+    case "boonCurse": {
+      const boon = item as BoonCurse;
+      return `${boon.category === "boon" ? "Boon" : "Curse"} · ${boon.deity}`;
     }
     default:
       return item.name;

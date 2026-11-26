@@ -19,6 +19,10 @@ import {
   type Heritage,
   type Monster,
   type Spell,
+  type Hazard,
+  type Vehicle,
+  type FamiliarAbility,
+  type BoonCurse,
 } from "../../shared/types";
 import { titleCase, traitLabel, weaponDamageLabel } from "../../shared/rules";
 import type { DomainEntry } from "../../shared/domains";
@@ -46,7 +50,11 @@ export type CompendiumEntry =
   | DomainEntry
   | ConditionRef
   | ActionRef
-  | Monster;
+  | Monster
+  | Hazard
+  | Vehicle
+  | FamiliarAbility
+  | BoonCurse;
 
 interface CompendiumDetailProps {
   kind: CompendiumEntryKind;
@@ -131,6 +139,10 @@ function entryLevel(kind: CompendiumEntryKind, entry: CompendiumEntry): number |
       return (entry as Equipment).level;
     case "monster":
       return (entry as Monster).level;
+    case "hazard":
+      return (entry as Hazard).level;
+    case "vehicle":
+      return (entry as Vehicle).level;
     default:
       return null;
   }
@@ -806,6 +818,119 @@ function renderBody(kind: CompendiumEntryKind, entry: CompendiumEntry): ReactNod
             html={monster.description || monster.blurb}
             empty="No description is stored for this creature."
           />
+        </>
+      );
+    }
+    case "hazard": {
+      const hazard = entry as Hazard;
+      return (
+        <>
+          <MetaGrid>
+            <Meta label="Complexity">{titleCase(hazard.complexity)}</Meta>
+            <Meta label="Stealth">{hazard.stealth ?? "—"}</Meta>
+            <Meta label="AC">{hazard.ac ?? "—"}</Meta>
+            <Meta label="Hardness">{hazard.hardness}</Meta>
+            <Meta label="HP">{hazard.hp || "—"}</Meta>
+            <Meta label="Fort">{hazard.fortitude}</Meta>
+            <Meta label="Ref">{hazard.reflex}</Meta>
+            <Meta label="Will">{hazard.will}</Meta>
+          </MetaGrid>
+          <Description
+            html={hazard.description}
+            empty="No description is stored for this hazard."
+          />
+          {hazard.disable ? (
+            <section className="compendium-section">
+              <h3>Disable</h3>
+              <RichText html={hazard.disable} />
+            </section>
+          ) : null}
+          {hazard.routine ? (
+            <section className="compendium-section">
+              <h3>Routine</h3>
+              <RichText html={hazard.routine} />
+            </section>
+          ) : null}
+          {hazard.reset ? (
+            <section className="compendium-section">
+              <h3>Reset</h3>
+              <RichText html={hazard.reset} />
+            </section>
+          ) : null}
+          {hazard.abilities.length ? (
+            <section className="monster-abilities">
+              <h3>
+                <Sparkles size={14} /> Abilities
+              </h3>
+              {hazard.abilities.map((ability) => (
+                <details key={`${ability.name}-${ability.type}`}>
+                  <summary>
+                    <strong>{ability.name}</strong>
+                    {ability.actions ? (
+                      <span className="tiny muted"> · {ability.actions}</span>
+                    ) : null}
+                  </summary>
+                  <RichText html={ability.description} />
+                </details>
+              ))}
+            </section>
+          ) : null}
+        </>
+      );
+    }
+    case "vehicle": {
+      const vehicle = entry as Vehicle;
+      return (
+        <>
+          <MetaGrid>
+            <Meta label="Price">{vehicle.priceGp.toLocaleString()} gp</Meta>
+            <Meta label="AC">{vehicle.ac}</Meta>
+            <Meta label="Hardness">{vehicle.hardness}</Meta>
+            <Meta label="HP">{vehicle.hp}</Meta>
+            <Meta label="Speed">{vehicle.speed || "—"}</Meta>
+            <Meta label="Size">{SIZES[vehicle.size] ?? vehicle.size}</Meta>
+            <Meta label="Crew">{vehicle.crew || "—"}</Meta>
+            <Meta label="Passengers">{vehicle.passengers || "—"}</Meta>
+            <Meta label="Piloting">{vehicle.pilotingCheck || "—"}</Meta>
+            <Meta label="Collision">{vehicle.collisionDC || "—"}</Meta>
+            <Meta label="Collision damage">{vehicle.collisionDamage || "—"}</Meta>
+          </MetaGrid>
+          <Description
+            html={vehicle.description}
+            empty="No description is stored for this vehicle."
+          />
+          {vehicle.abilities.length ? (
+            <section className="monster-abilities">
+              <h3>
+                <Sparkles size={14} /> Abilities
+              </h3>
+              {vehicle.abilities.map((ability) => (
+                <details key={`${ability.name}-${ability.type}`}>
+                  <summary>
+                    <strong>{ability.name}</strong>
+                  </summary>
+                  <RichText html={ability.description} />
+                </details>
+              ))}
+            </section>
+          ) : null}
+        </>
+      );
+    }
+    case "familiarAbility": {
+      const ability = entry as FamiliarAbility;
+      return <Description html={ability.description} />;
+    }
+    case "boonCurse": {
+      const boon = entry as BoonCurse;
+      return (
+        <>
+          <MetaGrid>
+            <Meta label="Type">{boon.category === "boon" ? "Boon" : "Curse"}</Meta>
+            <Meta label="Tier">{titleCase(boon.tier) || "—"}</Meta>
+            <Meta label="Deity">{boon.deity}</Meta>
+          </MetaGrid>
+          <Description html={boon.description} />
         </>
       );
     }

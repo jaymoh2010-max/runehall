@@ -728,6 +728,10 @@ const raw = {
   conditions: [],
   actions: [],
   monsters: [],
+  hazards: [],
+  vehicles: [],
+  familiarAbilities: [],
+  boonsAndCurses: [],
 };
 
 for (const file of walkJson(path.join(PACKS, "ancestries"))) {
@@ -780,6 +784,24 @@ for (const file of walkJson(path.join(PACKS, "conditions"))) {
 for (const file of walkJson(path.join(PACKS, "actions"))) {
   const j = readJson(file);
   if (j?.type === "action") raw.actions.push(j);
+}
+for (const file of walkJson(path.join(PACKS, "hazards"))) {
+  const j = readJson(file);
+  if (j?.type === "hazard") raw.hazards.push(j);
+}
+for (const file of walkJson(path.join(PACKS, "vehicles"))) {
+  const j = readJson(file);
+  if (j?.type === "vehicle") raw.vehicles.push(j);
+}
+for (const file of walkJson(path.join(PACKS, "familiar-abilities"))) {
+  const j = readJson(file);
+  if (j?.type === "action" && j?.system?.category === "familiar") raw.familiarAbilities.push(j);
+}
+for (const file of walkJson(path.join(PACKS, "boons-and-curses"))) {
+  const j = readJson(file);
+  if (j?.type === "feat" && ["deityboon", "curse"].includes(j?.system?.category)) {
+    raw.boonsAndCurses.push(j);
+  }
 }
 // The domains reference is a journal with one page per domain.
 const domainsJournal = readJson(path.join(PACKS, "journals", "domains.json"));
@@ -1811,6 +1833,126 @@ const actions = raw.actions
   })
   .sort((a, b) => a.name.localeCompare(b.name));
 
+// --- Reference entries (hazards, vehicles, familiars, boons/curses) --------
+function referenceAbilities(items) {
+  return (items ?? [])
+    .filter((item) => ["action", "spell"].includes(item.type))
+    .map((item) => ({
+      name: item.name,
+      type: item.type,
+      actions: item.system?.actions?.value ?? item.system?.time?.value ?? null,
+      actionType: item.system?.actionType?.value ?? null,
+      traits: item.system?.traits?.value ?? [],
+      description: cleanHtml(item.system?.description?.value),
+    }))
+    .filter((ability) => ability.description || ability.traits.length);
+}
+
+const hazards = raw.hazards
+  .map((j) => {
+    const s = j.system;
+    const pub = publication(s);
+    const tr = traits(s);
+    return {
+      id: `haz:${j._id}`,
+      name: j.name,
+      type: "hazard",
+      level: Number(s.details?.level?.value ?? 0),
+      complexity: s.details?.isComplex ? "complex" : "simple",
+      stealth: s.attributes?.stealth?.value == null ? null : Number(s.attributes.stealth.value),
+      ac: s.attributes?.ac?.value == null ? null : Number(s.attributes.ac.value),
+      hardness: Number(s.attributes?.hardness ?? 0),
+      hp: Number(s.attributes?.hp?.max ?? 0),
+      fortitude: Number(s.saves?.fortitude?.value ?? 0),
+      reflex: Number(s.saves?.reflex?.value ?? 0),
+      will: Number(s.saves?.will?.value ?? 0),
+      rarity: tr.rarity,
+      traits: tr.traits,
+      description: cleanHtml(s.details?.description || descriptionOf(s, true)),
+      disable: cleanHtml(s.details?.disable),
+      reset: cleanHtml(s.details?.reset),
+      routine: cleanHtml(s.details?.routine),
+      abilities: referenceAbilities(j.items),
+      ...pub,
+    };
+  })
+  .sort((a, b) => a.level - b.level || a.name.localeCompare(b.name));
+
+const vehicles = raw.vehicles
+  .map((j) => {
+    const s = j.system;
+    const pub = publication(s);
+    const tr = traits(s);
+    return {
+      id: `veh:${j._id}`,
+      name: j.name,
+      type: "vehicle",
+      level: Number(s.details?.level?.value ?? 0),
+      priceGp: Number(s.details?.price ?? 0),
+      ac: Number(s.attributes?.ac?.value ?? 0),
+      hardness: Number(s.attributes?.hardness ?? 0),
+      hp: Number(s.attributes?.hp?.max ?? 0),
+      speed: s.details?.speed ?? "",
+      crew: s.details?.crew ?? "",
+      passengers: s.details?.passengers ?? "",
+      pilotingCheck: s.details?.pilotingCheck ?? "",
+      collisionDC: Number(s.attributes?.collisionDC?.value ?? 0),
+      collisionDamage: s.attributes?.collisionDamage?.value ?? "",
+      size: s.traits?.size?.value ?? "med",
+      rarity: tr.rarity,
+      traits: tr.traits,
+      description: cleanHtml(descriptionOf(s, true) || s.details?.description),
+      immunities: Array.isArray(s.attributes?.immunities) ? s.attributes.immunities : [],
+      abilities: referenceAbilities(j.items),
+      ...pub,
+    };
+  })
+  .sort((a, b) => a.level - b.level || a.name.localeCompare(b.name));
+
+const familiarAbilities = raw.familiarAbilities
+  .map((j) => {
+    const s = j.system;
+    const pub = publication(s);
+    const tr = traits(s);
+    return {
+      id: `fam:${j._id}`,
+      name: j.name,
+      type: "familiarAbility",
+      rarity: tr.rarity,
+      traits: tr.traits,
+      description: cleanHtml(s.description?.value),
+      ...pub,
+    };
+  })
+  .sort((a, b) => a.name.localeCompare(b.name));
+
+const boonsAndCurses = raw.boonsAndCurses
+  .map((j) => {
+    const s = j.system;
+    const pub = publication(s);
+    const tr = traits(s);
+    const tier = /major/i.test(j.name)
+      ? "major"
+      : /moderate/i.test(j.name)
+        ? "moderate"
+        : /minor/i.test(j.name)
+          ? "minor"
+          : "";
+    return {
+      id: `boon:${j._id}`,
+      name: j.name,
+      type: "boonCurse",
+      category: s.category === "curse" ? "curse" : "boon",
+      tier,
+      deity: String(j.name).split(" - ")[0] ?? "",
+      rarity: tr.rarity,
+      traits: tr.traits,
+      description: cleanHtml(s.description?.value),
+      ...pub,
+    };
+  })
+  .sort((a, b) => a.name.localeCompare(b.name));
+
 // --- Monsters --------------------------------------------------------------
 function monsterSizeCells(size) {
   switch ((size || "").toLowerCase()) {
@@ -1952,6 +2094,10 @@ write("domains.json", domains);
 write("conditions.json", conditions);
 write("actions.json", actions);
 write("monsters.json", applyNameOverrides(monsters, MONSTER_OVERRIDES));
+write("hazards.json", hazards);
+write("vehicles.json", vehicles);
+write("familiarAbilities.json", familiarAbilities);
+write("boonsAndCurses.json", boonsAndCurses);
 
 function gitOutput(gitArgs) {
   try {
@@ -1988,6 +2134,10 @@ const manifest = {
     conditions: conditions.length,
     actions: actions.length,
     monsters: monsters.length,
+    hazards: hazards.length,
+    vehicles: vehicles.length,
+    familiarAbilities: familiarAbilities.length,
+    boonsAndCurses: boonsAndCurses.length,
   },
   remasterOnlyCount: {
     ancestries: ancestries.filter((x) => x.remaster).length,

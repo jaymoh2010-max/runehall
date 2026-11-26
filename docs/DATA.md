@@ -20,6 +20,7 @@ The generated compendium is currently tracked in Git so a fresh clone is runnabl
 - `actions`
 - `pathfinder-monster-core`, `pathfinder-monster-core-2`, `pathfinder-npc-core`
 - legacy/expansion bestiaries: `pathfinder-bestiary`, `pathfinder-bestiary-2`, `pathfinder-bestiary-3`, `lost-omens-bestiary`, `npc-gallery`, `battlecry-bestiary`, `howl-of-the-wild-bestiary`, `book-of-the-dead-bestiary`, `rage-of-elements-bestiary`, `war-of-immortals-bestiary`
+- `hazards`, `vehicles`, `familiar-abilities`, `boons-and-curses`
 - `journals` (`domains.json` for the domain reference)
 - localization: `static/lang/en.json`, `re-en.json`, `action-en.json`
 
@@ -57,6 +58,10 @@ git -C $cache sparse-checkout set `
   packs/pf2e/book-of-the-dead-bestiary `
   packs/pf2e/rage-of-elements-bestiary `
   packs/pf2e/war-of-immortals-bestiary `
+  packs/pf2e/hazards `
+  packs/pf2e/vehicles `
+  packs/pf2e/familiar-abilities `
+  packs/pf2e/boons-and-curses `
   packs/pf2e/journals `
   static/lang
 ```
@@ -97,6 +102,10 @@ The script writes:
 | `conditions.json` | Conditions |
 | `actions.json` | Actions and activities |
 | `monsters.json` | Bestiary/NPC data, attacks, abilities, stat block |
+| `hazards.json` | Hazard level, complexity, stealth, disable/reset/routine, abilities |
+| `vehicles.json` | Vehicle level, price, AC/HP, crew, speed, collision data |
+| `familiarAbilities.json` | Familiar ability rules text |
+| `boonsAndCurses.json` | Deity boons and curses by tier |
 | `manifest.json` | Counts, generated timestamp, source, `sourceCommit`, `sourceRef`, `sourceDirty` |
 
 ## Verify the data
