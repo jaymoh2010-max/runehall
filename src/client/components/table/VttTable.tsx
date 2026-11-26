@@ -182,12 +182,20 @@ export function VttTable({ initial, campaignId, user, isGm, active }: VttTablePr
 
   const duplicateScene = async (sceneId: string) => {
     try {
-      const result = await api<{ scene: Scene }>(`/api/scenes/${sceneId}/duplicate`, {
-        method: "POST",
-      });
+      const result = await api<{ scene: Scene; tokens?: Token[] }>(
+        `/api/scenes/${sceneId}/duplicate`,
+        { method: "POST" }
+      );
       setScenes((current) =>
         current.some((scene) => scene.id === result.scene.id) ? current : [...current, result.scene]
       );
+      const duplicatedTokens = result.tokens ?? [];
+      if (duplicatedTokens.length) {
+        setTokens((current) => [
+          ...current.filter((token) => !duplicatedTokens.some((entry) => entry.id === token.id)),
+          ...duplicatedTokens,
+        ]);
+      }
       toast("Scene duplicated with its tokens.", "success");
     } catch (error) {
       toast(errorMessage(error), "error");

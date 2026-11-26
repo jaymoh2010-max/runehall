@@ -221,7 +221,12 @@ interface Account {
 async function register(username: string, displayName: string): Promise<Account> {
   const result = await api("/api/auth/register", {
     method: "POST",
-    body: { username, displayName, password: "party-sim-password-123" },
+    body: {
+      username,
+      displayName,
+      password: "party-sim-password-123",
+      bootstrapToken: "party-sim-bootstrap-token",
+    },
   });
   return {
     id: result.payload.user.id,
@@ -686,6 +691,7 @@ async function main(): Promise<void> {
       NODE_ENV: "production",
       COOKIE_SECURE: "0",
       REGISTRATION_MODE: "open",
+      BOOTSTRAP_TOKEN: "party-sim-bootstrap-token",
     },
     stdio: ["ignore", "pipe", "pipe"],
   });

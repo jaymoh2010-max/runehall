@@ -308,12 +308,14 @@ export async function registerTableRoutes(app: FastifyInstance): Promise<void> {
     const sourceTokens = db
       .prepare("SELECT * FROM tokens WHERE scene_id = ?")
       .all(id) as TokenRow[];
+    const duplicatedTokens: ReturnType<typeof serializeToken>[] = [];
     for (const token of sourceTokens) {
+      const tokenId = `tok_${Math.random().toString(16).slice(2, 14)}${Date.now().toString(16)}`;
       db.prepare(
         `INSERT INTO tokens (id, scene_id, name, image_url, character_id, monster_id, owner_id, x, y, size, vision_radius, light_radius, light_color, vision_mode, color, hp_current, hp_max, ac, initiative_bonus, group_id, group_name, conditions, turn_effects, hidden, locked, sort_order, created_at, updated_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).run(
-        `tok_${Math.random().toString(16).slice(2, 14)}${Date.now().toString(16)}`,
+        tokenId,
         sceneId,
         token.name,
         token.image_url,
@@ -342,12 +344,17 @@ export async function registerTableRoutes(app: FastifyInstance): Promise<void> {
         ts,
         ts
       );
+      const created = db.prepare("SELECT * FROM tokens WHERE id = ?").get(tokenId) as TokenRow;
+      duplicatedTokens.push(serializeToken(created));
     }
     const row = db.prepare("SELECT * FROM scenes WHERE id = ?").get(sceneId) as SceneRow;
     const scene = serializeScene(row);
     broadcastScene(app, source.campaign_id, "scene:created", row);
+    for (const duplicated of duplicatedTokens) {
+      tokenEventsFor(app, source.campaign_id).created(duplicated);
+    }
     touchCampaign(source.campaign_id);
-    return reply.code(201).send({ scene });
+    return reply.code(201).send({ scene, tokens: duplicatedTokens });
   });
 
   app.patch("/api/scenes/:id", async (request, reply) => {

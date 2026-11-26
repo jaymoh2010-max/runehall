@@ -142,6 +142,7 @@ async function main() {
       ENABLE_CSP: "1",
       COOKIE_SECURE: "0",
       REGISTRATION_MODE: "open",
+      BOOTSTRAP_TOKEN: "smoke-bootstrap-token",
     },
     stdio: ["ignore", "pipe", "pipe"],
   });
@@ -175,9 +176,29 @@ async function main() {
   }
   log("security headers and same-origin enforcement are active");
 
+  const blockedBootstrap = await fetch(`${base}/api/auth/register`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      username: "smoke_no_token",
+      displayName: "No Token",
+      password: "smoke-password-123",
+    }),
+  });
+  if (blockedBootstrap.status !== 403) {
+    throw new Error(
+      `First-account registration without a token returned ${blockedBootstrap.status}`
+    );
+  }
+
   const gmRegister = await api("/api/auth/register", {
     method: "POST",
-    body: { username: "smoke_gm", displayName: "Smoke GM", password: "smoke-password-123" },
+    body: {
+      username: "smoke_gm",
+      displayName: "Smoke GM",
+      password: "smoke-password-123",
+      bootstrapToken: "smoke-bootstrap-token",
+    },
   });
   const gmCookie = gmRegister.cookie;
   const gm = gmRegister.payload.user;
@@ -1326,6 +1347,30 @@ async function main() {
   ) {
     throw new Error("Token vision/light settings were not saved");
   }
+
+  const duplicatedTokenEvent = waitForEvent(
+    playerSocket,
+    "token:created",
+    (created) => created.name === "Smoke Hero" && created.sceneId !== scene.id
+  );
+  const duplicatedWithToken = await api(`/api/scenes/${scene.id}/duplicate`, {
+    method: "POST",
+    cookie: gmCookie,
+  });
+  const duplicatedToken = await duplicatedTokenEvent;
+  const expectedDuplicateToken = duplicatedWithToken.payload.tokens?.find(
+    (entry) => entry.name === "Smoke Hero"
+  );
+  if (!expectedDuplicateToken || duplicatedToken.id !== expectedDuplicateToken.id) {
+    throw new Error("Duplicated scene did not return and broadcast its copied tokens");
+  }
+  const duplicatedPlayerTable = await api(`/api/campaigns/${campaign.id}/table`, {
+    cookie: playerCookie,
+  });
+  if (!duplicatedPlayerTable.payload.tokens.some((entry) => entry.id === duplicatedToken.id)) {
+    throw new Error("Duplicated scene token did not reach the player snapshot");
+  }
+  log("duplicated scenes copy and broadcast tokens");
 
   const hiddenToken = await emitAck(gmSocket, "token:create", {
     campaignId: campaign.id,

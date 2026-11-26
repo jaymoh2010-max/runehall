@@ -1,4 +1,5 @@
 import { db, type RegistrationInviteRow } from "./db";
+import { bootstrapPolicy } from "../shared/registration";
 import { inviteCode, newId, now, safeString } from "./util";
 import type { RegistrationInvite, RegistrationMode, RegistrationStatus } from "../shared/types";
 
@@ -44,13 +45,18 @@ export function setRegistrationMode(mode: unknown): RegistrationMode {
 export function registrationStatus(): RegistrationStatus {
   const mode = getRegistrationMode();
   const count = userCount();
-  const bootstrap = count === 0;
+  const policy = bootstrapPolicy({
+    userCount: count,
+    token: process.env.BOOTSTRAP_TOKEN,
+    nodeEnv: process.env.NODE_ENV,
+  });
   return {
     mode,
-    bootstrap,
-    inviteRequired: !bootstrap && mode === "invite",
-    bootstrapTokenRequired: bootstrap && Boolean((process.env.BOOTSTRAP_TOKEN ?? "").trim()),
-    canRegister: bootstrap || mode === "open" || mode === "invite",
+    bootstrap: policy.bootstrap,
+    inviteRequired: !policy.bootstrap && mode === "invite",
+    bootstrapTokenRequired: policy.tokenRequired,
+    bootstrapTokenConfigured: policy.tokenConfigured,
+    canRegister: policy.bootstrap ? policy.canRegister : mode === "open" || mode === "invite",
     userCount: count,
   };
 }

@@ -103,10 +103,12 @@ Open **http://localhost:5173**. The API and Socket.IO server run on port 3001; V
 
 ```bash
 npm run build
+# First run only: set BOOTSTRAP_TOKEN in .env before creating the administrator.
 npm start
 ```
 
-Open **http://localhost:3001**.
+Open **http://localhost:3001**. Production refuses to create the first account
+until `BOOTSTRAP_TOKEN` is set; enter that token on the registration page.
 
 ### 4. Docker
 

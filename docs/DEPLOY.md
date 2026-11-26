@@ -37,9 +37,9 @@ docker compose up -d
 ```
 
 The first account becomes the instance administrator. Create it **before** exposing the site through
-the proxy, because the first account is always allowed even when registration is closed. After the
-administrator exists, use **Admin → Hall controls** to create single-use registration invite codes
-for your friends. Do not expose port 3001 directly; bind it to loopback and close it at the firewall
+the proxy. Production refuses the first account unless `BOOTSTRAP_TOKEN` is set, and the registration
+form requires that token. After the administrator exists, use **Admin → Hall controls** to create
+single-use registration invite codes for your friends. Do not expose port 3001 directly; bind it to loopback and close it at the firewall
 or cloud security group. See the reverse-proxy examples below.
 
 After the first session, take a backup and verify the restore drill:
@@ -60,10 +60,13 @@ see [FIRST-CAMPAIGN.md](FIRST-CAMPAIGN.md).
 ```bash
 npm ci
 npm run build
+# First run only: set BOOTSTRAP_TOKEN in .env before creating the administrator.
 NODE_ENV=production COOKIE_SECURE=0 npm start
 ```
 
-Open `http://localhost:3001`. This serves the built client and the API from the same Fastify process.
+Open `http://localhost:3001`. Production refuses the first account until
+`BOOTSTRAP_TOKEN` is set. This serves the built client and the API from the same
+Fastify process.
 
 ## Option 2 — Docker Compose
 
@@ -197,7 +200,7 @@ curl http://127.0.0.1:3001/api/health
 
 ## Registration, admin recovery, and audit
 
-The first account created on a fresh install becomes the instance administrator. That account sees **Admin → Hall controls** in the top navigation.
+The first account created on a fresh install becomes the instance administrator. In production, set `BOOTSTRAP_TOKEN` and enter it on the registration form. That account sees **Admin → Hall controls** in the top navigation.
 
 Registration modes:
 

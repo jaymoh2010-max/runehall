@@ -72,6 +72,7 @@ function startServer(dataDir, port, rulesDir = compendiumDir) {
       ENABLE_CSP: "0",
       COOKIE_SECURE: "0",
       REGISTRATION_MODE: "open",
+      BOOTSTRAP_TOKEN: "restore-drill-bootstrap-token",
     },
     stdio: ["ignore", "pipe", "pipe"],
   });
@@ -172,6 +173,7 @@ async function main() {
       username,
       displayName: "Restore Drill GM",
       password,
+      bootstrapToken: "restore-drill-bootstrap-token",
     },
   });
   const cookie = register.cookie;

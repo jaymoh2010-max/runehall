@@ -10235,6 +10235,9 @@ body.table-fullscreen-active {
 .pb-save.is-saving {
   color: var(--pb-orange-bright);
 }
+.pb-save.is-error {
+  color: var(--red);
+}
 .pb-prep-banner {
   display: flex;
   align-items: center;

@@ -20,6 +20,7 @@ process.env.NODE_ENV = "production";
 process.env.ENABLE_CSP = "0";
 process.env.COOKIE_SECURE = "0";
 process.env.REGISTRATION_MODE = "open";
+process.env.BOOTSTRAP_TOKEN = "e2e-bootstrap-token";
 process.env.AUTH_RATE_LIMIT_MAX = "200";
 process.env.LOG_LEVEL = process.env.LOG_LEVEL || "warn";
 
