@@ -56,6 +56,7 @@ import {
   type Heritage,
   type SkillId,
   type Spell,
+  type SpellTradition,
 } from "../../../../shared/types";
 import {
   abilityMod,
@@ -981,7 +982,7 @@ export function SpellsStep({ draft, update, derived, context, setStep, openPicke
                   <h3>{derived.multiclassCaster.className} Dedication cantrips</h3>
                   <p className="muted small">
                     Choose up to {derived.multiclassCaster.cantripLimit}{" "}
-                    {derived.multiclassCaster.tradition} cantrip
+                    {derived.multiclassCaster.tradition ?? "dedication"} cantrip
                     {derived.multiclassCaster.cantripLimit === 1 ? "" : "s"} from the dedication.
                   </p>
                 </div>
@@ -995,6 +996,31 @@ export function SpellsStep({ draft, update, derived, context, setStep, openPicke
                   {multiclassCantrips.length} / {derived.multiclassCaster.cantripLimit}
                 </Badge>
               </div>
+              {derived.multiclassCaster.variableTradition ? (
+                <Field label="Dedication tradition">
+                  <Select
+                    value={derived.multiclassCaster.tradition ?? ""}
+                    onChange={(event) =>
+                      update((current) => ({
+                        ...current,
+                        spells: {
+                          ...current.spells,
+                          multiclassTradition: (event.target.value ||
+                            null) as SpellTradition | null,
+                          multiclassCantrips: [],
+                          multiclassSpells: [],
+                        },
+                      }))
+                    }
+                  >
+                    <option value="">Choose a tradition…</option>
+                    <option value="arcane">Arcane</option>
+                    <option value="divine">Divine</option>
+                    <option value="occult">Occult</option>
+                    <option value="primal">Primal</option>
+                  </Select>
+                </Field>
+              ) : null}
               <div className="chip-row">
                 {multiclassCantrips.map((spell) => (
                   <span className="chip" key={spell.id}>
@@ -1024,7 +1050,10 @@ export function SpellsStep({ draft, update, derived, context, setStep, openPicke
                 <Button
                   size="sm"
                   icon={<Plus size={13} />}
-                  disabled={multiclassCantrips.length >= derived.multiclassCaster.cantripLimit}
+                  disabled={
+                    !derived.multiclassCaster.tradition ||
+                    multiclassCantrips.length >= derived.multiclassCaster.cantripLimit
+                  }
                   onClick={() => setMulticlassPickerOpen(true)}
                 >
                   Add dedication cantrip
@@ -1067,7 +1096,10 @@ export function SpellsStep({ draft, update, derived, context, setStep, openPicke
                     <Button
                       size="sm"
                       icon={<Plus size={13} />}
-                      disabled={multiclassSpells.length >= multiclassSlotTotal}
+                      disabled={
+                        !derived.multiclassCaster.tradition ||
+                        multiclassSpells.length >= multiclassSlotTotal
+                      }
                       onClick={() => setMulticlassSpellPickerOpen(true)}
                     >
                       Add dedication spell

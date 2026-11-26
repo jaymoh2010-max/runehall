@@ -934,6 +934,8 @@ export interface CharacterDraft {
     multiclassSpells: string[];
     /** Dedication spell slots spent today, keyed by rank. */
     multiclassSlotsUsed: Record<string, number>;
+    /** Chosen tradition for a bloodline/patron/eidolon-dependent dedication. */
+    multiclassTradition: SpellTradition | null;
     /** Innate spells granted by ancestry, heritage, feats, or items. */
     innate: string[];
     /** Innate spell uses spent today, keyed by spell id. */
@@ -1162,7 +1164,8 @@ export interface DerivedCharacter {
   multiclassCaster?: {
     featId: string;
     className: string;
-    tradition: SpellTradition;
+    tradition: SpellTradition | null;
+    variableTradition?: boolean;
     ability: AbilityKey;
     cantripLimit: number;
     spellSlots: number[];
