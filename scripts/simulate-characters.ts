@@ -29,7 +29,7 @@ import {
 import { ANIMIST_APPARITIONS } from "../src/shared/apparitions";
 import { validateFormula } from "../src/shared/dice";
 import { automationForEquipment, automationForFeat } from "../src/shared/automation";
-import { featChoice } from "../src/shared/effects";
+import { featChoice, featChoiceOptions } from "../src/shared/effects";
 import {
   featAllowedByHeritageGrant,
   heritageChosenFeatId,
@@ -399,9 +399,9 @@ function fillFeatChoices(
       draft.featChoices[feat.id] = [text];
       continue;
     }
-    if (!choice.options.length) continue;
-    const untrained = choice.options.filter((option) => !draft.skills.trained.includes(option.id));
-    draft.featChoices[feat.id] = [pick(rng, untrained.length ? untrained : choice.options).id];
+    const options = featChoiceOptions(choice, draft, context);
+    if (!options.length) continue;
+    draft.featChoices[feat.id] = [pick(rng, options).id];
   }
 }
 

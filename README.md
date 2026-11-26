@@ -159,10 +159,11 @@ npm run verify:data  # compendium and SQLite integrity
 | `npm run e2e` | Playwright browser flows |
 | `npm run ingest` | Rebuild the compendium from the Foundry PF2e data clone |
 | `npm run verify:data` | Validate compendium counts, required fields, and SQLite integrity |
-| `npm run simulate` | Generate characters across classes, levels, and options |
+| `npm run simulate` | Generate characters across classes, levels, options, and feat choices |
 | `npm run simulate:exhaustive` | Run the exhaustive class/ancestry/heritage/background/deity/subclass builder matrix |
+| `npm run simulate:feats` | Test every accessible feat against every class and verify it reaches the derived sheet |
 | `npm run simulate:campaign` | Run two isolated 1-20 campaign simulations through the API and sockets |
-| `npm run simulate:parties` | Advance seven class-combination campaigns from level 1 to 20 through the API |
+| `npm run simulate:parties` | Advance seven class-combination campaigns from level 1 to 20, including a Free Archetype + ABP campaign |
 | `npm run backup` | Snapshot SQLite + uploaded assets into `backups/` |
 | `npm run restore -- --from <dir> --yes` | Restore a backup (server must be stopped) |
 | `npm run reset-password -- --username <name>` | Issue a temporary password |

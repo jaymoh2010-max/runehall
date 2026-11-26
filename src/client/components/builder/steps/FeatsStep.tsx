@@ -109,6 +109,7 @@ import { ContentSourceToggle } from "../ContentSourceToggle";
 import { RunePicker } from "../RunePicker";
 import {
   featChoice,
+  featChoiceOptions,
   featGrant,
   featGrantChoiceKey,
   featGrantChoicePrefix,
@@ -334,7 +335,7 @@ export function FeatsStep({
                       }}
                     >
                       <option value="">Choose…</option>
-                      {heritageChosenChoice.options.map((option) => (
+                      {featChoiceOptions(heritageChosenChoice, draft, context).map((option) => (
                         <option key={option.id} value={option.id}>
                           {option.label}
                         </option>
@@ -561,7 +562,7 @@ export function FeatsStep({
                           }}
                         >
                           <option value="">Choose…</option>
-                          {choice.options.map((option) => (
+                          {featChoiceOptions(choice, draft, context).map((option) => (
                             <option key={option.id} value={option.id}>
                               {option.label}
                             </option>

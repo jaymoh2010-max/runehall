@@ -25,14 +25,15 @@ The rest of this document records what is verified and what remains manual, so a
 | Check | Result |
 | --- | --- |
 | `npm run check` | Typecheck, lint, formatting, unit tests, production build, and bundle budget pass |
-| Unit tests | 813 passing |
+| Unit tests | 822 passing |
 | `npm run e2e` | 36 passing browser scenarios |
 | `npm run smoke` | End-to-end smoke suite passes |
 | `npm run simulate` | 2,337 characters, 145 class/level matrix builds, 578 option builds, 38 ancestries × 269 backgrounds; 0 problems |
+| `npm run simulate:feats` | 144,565 class/feat combinations checked; 39,166 accessible feats reflected on the sheet; 0 failures |
 | `npm run simulate:campaign` | 18 passed, 0 failed, 0 observations per run |
-| `npm run simulate:parties` | 22 passed, 0 failed, 0 observations (7 campaigns, 29 characters, 140 level steps) |
+| `npm run simulate:parties` | 23 passed, 0 failed, 0 observations (7 campaigns, 29 characters, 140 level steps, one campaign with Free Archetype + ABP) |
 
-The campaign simulation exercises two complete 1-20 campaigns per run, one XP and one milestone, including tokens, hidden scene layers, party advancement, level-20 cap, export/import, revisions, and permission boundaries. The party simulation advances seven class-combination campaigns from level 1 to 20, rebuilding and saving all 29 remaster classes through the real character API at every level.
+The campaign simulation exercises two complete 1-20 campaigns per run, one XP and one milestone, including tokens, hidden scene layers, party advancement, level-20 cap, export/import, revisions, and permission boundaries. The party simulation advances seven class-combination campaigns from level 1 to 20, rebuilding and saving all 29 remaster classes through the real character API at every level. The feat audit tests every accessible class/feat combination at level 20, including class-grant choices, selected-feat reflection, finite sheet math, valid damage formulas, and automation notes; incompatible classes and unmet prerequisites are counted separately.
 
 ---
 
@@ -119,7 +120,7 @@ These are optional campaign variants; the base Remastered rules do not require t
 
 ### Rules automation
 
-- Unusual feat, item, heritage, and class effects may remain prose-only. Automation badges are conservative.
+- Unusual feat, item, heritage, and class effects may remain prose-only. Automation badges are conservative. Common situational feats such as Shield Block, Ride, Assurance, Trick Magic Item, and Quick Identification now record their table rules as partial automation notes; Skill Training applies its first chosen skill.
 - Compendium hazard statblocks and ready-made hazard presets are not bundled. GMs can save custom hazards in the NPC & hazard library with trigger, disable, and routine text, then award hazard XP separately.
 - Compendium affliction statblocks are not bundled. Built-in recovery-frame templates cover common poison, disease, and curse shapes; stage effects remain manual.
 - Some action-count spell variants, fixed-rank heightening, and data conflicts stay manual.
@@ -144,6 +145,7 @@ npm run smoke
 npm run e2e
 npm run simulate:campaign
 npm run simulate:parties
+npm run simulate:feats
 ```
 
 Campaign simulation reports:

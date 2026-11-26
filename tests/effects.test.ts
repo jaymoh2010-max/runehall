@@ -9,6 +9,7 @@ import {
   collectFeatChoiceEffects,
   collectFeatEffects,
   featChoice,
+  featChoiceOptions,
   featGrant,
   mergeEffects,
 } from "../src/shared/effects";
@@ -389,6 +390,14 @@ describe("curated feat effects", () => {
         .trainedSkills
     ).toEqual(["stealth"]);
     expect(automationForFeat(skillTraining).level).toBe("partial");
+  });
+
+  it("hides already-trained skills from Skill Training choices", () => {
+    const draft = fighterDraft();
+    const characterContext = context({ [skillTraining.id]: skillTraining });
+    const options = featChoiceOptions(featChoice(skillTraining.id)!, draft, characterContext);
+    expect(options.some((option) => option.id === "athletics")).toBe(false);
+    expect(options.some((option) => option.id === "stealth")).toBe(true);
   });
 
   it("records the Assurance skill and keeps the take-10 result manual", () => {

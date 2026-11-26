@@ -1,4 +1,11 @@
-import { SKILLS, type AbilityKey, type CharacterDraft, type SaveKey, type SkillId } from "./types";
+import {
+  SKILLS,
+  type AbilityKey,
+  type CharacterContext,
+  type CharacterDraft,
+  type SaveKey,
+  type SkillId,
+} from "./types";
 
 /**
  * Structured, curated character effects. The compendium does not carry rule
@@ -509,8 +516,21 @@ export interface FeatChoiceDefinition {
   kind?: "select" | "text";
   placeholder?: string;
   options: FeatChoiceOption[];
+  /** Hide options that would have no effect for the current draft. */
+  optionFilter?: (optionId: string, draft: CharacterDraft, context: CharacterContext) => boolean;
   /** Turn the chosen option into sheet modifiers for the character's level. */
   apply: (choice: string, level: number) => EffectModifiers;
+}
+
+/** Options that the builder should offer for the current draft. */
+export function featChoiceOptions(
+  definition: FeatChoiceDefinition,
+  draft: CharacterDraft,
+  context: CharacterContext
+): FeatChoiceOption[] {
+  return definition.optionFilter
+    ? definition.options.filter((option) => definition.optionFilter!(option.id, draft, context))
+    : definition.options;
 }
 
 function loreName(value: string): string {
@@ -555,6 +575,7 @@ export const FEAT_CHOICES: Record<string, FeatChoiceDefinition> = {
   "feat:P6icK2DbRoZ3H6kc": {
     prompt: "Choose a skill",
     options: SKILLS.map((skill) => ({ id: skill.id, label: skill.name })),
+    optionFilter: (choice, draft) => !draft.skills.trained.includes(choice),
     apply: (choice) =>
       SKILLS.some((skill) => skill.id === choice) ? { trainedSkills: [choice] } : {},
   },

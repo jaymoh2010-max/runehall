@@ -14,6 +14,7 @@
     "verify:data": "node scripts/verify-compendium.mjs",
     "simulate": "tsx scripts/simulate-characters.ts 1000 --matrix --content --options --prereqs",
     "simulate:exhaustive": "tsx scripts/simulate-characters.ts --full 200",
+    "simulate:feats": "tsx scripts/simulate-feat-classes.ts",
     "simulate:campaign": "tsx scripts/simulate-campaign.ts",
     "simulate:parties": "tsx scripts/simulate-campaign-parties.ts",
     "backup": "node scripts/backup.mjs",

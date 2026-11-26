@@ -378,6 +378,9 @@ Acceptance: a GM can prepare a full session in Runehall and start it with one â€
 - [x] **Automation coverage labels**
   - Conservative `full` / `partial` / `manual` labels for feats and equipment.
   - Labels are shown in the feat and equipment pickers with a legend explaining manual tracking.
+  - Common situational feats now carry partial automation notes (Shield Block, Ride, Assurance, Trick Magic Item, Quick Identification, and similar), and Skill Training applies its first chosen skill.
+  - The multi-party simulation includes one Free Archetype + Automatic Bonus Progression campaign from 1-20.
+  - `npm run simulate:feats` audits all 144,565 class/feat combinations at level 20; 39,166 accessible picks reached the derived sheet with 0 failures, while class-incompatible and prerequisite-unmet combinations are reported separately.
   - Feat labels are text-based until a curated override list grows; equipment labels distinguish base gear from magic and other items.
 - [x] **Golden-sheet regression fixtures**
   - Level-1 fighter, wizard, and rogue fixtures pin abilities, HP, AC, saves, perception, DCs, attacks, and key skills.
