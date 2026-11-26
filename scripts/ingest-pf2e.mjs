@@ -13,6 +13,16 @@ import path from "node:path";
 import os from "node:os";
 import { execFileSync } from "node:child_process";
 import sanitizeHtml from "sanitize-html";
+import {
+  ANCESTRY_OVERRIDES,
+  BACKGROUND_OVERRIDES,
+  DEITY_OVERRIDES,
+  EQUIPMENT_OVERRIDES,
+  SPELL_OVERRIDES,
+  applyNameOverrides,
+  normalizeDeityWeapons,
+  normalizeMonsterAttackTypes,
+} from "./compendium-overrides.mjs";
 
 const args = process.argv.slice(2);
 const sourceArg = args.indexOf("--source");
@@ -1834,7 +1844,9 @@ function normalizeMonster(j) {
         .join(" plus ");
       return {
         name: item.name,
-        type: item.type,
+        // Foundry uses item type "melee" for both melee and ranged NPC
+        // strikes. A range increment is the reliable ranged indicator.
+        type: is.range?.increment != null && Number(is.range.increment) > 0 ? "ranged" : "melee",
         bonus: Number(is.bonus?.value ?? 0),
         damage,
         traits: is.traits?.value ?? [],
@@ -1917,15 +1929,17 @@ function write(name, data) {
 }
 
 console.log("\nWriting compendium:");
-write("ancestries.json", ancestries);
+normalizeDeityWeapons(deities, equipment);
+normalizeMonsterAttackTypes(monsters);
+write("ancestries.json", applyNameOverrides(ancestries, ANCESTRY_OVERRIDES));
 write("heritages.json", heritages);
-write("backgrounds.json", backgrounds);
+write("backgrounds.json", applyNameOverrides(backgrounds, BACKGROUND_OVERRIDES));
 write("classes.json", classes);
 write("classFeatures.json", classFeatures);
 write("feats.json", feats);
-write("spells.json", spells);
-write("equipment.json", equipment);
-write("deities.json", deities);
+write("spells.json", applyNameOverrides(spells, SPELL_OVERRIDES));
+write("equipment.json", applyNameOverrides(equipment, EQUIPMENT_OVERRIDES));
+write("deities.json", applyNameOverrides(deities, DEITY_OVERRIDES));
 write("domains.json", domains);
 write("conditions.json", conditions);
 write("actions.json", actions);

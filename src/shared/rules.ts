@@ -3084,6 +3084,7 @@ function matchesDeityWeapon(item: Equipment, deity: Deity | null | undefined): b
     value
       .toLowerCase()
       .replace(/\s*\([^)]*\)\s*/g, " ")
+      .replace(/[^a-z0-9]+/g, " ")
       .replace(/\s+/g, " ")
       .trim();
   const itemName = clean(item.name);

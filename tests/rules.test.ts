@@ -960,6 +960,24 @@ describe("PF2e character rules", () => {
     expect(derived.attacks.find((attack) => attack.name === "Longsword")?.attackBonus).toBe(5);
   });
 
+  it("matches a hyphenated deity weapon slug to the item name", () => {
+    const { draft, context } = buildCleric();
+    const achaekek = deities.find((entry) => entry.name === "Achaekek")!;
+    const sawtoothSaber = equipment.find((entry) => entry.name === "Sawtooth Saber")!;
+    draft.deityId = achaekek.id;
+    draft.deitySkill = null;
+    draft.equipment = [{ itemId: sawtoothSaber.id, quantity: 1, equipped: true }];
+    const withSaber: CharacterContext = {
+      ...context,
+      deity: achaekek,
+      equipment: { [sawtoothSaber.id]: sawtoothSaber },
+    };
+    const derived = computeCharacter(draft, withSaber);
+    // Achaekek's favored weapon is stored as "sawtooth-saber" upstream; it
+    // must still match the "Sawtooth Saber" item and grant trained proficiency.
+    expect(derived.attacks.find((attack) => attack.name === "Sawtooth Saber")?.attackBonus).toBe(5);
+  });
+
   it("applies the Encumbered condition when carried Bulk exceeds capacity", () => {
     const { draft, context } = buildCleric();
     const chainMail = equipment.find((entry) => entry.name === "Chain Mail")!;
