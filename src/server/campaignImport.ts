@@ -1,7 +1,7 @@
 import { getMembership, getUserByUsername } from "./access";
 import fs from "node:fs";
 import path from "node:path";
-import { contextForDraft, equipment } from "./compendium";
+import { contextForDraft } from "./compendium";
 import { db, transaction } from "./db";
 import { characterSummary, normalizeCharacterDraft } from "../shared/rules";
 import {
@@ -10,20 +10,8 @@ import {
   rulesetContentMode,
   rulesetIncludesLegacy,
 } from "../shared/content";
-import { normalizeCampaignThreads } from "../shared/dashboard";
 import { normalizeGolarionDate } from "../shared/calendar";
 import { normalizeAdvancementSpeed, normalizeXpAwardKind } from "../shared/xp";
-import {
-  normalizeTravelActivities,
-  normalizeTravelEncounterChecks,
-  normalizeTravelHistory,
-  normalizeTravelMiles,
-  normalizeTravelSpeed,
-  normalizeTravelTerrain,
-  normalizeTravelWatches,
-  normalizeTravelWaypoints,
-  normalizeTravelWeather,
-} from "../shared/travel";
 import { normalizeSessionZeroChecklist } from "../shared/sessionZero";
 import {
   normalizeHazardComplexity,
@@ -32,12 +20,6 @@ import {
   normalizeReputation,
 } from "../shared/people";
 import { normalizeChapterLevel, normalizeChapterStatus } from "../shared/chapters";
-import {
-  MAX_SHOP_STOCK_ROWS,
-  normalizeSettlementLevel,
-  normalizeShopStockMode,
-  shopStockCount,
-} from "../shared/shop";
 import { normalizeTokenTurnEffects } from "../shared/tokenTurnEffects";
 import {
   normalizeAmbientLight,
@@ -51,19 +33,11 @@ import {
   normalizeQuestStatus,
   normalizeQuestXp,
 } from "../shared/journal";
-import { normalizeLootItems } from "../shared/loot";
 import { normalizeTokenConditions } from "../shared/tokens";
 import { normalizeAoeTemplates } from "../shared/templates";
 import { normalizeWalls } from "../shared/walls";
 import { normalizeSceneProps } from "../shared/props";
 import { normalizeSceneDrawings } from "../shared/drawings";
-import {
-  isSessionCheckinStatus,
-  normalizeAttendanceStatus,
-  normalizeSessionAgenda,
-  normalizeSessionRecurrence,
-  normalizeSessionStatus,
-} from "../shared/sessions";
 import {
   clamp,
   inviteCode,
@@ -103,14 +77,9 @@ export interface CampaignImportStats {
   messages: number;
   journal: number;
   encounters: number;
-  loot: number;
-  shopStock: number;
-  merchants: number;
-  travel: number;
   npcs: number;
   knowledge: number;
   chapters: number;
-  sessions: number;
   audioTracks: number;
   xpAwards: number;
   embeddedAssets: number;
@@ -174,12 +143,6 @@ function timestamp(value: unknown, fallback = now()): number {
   return Number.isFinite(parsed) && parsed > 0 ? Math.round(parsed) : fallback;
 }
 
-function optionalTimestamp(value: unknown): number | null {
-  if (value === null || value === undefined || value === "") return null;
-  const parsed = Number(value);
-  return Number.isFinite(parsed) && parsed > 0 ? Math.round(parsed) : null;
-}
-
 function uniqueInviteCode(): string {
   for (let attempt = 0; attempt < 10; attempt += 1) {
     const code = inviteCode();
@@ -204,11 +167,9 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
   const ruleset = normalizeCampaignRuleset(campaignData.ruleset);
   const xpMode = normalizeXpMode(campaignData.xpMode);
   const advancementSpeed = normalizeAdvancementSpeed(campaignData.advancementSpeed);
-  const settlementLevel = normalizeSettlementLevel(campaignData.settlementLevel);
   const freeArchetype = campaignData.freeArchetype === true;
   const automaticBonusProgression = campaignData.automaticBonusProgression === true;
   const playerItemGrant = campaignData.playerItemGrant === true;
-  const shopMode = normalizeShopStockMode(campaignData.shopMode);
   const worldDate = normalizeGolarionDate(campaignData.worldDate);
 
   const stats: CampaignImportStats = {
@@ -220,14 +181,9 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
     messages: 0,
     journal: 0,
     encounters: 0,
-    loot: 0,
-    shopStock: 0,
-    merchants: 0,
-    travel: 0,
     npcs: 0,
     knowledge: 0,
     chapters: 0,
-    sessions: 0,
     audioTracks: 0,
     xpAwards: 0,
     embeddedAssets: 0,
@@ -244,13 +200,10 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
     ["messages", 200_000, "messages"],
     ["journal", 50_000, "journal"],
     ["encounters", 20_000, "encounters"],
-    ["loot", 20_000, "loot parcels"],
-    ["merchants", 500, "merchants"],
     ["factions", 5_000, "factions"],
     ["knowledge", 20_000, "knowledge entries"],
     ["chapters", 1_000, "chapters"],
     ["npcs", 20_000, "NPCs"],
-    ["sessions", 10_000, "sessions"],
     ["xpAwards", 50_000, "XP awards"],
   ] as const) {
     records(payload[key], max, label);
@@ -262,7 +215,7 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
       const campaignId = newId("camp");
       const ts = now();
       db.prepare(
-        "INSERT INTO campaigns (id, name, description, gm_id, invite_code, ruleset, xp_mode, advancement_speed, settlement_level, shop_mode, world_year, world_month, world_day, created_at, updated_at, last_played_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        "INSERT INTO campaigns (id, name, description, gm_id, invite_code, ruleset, xp_mode, advancement_speed, world_year, world_month, world_day, created_at, updated_at, last_played_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
       ).run(
         campaignId,
         name,
@@ -272,8 +225,6 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
         ruleset,
         xpMode,
         advancementSpeed,
-        settlementLevel,
-        shopMode,
         worldDate.year,
         worldDate.month,
         worldDate.day,
@@ -749,140 +700,6 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
         stats.encounters += 1;
       }
 
-      for (const parcel of records(payload.loot, 20_000, "loot parcels")) {
-        const oldRecipient = text(parcel.distributedTo, "", 120);
-        db.prepare(
-          `INSERT INTO loot_parcels
-          (id, campaign_id, name, description, items, level, gp, sp, cp, status,
-           distributed_to, distributed_to_name, distributed_at, sort_order, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-        ).run(
-          newId("loot"),
-          campaignId,
-          text(parcel.name, "Imported loot", 120),
-          longText(parcel.description, "", 4000),
-          JSON.stringify(normalizeLootItems(parcel.items)),
-          numberValue(parcel.level, 1, 1, 20),
-          numberValue(parcel.gp, 0, 0, 1_000_000_000),
-          numberValue(parcel.sp, 0, 0, 1_000_000_000),
-          numberValue(parcel.cp, 0, 0, 1_000_000_000),
-          parcel.status === "distributed" ? "distributed" : "open",
-          oldRecipient ? (characterMap.get(oldRecipient) ?? null) : null,
-          parcel.distributedToName ? text(parcel.distributedToName, "", 120) : null,
-          optionalTimestamp(parcel.distributedAt),
-          numberValue(parcel.sortOrder, 0),
-          ts,
-          ts
-        );
-        stats.loot += 1;
-      }
-
-      const importedStock = new Map<string, number>();
-      for (const entry of records(payload.shopStock, MAX_SHOP_STOCK_ROWS, "shop stock")) {
-        const itemId = text(entry.itemId, "", 200);
-        if (!itemId || !equipment.some((item) => item.id === itemId)) continue;
-        importedStock.set(itemId, shopStockCount(entry.quantity));
-      }
-      for (const [itemId, quantity] of importedStock) {
-        db.prepare(
-          `INSERT INTO campaign_shop_stock
-           (campaign_id, item_id, quantity, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?)
-         ON CONFLICT(campaign_id, item_id) DO UPDATE SET
-           quantity = excluded.quantity,
-           updated_at = excluded.updated_at`
-        ).run(campaignId, itemId, quantity, ts, ts);
-        stats.shopStock += 1;
-      }
-
-      const importedMerchants = records(payload.merchants, 500, "merchants");
-      let hasActiveMerchant = false;
-      for (const [index, merchant] of importedMerchants.entries()) {
-        const rawStock = Array.isArray(merchant.stock) ? merchant.stock : [];
-        const stock = new Map<string, number>();
-        for (const raw of rawStock.slice(0, MAX_SHOP_STOCK_ROWS)) {
-          if (!raw || typeof raw !== "object") continue;
-          const entry = raw as Record<string, unknown>;
-          const itemId = text(entry.itemId, "", 200);
-          if (!itemId || !equipment.some((item) => item.id === itemId)) continue;
-          stock.set(itemId, shopStockCount(entry.quantity));
-        }
-        const active = merchant.active === true && !hasActiveMerchant ? 1 : 0;
-        if (active) hasActiveMerchant = true;
-        db.prepare(
-          `INSERT INTO campaign_merchants
-           (id, campaign_id, name, description, mode, stock, active, sort_order,
-            created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-        ).run(
-          newId("merchant"),
-          campaignId,
-          text(merchant.name, `Merchant ${index + 1}`, 120),
-          longText(merchant.description, "", 2_000),
-          normalizeShopStockMode(merchant.mode),
-          JSON.stringify([...stock.entries()].map(([itemId, quantity]) => ({ itemId, quantity }))),
-          active,
-          numberValue(merchant.sortOrder, index),
-          ts,
-          ts
-        );
-        stats.merchants += 1;
-      }
-
-      const importedTravel = record(payload.travel);
-      if (Object.keys(importedTravel).length) {
-        const newCharacterIds = new Set(characterMap.values());
-        const oldWatches = record(importedTravel.watches);
-        const remappedWatches: Record<string, string[]> = {};
-        for (const key of ["first", "second", "third", "fourth"]) {
-          const raw = Array.isArray(oldWatches[key]) ? oldWatches[key] : [];
-          remappedWatches[key] = raw
-            .map((value) => (typeof value === "string" ? characterMap.get(value) : undefined))
-            .filter((value): value is string => Boolean(value));
-        }
-        const oldActivities = record(importedTravel.activities);
-        const remappedActivities: Record<string, string> = {};
-        for (const [oldId, activity] of Object.entries(oldActivities)) {
-          const newId = characterMap.get(oldId);
-          if (newId && typeof activity === "string") remappedActivities[newId] = activity;
-        }
-        const distanceMiles = normalizeTravelMiles(importedTravel.distanceMiles);
-        const importedWaypoints = normalizeTravelWaypoints(importedTravel.waypoints);
-        const importedChecks = normalizeTravelEncounterChecks(importedTravel.encounterChecks);
-        const importedHistory = normalizeTravelHistory(importedTravel.history);
-        db.prepare(
-          `INSERT INTO campaign_travel
-           (campaign_id, origin, destination, terrain, distance_miles, progress_miles, party_speed,
-            weather, notes, watches, activities, waypoints, encounter_checks, history,
-            days_travelled, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-        ).run(
-          campaignId,
-          text(importedTravel.origin, "", 120),
-          text(importedTravel.destination, "", 120),
-          normalizeTravelTerrain(importedTravel.terrain),
-          distanceMiles,
-          Math.min(distanceMiles, normalizeTravelMiles(importedTravel.progressMiles)),
-          normalizeTravelSpeed(importedTravel.partySpeed),
-          normalizeTravelWeather(importedTravel.weather),
-          longText(importedTravel.notes, "", 4000),
-          JSON.stringify(normalizeTravelWatches(remappedWatches, newCharacterIds)),
-          JSON.stringify(normalizeTravelActivities(remappedActivities, newCharacterIds)),
-          JSON.stringify(
-            importedWaypoints.map(({ reached: _reached, ...entry }) => ({
-              ...entry,
-              id: newId("waypoint"),
-            }))
-          ),
-          JSON.stringify(importedChecks.map((check) => ({ ...check, id: newId("travel-check") }))),
-          JSON.stringify(importedHistory.map((day) => ({ ...day, id: newId("tday") }))),
-          numberValue(importedTravel.daysTravelled, 0, 0, 100_000),
-          ts,
-          ts
-        );
-        stats.travel += 1;
-      }
-
       const importedSessionZero = record(payload.sessionZero);
       if (Object.keys(importedSessionZero).length) {
         db.prepare(
@@ -907,21 +724,6 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
           longText(importedSessionZero.gmNotes, "", 20_000),
           JSON.stringify(normalizeSessionZeroChecklist(importedSessionZero.checklist)),
           ts,
-          ts
-        );
-      }
-
-      const dashboard = record(payload.dashboard);
-      if (Object.keys(dashboard).length) {
-        db.prepare(
-          "INSERT INTO campaign_dashboard (campaign_id, last_session_summary, next_session_at, next_session_teaser, next_session_notes, threads, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
-        ).run(
-          campaignId,
-          longText(dashboard.lastSessionSummary, "", 20_000),
-          optionalTimestamp(dashboard.nextSessionAt),
-          longText(dashboard.nextSessionTeaser, "", 500),
-          longText(dashboard.nextSessionNotes, "", 20_000),
-          JSON.stringify(normalizeCampaignThreads(dashboard.threads)),
           ts
         );
       }
@@ -1036,59 +838,6 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
           ts
         );
         stats.npcs += 1;
-      }
-
-      for (const session of records(payload.sessions, 10_000, "sessions")) {
-        const sessionId = newId("sess");
-        db.prepare(
-          "INSERT INTO campaign_sessions (id, campaign_id, title, scheduled_at, duration_minutes, notes, agenda, status, recurrence, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-        ).run(
-          sessionId,
-          campaignId,
-          text(session.title, "Imported session", 140),
-          timestamp(session.scheduledAt, ts),
-          clamp(numberValue(session.durationMinutes, 180, 30, 1440), 30, 1440),
-          longText(session.notes, "", 20_000),
-          JSON.stringify(normalizeSessionAgenda(session.agenda)),
-          normalizeSessionStatus(session.status),
-          normalizeSessionRecurrence(session.recurrence),
-          ts,
-          ts
-        );
-        for (const attendance of records(session.attendance, 50, "attendance")) {
-          const exportUserId = text(attendance.userId, "", 120);
-          const localUserId =
-            memberUserByExportId.get(exportUserId) ??
-            (memberIds.has(exportUserId) ? exportUserId : null);
-          if (!localUserId) continue;
-          db.prepare(
-            `INSERT INTO session_attendance (session_id, user_id, status, note, updated_at)
-           VALUES (?, ?, ?, ?, ?)
-           ON CONFLICT(session_id, user_id)
-           DO UPDATE SET status = excluded.status, note = excluded.note, updated_at = excluded.updated_at`
-          ).run(
-            sessionId,
-            localUserId,
-            normalizeAttendanceStatus(attendance.status),
-            longText(attendance.note, "", 500),
-            ts
-          );
-        }
-        for (const checkin of records(session.checkins, 100, "checkins")) {
-          if (!isSessionCheckinStatus(checkin.status) || checkin.status === "unanswered") continue;
-          const exportUserId = text(checkin.userId, "", 120);
-          const localUserId =
-            memberUserByExportId.get(exportUserId) ??
-            (memberIds.has(exportUserId) ? exportUserId : null);
-          if (!localUserId) continue;
-          db.prepare(
-            `INSERT INTO session_checkins (session_id, user_id, status, updated_at)
-           VALUES (?, ?, ?, ?)
-           ON CONFLICT(session_id, user_id)
-           DO UPDATE SET status = excluded.status, updated_at = excluded.updated_at`
-          ).run(sessionId, localUserId, checkin.status, ts);
-        }
-        stats.sessions += 1;
       }
 
       for (const award of records(payload.xpAwards, 50_000, "XP awards")) {

@@ -4,8 +4,8 @@
 > shared map, tokens, fog, dice/chat, soundtrack, a manual initiative order, the
 > compendium/bestiary, and a character builder/sheet that opens inside the table.
 > Campaign navigation is limited to Table, Party, Journal, and Settings.
-> Sections below describe features that may still exist in the codebase but are
-> not part of the core UI. Do not treat them as current product requirements.
+> Sections below are historical notes; only the current four-section product is
+> supported.
 
 ## 1. Vision
 
@@ -59,14 +59,11 @@ The target table size is one GM plus 4–10 players. That means the product shou
 - Party roster, character permissions, journal with visibility, settings, member management.
 - Library and rules quick reference.
 - Encounter builder with saved fights, bestiary counts, launch-to-table, waves, duplication, launch preview, party-size presets, and a GM-controlled Milestone/XP-budget toggle. Reinforcements join the existing initiative without resetting the round; the GM can advance the party without XP bookkeeping.
-- Loot parcels with compendium equipment, coins, and one-action distribution to a character sheet.
 - Player-facing inventory and purse ledger with quantity, equipped, bulk, and value tracking; item stacks and coins can be transferred between campaign characters with revision-checked, two-sheet updates.
 - Journal handouts with image attachments, shared/GM-only visibility, a player-facing gallery, one-click duplication, and a campaign asset picker for reusing existing images.
 - GM-only asset library with usage labels, in-app deletion for unreferenced campaign images, and upload tracking per campaign.
-- Campaign Overview with last-session summary, next-session details, party status, and shared or GM-only clue threads. The GM can generate an editable recap from shared rolls, visible handouts, loot, and open threads, then save it as the summary or a shared handout.
 - Grouped bestiary tokens with formation dragging, aggregate group HP, and one initiative roll per group.
 - GM-only NPC statblock library with optional art and one-click token placement.
-- Shared session schedule with GM-managed attendance, GM-only agenda checklists, player check-ins, and automatic Overview date/check-in reminders.
 - Persistent bestiary palette with drag-to-map group placement.
 - GM screen with level/simple DCs, condition lookup, secret rolls, and player roll requests.
 - Campaign import with ID remapping and player-account matching, Pathbuilder 2e character import with a best-effort unmatched report, and a dry-run-first unused-asset cleanup command for legacy files.

@@ -9,8 +9,8 @@ import {
 } from "../src/shared/requests";
 
 describe("campaign request kinds", () => {
-  it("accepts the three player-initiated actions", () => {
-    expect(CAMPAIGN_REQUEST_KINDS).toEqual(["level-up", "downtime", "journal"]);
+  it("accepts the two player-initiated actions", () => {
+    expect(CAMPAIGN_REQUEST_KINDS).toEqual(["level-up", "journal"]);
     for (const kind of CAMPAIGN_REQUEST_KINDS) {
       expect(isCampaignRequestKind(kind)).toBe(true);
     }
@@ -46,14 +46,6 @@ describe("campaign request summaries", () => {
         toLevel: 3,
       })
     ).toBe("E2E Hero advances from level 2 to level 3.");
-  });
-
-  it("pluralizes downtime days", () => {
-    expect(campaignRequestTitle({ kind: "downtime", days: 1 })).toBe("Grant 1 downtime day");
-    expect(campaignRequestTitle({ kind: "downtime", days: 4 })).toBe("Grant 4 downtime days");
-    expect(campaignRequestDetail({ kind: "downtime", characterName: "E2E Hero", days: 4 })).toBe(
-      "4 downtime days for E2E Hero."
-    );
   });
 
   it("uses the proposed journal title and a safe fallback", () => {

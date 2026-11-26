@@ -955,4 +955,21 @@ export const migrations: Migration[] = [
       ALTER TABLE scenes ADD COLUMN drawings TEXT NOT NULL DEFAULT '[]';
     `,
   },
+  {
+    version: 58,
+    name: "remove_unexposed_campaign_features",
+    sql: `
+      DROP TABLE IF EXISTS session_checkins;
+      DROP TABLE IF EXISTS session_attendance;
+      DROP TABLE IF EXISTS campaign_sessions;
+      DROP TABLE IF EXISTS campaign_clocks;
+      DROP TABLE IF EXISTS campaign_dashboard;
+      DROP TABLE IF EXISTS loot_parcels;
+      DROP TABLE IF EXISTS campaign_shop_stock;
+      DROP TABLE IF EXISTS campaign_merchants;
+      DROP TABLE IF EXISTS campaign_travel;
+      ALTER TABLE campaigns DROP COLUMN settlement_level;
+      ALTER TABLE campaigns DROP COLUMN shop_mode;
+    `,
+  },
 ];

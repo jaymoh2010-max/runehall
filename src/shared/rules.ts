@@ -44,8 +44,6 @@ import {
 import { conditionModifiers } from "./conditions";
 import { normalizeAfflictions } from "./afflictions";
 import { normalizePersistentDamageList } from "./persistentDamage";
-import { normalizeLifestyle } from "./upkeep";
-import { normalizeDowntimeActivities } from "./downtime";
 import { clampHeroPoints } from "./heroPoints";
 import { normalizeCharacterTurnEffects } from "./characterTurnEffects";
 import { INVESTED_LIMIT, investedCount } from "./itemActivation";
@@ -1608,9 +1606,6 @@ export function emptyCharacterDraft(name = "New Hero"): CharacterDraft {
       tempHp: 0,
       heroPoints: 1,
       focusPoints: 1,
-      downtimeDays: 0,
-      lifestyle: "subsistence",
-      downtimeActivities: [],
       conditions: [],
       afflictions: [],
       persistentDamage: [],
@@ -2018,9 +2013,6 @@ export function normalizeCharacterDraft(input: unknown, fallbackName = "New Hero
       tempHp: Math.max(0, num(play.tempHp, 0)),
       heroPoints: clampHeroPoints(num(play.heroPoints, 1)),
       focusPoints: Math.max(0, Math.min(3, Math.floor(num(play.focusPoints, 1)))),
-      downtimeDays: Math.max(0, Math.min(9_999, Math.floor(num(play.downtimeDays, 0)))),
-      lifestyle: normalizeLifestyle(play.lifestyle),
-      downtimeActivities: normalizeDowntimeActivities(play.downtimeActivities),
       conditions: arr<Record<string, unknown>>(play.conditions)
         .filter((c) => c && typeof c.name === "string")
         .map((c) => ({
@@ -5149,7 +5141,6 @@ export function characterSummary(draft: CharacterDraft, context: CharacterContex
     spellDc: derived.spellDc,
     heroPoints: draft.play.heroPoints,
     focusPoints: draft.play.focusPoints,
-    downtimeDays: draft.play.downtimeDays,
     xp: draft.play.xp,
     conditions: draft.play.conditions.map(
       (condition) =>

@@ -220,63 +220,6 @@ hr {
   margin: 18px 0;
 }
 
-/* Downtime activities */
-.downtime-section {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding-top: 14px;
-  border-top: 1px solid var(--line);
-}
-.downtime-section:first-of-type {
-  border-top: 0;
-  padding-top: 0;
-}
-.downtime-activity {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 10px 12px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: var(--panel-2);
-}
-.downtime-result {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 10px 12px;
-  border: 1px solid var(--gold-deep);
-  border-radius: 10px;
-  background: var(--panel-2);
-}
-.downtime-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 8px;
-  color: var(--gold-bright);
-  background: var(--panel-3);
-}
-.downtime-form-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-.downtime-form-row > .field {
-  flex: 1 1 160px;
-}
-.downtime-log-row {
-  padding-bottom: 8px;
-  border-bottom: 1px solid var(--line);
-}
-.downtime-log-row:last-child {
-  padding-bottom: 0;
-  border-bottom: 0;
-}
-
 /* ==========================================================================
    Buttons
    ========================================================================== */

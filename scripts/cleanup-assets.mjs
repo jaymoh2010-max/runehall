@@ -35,8 +35,8 @@ const referenced = new Set();
 const uploadPattern = /\/uploads\/([A-Za-z0-9._-]+)/g;
 
 // Scan every user table, not a hand-maintained list. A journal attachment,
-// private note, faction portrait, or travel image is just as real as a scene
-// background. uploaded_assets is included automatically.
+// private note, or faction portrait is just as real as a scene background.
+// uploaded_assets is included automatically.
 const tables = db
   .prepare(
     "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name"

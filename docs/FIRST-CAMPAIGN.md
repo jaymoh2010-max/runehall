@@ -102,7 +102,7 @@ This is the short checklist for the friend hosting Runehall and for the GM runni
    them. A paid quest keeps its reward marker even if the handout is edited later.
 9. Advance the party from **Party** or **Settings** when the story calls for it. No character levels
    up automatically.
-10. Before ending the night, write a short recap in **Journal** and take a backup.
+10. Before ending the night, write a short session summary in **Journal** and take a backup.
 
 ## Known limits worth telling the table
 

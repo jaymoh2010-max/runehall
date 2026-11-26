@@ -20,19 +20,15 @@ import {
   createDefaultScene,
   transaction,
   type AudioTrackRow,
-  type CampaignDashboardRow,
   type CampaignFactionRow,
   type CampaignKnowledgeRow,
   type CampaignChapterRow,
-  type CampaignMerchantRow,
   type CampaignNpcRow,
   type CampaignRow,
   type CampaignSessionZeroRow,
-  type CampaignTravelRow,
   type CharacterRow,
   type EncounterRow,
   type JournalRow,
-  type LootParcelRow,
   type MessageRow,
   type SceneRow,
   type TokenRow,
@@ -40,20 +36,17 @@ import {
 } from "../db";
 import {
   serializeAudioTrack,
-  serializeCampaignDashboard,
   serializeCampaignFaction,
   serializeCampaignKnowledge,
   serializeCampaignChapter,
   serializeCampaignNpc,
   serializeCampaignSummary,
-  serializeCampaignTravel,
   serializeCampaignSessionZero,
   serializeCharacter,
   serializeEncounter,
   serializeInitiative,
   serializeJoinRequest,
   serializeJournal,
-  serializeLootParcel,
   serializeMember,
   serializeMessage,
   serializeScene,
@@ -86,15 +79,8 @@ import {
   normalizeAdvancementSpeed,
   type AdvancementSpeed,
 } from "../../shared/xp";
-import {
-  isSettlementLevel,
-  normalizeSettlementLevel,
-  normalizeShopStockMode,
-  shopStockCount,
-} from "../../shared/shop";
 import { compendiumManifest, contextForDraft } from "../compendium";
 import { contextForCampaign } from "../campaignContext";
-import { campaignSessionsFor } from "../sessionData";
 import { importCampaign } from "../campaignImport";
 import { logAudit } from "../audit";
 import {
@@ -409,10 +395,6 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
       return reply.code(400).send({ error: "Choose fast, medium, or slow advancement." });
     }
     const advancementSpeed: AdvancementSpeed = normalizeAdvancementSpeed(body.advancementSpeed);
-    if (body.settlementLevel !== undefined && !isSettlementLevel(body.settlementLevel)) {
-      return reply.code(400).send({ error: "Choose a settlement level between 0 and 25." });
-    }
-    const settlementLevel = normalizeSettlementLevel(body.settlementLevel);
     let code = inviteCode();
     for (let attempt = 0; attempt < 10; attempt++) {
       const exists = db.prepare("SELECT id FROM campaigns WHERE invite_code = ?").get(code);
@@ -422,7 +404,7 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
     const id = newId("camp");
     const ts = now();
     db.prepare(
-      "INSERT INTO campaigns (id, name, description, gm_id, invite_code, ruleset, xp_mode, advancement_speed, settlement_level, created_at, updated_at, last_played_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+      "INSERT INTO campaigns (id, name, description, gm_id, invite_code, ruleset, xp_mode, advancement_speed, created_at, updated_at, last_played_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
     ).run(
       id,
       name,
@@ -432,7 +414,6 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
       ruleset,
       xpMode,
       advancementSpeed,
-      settlementLevel,
       ts,
       ts,
       ts
@@ -450,7 +431,7 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
       actor: request.user,
       targetType: "campaign",
       targetId: id,
-      detail: `${name} (${ruleset}/${xpMode}/${advancementSpeed}/settlement ${settlementLevel})`,
+      detail: `${name} (${ruleset}/${xpMode}/${advancementSpeed})`,
       request,
     });
     return reply.code(201).send({
@@ -470,7 +451,7 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
         actor: request.user,
         targetType: "campaign",
         targetId: result.campaignId,
-        detail: `${row.name} (${result.stats.characters} characters, ${result.stats.sessions} sessions)`,
+        detail: `${row.name} (${result.stats.characters} characters)`,
         request,
       });
       return reply.code(201).send({
@@ -810,60 +791,10 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
         )
         .all(id) as EncounterRow[]
     ).map(serializeEncounter);
-    const loot = (
-      db
-        .prepare(
-          "SELECT * FROM loot_parcels WHERE campaign_id = ? ORDER BY sort_order ASC, created_at ASC"
-        )
-        .all(id) as LootParcelRow[]
-    ).map(serializeLootParcel);
-    const legacyShopStock = (
-      db
-        .prepare(
-          "SELECT item_id, quantity FROM campaign_shop_stock WHERE campaign_id = ? ORDER BY item_id ASC"
-        )
-        .all(id) as { item_id: string; quantity: number }[]
-    ).map((entry) => ({ itemId: entry.item_id, quantity: shopStockCount(entry.quantity) }));
-    const merchants = (
-      db
-        .prepare(
-          "SELECT * FROM campaign_merchants WHERE campaign_id = ? ORDER BY sort_order ASC, name ASC"
-        )
-        .all(id) as CampaignMerchantRow[]
-    ).map((merchant) => ({
-      id: merchant.id,
-      name: merchant.name,
-      description: merchant.description,
-      mode: normalizeShopStockMode(merchant.mode),
-      active: Boolean(merchant.active),
-      sortOrder: merchant.sort_order,
-      stock: (parseJson<unknown>(merchant.stock, []) as unknown[])
-        .filter((entry): entry is Record<string, unknown> =>
-          Boolean(entry && typeof entry === "object")
-        )
-        .map((entry) => ({
-          itemId: typeof entry.itemId === "string" ? entry.itemId : "",
-          quantity: shopStockCount(entry.quantity),
-        }))
-        .filter((entry) => entry.itemId),
-      createdAt: merchant.created_at,
-      updatedAt: merchant.updated_at,
-    }));
-    const activeMerchant = merchants.find((merchant) => merchant.active) ?? merchants[0];
-    const shopStock = activeMerchant?.stock.length ? activeMerchant.stock : legacyShopStock;
-    const travelRow = db.prepare("SELECT * FROM campaign_travel WHERE campaign_id = ?").get(id) as
-      CampaignTravelRow | undefined;
-    const travel = travelRow
-      ? serializeCampaignTravel(travelRow, new Set(characters.map((entry) => entry.id)), true)
-      : null;
     const sessionZeroRow = db
       .prepare("SELECT * FROM campaign_session_zero WHERE campaign_id = ?")
       .get(id) as CampaignSessionZeroRow | undefined;
     const sessionZero = serializeCampaignSessionZero(sessionZeroRow ?? null, id, true);
-    const dashboardRow = db
-      .prepare("SELECT * FROM campaign_dashboard WHERE campaign_id = ?")
-      .get(id) as CampaignDashboardRow | undefined;
-    const dashboard = dashboardRow ? serializeCampaignDashboard(dashboardRow, "gm") : null;
     const npcs = (
       db
         .prepare(
@@ -892,7 +823,6 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
         )
         .all(id) as CampaignChapterRow[]
     ).map((chapter) => serializeCampaignChapter(chapter));
-    const sessions = campaignSessionsFor(id, "gm", request.user.id);
     const audioTracks = (
       db
         .prepare(
@@ -929,17 +859,11 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
       scenes,
       tokens,
       encounters,
-      loot,
-      shopStock,
-      merchants,
-      travel,
       sessionZero,
-      dashboard,
       npcs,
       factions,
       knowledge,
       chapters,
-      sessions,
       messages,
       journal,
       audioTracks,
@@ -1036,9 +960,6 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
     if (body.advancementSpeed !== undefined && !isAdvancementSpeed(body.advancementSpeed)) {
       return reply.code(400).send({ error: "Choose fast, medium, or slow advancement." });
     }
-    if (body.settlementLevel !== undefined && !isSettlementLevel(body.settlementLevel)) {
-      return reply.code(400).send({ error: "Choose a settlement level between 0 and 25." });
-    }
     const ruleset =
       body.ruleset === undefined ? normalizeCampaignRuleset(row.ruleset) : body.ruleset;
     const xpMode = body.xpMode === undefined ? normalizeXpMode(row.xp_mode) : body.xpMode;
@@ -1046,10 +967,6 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
       body.advancementSpeed === undefined
         ? normalizeAdvancementSpeed(row.advancement_speed)
         : body.advancementSpeed;
-    const settlementLevel =
-      body.settlementLevel === undefined
-        ? normalizeSettlementLevel(row.settlement_level)
-        : body.settlementLevel;
     const freeArchetype =
       body.freeArchetype === undefined ? Boolean(row.free_archetype) : body.freeArchetype === true;
     const automaticBonusProgression =
@@ -1064,14 +981,13 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
       freeArchetype !== Boolean(row.free_archetype) ||
       automaticBonusProgression !== Boolean(row.automatic_bonus_progression);
     db.prepare(
-      "UPDATE campaigns SET name = ?, description = ?, ruleset = ?, xp_mode = ?, advancement_speed = ?, settlement_level = ?, free_archetype = ?, automatic_bonus_progression = ?, player_item_grant = ?, updated_at = ? WHERE id = ?"
+      "UPDATE campaigns SET name = ?, description = ?, ruleset = ?, xp_mode = ?, advancement_speed = ?, free_archetype = ?, automatic_bonus_progression = ?, player_item_grant = ?, updated_at = ? WHERE id = ?"
     ).run(
       name,
       description,
       ruleset,
       xpMode,
       advancementSpeed,
-      settlementLevel,
       freeArchetype ? 1 : 0,
       automaticBonusProgression ? 1 : 0,
       playerItemGrant ? 1 : 0,

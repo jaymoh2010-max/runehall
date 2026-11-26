@@ -69,7 +69,7 @@ Four campaign sections:
 - No automatic damage application from chat rolls.
 - No automatic leveling. The GM advances the party when the story says so.
 - The compendium carries prose rather than structured rule elements. Runehall applies curated always-on feat and item effects, base gear/runes, and common conditions; other feat and item effects are labelled **Manual** or **Partly automated** in the builder so the table knows what to track.
-- The campaign navigation is intentionally limited to **Table**, **Party**, **Journal**, and **Settings**. Loot, shops, downtime, travel, session scheduling, encounter builders, NPC libraries, clocks, notes, and prep dashboards are not exposed in the current UI.
+- The campaign navigation is intentionally limited to **Table**, **Party**, **Journal**, and **Settings**.
 
 ---
 
