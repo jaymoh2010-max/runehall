@@ -503,6 +503,23 @@ test("lazy library, compendium entry, rules, and account routes load", async ({ 
     page.getByRole("heading", { name: "Achaekek - Major Boon", level: 2 })
   ).toBeVisible();
 
+  await page.getByRole("tab", { name: "Traits" }).click();
+  await page.getByPlaceholder(/Search traits/).fill("Aberration");
+  await page
+    .getByRole("button", { name: /Aberration/ })
+    .first()
+    .click();
+  await expect(page.getByRole("heading", { name: "Aberration", level: 2 })).toBeVisible();
+
+  await page.getByRole("tab", { name: "Afflictions" }).click();
+  await page.getByPlaceholder(/Search afflictions/).fill("Bog Rot");
+  await page
+    .getByRole("button", { name: /Bog Rot/ })
+    .first()
+    .click();
+  await expect(page.getByRole("heading", { name: "Bog Rot", level: 2 })).toBeVisible();
+  await expect(page.getByText("DC 13 Fortitude")).toBeVisible();
+
   await page.goto("/rules");
   await expect(page.getByRole("heading", { name: "Rules at the table" })).toBeVisible();
   await page.getByRole("tab", { name: "Actions" }).click();

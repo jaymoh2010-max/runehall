@@ -156,9 +156,10 @@ A second pass closed the builder-facing gaps from the list above:
   Oread Guard (20 HP, AC 17, Fort +7, Ref +6, Will +5, Perception +7, Society +3).
 - **Hei Feng** now stores a `sanctificationNote` for the tengu-only holy option,
   and the deity page displays it beside the allowed sanctifications.
-- **Hazards, vehicles, familiar abilities, and boons/curses** are now ingested
-  and exposed as Library tabs with detail pages. Counts: 53 hazards, 100
-  vehicles, 117 familiar abilities, and 240 boons/curses.
+- **Hazards, vehicles, familiar abilities, boons/curses, traits, and
+  afflictions** are now ingested and exposed as Library tabs with detail pages.
+  Counts: 53 hazards, 100 vehicles, 117 familiar abilities, 240 boons/curses,
+  571 traits, and 95 afflictions.
 - The verifier now checks size choices, heritage speeds, class skill choices,
   and remains strict about divine fonts/sanctification and attack types.
 
@@ -173,10 +174,9 @@ A second pass closed the builder-facing gaps from the list above:
    have legacy prices/levels alongside remastered groups or bulk. The local
    compendium intentionally keeps both eras, so source matching can show a
    difference without the local value being wrong.
-3. **Reference coverage.** Hazards, vehicles, familiar abilities, and deity
-   boons/curses are now first-class library entries. Traits remain labels only,
-   and afflictions, vehicles' full vehicle-specific rules, and a trait glossary
-   are still outside the compendium.
+3. **Remaining reference gaps.** The trait glossary and disease/curse
+   afflictions are now present. Poisons and other affliction templates still
+   need their own import if the AoN index exposes them consistently.
 
 ## References
 

@@ -24,6 +24,19 @@ The generated compendium is currently tracked in Git so a fresh clone is runnabl
 - `journals` (`domains.json` for the domain reference)
 - localization: `static/lang/en.json`, `re-en.json`, `action-en.json`
 
+### Archives of Nethys reference files
+The Foundry packs do not contain a trait glossary or afflictions. Those two
+files are generated separately from the live Archives of Nethys index:
+
+```bash
+npm run ingest:aon
+```
+
+This writes `traits.json` and `afflictions.json` and records an `aonSource`
+block in `manifest.json`. The remaining files are Foundry-sourced. Trait and
+affliction rules text is Pathfinder ORC/OGL content published by Paizo and
+indexed by Archives of Nethys; see `THIRD_PARTY_NOTICES.md`.
+
 ## Rebuild the data
 
 The source clone is intentionally not kept in the project directory. A sparse, blob-filtered clone keeps it manageable:
@@ -106,6 +119,8 @@ The script writes:
 | `vehicles.json` | Vehicle level, price, AC/HP, crew, speed, collision data |
 | `familiarAbilities.json` | Familiar ability rules text |
 | `boonsAndCurses.json` | Deity boons and curses by tier |
+| `traits.json` | Trait glossary from Archives of Nethys |
+| `afflictions.json` | Diseases and curses with saves, onset, and stages from Archives of Nethys |
 | `manifest.json` | Counts, generated timestamp, source, `sourceCommit`, `sourceRef`, `sourceDirty` |
 
 ## Verify the data
