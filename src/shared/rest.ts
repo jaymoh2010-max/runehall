@@ -172,6 +172,7 @@ export function applyLongRest(
         innateUsed: {},
         studiousUsed: {},
         apparitionUsed: {},
+        multiclassSlotsUsed: {},
         preparationsPending: options.preparedCaster === true,
       },
       play: {

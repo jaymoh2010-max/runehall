@@ -28,7 +28,9 @@ const fighterId = compendiumClasses.find((entry) => entry.name === "Fighter")!.i
 const psychicId = compendiumClasses.find((entry) => entry.name === "Psychic")!.id;
 const fireballId = compendiumSpells.find((entry) => entry.name === "Fireball")!.id;
 const shieldId = compendiumSpells.find((entry) => entry.name === "Shield")!.id;
+const forceBarrageId = compendiumSpells.find((entry) => entry.name === "Force Barrage")!.id;
 const wizardDedicationId = "feat:oQ6EZRFXbHWCx08C";
+const basicWizardSpellcastingId = "feat:SHUfHzElHZPXJFiP";
 const abadarId = compendiumDeities.find((entry) => entry.name === "Abadar")!.id;
 const domainInitiateId = compendiumFeats.find((entry) => entry.name === "Domain Initiate")!.id;
 const advancedDomainId = compendiumFeats.find((entry) => entry.name === "Advanced Domain")!.id;
@@ -1971,11 +1973,13 @@ test("sheet casts a dedication cantrip from a multiclass archetype", async ({ pa
   expect(created.ok()).toBe(true);
   const character = (await created.json()) as { character: { id: string } };
   const draft = emptyCharacterDraft("E2E Dedicated Fighter");
-  draft.level = 2;
+  draft.level = 4;
   draft.classId = fighterId;
   draft.keyAbility = "str";
   draft.feats.class["2"] = wizardDedicationId;
+  draft.feats.class["4"] = basicWizardSpellcastingId;
   draft.spells.multiclassCantrips = [shieldId];
+  draft.spells.multiclassSpells = [forceBarrageId];
   const saved = await page.request.put(`/api/characters/${character.character.id}`, {
     data: { data: draft, force: true },
   });
@@ -1993,6 +1997,13 @@ test("sheet casts a dedication cantrip from a multiclass archetype", async ({ pa
   await expect(row).toBeVisible();
   await row.getByRole("button", { name: "Cast" }).click();
   await expect(page.getByText(/Cast Shield/)).toBeVisible({ timeout: 15_000 });
+  const rankedRow = page
+    .locator(".pb-spell-row")
+    .filter({ hasText: "Force Barrage" })
+    .filter({ hasText: "Multiclass" });
+  await expect(rankedRow).toBeVisible();
+  await rankedRow.getByRole("button", { name: "Cast" }).click();
+  await expect(page.getByText(/Cast Force Barrage/)).toBeVisible({ timeout: 15_000 });
 });
 
 test("builder grants a Cloistered Cleric domain focus spell", async ({ page }) => {

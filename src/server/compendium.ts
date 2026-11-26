@@ -639,6 +639,7 @@ export function contextForDraft(
     ...draft.spells.rituals,
     ...draft.spells.innate,
     ...draft.spells.multiclassCantrips,
+    ...draft.spells.multiclassSpells,
   ]) {
     const spell = maps.spell.get(id);
     if (spell) spellMap[id] = spell;

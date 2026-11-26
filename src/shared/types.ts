@@ -930,6 +930,10 @@ export interface CharacterDraft {
     ritualSkills?: Record<string, string>;
     /** Cantrips granted by a spellcasting archetype dedication. */
     multiclassCantrips: string[];
+    /** Ranked spells learned through spellcasting archetype feats. */
+    multiclassSpells: string[];
+    /** Dedication spell slots spent today, keyed by rank. */
+    multiclassSlotsUsed: Record<string, number>;
     /** Innate spells granted by ancestry, heritage, feats, or items. */
     innate: string[];
     /** Innate spell uses spent today, keyed by spell id. */
@@ -1161,6 +1165,7 @@ export interface DerivedCharacter {
     tradition: SpellTradition;
     ability: AbilityKey;
     cantripLimit: number;
+    spellSlots: number[];
     spellDc: number;
     spellAttack: number;
   } | null;

@@ -157,6 +157,7 @@ export function SpellsStep({ draft, update, derived, context, setStep, openPicke
   const [prepOpen, setPrepOpen] = useState(false);
   const [studiousChoice, setStudiousChoice] = useState("");
   const [multiclassPickerOpen, setMulticlassPickerOpen] = useState(false);
+  const [multiclassSpellPickerOpen, setMulticlassSpellPickerOpen] = useState(false);
   const classData = context.classData;
   const caster = casterInfo(classData);
   const tradition = derived.casterTradition ?? draft.spells.tradition;
@@ -166,6 +167,15 @@ export function SpellsStep({ draft, update, derived, context, setStep, openPicke
   const multiclassCantrips = draft.spells.multiclassCantrips
     .map((id) => context.spells[id])
     .filter((spell): spell is Spell => Boolean(spell));
+  const multiclassSpells = draft.spells.multiclassSpells
+    .map((id) => context.spells[id])
+    .filter((spell): spell is Spell => Boolean(spell));
+  const multiclassSlots = derived.multiclassCaster?.spellSlots ?? [];
+  const multiclassMaxRank = multiclassSlots.reduce(
+    (max, count, index) => (count > 0 ? index + 1 : max),
+    0
+  );
+  const multiclassSlotTotal = multiclassSlots.reduce((sum, count) => sum + count, 0);
   const known = draft.spells.known
     .map((id) => context.spells[id])
     .filter((spell): spell is Spell => Boolean(spell));
@@ -1020,6 +1030,51 @@ export function SpellsStep({ draft, update, derived, context, setStep, openPicke
                   Add dedication cantrip
                 </Button>
               </div>
+              {multiclassSlotTotal > 0 ? (
+                <div style={{ marginTop: 14 }}>
+                  <div className="row-between">
+                    <h4>Dedication spells</h4>
+                    <Badge tone={multiclassSpells.length >= multiclassSlotTotal ? "green" : "gold"}>
+                      {multiclassSpells.length} / {multiclassSlotTotal}
+                    </Badge>
+                  </div>
+                  <div className="chip-row">
+                    {multiclassSpells.map((spell) => (
+                      <span className="chip" key={spell.id}>
+                        {spell.name} · rank {spell.rank}
+                        <button
+                          type="button"
+                          className="chip-remove"
+                          aria-label={`Remove ${spell.name} from dedication spells`}
+                          onClick={() =>
+                            update((current) => ({
+                              ...current,
+                              spells: {
+                                ...current.spells,
+                                multiclassSpells: current.spells.multiclassSpells.filter(
+                                  (id) => id !== spell.id
+                                ),
+                              },
+                            }))
+                          }
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                  <div style={{ marginTop: 8 }}>
+                    <Button
+                      size="sm"
+                      icon={<Plus size={13} />}
+                      disabled={multiclassSpells.length >= multiclassSlotTotal}
+                      onClick={() => setMulticlassSpellPickerOpen(true)}
+                    >
+                      Add dedication spell
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
             </Card>
           ) : null}
 
@@ -1505,6 +1560,43 @@ export function SpellsStep({ draft, update, derived, context, setStep, openPicke
               };
             });
             setMulticlassPickerOpen(false);
+          }}
+        />
+      ) : null}
+      {derived.multiclassCaster ? (
+        <SpellPicker
+          open={multiclassSpellPickerOpen}
+          onClose={() => setMulticlassSpellPickerOpen(false)}
+          rank={null}
+          maxRank={multiclassMaxRank}
+          tradition={derived.multiclassCaster.tradition}
+          classTrait={derived.multiclassCaster.className.toLowerCase()}
+          expanded={draft.contentMode === "expanded"}
+          onExpandedChange={() => undefined}
+          contentModeLocked
+          legacyDefault={draft.includeLegacy}
+          legacyLocked
+          excludeIds={[
+            ...draft.spells.cantrips,
+            ...draft.spells.known,
+            ...draft.spells.multiclassCantrips,
+            ...draft.spells.multiclassSpells,
+            ...derived.grantedSpells.map((spell) => spell.id),
+          ]}
+          onSelect={(spell) => {
+            update((current) => {
+              if (spell.rank === 0) return current;
+              if (current.spells.multiclassSpells.includes(spell.id)) return current;
+              if (current.spells.multiclassSpells.length >= multiclassSlotTotal) return current;
+              return {
+                ...current,
+                spells: {
+                  ...current.spells,
+                  multiclassSpells: [...current.spells.multiclassSpells, spell.id],
+                },
+              };
+            });
+            setMulticlassSpellPickerOpen(false);
           }}
         />
       ) : null}
