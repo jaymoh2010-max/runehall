@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { multiclassDedicationFor } from "../src/shared/multiclass";
+import { multiclassDedicationFor, multiclassSlotCounts } from "../src/shared/multiclass";
 import { emptyCharacterDraft } from "../src/shared/rules";
 import { contextForDraft } from "../src/server/compendium";
 import { computeCharacter } from "../src/shared/rules";
@@ -32,12 +32,28 @@ describe("multiclass dedication cantrips", () => {
     expect(multiclassDedicationFor(["feat:unknown"])).toBeNull();
   });
 
+  it("derives basic, expert, and master archetype slots", () => {
+    const none = { basic: false, expert: false, master: false };
+    expect(multiclassSlotCounts(4, { ...none, basic: true })).toEqual([1, 0, 0, 0, 0, 0, 0, 0]);
+    expect(multiclassSlotCounts(8, { ...none, basic: true })).toEqual([1, 1, 1, 0, 0, 0, 0, 0]);
+    expect(multiclassSlotCounts(12, { basic: true, expert: true, master: false })).toEqual([
+      1, 1, 1, 1, 0, 0, 0, 0,
+    ]);
+    expect(multiclassSlotCounts(18, { basic: true, expert: true, master: true })).toEqual([
+      1, 1, 1, 1, 1, 1, 1, 0,
+    ]);
+    expect(multiclassSlotCounts(20, { basic: true, expert: true, master: true })).toEqual([
+      1, 1, 1, 1, 1, 1, 1, 1,
+    ]);
+  });
+
   it("derives a separate spell DC for a dedication cantrip", () => {
     const draft = emptyCharacterDraft("Dedicated Fighter");
     draft.classId = fighter.id;
     draft.keyAbility = "str";
-    draft.level = 2;
+    draft.level = 4;
     draft.feats.class["2"] = "feat:oQ6EZRFXbHWCx08C";
+    draft.feats.class["4"] = "feat:SHUfHzElHZPXJFiP";
     draft.spells.multiclassCantrips = [shield.id];
     const derived = computeCharacter(draft, contextForDraft(draft));
     expect(derived.multiclassCaster).toMatchObject({
@@ -45,6 +61,7 @@ describe("multiclass dedication cantrips", () => {
       tradition: "arcane",
       ability: "int",
       cantripLimit: 2,
+      spellSlots: [1, 0, 0, 0, 0, 0, 0, 0],
     });
     expect(derived.multiclassCaster?.spellDc).toBeTypeOf("number");
     expect(derived.multiclassCaster?.spellAttack).toBeTypeOf("number");

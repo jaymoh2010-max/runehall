@@ -71,7 +71,11 @@ import {
 import { MAGUS_STUDIOUS_BASE, MAGUS_STUDIOUS_BY_STUDY, selectedClassGrants } from "./classGrants";
 import { APPARITION_BY_ID } from "./apparitions";
 import { activeGrantChoiceGroups } from "./classGrantChoices";
-import { multiclassDedicationFor, multiclassProficiencyRank } from "./multiclass";
+import {
+  multiclassDedicationFor,
+  multiclassProficiencyRank,
+  multiclassSlotCounts,
+} from "./multiclass";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -1573,6 +1577,8 @@ export function emptyCharacterDraft(name = "New Hero"): CharacterDraft {
       signature: [],
       rituals: [],
       multiclassCantrips: [],
+      multiclassSpells: [],
+      multiclassSlotsUsed: {},
       innate: [],
       innateUsed: {},
       preparationsPending: false,
@@ -1901,6 +1907,14 @@ export function normalizeCharacterDraft(input: unknown, fallbackName = "New Hero
       multiclassCantrips: [
         ...new Set(arr<string>(spells.multiclassCantrips).filter((x) => typeof x === "string")),
       ].slice(0, 20),
+      multiclassSpells: [
+        ...new Set(arr<string>(spells.multiclassSpells).filter((x) => typeof x === "string")),
+      ].slice(0, 40),
+      multiclassSlotsUsed: Object.fromEntries(
+        Object.entries(obj(spells.multiclassSlotsUsed))
+          .filter(([, value]) => typeof value === "number" && Number.isFinite(value))
+          .map(([key, value]) => [key, Math.max(0, Math.min(20, Math.floor(value as number)))])
+      ) as Record<string, number>,
       innate: [...new Set(arr<string>(spells.innate).filter((x) => typeof x === "string"))].slice(
         0,
         80
@@ -3854,7 +3868,7 @@ export function computeCharacter(
         spellMod +
         (spellAbility ? conditionEffects.checks[spellAbility] : conditionEffects.allChecks);
 
-  const multiclass = multiclassDedicationFor([
+  const multiclassFeatIds = [
     ...Object.values(draft.feats.ancestry),
     ...Object.values(draft.feats.class),
     ...Object.values(draft.feats.skill),
@@ -3863,7 +3877,16 @@ export function computeCharacter(
     ...draft.feats.extras,
     ...Object.values(draft.featChoices).flat(),
     ...(draft.backgroundFeat ? [draft.backgroundFeat] : []),
-  ]);
+  ];
+  const multiclassFeatSet = new Set(multiclassFeatIds);
+  const multiclass = multiclassDedicationFor(multiclassFeatIds);
+  const multiclassSlots = multiclass
+    ? multiclassSlotCounts(draft.level, {
+        basic: multiclassFeatSet.has(multiclass.basicFeatId),
+        expert: multiclassFeatSet.has(multiclass.expertFeatId),
+        master: multiclassFeatSet.has(multiclass.masterFeatId),
+      })
+    : [];
   const multiclassCondition = multiclass
     ? conditionEffects.checks[multiclass.ability]
     : conditionEffects.allChecks;
@@ -4281,6 +4304,24 @@ export function computeCharacter(
         issue(
           "warning",
           `${spell.name} is not a ${multiclass.tradition} cantrip for the ${multiclass.className} Dedication.`,
+          "spells"
+        );
+      }
+    }
+    for (const spellId of draft.spells.multiclassSpells) {
+      const spell = context.spells[spellId];
+      if (!spell) {
+        issue("warning", "A dedication spell is missing from the compendium.", "spells");
+        continue;
+      }
+      if (spell.rank === 0) {
+        issue("warning", `${spell.name} is a cantrip, not a ranked dedication spell.`, "spells");
+        continue;
+      }
+      if (spell.traditions.length && !spell.traditions.includes(multiclass.tradition)) {
+        issue(
+          "warning",
+          `${spell.name} is not a ${multiclass.tradition} spell for the ${multiclass.className} Dedication.`,
           "spells"
         );
       }
@@ -4938,6 +4979,7 @@ export function computeCharacter(
       multiclass && multiclassSpellDc !== null && multiclassSpellAttack !== null
         ? {
             ...multiclass,
+            spellSlots: multiclassSlots,
             spellDc: multiclassSpellDc,
             spellAttack: multiclassSpellAttack,
           }
