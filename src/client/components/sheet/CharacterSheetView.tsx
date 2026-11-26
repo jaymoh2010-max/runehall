@@ -61,8 +61,15 @@ import {
   castSpell,
   restoreSpellUse,
   spellCastOptions,
+  spellDamageAtRank,
   type SpellCastChoice,
 } from "../../../shared/spellcasting";
+import {
+  parseSpellArea,
+  spellAreaColor,
+  spellDurationRounds,
+  type CastAreaRequest,
+} from "../../../shared/templates";
 import { innateUsesRemaining } from "../../../shared/innate";
 import { psiAmpFor } from "../../../shared/psiAmps";
 import { ritualPrimarySkillName } from "../../../shared/ritual";
@@ -336,6 +343,7 @@ export function CharacterSheetView({
   mode = "page",
   onClose,
   onRoll,
+  onCastArea,
 }: {
   characterId: string;
   mode?: "page" | "overlay";
@@ -348,6 +356,7 @@ export function CharacterSheetView({
     requestId?: string | null,
     upgradeSuccess?: boolean
   ) => void;
+  onCastArea?: (request: CastAreaRequest) => void;
 }) {
   const toast = useToasts((state) => state.push);
   const navigate = useNavigate();
@@ -1269,6 +1278,38 @@ export function CharacterSheetView({
         content: `${currentDraft.name} casts ${spell.name} at rank ${effectiveRank}${downcast ? ` using a rank ${result.option.rank} slot` : ""}${amped ? " (amped)" : ""} (${result.option.label}).`,
         visibility: "all",
       });
+    }
+    const area = parseSpellArea(spell.area, spellDamageAtRank(spell, effectiveRank).areaDelta ?? 0);
+    if (area) {
+      const damage = spellDamageAtRank(spell, effectiveRank)
+        .parts.map((part) => `${part.formula} ${part.type}`)
+        .join(" + ");
+      const save = spell.defense?.save
+        ? `${spell.defense.save.slice(0, 1).toUpperCase()}${spell.defense.save.slice(1).toLowerCase()}`
+        : "";
+      const dc = derived?.spellDc;
+      const effect = [
+        save ? `${save}${dc ? ` DC ${dc}` : ""}` : "",
+        damage ? `${damage} damage` : "",
+        spell.duration ? `Duration ${spell.duration}` : "",
+      ]
+        .filter(Boolean)
+        .join(" · ");
+      if (onCastArea && character) {
+        onCastArea({
+          characterId: character.id,
+          characterName: currentDraft.name,
+          label: spell.name,
+          kind: area.kind,
+          size: area.size,
+          color: spellAreaColor(spell),
+          spellId: spell.id,
+          durationRounds: spellDurationRounds(spell.duration),
+          effect,
+        });
+      } else {
+        toast(`Open the table to place ${spell.name}'s ${area.size}-ft. ${area.kind}.`, "info");
+      }
     }
   };
 

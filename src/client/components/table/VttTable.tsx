@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Map, Plus, Volume2 } from "lucide-react";
+import { Map, Plus, Volume2, X } from "lucide-react";
 import type {
   CampaignTable,
   CharacterRecord,
@@ -11,10 +11,20 @@ import type {
 } from "../../../shared/types";
 import { suggestedTokenPosition } from "../../../shared/tokens";
 import { DRAWING_COLORS, DRAWING_WIDTHS } from "../../../shared/drawings";
+import {
+  TEMPLATE_COLOR,
+  TEMPLATE_LABELS,
+  TEMPLATE_SIZES,
+  templateLabel,
+  tokensInTemplate,
+  type AoeTemplate,
+  type CastAreaRequest,
+  type TemplateKind,
+} from "../../../shared/templates";
 import { errorMessage, useToasts } from "../../stores";
 import { api } from "../../api";
 import { getSocket } from "../../socket";
-import { Button, EmptyState } from "../ui";
+import { Button, EmptyState, Select } from "../ui";
 import { SceneCanvas } from "./SceneCanvas";
 import type { DrawingTool } from "./DrawingToolbar";
 import { ChatPanel } from "./ChatPanel";
@@ -80,6 +90,9 @@ export function VttTable({ initial, campaignId, user, isGm, active }: VttTablePr
   const [sheetCharacterId, setSheetCharacterId] = useState<string | null>(null);
   const [myCharacterChoice, setMyCharacterChoice] = useState<string | null>(null);
   const [fullscreenMode, setFullscreenMode] = useState(false);
+  const [templateKind, setTemplateKind] = useState<TemplateKind | null>(null);
+  const [templateSize, setTemplateSize] = useState(20);
+  const [templatePlacement, setTemplatePlacement] = useState<CastAreaRequest | null>(null);
 
   useEffect(() => {
     if (window.innerWidth < 1160) setRightOpen(false);
@@ -311,6 +324,100 @@ export function VttTable({ initial, campaignId, user, isGm, active }: VttTablePr
 
   const sendChat = (content: string, gmOnly: boolean) => {
     getSocket().emit("chat:send", { campaignId, content, visibility: gmOnly ? "gm" : "all" });
+  };
+
+  const beginAreaPlacement = () => {
+    setTemplatePlacement(null);
+    setTemplateKind("burst");
+    setTemplateSize(20);
+    setFogBrush(null);
+    setMeasureMode(false);
+    setDrawingTool(null);
+  };
+
+  const beginSpellArea = (request: CastAreaRequest) => {
+    const casterToken =
+      sceneTokens.find((token) => token.characterId === request.characterId) ?? null;
+    setSheetCharacterId(null);
+    setTemplatePlacement({ ...request, casterTokenId: casterToken?.id ?? null });
+    setTemplateKind(request.kind);
+    setTemplateSize(request.size);
+    setFogBrush(null);
+    setMeasureMode(false);
+    setDrawingTool(null);
+    toast(`Choose where ${request.label} lands on the map.`, "info");
+  };
+
+  const cancelAreaPlacement = () => {
+    setTemplateKind(null);
+    setTemplatePlacement(null);
+  };
+
+  const placeTemplate = (template: AoeTemplate) => {
+    if (!activeScene || !activeSceneId) return;
+    const meta = templatePlacement;
+    const full: AoeTemplate = {
+      ...template,
+      label: meta?.label ?? templateLabel(template),
+      color: meta?.color ?? TEMPLATE_COLOR,
+      spellId: meta?.spellId ?? null,
+      casterTokenId: meta?.casterTokenId ?? null,
+      durationRounds: meta?.durationRounds ?? null,
+      effect: meta?.effect ?? "",
+    };
+    getSocket().emit("template:add", {
+      campaignId,
+      sceneId: activeSceneId,
+      template: full,
+    });
+    const affected = tokensInTemplate(sceneTokens, full, activeScene.gridSize);
+    if (meta) {
+      const names = affected.map((token) => token.name).join(", ");
+      const effect = meta.effect ? `${meta.effect}. ` : "";
+      sendChat(
+        names
+          ? `${meta.characterName} casts ${meta.label}. ${effect}Targets in the area: ${names}.`
+          : `${meta.characterName} casts ${meta.label}. ${effect}No tokens are in the area.`,
+        false
+      );
+      toast(
+        names ? `${meta.label} affects ${names}.` : `${meta.label} placed; no tokens in the area.`,
+        names ? "success" : "info"
+      );
+    } else {
+      toast(
+        affected.length
+          ? `Area placed. In the area: ${affected.map((token) => token.name).join(", ")}.`
+          : "Area placed; no tokens are in the area.",
+        "success"
+      );
+    }
+    cancelAreaPlacement();
+  };
+
+  const removeTemplate = (template: AoeTemplate) => {
+    if (!activeSceneId || !template.id) return;
+    if (!isGm && template.casterUserId !== user.id) return;
+    setScenes((current) =>
+      current.map((scene) =>
+        scene.id === activeSceneId
+          ? { ...scene, templates: scene.templates.filter((entry) => entry.id !== template.id) }
+          : scene
+      )
+    );
+    getSocket().emit("template:remove", {
+      campaignId,
+      sceneId: activeSceneId,
+      templateId: template.id,
+    });
+  };
+
+  const clearTemplates = () => {
+    if (!activeSceneId || !isGm) return;
+    setScenes((current) =>
+      current.map((scene) => (scene.id === activeSceneId ? { ...scene, templates: [] } : scene))
+    );
+    getSocket().emit("template:clear", { campaignId, sceneId: activeSceneId });
   };
 
   const roll = (
@@ -635,6 +742,11 @@ export function VttTable({ initial, campaignId, user, isGm, active }: VttTablePr
           setFogBrush(null);
           setDrawingTool(null);
         }}
+        areaActive={templateKind !== null}
+        onArea={() => {
+          if (templateKind) cancelAreaPlacement();
+          else beginAreaPlacement();
+        }}
         connectionStatus={connectionStatus}
         presence={presence}
         partyOpen={partyOpen}
@@ -695,6 +807,56 @@ export function VttTable({ initial, campaignId, user, isGm, active }: VttTablePr
             />
           ) : null}
 
+          {templateKind ? (
+            <div className="aoe-placement-bar" role="status">
+              <div className="aoe-placement-copy">
+                <strong>
+                  {templatePlacement
+                    ? templatePlacement.label
+                    : `Place a ${TEMPLATE_LABELS[templateKind].toLowerCase()}`}
+                </strong>
+                <span className="tiny muted">
+                  {templatePlacement
+                    ? `${templatePlacement.size} ft. · ${
+                        templatePlacement.effect || "click and drag on the map"
+                      }`
+                    : "Click and drag on the map to place the area."}
+                </span>
+              </div>
+              {templatePlacement ? (
+                <span className="aoe-placement-size">{templatePlacement.size} ft.</span>
+              ) : (
+                <>
+                  <Select
+                    aria-label="Area shape"
+                    value={templateKind}
+                    onChange={(event) => setTemplateKind(event.target.value as TemplateKind)}
+                  >
+                    {(Object.keys(TEMPLATE_LABELS) as TemplateKind[]).map((kind) => (
+                      <option key={kind} value={kind}>
+                        {TEMPLATE_LABELS[kind]}
+                      </option>
+                    ))}
+                  </Select>
+                  <Select
+                    aria-label="Area size in feet"
+                    value={templateSize}
+                    onChange={(event) => setTemplateSize(Number(event.target.value))}
+                  >
+                    {TEMPLATE_SIZES.map((size) => (
+                      <option key={size} value={size}>
+                        {size} ft.
+                      </option>
+                    ))}
+                  </Select>
+                </>
+              )}
+              <Button size="sm" variant="ghost" onClick={cancelAreaPlacement}>
+                Cancel
+              </Button>
+            </div>
+          ) : null}
+
           <SceneCanvas
             scene={canvasScene}
             tokens={sceneTokens}
@@ -727,10 +889,10 @@ export function VttTable({ initial, campaignId, user, isGm, active }: VttTablePr
             }
             remotePointer={remotePointer}
             onDropMonster={isGm ? placeMonster : undefined}
-            templateKind={null}
-            templateSize={20}
+            templateKind={templateKind}
+            templateSize={templateSize}
             templateHidden={false}
-            onTemplate={() => undefined}
+            onTemplate={placeTemplate}
             drawingTool={drawingTool}
             drawingColor={drawingColor}
             drawingWidth={drawingWidth}
@@ -772,6 +934,52 @@ export function VttTable({ initial, campaignId, user, isGm, active }: VttTablePr
               })
             }
           />
+
+          {activeScene.templates.length ? (
+            <div className="aoe-active-panel">
+              <div className="aoe-active-title">
+                <strong>Active areas</strong>
+                <span>{activeScene.templates.length}</span>
+              </div>
+              <div className="aoe-active-list">
+                {activeScene.templates.map((entry, index) => {
+                  const remaining = entry.expiresRound
+                    ? Math.max(0, entry.expiresRound - round + 1)
+                    : null;
+                  return (
+                    <div className="aoe-active-row" key={entry.id ?? `${entry.kind}-${index}`}>
+                      <span
+                        className="aoe-swatch"
+                        style={{ background: entry.color ?? TEMPLATE_COLOR }}
+                      />
+                      <div className="grow">
+                        <div>{templateLabel(entry)}</div>
+                        {entry.effect ? <span className="tiny muted">{entry.effect}</span> : null}
+                      </div>
+                      <span className="tiny muted">
+                        {remaining === null ? "until cleared" : `${remaining} rd`}
+                      </span>
+                      {entry.id && (isGm || entry.casterUserId === user.id) ? (
+                        <button
+                          type="button"
+                          className="aoe-clear"
+                          aria-label={`Clear area ${templateLabel(entry)}`}
+                          onClick={() => removeTemplate(entry)}
+                        >
+                          <X size={12} />
+                        </button>
+                      ) : null}
+                    </div>
+                  );
+                })}
+              </div>
+              {isGm ? (
+                <Button size="sm" variant="ghost" onClick={clearTemplates}>
+                  Clear all
+                </Button>
+              ) : null}
+            </div>
+          ) : null}
 
           {isGm && bestiaryOpen ? (
             <BestiaryPalette
@@ -869,6 +1077,7 @@ export function VttTable({ initial, campaignId, user, isGm, active }: VttTablePr
           mode="overlay"
           onClose={() => setSheetCharacterId(null)}
           onRoll={roll}
+          onCastArea={beginSpellArea}
         />
       ) : null}
     </div>

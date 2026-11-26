@@ -18,7 +18,11 @@ import {
   renameInitiativeEntries,
   sortInitiativeEntries,
 } from "../shared/initiative";
-import { normalizeAoeTemplate, normalizeAoeTemplates } from "../shared/templates";
+import {
+  normalizeAoeTemplate,
+  normalizeAoeTemplates,
+  unexpiredAoeTemplates,
+} from "../shared/templates";
 import { normalizeWalls } from "../shared/walls";
 import { normalizeSceneProps } from "../shared/props";
 import {
@@ -236,6 +240,41 @@ function broadcastInitiative(
     round: state.round,
     turnIndex: state.turn_index,
   });
+}
+
+function broadcastSceneTemplates(
+  io: TypedServer,
+  campaignId: string,
+  sceneId: string,
+  templates: ReturnType<typeof normalizeAoeTemplates>
+): void {
+  io.to(room(campaignId))
+    .except(gmRoom(campaignId))
+    .emit("scene:templates", {
+      sceneId,
+      templates: templates.filter((entry) => !entry.hidden),
+    });
+  io.to(gmRoom(campaignId)).emit("scene:templates", { sceneId, templates });
+}
+
+/** Remove spell areas whose round duration ended on the active scene. */
+function expireSceneTemplates(io: TypedServer, campaignId: string, round: number): void {
+  const state = ensureState(campaignId);
+  if (!state.active_scene_id) return;
+  const scene = db
+    .prepare("SELECT * FROM scenes WHERE id = ? AND campaign_id = ?")
+    .get(state.active_scene_id, campaignId) as SceneRow | undefined;
+  if (!scene) return;
+  const templates = normalizeAoeTemplates(parseJson(scene.templates, []));
+  const kept = unexpiredAoeTemplates(templates, round);
+  if (kept.length === templates.length) return;
+  db.prepare("UPDATE scenes SET templates = ?, updated_at = ? WHERE id = ?").run(
+    JSON.stringify(kept),
+    now(),
+    scene.id
+  );
+  broadcastSceneTemplates(io, campaignId, scene.id, kept);
+  touchCampaign(campaignId);
 }
 
 export function broadcastCampaignInitiative(io: TypedServer, campaignId: string): void {
@@ -1099,11 +1138,25 @@ export function registerSocketServer(io: TypedServer): void {
     });
 
     on("template:add", ({ campaignId, sceneId, template }) => {
-      if (!requireGm(socket, campaignId)) return;
+      const role = getCampaignRole(campaignId, socket.data.user.id);
+      if (!role) return;
       const scene = sceneBelongs(sceneId, campaignId);
       if (!scene) return;
       const normalized = normalizeAoeTemplate(template);
       if (!normalized) return;
+      // Players can place their own visible spell areas. Hidden areas and
+      // clearing the whole layer remain GM tools.
+      if (role !== "gm") normalized.hidden = false;
+      normalized.id = normalized.id ?? newId("aoe");
+      normalized.casterUserId = socket.data.user.id;
+      if (
+        normalized.expiresRound === null &&
+        normalized.durationRounds !== null &&
+        normalized.durationRounds !== undefined
+      ) {
+        const currentRound = ensureState(campaignId).round;
+        normalized.expiresRound = Math.max(1, currentRound + normalized.durationRounds - 1);
+      }
       const templates = [
         ...normalizeAoeTemplates(parseJson(scene.templates, [])),
         normalized,
@@ -1113,13 +1166,26 @@ export function registerSocketServer(io: TypedServer): void {
         now(),
         sceneId
       );
-      io.to(room(campaignId))
-        .except(gmRoom(campaignId))
-        .emit("scene:templates", {
-          sceneId,
-          templates: templates.filter((entry) => !entry.hidden),
-        });
-      io.to(gmRoom(campaignId)).emit("scene:templates", { sceneId, templates });
+      broadcastSceneTemplates(io, campaignId, sceneId, templates);
+      touchCampaign(campaignId);
+    });
+
+    on("template:remove", ({ campaignId, sceneId, templateId }) => {
+      const role = getCampaignRole(campaignId, socket.data.user.id);
+      if (!role) return;
+      const scene = sceneBelongs(sceneId, campaignId);
+      if (!scene) return;
+      const templates = normalizeAoeTemplates(parseJson(scene.templates, []));
+      const target = templates.find((entry) => entry.id === templateId);
+      if (!target) return;
+      if (role !== "gm" && target.casterUserId !== socket.data.user.id) return;
+      const kept = templates.filter((entry) => entry.id !== templateId);
+      db.prepare("UPDATE scenes SET templates = ?, updated_at = ? WHERE id = ?").run(
+        JSON.stringify(kept),
+        now(),
+        sceneId
+      );
+      broadcastSceneTemplates(io, campaignId, sceneId, kept);
       touchCampaign(campaignId);
     });
 
@@ -1502,6 +1568,7 @@ export function registerSocketServer(io: TypedServer): void {
         "UPDATE campaign_state SET initiative = ?, round = ?, turn_index = ?, updated_at = ? WHERE campaign_id = ?"
       ).run(JSON.stringify(clean), nextRound, nextTurn, now(), campaignId);
       broadcastInitiative(io, campaignId, ensureState(campaignId));
+      if (nextRound > current.round) expireSceneTemplates(io, campaignId, nextRound);
       touchCampaign(campaignId);
     });
 
@@ -1524,6 +1591,7 @@ export function registerSocketServer(io: TypedServer): void {
         "UPDATE campaign_state SET turn_index = ?, round = ?, updated_at = ? WHERE campaign_id = ?"
       ).run(turn, round, now(), campaignId);
       broadcastInitiative(io, campaignId, ensureState(campaignId));
+      if (round > state.round) expireSceneTemplates(io, campaignId, round);
       touchCampaign(campaignId);
     });
 

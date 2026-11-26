@@ -122,7 +122,7 @@ These are optional campaign variants; the base Remastered rules do not require t
 - Compendium affliction statblocks are not bundled. Built-in recovery-frame templates cover common poison, disease, and curse shapes; stage effects remain manual.
 - Some action-count spell variants, fixed-rank heightening, and data conflicts stay manual.
 - Difficult terrain, elevation/flying, squeezing, forced movement, flanking automation, and token-to-token collision are not automated.
-- AoE templates are visual, not target-resolution cards.
+- AoE templates list affected tokens and track round durations, but do not apply saves or damage automatically.
 
 ### Campaign depth
 

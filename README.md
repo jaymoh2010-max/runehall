@@ -33,7 +33,7 @@ Four campaign sections:
 - A **Pathbuilder-style character sheet** that opens over the table from **My sheet**, a party avatar, or a linked token. It uses a compact three-column layout: build summary and a level-by-level character plan on the left, stats and skills in the center, and tabbed Weapons / Defense / Gear / Spells / Feats / Details / Status panels on the right.
 - The plan rail shows the current level by default and expands to all 20 levels, including feats, skill increases, ability boosts, and class features.
 - Click a skill, attack, spell, feat, or item **name** to open its compendium page. Click the **dice icon** to roll it into table chat.
-- Spellcasting tracks ordinary slots, divine font, focus points, prepared cantrips, and daily preparations by hand. **Cast** spends the selected slot and posts the spell to table chat. A long rest restores slots and focus, then prompts prepared casters to choose today's spells.
+- Spellcasting tracks ordinary slots, divine font, focus points, prepared cantrips, and daily preparations by hand. **Cast** spends the selected slot and posts the spell to table chat. If the spell has an area, the sheet closes and the map switches to placement mode with the spell's burst/cone/line/emanation/square size and colour; placing it lists affected tokens in chat and the active-area panel, and round-based durations expire as initiative advances. A long rest restores slots and focus, then prompts prepared casters to choose today's spells.
 - **Minimize** returns to the map without losing table state. Rolls from the sheet post to the same chat as the manual dice tray.
 - The bestiary palette for dragging monsters onto the map.
 - A shared soundtrack player with GM uploads and a bundled music library.

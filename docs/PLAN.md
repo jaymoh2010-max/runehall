@@ -82,7 +82,7 @@ The target table size is one GM plus 4–10 players. That means the product shou
 
 ### Phase 5 — Table depth
 - Walls/doors and dynamic light.
-- Area templates (burst, emanation, cone, line) persisted per scene and shared across clients; rotation handles and save/roll cards remain.
+- Area templates (burst, emanation, cone, line, square) persist per scene, are shared across clients, and can be started directly from an area spell; affected tokens and round durations are tracked. Rotation handles and automatic save/damage application remain.
 - Token conditions with values and round durations, ticking automatically when initiative advances; linked character-sheet conditions also tick, with a manual −1 button.
 - Auras, multi-select, and a proper token context menu. Multi-select, marquee selection, group drag, bulk HP/condition actions, bulk visibility/lock toggles, and bulk delete are built.
 - Scene playlists with reorder controls, drag-and-drop reordering, previous/next navigation, activate-on-create, GM player-safe preview, and generated WebP thumbnails with lazy loading.

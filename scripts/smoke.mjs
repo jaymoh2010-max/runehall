@@ -1136,6 +1136,108 @@ async function main() {
   }
   log("shared drawings sync live and the GM can erase any player's drawing");
 
+  const playerAreaEvent = waitForEvent(
+    playerSocket,
+    "scene:templates",
+    (payload) =>
+      payload.sceneId === scene.id &&
+      payload.templates?.some((template) => template.label === "Smoke Fireball")
+  );
+  const gmAreaEvent = waitForEvent(
+    gmSocket,
+    "scene:templates",
+    (payload) =>
+      payload.sceneId === scene.id &&
+      payload.templates?.some((template) => template.label === "Smoke Fireball")
+  );
+  playerSocket.emit("template:add", {
+    campaignId: campaign.id,
+    sceneId: scene.id,
+    template: {
+      kind: "burst",
+      size: 20,
+      x: 220,
+      y: 220,
+      direction: 0,
+      hidden: true,
+      label: "Smoke Fireball",
+      color: "#e07a3f",
+      durationRounds: 1,
+      effect: "Reflex DC 20 · 6d6 fire damage",
+    },
+  });
+  const [playerAreaPayload] = await Promise.all([playerAreaEvent, gmAreaEvent]);
+  const playerArea = playerAreaPayload.templates.find(
+    (template) => template.label === "Smoke Fireball"
+  );
+  if (!playerArea?.id || playerArea.hidden || playerArea.casterUserId !== player.id) {
+    throw new Error("A player spell area was not stored as a visible owned template");
+  }
+  if (!playerArea.expiresRound) {
+    throw new Error("A timed spell area did not receive an expiry round");
+  }
+  const areaTable = await api(`/api/campaigns/${campaign.id}/table`, { cookie: gmCookie });
+  const areaScene = areaTable.payload.scenes.find((entry) => entry.id === scene.id);
+  if (!areaScene?.templates?.some((template) => template.id === playerArea.id)) {
+    throw new Error("The spell area was not persisted on the scene");
+  }
+  const areaRemoved = waitForEvent(
+    playerSocket,
+    "scene:templates",
+    (payload) =>
+      payload.sceneId === scene.id &&
+      !payload.templates?.some((template) => template.id === playerArea.id)
+  );
+  playerSocket.emit("template:remove", {
+    campaignId: campaign.id,
+    sceneId: scene.id,
+    templateId: playerArea.id,
+  });
+  await areaRemoved;
+  log("players can place and clear owned spell areas and hidden areas are forced visible");
+
+  const timedAreaEvent = waitForEvent(
+    playerSocket,
+    "scene:templates",
+    (payload) =>
+      payload.sceneId === scene.id &&
+      payload.templates?.some((template) => template.label === "Smoke Bless")
+  );
+  playerSocket.emit("template:add", {
+    campaignId: campaign.id,
+    sceneId: scene.id,
+    template: {
+      kind: "emanation",
+      size: 15,
+      x: 220,
+      y: 220,
+      direction: 0,
+      hidden: false,
+      label: "Smoke Bless",
+      color: "#e5ca91",
+      durationRounds: 1,
+      effect: "1 minute",
+    },
+  });
+  const timedAreaPayload = await timedAreaEvent;
+  const timedArea = timedAreaPayload.templates.find((template) => template.label === "Smoke Bless");
+  if (!timedArea?.id) throw new Error("Timed area was not added");
+  const timedAreaExpired = waitForEvent(
+    playerSocket,
+    "scene:templates",
+    (payload) =>
+      payload.sceneId === scene.id &&
+      !payload.templates?.some((template) => template.id === timedArea.id)
+  );
+  gmSocket.emit("initiative:update", {
+    campaignId: campaign.id,
+    entries: [],
+    round: 2,
+    turnIndex: 0,
+  });
+  await timedAreaExpired;
+  log("round-based spell areas expire when the round advances");
+
   let playerSawPrepScene = false;
   const onPrepScene = (created) => {
     if (created.name === "GM Prep Vault") playerSawPrepScene = true;

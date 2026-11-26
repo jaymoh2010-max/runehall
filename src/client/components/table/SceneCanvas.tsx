@@ -40,6 +40,7 @@ import { BESTIARY_DRAG_TYPE, type BestiaryDragPayload } from "./bestiaryDrag";
 import {
   templateLabel,
   templateRadiusPx,
+  TEMPLATE_COLOR,
   TEMPLATE_LABELS,
   type AoeTemplate,
   type TemplateKind,
@@ -691,7 +692,7 @@ export function SceneCanvas({
       viewportRef.current?.setPointerCapture(event.pointerId);
       return;
     }
-    if (templateKind && isGm) {
+    if (templateKind) {
       const point = scenePoint(event.clientX, event.clientY);
       const draft = {
         x: snap(point.x, scene.gridOffsetX),
@@ -1149,7 +1150,8 @@ export function SceneCanvas({
   const templateStroke = 2 / Math.max(zoom, 0.4);
   const renderTemplate = (value: AoeTemplate, draft = false): ReactElement => {
     const radius = templateRadiusPx(value.size, scene.gridSize);
-    const fill = draft ? "rgba(240,217,168,0.2)" : "rgba(200,169,107,0.14)";
+    const color = value.color ?? TEMPLATE_COLOR;
+    const fill = lightColorRgba(color, draft ? 0.2 : 0.14);
     const hiddenDash = value.hidden
       ? `${6 / Math.max(zoom, 0.4)} ${4 / Math.max(zoom, 0.4)}`
       : undefined;
@@ -1160,7 +1162,24 @@ export function SceneCanvas({
           cy={value.y}
           r={radius}
           fill={fill}
-          stroke="#e5ca91"
+          stroke={color}
+          strokeWidth={templateStroke}
+          strokeDasharray={hiddenDash}
+          opacity={value.hidden ? 0.55 : 1}
+        />
+      );
+    }
+    if (value.kind === "square") {
+      const half = radius / 2;
+      return (
+        <rect
+          x={value.x - half}
+          y={value.y - half}
+          width={radius}
+          height={radius}
+          rx={4 / Math.max(zoom, 0.4)}
+          fill={fill}
+          stroke={color}
           strokeWidth={templateStroke}
           strokeDasharray={hiddenDash}
           opacity={value.hidden ? 0.55 : 1}
@@ -1179,7 +1198,7 @@ export function SceneCanvas({
         <path
           d={`M ${value.x} ${value.y} L ${p1x} ${p1y} A ${radius} ${radius} 0 0 1 ${p2x} ${p2y} Z`}
           fill={fill}
-          stroke="#e5ca91"
+          stroke={color}
           strokeWidth={templateStroke}
           strokeDasharray={hiddenDash}
           opacity={value.hidden ? 0.55 : 1}
@@ -1195,7 +1214,7 @@ export function SceneCanvas({
       <polygon
         points={`${value.x + px},${value.y + py} ${ex + px},${ey + py} ${ex - px},${ey - py} ${value.x - px},${value.y - py}`}
         fill={fill}
-        stroke="#e5ca91"
+        stroke={color}
         strokeWidth={templateStroke}
         strokeDasharray={hiddenDash}
         opacity={value.hidden ? 0.55 : 1}
@@ -1524,7 +1543,22 @@ export function SceneCanvas({
         {visibleTemplates.length || draftTemplate ? (
           <svg className="template-layer" width={scene.width} height={scene.height}>
             {visibleTemplates.map((entry, index) => (
-              <g key={`${entry.kind}-${index}`}>{renderTemplate(entry)}</g>
+              <g key={entry.id ?? `${entry.kind}-${index}`}>
+                {renderTemplate(entry)}
+                <text
+                  x={entry.x + 8}
+                  y={entry.y - 8}
+                  fill={entry.color ?? TEMPLATE_COLOR}
+                  stroke="#05070b"
+                  strokeWidth={3 / Math.max(zoom, 0.4)}
+                  paintOrder="stroke"
+                  fontSize={12 / Math.max(zoom, 0.4)}
+                  fontWeight={600}
+                  opacity={entry.hidden ? 0.75 : 1}
+                >
+                  {templateLabel(entry)}
+                </text>
+              </g>
             ))}
             {draftTemplate ? (
               <g>

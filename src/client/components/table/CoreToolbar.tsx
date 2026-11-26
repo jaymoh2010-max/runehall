@@ -2,6 +2,7 @@ import {
   BookOpen,
   ChevronLeft,
   ChevronRight,
+  Circle,
   Eye,
   EyeOff,
   Grid3X3,
@@ -32,6 +33,8 @@ export function CoreToolbar({
   onBrushSize,
   measureMode,
   onMeasureMode,
+  areaActive,
+  onArea,
   connectionStatus,
   presence,
   partyOpen,
@@ -59,6 +62,8 @@ export function CoreToolbar({
   onBrushSize: (size: number) => void;
   measureMode: boolean;
   onMeasureMode: (next: boolean) => void;
+  areaActive: boolean;
+  onArea: () => void;
   connectionStatus: "connecting" | "online" | "offline";
   presence: PresenceUser[];
   partyOpen: boolean;
@@ -160,6 +165,16 @@ export function CoreToolbar({
           title="Measure distance (M)"
         >
           Measure
+        </Button>
+        <Button
+          size="sm"
+          variant="ghost"
+          className={areaActive ? "is-active" : ""}
+          icon={<Circle size={14} />}
+          onClick={onArea}
+          title="Place a spell area"
+        >
+          Area
         </Button>
       </div>
 

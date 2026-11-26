@@ -1076,6 +1076,43 @@ test("drawing tools add and erase shared map annotations", async ({ page }) => {
   await page.getByRole("button", { name: "Select and pan" }).click();
 });
 
+test("area templates place on the map and stay listed until cleared", async ({ page }) => {
+  test.setTimeout(60_000);
+  await signIn(page, admin);
+  await page.goto(campaignPath);
+  await expect(page.locator(".scene-viewport")).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator(".core-connection")).toHaveClass(/is-online/, {
+    timeout: 15_000,
+  });
+
+  await page.getByRole("button", { name: "Area", exact: true }).click();
+  const bar = page.locator(".aoe-placement-bar");
+  await expect(bar).toBeVisible();
+  await bar.getByLabel("Area shape").selectOption("cone");
+  await bar.getByLabel("Area size in feet").selectOption("30");
+
+  const viewport = page.locator(".scene-viewport");
+  const box = await viewport.boundingBox();
+  expect(box).toBeTruthy();
+  const startX = box!.x + box!.width * 0.38;
+  const startY = box!.y + box!.height * 0.52;
+  await page.mouse.move(startX, startY);
+  await page.mouse.down();
+  await page.mouse.move(startX + 120, startY + 40, { steps: 8 });
+  await page.mouse.up();
+
+  const areaLabel = page.locator(".template-layer text").filter({ hasText: "Cone 30 ft." });
+  await expect(areaLabel).toBeVisible({ timeout: 10_000 });
+  const panel = page.locator(".aoe-active-panel");
+  await expect(panel).toBeVisible();
+  await expect(panel.getByText("Cone 30 ft.")).toBeVisible();
+  await expect(panel.getByText("until cleared")).toBeVisible();
+
+  await panel.getByRole("button", { name: "Clear area Cone 30 ft." }).click();
+  await expect(panel).toBeHidden({ timeout: 10_000 });
+  await expect(areaLabel).toBeHidden();
+});
+
 test("GM adds an elite monster token from the bestiary", async ({ page }) => {
   test.setTimeout(60_000);
   await signIn(page, admin);
@@ -1627,6 +1664,59 @@ test("builder learns a spontaneous spell at more than one rank", async ({ page }
     .locator(".pb-inventory-row")
     .filter({ hasText: "Magic Wand (3rd-Rank Spell)" });
   await expect(savedWandRow.getByRole("button", { name: /used today/i })).toBeDisabled();
+});
+
+test("casting an area spell prompts map placement and lists the effect", async ({ page }) => {
+  test.setTimeout(90_000);
+  await signIn(page, admin);
+  await page.goto(campaignPath);
+  await expect(page.locator(".scene-viewport")).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator(".core-connection")).toHaveClass(/is-online/, {
+    timeout: 15_000,
+  });
+
+  const picker = page.getByLabel("Character for My sheet");
+  if (await picker.count()) {
+    await picker.selectOption({ label: "E2E Ranked Sorcerer" });
+  }
+  await page.getByRole("button", { name: "My sheet" }).click();
+  const sheet = page.locator(".pb-sheet-overlay");
+  await expect(sheet).toBeVisible({ timeout: 15_000 });
+  await expect(sheet.getByText("E2E Ranked Sorcerer").first()).toBeVisible({
+    timeout: 15_000,
+  });
+  await sheet.getByRole("button", { name: "Spells", exact: true }).click();
+  const fireball = sheet.locator(".pb-spell-row").filter({ hasText: "Fireball" }).first();
+  await expect(fireball).toBeVisible({ timeout: 15_000 });
+  await fireball.getByRole("button", { name: "Cast", exact: true }).click();
+
+  const bar = page.locator(".aoe-placement-bar");
+  await expect(bar).toBeVisible({ timeout: 15_000 });
+  await expect(bar).toContainText("Fireball");
+  await expect(bar).toContainText("20 ft.");
+  await expect(sheet).toBeHidden();
+
+  const viewport = page.locator(".scene-viewport");
+  const box = await viewport.boundingBox();
+  expect(box).toBeTruthy();
+  const startX = box!.x + box!.width * 0.46;
+  const startY = box!.y + box!.height * 0.48;
+  await page.mouse.move(startX, startY);
+  await page.mouse.down();
+  await page.mouse.move(startX + 80, startY + 20, { steps: 8 });
+  await page.mouse.up();
+
+  await expect(page.locator(".template-layer text").filter({ hasText: "Fireball" })).toBeVisible({
+    timeout: 10_000,
+  });
+  const panel = page.locator(".aoe-active-panel");
+  await expect(panel).toBeVisible();
+  await expect(panel).toContainText("Fireball");
+  await expect(panel).toContainText("until cleared");
+  await expect(panel.getByText(/Reflex DC|damage/)).toBeVisible();
+
+  await panel.getByRole("button", { name: "Clear area Fireball" }).click();
+  await expect(panel).toBeHidden({ timeout: 10_000 });
 });
 
 test("sheet casts psychic psi cantrip amps with focus", async ({ page }) => {

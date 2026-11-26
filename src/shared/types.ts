@@ -2185,6 +2185,7 @@ export interface ClientToServerEvents {
   "scene:delete": (payload: { campaignId: string; sceneId: string }) => void;
   "scene:reorder": (payload: { campaignId: string; sceneIds: string[] }) => void;
   "template:add": (payload: { campaignId: string; sceneId: string; template: AoeTemplate }) => void;
+  "template:remove": (payload: { campaignId: string; sceneId: string; templateId: string }) => void;
   "template:clear": (payload: { campaignId: string; sceneId: string }) => void;
   "scene:walls": (payload: { campaignId: string; sceneId: string; walls: Wall[] }) => void;
   "scene:props": (payload: { campaignId: string; sceneId: string; props: SceneProp[] }) => void;
