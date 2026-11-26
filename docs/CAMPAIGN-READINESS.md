@@ -25,12 +25,13 @@ The rest of this document records what is verified and what remains manual, so a
 | Check | Result |
 | --- | --- |
 | `npm run check` | Typecheck, lint, formatting, unit tests, production build, and bundle budget pass |
-| Unit tests | 675 passing |
-| `npm run e2e` | 50 passing browser scenarios |
+| Unit tests | 812 passing |
+| `npm run e2e` | 36 passing browser scenarios |
 | `npm run smoke` | End-to-end smoke suite passes |
-| `npm run simulate:campaign` | 85 passed, 0 failed, 0 observations |
+| `npm run simulate:campaign` | 18 passed, 0 failed, 0 observations per run |
+| `npm run simulate:parties` | 22 passed, 0 failed, 0 observations (7 campaigns, 29 characters, 140 level steps) |
 
-The campaign simulation exercises two complete 1–20 campaigns, including XP and milestone advancement, party catch-up, long rests, loot, shops, downtime, travel, sessions, quest XP, ownership transfer, export/import, revisions, and permission boundaries.
+The campaign simulation exercises two complete 1-20 campaigns per run, one XP and one milestone, including tokens, hidden scene layers, party advancement, level-20 cap, export/import, revisions, and permission boundaries. The party simulation advances seven class-combination campaigns from level 1 to 20, rebuilding and saving all 29 remaster classes through the real character API at every level.
 
 ---
 
@@ -141,6 +142,7 @@ npm run check
 npm run smoke
 npm run e2e
 npm run simulate:campaign
+npm run simulate:parties
 ```
 
 Campaign simulation reports:
