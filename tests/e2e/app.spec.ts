@@ -1874,7 +1874,10 @@ test("sheet tracks rituals and innate spells", async ({ page }) => {
   await resurrectRow.getByRole("button", { name: "Details" }).click();
   await expect(page.getByRole("heading", { name: "Resurrect" })).toBeVisible();
   await expect(page.getByText("Religion (expert)").first()).toBeVisible();
-  const secondary = page.locator("p").filter({ hasText: /Secondary casters/ }).first();
+  const secondary = page
+    .locator("p")
+    .filter({ hasText: /Secondary casters/ })
+    .first();
   await expect(secondary).toContainText("2");
   await expect(secondary).toContainText("Medicine, Society");
   await page.keyboard.press("Escape");
