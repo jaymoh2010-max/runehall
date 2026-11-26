@@ -8,6 +8,12 @@ import type {
   StudiousSlotSpell,
 } from "./types";
 import { activeGrantChoiceGroups } from "./classGrantChoices";
+import {
+  ORACLE_MYSTERY_SPELLS,
+  SORCERER_BLOODLINE_FOCUS,
+  SORCERER_BLOODLINE_SPELLS,
+  WIZARD_CURRICULUM_SPELLS,
+} from "./classSpellData";
 
 export type { ClassGrant, ClassGrantFeat, ClassGrantSpell, ClassGrantSpellKind } from "./types";
 
@@ -216,7 +222,7 @@ export const CLASS_GRANTS: Record<string, ClassGrant> = {
       curriculum("spell:Gb7SeieEvd0pL2Eh", "Sure Strike"),
     ],
     notes: [
-      "Runelord: the chosen sin grants its focus spell and rank-0/rank-1 sin curriculum. Personal rune, arcane bond, polearm/spear training, higher-rank sin curriculum, and Runelord Dedication remain manual.",
+      "Runelord: the chosen sin grants its focus spell and full sin curriculum. Personal rune, arcane bond, and polearm/spear training remain manual.",
     ],
   },
   "cf:wObrT6PytPdS5aUi": {
@@ -347,7 +353,7 @@ export const CLASS_GRANTS: Record<string, ClassGrant> = {
       curriculum("spell:gpzpAAAJ1Lza2JVl", "Detect Magic", 0),
       curriculum("spell:4WAib3GichxLjp5p", "Alarm"),
     ],
-    notes: ["Rooted Wisdom: choose one secondary branch; its curriculum remains manual."],
+    notes: ["Rooted Wisdom: the chosen secondary branch's additional curriculum is granted."],
   },
   "cf:0QAFC61tpP63GUQa": {
     spells: [
@@ -494,6 +500,7 @@ export const CLASS_GRANTS: Record<string, ClassGrant> = {
       repertoire("spell:gpzpAAAJ1Lza2JVl", "Detect Magic", 0),
       repertoire("spell:gKKqvLohtrSJj3BM", "Force Barrage"),
     ],
+    notes: ["Imperial: the advanced bloodline spell Extend is not in the compendium."],
   },
   "cf:5Wxjghw7lHuCxjZz": {
     spells: [
@@ -644,15 +651,43 @@ export const CLASS_GRANTS: Record<string, ClassGrant> = {
   },
 };
 
+// The compendium descriptions list every bloodline gift, mystery spell, and
+// school curriculum entry. Use the generated data as the source of truth so
+// higher-rank grants stay in sync with the class features.
+for (const [featureId, spells] of Object.entries(SORCERER_BLOODLINE_SPELLS)) {
+  const grant = CLASS_GRANTS[featureId] ?? {};
+  CLASS_GRANTS[featureId] = grant;
+  const initial = SORCERER_BLOODLINE_FOCUS[featureId]?.initial;
+  grant.spells = [
+    ...(initial ? [focus(initial.id, initial.name)] : []),
+    ...spells.map((spell) => repertoire(spell.id, spell.name, spell.rank)),
+  ];
+}
+
+for (const [featureId, spells] of Object.entries(ORACLE_MYSTERY_SPELLS)) {
+  const grant = CLASS_GRANTS[featureId] ?? {};
+  CLASS_GRANTS[featureId] = grant;
+  grant.spells = spells.map((spell) => repertoire(spell.id, spell.name, spell.rank));
+}
+
+for (const [featureId, spells] of Object.entries(WIZARD_CURRICULUM_SPELLS)) {
+  const grant = CLASS_GRANTS[featureId] ?? {};
+  CLASS_GRANTS[featureId] = grant;
+  grant.spells = [
+    ...(grant.spells ?? []).filter((spell) => spell.kind !== "curriculum"),
+    ...spells.map((spell) => curriculum(spell.id, spell.name, spell.rank)),
+  ];
+}
+
 const CLASS_NOTES: Record<string, string[]> = {
   champion: [
     "The devotion spell choice is filtered by your deity's divine font; Lay on Hands requires heal, Touch of the Void requires harm, and Shields of the Spirit is always legal. Cause sanctification, blessings, and higher-level focus spells remain manual.",
   ],
   wizard: [
-    "Rank-0 and rank-1 school curriculum spells are granted automatically, including the chosen Runelord sin's focus spell and rank-0/rank-1 sin curriculum. Higher-rank curriculum, Rooted Wisdom branch spells, personal runes, and arcane bonds remain manual.",
+    "School curriculum spells are granted at every rank, including the chosen Runelord sin and Rooted Wisdom branch. Personal runes, arcane bonds, and spellbook accounting remain manual.",
   ],
   sorcerer: [
-    "The fixed bloodline cantrip and 1st-rank gift are granted automatically; Elemental's chosen element grants its cantrip and 1st-rank gift. Higher-rank and advanced bloodline gifts remain manual.",
+    "Bloodline gifts are granted at every rank. Elemental influence, genie type, and draconic tradition choices fill in their variable gifts; advanced and greater bloodline spells are chosen on the Class step after taking their feats.",
   ],
   cleric: [
     "Divine font slots are heal-or-harm only and are tracked separately from ordinary slots.",

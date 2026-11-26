@@ -1,4 +1,13 @@
 import type { CharacterDraft, ClassData, ClassGrant, ClassGrantSpell, Deity } from "./types";
+import {
+  ORACLE_REVELATIONS,
+  RUNELORD_SIN_SPELLS,
+  SORCERER_BLOODLINE_FOCUS,
+  SORCERER_DRACONIC_GIFTS,
+  SORCERER_ELEMENT_GIFTS,
+  SORCERER_GENIE_GIFTS,
+  WIZARD_BRANCH_SPELLS,
+} from "./classSpellData";
 
 function focus(id: string, name: string, source?: string): ClassGrantSpell {
   return { id, name, rank: 1, kind: "focus", source };
@@ -26,6 +35,8 @@ export interface GrantChoiceOption {
   domain?: string;
   /** Requires this entry in the deity's font. */
   requiresDeityFont?: "heal" | "harm";
+  /** Requires this class-choice option (bloodline, mystery, arcane school). */
+  requiresClassOption?: string;
   hint?: string;
 }
 
@@ -72,11 +83,18 @@ export const GRANT_CHOICE_KEYS = {
   clericAdvancedDomain: "grant:cleric-advanced-domain",
   championDevotion: "grant:champion-devotion",
   sorcererElement: "grant:sorcerer-element",
+  sorcererGenie: "grant:sorcerer-genie",
+  sorcererDraconic: "grant:sorcerer-draconic",
+  sorcererAdvancedBloodline: "grant:sorcerer-advanced-bloodline",
+  sorcererGreaterBloodline: "grant:sorcerer-greater-bloodline",
   runelordSin: "grant:runelord-sin",
+  wizardRootedBranch: "grant:wizard-rooted-branch",
   witchHex: "grant:witch-hex",
   oracleMystery: "grant:oracle-mystery",
   oracleDomainAcumen: "grant:oracle-domain-acumen",
   oracleDomainFluency: "grant:oracle-domain-fluency",
+  oracleAdvancedRevelation: "grant:oracle-advanced-revelation",
+  oracleGreaterRevelation: "grant:oracle-greater-revelation",
 } as const;
 
 const DOMAIN_NAMES: Record<string, string> = {
@@ -333,74 +351,129 @@ function advancedDomainOption(domain: string): GrantChoiceOption {
   };
 }
 
-const ELEMENT_OPTIONS: GrantChoiceOption[] = [
-  {
-    id: "air",
-    name: "Air",
+const ELEMENT_NAMES: Record<string, string> = {
+  air: "Air",
+  earth: "Earth",
+  fire: "Fire",
+  metal: "Metal",
+  water: "Water",
+  wood: "Wood",
+};
+
+function spellGiftOption(
+  id: string,
+  name: string,
+  spells: Array<{ id: string; name: string; rank: number }>,
+  requiresClassOption?: string
+): GrantChoiceOption {
+  return {
+    id,
+    name,
+    ...(requiresClassOption ? { requiresClassOption } : {}),
     grant: {
-      spells: [
-        repertoire("spell:dDiOnjcsBFbAvP6t", "Gale Blast", 0),
-        repertoire("spell:KcLVELhCUcKXxiKE", "Tailwind", 1),
-      ],
+      spells: spells.map((spell) => repertoire(spell.id, spell.name, spell.rank)),
     },
-    hint: "Gale Blast · Tailwind",
-  },
-  {
-    id: "earth",
-    name: "Earth",
+    hint: spells.map((spell) => `${spell.name} (rank ${spell.rank})`).join(" · "),
+  };
+}
+
+const ELEMENT_OPTIONS: GrantChoiceOption[] = Object.entries(SORCERER_ELEMENT_GIFTS).map(
+  ([element, spells]) => spellGiftOption(element, ELEMENT_NAMES[element] ?? element, spells)
+);
+
+const GENIE_OPTIONS: GrantChoiceOption[] = Object.entries(SORCERER_GENIE_GIFTS).map(
+  ([genie, spells]) => spellGiftOption(genie, genie, spells)
+);
+
+const DRACONIC_OPTIONS: GrantChoiceOption[] = Object.entries(SORCERER_DRACONIC_GIFTS).map(
+  ([tradition, spells]) => spellGiftOption(tradition, tradition, spells)
+);
+
+const ADVANCED_BLOODLINE_OPTIONS: GrantChoiceOption[] = Object.entries(
+  SORCERER_BLOODLINE_FOCUS
+).flatMap(([featureId, focusData]) => {
+  const spell = focusData.advanced;
+  if (!spell) return [];
+  return [
+    {
+      id: `advanced-bloodline:${featureId}`,
+      name: spell.name,
+      requiresClassOption: featureId,
+      grant: { spells: [focus(spell.id, spell.name)] },
+      hint: `${focusData.name} advanced bloodline spell`,
+    },
+  ];
+});
+
+const GREATER_BLOODLINE_OPTIONS: GrantChoiceOption[] = Object.entries(
+  SORCERER_BLOODLINE_FOCUS
+).flatMap(([featureId, focusData]) => {
+  const spell = focusData.greater;
+  if (!spell) return [];
+  return [
+    {
+      id: `greater-bloodline:${featureId}`,
+      name: spell.name,
+      requiresClassOption: featureId,
+      grant: { spells: [focus(spell.id, spell.name)] },
+      hint: `${focusData.name} greater bloodline spell`,
+    },
+  ];
+});
+
+const ADVANCED_REVELATION_OPTIONS: GrantChoiceOption[] = Object.entries(ORACLE_REVELATIONS).flatMap(
+  ([featureId, mystery]) => {
+    const spell = mystery.advanced;
+    if (!spell) return [];
+    return [
+      {
+        id: `advanced-revelation:${featureId}`,
+        name: spell.name,
+        requiresClassOption: featureId,
+        grant: { spells: [focus(spell.id, spell.name)] },
+        hint: `${mystery.name} advanced revelation`,
+      },
+    ];
+  }
+);
+
+const GREATER_REVELATION_OPTIONS: GrantChoiceOption[] = Object.entries(ORACLE_REVELATIONS).flatMap(
+  ([featureId, mystery]) => {
+    const spell = mystery.greater;
+    if (!spell) return [];
+    return [
+      {
+        id: `greater-revelation:${featureId}`,
+        name: spell.name,
+        requiresClassOption: featureId,
+        grant: { spells: [focus(spell.id, spell.name)] },
+        hint: `${mystery.name} greater revelation`,
+      },
+    ];
+  }
+);
+
+const ROOTED_BRANCH_NAMES: Record<string, string> = {
+  "cf:4fmks2barqWlLtik": "Cascade Bearers",
+  "cf:JhczMKRuy53BxqBi": "Emerald Boughs",
+  "cf:Oa0ENh8Zh7BftViG": "Rain-Scribes",
+  "cf:bYooavyooaCqdhYJ": "Tempest-Sun Mages",
+  "cf:ivtpFSNKYZGvApBe": "Uzunjati",
+};
+
+const ROOTED_BRANCH_OPTIONS: GrantChoiceOption[] = Object.entries(WIZARD_BRANCH_SPELLS).map(
+  ([featureId, spells]) => ({
+    id: featureId,
+    name: ROOTED_BRANCH_NAMES[featureId] ?? featureId,
     grant: {
-      spells: [
-        repertoire("spell:zA0jNIBRgLsyTpbm", "Scatter Scree", 0),
-        repertoire("spell:Rn2LkoSq1XhLsODV", "Pummeling Rubble", 1),
-      ],
+      spells: spells.map((spell) => curriculum(spell.id, spell.name, spell.rank)),
     },
-    hint: "Scatter Scree · Pummeling Rubble",
-  },
-  {
-    id: "fire",
-    name: "Fire",
-    grant: {
-      spells: [
-        repertoire("spell:6DfLZBl8wKIV03Iq", "Ignition", 0),
-        repertoire("spell:y6rAdMK6EFlV6U0t", "Breathe Fire", 1),
-      ],
-    },
-    hint: "Ignition · Breathe Fire",
-  },
-  {
-    id: "metal",
-    name: "Metal",
-    grant: {
-      spells: [
-        repertoire("spell:kBhaPuzLUSwS6vVf", "Electric Arc", 0),
-        repertoire("spell:zDJS8E66UI0himqV", "Thunderstrike", 1),
-      ],
-    },
-    hint: "Electric Arc · Thunderstrike",
-  },
-  {
-    id: "water",
-    name: "Water",
-    grant: {
-      spells: [
-        repertoire("spell:IxhGEKl63R4QBvkj", "Frostbite", 0),
-        repertoire("spell:jfVCuOpzC6mUrf6f", "Hydraulic Push", 1),
-      ],
-    },
-    hint: "Frostbite · Hydraulic Push",
-  },
-  {
-    id: "wood",
-    name: "Wood",
-    grant: {
-      spells: [
-        repertoire("spell:uZK2BYzPnxUBnDjr", "Tangle Vine", 0),
-        repertoire("spell:qXTB7Ec9yYh5JPPV", "Cleanse Cuisine", 1),
-      ],
-    },
-    hint: "Tangle Vine · Cleanse Cuisine",
-  },
-];
+    hint: spells
+      .slice(0, 3)
+      .map((spell) => spell.name)
+      .join(" · "),
+  })
+);
 
 interface SinData {
   focus: [string, string];
@@ -500,17 +573,23 @@ const SIN_NAMES: Record<string, string> = {
 
 function sinOption(sin: string): GrantChoiceOption {
   const data = SIN_DATA[sin];
+  const generated = RUNELORD_SIN_SPELLS[sin];
+  const spells = generated?.length
+    ? generated
+    : [
+        ...data.cantrips.map(([id, name]) => ({ id, name, rank: 0 })),
+        ...data.first.map(([id, name]) => ({ id, name, rank: 1 })),
+      ];
   return {
     id: sin,
     name: SIN_NAMES[sin] ?? sin,
     grant: {
       spells: [
         focus(data.focus[0], data.focus[1]),
-        ...data.cantrips.map(([id, name]) => curriculum(id, name, 0)),
-        ...data.first.map(([id, name]) => curriculum(id, name, 1)),
+        ...spells.map((spell) => curriculum(spell.id, spell.name, spell.rank)),
       ],
     },
-    hint: `${data.focus[1]} · sin curriculum`,
+    hint: `${data.focus[1]} · full sin curriculum`,
   };
 }
 
@@ -627,6 +706,44 @@ export const GRANT_CHOICE_GROUPS: GrantChoiceGroup[] = [
     options: ELEMENT_OPTIONS,
   },
   {
+    key: GRANT_CHOICE_KEYS.sorcererGenie,
+    prompt: "Genie bloodline: choose a genie type.",
+    chooseLabel: "genie type",
+    count: 1,
+    minLevel: 1,
+    source: { kind: "class-option", optionId: "cf:tYOMBiH3HbViNWwn" },
+    options: GENIE_OPTIONS,
+  },
+  {
+    key: GRANT_CHOICE_KEYS.sorcererDraconic,
+    prompt: "Draconic bloodline: choose a draconic exemplar tradition.",
+    chooseLabel: "draconic tradition",
+    count: 1,
+    minLevel: 1,
+    source: { kind: "class-option", optionId: "cf:ZHabYxSgYK0XbjhM" },
+    options: DRACONIC_OPTIONS,
+  },
+  {
+    key: GRANT_CHOICE_KEYS.sorcererAdvancedBloodline,
+    prompt: "Advanced Bloodline: choose your advanced bloodline spell.",
+    chooseLabel: "advanced bloodline spell",
+    count: 1,
+    minLevel: 6,
+    source: { kind: "feat", featId: "feat:eZrftEihfuJBldG5" },
+    emptyHint: "Choose a bloodline on the Class step first.",
+    options: ADVANCED_BLOODLINE_OPTIONS,
+  },
+  {
+    key: GRANT_CHOICE_KEYS.sorcererGreaterBloodline,
+    prompt: "Greater Bloodline: choose your greater bloodline spell.",
+    chooseLabel: "greater bloodline spell",
+    count: 1,
+    minLevel: 10,
+    source: { kind: "feat", featId: "feat:DpRMdytpPiCypmkJ" },
+    emptyHint: "Choose a bloodline on the Class step first.",
+    options: GREATER_BLOODLINE_OPTIONS,
+  },
+  {
     key: GRANT_CHOICE_KEYS.runelordSin,
     prompt: "Runelord: choose your sin.",
     chooseLabel: "sin",
@@ -634,6 +751,15 @@ export const GRANT_CHOICE_GROUPS: GrantChoiceGroup[] = [
     minLevel: 1,
     source: { kind: "class-option", optionId: "cf:HYTaibaCGE85rhbZ" },
     options: ["envy", "gluttony", "greed", "lust", "pride", "sloth", "wrath"].map(sinOption),
+  },
+  {
+    key: GRANT_CHOICE_KEYS.wizardRootedBranch,
+    prompt: "Rooted Wisdom: choose a secondary branch.",
+    chooseLabel: "branch",
+    count: 1,
+    minLevel: 1,
+    source: { kind: "class-option", optionId: "cf:KGkWSv9rARpwWzXW" },
+    options: ROOTED_BRANCH_OPTIONS,
   },
   {
     key: GRANT_CHOICE_KEYS.witchHex,
@@ -678,6 +804,26 @@ export const GRANT_CHOICE_GROUPS: GrantChoiceGroup[] = [
     emptyHint: "Choose an initial mystery domain spell first.",
     options: Object.keys(DOMAIN_ADVANCED_SPELLS).map(advancedDomainOption),
   },
+  {
+    key: GRANT_CHOICE_KEYS.oracleAdvancedRevelation,
+    prompt: "Advanced Revelation: choose your advanced revelation spell.",
+    chooseLabel: "advanced revelation",
+    count: 1,
+    minLevel: 6,
+    source: { kind: "feat", featId: "feat:FPVe3o7YctBicSQa" },
+    emptyHint: "Choose a mystery on the Class step first.",
+    options: ADVANCED_REVELATION_OPTIONS,
+  },
+  {
+    key: GRANT_CHOICE_KEYS.oracleGreaterRevelation,
+    prompt: "Greater Revelation: choose your greater revelation spell.",
+    chooseLabel: "greater revelation",
+    count: 1,
+    minLevel: 12,
+    source: { kind: "feat", featId: "feat:HSW3N9pfHhM7upRB" },
+    emptyHint: "Choose a mystery on the Class step first.",
+    options: GREATER_REVELATION_OPTIONS,
+  },
 ];
 
 export function activeGrantChoiceGroups(
@@ -718,6 +864,7 @@ export function activeGrantChoiceGroups(
     return selectedTags.has(source.tag);
   };
   const optionAllowed = (option: GrantChoiceOption, group: GrantChoiceGroup) => {
+    if (option.requiresClassOption) return selectedOptionIds.has(option.requiresClassOption);
     if (option.domain) {
       if (group.domainScope?.startsWith("mystery")) return true;
       if (!deity) return false;

@@ -2,7 +2,7 @@
 
 Date: 2026-11-23
 
-Status: review complete. Sprint 1 (the daily spellcasting loop), the class-grant portion of Sprint 2, the first table-magic pass of Sprint 3, the magus studious-slot pass of Sprint 4, the animist prepared/spontaneous split of Sprint 5, the spontaneous known-at-rank pass of Sprint 6, the psychic psi-amp pass of Sprint 7, the table Sustain-reminder pass of Sprint 8, the higher-slot downcast pass of Sprint 9, the scroll-spellcasting pass of Sprint 10, the Magic Wand spellcasting pass of Sprint 11, the fixed-spell specific-wand pass of Sprint 12, the expanded/advanced domain pass of Sprint 13, the flexible-wand pass of Sprint 14, the staff/trait-restricted wand pass of Sprint 15, the ritual-detail pass of Sprint 16, the spell-source label pass of Sprint 17, the staff-slot/repeated-domain pass of Sprint 18, the oracle mystery-domain pass of Sprint 19, the Learn-a-Spell pass of Sprint 20, the last-staff-list pass of Sprint 21, the multiclass-dedication pass of Sprint 22, the multiclass-slot pass of Sprint 23, the variable-tradition dedication pass of Sprint 24, and the heightening/starting-budget pass of Sprint 25 were implemented on 2026-11-23 through 2026-11-26. The findings below describe the pre-Sprint state; the implementation status sections record what changed, and the remaining class and table gaps stay in the backlog.
+Status: review complete. Sprint 1 (the daily spellcasting loop), the class-grant portion of Sprint 2, the first table-magic pass of Sprint 3, the magus studious-slot pass of Sprint 4, the animist prepared/spontaneous split of Sprint 5, the spontaneous known-at-rank pass of Sprint 6, the psychic psi-amp pass of Sprint 7, the table Sustain-reminder pass of Sprint 8, the higher-slot downcast pass of Sprint 9, the scroll-spellcasting pass of Sprint 10, the Magic Wand spellcasting pass of Sprint 11, the fixed-spell specific-wand pass of Sprint 12, the expanded/advanced domain pass of Sprint 13, the flexible-wand pass of Sprint 14, the staff/trait-restricted wand pass of Sprint 15, the ritual-detail pass of Sprint 16, the spell-source label pass of Sprint 17, the staff-slot/repeated-domain pass of Sprint 18, the oracle mystery-domain pass of Sprint 19, the Learn-a-Spell pass of Sprint 20, the last-staff-list pass of Sprint 21, the multiclass-dedication pass of Sprint 22, the multiclass-slot pass of Sprint 23, the variable-tradition dedication pass of Sprint 24, the heightening/starting-budget pass of Sprint 25, and the higher-rank class-choice pass of Sprint 26 were implemented on 2026-11-23 through 2026-11-26. The findings below describe the pre-Sprint state; the implementation status sections record what changed, and the remaining class and table gaps stay in the backlog.
 
 > **Follow-up (2026-11-23):** `docs/RULES-AUDIT.md` corrected two table errors
 > this review did not catch: bards use the 2/3 full-caster slot table (not the
@@ -299,7 +299,7 @@ Variable-tradition dedications are implemented:
 - The builder asks for the dedication's tradition before allowing cantrip or ranked-spell picks.
 - Changing the tradition clears the dedication selections to avoid stale invalid spells.
 - Validation warns until the tradition is chosen and rejects spells outside it.
-- Archetype spell heightening remains manual.
+- Archetype spell heightening is implemented; other dedication details remain manual.
 
 ## Sprint 25 implementation status (2026-11-26)
 
@@ -309,6 +309,17 @@ Multiclass heightening and starting-spellbook guidance are implemented:
 - The selected slot rank is recorded and used as the effective cast rank.
 - Spellbook/familiar/dirge classes see a starting-contents card with their starting cantrips, ranked spells, gold budget, and two-spells-per-level guidance.
 - Current cantrip and ranked-spell counts are shown for comparison; the budget is advisory rather than enforced.
+
+## Sprint 26 implementation status (2026-11-26)
+
+Higher-rank class spell choices are implemented:
+
+- All 18 sorcerer bloodlines grant their bloodline gifts at every rank. Elemental influence, genie type, and draconic exemplar choices fill in the variable ranks.
+- Advanced Bloodline and Greater Bloodline grant their focus spells when the feats are selected.
+- All 11 oracle mysteries grant their listed mystery spells. Advanced Revelation and Greater Revelation grant their focus spells.
+- All wizard schools grant rank-0 through rank-9 curriculum spells. Runelord sins grant their full sin curricula, and Rooted Wisdom branches grant their additional curriculum.
+- Imperial's advanced bloodline spell Extend and Corentyn Armada's 3rd-rank aquatic arsenal are absent from the compendium, so those two entries remain explicit notes rather than guessed ids.
+- Unified Magical Theory's free 1st-level feat and spell remain manual.
 
 ## Rules baseline
 
@@ -335,8 +346,8 @@ Multiclass heightening and starting-spellbook guidance are implemented:
 | Magus | Bounded prepared arcane | Spellbook; 8 starting cantrips; prepares 5 cantrips; conflux focus spells; studious spell slots from 7th level |
 | Necromancer | Bounded prepared occult | Dirge spell list; grave focus spells; focus pool 2 |
 | Bard | Full spontaneous occult | Repertoire; muse grants a repertoire spell; composition cantrips; signature spells |
-| Sorcerer | Full spontaneous, bloodline tradition | Repertoire; bloodline cantrip, 1st-rank gift, focus spell, and higher-rank gifts; signature spells |
-| Oracle | Full spontaneous divine | Repertoire; mystery revelation focus spells; curse; signature spells |
+| Sorcerer | Full spontaneous, bloodline tradition | Repertoire; bloodline cantrip, gifts at every rank, initial focus spell, and advanced/greater bloodline focus spells; signature spells |
+| Oracle | Full spontaneous divine | Repertoire; mystery granted spells and initial/advanced/greater revelation focus spells; curse; signature spells |
 | Psychic | Bounded spontaneous occult | 3 regular cantrips plus 3 psi cantrips; amps spend Focus Points; focus pool 2, increasing to 3 with Clarity of Focus; signature spells; 10th-rank capstone |
 | Summoner | Bounded spontaneous, eidolon tradition | Repertoire; link spell (focus) and link cantrip (no Focus Point cost); signature spells |
 | Champion | Focus only, divine | Devotion spells use the focus pool; no spell slots |
@@ -368,7 +379,7 @@ Legend: Yes = modeled and usable; Partial = some support with known gaps; No = n
 | Bounded-caster slots | Yes | Magus, summoner, psychic, and necromancer; psychic/necromancer get the 10th-rank capstone |
 | Prepared copies by rank | Yes | Duplicates, upcasting, and rank-aware validation |
 | Divine font | Yes | Rank, slot count, dual-font choice, separate usage |
-| Wizard curriculum | Partial | Extra slot and rank-1 validation; higher-rank curriculum lists remain manual |
+| Wizard curriculum | Partial | Extra slot and rank-aware validation; all schools grant rank-0 through rank-9 curriculum, including Runelord sins and Rooted Wisdom branches; Unified Magical Theory's free feat/spell remains manual |
 | Prepared cantrips | Yes | Daily prepared list, class caps, and the wizard curriculum extra |
 | Spell source presentation | Partial | Class-specific spellbook/familiar/dirge/spell-list/repertoire labels and starting-contents guidance; the full spellbook/known data split remains open |
 | Learn a Spell | Partial | Cost by rank/rarity, rank DC, gold deduction, known-list addition, and starting-contents guidance; the check, downtime day, and strict starting budget remain manual |
@@ -376,11 +387,11 @@ Legend: Yes = modeled and usable; Partial = some support with known gaps; No = n
 | Spontaneous heightening by learned rank | Yes | Known ranks are tracked; signature spells heighten upward and non-signature spells can downcast from higher slots |
 | Signature spells | Yes | One per rank, level 3 gate, validation |
 | Focus points and focus casting | Partial | Separate focus spell DC/attack works; psi amps now spend focus, while some feat-granted pools remain manual |
-| Focus spells from feats/archetypes | Partial | Manual focus list; no automatic grants or pool changes |
+| Focus spells from feats/archetypes | Partial | Advanced Bloodline, Greater Bloodline, Advanced Revelation, and Greater Revelation are automatic; other archetype focus spells remain manual |
 | Innate spells and uses | Partial | Uses and casting work; innate attack/DC is derived separately |
 | Cleric deity spells | Yes | Deity spells are offered to prepare; higher-rank deity spells appear as level permits |
 | Cleric domains | Partial | Domain Initiate, Expanded Domain Initiate, and repeated Advanced Domain picks grant focus spells from the deity's domains; later domain feats remain manual |
-| Oracle mystery domains | Partial | Domain Acumen and Domain Fluency grant mystery-linked initial and advanced domain spells; other oracle mystery gifts remain manual |
+| Oracle mystery domains | Partial | Mystery granted spells, Domain Acumen/Fluency, and Advanced/Greater Revelation are automatic; the curse, mystery skill, and deity access remain manual |
 | Psychic conscious minds | Partial | 1st-rank spell, psi cantrips, and amp casting are granted; higher-level unique cantrips remain manual |
 | Necromancer grave spells | Partial | Necrotic Bomb and grim fascination spells granted; thralls and effects manual |
 | Summoner link spells | Yes | Evolution Surge and Boost Eidolon granted; eidolon actions remain manual |
@@ -477,18 +488,18 @@ Fix: At minimum, introduce labels by class (`spellbook`, `familiar`, `dirge`, `s
 
 ### F6. Several class resources are missing or hard-coded (P1)
 
-Status: partly fixed in Sprint 2, Sprint 4, Sprint 5, Sprint 7, and Sprint 13. Psychic, necromancer, summoner, cleric deity spells and domains, magus studious slots, the animist prepared/spontaneous split, and psychic psi amps are now granted or tracked.
+Status: partly fixed in Sprint 2, Sprint 4, Sprint 5, Sprint 7, Sprint 13, and Sprint 26. Psychic, necromancer, summoner, cleric deity spells and domains, magus studious slots, the animist prepared/spontaneous split, psychic psi amps, and the higher-rank bloodline, mystery, and curriculum lists are now granted or tracked.
 
 - **Psychic**: repertoire limits, conscious-mind 1st-rank spells, psi cantrips, and amp casting are granted; amps spend focus and show their summaries in the builder and sheet. Higher-level unique psi cantrips remain manual.
 - **Necromancer**: Necrotic Bomb, grim fascination grave spells, and the focus pool are granted. Thralls and full grave-spell effects remain manual.
 - **Magus**: studious slots are tracked at 7th/11th/13th level with the hybrid-study spell list. Spellstrike, Arcane Cascade, and conflux spell recharge remain manual.
 - **Summoner**: `evolution surge` and `boost eidolon` are granted; the link cantrip does not count toward the focus pool. Eidolon actions remain manual.
 - **Animist**: prepared animist slots and spontaneous apparition slots are separate. Attuned apparitions supply a curated repertoire, the primary apparition grants its vessel focus spell, and apparition slots reset during daily preparations. Invocations and wandering-feat retraining remain manual.
-- **Wizard**: higher-rank curriculum spells are not granted, so the extra slot is effectively unrestricted at those ranks.
-- **Sorcerer/oracle**: oracle Domain Acumen and Domain Fluency now grant mystery-linked domain spells; higher-rank bloodline gifts and other oracle mystery spells remain manual.
+- **Wizard**: rank-0 through rank-9 curriculum spells are granted for each school, including Runelord sins and Rooted Wisdom branches, so the extra slot is restricted at every rank. Unified Magical Theory's free feat and spell remain manual.
+- **Sorcerer/oracle**: bloodline gifts are granted at every rank, including the Elemental, Genie, and Draconic variable choices; advanced and greater bloodline spells are granted by their feats. Oracle mysteries grant their listed spells, and Advanced/Greater Revelation are granted by their feats. Oracle curse effects and mystery skills remain manual.
 - **Cleric**: deity spells are resolved and offered through the normal preparation workflow. Domain Initiate, Expanded Domain Initiate, and Advanced Domain grant their domain focus spells; repeated Advanced Domain picks are supported, while later domain feats remain manual.
 
-Impact: These classes are usable only with manual bookkeeping. The most visible remaining class gaps are higher-level class-specific gifts and item spellcasting.
+Impact: These classes are usable only with manual bookkeeping for their remaining niche resources.
 
 Fix: Treat class completeness as a separate sprint. Start with grants and caps that can be curated from existing class-choice descriptions; avoid a generic parser until the curated path is stable.
 
@@ -572,9 +583,9 @@ Status: partly fixed in Sprint 22, Sprint 23, Sprint 24, and Sprint 25. Spellcas
 
 `casterInfo` reads only `context.classData`. Spellcasting dedication feats now add dedication cantrips, ranked spells, and delayed slots.
 
-Impact: A fighter with a wizard dedication can track and cast the archetype's cantrips and ranked spells with the correct DC and slots; higher-level archetype heightening is still manual.
+Impact: A fighter with a wizard dedication can track and cast the archetype's cantrips and ranked spells with the correct DC and slots, including casting them from higher-rank dedication slots.
 
-Fix: Resolve bloodline/patron/eidolon-dependent traditions and archetype heightening. Do not fake it by changing the primary class's progression.
+Fix: Variable traditions are now chosen in the builder, and dedication spells can use higher-rank dedication slots. Do not fake archetype casting by changing the primary class's progression.
 
 ### F14. Spellbook capacity and spell learning are not enforced (P2)
 
@@ -707,8 +718,8 @@ Tasks:
 
 5. **Cleric, Wizard, Sorcerer, Oracle**
    - Resolve `deity.spells` UUIDs and add deity spells to the cleric's available list.
-   - Curate higher-rank wizard curriculum spells from the arcane-school descriptions.
-   - Curate higher-rank bloodline and mystery gifts, or keep them explicit manual notes.
+   - Curate higher-rank wizard curriculum spells from the arcane-school descriptions. (Implemented in Sprint 26, including Runelord sins and Rooted Wisdom branches.)
+   - Curate higher-rank bloodline and mystery gifts, or keep them explicit manual notes. (Implemented in Sprint 26, including advanced and greater focus spells.)
 
 6. **Animist**
    - Separate prepared animist slots from spontaneous apparition slots.
