@@ -50,6 +50,7 @@ import {
   scrollSpellRank,
   specificWandSpell,
   staffSpells,
+  staffSpecialEffect,
   wandSpellRank,
 } from "../../../shared/itemSpellcasting";
 import { SpellPicker } from "../builder/pickers";
@@ -445,6 +446,7 @@ export function CharacterSheetView({
     spells: { spell: Spell; rank: number }[];
   } | null>(null);
   const [staffCharge, setStaffCharge] = useState<Equipment | null>(null);
+  const [staffEffect, setStaffEffect] = useState<Equipment | null>(null);
   const [ritualView, setRitualView] = useState<Spell | null>(null);
   const [learnOpen, setLearnOpen] = useState(false);
   const characterRef = useRef<CharacterRecord | null>(null);
@@ -2720,6 +2722,14 @@ export function CharacterSheetView({
                                         <button
                                           type="button"
                                           className="pb-small-button"
+                                          aria-label={`View ${item.name} effects`}
+                                          onClick={() => setStaffEffect(item)}
+                                        >
+                                          Effects
+                                        </button>
+                                        <button
+                                          type="button"
+                                          className="pb-small-button"
                                           disabled={!canEdit}
                                           aria-label={`Cast spell from ${item.name}`}
                                           onClick={() =>
@@ -3908,6 +3918,35 @@ export function CharacterSheetView({
               </div>
             );
           })()}
+        </Modal>
+      ) : null}
+      {staffEffect ? (
+        <Modal
+          open
+          onClose={() => setStaffEffect(null)}
+          title={`${staffEffect.name} effects`}
+          subtitle="Special staff effects apply manually at the table"
+          elevated={mode === "overlay"}
+          footer={
+            <Button variant="ghost" onClick={() => setStaffEffect(null)}>
+              Close
+            </Button>
+          }
+        >
+          <div className="stack">
+            {staffSpecialEffect(staffEffect) ? (
+              <p>{staffSpecialEffect(staffEffect)}</p>
+            ) : (
+              <p>No special staff effect was found in the item text.</p>
+            )}
+            <p className="tiny muted">
+              Charges, spell casting, and spell slots are tracked. Bonuses, triggered effects, and
+              destruction effects remain manual.
+            </p>
+            <a className="pb-link" href={`/library/equipment/${staffEffect.id}`}>
+              Open the full item page
+            </a>
+          </div>
         </Modal>
       ) : null}
       {staffCharge ? (
