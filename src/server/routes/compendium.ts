@@ -26,6 +26,8 @@ import {
   searchVehicles,
   searchFamiliarAbilities,
   searchBoonsAndCurses,
+  searchTraits,
+  searchAfflictions,
   spells,
   type SearchOptions,
 } from "../compendium";
@@ -203,6 +205,16 @@ export async function registerCompendiumRoutes(app: FastifyInstance): Promise<vo
   app.get("/api/compendium/boons-and-curses", async (request, reply) => {
     const query = request.query as Record<string, unknown>;
     return reply.send(searchBoonsAndCurses(parseSearch(query)));
+  });
+
+  app.get("/api/compendium/traits", async (request, reply) => {
+    const query = request.query as Record<string, unknown>;
+    return reply.send(searchTraits(parseSearch(query)));
+  });
+
+  app.get("/api/compendium/afflictions", async (request, reply) => {
+    const query = request.query as Record<string, unknown>;
+    return reply.send(searchAfflictions(parseSearch(query)));
   });
 
   app.get("/api/compendium/monsters", async (request, reply) => {

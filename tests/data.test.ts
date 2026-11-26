@@ -16,6 +16,8 @@ import type {
   Vehicle,
   FamiliarAbility,
   BoonCurse,
+  TraitEntry,
+  Affliction,
 } from "../src/shared/types";
 import type { DomainEntry } from "../src/shared/domains";
 
@@ -42,6 +44,8 @@ const hazards = read<Hazard>("hazards.json");
 const vehicles = read<Vehicle>("vehicles.json");
 const familiarAbilities = read<FamiliarAbility>("familiarAbilities.json");
 const boonsAndCurses = read<BoonCurse>("boonsAndCurses.json");
+const traits = read<TraitEntry>("traits.json");
+const afflictions = read<Affliction>("afflictions.json");
 const ritualChecks = JSON.parse(
   fs.readFileSync(path.resolve("data", "compendium", "ritualData.json"), "utf8")
 ) as Record<string, RitualData>;
@@ -69,6 +73,8 @@ describe("compendium data", () => {
       ["vehicles", vehicles],
       ["familiarAbilities", familiarAbilities],
       ["boonsAndCurses", boonsAndCurses],
+      ["traits", traits],
+      ["afflictions", afflictions],
     ];
     for (const [key, items] of files) {
       expect(manifest.count[key], `${key} manifest count`).toBe(items.length);
@@ -624,5 +630,17 @@ describe("compendium data", () => {
       deity: "Abadar",
       tier: "major",
     });
+  });
+
+  it("includes the trait glossary and afflictions", () => {
+    expect(byName(traits, "Aberration").description).toContain("beyond the planes");
+    expect(byName(traits, "Abjuration").group).toContain("School");
+    expect(byName(afflictions, "Bog Rot")).toMatchObject({
+      category: "disease",
+      level: 0,
+      savingThrow: "DC 13 Fortitude",
+      onset: "1 day",
+    });
+    expect(byName(afflictions, "Bog Rot").stages.length).toBeGreaterThan(1);
   });
 });

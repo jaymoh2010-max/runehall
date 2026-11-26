@@ -23,6 +23,8 @@ import {
   type Vehicle,
   type FamiliarAbility,
   type BoonCurse,
+  type TraitEntry,
+  type Affliction,
 } from "../../shared/types";
 import { titleCase, traitLabel, weaponDamageLabel } from "../../shared/rules";
 import type { DomainEntry } from "../../shared/domains";
@@ -54,7 +56,9 @@ export type CompendiumEntry =
   | Hazard
   | Vehicle
   | FamiliarAbility
-  | BoonCurse;
+  | BoonCurse
+  | TraitEntry
+  | Affliction;
 
 interface CompendiumDetailProps {
   kind: CompendiumEntryKind;
@@ -143,6 +147,8 @@ function entryLevel(kind: CompendiumEntryKind, entry: CompendiumEntry): number |
       return (entry as Hazard).level;
     case "vehicle":
       return (entry as Vehicle).level;
+    case "affliction":
+      return (entry as Affliction).level;
     default:
       return null;
   }
@@ -931,6 +937,44 @@ function renderBody(kind: CompendiumEntryKind, entry: CompendiumEntry): ReactNod
             <Meta label="Deity">{boon.deity}</Meta>
           </MetaGrid>
           <Description html={boon.description} />
+        </>
+      );
+    }
+    case "trait": {
+      const trait = entry as TraitEntry;
+      return (
+        <>
+          {trait.group.length ? (
+            <MetaGrid>
+              <Meta label="Group">{trait.group.join(", ")}</Meta>
+            </MetaGrid>
+          ) : null}
+          <Description html={trait.description} empty="No trait description is stored." />
+        </>
+      );
+    }
+    case "affliction": {
+      const affliction = entry as Affliction;
+      return (
+        <>
+          <MetaGrid>
+            <Meta label="Type">{affliction.category === "disease" ? "Disease" : "Curse"}</Meta>
+            <Meta label="Level">{affliction.level}</Meta>
+            <Meta label="Saving throw">{affliction.savingThrow || "—"}</Meta>
+            <Meta label="Onset">{affliction.onset || "—"}</Meta>
+            <Meta label="Usage">{affliction.usage || "—"}</Meta>
+          </MetaGrid>
+          <Description html={affliction.description} />
+          {affliction.stages.length ? (
+            <section className="compendium-section">
+              <h3>Stages</h3>
+              <ol className="compendium-stage-list">
+                {affliction.stages.map((stage, index) => (
+                  <li key={index}>{stage}</li>
+                ))}
+              </ol>
+            </section>
+          ) : null}
         </>
       );
     }

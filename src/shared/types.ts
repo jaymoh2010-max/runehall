@@ -674,6 +674,31 @@ export interface BoonCurse extends Publication {
   description: string;
 }
 
+export interface TraitEntry extends Publication {
+  id: string;
+  name: string;
+  type: "trait";
+  group: string[];
+  rarity: string;
+  traits: string[];
+  description: string;
+}
+
+export interface Affliction extends Publication {
+  id: string;
+  name: string;
+  type: "affliction";
+  category: "disease" | "curse";
+  level: number;
+  rarity: string;
+  traits: string[];
+  description: string;
+  savingThrow: string;
+  onset: string;
+  stages: string[];
+  usage: string;
+}
+
 export interface Compendium {
   ancestries: Ancestry[];
   heritages: Heritage[];
@@ -691,6 +716,8 @@ export interface Compendium {
   vehicles: Vehicle[];
   familiarAbilities: FamiliarAbility[];
   boonsAndCurses: BoonCurse[];
+  traits: TraitEntry[];
+  afflictions: Affliction[];
 }
 
 // ---------------------------------------------------------------------------

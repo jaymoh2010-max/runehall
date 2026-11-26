@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent }
 import {
   AlertTriangle,
   BookOpen,
+  Bug,
   Cat,
   Dices,
   Gift,
@@ -16,6 +17,7 @@ import {
   Skull,
   Sparkles,
   Swords,
+  Tags,
   Truck,
   Users,
   X,
@@ -39,6 +41,8 @@ import type {
   Vehicle,
   FamiliarAbility,
   BoonCurse,
+  TraitEntry,
+  Affliction,
 } from "../../shared/types";
 import type { DomainEntry } from "../../shared/domains";
 import {
@@ -81,7 +85,9 @@ type Tab =
   | "hazards"
   | "vehicles"
   | "familiarAbilities"
-  | "boonsAndCurses";
+  | "boonsAndCurses"
+  | "traits"
+  | "afflictions";
 
 const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: "ancestries", label: "Ancestries", icon: <Users size={15} /> },
@@ -101,6 +107,8 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: "vehicles", label: "Vehicles", icon: <Truck size={15} /> },
   { id: "familiarAbilities", label: "Familiars", icon: <Cat size={15} /> },
   { id: "boonsAndCurses", label: "Boons & Curses", icon: <Gift size={15} /> },
+  { id: "traits", label: "Traits", icon: <Tags size={15} /> },
+  { id: "afflictions", label: "Afflictions", icon: <Bug size={15} /> },
 ];
 
 type Entry =
@@ -120,7 +128,9 @@ type Entry =
   | Hazard
   | Vehicle
   | FamiliarAbility
-  | BoonCurse;
+  | BoonCurse
+  | TraitEntry
+  | Affliction;
 
 const TAB_KINDS: Record<Tab, CompendiumEntryKind> = {
   ancestries: "ancestry",
@@ -140,6 +150,8 @@ const TAB_KINDS: Record<Tab, CompendiumEntryKind> = {
   vehicles: "vehicle",
   familiarAbilities: "familiarAbility",
   boonsAndCurses: "boonCurse",
+  traits: "trait",
+  afflictions: "affliction",
 };
 
 const TAB_ROUTES: Partial<Record<Tab, string>> = {
@@ -154,6 +166,8 @@ const TAB_ROUTES: Partial<Record<Tab, string>> = {
   vehicles: "/api/compendium/vehicles",
   familiarAbilities: "/api/compendium/familiar-abilities",
   boonsAndCurses: "/api/compendium/boons-and-curses",
+  traits: "/api/compendium/traits",
+  afflictions: "/api/compendium/afflictions",
 };
 
 function entrySubtitle(item: Entry, tab: Tab): string {
@@ -220,6 +234,12 @@ function entrySubtitle(item: Entry, tab: Tab): string {
     case "boonCurse": {
       const boon = item as BoonCurse;
       return `${boon.category === "boon" ? "Boon" : "Curse"} · ${boon.deity}`;
+    }
+    case "trait":
+      return (item as TraitEntry).group.join(", ") || (item as TraitEntry).source;
+    case "affliction": {
+      const affliction = item as Affliction;
+      return `${affliction.category === "disease" ? "Disease" : "Curse"} · level ${affliction.level}`;
     }
     default:
       return item.name;

@@ -37,6 +37,8 @@ const files = [
   { key: "vehicles", prefix: "veh", label: "Vehicles" },
   { key: "familiarAbilities", prefix: "fam", label: "Familiar abilities" },
   { key: "boonsAndCurses", prefix: "boon", label: "Boons & curses" },
+  { key: "traits", prefix: "trait", label: "Traits" },
+  { key: "afflictions", prefix: "aff", label: "Afflictions" },
 ];
 
 const errors = [];
@@ -260,6 +262,8 @@ requireFields("hazards", ["name", "level", "complexity", "description", "source"
 requireFields("vehicles", ["name", "level", "priceGp", "ac", "hp", "source"]);
 requireFields("familiarAbilities", ["name", "description", "source"]);
 requireFields("boonsAndCurses", ["name", "category", "description", "source"]);
+requireFields("traits", ["name", "description", "source", "group"]);
+requireFields("afflictions", ["name", "category", "level", "description", "source"]);
 
 // --- Cross references ------------------------------------------------------
 const ancestryNames = new Set((data.ancestries ?? []).map((item) => item.name.toLowerCase()));
@@ -537,6 +541,21 @@ for (const boon of data.boonsAndCurses ?? []) {
     fail(`boon/curse ${boon.name}: invalid category ${boon.category}`);
   }
   if (!boon.deity) fail(`boon/curse ${boon.name}: missing deity`);
+}
+for (const trait of data.traits ?? []) {
+  if (!Array.isArray(trait.group)) fail(`trait ${trait.name}: group must be an array`);
+  if (!String(trait.description ?? "").trim()) fail(`trait ${trait.name}: missing description`);
+}
+for (const affliction of data.afflictions ?? []) {
+  if (!["disease", "curse"].includes(affliction.category)) {
+    fail(`affliction ${affliction.name}: invalid category ${affliction.category}`);
+  }
+  if (!Number.isFinite(affliction.level) || affliction.level < 0 || affliction.level > 30) {
+    fail(`affliction ${affliction.name}: invalid level ${affliction.level}`);
+  }
+  if (!Array.isArray(affliction.stages)) {
+    fail(`affliction ${affliction.name}: stages must be an array`);
+  }
 }
 const attacksWithoutDamage = (data.monsters ?? []).flatMap((monster) =>
   (monster.attacks ?? [])

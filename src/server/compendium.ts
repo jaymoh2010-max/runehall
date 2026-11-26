@@ -21,6 +21,8 @@ import type {
   Vehicle,
   FamiliarAbility,
   BoonCurse,
+  TraitEntry,
+  Affliction,
 } from "../shared/types";
 import type { DomainEntry } from "../shared/domains";
 import { isCoreSource } from "../shared/content";
@@ -111,6 +113,8 @@ export const hazards = readArray<Hazard>("hazards.json");
 export const vehicles = readArray<Vehicle>("vehicles.json");
 export const familiarAbilities = readArray<FamiliarAbility>("familiarAbilities.json");
 export const boonsAndCurses = readArray<BoonCurse>("boonsAndCurses.json");
+export const traits = readArray<TraitEntry>("traits.json");
+export const afflictions = readArray<Affliction>("afflictions.json");
 
 const maps = {
   ancestry: new Map(ancestries.map((item) => [item.id, item])),
@@ -130,6 +134,8 @@ const maps = {
   vehicle: new Map(vehicles.map((item) => [item.id, item])),
   familiarAbility: new Map(familiarAbilities.map((item) => [item.id, item])),
   boonCurse: new Map(boonsAndCurses.map((item) => [item.id, item])),
+  trait: new Map(traits.map((item) => [item.id, item])),
+  affliction: new Map(afflictions.map((item) => [item.id, item])),
 };
 
 function normalizedSpellName(name: string): string {
@@ -418,6 +424,14 @@ export function searchBoonsAndCurses(opts: SearchOptions) {
   return searchList(boonsAndCurses, opts);
 }
 
+export function searchTraits(opts: SearchOptions) {
+  return searchList(traits, opts);
+}
+
+export function searchAfflictions(opts: SearchOptions) {
+  return searchList(afflictions, opts, (affliction) => affliction.level);
+}
+
 export function searchDeities(q?: string, limit = 80) {
   const filtered = deities.filter((deity) =>
     matchesText(`${deity.name} ${deity.traits.join(" ")} ${deity.source}`, q)
@@ -506,6 +520,8 @@ const searchCandidates: SearchCandidate[] = (() => {
   add(vehicles, "vehicle", (item: Vehicle) => item.level);
   add(familiarAbilities, "familiarAbility", () => null);
   add(boonsAndCurses, "boonCurse", () => null);
+  add(traits, "trait", () => null);
+  add(afflictions, "affliction", (item: Affliction) => item.level);
   return candidates;
 })();
 
@@ -793,4 +809,6 @@ export const compendiumCounts = {
   vehicles: vehicles.length,
   familiarAbilities: familiarAbilities.length,
   boonsAndCurses: boonsAndCurses.length,
+  traits: traits.length,
+  afflictions: afflictions.length,
 };

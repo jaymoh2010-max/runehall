@@ -21,7 +21,9 @@
     "hazards": 53,
     "vehicles": 100,
     "familiarAbilities": 117,
-    "boonsAndCurses": 240
+    "boonsAndCurses": 240,
+    "traits": 571,
+    "afflictions": 95
   },
   "remasterOnlyCount": {
     "ancestries": 38,
@@ -30,5 +32,13 @@
     "spells": 1628,
     "equipment": 4430,
     "monsters": 1736
+  },
+  "aonSource": {
+    "generatedAt": "2026-11-26T17:20:57.221Z",
+    "url": "https://2e.aonprd.com",
+    "counts": {
+      "traits": 571,
+      "afflictions": 95
+    }
   }
 }

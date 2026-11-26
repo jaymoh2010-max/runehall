@@ -153,6 +153,8 @@ describe("compendium search", () => {
       ["Airship", "vehicle"],
       ["Absorb Familiar", "familiarAbility"],
       ["Abadar - Major Boon", "boonCurse"],
+      ["Aberration", "trait"],
+      ["Bog Rot", "affliction"],
     ];
     for (const [query, kind] of cases) {
       const result = globalSearch(query, 60);

@@ -20,7 +20,9 @@ export type CompendiumEntryKind =
   | "hazard"
   | "vehicle"
   | "familiarAbility"
-  | "boonCurse";
+  | "boonCurse"
+  | "trait"
+  | "affliction";
 
 export const COMPENDIUM_KIND_ORDER: CompendiumEntryKind[] = [
   "feat",
@@ -40,6 +42,8 @@ export const COMPENDIUM_KIND_ORDER: CompendiumEntryKind[] = [
   "vehicle",
   "familiarAbility",
   "boonCurse",
+  "trait",
+  "affliction",
 ];
 
 export const COMPENDIUM_KIND_LABELS: Record<CompendiumEntryKind, string> = {
@@ -60,6 +64,8 @@ export const COMPENDIUM_KIND_LABELS: Record<CompendiumEntryKind, string> = {
   vehicle: "Vehicle",
   familiarAbility: "Familiar ability",
   boonCurse: "Boon or curse",
+  trait: "Trait",
+  affliction: "Affliction",
 };
 
 export const COMPENDIUM_KIND_PLURALS: Record<CompendiumEntryKind, string> = {
@@ -80,6 +86,8 @@ export const COMPENDIUM_KIND_PLURALS: Record<CompendiumEntryKind, string> = {
   vehicle: "Vehicles",
   familiarAbility: "Familiar abilities",
   boonCurse: "Boons & curses",
+  trait: "Traits",
+  affliction: "Afflictions",
 };
 
 export interface CompendiumSearchItem {
@@ -121,6 +129,8 @@ const ID_PREFIXES: Record<string, CompendiumEntryKind> = {
   veh: "vehicle",
   fam: "familiarAbility",
   boon: "boonCurse",
+  trait: "trait",
+  aff: "affliction",
 };
 
 export function isCompendiumEntryKind(value: unknown): value is CompendiumEntryKind {

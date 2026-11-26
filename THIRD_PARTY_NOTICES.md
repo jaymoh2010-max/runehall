@@ -2,13 +2,22 @@
 
 ## Foundry VTT PF2e system
 
-Rules data in `data/compendium/` is generated from:
+Rules data in `data/compendium/` is primarily generated from:
 
 - https://github.com/foundryvtt/pf2e
 - Copyright the PF2e for Foundry VTT contributors
 - Licensed under the Apache License, Version 2.0: https://www.apache.org/licenses/LICENSE-2.0
 
 The generated compendium preserves `source`, `license`, and `remaster` metadata from the upstream items.
+
+## Archives of Nethys
+
+The trait glossary (`traits.json`) and afflictions (`afflictions.json`) are
+generated from the Archives of Nethys index:
+
+- https://2e.aonprd.com
+- Pathfinder Second Edition rules content, published by Paizo under the ORC License.
+- No Paizo artwork is copied; only rules text and structured statblock fields are stored.
 
 ## Pathfinder Second Edition
 
