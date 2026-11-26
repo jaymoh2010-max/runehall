@@ -103,6 +103,39 @@ for (const file of files) {
   }
 }
 
+const ritualChecks = readJson("ritualData.json");
+if (ritualChecks) {
+  if (!ritualChecks || typeof ritualChecks !== "object" || Array.isArray(ritualChecks)) {
+    fail("ritualData.json must contain an object keyed by spell id");
+  } else {
+    const spellById = new Map((data.spells ?? []).map((spell) => [spell.id, spell]));
+    for (const [id, entry] of Object.entries(ritualChecks)) {
+      const spell = spellById.get(id);
+      if (!spell) fail(`ritualData.json references missing spell ${id}`);
+      else if (!spell.ritual) fail(`ritualData.json references non-ritual spell ${id}`);
+      if (!entry || typeof entry !== "object") {
+        fail(`ritualData.json: ${id} is not an object`);
+        continue;
+      }
+      if (typeof entry.primaryCheck !== "string" || !entry.primaryCheck.trim()) {
+        fail(`ritualData.json: ${id} has no primary check`);
+      }
+      if (!Number.isInteger(entry.secondaryCasters) || entry.secondaryCasters < 0) {
+        fail(`ritualData.json: ${id} has invalid secondaryCasters`);
+      }
+      if (entry.secondaryCasters > 0 && typeof entry.secondaryChecks !== "string") {
+        fail(`ritualData.json: ${id} has secondary casters but no secondary checks`);
+      }
+    }
+    const ritualCount = (data.spells ?? []).filter((spell) => spell.ritual).length;
+    if (Object.keys(ritualChecks).length < ritualCount) {
+      warn(
+        `ritualData.json covers ${Object.keys(ritualChecks).length} of ${ritualCount} rituals; the rest fall back to prose detection.`
+      );
+    }
+  }
+}
+
 const allIds = new Set();
 for (const file of files) {
   for (const item of data[file.key] ?? []) {

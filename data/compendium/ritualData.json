@@ -1,0 +1,842 @@
+{
+  "spell:1QMjWGq1DPOQr4VL": {
+    "primaryCheck": "Arcana or Occultism (expert)",
+    "secondaryCasters": 1,
+    "secondaryChecks": "Deception"
+  },
+  "spell:1aXX52MnVbBvT9S7": {
+    "primaryCheck": "Arcana, Nature, Occultism, or Religion, matching the ley line's tradition (master)",
+    "secondaryCasters": 2,
+    "secondaryChecks": "Ley Line Lore or Occultism"
+  },
+  "spell:29AyhknPKiDBcy8s": {
+    "primaryCheck": "Arcana (expert)",
+    "secondaryCasters": 2,
+    "secondaryChecks": "Crafting, Occultism"
+  },
+  "spell:2CNqkt2s2IYkVnv6": {
+    "primaryCheck": "Arcana (mythic) or Occultism (mythic)",
+    "secondaryCasters": 6,
+    "secondaryChecks": "Crafting, Society"
+  },
+  "spell:2LsiiZZIZEKD23VQ": {
+    "primaryCheck": "Cooking Lore (expert) or Crafting (expert)",
+    "secondaryCasters": 0,
+    "secondaryChecks": ""
+  },
+  "spell:2ykmAVKrsAWcazcC": {
+    "primaryCheck": "Arcana (master) or Occultism (master)",
+    "secondaryCasters": 3,
+    "secondaryChecks": "Diplomacy or Intimidation; Arcana or Occultism (whichever isn't used for the primary check)"
+  },
+  "spell:30BBep9U4BDV0EgQ": {
+    "primaryCheck": "Religion (expert; you must be a devil)",
+    "secondaryCasters": 0,
+    "secondaryChecks": ""
+  },
+  "spell:32NpJbPblay77K6v": {
+    "primaryCheck": "Crafting (expert)",
+    "secondaryCasters": 0,
+    "secondaryChecks": "Arcana, Occultism"
+  },
+  "spell:3DB3F2hIx2dMbX8n": {
+    "primaryCheck": "Occultism (expert)",
+    "secondaryCasters": 0,
+    "secondaryChecks": "Crafting, Performance"
+  },
+  "spell:3ipOKanMLnJrPwbr": {
+    "primaryCheck": "Occultism or Religion",
+    "secondaryCasters": 1,
+    "secondaryChecks": "Athletics, Diplomacy, or Society"
+  },
+  "spell:4Cntq9odgW6xMpAs": {
+    "primaryCheck": "Arcana or Occultism (master)",
+    "secondaryCasters": 2,
+    "secondaryChecks": "Arcana or Occultism (whichever isn't used for the primary check), Survival"
+  },
+  "spell:4ddJSjC9Zz5DX0oG": {
+    "primaryCheck": "Arcana (mythic) or Occultism (mythic)",
+    "secondaryCasters": 2,
+    "secondaryChecks": "Society"
+  },
+  "spell:5NReCnDFFuThEAHB": {
+    "primaryCheck": "Arcana or Nature (expert)",
+    "secondaryCasters": 2,
+    "secondaryChecks": "Diplomacy"
+  },
+  "spell:5ZW1w9f4gWlSIuWA": {
+    "primaryCheck": "Arcana or Occultism (master)",
+    "secondaryCasters": 2,
+    "secondaryChecks": "Crafting, Survival"
+  },
+  "spell:5pwK2FZX6QwgtfqX": {
+    "primaryCheck": "Arcana (expert), Occultism (expert), or Religion (expert)",
+    "secondaryCasters": 0,
+    "secondaryChecks": ""
+  },
+  "spell:5xf9wK9xyAeGFPw7": {
+    "primaryCheck": "Perception (master)",
+    "secondaryCasters": 1,
+    "secondaryChecks": "Religion or Warfare Lore"
+  },
+  "spell:5y3RlXMDPovOmrhp": {
+    "primaryCheck": "Nature (mythic)",
+    "secondaryCasters": 2,
+    "secondaryChecks": "Diplomacy, Survival"
+  },
+  "spell:66xBcxqzYcpbItBU": {
+    "primaryCheck": "Religion (trained)",
+    "secondaryCasters": 0,
+    "secondaryChecks": ""
+  },
+  "spell:6P2fzrYkaiiptxlY": {
+    "primaryCheck": "Arcana (mythic) or Occultism (mythic)",
+    "secondaryCasters": 2,
+    "secondaryChecks": "Arcana, Medicine, or Occultism"
+  },
+  "spell:6TKGaQm4PfEMkeRd": {
+    "primaryCheck": "Occultism (master) or Religion (master)",
+    "secondaryCasters": 2,
+    "secondaryChecks": "Performance"
+  },
+  "spell:6WZgtQ2Iw9CTbv2c": {
+    "primaryCheck": "Nature (mythic)",
+    "secondaryCasters": 3,
+    "secondaryChecks": "Diplomacy, Sailing Lore, Survival"
+  },
+  "spell:6dDtGIUerazSHIOu": {
+    "primaryCheck": "Arcana (legendary), Nature (legendary), Occultism (legendary), or Religion (legendary)",
+    "secondaryCasters": 2,
+    "secondaryChecks": "Crafting, Diplomacy"
+  },
+  "spell:6fN8ePYatRCW1yck": {
+    "primaryCheck": "Arcana (legendary) or Occultism (legendary)",
+    "secondaryCasters": 3,
+    "secondaryChecks": "Arcana or Occultism, or Crafting or Survival"
+  },
+  "spell:6nPc5CPRUbSSRDP1": {
+    "primaryCheck": "Fungus Lore (trained), Nature (expert)",
+    "secondaryCasters": 1,
+    "secondaryChecks": "Fungus Lore (trained), Nature (expert)"
+  },
+  "spell:7DN13ILADW2N9Z1t": {
+    "primaryCheck": "Nature (master), Occultism (master) or Religion (master)",
+    "secondaryCasters": 1,
+    "secondaryChecks": "Nature, Occultism or Religion (whichever is used for the primary check)"
+  },
+  "spell:7Fd4lxozd11MQ55N": {
+    "primaryCheck": "Nature or Religion (expert)",
+    "secondaryCasters": 0,
+    "secondaryChecks": "Nature or Religion (whichever is used for the primary check)"
+  },
+  "spell:7c3wzL3jj3E8zRsT": {
+    "primaryCheck": "Nature (proficiency)",
+    "secondaryCasters": 1,
+    "secondaryChecks": "Nature or Society"
+  },
+  "spell:7yWXx3qC4eFNHhxD": {
+    "primaryCheck": "Nature (expert)",
+    "secondaryCasters": 1,
+    "secondaryChecks": "Survival"
+  },
+  "spell:7ymYZ89WNBqGxWuh": {
+    "primaryCheck": "Arcana (expert) or Religion (expert)",
+    "secondaryCasters": 2,
+    "secondaryChecks": "Arcana or Religion, or Society or Survival"
+  },
+  "spell:8Lk9K3tRnV68MQPW": {
+    "primaryCheck": "Occultism or Religion",
+    "secondaryCasters": 2,
+    "secondaryChecks": "Crafting, Nature, Society, or Willowshore Lore"
+  },
+  "spell:8MAHUK6jphbME4BR": {
+    "primaryCheck": "Arcana or Occultism (expert)",
+    "secondaryCasters": 3,
+    "secondaryChecks": "Arcana or Occultism, Deception or Diplomacy, Perception"
+  },
+  "spell:90CYsk0cB2V6dRPQ": {
+    "primaryCheck": "Arcana (expert) or Nature (expert)",
+    "secondaryCasters": 0,
+    "secondaryChecks": ""
+  },
+  "spell:9WMEO6JEcAulgUv3": {
+    "primaryCheck": "Diplomacy (mythic) or Society (mythic)",
+    "secondaryCasters": 2,
+    "secondaryChecks": "Intimidation, Underworld Lore"
+  },
+  "spell:9lz67JCNCLDfIEy3": {
+    "primaryCheck": "Arcana (expert) or Occultism (expert)",
+    "secondaryCasters": 2,
+    "secondaryChecks": "Crafting, Arcana or Occultism (whichever isn't used for the primary check)"
+  },
+  "spell:9vDmTCHyAWdWWPIs": {
+    "primaryCheck": "Arcana or Occultism (expert)",
+    "secondaryCasters": 0,
+    "secondaryChecks": "Survival"
+  },
+  "spell:AkF4yFcSCdhoULyZ": {
+    "primaryCheck": "Arcana or Occultism (trained)",
+    "secondaryCasters": 0,
+    "secondaryChecks": "Whichever is used for the primary check"
+  },
+  "spell:B4dDkYsHFo1H0CIF": {
+    "primaryCheck": "Nature (master)",
+    "secondaryCasters": 3,
+    "secondaryChecks": "Lore (any), Society, Survival"
+  },
+  "spell:BBw5oGFvoQc3gg52": {
+    "primaryCheck": "Diplomacy (expert)",
+    "secondaryCasters": 1,
+    "secondaryChecks": "Nature, Religion"
+  },
+  "spell:BNkgZi1bcQcVmBHp": {
+    "primaryCheck": "Nature (master)",
+    "secondaryCasters": 2,
+    "secondaryChecks": "Survival, Warfare Lore"
+  },
+  "spell:CGB3a9gJU5S8gjKk": {
+    "primaryCheck": "Occultism (mythic)",
+    "secondaryCasters": 3,
+    "secondaryChecks": "Arcana, Nature, Religion"
+  },
+  "spell:D4Rxud1DBr52Dmdo": {
+    "primaryCheck": "Nature (master) or Occultism (master)",
+    "secondaryCasters": 1,
+    "secondaryChecks": "Cooking Lore, Survival"
+  },
+  "spell:D8cWhrzcsd43OlIX": {
+    "primaryCheck": "Religion (expert; you must be a div)",
+    "secondaryCasters": 0,
+    "secondaryChecks": ""
+  },
+  "spell:DPjhtfAjFQVQwZH2": {
+    "primaryCheck": "Occultism or Religion (expert)",
+    "secondaryCasters": 4,
+    "secondaryChecks": "Occultism or Religion"
+  },
+  "spell:Dbd5W6G8U2vzWolN": {
+    "primaryCheck": "Religion",
+    "secondaryCasters": 2,
+    "secondaryChecks": "Crafting, Performance"
+  },
+  "spell:DcUGLLyaa9tHH1kN": {
+    "primaryCheck": "Nature (expert)",
+    "secondaryCasters": 3,
+    "secondaryChecks": "Arcana, Medicine, Occultism, or Religion"
+  },
+  "spell:Do0pe0gn8OFdCOnN": {
+    "primaryCheck": "DC 29 Nature or Religion",
+    "secondaryCasters": 3,
+    "secondaryChecks": "Diplomacy, Mountain Lore, Nature, or Survival"
+  },
+  "spell:Er9XNUlL0wB0PM36": {
+    "primaryCheck": "Arcana, Nature, or Occultism (master)",
+    "secondaryCasters": 3,
+    "secondaryChecks": "Lore (any), Survival, Thievery"
+  },
+  "spell:FKtPRWcs4zhwn9N1": {
+    "primaryCheck": "Religion (master)",
+    "secondaryCasters": 4,
+    "secondaryChecks": "Arcana, Occultism, Religion"
+  },
+  "spell:FQZaQXiKtHdVjSc5": {
+    "primaryCheck": "Performance (expert)",
+    "secondaryCasters": 3,
+    "secondaryChecks": "Acrobatics, Occultism, or Religion"
+  },
+  "spell:GhU0NARQeFZpB276": {
+    "primaryCheck": "see below",
+    "secondaryCasters": 2,
+    "secondaryChecks": "see below"
+  },
+  "spell:GzlVI3qYdCtUigLz": {
+    "primaryCheck": "Nature (trained)",
+    "secondaryCasters": 1,
+    "secondaryChecks": "Crafting, Intimidation, Occultism, Performance"
+  },
+  "spell:HBxsMKXzZM0HviEE": {
+    "primaryCheck": "skill corresponding to the target's casting tradition (trained)",
+    "secondaryCasters": 0,
+    "secondaryChecks": ""
+  },
+  "spell:HYXyMFsH0K80etBI": {
+    "primaryCheck": "Performance",
+    "secondaryCasters": 6,
+    "secondaryChecks": "Crafting, Society"
+  },
+  "spell:HmKajQS0DP23bipp": {
+    "primaryCheck": "Arcana (master), Nature (master), Occultism (master), or Religion (master)",
+    "secondaryCasters": 2,
+    "secondaryChecks": "Lore (related to the destination plane), Survival"
+  },
+  "spell:INEAWirvb8c1eAFD": {
+    "primaryCheck": "Occultism (trained) or Survival (expert)",
+    "secondaryCasters": 0,
+    "secondaryChecks": ""
+  },
+  "spell:Jte2jlX59a1yQPp8": {
+    "primaryCheck": "DC 31 Nature (master)",
+    "secondaryCasters": 5,
+    "secondaryChecks": "DC 26 Diplomacy or Nature or Occultism"
+  },
+  "spell:KkimKrhDxEJVm6TH": {
+    "primaryCheck": "Occultism or Religion (legendary)",
+    "secondaryCasters": 3,
+    "secondaryChecks": "Fortitude, Society, Will"
+  },
+  "spell:KwDyrUIlnOrpdxYi": {
+    "primaryCheck": "DC 20 Religion or Occultism",
+    "secondaryCasters": 3,
+    "secondaryChecks": "DC 18 Acrobatics, Nature, or Performance"
+  },
+  "spell:LEMfFL551YB120RN": {
+    "primaryCheck": "Occultism or Religion (legendary)",
+    "secondaryCasters": 3,
+    "secondaryChecks": "Arcana, Crafting, Society, and the other skill not used for the primary check"
+  },
+  "spell:LN7bFOw8PFs5Q5rD": {
+    "primaryCheck": "Arcana (legendary) or Nature (legendary)",
+    "secondaryCasters": 3,
+    "secondaryChecks": "Arcana or Nature, Athletics"
+  },
+  "spell:LmtwcpYmrJfhGIZY": {
+    "primaryCheck": "Arcana (master), Nature (master), Occultism (master), or Religion (master)",
+    "secondaryCasters": 2,
+    "secondaryChecks": "Arcana, Nature, Occultism, or Religion (whichever is used for the primary check) and Warfare Lore"
+  },
+  "spell:M6HsK7W6JMkJXeog": {
+    "primaryCheck": "Occultism (expert)",
+    "secondaryCasters": 1,
+    "secondaryChecks": "Crafting"
+  },
+  "spell:M7leucozfgQXW0eV": {
+    "primaryCheck": "Occultism (master)",
+    "secondaryCasters": 1,
+    "secondaryChecks": "Occultism, or Society"
+  },
+  "spell:MTNlvZ0A9xY5sOg1": {
+    "primaryCheck": "Religion (expert)",
+    "secondaryCasters": 2,
+    "secondaryChecks": "Occultism, Religion"
+  },
+  "spell:MkHshwYy2UOeEHRR": {
+    "primaryCheck": "Religion (trained)",
+    "secondaryCasters": 3,
+    "secondaryChecks": "Crafting, Performance, Society"
+  },
+  "spell:NCUXsaj2yFxOVhrK": {
+    "primaryCheck": "Religion (expert)",
+    "secondaryCasters": 1,
+    "secondaryChecks": "Crafting"
+  },
+  "spell:NQk8Cabhhw7jXkg0": {
+    "primaryCheck": "Warfare Lore (legendary)",
+    "secondaryCasters": 3,
+    "secondaryChecks": "Medicine, Occultism, Pharasma Lore"
+  },
+  "spell:NeyyAPwa639WjYGG": {
+    "primaryCheck": "Occultism (expert)",
+    "secondaryCasters": 0,
+    "secondaryChecks": "Society"
+  },
+  "spell:NjK0kWRC6FYsPwXC": {
+    "primaryCheck": "Religion (mythic)",
+    "secondaryCasters": 3,
+    "secondaryChecks": "Medicine (master), Occultism, Void Lore"
+  },
+  "spell:NjN6md0KpdelWpu7": {
+    "primaryCheck": "Medicine (expert)",
+    "secondaryCasters": 1,
+    "secondaryChecks": "Warfare Lore"
+  },
+  "spell:Pp88ueeq4AlkaL6g": {
+    "primaryCheck": "Arcana or Occultism (master)",
+    "secondaryCasters": 2,
+    "secondaryChecks": "Arcana or Occultism, Crafting"
+  },
+  "spell:PvkEzzCaDT07DcJb": {
+    "primaryCheck": "Occultism or Religion (expert)",
+    "secondaryCasters": 3,
+    "secondaryChecks": "Deception, Diplomacy, or Intimidation"
+  },
+  "spell:Q690d3mw3TUrKX7E": {
+    "primaryCheck": "Arcana (expert), Occultism (expert), or Religion (expert)",
+    "secondaryCasters": 1,
+    "secondaryChecks": "Society or Legal Lore"
+  },
+  "spell:QGfVFyQhoalZbE9s": {
+    "primaryCheck": "Athletics (mythic) or Nature (mythic)",
+    "secondaryCasters": 2,
+    "secondaryChecks": "Athletics, Acrobatics, Nature, or Survival"
+  },
+  "spell:QIjc7Zyej0P3b9v5": {
+    "primaryCheck": "Occultism (master) or Religion (master)",
+    "secondaryCasters": 2,
+    "secondaryChecks": "Deception, Society"
+  },
+  "spell:QqMlN9VSHfD2v4Qv": {
+    "primaryCheck": "Religion (mythic) or Performance (mythic)",
+    "secondaryCasters": 3,
+    "secondaryChecks": "Crafting, Pharasma Lore, or Survival"
+  },
+  "spell:RGmPRCBFcWVUoiZz": {
+    "primaryCheck": "Arcana (trained)",
+    "secondaryCasters": 0,
+    "secondaryChecks": ""
+  },
+  "spell:RWwiFnjxoJXn7H6D": {
+    "primaryCheck": "Occultism (expert)",
+    "secondaryCasters": 1,
+    "secondaryChecks": "Medicine or Occultism"
+  },
+  "spell:RgVlYrn5mu8wNHK4": {
+    "primaryCheck": "Nature (expert)",
+    "secondaryCasters": 0,
+    "secondaryChecks": ""
+  },
+  "spell:RqUpZmKtfnDEKkcf": {
+    "primaryCheck": "Occultism (trained)",
+    "secondaryCasters": 0,
+    "secondaryChecks": ""
+  },
+  "spell:SnBc7Gl5VormWzS1": {
+    "primaryCheck": "Nature (expert)",
+    "secondaryCasters": 1,
+    "secondaryChecks": "Nature or Survival"
+  },
+  "spell:TYydobaLN4U7Ol3M": {
+    "primaryCheck": "Crafting (master) or any (legendary)",
+    "secondaryCasters": 0,
+    "secondaryChecks": "any"
+  },
+  "spell:VJgSQBYwXGDbMmiW": {
+    "primaryCheck": "Arcana or Occultism (expert) or Willowshore Lore",
+    "secondaryCasters": 3,
+    "secondaryChecks": "Arcana, Deception, Diplomacy, Occultism, Perception, or Willowshore Lore"
+  },
+  "spell:Vpohy4XH1DaH95hT": {
+    "primaryCheck": "Religion (expert; you must be a daemon or an urdefhan)",
+    "secondaryCasters": 0,
+    "secondaryChecks": ""
+  },
+  "spell:WRRbNyGam4ytTRgr": {
+    "primaryCheck": "Deception (expert), Maze Lore (trained), or Religion (expert)",
+    "secondaryCasters": 2,
+    "secondaryChecks": "Art Lore (trained), Crafting (trained), or Thievery (trained)"
+  },
+  "spell:WRmh1aKEo0dI0NJs": {
+    "primaryCheck": "Crafting (master), Occultism (expert), Religion (expert)",
+    "secondaryCasters": 0,
+    "secondaryChecks": ""
+  },
+  "spell:WfImUYSXyW3YdyY9": {
+    "primaryCheck": "Occultism (expert) or Warfare Lore (expert)",
+    "secondaryCasters": 0,
+    "secondaryChecks": ""
+  },
+  "spell:X0t0gr7S7CeCt2Q5": {
+    "primaryCheck": "Occultism (Legendary)",
+    "secondaryCasters": 4,
+    "secondaryChecks": "Arcana, Religion"
+  },
+  "spell:XhfsRLfQjN3ed1zI": {
+    "primaryCheck": "Performance (mythic)",
+    "secondaryCasters": 2,
+    "secondaryChecks": "Arcana, Nature"
+  },
+  "spell:XkDCzMIyc0YOjw05": {
+    "primaryCheck": "Nature (master)",
+    "secondaryCasters": 1,
+    "secondaryChecks": "Survival"
+  },
+  "spell:XnpRRUVAVoY6z88H": {
+    "primaryCheck": "Arcana, Nature, Occultism, or Religion matching the ley line's tradition (legendary)",
+    "secondaryCasters": 6,
+    "secondaryChecks": "Ley Line Lore or Occultism"
+  },
+  "spell:Y9w4TYnb8cXU4UKY": {
+    "primaryCheck": "Arcana or Occultism (master, the check has the secret trait)",
+    "secondaryCasters": 4,
+    "secondaryChecks": "Crafting, Deception, Performance, Society"
+  },
+  "spell:Z60JRD78wT3afOEJ": {
+    "primaryCheck": "Occultism or Religion (master)",
+    "secondaryCasters": 3,
+    "secondaryChecks": "Crafting, Occultism or Religion (whichever isn't used for the primary check)"
+  },
+  "spell:ZVdKM0HkgpWykrqf": {
+    "primaryCheck": "Nature or Religion",
+    "secondaryCasters": 3,
+    "secondaryChecks": "Arcana, Nature, Religion, Survival, or Tanglebriar Lore"
+  },
+  "spell:ZWsZGtBfdW1Cj5C2": {
+    "primaryCheck": "Religion (trained)",
+    "secondaryCasters": 0,
+    "secondaryChecks": "Diplomacy or Religion"
+  },
+  "spell:ZhJ8d9Uk4lwIx86b": {
+    "primaryCheck": "Nature (expert)",
+    "secondaryCasters": 1,
+    "secondaryChecks": "Farming Lore or Survival"
+  },
+  "spell:ZwwIUavMbEwcZz35": {
+    "primaryCheck": "Arcana (mythic), Nature (mythic), Occultism (mythic), or Religion (mythic)",
+    "secondaryCasters": 3,
+    "secondaryChecks": "Arcana, Nature, Occultism, Religion (whichever three aren't used for the primary check)"
+  },
+  "spell:a9og2ZYfr8kAeltU": {
+    "primaryCheck": "Crafting (expert) or Warfare Lore (expert)",
+    "secondaryCasters": 1,
+    "secondaryChecks": "Engineering Lore"
+  },
+  "spell:aVqsE5OedOwdHQvF": {
+    "primaryCheck": "Nature (master)",
+    "secondaryCasters": 5,
+    "secondaryChecks": "Performance, Religion, Society, Mammoth Lord Lore or a similar Lore skill, Survival"
+  },
+  "spell:aYn7Xgrz4vIMNeIc": {
+    "primaryCheck": "Cooking Lore, Crafting, Performance, or Survival (trained)",
+    "secondaryCasters": 0,
+    "secondaryChecks": ""
+  },
+  "spell:bK7EZFCxZgDcko6D": {
+    "primaryCheck": "Arcana or Occultism (expert)",
+    "secondaryCasters": 2,
+    "secondaryChecks": "Arcana or Occultism (whichever isn't used for the primary check), Diplomacy"
+  },
+  "spell:bODHqeXoEc8GVU6a": {
+    "primaryCheck": "Arcana (mythic), Nature (mythic), or Occultism (mythic), Religion (mythic)",
+    "secondaryCasters": 3,
+    "secondaryChecks": "Arcana, Nature, Occultism, Religion (cannot be the same skill as for the primary check)"
+  },
+  "spell:bOf5WuLh6ZJloi7F": {
+    "primaryCheck": "Warfare Lore (expert)",
+    "secondaryCasters": 1,
+    "secondaryChecks": "Architecture Lore or Crafting"
+  },
+  "spell:bRW61IbjaFea0wcv": {
+    "primaryCheck": "Occultism (expert)",
+    "secondaryCasters": 2,
+    "secondaryChecks": "Religion, Society"
+  },
+  "spell:bS3DW0MptpnZl5Zr": {
+    "primaryCheck": "Cooking Lore, Crafting, Performance or Survival (expert)",
+    "secondaryCasters": 2,
+    "secondaryChecks": "Deception or Thievery"
+  },
+  "spell:bTFWSpHEvXq8IK37": {
+    "primaryCheck": "Herbalism Lore (master) or Occultism (master)",
+    "secondaryCasters": 1,
+    "secondaryChecks": "Medicine or Warfare Lore"
+  },
+  "spell:bmz35f9k1ydHOOli": {
+    "primaryCheck": "Arcana (master), Nature (master), Occultism (master), or Religion (master)",
+    "secondaryCasters": 0,
+    "secondaryChecks": ""
+  },
+  "spell:bqx1tJeOZq1Ufhcc": {
+    "primaryCheck": "Occultism (master) or Religion (master)",
+    "secondaryCasters": 2,
+    "secondaryChecks": "Crafting"
+  },
+  "spell:c3b6LdLlQDPngNIb": {
+    "primaryCheck": "Arcana (expert), Occultism (expert), or Religion (expert)",
+    "secondaryCasters": 1,
+    "secondaryChecks": "Religion"
+  },
+  "spell:dL3A7H4LlRH26Imo": {
+    "primaryCheck": "Arcana or Occultism (expert)",
+    "secondaryCasters": 1,
+    "secondaryChecks": "Arcana, Crafting, or Occultism"
+  },
+  "spell:dNpIc5k1aCI3bHIg": {
+    "primaryCheck": "Nature (expert; you must be the Mosquito Witch)",
+    "secondaryCasters": 0,
+    "secondaryChecks": ""
+  },
+  "spell:dQGn0eAyvYMDdj0h": {
+    "primaryCheck": "Arcana or Occultism (legendary)",
+    "secondaryCasters": 2,
+    "secondaryChecks": "Arcana or Occultism, Crafting"
+  },
+  "spell:dZV8nZUKRhGIr6g9": {
+    "primaryCheck": "Nature or Religion (expert)",
+    "secondaryCasters": 2,
+    "secondaryChecks": "Diplomacy, Society"
+  },
+  "spell:dobuPIfpDHjIq8DP": {
+    "primaryCheck": "Occultism (trained)",
+    "secondaryCasters": 1,
+    "secondaryChecks": "Deception, Performance, Occultism, or Thievery"
+  },
+  "spell:ehd9PtifLMwjk4ep": {
+    "primaryCheck": "Occultism",
+    "secondaryCasters": 3,
+    "secondaryChecks": "Arcana, Deception, Stealth"
+  },
+  "spell:fLiowSDQXo3vCQDh": {
+    "primaryCheck": "DC 40 Arcana or Nature (master)",
+    "secondaryCasters": 0,
+    "secondaryChecks": "DC 35 Arcana, Nature, Occultism, or Religion"
+  },
+  "spell:fr1AGcQo7WuvLvUi": {
+    "primaryCheck": "Arcana (mythic)",
+    "secondaryCasters": 2,
+    "secondaryChecks": "Religion, Occultism, Society"
+  },
+  "spell:gIVaSCrLhhBzGHQY": {
+    "primaryCheck": "Nature (expert)",
+    "secondaryCasters": 2,
+    "secondaryChecks": "Occultism, Religion"
+  },
+  "spell:gsYEuWv04XTDxe91": {
+    "primaryCheck": "Occultism (expert) or Religion (expert)",
+    "secondaryCasters": 1,
+    "secondaryChecks": "Occultism or Religion (whichever isn't used for the primary check)"
+  },
+  "spell:h5UqEdeqK8iTcU0J": {
+    "primaryCheck": "Arcana or Occultism (master, the check has the secret trait)",
+    "secondaryCasters": 3,
+    "secondaryChecks": "Arcana, Nature, Occultism, Religion, or Society (whichever is required to Recall Knowledge about the creature being duplicated); Crafting; Deception"
+  },
+  "spell:hdzyDrRdHSse88XM": {
+    "primaryCheck": "Occultism (expert)",
+    "secondaryCasters": 0,
+    "secondaryChecks": "Medicine"
+  },
+  "spell:hp6Q64dl7xbdn4gQ": {
+    "primaryCheck": "Occultism (master)",
+    "secondaryCasters": 2,
+    "secondaryChecks": "Performance, Society"
+  },
+  "spell:jOWQ5wPd4xvSkjI5": {
+    "primaryCheck": "Arcana (Expert) or Occultism (Expert)",
+    "secondaryCasters": 1,
+    "secondaryChecks": "Crafting or Driving Lore"
+  },
+  "spell:jh6d9n4VQTeOewEU": {
+    "primaryCheck": "Religion (master) or Occultism (master)",
+    "secondaryCasters": 3,
+    "secondaryChecks": "Society"
+  },
+  "spell:joEruBVz31Uxczzq": {
+    "primaryCheck": "Religion (expert; you must be an angel)",
+    "secondaryCasters": 0,
+    "secondaryChecks": ""
+  },
+  "spell:kExRMPVI07iIFCaa": {
+    "primaryCheck": "Crafting (expert)",
+    "secondaryCasters": 1,
+    "secondaryChecks": "Medicine, Religion"
+  },
+  "spell:kqhPt9344UkcGVYO": {
+    "primaryCheck": "Religion (expert)",
+    "secondaryCasters": 2,
+    "secondaryChecks": "Medicine, Society"
+  },
+  "spell:ksJFGSGlNpUhwcsp": {
+    "primaryCheck": "Religion (expert)",
+    "secondaryCasters": 3,
+    "secondaryChecks": "Arcana, Intimidation, or Occultism"
+  },
+  "spell:me5E8UvbBrHe3dZh": {
+    "primaryCheck": "Performance (expert)",
+    "secondaryCasters": 0,
+    "secondaryChecks": "Crafting, Performance, Society"
+  },
+  "spell:mlK8r1P2eszyfkGz": {
+    "primaryCheck": "Arcana (legendary) or Occultism (legendary)",
+    "secondaryCasters": 0,
+    "secondaryChecks": "Arcana or Occultism"
+  },
+  "spell:nA0XlPsnMNrQMpio": {
+    "primaryCheck": "Arcana or Occultism (legendary)",
+    "secondaryCasters": 3,
+    "secondaryChecks": "Deception; Society or Survival; Stealth"
+  },
+  "spell:nEXkk85BQu1cREa4": {
+    "primaryCheck": "Nature (expert)",
+    "secondaryCasters": 2,
+    "secondaryChecks": "Crafting or Medicine"
+  },
+  "spell:nuE9qsY2HfPFEgAo": {
+    "primaryCheck": "Occultism or Religion (legendary)",
+    "secondaryCasters": 3,
+    "secondaryChecks": "Diplomacy or Performance; Nature; Religion or Society"
+  },
+  "spell:nxnGKgcVii5KTwtM": {
+    "primaryCheck": "Crafting (mythic)",
+    "secondaryCasters": 4,
+    "secondaryChecks": "Engineering Lore, Kaiju Lore, Survival, Warfare Lore"
+  },
+  "spell:nzbnTqHgNKiGZkrZ": {
+    "primaryCheck": "Arcana or Occultism (expert, the check has the secret trait)",
+    "secondaryCasters": 2,
+    "secondaryChecks": "Arcana or Occultism (whichever isn't used for the primary check), Society"
+  },
+  "spell:o0l57UfBm9ScEUMW": {
+    "primaryCheck": "Arcana (expert), Nature (expert), Occultism (expert), or Religion (expert) as determined by the tradition of spell cast in the ritual",
+    "secondaryCasters": 1,
+    "secondaryChecks": "Crafting"
+  },
+  "spell:oND3oFBjxrhyVvyG": {
+    "primaryCheck": "Performance (expert)",
+    "secondaryCasters": 0,
+    "secondaryChecks": "Crafting, Performance, Society"
+  },
+  "spell:oOFilBgsXTVIbJpN": {
+    "primaryCheck": "Occultism (expert)",
+    "secondaryCasters": 2,
+    "secondaryChecks": "Sailing Lore or Survival"
+  },
+  "spell:oYxxcgszpT242sEi": {
+    "primaryCheck": "Cooking Lore or Tea Lore (expert)",
+    "secondaryCasters": 1,
+    "secondaryChecks": "Diplomacy or Society"
+  },
+  "spell:ofAQyLtLEGnOIs3N": {
+    "primaryCheck": "Fortune-Telling Lore (trained) or Occultism (expert)",
+    "secondaryCasters": 0,
+    "secondaryChecks": ""
+  },
+  "spell:opXqASAY37ltENB8": {
+    "primaryCheck": "Medicine (expert)",
+    "secondaryCasters": 1,
+    "secondaryChecks": "Nature, Religion"
+  },
+  "spell:otdzpPYzWMJt76Rh": {
+    "primaryCheck": "Athletics (expert)",
+    "secondaryCasters": 1,
+    "secondaryChecks": "Cooking Lore, Crafting, Religion"
+  },
+  "spell:pZc8ZwtsyWnxUUW0": {
+    "primaryCheck": "Nature (master)",
+    "secondaryCasters": 4,
+    "secondaryChecks": "Crafting, Diplomacy, Survival"
+  },
+  "spell:pZr1xrCpaSu6qrXU": {
+    "primaryCheck": "Crafting (legendary)",
+    "secondaryCasters": 3,
+    "secondaryChecks": "Arcana, Medicine, Occultism"
+  },
+  "spell:pib9AhtUlVclvm02": {
+    "primaryCheck": "Nature (trained) or Occultism (trained)",
+    "secondaryCasters": 1,
+    "secondaryChecks": "Nature, Occultism, or Performance"
+  },
+  "spell:q9QGc0PJMFWxFOCz": {
+    "primaryCheck": "Diplomacy (mythic) or Society (mythic)",
+    "secondaryCasters": 2,
+    "secondaryChecks": "Diplomacy, Intimidation, or Society"
+  },
+  "spell:qBSyP5csMVmaOWCF": {
+    "primaryCheck": "Religion (master)",
+    "secondaryCasters": 1,
+    "secondaryChecks": "Intimidation or Religion"
+  },
+  "spell:qVXraYXlTjissCaG": {
+    "primaryCheck": "Nature (expert)",
+    "secondaryCasters": 3,
+    "secondaryChecks": "Crafting, Medicine, Survival"
+  },
+  "spell:rOwOLlfVgLMg1FND": {
+    "primaryCheck": "Arcana (expert) or Occultism (expert)",
+    "secondaryCasters": 0,
+    "secondaryChecks": ""
+  },
+  "spell:rsYeiz2V2KeEfjpr": {
+    "primaryCheck": "Mining Lore (expert) or Nature (expert)",
+    "secondaryCasters": 2,
+    "secondaryChecks": "Engineering Lore, Warfare Lore"
+  },
+  "spell:s0SerOrkkUd7SAH9": {
+    "primaryCheck": "Occultism or Religion",
+    "secondaryCasters": 8,
+    "secondaryChecks": "Performance"
+  },
+  "spell:sLzPzk7DJnfuORJ0": {
+    "primaryCheck": "Arcana (expert)",
+    "secondaryCasters": 1,
+    "secondaryChecks": "Crafting"
+  },
+  "spell:sYd3hqv2ZQqa0PSc": {
+    "primaryCheck": "Nature (master)",
+    "secondaryCasters": 2,
+    "secondaryChecks": "Crafting, Diplomacy"
+  },
+  "spell:tsKnoBuBbKMXkiz5": {
+    "primaryCheck": "Religion (expert; you must be a demon)",
+    "secondaryCasters": 0,
+    "secondaryChecks": ""
+  },
+  "spell:u3G7KX1qpFJlSeWm": {
+    "primaryCheck": "Occultism (expert)",
+    "secondaryCasters": 2,
+    "secondaryChecks": ""
+  },
+  "spell:u3pdkfmy0AWICdoM": {
+    "primaryCheck": "Arcana (master), Occultism (master), or Religion (master)",
+    "secondaryCasters": 0,
+    "secondaryChecks": ""
+  },
+  "spell:uuoPmbjEtqzWZs0v": {
+    "primaryCheck": "Arcana or Occultism (expert)",
+    "secondaryCasters": 2,
+    "secondaryChecks": "Arcana or Occultism (whichever isn't used for the primary check), Diplomacy"
+  },
+  "spell:vgy00hnqxN9VoeoF": {
+    "primaryCheck": "Religion (expert)",
+    "secondaryCasters": 2,
+    "secondaryChecks": "Diplomacy"
+  },
+  "spell:w00PBRjENqJa7Vxu": {
+    "primaryCheck": "Occultism (trained) or Religion (trained)",
+    "secondaryCasters": 0,
+    "secondaryChecks": "Occultism or Religion (whichever is used for the primary check); Diplomacy, Performance, Society, or a Lore corresponding to the rightful owners"
+  },
+  "spell:wAJ8mXPYbyAg0qWX": {
+    "primaryCheck": "Cooking Lore (expert)",
+    "secondaryCasters": 3,
+    "secondaryChecks": "Diplomacy, Performance, or Religion"
+  },
+  "spell:wneYzMFUWreyqWHD": {
+    "primaryCheck": "Medicine (trained)",
+    "secondaryCasters": 2,
+    "secondaryChecks": "Diplomacy"
+  },
+  "spell:wrm1zIiLyFD1Is6h": {
+    "primaryCheck": "DC 32 Occultism (master; DC 34 for levels 9-10)",
+    "secondaryCasters": 0,
+    "secondaryChecks": "DC 24 Arcana, Athletics, Nature, Occultism, Performance, Religion, or Society (DC 27 for levels 9-10)"
+  },
+  "spell:xKHq2Eisapixvj6q": {
+    "primaryCheck": "Arcana (master) or Religion (expert)",
+    "secondaryCasters": 1,
+    "secondaryChecks": "Architecture Lore, Crafting, or Engineering Lore"
+  },
+  "spell:yRf59eFtZ50cGlem": {
+    "primaryCheck": "Crafting, Nature, or Society (expert)",
+    "secondaryCasters": 1,
+    "secondaryChecks": "Alcohol Lore (or related lore), Crafting, Society"
+  },
+  "spell:yUM5OYeMY8971b2S": {
+    "primaryCheck": "Occultism (master)",
+    "secondaryCasters": 3,
+    "secondaryChecks": "Society"
+  },
+  "spell:yrsgOdj5oqp7lEQY": {
+    "primaryCheck": "Diplomacy (expert)",
+    "secondaryCasters": 3,
+    "secondaryChecks": "Crafting, Occultism, or Religion"
+  },
+  "spell:zIAvj7V6BTuQMAIi": {
+    "primaryCheck": "DC 24 Nature (master) or DC 29 Nature (expert)",
+    "secondaryCasters": 3,
+    "secondaryChecks": "DC 24 Forest Lore, Perception, or Survival"
+  },
+  "spell:zaZieDHguhahmM2z": {
+    "primaryCheck": "Nature or Religion (master, the check has the secret trait)",
+    "secondaryCasters": 3,
+    "secondaryChecks": "Nature, Occultism, Religion, or Survival"
+  }
+}

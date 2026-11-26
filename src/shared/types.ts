@@ -419,6 +419,14 @@ export interface XpAward {
   createdAt: number;
 }
 
+export interface RitualData {
+  /** Formatted primary-check text, e.g. "Religion (expert)". */
+  primaryCheck: string;
+  secondaryCasters: number;
+  /** Formatted secondary-check text; empty when no secondary casters. */
+  secondaryChecks: string;
+}
+
 export interface Spell extends Publication {
   id: string;
   name: string;
@@ -426,6 +434,8 @@ export interface Spell extends Publication {
   rank: number;
   /** Rituals live with spells but are not tied to a magical tradition. */
   ritual?: boolean;
+  /** Structured ritual checks from the compendium, when available. */
+  ritualData?: RitualData;
   traditions: string[];
   rarity: string;
   traits: string[];

@@ -1581,6 +1581,20 @@ const spells = raw.spells
   })
   .sort((a, b) => a.rank - b.rank || a.name.localeCompare(b.name));
 
+/** Structured ritual checks; the spell rows carry cost and requirements. */
+const ritualData = {};
+for (const j of raw.spells) {
+  if (j.__folder !== "rituals") continue;
+  const ritual = j.system?.ritual;
+  const primaryCheck = String(ritual?.primary?.check ?? "").trim();
+  if (!primaryCheck) continue;
+  ritualData[`spell:${j._id}`] = {
+    primaryCheck,
+    secondaryCasters: Number(ritual?.secondary?.casters ?? 0),
+    secondaryChecks: String(ritual?.secondary?.checks ?? "").trim(),
+  };
+}
+
 // --- Equipment -------------------------------------------------------------
 const equipment = raw.equipment
   .map((j) => {
@@ -2075,6 +2089,15 @@ function write(name, data) {
   );
 }
 
+function writeObject(name, data) {
+  const file = path.join(OUT, name);
+  fs.writeFileSync(file, JSON.stringify(data));
+  const size = fs.statSync(file).size;
+  console.log(
+    `  ${name.padEnd(24)} ${String(Object.keys(data).length).padStart(6)} entries  ${(size / 1024).toFixed(0)} KB`
+  );
+}
+
 console.log("\nWriting compendium:");
 normalizeDeityWeapons(deities, equipment);
 normalizeMonsterAttackTypes(monsters);
@@ -2088,6 +2111,7 @@ write("classes.json", applyNameOverrides(classes, CLASS_OVERRIDES));
 write("classFeatures.json", classFeatures);
 write("feats.json", feats);
 write("spells.json", applyNameOverrides(spells, SPELL_OVERRIDES));
+writeObject("ritualData.json", ritualData);
 write("equipment.json", applyNameOverrides(equipment, EQUIPMENT_OVERRIDES));
 write("deities.json", applyNameOverrides(deities, DEITY_OVERRIDES));
 write("domains.json", domains);

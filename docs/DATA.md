@@ -4,7 +4,7 @@
 
 Runehall generates its local compendium from the [Foundry VTT PF2e system](https://github.com/foundryvtt/pf2e) repository, which is licensed under the **Apache License 2.0**.
 
-The generated files live in `data/compendium/`. They are committed/generated separately from the SQLite database so they can be rebuilt without touching user data.
+The generated files live in `data/compendium/`. They are committed/generated separately from the SQLite database so they can be rebuilt without touching user data. `ritualData.json` holds the structured primary/secondary ritual checks that the spell rows do not carry; the server merges it into spell context at load time.
 
 The generated compendium is currently tracked in Git so a fresh clone is runnable without a data download (about 40 MB). Re-running ingest replaces those files and can grow repository history; regenerate only when the source commit or normalization changes, or move the folder to Git LFS / a release artifact if history size becomes a problem.
 
