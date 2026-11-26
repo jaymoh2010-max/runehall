@@ -18,7 +18,7 @@
     "simulate:parties": "tsx scripts/simulate-campaign-parties.ts",
     "backup": "node scripts/backup.mjs",
     "ship-backup": "node scripts/ship-backup.mjs",
-    "restore": "node scripts/restore.mjs",
+    "restore": "node --env-file-if-exists=.env scripts/restore.mjs",
     "restore-drill": "node scripts/restore-drill.mjs",
     "reset-password": "node scripts/reset-password.mjs",
     "cleanup-assets": "node scripts/cleanup-assets.mjs",

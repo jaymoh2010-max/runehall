@@ -32,6 +32,7 @@ import {
   touchCampaign,
 } from "../serialize";
 import { redactTokenForPlayers } from "../../shared/tokenVisibility";
+import { tokenEventsFor } from "../tokenEvents";
 import { clamp, now, safeInt, safeString } from "../util";
 import { normalizeAmbientLight, normalizePartyVisionScope } from "../../shared/lighting";
 import { filterInitiativeForPlayers } from "../../shared/initiative";
@@ -456,6 +457,14 @@ export async function registerTableRoutes(app: FastifyInstance): Promise<void> {
         "players"
       );
       app.broadcastCampaign(row.campaign_id, "scene:updated", serializeScene(updated), "gm");
+      // Tokens placed while the scene was GM-only were sent only to the GM.
+      // Replay them now that the scene is visible.
+      const hiddenTokens = db
+        .prepare("SELECT * FROM tokens WHERE scene_id = ?")
+        .all(id) as TokenRow[];
+      for (const token of hiddenTokens) {
+        tokenEventsFor(app, row.campaign_id).created(serializeToken(token));
+      }
     } else {
       broadcastScene(app, row.campaign_id, "scene:updated", updated);
     }
@@ -493,14 +502,18 @@ export async function registerTableRoutes(app: FastifyInstance): Promise<void> {
     if (getCampaignRole(row.campaign_id, request.user.id) !== "gm") {
       return reply.code(403).send({ error: "Only the GM can delete scenes." });
     }
+    // Read the state before deleting: the scenes FK sets active_scene_id to
+    // NULL as soon as the row is gone, which would hide the fact that this was
+    // the active scene.
+    const state = ensureState(row.campaign_id);
+    const wasActive = state.active_scene_id === id;
     db.prepare("DELETE FROM scenes WHERE id = ?").run(id);
     const remaining = db
       .prepare(
         "SELECT id FROM scenes WHERE campaign_id = ? AND visible = 1 ORDER BY sort_order ASC LIMIT 1"
       )
       .get(row.campaign_id) as { id: string } | undefined;
-    const state = ensureState(row.campaign_id);
-    if (state.active_scene_id === id) {
+    if (wasActive) {
       db.prepare(
         "UPDATE campaign_state SET active_scene_id = ?, updated_at = ? WHERE campaign_id = ?"
       ).run(remaining?.id ?? null, now(), row.campaign_id);
@@ -559,7 +572,12 @@ export async function registerTableRoutes(app: FastifyInstance): Promise<void> {
       { entries, round: state.round, turnIndex },
       "gm"
     );
-    app.broadcastCampaign(row.campaign_id, "scene:deleted", { sceneId: id });
+    app.broadcastCampaign(
+      row.campaign_id,
+      "scene:deleted",
+      { sceneId: id },
+      row.visible === 0 ? "gm" : "all"
+    );
     touchCampaign(row.campaign_id);
     return reply.send({ ok: true });
   });

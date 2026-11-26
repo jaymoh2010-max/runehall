@@ -8326,6 +8326,9 @@ body.table-fullscreen-active {
 .vtt-right .chat-panel {
   flex: 1;
 }
+.vtt-right.vtt-right-hidden {
+  display: none;
+}
 .sound-panel {
   display: flex;
   flex-direction: column;

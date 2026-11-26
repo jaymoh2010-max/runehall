@@ -250,7 +250,8 @@ describe("curated feat effects", () => {
     const appliedArcana = applied.skills.find((skill) => skill.id === "arcana");
     expect(baselineArcana?.rank).toBe(0);
     expect(appliedArcana?.rank).toBe(0);
-    expect(appliedArcana?.mod).toBe((baselineArcana?.mod ?? 0) + Math.floor(5 / 2));
+    // Untrained Improvisation is level-1 at 5th level.
+    expect(appliedArcana?.mod).toBe((baselineArcana?.mod ?? 0) + 4);
     expect(applied.initiative).toBe(baseline.initiative);
   });
 

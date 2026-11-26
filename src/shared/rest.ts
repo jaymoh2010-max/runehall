@@ -62,6 +62,7 @@ function restoreConditions(
   const next: CharacterCondition[] = [];
   const removed: string[] = [];
   const reduced: { name: string; from: number; to: number }[] = [];
+  const hadDying = conditions.some((condition) => conditionBaseName(condition.name) === "dying");
 
   for (const condition of conditions) {
     const name = conditionBaseName(condition.name);
@@ -91,6 +92,22 @@ function restoreConditions(
       }
     }
     next.push(condition);
+  }
+
+  // Losing the dying condition increases wounded by 1 (or starts it at 1).
+  // A rest that ends at full HP removes wounded instead, matching the normal
+  // full-HP recovery rule.
+  if (hadDying && hpAfter > 0 && hpAfter < maxHp) {
+    const woundedCondition = next.find(
+      (condition) => conditionBaseName(condition.name) === "wounded"
+    );
+    const woundedValue = woundedCondition
+      ? Math.max(1, conditionNumericValue(woundedCondition) ?? 1)
+      : 0;
+    for (let index = next.length - 1; index >= 0; index -= 1) {
+      if (conditionBaseName(next[index].name) === "wounded") next.splice(index, 1);
+    }
+    next.push({ name: "Wounded", value: woundedValue + 1, duration: null });
   }
 
   return { conditions: next, removed, reduced };

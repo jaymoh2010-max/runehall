@@ -76,6 +76,7 @@ export function useCampaignTable({ initial, campaignId, toast }: UseCampaignTabl
 
   const revisionRef = useRef(initial.revision);
   const refreshingRef = useRef(false);
+  const refreshSeq = useRef(0);
   const pointerTimer = useRef<number | null>(null);
   const scenesRef = useRef(scenes);
   const tokensRef = useRef(tokens);
@@ -116,8 +117,13 @@ export function useCampaignTable({ initial, campaignId, toast }: UseCampaignTabl
   }, []);
 
   const refreshTable = useCallback(async () => {
+    const sequence = ++refreshSeq.current;
     try {
       const snapshot = await api<CampaignTable>(`/api/campaigns/${campaignId}/table`);
+      // A newer refresh finished first, or a live event advanced the campaign
+      // revision while this request was in flight: keep the newer state.
+      if (sequence !== refreshSeq.current) return;
+      if (snapshot.revision < revisionRef.current) return;
       setScenes(snapshot.scenes);
       setTokens(snapshot.tokens);
       setCharacters(snapshot.characters);
@@ -180,9 +186,10 @@ export function useCampaignTable({ initial, campaignId, toast }: UseCampaignTabl
     const onTokenMoved = (payload: { tokenId: string; x: number; y: number }) =>
       setTokens((current) => applyTokenMoved(current, payload));
     const onTokenCreated = (token: Token) => {
+      // The creating client selects the token from its emit ack. A broadcast
+      // must not steal another player's selection or overwrite a quick-panel
+      // draft.
       setTokens((current) => applyTokenCreated(current, token));
-      setSelectedTokenIdState(token.id);
-      setSelectedTokenIds([token.id]);
     };
     const onTokenUpdated = (token: Token) =>
       setTokens((current) => applyTokenUpdated(current, token));
@@ -284,6 +291,8 @@ export function useCampaignTable({ initial, campaignId, toast }: UseCampaignTabl
       characterId: string;
       summary: CharacterRecord["summary"];
       name: string;
+      data?: CharacterRecord["data"];
+      revision?: number;
     }) => setCharacters((current) => applyCharacterUpdated(current, payload));
     const onCharacterCreated = (payload: { character: CharacterRecord }) =>
       setCharacters((current) => applyCharacterCreated(current, payload.character));

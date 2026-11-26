@@ -122,9 +122,7 @@ export function SkillsStep({ draft, update, derived, context, setStep }: Builder
   const background = context.background;
   const classData = context.classData;
   const fixed = grantedTrainedSkills(draft, context);
-  const required = classData
-    ? Math.max(0, classData.trainedSkills.additional + Math.max(0, derived.abilityMods.int))
-    : 0;
+  const required = requiredExtraSkills(draft, context);
   const chosen = draft.skills.trained.filter((skill) => !fixed.has(skill));
   const increaseLevels = (classData?.skillIncreaseLevels ?? []).filter(
     (level) => level <= draft.level

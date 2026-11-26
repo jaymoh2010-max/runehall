@@ -1146,6 +1146,8 @@ export interface DerivedCharacter {
   notes: string[];
   equipment: CharacterEquipment[];
   bulk: { total: number; capacity: number; encumbered: boolean; max: number };
+  /** Maximum invested items, including feats such as Incredible Investiture. */
+  investedLimit: number;
   wealth: {
     budget: number | null;
     spent: number;
@@ -2196,7 +2198,10 @@ export interface ClientToServerEvents {
     cells: string[];
     mode: "reveal" | "hide" | "replace";
   }) => void;
-  "scene:activate": (payload: { campaignId: string; sceneId: string }) => void;
+  "scene:activate": (
+    payload: { campaignId: string; sceneId: string },
+    ack?: (result: { ok: boolean; error?: string }) => void
+  ) => void;
   "scene:update": (payload: { campaignId: string; scene: Partial<Scene> & { id: string } }) => void;
   "scene:create": (
     payload: { campaignId: string; scene: Partial<Scene> },

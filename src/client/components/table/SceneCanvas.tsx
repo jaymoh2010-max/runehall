@@ -667,7 +667,6 @@ export function SceneCanvas({
   const onViewportPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (event.button !== 0) return;
     const target = event.target as HTMLElement;
-    if (target.closest(".scene-token")) return;
     if (propMode && isGm) {
       if (pendingProp) {
         const point = scenePoint(event.clientX, event.clientY);
@@ -733,6 +732,8 @@ export function SceneCanvas({
       viewportRef.current?.setPointerCapture(event.pointerId);
       return;
     }
+    // With no map tool active, a token handles its own selection and drag.
+    if (target.closest(".scene-token")) return;
     if (event.shiftKey) {
       const point = scenePoint(event.clientX, event.clientY);
       setMarquee({ startX: point.x, startY: point.y, x: point.x, y: point.y });
@@ -963,6 +964,18 @@ export function SceneCanvas({
   };
 
   const onTokenPointerDown = (event: ReactPointerEvent<HTMLDivElement>, token: Token) => {
+    // Let the active map tool receive the gesture; otherwise the token's drag
+    // handler would swallow the click before the viewport can start an AoE or
+    // measurement on top of a creature.
+    if (
+      templateKind ||
+      measureMode ||
+      (propMode && isGm) ||
+      (wallMode && isGm) ||
+      (fogBrush && isGm)
+    ) {
+      return;
+    }
     event.stopPropagation();
     const additive = event.shiftKey || event.ctrlKey || event.metaKey;
     if (additive) {

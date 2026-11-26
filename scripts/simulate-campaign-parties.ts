@@ -685,6 +685,7 @@ async function main(): Promise<void> {
       LOG_LEVEL: "error",
       NODE_ENV: "production",
       COOKIE_SECURE: "0",
+      REGISTRATION_MODE: "open",
     },
     stdio: ["ignore", "pipe", "pipe"],
   });

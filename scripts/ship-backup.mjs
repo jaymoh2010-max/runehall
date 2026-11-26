@@ -108,7 +108,9 @@ if (keep > 0) {
     .map((entry) => entry.name)
     .sort()
     .reverse();
-  const stale = archives.slice(keep);
+  const stale = archives
+    .slice(keep)
+    .filter((name) => path.resolve(path.join(destination, name)) !== path.resolve(final));
   for (const name of stale) {
     fs.rmSync(path.join(destination, name), { recursive: true, force: true });
   }

@@ -329,7 +329,14 @@ function hasFeat(draft: CharacterDraft, featId: string): boolean {
   ]) {
     if (bucket && Object.values(bucket).includes(featId)) return true;
   }
-  return Array.isArray(feats.extras) && feats.extras.includes(featId);
+  if (Array.isArray(feats.extras) && feats.extras.includes(featId)) return true;
+  if (draft.backgroundFeat === featId) return true;
+  // Versatile Human, General Training, and similar grants store the chosen
+  // feat in featChoices rather than the normal feat buckets.
+  for (const choices of Object.values(draft.featChoices ?? {})) {
+    if (Array.isArray(choices) && choices.includes(featId)) return true;
+  }
+  return false;
 }
 
 /**

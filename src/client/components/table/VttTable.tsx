@@ -164,9 +164,15 @@ export function VttTable({ initial, campaignId, user, isGm, active }: VttTablePr
 
   const activateScene = (sceneId: string) => {
     if (!isGm) return;
+    const previousSceneId = activeSceneId;
     setActiveSceneId(sceneId);
     setSelectedTokenId(null);
-    getSocket().emit("scene:activate", { campaignId, sceneId });
+    getSocket().emit("scene:activate", { campaignId, sceneId }, (result) => {
+      if (result?.ok) return;
+      setActiveSceneId(previousSceneId);
+      setSelectedTokenId(null);
+      toast(result?.error ?? "Could not activate that scene.", "error");
+    });
   };
 
   const reorderScenes = (sceneIds: string[]) => {
@@ -990,6 +996,7 @@ export function VttTable({ initial, campaignId, user, isGm, active }: VttTablePr
 
           {selectedToken && !sheetCharacterId ? (
             <TokenQuickPanel
+              key={selectedToken.id}
               token={selectedToken}
               campaignId={campaignId}
               characters={characters}
@@ -1004,31 +1011,29 @@ export function VttTable({ initial, campaignId, user, isGm, active }: VttTablePr
           ) : null}
         </div>
 
-        {rightOpen ? (
-          <aside className="vtt-right">
-            <details className="core-audio">
-              <summary>
-                <Volume2 size={13} /> Soundtrack
-              </summary>
-              <SoundPanel
-                campaignId={campaignId}
-                isGm={isGm}
-                tracks={audioTracks}
-                state={audioState}
-                onTracksChange={setAudioTracks}
-              />
-            </details>
-            <ChatPanel
-              messages={messages}
-              presence={presence}
-              user={user}
+        <aside className={`vtt-right ${rightOpen ? "" : "vtt-right-hidden"}`}>
+          <details className="core-audio">
+            <summary>
+              <Volume2 size={13} /> Soundtrack
+            </summary>
+            <SoundPanel
+              campaignId={campaignId}
               isGm={isGm}
-              onSend={sendChat}
-              onRoll={roll}
-              onRequest={requestRoll}
+              tracks={audioTracks}
+              state={audioState}
+              onTracksChange={setAudioTracks}
             />
-          </aside>
-        ) : null}
+          </details>
+          <ChatPanel
+            messages={messages}
+            presence={presence}
+            user={user}
+            isGm={isGm}
+            onSend={sendChat}
+            onRoll={roll}
+            onRequest={requestRoll}
+          />
+        </aside>
       </div>
 
       <SceneManagerModal

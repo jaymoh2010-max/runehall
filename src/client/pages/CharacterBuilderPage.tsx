@@ -292,6 +292,11 @@ export function CharacterBuilderPage({
     () => (draft ? computeCharacter(draft, context) : null),
     [draft, context]
   );
+  const previousMaxHpRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    previousMaxHpRef.current = null;
+  }, [id]);
 
   useEffect(() => {
     draftRef.current = draft;
@@ -375,7 +380,9 @@ export function CharacterBuilderPage({
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           data: draftRef.current,
-          expectedRevision: characterRef.current?.revision,
+          ...(characterRef.current
+            ? { expectedRevision: characterRef.current.revision }
+            : { force: true }),
         }),
       });
     };
@@ -454,6 +461,28 @@ export function CharacterBuilderPage({
       return next;
     });
   };
+
+  // A level-up can raise Constitution or add Toughness after the level was
+  // applied. Keep a wounded character's current HP in step with the new
+  // maximum instead of leaving them permanently under-healed.
+  useEffect(() => {
+    if (!derived || !draft) return;
+    const maxHp = derived.maxHp;
+    const previousMaxHp = previousMaxHpRef.current;
+    previousMaxHpRef.current = maxHp;
+    if (previousMaxHp === null || previousMaxHp === maxHp) return;
+    const currentHp = draft.play.hp;
+    if (currentHp === null || currentHp <= 0) return;
+    const delta = maxHp - previousMaxHp;
+    if (!delta) return;
+    update((current) => {
+      if (current.play.hp === null || current.play.hp <= 0) return current;
+      const nextHp = Math.max(1, Math.min(maxHp, current.play.hp + delta));
+      return nextHp === current.play.hp
+        ? current
+        : { ...current, play: { ...current.play, hp: nextHp } };
+    });
+  }, [derived, draft, update]);
 
   const choosePortrait = async (url: string | null) => {
     update((current) => ({ ...current, portraitUrl: url }));

@@ -82,11 +82,23 @@ export function mergeSnapshotMessages(
 
 export function applyCharacterUpdated(
   characters: CharacterRecord[],
-  payload: { characterId: string; summary: CharacterSummary | null; name: string }
+  payload: {
+    characterId: string;
+    summary: CharacterSummary | null;
+    name: string;
+    data?: CharacterRecord["data"];
+    revision?: number;
+  }
 ): CharacterRecord[] {
   return characters.map((character) =>
     character.id === payload.characterId
-      ? { ...character, name: payload.name, summary: payload.summary }
+      ? {
+          ...character,
+          name: payload.name,
+          summary: payload.summary,
+          data: payload.data ?? character.data,
+          revision: payload.revision ?? character.revision,
+        }
       : character
   );
 }

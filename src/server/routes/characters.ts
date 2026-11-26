@@ -22,7 +22,8 @@ import {
   rulesetContentMode,
   rulesetIncludesLegacy,
 } from "../../shared/content";
-import { contextForDraft, equipment } from "../compendium";
+import { equipment } from "../compendium";
+import { contextForCampaign, contextForCharacter } from "../campaignContext";
 import { importPathbuilder } from "../pathbuilder";
 import { db, type CampaignRow, type CharacterRow, type TokenRow } from "../db";
 import { serializeCharacter, serializeToken, touchCampaign } from "../serialize";
@@ -68,17 +69,8 @@ function parseDraft(raw: unknown, fallbackName = "New Hero"): CharacterDraft {
   return draft;
 }
 
-function summarize(draft: CharacterDraft): CharacterSummary {
-  return characterSummary(draft, contextForDraft(draft));
-}
-
-function contextForCharacter(row: CharacterRow, draft: CharacterDraft) {
-  const campaign = row.campaign_id ? getCampaign(row.campaign_id) : null;
-  return contextForDraft(
-    draft,
-    Boolean(campaign?.free_archetype),
-    Boolean(campaign?.automatic_bonus_progression)
-  );
+function summarize(draft: CharacterDraft, campaignId: string | null = null): CharacterSummary {
+  return characterSummary(draft, contextForCampaign(campaignId, draft));
 }
 
 /** Downtime and long rests consume in-world days, not just character resources. */
@@ -106,8 +98,11 @@ export function syncCharacterDraft(
   if (!row.campaign_id) return;
   // Keep any linked table tokens in step with the sheet.
   const linkedTokens = db
-    .prepare("SELECT * FROM tokens WHERE character_id = ?")
-    .all(row.id) as TokenRow[];
+    .prepare(
+      `SELECT t.* FROM tokens t JOIN scenes s ON s.id = t.scene_id
+       WHERE t.character_id = ? AND s.campaign_id = ?`
+    )
+    .all(row.id, row.campaign_id) as TokenRow[];
   for (const token of linkedTokens) {
     db.prepare(
       "UPDATE tokens SET name = ?, hp_max = ?, hp_current = ?, ac = ?, conditions = ?, turn_effects = ?, updated_at = ? WHERE id = ?"
@@ -127,10 +122,14 @@ export function syncCharacterDraft(
       Boolean(token.hidden)
     );
   }
+  const revisionRow = db.prepare("SELECT revision FROM characters WHERE id = ?").get(row.id) as
+    { revision: number } | undefined;
   app.broadcastCampaign(row.campaign_id, "character:updated", {
     characterId: row.id,
     summary,
     name: draft.name,
+    data: draft,
+    revision: Number(revisionRow?.revision ?? 0),
   });
 }
 
@@ -206,7 +205,9 @@ export async function registerCharacterRoutes(app: FastifyInstance): Promise<voi
       canAdvance: canAdvanceCharacter(row, request.user.id),
     });
     if (campaignId) {
-      app.broadcastCampaign(campaignId, "character:created", { character: created });
+      app.broadcastCampaign(campaignId, "character:created", {
+        character: { ...created, permissions: undefined },
+      });
     }
     return reply.code(201).send({ character: created });
   });
@@ -276,7 +277,7 @@ export async function registerCharacterRoutes(app: FastifyInstance): Promise<voi
       return reply.code(400).send({ error: "Runehall could not read that Pathbuilder export." });
     }
     const draft = normalizeCharacterDraft(result.draft, result.draft.name);
-    const summary = summarize(draft);
+    const summary = summarize(draft, attachCampaignId);
     const report = {
       matched: result.report.matched,
       unmatched: result.report.unmatched.slice(0, 200),
@@ -336,7 +337,9 @@ export async function registerCharacterRoutes(app: FastifyInstance): Promise<voi
         "gm"
       );
     } else if (campaign) {
-      app.broadcastCampaign(campaign.id, "character:created", { character: created });
+      app.broadcastCampaign(campaign.id, "character:created", {
+        character: { ...created, permissions: undefined },
+      });
     }
     return reply.code(201).send({ character: created, report, joinRequest });
   });
@@ -373,6 +376,11 @@ export async function registerCharacterRoutes(app: FastifyInstance): Promise<voi
         ? Math.round(body.expectedRevision)
         : null;
     const force = body.force === true;
+    if (!force && expectedRevision === null) {
+      return reply.code(400).send({
+        error: "Include expectedRevision with the save, or set force to overwrite deliberately.",
+      });
+    }
     if (!force && expectedRevision !== null && Number(row.revision) !== expectedRevision) {
       const owner = getUser(row.user_id);
       return reply.code(409).send({
@@ -474,7 +482,7 @@ export async function registerCharacterRoutes(app: FastifyInstance): Promise<voi
             : "That character has no Hero Points to spend.";
       return reply.code(400).send({ error: message });
     }
-    const summary = characterSummary(result.draft, contextForDraft(result.draft));
+    const summary = characterSummary(result.draft, contextForCharacter(character, result.draft));
     db.prepare(
       "UPDATE characters SET data = ?, summary = ?, updated_at = ?, revision = revision + 1 WHERE id = ?"
     ).run(JSON.stringify(result.draft), JSON.stringify(summary), now(), character.id);
@@ -540,7 +548,7 @@ export async function registerCharacterRoutes(app: FastifyInstance): Promise<voi
         notes:
           rawActivity.notes === undefined ? undefined : sanitizeUserText(rawActivity.notes, 4000),
       };
-      const derived = computeCharacter(draft, contextForDraft(draft));
+      const derived = computeCharacter(draft, contextForCharacter(character, draft));
       const campaign = character.campaign_id ? getCampaign(character.campaign_id) : null;
       const result = performDowntimeDay({
         draft,
@@ -555,7 +563,7 @@ export async function registerCharacterRoutes(app: FastifyInstance): Promise<voi
         return reply.code(result.code).send({ error: result.error });
       }
       const rate = lifestyleRate(draft.play.lifestyle);
-      const summary = characterSummary(draft, contextForDraft(draft));
+      const summary = characterSummary(draft, contextForCharacter(character, draft));
       db.prepare(
         "UPDATE characters SET data = ?, summary = ?, updated_at = ?, revision = revision + 1 WHERE id = ?"
       ).run(JSON.stringify(draft), JSON.stringify(summary), now(), character.id);
@@ -613,7 +621,7 @@ export async function registerCharacterRoutes(app: FastifyInstance): Promise<voi
     }
     draft.currency = currency;
     draft.play.downtimeDays -= days;
-    const summary = characterSummary(draft, contextForDraft(draft));
+    const summary = characterSummary(draft, contextForCharacter(character, draft));
     db.prepare(
       "UPDATE characters SET data = ?, summary = ?, updated_at = ?, revision = revision + 1 WHERE id = ?"
     ).run(JSON.stringify(draft), JSON.stringify(summary), now(), character.id);
@@ -661,18 +669,20 @@ export async function registerCharacterRoutes(app: FastifyInstance): Promise<voi
     } catch {
       return reply.code(400).send({ error: "That character's draft could not be read." });
     }
-    const healerDerived = computeCharacter(healerDraft, contextForDraft(healerDraft));
+    const healerDerived = computeCharacter(healerDraft, contextForCharacter(healer, healerDraft));
     const medicine = healerDerived.skills.find((skill) => skill.id === "medicine");
-    if (!medicine || medicine.rank < 1) {
-      return reply.code(400).send({
-        error: "Train Medicine before using Treat Wounds, Battle Medicine, or Stabilize.",
-      });
-    }
 
     const body = (request.body ?? {}) as Record<string, unknown>;
     const activity = safeString(body.activity, "treat-wounds", 40) as RecoveryActivity;
     if (!RECOVERY_ACTIVITIES.includes(activity)) {
       return reply.code(400).send({ error: "Choose a recovery activity." });
+    }
+    // Stabilize is an untrained Medicine action; the other recovery activities
+    // require at least trained proficiency.
+    if (activity !== "stabilize" && (!medicine || medicine.rank < 1)) {
+      return reply.code(400).send({
+        error: "Train Medicine before using Treat Wounds or Battle Medicine.",
+      });
     }
     if (activity === "battle-medicine" && !hasRecoveryFeat(healerDerived, "Battle Medicine")) {
       return reply.code(400).send({ error: "Battle Medicine requires the Battle Medicine feat." });
@@ -710,7 +720,9 @@ export async function registerCharacterRoutes(app: FastifyInstance): Promise<voi
     }
     // Stabilize is untrained and its DC is 5 + the recovery-roll DC.
     const allowedDcs =
-      activity === "stabilize" ? [stabilizeDc(dying)] : recoveryDcsForRank(medicine.rank, activity);
+      activity === "stabilize"
+        ? [stabilizeDc(dying)]
+        : recoveryDcsForRank(medicine?.rank ?? 0, activity);
     const requestedDc =
       body.dc === undefined || body.dc === null
         ? allowedDcs[0]
@@ -735,7 +747,7 @@ export async function registerCharacterRoutes(app: FastifyInstance): Promise<voi
     }
 
     const label = `${recoveryActivityLabel(activity)} on ${target.name}`;
-    const check = rollFormula(`1d20${signed(medicine.mod)}`, {
+    const check = rollFormula(`1d20${signed(medicine?.mod ?? 0)}`, {
       dc: requestedDc,
       label: `${label} (Medicine)`,
     });
@@ -751,7 +763,7 @@ export async function registerCharacterRoutes(app: FastifyInstance): Promise<voi
       activity === "treat-wounds" && degree === "critical-failure"
         ? rollFormula("1d8", { label: `${label} critical failure damage` })
         : null;
-    const targetDerived = computeCharacter(targetDraft, contextForDraft(targetDraft));
+    const targetDerived = computeCharacter(targetDraft, contextForCharacter(target, targetDraft));
     // Robust Health belongs to the target, not the healer, and grants HP
     // equal to the target's level.
     const robustHealth = hasRecoveryFeat(targetDerived, "Robust Health");
@@ -769,7 +781,7 @@ export async function registerCharacterRoutes(app: FastifyInstance): Promise<voi
       continualRecovery,
     });
     targetDraft = applied.draft;
-    const summary = summarize(targetDraft);
+    const summary = summarize(targetDraft, target.campaign_id);
     db.prepare(
       "UPDATE characters SET data = ?, summary = ?, updated_at = ?, revision = revision + 1 WHERE id = ?"
     ).run(JSON.stringify(targetDraft), JSON.stringify(summary), now(), target.id);
@@ -826,7 +838,7 @@ export async function registerCharacterRoutes(app: FastifyInstance): Promise<voi
       return reply.code(400).send({ error: "That character's draft could not be read." });
     }
     const cleared = clearRecoveryImmunities(draft);
-    const summary = summarize(cleared);
+    const summary = summarize(cleared, character.campaign_id);
     db.prepare(
       "UPDATE characters SET data = ?, summary = ?, updated_at = ?, revision = revision + 1 WHERE id = ?"
     ).run(JSON.stringify(cleared), JSON.stringify(summary), now(), character.id);
@@ -879,7 +891,14 @@ export async function registerCharacterRoutes(app: FastifyInstance): Promise<voi
       typeof body.expectedRevision === "number" && Number.isFinite(body.expectedRevision)
         ? Math.round(body.expectedRevision)
         : null;
-    if (expectedRevision !== null && Number(source.revision) !== expectedRevision) {
+    const force = body.force === true;
+    if (!force && expectedRevision === null) {
+      return reply.code(400).send({
+        error:
+          "Include expectedRevision with the transfer, or set force to overwrite deliberately.",
+      });
+    }
+    if (!force && expectedRevision !== null && Number(source.revision) !== expectedRevision) {
       const owner = getUser(source.user_id);
       return reply.code(409).send({
         error: "This character changed somewhere else. Reload before transferring.",
@@ -940,8 +959,8 @@ export async function registerCharacterRoutes(app: FastifyInstance): Promise<voi
     // A transfer is play history, not character creation.
     sourceDraft.wealthBudgetCp = null;
     targetDraft.wealthBudgetCp = null;
-    const sourceSummary = summarize(sourceDraft);
-    const targetSummary = summarize(targetDraft);
+    const sourceSummary = summarize(sourceDraft, source.campaign_id);
+    const targetSummary = summarize(targetDraft, target.campaign_id);
     const updatedAt = now();
     db.exec("BEGIN");
     try {
@@ -1065,6 +1084,8 @@ export async function registerCharacterRoutes(app: FastifyInstance): Promise<voi
         characterId: id,
         summary,
         name: nextDraft.name,
+        data: nextDraft,
+        revision: Number(updated?.revision ?? row.revision + 1),
       });
     }
     const owner = getUser(row.user_id);
@@ -1155,7 +1176,7 @@ export async function registerCharacterRoutes(app: FastifyInstance): Promise<voi
                 invested: false,
                 runes: [],
               });
-        const summary = summarize(nextDraft);
+        const summary = summarize(nextDraft, id);
         db.prepare(
           "UPDATE characters SET data = ?, summary = ?, updated_at = ?, revision = revision + 1 WHERE id = ?"
         ).run(JSON.stringify(nextDraft), JSON.stringify(summary), updatedAt, row.id);
@@ -1232,7 +1253,7 @@ export async function registerCharacterRoutes(app: FastifyInstance): Promise<voi
     }
     const newCharacterId = newId("char");
     const ts = now();
-    const summary = summarize(draft);
+    const summary = summarize(draft, row.campaign_id);
     db.prepare(
       "INSERT INTO characters (id, user_id, campaign_id, name, data, summary, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
     ).run(
@@ -1253,7 +1274,9 @@ export async function registerCharacterRoutes(app: FastifyInstance): Promise<voi
     });
     if (row.campaign_id) {
       touchCampaign(row.campaign_id);
-      app.broadcastCampaign(row.campaign_id, "character:created", { character: serialized });
+      app.broadcastCampaign(row.campaign_id, "character:created", {
+        character: { ...serialized, permissions: undefined },
+      });
     }
     return reply.code(201).send({ character: serialized });
   });
@@ -1268,7 +1291,12 @@ export async function registerCharacterRoutes(app: FastifyInstance): Promise<voi
     }
     const linkedTokenIds = row.campaign_id
       ? (
-          db.prepare("SELECT id FROM tokens WHERE character_id = ?").all(id) as { id: string }[]
+          db
+            .prepare(
+              `SELECT t.id FROM tokens t JOIN scenes s ON s.id = t.scene_id
+               WHERE t.character_id = ? AND s.campaign_id = ?`
+            )
+            .all(id, row.campaign_id) as { id: string }[]
         ).map((token) => token.id)
       : [];
     db.prepare("DELETE FROM characters WHERE id = ?").run(id);
@@ -1279,7 +1307,10 @@ export async function registerCharacterRoutes(app: FastifyInstance): Promise<voi
         const token = db.prepare("SELECT * FROM tokens WHERE id = ?").get(tokenId) as
           TokenRow | undefined;
         if (token) {
-          app.broadcastCampaign(row.campaign_id, "token:updated", serializeToken(token));
+          tokenEventsFor(app, row.campaign_id).updated(
+            serializeToken(token),
+            Boolean(token.hidden)
+          );
         }
       }
     }

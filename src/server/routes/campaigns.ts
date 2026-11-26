@@ -1,4 +1,5 @@
 import type { FastifyInstance } from "fastify";
+import type { CharacterDraft, CharacterSummary } from "../../shared/types";
 import fs from "node:fs";
 import path from "node:path";
 import {
@@ -92,6 +93,7 @@ import {
   shopStockCount,
 } from "../../shared/shop";
 import { compendiumManifest, contextForDraft } from "../compendium";
+import { contextForCampaign } from "../campaignContext";
 import { campaignSessionsFor } from "../sessionData";
 import { importCampaign } from "../campaignImport";
 import { logAudit } from "../audit";
@@ -128,15 +130,29 @@ function unassignCampaignCharacters(
   if (!rows.length) return;
   const ids = rows.map((row) => row.id);
   const placeholders = ids.map(() => "?").join(",");
+  const linkedTokens = db
+    .prepare(
+      `SELECT t.* FROM tokens t JOIN scenes s ON s.id = t.scene_id
+       WHERE t.character_id IN (${placeholders}) AND s.campaign_id = ?`
+    )
+    .all(...ids, campaignId) as TokenRow[];
   db.prepare(
     `UPDATE tokens SET character_id = NULL, owner_id = NULL, updated_at = ?
      WHERE character_id IN (${placeholders})`
   ).run(now(), ...ids);
   db.prepare(
-    `UPDATE characters SET campaign_id = NULL, updated_at = ? WHERE id IN (${placeholders})`
+    `UPDATE characters SET campaign_id = NULL, updated_at = ?, revision = revision + 1
+     WHERE id IN (${placeholders})`
   ).run(now(), ...ids);
   for (const row of rows) {
     app.broadcastCampaign(campaignId, "character:removed", { characterId: row.id });
+  }
+  for (const token of linkedTokens) {
+    const refreshed = db.prepare("SELECT * FROM tokens WHERE id = ?").get(token.id) as
+      TokenRow | undefined;
+    if (refreshed) {
+      tokenEventsFor(app, campaignId).updated(serializeToken(refreshed), Boolean(refreshed.hidden));
+    }
   }
 }
 
@@ -151,6 +167,23 @@ function ejectUserSockets(
     socket.leave(`campaign:${campaignId}`);
     socket.leave(`gm:${campaignId}`);
     if (disconnect) socket.disconnect(true);
+  }
+}
+
+/** Keep a connected member's role rooms in step after a GM transfer. */
+function syncUserCampaignRooms(
+  app: FastifyInstance,
+  campaignId: string,
+  userId: string,
+  role: "gm" | "player"
+): void {
+  for (const socket of app.io.sockets.sockets.values()) {
+    const data = socket.data as { user?: { id?: string }; campaigns?: Set<string> };
+    if (data.user?.id !== userId) continue;
+    socket.join(`campaign:${campaignId}`);
+    if (role === "gm") socket.join(`gm:${campaignId}`);
+    else socket.leave(`gm:${campaignId}`);
+    data.campaigns?.add(campaignId);
   }
 }
 
@@ -254,8 +287,11 @@ function advanceCharacterLevel(
   ).run(JSON.stringify(draft), JSON.stringify(summary), now(), character.id);
 
   const linkedTokens = db
-    .prepare("SELECT * FROM tokens WHERE character_id = ?")
-    .all(character.id) as TokenRow[];
+    .prepare(
+      `SELECT t.* FROM tokens t JOIN scenes s ON s.id = t.scene_id
+       WHERE t.character_id = ? AND s.campaign_id = ?`
+    )
+    .all(character.id, campaign.id) as TokenRow[];
   for (const token of linkedTokens) {
     const nextHp = Math.min(draft.play.hp ?? summary.hp, summary.hp);
     db.prepare(
@@ -269,6 +305,13 @@ function advanceCharacterLevel(
     characterId: character.id,
     summary,
     name: draft.name,
+    data: draft,
+    revision: Number(
+      (
+        db.prepare("SELECT revision FROM characters WHERE id = ?").get(character.id) as
+          { revision: number } | undefined
+      )?.revision ?? 0
+    ),
   });
   return summary;
 }
@@ -296,8 +339,11 @@ function refreshVariantSummaries(app: FastifyInstance, campaign: CampaignRow): v
       "UPDATE characters SET summary = ?, updated_at = ?, revision = revision + 1 WHERE id = ?"
     ).run(JSON.stringify(summary), now(), character.id);
     const linkedTokens = db
-      .prepare("SELECT * FROM tokens WHERE character_id = ?")
-      .all(character.id) as TokenRow[];
+      .prepare(
+        `SELECT t.* FROM tokens t JOIN scenes s ON s.id = t.scene_id
+         WHERE t.character_id = ? AND s.campaign_id = ?`
+      )
+      .all(character.id, campaign.id) as TokenRow[];
     for (const token of linkedTokens) {
       const nextHp = Math.min(draft.play.hp ?? summary.hp, summary.hp);
       db.prepare(
@@ -312,6 +358,13 @@ function refreshVariantSummaries(app: FastifyInstance, campaign: CampaignRow): v
       characterId: character.id,
       summary,
       name: draft.name,
+      data: draft,
+      revision: Number(
+        (
+          db.prepare("SELECT revision FROM characters WHERE id = ?").get(character.id) as
+            { revision: number } | undefined
+        )?.revision ?? 0
+      ),
     });
   }
 }
@@ -490,9 +543,11 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
       serializedCharacter = character
         ? serializeCharacter(character, request.user.displayName, { canEdit: true, canView: true })
         : null;
-      app.broadcastCampaign(row.id, "character:created", {
-        character: serializedCharacter,
-      });
+      if (serializedCharacter) {
+        app.broadcastCampaign(row.id, "character:created", {
+          character: { ...serializedCharacter, permissions: undefined },
+        });
+      }
     }
 
     touchCampaign(row.id);
@@ -569,7 +624,7 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
       draft.contentMode = rulesetContentMode(ruleset);
       draft.includeLegacy = rulesetIncludesLegacy(ruleset);
       data = JSON.stringify(draft);
-      summary = characterSummary(draft, contextForDraft(draft));
+      summary = characterSummary(draft, contextForCampaign(id, draft));
     } catch {
       // Keep the imported draft and summary if normalization fails.
     }
@@ -591,7 +646,9 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
         })
       : null;
     if (serialized) {
-      app.broadcastCampaign(id, "character:created", { character: serialized });
+      app.broadcastCampaign(id, "character:created", {
+        character: { ...serialized, permissions: undefined },
+      });
     }
     app.broadcastCampaign(
       id,
@@ -921,8 +978,19 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
       for (const match of JSON.stringify(payload).matchAll(/\/uploads\/([A-Za-z0-9._-]+)/g)) {
         referencedUploads.add(match[1]);
       }
+      const ownedAssets = new Set(
+        (
+          db
+            .prepare(
+              `SELECT filename FROM uploaded_assets
+               WHERE campaign_id = ? OR (campaign_id IS NULL AND uploaded_by = ?)`
+            )
+            .all(id, request.user!.id) as { filename: string }[]
+        ).map((row) => row.filename)
+      );
       let totalBytes = 0;
       for (const filename of referencedUploads) {
+        if (!ownedAssets.has(filename)) continue;
         if (!allowedExtensions.has(path.extname(filename).toLowerCase())) continue;
         const filePath = path.join(uploadsDir(), filename);
         if (!fs.existsSync(filePath)) continue;
@@ -1111,6 +1179,10 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
         "UPDATE campaign_members SET role = 'gm' WHERE campaign_id = ? AND user_id = ?"
       ).run(id, targetId);
     });
+    // Role rooms are joined at socket connect time, so swap them immediately
+    // rather than waiting for either GM to reconnect.
+    syncUserCampaignRooms(app, id, row.gm_id, "player");
+    syncUserCampaignRooms(app, id, targetId, "gm");
     touchCampaign(id);
     logAudit({
       action: "campaign.transfer",
@@ -1491,44 +1563,51 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
     }
     let recipients = 0;
     let skipped = 0;
-    for (const character of selected) {
-      let draft;
-      try {
-        draft = normalizeCharacterDraft(JSON.parse(character.data), character.name);
-      } catch {
-        skipped += 1;
-        continue;
+    let rewardedAt = 0;
+    let questAwardId = "";
+    const actorId = request.user.id;
+    const updates: { character: CharacterRow; draft: CharacterDraft; summary: CharacterSummary }[] =
+      [];
+    transaction(() => {
+      for (const character of selected) {
+        let draft;
+        try {
+          draft = normalizeCharacterDraft(JSON.parse(character.data), character.name);
+        } catch {
+          skipped += 1;
+          continue;
+        }
+        draft.play.xp = Math.max(0, Math.round(draft.play.xp + amount));
+        const summary = characterSummary(draft, contextForCampaign(id, draft));
+        db.prepare(
+          "UPDATE characters SET data = ?, summary = ?, updated_at = ?, revision = revision + 1 WHERE id = ?"
+        ).run(JSON.stringify(draft), JSON.stringify(summary), now(), character.id);
+        updates.push({ character, draft, summary });
+        recipients += 1;
       }
-      draft.play.xp = Math.max(0, Math.round(draft.play.xp + amount));
-      const summary = characterSummary(draft, contextForDraft(draft));
+      rewardedAt = now();
       db.prepare(
-        "UPDATE characters SET data = ?, summary = ?, updated_at = ?, revision = revision + 1 WHERE id = ?"
-      ).run(JSON.stringify(draft), JSON.stringify(summary), now(), character.id);
+        "UPDATE journal_entries SET quest_rewarded_at = ?, updated_at = ? WHERE id = ?"
+      ).run(rewardedAt, rewardedAt, entryId);
+      questAwardId = newId("xpa");
+      db.prepare(
+        "INSERT INTO xp_awards (id, campaign_id, actor_id, kind, amount, reason, recipient_count, created_at) VALUES (?, ?, ?, 'quest', ?, ?, ?, ?)"
+      ).run(questAwardId, id, actorId, amount, `Quest: ${existing.title}`, recipients, rewardedAt);
+    });
+    for (const update of updates) {
       app.broadcastCampaign(id, "character:updated", {
-        characterId: character.id,
-        summary,
-        name: draft.name,
+        characterId: update.character.id,
+        summary: update.summary,
+        name: update.draft.name,
+        data: update.draft,
+        revision: Number(
+          (
+            db.prepare("SELECT revision FROM characters WHERE id = ?").get(update.character.id) as
+              { revision: number } | undefined
+          )?.revision ?? 0
+        ),
       });
-      recipients += 1;
     }
-    const rewardedAt = now();
-    db.prepare("UPDATE journal_entries SET quest_rewarded_at = ?, updated_at = ? WHERE id = ?").run(
-      rewardedAt,
-      rewardedAt,
-      entryId
-    );
-    const questAwardId = newId("xpa");
-    db.prepare(
-      "INSERT INTO xp_awards (id, campaign_id, actor_id, kind, amount, reason, recipient_count, created_at) VALUES (?, ?, ?, 'quest', ?, ?, ?, ?)"
-    ).run(
-      questAwardId,
-      id,
-      request.user.id,
-      amount,
-      `Quest: ${existing.title}`,
-      recipients,
-      rewardedAt
-    );
     touchCampaign(id);
     logAudit({
       action: "campaign.quest_xp",

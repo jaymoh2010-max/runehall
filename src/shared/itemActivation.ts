@@ -253,15 +253,17 @@ export interface InvestItemResult {
 export function setItemInvested(
   draft: CharacterDraft,
   itemId: string,
-  invested: boolean
+  invested: boolean,
+  limit = INVESTED_LIMIT
 ): InvestItemResult {
   const entry = draft.equipment.find((candidate) => candidate.itemId === itemId);
   if (!entry) return { draft, blocked: "That item is no longer in the pack." };
   if (entry.invested === invested) return { draft, blocked: null };
-  if (invested && investedCount(draft) >= INVESTED_LIMIT) {
+  const investedLimit = Math.max(INVESTED_LIMIT, Math.round(limit));
+  if (invested && investedCount(draft) >= investedLimit) {
     return {
       draft,
-      blocked: `You can invest at most ${INVESTED_LIMIT} items. Uninvest another item first.`,
+      blocked: `You can invest at most ${investedLimit} items. Uninvest another item first.`,
     };
   }
   return {

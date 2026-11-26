@@ -12,8 +12,11 @@ function isMode(value: unknown): value is RegistrationMode {
 }
 
 function envMode(): RegistrationMode {
-  const raw = (process.env.REGISTRATION_MODE ?? "open").trim().toLowerCase();
-  return isMode(raw) ? raw : "open";
+  // Invite-only is the safe default for a self-hosted instance. The first
+  // account is still allowed (and becomes the administrator), and the Docker
+  // compose file sets this explicitly as well.
+  const raw = (process.env.REGISTRATION_MODE ?? "invite").trim().toLowerCase();
+  return isMode(raw) ? raw : "invite";
 }
 
 export function userCount(): number {

@@ -1679,9 +1679,9 @@ export function normalizeCharacterDraft(input: unknown, fallbackName = "New Hero
   const levelsRaw = obj(boosts.levels);
   const levels: Record<string, (AbilityKey | null)[]> = { "5": [], "10": [], "15": [], "20": [] };
   for (const key of Object.keys(levels)) {
-    levels[key] = arr<AbilityKey | null>(levelsRaw[key]).map((x) =>
-      x && ABILITIES.includes(x) ? x : null
-    );
+    levels[key] = arr<AbilityKey | null>(levelsRaw[key])
+      .slice(0, 4)
+      .map((x) => (x && ABILITIES.includes(x) ? x : null));
   }
   const skills = obj(raw.skills);
   const feats = obj(raw.feats);
@@ -2192,7 +2192,9 @@ export function classKeyOptions(
 export function requiredExtraSkills(draft: CharacterDraft, context: CharacterContext): number {
   const classData = context.classData;
   if (!classData) return 0;
-  const baseMod = abilityMod(baseAbilityScores(draft, context).int);
+  // Class training grants extra skills from the 1st-level Intelligence
+  // modifier. Later milestone boosts do not retroactively add skills.
+  const baseMod = abilityMod(baseAbilityScores({ ...draft, level: 1 }, context, false).int);
   return Math.max(0, classData.trainedSkills.additional + Math.max(0, baseMod));
 }
 
@@ -3111,6 +3113,10 @@ function attackRankFor(
 ): number {
   if (!item.weapon) return 0;
   let rank = prof.attacks[item.weapon.category || "simple"] ?? 0;
+  if (isFirearm(item)) {
+    const category = item.weapon.category || "simple";
+    rank = Math.max(rank, prof.attacks[`${category}-firearms-crossbows`] ?? 0);
+  }
   const slug = weaponSlug(item.name);
   rank = Math.max(rank, prof.attacks[`weapon-base-${slug}`] ?? 0);
   if (isBomb(item)) rank = Math.max(rank, prof.attacks["weapon-base-alchemical-bomb"] ?? 0);
@@ -3564,9 +3570,7 @@ export function computeCharacter(
       );
     }
   }
-  const extraRequired = classData
-    ? Math.max(0, classData.trainedSkills.additional + Math.max(0, abilityMods.int))
-    : 0;
+  const extraRequired = classData ? requiredExtraSkills(draft, context) : 0;
   const selectedExtra = draft.skills.trained.filter(
     (skill) => SKILL_BY_ID[skill as SkillId] && !fixedSkillSet.has(skill)
   );
@@ -3635,10 +3639,21 @@ export function computeCharacter(
   const meetsArmorStrength = equippedArmorItem?.armor
     ? abilityMods.str >= (equippedArmorItem.armor.strength || 0)
     : true;
-  const armorCheckPenalty =
-    equippedArmorItem?.armor && !meetsArmorStrength && equippedArmorItem.armor.checkPenalty
-      ? -Math.abs(equippedArmorItem.armor.checkPenalty)
-      : 0;
+  const armorCheckPenalty = equippedArmorItem?.armor?.checkPenalty
+    ? -Math.abs(equippedArmorItem.armor.checkPenalty)
+    : 0;
+  const armorTraits = new Set(equippedArmorItem?.traits ?? []);
+  const armorPenaltyForSkill = (skill: (typeof SKILLS)[number]) => {
+    if (!skill.armorPenalty) return 0;
+    // Noisy armor applies its check penalty to Stealth even at the required
+    // Strength. Flexible armor waives the penalty for Acrobatics and Athletics.
+    if (armorTraits.has("noisy") && skill.id === "stealth") return armorCheckPenalty;
+    if (meetsArmorStrength) return 0;
+    if (armorTraits.has("flexible") && (skill.id === "acrobatics" || skill.id === "athletics")) {
+      return 0;
+    }
+    return armorCheckPenalty;
+  };
 
   const derivedSkills: DerivedSkill[] = SKILLS.map((skill) => {
     const rank = ranks[skill.id] ?? 0;
@@ -3646,12 +3661,16 @@ export function computeCharacter(
       rank > 0
         ? proficiencyBonus(rank, draft.level)
         : featMods.untrainedImprovisation
-          ? Math.floor(draft.level / 2)
+          ? draft.level >= 7
+            ? draft.level
+            : draft.level >= 5
+              ? draft.level - 1
+              : Math.max(0, draft.level - 2)
           : 0;
     const mod =
       proficiency +
       abilityMods[skill.ability] +
-      (skill.armorPenalty ? armorCheckPenalty : 0) +
+      armorPenaltyForSkill(skill) +
       Math.max(
         itemMods.skillItemBonus?.[skill.id] ?? 0,
         draft.abpSkill === skill.id ? abp.skill : 0
@@ -4995,6 +5014,7 @@ export function computeCharacter(
       committed,
       remaining: budget === null ? null : budget - committed,
     },
+    investedLimit,
     features,
     selectedFeats,
     grantedFeats,

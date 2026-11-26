@@ -14,7 +14,6 @@ export async function registerSystemRoutes(app: FastifyInstance): Promise<void> 
     return reply.send({
       addresses,
       port: Number(process.env.PORT || 3001),
-      hostname: os.hostname(),
     });
   });
 }

@@ -1,9 +1,20 @@
 import type { Server, Socket } from "socket.io";
 import { getCampaignRole, getCharacter, getMembership, getUser } from "./access";
-import { contextForDraft, monsters } from "./compendium";
+import { monsters } from "./compendium";
+import { contextForCharacter } from "./campaignContext";
 import { db, type CampaignRow, type MessageRow, type SceneRow, type TokenRow } from "./db";
-import { userFromCookieHeader } from "./auth";
-import { now, newId, safeInt, safeString, parseJson, clamp, sanitizeUserText } from "./util";
+import { SESSION_COOKIE, userFromCookieHeader } from "./auth";
+import {
+  now,
+  newId,
+  safeInt,
+  safeString,
+  parseJson,
+  parseCookies,
+  sha256,
+  clamp,
+  sanitizeUserText,
+} from "./util";
 import { characterSummary, computeCharacter, normalizeCharacterDraft } from "../shared/rules";
 import { rollFormula, upgradeDegreeOfSuccess, validateFormula } from "../shared/dice";
 import {
@@ -35,6 +46,8 @@ import { normalizeLightColor, normalizeTokenVisionMode } from "../shared/lightin
 import { normalizeTokenTurnEffects } from "../shared/tokenTurnEffects";
 import { characterTokenTurnEffects } from "../shared/characterTurnEffects";
 import type {
+  CharacterDraft,
+  CharacterSummary,
   ClientToServerEvents,
   InitiativeEntry,
   PresenceUser,
@@ -51,10 +64,11 @@ import {
   serializeToken,
   touchCampaign,
 } from "./serialize";
-import { tokenBroadcaster } from "./tokenEvents";
+import { sceneVisible, tokenBroadcaster } from "./tokenEvents";
 
 interface SocketData {
   user: PublicUser;
+  sessionHash: string;
   campaigns: Set<string>;
 }
 
@@ -98,7 +112,7 @@ function socketTokenEvents(io: TypedServer, campaignId: string) {
     if (target === "gm") emitTo(gmRoom(campaignId), event, payload);
     else if (target === "players") emitToPlayers(event, payload);
     else emitTo(room(campaignId), event, payload);
-  });
+  }, sceneVisible);
 }
 
 function presenceList(campaignId: string): PresenceUser[] {
@@ -126,12 +140,25 @@ function requireGm(socket: TypedSocket, campaignId: string): boolean {
  * malformed client payload is reported back to its sender instead of becoming
  * an uncaught exception that disconnects the whole table.
  */
+const socketEventBuckets = new WeakMap<object, { count: number; resetAt: number }>();
+
 function onSocket<E extends keyof ClientToServerEvents>(
   socket: TypedSocket,
   event: E,
   handler: ClientToServerEvents[E]
 ): void {
   const guarded = ((...args: unknown[]) => {
+    const timestamp = Date.now();
+    let bucket = socketEventBuckets.get(socket);
+    if (!bucket || timestamp >= bucket.resetAt) {
+      bucket = { count: 0, resetAt: timestamp + 10_000 };
+      socketEventBuckets.set(socket, bucket);
+    }
+    bucket.count += 1;
+    if (bucket.count > 600) {
+      sendError(socket, "Too many table actions. Wait a moment and try again.");
+      return;
+    }
     try {
       (handler as unknown as (...values: unknown[]) => void)(...args);
     } catch (error) {
@@ -158,6 +185,23 @@ function tokenRow(tokenId: string): TokenRow | null {
 function tokenWithOwner(row: TokenRow): Token {
   const owner = row.owner_id ? getUser(row.owner_id) : null;
   return serializeToken(row, owner?.display_name ?? undefined);
+}
+
+/** Character save events carry the full draft so the table stays in sync. */
+function characterUpdatedPayload(
+  characterId: string,
+  draft: CharacterDraft,
+  summary: CharacterSummary
+) {
+  const row = db.prepare("SELECT revision FROM characters WHERE id = ?").get(characterId) as
+    { revision: number } | undefined;
+  return {
+    characterId,
+    summary,
+    name: draft.name,
+    data: draft,
+    revision: Number(row?.revision ?? 0),
+  };
 }
 
 function addPresence(socket: TypedSocket, campaignId: string, role: "gm" | "player"): void {
@@ -248,13 +292,29 @@ function broadcastSceneTemplates(
   sceneId: string,
   templates: ReturnType<typeof normalizeAoeTemplates>
 ): void {
-  io.to(room(campaignId))
-    .except(gmRoom(campaignId))
-    .emit("scene:templates", {
-      sceneId,
-      templates: templates.filter((entry) => !entry.hidden),
-    });
+  if (sceneVisible(sceneId)) {
+    io.to(room(campaignId))
+      .except(gmRoom(campaignId))
+      .emit("scene:templates", {
+        sceneId,
+        templates: templates.filter((entry) => !entry.hidden),
+      });
+  }
   io.to(gmRoom(campaignId)).emit("scene:templates", { sceneId, templates });
+}
+
+function broadcastSceneDrawings(
+  io: TypedServer,
+  campaignId: string,
+  sceneId: string,
+  drawings: ReturnType<typeof normalizeSceneDrawings>
+): void {
+  if (sceneVisible(sceneId)) {
+    io.to(room(campaignId))
+      .except(gmRoom(campaignId))
+      .emit("scene:drawings", { sceneId, drawings });
+  }
+  io.to(gmRoom(campaignId)).emit("scene:drawings", { sceneId, drawings });
 }
 
 /** Remove spell areas whose round duration ended on the active scene. */
@@ -287,7 +347,7 @@ function initiativeBonusForToken(row: TokenRow): number {
   if (!character) return 0;
   try {
     const draft = normalizeCharacterDraft(JSON.parse(character.data), character.name);
-    return computeCharacter(draft, contextForDraft(draft)).initiative;
+    return computeCharacter(draft, contextForCharacter(character, draft)).initiative;
   } catch {
     return 0;
   }
@@ -509,6 +569,7 @@ export function registerSocketServer(io: TypedServer): void {
   io.use((socket, next) => {
     const user = userFromCookieHeader(socket.handshake.headers.cookie);
     if (!user) return next(new Error("unauthorized"));
+    const token = parseCookies(socket.handshake.headers.cookie)[SESSION_COOKIE];
     socket.data.user = {
       id: user.id,
       username: user.username,
@@ -516,6 +577,7 @@ export function registerSocketServer(io: TypedServer): void {
       avatarUrl: user.avatar_url,
       isAdmin: Boolean(user.is_admin),
     };
+    socket.data.sessionHash = token ? sha256(token) : "";
     socket.data.campaigns = new Set();
     next();
   });
@@ -535,6 +597,7 @@ export function registerSocketServer(io: TypedServer): void {
       }
       socket.join(room(campaignId));
       if (role === "gm") socket.join(gmRoom(campaignId));
+      else socket.leave(gmRoom(campaignId));
       socket.data.campaigns.add(campaignId);
       addPresence(socket, campaignId, role);
       emitPresence(io, campaignId);
@@ -556,6 +619,7 @@ export function registerSocketServer(io: TypedServer): void {
       if (!role) return;
       const scene = sceneBelongs(sceneId, campaignId);
       if (!scene) return;
+      if (role !== "gm" && scene.visible === 0) return;
       if (role !== "gm" && (row.owner_id !== socket.data.user.id || row.locked)) {
         sendError(socket, "You can only move your own unlocked token.");
         return;
@@ -592,6 +656,7 @@ export function registerSocketServer(io: TypedServer): void {
         .prepare("SELECT * FROM scenes WHERE id = ? AND campaign_id = ?")
         .get(row.scene_id, campaignId) as SceneRow | undefined;
       if (!scene) return;
+      if (role !== "gm" && scene.visible === 0) return;
       const isOwner = row.owner_id === socket.data.user.id;
       if (role !== "gm" && !isOwner) {
         sendError(socket, "You can't edit that token.");
@@ -714,21 +779,20 @@ export function registerSocketServer(io: TypedServer): void {
       // back so a GM-applied Frightened or Prone changes the player's math.
       if (updated?.character_id && token.conditions !== undefined) {
         const character = getCharacter(updated.character_id);
-        if (character) {
+        if (character && (!character.campaign_id || character.campaign_id === campaignId)) {
           try {
             const draft = normalizeCharacterDraft(JSON.parse(character.data), character.name);
             draft.play.conditions = sheetConditionsFromToken(
               normalizeTokenConditions(parseJson(updated.conditions, []))
             );
-            const summary = characterSummary(draft, contextForDraft(draft));
+            const summary = characterSummary(draft, contextForCharacter(character, draft));
             db.prepare(
               "UPDATE characters SET data = ?, summary = ?, updated_at = ?, revision = revision + 1 WHERE id = ?"
             ).run(JSON.stringify(draft), JSON.stringify(summary), now(), character.id);
-            io.to(room(campaignId)).emit("character:updated", {
-              characterId: character.id,
-              summary,
-              name: draft.name,
-            });
+            io.to(room(campaignId)).emit(
+              "character:updated",
+              characterUpdatedPayload(character.id, draft, summary)
+            );
           } catch {
             // A malformed draft shouldn't block the token update.
           }
@@ -738,10 +802,10 @@ export function registerSocketServer(io: TypedServer): void {
       // the character sheet so the player's next view is consistent.
       if (updated?.character_id && token.hpCurrent !== undefined) {
         const character = getCharacter(updated.character_id);
-        if (character) {
+        if (character && (!character.campaign_id || character.campaign_id === campaignId)) {
           try {
             const draft = normalizeCharacterDraft(JSON.parse(character.data), character.name);
-            const maxHp = computeCharacter(draft, contextForDraft(draft)).maxHp;
+            const maxHp = computeCharacter(draft, contextForCharacter(character, draft)).maxHp;
             const result = applyHpEditToDraft(draft, maxHp, {
               type: "set",
               hp:
@@ -750,7 +814,7 @@ export function registerSocketServer(io: TypedServer): void {
                   : Math.max(0, Math.min(maxHp, Number(updated.hp_current))),
             });
             const nextDraft = result.draft;
-            const summary = characterSummary(nextDraft, contextForDraft(nextDraft));
+            const summary = characterSummary(nextDraft, contextForCharacter(character, nextDraft));
             db.prepare(
               "UPDATE characters SET data = ?, summary = ?, updated_at = ?, revision = revision + 1 WHERE id = ?"
             ).run(JSON.stringify(nextDraft), JSON.stringify(summary), now(), character.id);
@@ -776,11 +840,10 @@ export function registerSocketServer(io: TypedServer): void {
                 Boolean(refreshed.hidden)
               );
             }
-            io.to(room(campaignId)).emit("character:updated", {
-              characterId: character.id,
-              summary,
-              name: nextDraft.name,
-            });
+            io.to(room(campaignId)).emit(
+              "character:updated",
+              characterUpdatedPayload(character.id, nextDraft, summary)
+            );
           } catch {
             // A malformed draft shouldn't block the token update.
           }
@@ -823,6 +886,7 @@ export function registerSocketServer(io: TypedServer): void {
       if (!role) return;
       const scene = sceneBelongs(row.scene_id, campaignId);
       if (!scene) return;
+      if (role !== "gm" && scene.visible === 0) return;
       const isOwner = row.owner_id === socket.data.user.id;
       if (role !== "gm" && !isOwner) {
         sendError(socket, "You can't damage that token.");
@@ -840,14 +904,17 @@ export function registerSocketServer(io: TypedServer): void {
         }
         try {
           const draft = normalizeCharacterDraft(JSON.parse(character.data), character.name);
-          const derived = computeCharacter(draft, contextForDraft(draft));
+          const derived = computeCharacter(draft, contextForCharacter(character, draft));
           const result = applyHpEditToDraft(draft, derived.maxHp, {
             type: "damage",
             amount: damage,
             critical: Boolean(critical),
             nonlethal: Boolean(nonlethal),
           });
-          const summary = characterSummary(result.draft, contextForDraft(result.draft));
+          const summary = characterSummary(
+            result.draft,
+            contextForCharacter(character, result.draft)
+          );
           db.prepare(
             "UPDATE characters SET data = ?, summary = ?, updated_at = ?, revision = revision + 1 WHERE id = ?"
           ).run(JSON.stringify(result.draft), JSON.stringify(summary), ts, character.id);
@@ -872,11 +939,10 @@ export function registerSocketServer(io: TypedServer): void {
               Boolean(updated.hidden)
             );
           }
-          io.to(room(campaignId)).emit("character:updated", {
-            characterId: character.id,
-            summary,
-            name: draft.name,
-          });
+          io.to(room(campaignId)).emit(
+            "character:updated",
+            characterUpdatedPayload(character.id, draft, summary)
+          );
           ack?.({ applied: damage, notes: [] });
           touchCampaign(campaignId);
         } catch {
@@ -981,20 +1047,38 @@ export function registerSocketServer(io: TypedServer): void {
         now(),
         sceneId
       );
-      io.to(room(campaignId)).emit("fog:updated", { sceneId, cells, mode });
+      if (scene.visible !== 0) {
+        io.to(room(campaignId)).emit("fog:updated", { sceneId, cells, mode });
+      } else {
+        io.to(gmRoom(campaignId)).emit("fog:updated", { sceneId, cells, mode });
+      }
       touchCampaign(campaignId);
     });
 
-    on("scene:activate", ({ campaignId, sceneId }) => {
-      if (!requireGm(socket, campaignId)) return;
+    on("scene:activate", ({ campaignId, sceneId }, ack) => {
+      if (!requireGm(socket, campaignId)) {
+        ack?.({ ok: false, error: "Only the GM can change scenes." });
+        return;
+      }
       const scene = sceneBelongs(sceneId, campaignId);
-      if (!scene || scene.visible === 0) return;
+      if (!scene) {
+        ack?.({ ok: false, error: "That scene no longer exists." });
+        return;
+      }
+      if (scene.visible === 0) {
+        ack?.({
+          ok: false,
+          error: "Make the scene visible to players before activating it.",
+        });
+        return;
+      }
       ensureState(campaignId);
       db.prepare(
         "UPDATE campaign_state SET active_scene_id = ?, updated_at = ? WHERE campaign_id = ?"
       ).run(sceneId, now(), campaignId);
       io.to(room(campaignId)).emit("scene:activated", { sceneId });
       touchCampaign(campaignId);
+      ack?.({ ok: true });
     });
 
     on("scene:update", ({ campaignId, scene }) => {
@@ -1033,14 +1117,15 @@ export function registerSocketServer(io: TypedServer): void {
       const width = clamp(safeInt(scene.width, 1600, 100, 10_000), 100, 10_000);
       const height = clamp(safeInt(scene.height, 1000, 100, 10_000), 100, 10_000);
       const grid = clamp(safeInt(scene.gridSize, 70, 20, 300), 20, 300);
+      const visible = scene.visible !== false;
       const order = db
         .prepare(
           "SELECT COALESCE(MAX(sort_order), 0) + 1 AS next FROM scenes WHERE campaign_id = ?"
         )
         .get(campaignId) as { next: number };
       db.prepare(
-        `INSERT INTO scenes (id, campaign_id, name, image_url, width, height, grid_size, grid_offset_x, grid_offset_y, fog_enabled, fog_revealed, sort_order, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, 0, 0, 1, '[]', ?, ?, ?)`
+        `INSERT INTO scenes (id, campaign_id, name, image_url, width, height, grid_size, grid_offset_x, grid_offset_y, fog_enabled, fog_revealed, visible, sort_order, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 0, 0, 1, '[]', ?, ?, ?, ?)`
       ).run(
         id,
         campaignId,
@@ -1049,15 +1134,18 @@ export function registerSocketServer(io: TypedServer): void {
         width,
         height,
         grid,
+        visible ? 1 : 0,
         order.next,
         ts,
         ts
       );
       const row = db.prepare("SELECT * FROM scenes WHERE id = ?").get(id) as SceneRow;
       const serialized = serializeScene(row);
-      io.to(room(campaignId))
-        .except(gmRoom(campaignId))
-        .emit("scene:created", serializeSceneForPlayers(row));
+      if (visible) {
+        io.to(room(campaignId))
+          .except(gmRoom(campaignId))
+          .emit("scene:created", serializeSceneForPlayers(row));
+      }
       io.to(gmRoom(campaignId)).emit("scene:created", serialized);
       ack?.(serialized);
       touchCampaign(campaignId);
@@ -1067,14 +1155,15 @@ export function registerSocketServer(io: TypedServer): void {
       if (!requireGm(socket, campaignId)) return;
       const scene = sceneBelongs(sceneId, campaignId);
       if (!scene) return;
+      const state = ensureState(campaignId);
+      const wasActive = state.active_scene_id === sceneId;
       db.prepare("DELETE FROM scenes WHERE id = ?").run(sceneId);
       const remaining = db
         .prepare(
           "SELECT id FROM scenes WHERE campaign_id = ? AND visible = 1 ORDER BY sort_order ASC LIMIT 1"
         )
         .get(campaignId) as { id: string } | undefined;
-      const state = ensureState(campaignId);
-      if (state.active_scene_id === sceneId) {
+      if (wasActive) {
         db.prepare(
           "UPDATE campaign_state SET active_scene_id = ?, updated_at = ? WHERE campaign_id = ?"
         ).run(remaining?.id ?? null, now(), campaignId);
@@ -1099,7 +1188,11 @@ export function registerSocketServer(io: TypedServer): void {
       db.prepare(
         "UPDATE campaign_state SET initiative = ?, turn_index = ?, updated_at = ? WHERE campaign_id = ?"
       ).run(JSON.stringify(entries), turnIndex, now(), campaignId);
-      io.to(room(campaignId)).emit("scene:deleted", { sceneId });
+      if (scene.visible !== 0) {
+        io.to(room(campaignId)).emit("scene:deleted", { sceneId });
+      } else {
+        io.to(gmRoom(campaignId)).emit("scene:deleted", { sceneId });
+      }
       broadcastInitiative(io, campaignId, ensureState(campaignId));
       touchCampaign(campaignId);
     });
@@ -1142,6 +1235,10 @@ export function registerSocketServer(io: TypedServer): void {
       if (!role) return;
       const scene = sceneBelongs(sceneId, campaignId);
       if (!scene) return;
+      if (role !== "gm" && scene.visible === 0) {
+        sendError(socket, "That scene is GM-only.");
+        return;
+      }
       const normalized = normalizeAoeTemplate(template);
       if (!normalized) return;
       // Players can place their own visible spell areas. Hidden areas and
@@ -1175,6 +1272,10 @@ export function registerSocketServer(io: TypedServer): void {
       if (!role) return;
       const scene = sceneBelongs(sceneId, campaignId);
       if (!scene) return;
+      if (role !== "gm" && scene.visible === 0) {
+        sendError(socket, "That scene is GM-only.");
+        return;
+      }
       const templates = normalizeAoeTemplates(parseJson(scene.templates, []));
       const target = templates.find((entry) => entry.id === templateId);
       if (!target) return;
@@ -1197,7 +1298,7 @@ export function registerSocketServer(io: TypedServer): void {
         now(),
         sceneId
       );
-      io.to(room(campaignId)).emit("scene:templates", { sceneId, templates: [] });
+      broadcastSceneTemplates(io, campaignId, sceneId, []);
       touchCampaign(campaignId);
     });
 
@@ -1217,12 +1318,14 @@ export function registerSocketServer(io: TypedServer): void {
         now(),
         sceneId
       );
-      io.to(room(campaignId))
-        .except(gmRoom(campaignId))
-        .emit("scene:walls", {
-          sceneId,
-          walls: normalized.filter((wall) => !wall.hidden),
-        });
+      if (scene.visible !== 0) {
+        io.to(room(campaignId))
+          .except(gmRoom(campaignId))
+          .emit("scene:walls", {
+            sceneId,
+            walls: normalized.filter((wall) => !wall.hidden),
+          });
+      }
       io.to(gmRoom(campaignId)).emit("scene:walls", { sceneId, walls: normalized });
       touchCampaign(campaignId);
     });
@@ -1241,24 +1344,32 @@ export function registerSocketServer(io: TypedServer): void {
         now(),
         sceneId
       );
-      io.to(room(campaignId))
-        .except(gmRoom(campaignId))
-        .emit("scene:props", {
-          sceneId,
-          props: normalized.filter((prop) => prop.visible),
-        });
+      if (scene.visible !== 0) {
+        io.to(room(campaignId))
+          .except(gmRoom(campaignId))
+          .emit("scene:props", {
+            sceneId,
+            props: normalized.filter((prop) => prop.visible),
+          });
+      }
       io.to(gmRoom(campaignId)).emit("scene:props", { sceneId, props: normalized });
       touchCampaign(campaignId);
     });
 
     on("drawing:add", ({ campaignId, sceneId, drawing }, ack) => {
-      if (!getMembership(campaignId, socket.data.user.id)) {
+      const role = getCampaignRole(campaignId, socket.data.user.id);
+      if (!role) {
         sendError(socket, "You're not a member of that campaign.");
         ack?.(null);
         return;
       }
       const scene = sceneBelongs(sceneId, campaignId);
       if (!scene) {
+        ack?.(null);
+        return;
+      }
+      if (role !== "gm" && scene.visible === 0) {
+        sendError(socket, "That scene is GM-only.");
         ack?.(null);
         return;
       }
@@ -1294,18 +1405,23 @@ export function registerSocketServer(io: TypedServer): void {
         now(),
         sceneId
       );
-      io.to(room(campaignId)).emit("scene:drawings", { sceneId, drawings: next });
+      broadcastSceneDrawings(io, campaignId, sceneId, next);
       touchCampaign(campaignId);
       ack?.(normalized);
     });
 
     on("drawing:erase", ({ campaignId, sceneId, drawingId }) => {
-      if (!getMembership(campaignId, socket.data.user.id)) {
+      const role = getCampaignRole(campaignId, socket.data.user.id);
+      if (!role) {
         sendError(socket, "You're not a member of that campaign.");
         return;
       }
       const scene = sceneBelongs(sceneId, campaignId);
       if (!scene) return;
+      if (role !== "gm" && scene.visible === 0) {
+        sendError(socket, "That scene is GM-only.");
+        return;
+      }
       const drawings = normalizeSceneDrawings(
         parseJson(scene.drawings, []),
         scene.width,
@@ -1329,18 +1445,23 @@ export function registerSocketServer(io: TypedServer): void {
         now(),
         sceneId
       );
-      io.to(room(campaignId)).emit("scene:drawings", { sceneId, drawings: next });
+      broadcastSceneDrawings(io, campaignId, sceneId, next);
       touchCampaign(campaignId);
     });
 
     on("drawing:clear", ({ campaignId, sceneId, scope }) => {
-      if (!getMembership(campaignId, socket.data.user.id)) {
+      const role = getCampaignRole(campaignId, socket.data.user.id);
+      if (!role) {
         sendError(socket, "You're not a member of that campaign.");
         return;
       }
       const scene = sceneBelongs(sceneId, campaignId);
       if (!scene) return;
-      const isGm = getCampaignRole(campaignId, socket.data.user.id) === "gm";
+      if (role !== "gm" && scene.visible === 0) {
+        sendError(socket, "That scene is GM-only.");
+        return;
+      }
+      const isGm = role === "gm";
       if (scope === "all" && !isGm) {
         sendError(socket, "Only the GM can clear the whole drawing layer.");
         return;
@@ -1359,7 +1480,7 @@ export function registerSocketServer(io: TypedServer): void {
         now(),
         sceneId
       );
-      io.to(room(campaignId)).emit("scene:drawings", { sceneId, drawings: next });
+      broadcastSceneDrawings(io, campaignId, sceneId, next);
       touchCampaign(campaignId);
     });
 
@@ -1598,7 +1719,7 @@ export function registerSocketServer(io: TypedServer): void {
     on("initiative:add", ({ campaignId, tokenId, value }) => {
       if (!requireGm(socket, campaignId)) return;
       const row = tokenRow(tokenId);
-      if (!row) return;
+      if (!row || !sceneBelongs(row.scene_id, campaignId)) return;
       const state = ensureState(campaignId);
       const entries = serializeInitiative(JSON.parse(state.initiative || "[]"));
       const activeId = entries[state.turn_index]?.id ?? null;
