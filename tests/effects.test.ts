@@ -58,6 +58,10 @@ const elvenInstincts = byName(feats, "Elven Instincts");
 const incredibleInvestiture = byName(feats, "Incredible Investiture");
 const unburdenedIron = byName(feats, "Unburdened Iron");
 const generalTraining = byName(feats, "General Training");
+const skillTraining = byName(feats, "Skill Training");
+const assurance = byName(feats, "Assurance");
+const shieldBlock = byName(feats, "Shield Block");
+const pet = byName(feats, "Pet");
 const human = byName(ancestries, "Human");
 const warrior = byName(backgrounds, "Warrior");
 const fighter = byName(classes, "Fighter");
@@ -376,6 +380,26 @@ describe("curated feat effects", () => {
       )
     ).toBe(true);
     expect(automationForFeat(cannyAcumen).level).toBe("full");
+  });
+
+  it("applies Skill Training's chosen skill and labels repeat picks partial", () => {
+    expect(featChoice(skillTraining.id)?.options.map((option) => option.id)).toContain("stealth");
+    expect(
+      collectFeatChoiceEffects({ [skillTraining.id]: ["stealth"] }, [skillTraining.id], 1)
+        .trainedSkills
+    ).toEqual(["stealth"]);
+    expect(automationForFeat(skillTraining).level).toBe("partial");
+  });
+
+  it("records the Assurance skill and keeps the take-10 result manual", () => {
+    const effect = collectFeatChoiceEffects({ [assurance.id]: ["athletics"] }, [assurance.id], 1);
+    expect(effect.notes?.[0]).toContain("Assurance (Athletics)");
+    expect(automationForFeat(assurance).level).toBe("partial");
+  });
+
+  it("labels common situational feats as partly automated notes", () => {
+    expect(automationForFeat(shieldBlock).level).toBe("partial");
+    expect(automationForFeat(pet).level).toBe("partial");
   });
 
   it("applies Additional Lore as a free-text lore choice", () => {

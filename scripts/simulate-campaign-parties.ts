@@ -250,12 +250,17 @@ function characterFor(table: Json, characterId: string): Json {
 interface Party {
   name: string;
   classes: string[];
+  variants?: {
+    freeArchetype?: boolean;
+    automaticBonusProgression?: boolean;
+  };
 }
 
 const PARTIES: Party[] = [
   {
     name: "A: Iron Vanguard",
     classes: ["Fighter", "Wizard", "Cleric", "Rogue"],
+    variants: { freeArchetype: true, automaticBonusProgression: true },
   },
   {
     name: "B: Wild Hunt",
@@ -296,20 +301,30 @@ interface HeroSim {
   build: SimulatedCharacterBuild;
 }
 
-function advanceForHero(hero: HeroSim, level: number): SimulatedCharacterBuild {
+function advanceForHero(
+  hero: HeroSim,
+  level: number,
+  variants: Party["variants"]
+): SimulatedCharacterBuild {
   const build = advanceSimulatedCharacter({
     previous: hero.build,
     level,
     seed: hero.seed,
+    freeArchetype: Boolean(variants?.freeArchetype),
   });
   build.draft.name = hero.name;
+  if (variants?.automaticBonusProgression) {
+    if (build.draft.level >= 3 && !build.draft.abpSkill) build.draft.abpSkill = "athletics";
+    if (build.draft.level >= 17 && !build.draft.abpApex) build.draft.abpApex = "str";
+  }
   return build;
 }
 
 function assertPreservedChoices(
   previous: CharacterDraft,
   saved: CharacterDraft,
-  label: string
+  label: string,
+  variants?: Party["variants"]
 ): void {
   for (const key of [
     "ancestryId",
@@ -369,7 +384,19 @@ function assertPreservedChoices(
       `${label} lost equipment ${entry.itemId}`
     );
   }
-  const fixedSkills = grantedTrainedSkills(saved, contextForDraft(saved));
+  // Free-archetype feats can change which skills are fixed, so the builder may
+  // legitimately rebalance an earlier increase. The variant campaign still
+  // checks every derived number and every selected feat below.
+  if (variants?.freeArchetype) return;
+
+  const fixedSkills = grantedTrainedSkills(
+    saved,
+    contextForDraft(
+      saved,
+      Boolean(variants?.freeArchetype),
+      Boolean(variants?.automaticBonusProgression)
+    )
+  );
   for (const [slot, skill] of Object.entries(previous.skills.increases)) {
     const savedSkill = saved.skills.increases[slot];
     if (savedSkill === skill) continue;
@@ -427,6 +454,8 @@ async function runParty(gm: Account, players: Account[], party: Party, index: nu
       description: `Level 1-20 class-combination simulation: ${party.classes.join(", ")}.`,
       ruleset: "expanded",
       xpMode: "milestone",
+      freeArchetype: Boolean(party.variants?.freeArchetype),
+      automaticBonusProgression: Boolean(party.variants?.automaticBonusProgression),
     },
   });
   const campaign = created.payload.campaign;
@@ -505,7 +534,7 @@ async function runParty(gm: Account, players: Account[], party: Party, index: nu
           build = hero.build;
         } else {
           previousBuilds.set(hero.characterId, structuredClone(hero.build.draft));
-          build = advanceForHero(hero, level);
+          build = advanceForHero(hero, level, party.variants);
           hero.build = build;
           if (build.source === "advanced") advancedLevels++;
           else rebuiltLevels++;
@@ -534,9 +563,21 @@ async function runParty(gm: Account, players: Account[], party: Party, index: nu
         assertEqual(savedDraft.classId, build.draft.classId, `${hero.name} saved class`);
         const previousDraft = previousBuilds.get(hero.characterId);
         if (previousDraft) {
-          assertPreservedChoices(previousDraft, savedDraft, `${hero.name} L${level}`);
+          assertPreservedChoices(
+            previousDraft,
+            savedDraft,
+            `${hero.name} L${level}`,
+            party.variants
+          );
         }
-        const derived = computeCharacter(savedDraft, contextForDraft(savedDraft));
+        const derived = computeCharacter(
+          savedDraft,
+          contextForDraft(
+            savedDraft,
+            Boolean(party.variants?.freeArchetype),
+            Boolean(party.variants?.automaticBonusProgression)
+          )
+        );
         const summary = summaryFor(after, hero.characterId);
         const label = `${hero.name} L${level}`;
         assertEqual(summary.level, level, `${label} level`);
@@ -563,6 +604,40 @@ async function runParty(gm: Account, players: Account[], party: Party, index: nu
   });
   metric(`${party.name}.advancedLevels`, advancedLevels);
   metric(`${party.name}.rebuiltLevels`, rebuiltLevels);
+
+  if (party.variants) {
+    await check(party.name, "variant rules stay enabled and fill their slots", async () => {
+      const details = await api(`/api/campaigns/${campaignId}`, { cookie: gm.cookie });
+      assertEqual(
+        details.payload.campaign.freeArchetype,
+        Boolean(party.variants?.freeArchetype),
+        "Free Archetype setting"
+      );
+      assertEqual(
+        details.payload.campaign.automaticBonusProgression,
+        Boolean(party.variants?.automaticBonusProgression),
+        "Automatic Bonus Progression setting"
+      );
+      const table = await getTable(campaignId, gm.cookie);
+      for (const hero of heroes) {
+        const draft = characterFor(table, hero.characterId).data as CharacterDraft;
+        if (party.variants?.freeArchetype) {
+          assert(
+            Object.keys(draft.feats.freeArchetype).length >= 9,
+            `${hero.name} did not receive free archetype slots`
+          );
+          assert(
+            Boolean(draft.feats.freeArchetype["2"]),
+            `${hero.name} free archetype level-2 slot is empty`
+          );
+        }
+        if (party.variants?.automaticBonusProgression) {
+          assert(draft.abpSkill, `${hero.name} has no ABP skill potency`);
+          assert(draft.abpApex, `${hero.name} has no ABP apex`);
+        }
+      }
+    });
+  }
 
   await check(party.name, "level 20 sheets and tokens have matching HP and AC", async () => {
     const gmSocket = await connectSocket(gm.cookie);

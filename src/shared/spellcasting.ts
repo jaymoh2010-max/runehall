@@ -15,7 +15,15 @@ import { psiAmpFor } from "./psiAmps";
 import type { CharacterContext, CharacterDraft, Spell } from "./types";
 
 export type SpellCastResource =
-  "cantrip" | "focus" | "font" | "slot" | "innate" | "studious" | "apparition" | "amp";
+  | "cantrip"
+  | "focus"
+  | "font"
+  | "slot"
+  | "multiclass"
+  | "innate"
+  | "studious"
+  | "apparition"
+  | "amp";
 
 export interface SpellCastOption {
   /** Slot rank used for the cast. */
@@ -109,6 +117,9 @@ export function spellCastOptions(
     focusPointsMax?: number;
     innate?: boolean;
     innateRemaining?: number | null;
+    multiclass?: boolean;
+    multiclassSlots?: number[];
+    multiclassSlotsUsed?: Record<string, number>;
   } = {}
 ): SpellCastOption[] {
   if (spell.ritual) return [];
@@ -142,7 +153,7 @@ export function spellCastOptions(
   }
 
   if (spell.rank === 0) {
-    if (!isCantripPrepared(draft, context, spell.id)) return [];
+    if (!opts.multiclass && !isCantripPrepared(draft, context, spell.id)) return [];
     const options: SpellCastOption[] = [
       {
         rank: cantripCastRank(level),
@@ -162,6 +173,23 @@ export function spellCastOptions(
       });
     }
     return options;
+  }
+
+  if (opts.multiclass) {
+    const rank = Math.max(1, spell.rank);
+    const slots = opts.multiclassSlots ?? [];
+    const slotCount = Math.max(0, Math.round(slots[rank - 1] ?? 0));
+    const used = clampInt(opts.multiclassSlotsUsed?.[String(rank)], 0, slotCount);
+    const remaining = Math.max(0, slotCount - used);
+    if (remaining <= 0) return [];
+    return [
+      {
+        rank,
+        resource: "multiclass",
+        remaining,
+        label: `Dedication rank ${rank} slot`,
+      },
+    ];
   }
 
   const caster = casterInfo(context.classData);
@@ -320,6 +348,9 @@ export function castSpell(
     focusPointsMax?: number;
     innate?: boolean;
     innateRemaining?: number | null;
+    multiclass?: boolean;
+    multiclassSlots?: number[];
+    multiclassSlotsUsed?: Record<string, number>;
   } = {}
 ): SpellCastResult | null {
   const option = spellCastOptions(spell, draft, context, opts).find(
@@ -436,6 +467,22 @@ export function castSpell(
     };
   }
 
+  if (option.resource === "multiclass") {
+    const key = String(option.rank);
+    const used = clampInt(draft.spells.multiclassSlotsUsed[key], 0, 99);
+    if (option.remaining !== null && option.remaining <= 0) return null;
+    return {
+      draft: {
+        ...draft,
+        spells: {
+          ...draft.spells,
+          multiclassSlotsUsed: { ...draft.spells.multiclassSlotsUsed, [key]: used + 1 },
+        },
+      },
+      option: { ...option, remaining: Math.max(0, (option.remaining ?? 0) - 1) },
+    };
+  }
+
   const key = String(option.rank);
   const used = Math.max(0, Math.round(Number(draft.spells.slotsUsed[key]) || 0));
   if (option.remaining !== null && option.remaining <= 0) return null;
@@ -492,6 +539,12 @@ export function canRestoreSpellUse(
   if (choice.resource === "apparition") {
     return (
       Math.max(0, Math.round(Number(draft.spells.apparitionUsed[String(choice.rank)]) || 0)) > 0
+    );
+  }
+  if (choice.resource === "multiclass") {
+    return (
+      Math.max(0, Math.round(Number(draft.spells.multiclassSlotsUsed[String(choice.rank)]) || 0)) >
+      0
     );
   }
   const key = String(choice.rank);
@@ -563,6 +616,21 @@ export function restoreSpellUse(
       spells: {
         ...draft.spells,
         apparitionUsed: { ...draft.spells.apparitionUsed, [key]: Math.max(0, used - 1) },
+      },
+    };
+  }
+
+  if (choice.resource === "multiclass") {
+    const key = String(choice.rank);
+    const used = Math.max(0, Math.round(Number(draft.spells.multiclassSlotsUsed[key]) || 0));
+    return {
+      ...draft,
+      spells: {
+        ...draft.spells,
+        multiclassSlotsUsed: {
+          ...draft.spells.multiclassSlotsUsed,
+          [key]: Math.max(0, used - 1),
+        },
       },
     };
   }

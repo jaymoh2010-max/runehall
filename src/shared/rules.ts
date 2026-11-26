@@ -71,6 +71,11 @@ import {
 import { MAGUS_STUDIOUS_BASE, MAGUS_STUDIOUS_BY_STUDY, selectedClassGrants } from "./classGrants";
 import { APPARITION_BY_ID } from "./apparitions";
 import { activeGrantChoiceGroups } from "./classGrantChoices";
+import {
+  multiclassDedicationFor,
+  multiclassProficiencyRank,
+  multiclassSlotCounts,
+} from "./multiclass";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -1571,6 +1576,9 @@ export function emptyCharacterDraft(name = "New Hero"): CharacterDraft {
       fontUsed: {},
       signature: [],
       rituals: [],
+      multiclassCantrips: [],
+      multiclassSpells: [],
+      multiclassSlotsUsed: {},
       innate: [],
       innateUsed: {},
       preparationsPending: false,
@@ -1896,6 +1904,17 @@ export function normalizeCharacterDraft(input: unknown, fallbackName = "New Hero
           .filter(([, value]) => typeof value === "string" && value.trim())
           .map(([key, value]) => [key.slice(0, 120), String(value).trim().slice(0, 120)])
       ) as Record<string, string>,
+      multiclassCantrips: [
+        ...new Set(arr<string>(spells.multiclassCantrips).filter((x) => typeof x === "string")),
+      ].slice(0, 20),
+      multiclassSpells: [
+        ...new Set(arr<string>(spells.multiclassSpells).filter((x) => typeof x === "string")),
+      ].slice(0, 40),
+      multiclassSlotsUsed: Object.fromEntries(
+        Object.entries(obj(spells.multiclassSlotsUsed))
+          .filter(([, value]) => typeof value === "number" && Number.isFinite(value))
+          .map(([key, value]) => [key, Math.max(0, Math.min(20, Math.floor(value as number)))])
+      ) as Record<string, number>,
       innate: [...new Set(arr<string>(spells.innate).filter((x) => typeof x === "string"))].slice(
         0,
         80
@@ -3868,6 +3887,41 @@ export function computeCharacter(
         spellMod +
         (spellAbility ? conditionEffects.checks[spellAbility] : conditionEffects.allChecks);
 
+  const multiclassFeatIds = [
+    ...Object.values(draft.feats.ancestry),
+    ...Object.values(draft.feats.class),
+    ...Object.values(draft.feats.skill),
+    ...Object.values(draft.feats.general),
+    ...Object.values(draft.feats.freeArchetype),
+    ...draft.feats.extras,
+    ...Object.values(draft.featChoices).flat(),
+    ...(draft.backgroundFeat ? [draft.backgroundFeat] : []),
+  ];
+  const multiclassFeatSet = new Set(multiclassFeatIds);
+  const multiclass = multiclassDedicationFor(multiclassFeatIds);
+  const multiclassSlots = multiclass
+    ? multiclassSlotCounts(draft.level, {
+        basic: multiclassFeatSet.has(multiclass.basicFeatId),
+        expert: multiclassFeatSet.has(multiclass.expertFeatId),
+        master: multiclassFeatSet.has(multiclass.masterFeatId),
+      })
+    : [];
+  const multiclassCondition = multiclass
+    ? conditionEffects.checks[multiclass.ability]
+    : conditionEffects.allChecks;
+  const multiclassRank = multiclassProficiencyRank(draft.level);
+  const multiclassSpellDc = multiclass
+    ? 10 +
+      proficiencyBonus(multiclassRank, draft.level) +
+      abilityMods[multiclass.ability] +
+      multiclassCondition
+    : null;
+  const multiclassSpellAttack = multiclass
+    ? proficiencyBonus(multiclassRank, draft.level) +
+      abilityMods[multiclass.ability] +
+      multiclassCondition
+    : null;
+
   // Focus spells from a class without spell slots use the proficiency and
   // tradition of the ability that granted them. Monk ki and ranger warden
   // spells use Wisdom; champions already have a focus caster profile.
@@ -4245,6 +4299,51 @@ export function computeCharacter(
     for (const spellId of draft.spells.known) {
       if (!context.spells[spellId])
         issue("warning", "A selected spell is missing from the compendium.", "spells");
+    }
+  }
+  if (multiclass) {
+    if (draft.spells.multiclassCantrips.length > multiclass.cantripLimit) {
+      issue(
+        "warning",
+        `${multiclass.className} Dedication allows ${multiclass.cantripLimit} cantrip${multiclass.cantripLimit === 1 ? "" : "s"}; remove the extra selection${draft.spells.multiclassCantrips.length === multiclass.cantripLimit + 1 ? "" : "s"}.`,
+        "spells"
+      );
+    }
+    for (const spellId of draft.spells.multiclassCantrips) {
+      const spell = context.spells[spellId];
+      if (!spell) {
+        issue("warning", "A dedication cantrip is missing from the compendium.", "spells");
+        continue;
+      }
+      if (spell.rank !== 0) {
+        issue("warning", `${spell.name} is not a cantrip.`, "spells");
+        continue;
+      }
+      if (spell.traditions.length && !spell.traditions.includes(multiclass.tradition)) {
+        issue(
+          "warning",
+          `${spell.name} is not a ${multiclass.tradition} cantrip for the ${multiclass.className} Dedication.`,
+          "spells"
+        );
+      }
+    }
+    for (const spellId of draft.spells.multiclassSpells) {
+      const spell = context.spells[spellId];
+      if (!spell) {
+        issue("warning", "A dedication spell is missing from the compendium.", "spells");
+        continue;
+      }
+      if (spell.rank === 0) {
+        issue("warning", `${spell.name} is a cantrip, not a ranked dedication spell.`, "spells");
+        continue;
+      }
+      if (spell.traditions.length && !spell.traditions.includes(multiclass.tradition)) {
+        issue(
+          "warning",
+          `${spell.name} is not a ${multiclass.tradition} spell for the ${multiclass.className} Dedication.`,
+          "spells"
+        );
+      }
     }
   }
   const preparedCaster = PREPARED_CASTER_CLASSES.has(classData?.name.toLowerCase() ?? "");
@@ -4896,6 +4995,15 @@ export function computeCharacter(
     grantedSpells: classGrants.spells,
     casterTradition: tradition,
     casterProgression: caster.progression,
+    multiclassCaster:
+      multiclass && multiclassSpellDc !== null && multiclassSpellAttack !== null
+        ? {
+            ...multiclass,
+            spellSlots: multiclassSlots,
+            spellDc: multiclassSpellDc,
+            spellAttack: multiclassSpellAttack,
+          }
+        : null,
     maxSpellRank,
     validation,
     conditionEffects,

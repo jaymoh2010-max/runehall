@@ -1,4 +1,4 @@
-import type { AbilityKey, CharacterDraft, SaveKey, SkillId } from "./types";
+import { SKILLS, type AbilityKey, type CharacterDraft, type SaveKey, type SkillId } from "./types";
 
 /**
  * Structured, curated character effects. The compendium does not carry rule
@@ -251,6 +251,148 @@ export const FEAT_EFFECTS: Record<string, EffectModifiers> = {
       "Hold your breath 25× longer; +1 circumstance to saves against inhaled threats, and a success becomes a critical success.",
     ],
   },
+  // Common general/skill feats whose effects are situational but useful to
+  // keep on the sheet instead of losing them in the feat description.
+  "feat:6yPrvbSDaa8glLjn": {
+    notes: [
+      "Pet: track it as a companion. Its level equals yours; AC and saves use yours, Perception/Acrobatics/Stealth use 3 + level, and other skills use level.",
+    ],
+  },
+  "feat:xT593tHyPkumPuzz": {
+    notes: [
+      "Improvised Repair: the patched item works as shoddy until it takes damage again; this restores no HP.",
+    ],
+  },
+  "feat:Rq5wkA8DtsmbzoGV": {
+    notes: [
+      "Ride: Command an Animal while mounted automatically succeeds for a move action; the mount acts on your turn.",
+    ],
+  },
+  "feat:fD9xjrnPfJ8aQxYA": {
+    notes: [
+      "Keen Follower: +3 circumstance to Follow the Expert behind an expert ally, or +4 behind a master; coordinate group checks manually.",
+    ],
+  },
+  "feat:1Eceqc6zbMj2x0q9": {
+    notes: [
+      "Seasoned: +1 circumstance to Craft food and drink, or +2 if you are a master in the prerequisite skill.",
+    ],
+  },
+  "feat:XmF4q4rzKWg55vG4": {
+    notes: [
+      "Assured Identification: a critical failure to Identify Magic becomes a failure; a cursed item you would misidentify is simply unidentified.",
+    ],
+  },
+  "feat:38uOVS8fLZxraUrg": {
+    notes: [
+      "Pick up the Pace: the group can Hustle for as long as the member who could Hustle longest on their own.",
+    ],
+  },
+  "feat:IlOQuCQIhjJpig3S": {
+    notes: [
+      "Quick Identification: Identify Magic takes 1 minute, or 3 actions at master and 1 action at legendary.",
+    ],
+  },
+  "feat:jM72TjJ965jocBV8": {
+    notes: [
+      "Shield Block: reaction while your shield is raised; reduce physical damage by the shield's Hardness, then both you and the shield take the remainder.",
+    ],
+  },
+  "feat:9QQnv7nFpsNCGE89": {
+    notes: [
+      "Thorough Search: Search at up to one quarter Speed for a +2 circumstance bonus to the secret Seek check; a success becomes a critical success.",
+    ],
+  },
+  "feat:MZgE2yonw4HUAyMk": {
+    notes: [
+      "The Harder They Fall: +1 circumstance to AC and saves against one chosen Huge or larger creature for 1 round.",
+    ],
+  },
+  "feat:8NnIrUijGD2Chl55": {
+    notes: [
+      "Speedrun Strats: Stride Acrobatics DC 15 for ±5 feet; a critical failure causes permanent paralysis (manual).",
+    ],
+  },
+  "feat:1Bt7uCW2WI4sM84P": {
+    notes: [
+      "Dubious Knowledge: on a failed Recall Knowledge check, learn one correct fact and one false fact without knowing which is which.",
+    ],
+  },
+  "feat:ZpAwFvTPiGJNp0wI": {
+    notes: [
+      "Unbound Torrent: cast Unfettered Movement once per day as a divine innate spell, heightened to a rank one lower than half your level rounded up.",
+    ],
+  },
+  "feat:9oU92ttNdXEKFOGh": {
+    notes: [
+      "Free the Bound: an ally within reach Escapes with a +1 circumstance bonus and can Strike as a reaction without increasing MAP until both attacks are made.",
+    ],
+  },
+  "feat:54yrFg10r680EVvJ": {
+    notes: [
+      "Bestiary Secrets: on a successful Track, also learn one weakness, resistance, immunity, or lowest save of the tracked monster.",
+    ],
+  },
+  "feat:NMbOfl885pn0Yzu9": {
+    notes: [
+      "Prepare Elemental Medicine: spend 10 minutes and attempt Crafting, Herbalism Lore, or Medicine against the recipient's level DC; the medicine lasts 24 hours.",
+    ],
+  },
+  "feat:uR62fVC9FyQAMCO1": {
+    notes: [
+      "Trick Magic Item: attempt the tradition skill check to activate a magic item temporarily; the item's normal activation still applies.",
+    ],
+  },
+  "feat:5ttqjN59TWIMImc3": {
+    notes: [
+      "Myth Hunter: after Recall Knowledge against a mythic creature, your next Strike treats its mythic resistance as 2 lower (once per 10 minutes).",
+    ],
+  },
+  "feat:v7Bt6hjmzYnLFLeG": {
+    notes: [
+      "Magical Shorthand: Learning a Spell takes 10 minutes; a success becomes a critical success, and downtime learning uses Earn Income rules.",
+    ],
+  },
+  "feat:H3I2X0f7v4EzwxuN": {
+    notes: [
+      "Automatic Knowledge: choose an expert Recall Knowledge skill with Assurance; use Recall Knowledge as a free action once per round using Assurance.",
+    ],
+  },
+  "feat:Lc4dJZivRwU3QEmT": {
+    notes: [
+      "Armor Assist: attempt Athletics or Warfare Lore (usually DC 15/20/25 by armor rarity) to halve the time to don armor for yourself or an ally.",
+    ],
+  },
+  "feat:d2opppdcH19LrAgy": {
+    notes: [
+      "Tactical Acumen: use Warfare Lore to Recall Knowledge about troops; at legendary, reduce rarity DC adjustments by 5.",
+    ],
+  },
+  "feat:MjQyTcV8Jiv1Jtln": {
+    notes: [
+      "Recognize Spell: automatically identify common spells of the listed rank or lower when trained in the tradition skill; higher ranks use the normal check.",
+    ],
+  },
+  "feat:TZDQM59QbGDLheEM": {
+    notes: [
+      "Stifle Flames: +2 circumstance to checks to extinguish non-magical fire; flat checks to end persistent fire damage are DC 10 (or 5 with appropriate aid).",
+    ],
+  },
+  "feat:qvLcZGsV0HP2O0CG": {
+    notes: [
+      "Battle Planner: spend 1 minute and attempt Warfare Lore to prepare a plan that reduces luck for the coming battle.",
+    ],
+  },
+  "feat:nTHhkHfAItjrO9d9": {
+    notes: [
+      "Aurochs-Headed: +1 circumstance to Make an Impression or Coerce orcs; enemy orcs that see you take a -1 penalty to initiative.",
+    ],
+  },
+  "feat:5YlHrBCZJmb6Q4Lz": {
+    notes: [
+      "Slippery Prey: reduce the multiple attack penalty for repeated Escape attempts based on your Acrobatics or Athletics proficiency.",
+    ],
+  },
 };
 
 /**
@@ -392,6 +534,29 @@ export const FEAT_CHOICES: Record<string, FeatChoiceDefinition> = {
       { id: "perception", label: "Perception" },
     ],
     apply: (choice, level) => ({ proficiencyRanks: { [choice]: level >= 17 ? 3 : 2 } }),
+  },
+  // Assurance — record the chosen skill; the "take 10" roll remains manual.
+  "feat:W6Gl9ePmItfDHji0": {
+    prompt: "Choose a skill for Assurance",
+    options: SKILLS.map((skill) => ({ id: skill.id, label: skill.name })),
+    apply: (choice) => {
+      const skill = SKILLS.find((entry) => entry.id === choice);
+      return skill
+        ? {
+            notes: [
+              `Assurance (${skill.name}): treat the check as 10 + proficiency, ignoring other bonuses and penalties.`,
+            ],
+          }
+        : {};
+    },
+  },
+  // Skill Training — trained in the chosen skill. Repeatable picks beyond the
+  // first share one stored choice, so automation.ts labels it partial.
+  "feat:P6icK2DbRoZ3H6kc": {
+    prompt: "Choose a skill",
+    options: SKILLS.map((skill) => ({ id: skill.id, label: skill.name })),
+    apply: (choice) =>
+      SKILLS.some((skill) => skill.id === choice) ? { trainedSkills: [choice] } : {},
   },
   // Additional Lore — trained in a chosen Lore, scaling at 3rd/7th/15th.
   "feat:BocFD2KV0qgUC76x": {

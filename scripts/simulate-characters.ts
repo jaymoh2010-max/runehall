@@ -29,6 +29,7 @@ import {
 import { ANIMIST_APPARITIONS } from "../src/shared/apparitions";
 import { validateFormula } from "../src/shared/dice";
 import { automationForEquipment, automationForFeat } from "../src/shared/automation";
+import { featChoice } from "../src/shared/effects";
 import {
   featAllowedByHeritageGrant,
   heritageChosenFeatId,
@@ -354,26 +355,53 @@ function chooseFeats(
   draft: CharacterDraft,
   context: CharacterContext,
   selectedFeats: Feat[],
-  fillEmptyOnly = false
+  fillEmptyOnly = false,
+  freeArchetype = false
 ) {
   const classData = context.classData!;
-  const slots = featSlotsFor(classData, draft.level);
+  const slots = featSlotsFor(classData, draft.level, freeArchetype);
   for (const slot of slots) {
     const key = String(slot.level);
-    if (fillEmptyOnly && draft.feats[slot.category][key]) continue;
+    const bucket = slot.freeArchetype ? draft.feats.freeArchetype : draft.feats[slot.category];
+    if (fillEmptyOnly && bucket[key]) continue;
     const derived = computeCharacter(draft, context);
     const candidatePool = (remasterFeats.length ? remasterFeats : feats).filter((feat) => {
       if (feat.level > slot.level) return false;
-      const expected = slot.category === "class" ? ["class", "archetype"] : [slot.category];
-      if (!expected.includes(feat.category)) return false;
+      if (slot.freeArchetype) {
+        if (feat.category !== "class" || !feat.traits.includes("archetype")) return false;
+      } else {
+        const expected = slot.category === "class" ? ["class", "archetype"] : [slot.category];
+        if (!expected.includes(feat.category)) return false;
+      }
       if (selectedFeats.some((selected) => selected.name === feat.name)) return false;
       return featPrerequisiteStatus(feat, draft, context, derived).status !== "unmet";
     });
     if (!candidatePool.length) continue;
     const feat = pick(rng, candidatePool);
-    draft.feats[slot.category][key] = feat.id;
+    bucket[key] = feat.id;
     selectedFeats.push(feat);
     context.feats[feat.id] = feat;
+  }
+}
+
+function fillFeatChoices(
+  rng: () => number,
+  draft: CharacterDraft,
+  context: CharacterContext
+): void {
+  for (const feat of Object.values(context.feats)) {
+    if (draft.featChoices[feat.id]?.length) continue;
+    const choice = featChoice(feat.id);
+    if (!choice) continue;
+    if (choice.kind === "text") {
+      const text =
+        (choice.placeholder ?? "").replace(/^e\.g\.\s*/i, "").trim() || "Adventuring Lore";
+      draft.featChoices[feat.id] = [text];
+      continue;
+    }
+    if (!choice.options.length) continue;
+    const untrained = choice.options.filter((option) => !draft.skills.trained.includes(option.id));
+    draft.featChoices[feat.id] = [pick(rng, untrained.length ? untrained : choice.options).id];
   }
 }
 
@@ -783,6 +811,7 @@ function buildDraftFrom(
 
   const selectedFeats: Feat[] = heritageFeat ? [heritageFeat] : [];
   chooseFeats(rng, draft, context, selectedFeats);
+  fillFeatChoices(rng, draft, context);
   // A regular class feat can activate a grant-choice group (for example,
   // Domain Initiate). Fill any groups that were not active before feats.
   chooseGrantChoices(rng, draft, classData);
@@ -1069,6 +1098,7 @@ export interface AdvanceSimulatedCharacterOptions {
   previous: SimulatedCharacterBuild;
   level: number;
   seed?: number;
+  freeArchetype?: boolean;
 }
 
 function validationErrors(draft: CharacterDraft, context: CharacterContext): string[] {
@@ -1135,7 +1165,8 @@ export function advanceSimulatedCharacter(
   context = contextForDraft(draft);
 
   const selectedFeats = Object.values(context.feats);
-  chooseFeats(rng, draft, context, selectedFeats, true);
+  chooseFeats(rng, draft, context, selectedFeats, true, options.freeArchetype === true);
+  fillFeatChoices(rng, draft, context);
   chooseGrantChoices(rng, draft, classData);
   context = contextForDraft(draft);
   rebalanceTrainedSkills(rng, draft, context);

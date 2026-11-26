@@ -1176,6 +1176,10 @@ export function CharacterSheetView({
         ids: (derived?.animistApparitions?.repertoire ?? []).map((entry) => entry.spell.id),
       },
       { label: "Spells", ids: draft.spells.known },
+      {
+        label: "Multiclass",
+        ids: [...draft.spells.multiclassCantrips, ...draft.spells.multiclassSpells],
+      },
       { label: "Focus", ids: draft.spells.focus },
       { label: "Innate", ids: draft.spells.innate },
       { label: "Rituals", ids: draft.spells.rituals },
@@ -1292,8 +1296,11 @@ export function CharacterSheetView({
         innate: group === "Innate",
         innateRemaining:
           group === "Innate" && draft ? innateUsesRemaining(draft, spell) : undefined,
+        multiclass: group === "Multiclass",
+        multiclassSlots: derived?.multiclassCaster?.spellSlots ?? [],
+        multiclassSlotsUsed: draft?.spells.multiclassSlotsUsed,
       }),
-    [context, derived?.focusPointsMax, draft]
+    [context, derived?.focusPointsMax, derived?.multiclassCaster, draft]
   );
 
   const cast = async (spell: Spell, group: string) => {
@@ -1313,6 +1320,9 @@ export function CharacterSheetView({
       focusPointsMax: derived?.focusPointsMax ?? 0,
       innate: group === "Innate",
       innateRemaining: group === "Innate" ? innateUsesRemaining(currentDraft, spell) : undefined,
+      multiclass: group === "Multiclass",
+      multiclassSlots: derived?.multiclassCaster?.spellSlots ?? [],
+      multiclassSlotsUsed: currentDraft.spells.multiclassSlotsUsed,
     });
     if (!result) {
       toast("That spell has no uses left at the selected rank.", "error");
@@ -1535,6 +1545,12 @@ export function CharacterSheetView({
     }
     if (group === "Innate") {
       return { attack: derived.innateSpellAttack, dc: derived.innateSpellDc };
+    }
+    if (group === "Multiclass") {
+      return {
+        attack: derived.multiclassCaster?.spellAttack ?? derived.spellAttack,
+        dc: derived.multiclassCaster?.spellDc ?? derived.spellDc,
+      };
     }
     return { attack: derived.spellAttack, dc: derived.spellDc };
   };

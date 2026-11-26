@@ -41,6 +41,17 @@ const FEAT_OVERRIDES: Record<string, AutomationInfo> = {
     reason:
       "Runehall adds the extra recovery healing and shortens Battle Medicine immunity to 1 hour.",
   },
+  // Skill Training is repeatable; the sheet stores one choice per feat id.
+  "feat:P6icK2DbRoZ3H6kc": {
+    level: "partial",
+    reason:
+      "The first Skill Training pick is applied to the sheet; additional repeatable picks need manual tracking.",
+  },
+  "feat:W6Gl9ePmItfDHji0": {
+    level: "partial",
+    reason:
+      "The chosen Assurance skill is recorded; the take-10 result still has to be used at the table.",
+  },
 };
 
 function plainText(html: string): string {
