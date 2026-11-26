@@ -52,7 +52,13 @@ export interface GrantChoiceGroup {
   /** Shown when no legal option exists yet, e.g. before a deity is chosen. */
   emptyHint?: string;
   /** Restrict domain options to alternate or already-initialized domains. */
-  domainScope?: "alternate" | "advanced" | "mysteryInitial" | "mysteryAdvanced";
+  domainScope?:
+    | "alternate"
+    | "advanced"
+    | "mysteryInitial"
+    | "mysteryAdvanced"
+    | "domainSpirit"
+    | "domainSpiritAdvanced";
   /** Expand the number of picks to the number of times this feat is selected. */
   countFromFeat?: string;
   options: GrantChoiceOption[];
@@ -81,6 +87,8 @@ export const GRANT_CHOICE_KEYS = {
   clericDomain: "grant:cleric-domain",
   clericExpandedDomain: "grant:cleric-expanded-domain",
   clericAdvancedDomain: "grant:cleric-advanced-domain",
+  domainSpirit: "grant:domain-spirit",
+  domainSpiritAdvanced: "grant:domain-spirit-advanced",
   championDevotion: "grant:champion-devotion",
   sorcererElement: "grant:sorcerer-element",
   sorcererGenie: "grant:sorcerer-genie",
@@ -686,6 +694,34 @@ export const GRANT_CHOICE_GROUPS: GrantChoiceGroup[] = [
     options: Object.keys(DOMAIN_ADVANCED_SPELLS).map(advancedDomainOption),
   },
   {
+    key: GRANT_CHOICE_KEYS.domainSpirit,
+    prompt: "Domain Spirit: choose a domain tied to your domain spirit.",
+    chooseLabel: "domain",
+    count: 1,
+    minLevel: 6,
+    source: { kind: "feat", featId: "feat:DjRkD92AyHNMHOK8" },
+    domainScope: "domainSpirit",
+    baseGrant: {
+      focusPoints: 1,
+      notes: [
+        "Domain Spirit: the spirit bond and domain approval remain table decisions; the chosen domain spell is granted.",
+      ],
+    },
+    emptyHint: "Take the Rivethun Emissary Dedication and Domain Spirit feat first.",
+    options: Object.keys(DOMAIN_SPELLS).map(domainOption),
+  },
+  {
+    key: GRANT_CHOICE_KEYS.domainSpiritAdvanced,
+    prompt: "Advanced Domain Spirit: choose your domain spirit's advanced spell.",
+    chooseLabel: "advanced domain",
+    count: 1,
+    minLevel: 10,
+    source: { kind: "feat", featId: "feat:053lglnu0gsC6S2N" },
+    domainScope: "domainSpiritAdvanced",
+    emptyHint: "Choose a domain with Domain Spirit first.",
+    options: Object.keys(DOMAIN_ADVANCED_SPELLS).map(advancedDomainOption),
+  },
+  {
     key: GRANT_CHOICE_KEYS.championDevotion,
     prompt: "Choose your devotion spell.",
     chooseLabel: "devotion spell",
@@ -867,6 +903,8 @@ export function activeGrantChoiceGroups(
     if (option.requiresClassOption) return selectedOptionIds.has(option.requiresClassOption);
     if (option.domain) {
       if (group.domainScope?.startsWith("mystery")) return true;
+      if (group.domainScope === "domainSpirit" || group.domainScope === "domainSpiritAdvanced")
+        return true;
       if (!deity) return false;
       const domains = new Set(
         [...(deity.domains ?? []), ...(deity.alternateDomains ?? [])].map(canonicalDomainKey)
@@ -896,6 +934,11 @@ export function activeGrantChoiceGroups(
       .map((id) => canonicalDomainKey(id.slice("domain:".length))),
   ]);
   const alternateDomains = new Set((deity?.alternateDomains ?? []).map(canonicalDomainKey));
+  const domainSpiritDomains = new Set(
+    (draft.grantChoices[GRANT_CHOICE_KEYS.domainSpirit] ?? [])
+      .filter((id) => id.startsWith("domain:"))
+      .map((id) => canonicalDomainKey(id.slice("domain:".length)))
+  );
 
   return GRANT_CHOICE_GROUPS.flatMap((group) => {
     if (group.minLevel > draft.level || !sourceActive(group.source)) return [];
@@ -927,6 +970,11 @@ export function activeGrantChoiceGroups(
           option.domain &&
           mysteryDomains.has(canonicalDomainKey(option.domain)) &&
           initializedDomains.has(canonicalDomainKey(option.domain))
+      );
+    }
+    if (group.domainScope === "domainSpiritAdvanced") {
+      options = options.filter(
+        (option) => option.domain && domainSpiritDomains.has(canonicalDomainKey(option.domain))
       );
     }
     if (!options.length && !group.emptyHint) return [];

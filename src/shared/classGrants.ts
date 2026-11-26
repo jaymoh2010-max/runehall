@@ -692,6 +692,7 @@ const CLASS_NOTES: Record<string, string[]> = {
   cleric: [
     "Divine font slots are heal-or-harm only and are tracked separately from ordinary slots.",
     "Spells granted by your deity are included as available cleric spells; prepare them like any other divine spell.",
+    "Domain Focus refills the focus pool completely when you Refocus; Refocus itself remains a table action.",
   ],
   magus: [
     "Studious spell slots are not tracked separately; add their specific spells manually.",

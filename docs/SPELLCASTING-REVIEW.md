@@ -2,7 +2,7 @@
 
 Date: 2026-11-23
 
-Status: review complete. Sprint 1 (the daily spellcasting loop), the class-grant portion of Sprint 2, the first table-magic pass of Sprint 3, the magus studious-slot pass of Sprint 4, the animist prepared/spontaneous split of Sprint 5, the spontaneous known-at-rank pass of Sprint 6, the psychic psi-amp pass of Sprint 7, the table Sustain-reminder pass of Sprint 8, the higher-slot downcast pass of Sprint 9, the scroll-spellcasting pass of Sprint 10, the Magic Wand spellcasting pass of Sprint 11, the fixed-spell specific-wand pass of Sprint 12, the expanded/advanced domain pass of Sprint 13, the flexible-wand pass of Sprint 14, the staff/trait-restricted wand pass of Sprint 15, the ritual-detail pass of Sprint 16, the spell-source label pass of Sprint 17, the staff-slot/repeated-domain pass of Sprint 18, the oracle mystery-domain pass of Sprint 19, the Learn-a-Spell pass of Sprint 20, the last-staff-list pass of Sprint 21, the multiclass-dedication pass of Sprint 22, the multiclass-slot pass of Sprint 23, the variable-tradition dedication pass of Sprint 24, the heightening/starting-budget pass of Sprint 25, and the higher-rank class-choice pass of Sprint 26 were implemented on 2026-11-23 through 2026-11-26. The findings below describe the pre-Sprint state; the implementation status sections record what changed, and the remaining class and table gaps stay in the backlog.
+Status: review complete. Sprint 1 (the daily spellcasting loop), the class-grant portion of Sprint 2, the first table-magic pass of Sprint 3, the magus studious-slot pass of Sprint 4, the animist prepared/spontaneous split of Sprint 5, the spontaneous known-at-rank pass of Sprint 6, the psychic psi-amp pass of Sprint 7, the table Sustain-reminder pass of Sprint 8, the higher-slot downcast pass of Sprint 9, the scroll-spellcasting pass of Sprint 10, the Magic Wand spellcasting pass of Sprint 11, the fixed-spell specific-wand pass of Sprint 12, the expanded/advanced domain pass of Sprint 13, the flexible-wand pass of Sprint 14, the staff/trait-restricted wand pass of Sprint 15, the ritual-detail pass of Sprint 16, the spell-source label pass of Sprint 17, the staff-slot/repeated-domain pass of Sprint 18, the oracle mystery-domain pass of Sprint 19, the Learn-a-Spell pass of Sprint 20, the last-staff-list pass of Sprint 21, the multiclass-dedication pass of Sprint 22, the multiclass-slot pass of Sprint 23, the variable-tradition dedication pass of Sprint 24, the heightening/starting-budget pass of Sprint 25, the higher-rank class-choice pass of Sprint 26, and the later-domain-feat pass of Sprint 27 were implemented on 2026-11-23 through 2026-11-26. The findings below describe the pre-Sprint state; the implementation status sections record what changed, and the remaining class and table gaps stay in the backlog.
 
 > **Follow-up (2026-11-23):** `docs/RULES-AUDIT.md` corrected two table errors
 > this review did not catch: bards use the 2/3 full-caster slot table (not the
@@ -321,6 +321,15 @@ Higher-rank class spell choices are implemented:
 - Imperial's advanced bloodline spell Extend and Corentyn Armada's 3rd-rank aquatic arsenal are absent from the compendium, so those two entries remain explicit notes rather than guessed ids.
 - Unified Magical Theory's free 1st-level feat and spell remain manual.
 
+## Sprint 27 implementation status (2026-11-26)
+
+Later domain feats are implemented:
+
+- Domain Spirit offers the initial domain spell for a domain tied to the character's domain spirit; the spirit bond and which domains are legal remain table decisions.
+- Advanced Domain Spirit offers the advanced spell for the domain chosen with Domain Spirit.
+- Domain Focus is documented as a complete focus-pool refill on Refocus; Refocus itself remains a table action.
+- Both feats work through the generic grant-choice framework, so they are available to any class that takes the Rivethun Emissary archetype.
+
 ## Rules baseline
 
 ### Core spellcasting
@@ -390,7 +399,7 @@ Legend: Yes = modeled and usable; Partial = some support with known gaps; No = n
 | Focus spells from feats/archetypes | Partial | Advanced Bloodline, Greater Bloodline, Advanced Revelation, and Greater Revelation are automatic; other archetype focus spells remain manual |
 | Innate spells and uses | Partial | Uses and casting work; innate attack/DC is derived separately |
 | Cleric deity spells | Yes | Deity spells are offered to prepare; higher-rank deity spells appear as level permits |
-| Cleric domains | Partial | Domain Initiate, Expanded Domain Initiate, and repeated Advanced Domain picks grant focus spells from the deity's domains; later domain feats remain manual |
+| Cleric domains | Partial | Domain Initiate, Expanded Domain Initiate, repeated Advanced Domain picks, and Domain Spirit/Advanced Domain Spirit grant focus spells; Domain Focus is documented; other later domain feats remain manual |
 | Oracle mystery domains | Partial | Mystery granted spells, Domain Acumen/Fluency, and Advanced/Greater Revelation are automatic; the curse, mystery skill, and deity access remain manual |
 | Psychic conscious minds | Partial | 1st-rank spell, psi cantrips, and amp casting are granted; higher-level unique cantrips remain manual |
 | Necromancer grave spells | Partial | Necrotic Bomb and grim fascination spells granted; thralls and effects manual |
@@ -497,7 +506,7 @@ Status: partly fixed in Sprint 2, Sprint 4, Sprint 5, Sprint 7, Sprint 13, and S
 - **Animist**: prepared animist slots and spontaneous apparition slots are separate. Attuned apparitions supply a curated repertoire, the primary apparition grants its vessel focus spell, and apparition slots reset during daily preparations. Invocations and wandering-feat retraining remain manual.
 - **Wizard**: rank-0 through rank-9 curriculum spells are granted for each school, including Runelord sins and Rooted Wisdom branches, so the extra slot is restricted at every rank. Unified Magical Theory's free feat and spell remain manual.
 - **Sorcerer/oracle**: bloodline gifts are granted at every rank, including the Elemental, Genie, and Draconic variable choices; advanced and greater bloodline spells are granted by their feats. Oracle mysteries grant their listed spells, and Advanced/Greater Revelation are granted by their feats. Oracle curse effects and mystery skills remain manual.
-- **Cleric**: deity spells are resolved and offered through the normal preparation workflow. Domain Initiate, Expanded Domain Initiate, and Advanced Domain grant their domain focus spells; repeated Advanced Domain picks are supported, while later domain feats remain manual.
+- **Cleric**: deity spells are resolved and offered through the normal preparation workflow. Domain Initiate, Expanded Domain Initiate, and Advanced Domain grant their domain focus spells; repeated Advanced Domain picks are supported. Domain Spirit and Advanced Domain Spirit grant a spirit-linked initial and advanced domain spell, and Domain Focus is documented. Other later domain feats remain manual.
 
 Impact: These classes are usable only with manual bookkeeping for their remaining niche resources.
 
