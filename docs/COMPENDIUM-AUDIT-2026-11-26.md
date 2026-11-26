@@ -130,9 +130,9 @@ Added structured choices that were only present in prose:
 | `npm run simulate:campaign` | 18 passed, 0 failed |
 
 The SQLite database in the main checkout passes `PRAGMA integrity_check` and
-`PRAGMA foreign_key_check`, and the migration ledger contains migrations 1-30
-with no duplicates. The database contains no users, campaigns, or characters, so
-there is no user content to reconcile.
+`PRAGMA foreign_key_check`, and the migration ledger contains migrations 1-57
+across 39 tables with no duplicates. The database contains no users, campaigns,
+or characters, so there is no user content to reconcile.
 
 ## Known remaining differences
 
