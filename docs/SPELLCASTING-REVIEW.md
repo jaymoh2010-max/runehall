@@ -2,7 +2,7 @@
 
 Date: 2026-11-23
 
-Status: review complete. Sprint 1 (the daily spellcasting loop), the class-grant portion of Sprint 2, the first table-magic pass of Sprint 3, the magus studious-slot pass of Sprint 4, the animist prepared/spontaneous split of Sprint 5, the spontaneous known-at-rank pass of Sprint 6, the psychic psi-amp pass of Sprint 7, the table Sustain-reminder pass of Sprint 8, the higher-slot downcast pass of Sprint 9, the scroll-spellcasting pass of Sprint 10, the Magic Wand spellcasting pass of Sprint 11, the fixed-spell specific-wand pass of Sprint 12, the expanded/advanced domain pass of Sprint 13, the flexible-wand pass of Sprint 14, the staff/trait-restricted wand pass of Sprint 15, the ritual-detail pass of Sprint 16, the spell-source label pass of Sprint 17, the staff-slot/repeated-domain pass of Sprint 18, the oracle mystery-domain pass of Sprint 19, the Learn-a-Spell pass of Sprint 20, the last-staff-list pass of Sprint 21, the multiclass-dedication pass of Sprint 22, the multiclass-slot pass of Sprint 23, and the variable-tradition dedication pass of Sprint 24 were implemented on 2026-11-23 through 2026-11-26. The findings below describe the pre-Sprint state; the implementation status sections record what changed, and the remaining class and table gaps stay in the backlog.
+Status: review complete. Sprint 1 (the daily spellcasting loop), the class-grant portion of Sprint 2, the first table-magic pass of Sprint 3, the magus studious-slot pass of Sprint 4, the animist prepared/spontaneous split of Sprint 5, the spontaneous known-at-rank pass of Sprint 6, the psychic psi-amp pass of Sprint 7, the table Sustain-reminder pass of Sprint 8, the higher-slot downcast pass of Sprint 9, the scroll-spellcasting pass of Sprint 10, the Magic Wand spellcasting pass of Sprint 11, the fixed-spell specific-wand pass of Sprint 12, the expanded/advanced domain pass of Sprint 13, the flexible-wand pass of Sprint 14, the staff/trait-restricted wand pass of Sprint 15, the ritual-detail pass of Sprint 16, the spell-source label pass of Sprint 17, the staff-slot/repeated-domain pass of Sprint 18, the oracle mystery-domain pass of Sprint 19, the Learn-a-Spell pass of Sprint 20, the last-staff-list pass of Sprint 21, the multiclass-dedication pass of Sprint 22, the multiclass-slot pass of Sprint 23, the variable-tradition dedication pass of Sprint 24, and the heightening/starting-budget pass of Sprint 25 were implemented on 2026-11-23 through 2026-11-26. The findings below describe the pre-Sprint state; the implementation status sections record what changed, and the remaining class and table gaps stay in the backlog.
 
 > **Follow-up (2026-11-23):** `docs/RULES-AUDIT.md` corrected two table errors
 > this review did not catch: bards use the 2/3 full-caster slot table (not the
@@ -301,6 +301,15 @@ Variable-tradition dedications are implemented:
 - Validation warns until the tradition is chosen and rejects spells outside it.
 - Archetype spell heightening remains manual.
 
+## Sprint 25 implementation status (2026-11-26)
+
+Multiclass heightening and starting-spellbook guidance are implemented:
+
+- Dedication spells offer every available slot rank at or above the spell's printed rank, so a rank-1 dedication spell can use a higher-rank dedication slot.
+- The selected slot rank is recorded and used as the effective cast rank.
+- Spellbook/familiar/dirge classes see a starting-contents card with their starting cantrips, ranked spells, gold budget, and two-spells-per-level guidance.
+- Current cantrip and ranked-spell counts are shown for comparison; the budget is advisory rather than enforced.
+
 ## Rules baseline
 
 ### Core spellcasting
@@ -361,8 +370,8 @@ Legend: Yes = modeled and usable; Partial = some support with known gaps; No = n
 | Divine font | Yes | Rank, slot count, dual-font choice, separate usage |
 | Wizard curriculum | Partial | Extra slot and rank-1 validation; higher-rank curriculum lists remain manual |
 | Prepared cantrips | Yes | Daily prepared list, class caps, and the wizard curriculum extra |
-| Spell source presentation | Partial | Class-specific spellbook/familiar/dirge/spell-list/repertoire labels; the full spellbook/known data split remains open |
-| Learn a Spell | Partial | Cost by rank/rarity, rank DC, gold deduction, and known-list addition; the check, downtime day, and starting-spellbook budget remain manual |
+| Spell source presentation | Partial | Class-specific spellbook/familiar/dirge/spell-list/repertoire labels and starting-contents guidance; the full spellbook/known data split remains open |
+| Learn a Spell | Partial | Cost by rank/rarity, rank DC, gold deduction, known-list addition, and starting-contents guidance; the check, downtime day, and strict starting budget remain manual |
 | Spontaneous repertoire limits | Yes | Bard, oracle, sorcerer, summoner, and psychic; rank copies count against each learned rank |
 | Spontaneous heightening by learned rank | Yes | Known ranks are tracked; signature spells heighten upward and non-signature spells can downcast from higher slots |
 | Signature spells | Yes | One per rank, level 3 gate, validation |
@@ -381,7 +390,7 @@ Legend: Yes = modeled and usable; Partial = some support with known gaps; No = n
 | Sustained spells | Yes | Casting starts sustain, the sheet and table list active spells, Sustain/End actions are available, and Restore clears them |
 | Spellbook capacity and learning | No | No starting-spellbook or Learn a Spell accounting |
 | Item spellcasting | Partial | Scrolls cast from the character's spell list and consume on use; generic Magic Wands cast at their rank once per day; fixed-spell specific wands cast directly; flexible wands cast a chosen spell at their listed rank; staves track parsed spell lists, charge pools, and spell-slot casting; fine-grained staff special effects remain manual |
-| Multiclass spellcasting archetypes | Partial | Spellcasting dedications grant cantrips, ranked spells, and Basic/Expert/Master slot pools with their own DC/attack; variable traditions are chosen in the builder; archetype heightening remains manual |
+| Multiclass spellcasting archetypes | Partial | Spellcasting dedications grant cantrips, ranked spells, Basic/Expert/Master slot pools, variable traditions, and higher-slot heightening; other archetype details remain manual |
 
 ## Findings
 
@@ -559,7 +568,7 @@ Fix: Scroll casting opens the spell picker at the scroll's rank, filters by the 
 
 ### F13. Multiclass spellcasting archetypes are not modeled (P2)
 
-Status: partly fixed in Sprint 22, Sprint 23, and Sprint 24. Spellcasting dedications grant a separate dedication-cantrip list, ranked dedication spells, and Basic/Expert/Master slot pools with their own spell DC/attack bonus. Bloodline/patron/eidolon-dependent dedications ask for their tradition; archetype spell heightening remains manual.
+Status: partly fixed in Sprint 22, Sprint 23, Sprint 24, and Sprint 25. Spellcasting dedications grant a separate dedication-cantrip list, ranked dedication spells, Basic/Expert/Master slot pools with their own spell DC/attack bonus, and higher-slot heightening. Variable traditions are chosen in the builder.
 
 `casterInfo` reads only `context.classData`. Spellcasting dedication feats now add dedication cantrips, ranked spells, and delayed slots.
 
@@ -569,7 +578,7 @@ Fix: Resolve bloodline/patron/eidolon-dependent traditions and archetype heighte
 
 ### F14. Spellbook capacity and spell learning are not enforced (P2)
 
-Status: partly fixed in Sprint 20. The sheet's Learn a Spell picker computes the rank/rarity cost and DC, deducts gold, and adds the spell to the known list. The check, downtime day, starting-spellbook value, and two-free-spells-per-level budget remain manual.
+Status: partly fixed in Sprint 20 and Sprint 25. The sheet's Learn a Spell picker computes the rank/rarity cost and DC, deducts gold, and adds the spell to the known list. Spellbook/familiar/dirge classes also see starting-contents guidance and current counts. Starting contents remain advisory, and the two-free-spells-per-level budget is not enforced.
 
 ## Sprint plan
 

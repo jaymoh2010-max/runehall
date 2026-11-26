@@ -236,6 +236,21 @@ export function SpellsStep({ draft, update, derived, context, setStep, openPicke
         .filter((amp): amp is PsiAmpInfo => Boolean(amp))
     : [];
   const preparedListLabel = isAnimist ? "prepared list" : spellSourceLabel(classData);
+  const bookClassName = classData?.name.toLowerCase() ?? "";
+  const bookGuidance: Record<string, string> = {
+    wizard:
+      "Your spellbook starts with 10 sp or less of spells. Add two spells of any rank you can cast each time you gain a level.",
+    magus:
+      "Your spellbook starts with 10 sp or less of spells. Add two spells of any rank you can cast each time you gain a level.",
+    witch:
+      "Your familiar starts with 10 cantrips, five 1st-rank spells, and your patron's initial lesson spell. Add two spells each level.",
+    necromancer:
+      "Your dirge starts with eight occult cantrips, Harm, and four other 1st-rank occult spells. Add two spells each level.",
+  };
+  const bookText = bookGuidance[bookClassName] ?? null;
+  const bookRankedCount = draft.spells.known.filter(
+    (id) => (context.spells[id]?.rank ?? 0) > 0
+  ).length;
   const cantripContext = { spells: context.spells, deity: context.deity, classData };
   const preparedCantripList = preparedCantripIds(draft, cantripContext);
   const preparedCantripSet = new Set(preparedCantripList);
@@ -1107,6 +1122,18 @@ export function SpellsStep({ draft, update, derived, context, setStep, openPicke
                   </div>
                 </div>
               ) : null}
+            </Card>
+          ) : null}
+
+          {bookText ? (
+            <Card className="spell-section" data-testid="starting-spellbook">
+              <h3>{classData?.name} starting contents</h3>
+              <p className="muted small">{bookText}</p>
+              <p className="tiny muted">
+                Current: {draft.spells.cantrips.length} cantrip
+                {draft.spells.cantrips.length === 1 ? "" : "s"} · {bookRankedCount} ranked spell
+                {bookRankedCount === 1 ? "" : "s"}.
+              </p>
             </Card>
           ) : null}
 

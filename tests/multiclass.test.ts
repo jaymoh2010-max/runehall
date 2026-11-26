@@ -5,6 +5,7 @@ import { multiclassDedicationFor, multiclassSlotCounts } from "../src/shared/mul
 import { emptyCharacterDraft } from "../src/shared/rules";
 import { contextForDraft } from "../src/server/compendium";
 import { computeCharacter } from "../src/shared/rules";
+import { spellCastOptions } from "../src/shared/spellcasting";
 import type { ClassData, Spell } from "../src/shared/types";
 
 function read<T>(file: string): T[] {
@@ -85,5 +86,24 @@ describe("multiclass dedication cantrips", () => {
       tradition: "occult",
       variableTradition: true,
     });
+  });
+
+  it("offers every available dedication slot rank for heightening", () => {
+    const draft = emptyCharacterDraft("Dedicated Wizard");
+    draft.classId = fighter.id;
+    draft.keyAbility = "str";
+    draft.level = 8;
+    draft.feats.class["2"] = "feat:oQ6EZRFXbHWCx08C";
+    draft.feats.class["4"] = "feat:SHUfHzElHZPXJFiP";
+    const context = contextForDraft(draft);
+    const derived = computeCharacter(draft, context);
+    const forceBarrage = spells.find((spell) => spell.name === "Force Barrage")!;
+    const options = spellCastOptions(forceBarrage, draft, context, {
+      multiclass: true,
+      multiclassSlots: derived.multiclassCaster?.spellSlots ?? [],
+      multiclassSlotsUsed: draft.spells.multiclassSlotsUsed,
+    });
+    expect(options.map((option) => option.rank)).toEqual([1, 2, 3]);
+    expect(options.every((option) => option.resource === "multiclass")).toBe(true);
   });
 });
