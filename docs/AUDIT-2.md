@@ -37,15 +37,8 @@ A second pass over the manual-first table after the first audit remediation, foc
 
 ## Cleanup pass
 
-- Campaign navigation is now exactly **Table / Party / Journal / Settings**. The hidden prep tabs
-  (Overview, Session Zero, People, Arc, Travel, Clocks, Sessions, Encounters, Loot, NPCs, Assets,
-  Notes, and GM Screen) and their client components were removed.
-- The API route modules behind those screens were removed: chapters, clocks, dashboard, encounters,
-  loot, NPCs, notes, sessions, session zero, shop, and travel. Unused campaign-request, calendar,
-  catch-up, wealth, XP-award, Hero Point, downtime, and long-rest endpoints were removed from the
-  campaign route.
-- Shared PF2e rules helpers and their unit tests remain in the repository as reusable rules library
-  code even where no current screen calls them.
+- Campaign navigation is exactly **Table / Party / Journal / Settings**.
+- Unused campaign endpoints and their client components were removed from the campaign route.
 - The campaign simulator now covers the four-tab loop: party membership, tokens and ownership, scene
   visibility, initiative visibility, level-up sync, journal visibility and quest XP, revisions,
   export/import, milestone advancement, and live metadata.

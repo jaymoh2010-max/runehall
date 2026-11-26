@@ -687,46 +687,11 @@ export interface CharacterDetails {
   languages: string[];
 }
 
-export type Lifestyle = "subsistence" | "comfortable" | "fine" | "extravagant";
-
-export type DowntimeActivityKind = "earn-income" | "subsist" | "craft" | "retrain" | "other";
-export type DowntimeActivityStatus = "active" | "complete";
-
-/**
- * A downtime job or project stored on the character. Earn Income keeps the
- * first day's pay in `dailyEarnedCp` so later days do not need another roll.
- */
-export interface DowntimeActivity {
-  id: string;
-  kind: DowntimeActivityKind;
-  label: string;
-  /** Skill id, or `lore:<name>` for a Lore skill. */
-  skill: string | null;
-  taskLevel: number | null;
-  dc: number | null;
-  daysRequired: number | null;
-  daysSpent: number;
-  earnedCp: number;
-  paidCp: number;
-  dailyEarnedCp: number | null;
-  status: DowntimeActivityStatus;
-  lastDegree: DegreeOfSuccess | null;
-  notes: string;
-  createdAt: number;
-  updatedAt: number;
-}
-
 export interface CharacterPlay {
   hp: number | null;
   tempHp: number;
   heroPoints: number;
   focusPoints: number;
-  /** Downtime days granted by the GM and spent between adventures. */
-  downtimeDays: number;
-  /** Standard of living paid for each downtime day. */
-  lifestyle: Lifestyle;
-  /** Earn Income jobs and Craft/Retrain projects. */
-  downtimeActivities: DowntimeActivity[];
   conditions: CharacterCondition[];
   afflictions: CharacterAffliction[];
   persistentDamage: PersistentDamageInstance[];
@@ -949,8 +914,8 @@ export interface CharacterDraft {
   companions: CharacterCompanion[];
   currency: CharacterCurrency;
   /**
-   * One-time creation budget in copper. Null for imported, looted, or legacy
-   * characters whose wealth provenance is not a fresh level-1 build.
+   * One-time creation budget in copper. Null for imported or legacy characters
+   * whose wealth provenance is not a fresh level-1 build.
    */
   wealthBudgetCp: number | null;
   details: CharacterDetails;
@@ -986,7 +951,6 @@ export interface CharacterSummary {
   spellDc: number | null;
   heroPoints: number;
   focusPoints: number;
-  downtimeDays: number;
   xp: number;
   conditions: string[];
   portraitUrl: string | null;
@@ -1009,8 +973,6 @@ export interface CharacterRecord {
   campaignRuleset?: CampaignRuleset | null;
   /** Set when the character belongs to a campaign; used for XP progress. */
   campaignAdvancementSpeed?: AdvancementSpeed | null;
-  /** Set when the character belongs to a campaign; controls shop stock. */
-  campaignSettlementLevel?: number | null;
   /** Set when the campaign uses the Free Archetype variant. */
   campaignFreeArchetype?: boolean | null;
   /** Set when the campaign uses Automatic Bonus Progression. */
@@ -1243,23 +1205,8 @@ export interface CampaignJoinRequest extends PendingJoinRequest {
   validation: ValidationIssue[];
 }
 
-/** A victory-point clock or countdown shown to the table. */
-export interface CampaignClock {
-  id: string;
-  campaignId: string;
-  name: string;
-  description: string;
-  segments: number;
-  filled: number;
-  visible: boolean;
-  playerEditable: boolean;
-  sortOrder: number;
-  createdAt: number;
-  updatedAt: number;
-}
-
 /** Player-initiated actions that wait for the GM's approval. */
-export type CampaignRequestKind = "level-up" | "downtime" | "journal";
+export type CampaignRequestKind = "level-up" | "journal";
 export type CampaignRequestStatus = "pending" | "approved" | "denied" | "withdrawn";
 
 /**
@@ -1285,7 +1232,6 @@ export interface CampaignRequest {
   payload: {
     fromLevel?: number;
     toLevel?: number;
-    days?: number;
     title?: string;
     content?: string;
   };
@@ -1302,15 +1248,12 @@ export interface CampaignSummary {
   ruleset: CampaignRuleset;
   xpMode: XpMode;
   advancementSpeed: AdvancementSpeed;
-  settlementLevel: number;
   /** Campaign variant: grant an extra archetype feat at every even level. */
   freeArchetype: boolean;
   /** Campaign variant: grant automatic attack/defense/save/Perception/skill potency. */
   automaticBonusProgression: boolean;
   /** Players may add compendium gear without paying, when the GM allows it. */
   playerItemGrant: boolean;
-  /** Open market (infinite common stock) or a GM-curated finite merchant list. */
-  shopMode: ShopStockMode;
   /** Current in-world date for this campaign. */
   worldDate: GolarionDate;
   memberCount: number;
@@ -1320,117 +1263,6 @@ export interface CampaignSummary {
   createdAt: number;
   updatedAt: number;
   lastPlayedAt: number | null;
-}
-
-export type ShopStockMode = "open" | "stocked";
-
-export interface ShopStockEntry {
-  itemId: string;
-  name: string;
-  level: number;
-  priceCp: number;
-  bulk: number;
-  rarity: string;
-  type: string;
-  quantity: number;
-  updatedAt: number;
-}
-
-export interface ShopState {
-  mode: ShopStockMode;
-  settlementLevel: number;
-  stock: ShopStockEntry[];
-  merchantId: string;
-  merchantName: string;
-  merchantDescription: string;
-  merchants: Array<{
-    id: string;
-    name: string;
-    mode: ShopStockMode;
-    active: boolean;
-    stockCount: number;
-  }>;
-}
-
-export type TravelTerrain = "normal" | "difficult" | "greater-difficult";
-export type TravelWeather = "clear" | "rain" | "snow" | "storm" | "fog" | "heat" | "cold";
-export type TravelStatus = "planning" | "traveling" | "complete";
-
-export interface TravelWatches {
-  first: string[];
-  second: string[];
-  third: string[];
-  fourth: string[];
-}
-
-export interface TravelWaypoint {
-  id: string;
-  name: string;
-  /** Distance from the origin in miles. */
-  miles: number;
-  description: string;
-  /** Shared with players when true; GM-only when false. */
-  visible: boolean;
-  /** True once the party's progress has reached this waypoint. */
-  reached: boolean;
-}
-
-export interface TravelEncounterCheck {
-  id: string;
-  day: number;
-  /** 1-4, matching the travel watch order. */
-  watch: number;
-  roll: number;
-  dc: number;
-  encounter: boolean;
-  terrain: TravelTerrain;
-  weather: TravelWeather;
-  note: string;
-  createdAt: number;
-}
-
-export interface TravelDayLog {
-  id: string;
-  /** Cumulative travel day after this entry. */
-  day: number;
-  miles: number;
-  terrain: TravelTerrain;
-  weather: TravelWeather;
-  worldYear: number;
-  worldMonth: number;
-  worldDay: number;
-  note: string;
-  createdAt: number;
-}
-
-export interface CampaignTravel {
-  campaignId: string;
-  origin: string;
-  destination: string;
-  terrain: TravelTerrain;
-  distanceMiles: number;
-  progressMiles: number;
-  partySpeed: number;
-  weather: TravelWeather;
-  notes: string;
-  watches: TravelWatches;
-  /** Character id to exploration activity id. */
-  activities: Record<string, string>;
-  waypoints: TravelWaypoint[];
-  /** One entry per elapsed travel day, shared with the party. */
-  history: TravelDayLog[];
-  /** GM-only encounter check history; omitted from player responses. */
-  encounterChecks?: TravelEncounterCheck[];
-  daysTravelled: number;
-  /** Miles the party covers on a normal travel day in the current terrain. */
-  dailyMiles: number;
-  status: TravelStatus;
-  updatedAt: number;
-}
-
-export interface CampaignTravelState {
-  travel: CampaignTravel | null;
-  suggestedSpeed: number;
 }
 
 export interface CampaignSessionZero {
@@ -1515,152 +1347,11 @@ export interface EncounterWaveSummary {
   creatures: number;
 }
 
-export interface LootItem {
-  itemId: string;
-  name: string;
-  quantity: number;
-}
-
-export type LootParcelStatus = "open" | "distributed";
-
-export interface LootParcel {
-  id: string;
-  campaignId: string;
-  name: string;
-  description: string;
-  items: LootItem[];
-  /** Party level this parcel was budgeted for. */
-  level: number;
-  gp: number;
-  sp: number;
-  cp: number;
-  status: LootParcelStatus;
-  distributedTo: string | null;
-  distributedToName: string | null;
-  distributedAt: number | null;
-  sortOrder: number;
-  createdAt: number;
-  updatedAt: number;
-}
-
 /** Party treasure by level from GM Core table 10-9 (four characters). */
 export interface TreasureBudget {
   level: number;
   totalGp: number;
   currencyGp: number;
-}
-
-export interface TreasureAuditParcel {
-  id: string;
-  name: string;
-  level: number;
-  status: LootParcelStatus;
-  valueCp: number;
-  permanentItems: number;
-  consumableItems: number;
-  otherItems: number;
-}
-
-export interface TreasureAuditCharacter {
-  id: string;
-  name: string;
-  level: number;
-  committedCp: number;
-  expectedCp: number;
-  deltaCp: number;
-}
-
-/** Counts of permanent, consumable, and other items against table 10-9. */
-export interface TreasureItemMixRow {
-  level: number;
-  permanent: number;
-  permanentTarget: number;
-  consumable: number;
-  consumableTarget: number;
-}
-
-export interface TreasureItemMix {
-  permanent: number;
-  consumable: number;
-  other: number;
-  permanentValueCp: number;
-  consumableValueCp: number;
-  otherValueCp: number;
-  levels: TreasureItemMixRow[];
-  warnings: string[];
-}
-
-export interface TreasureAudit {
-  partyLevel: number;
-  partySize: number;
-  budget: TreasureBudget;
-  preparedCp: number;
-  distributedCp: number;
-  mix: TreasureItemMix;
-  parcels: TreasureAuditParcel[];
-  byLevel: Array<{
-    level: number;
-    parcelCount: number;
-    preparedCp: number;
-    distributedCp: number;
-    mix: TreasureItemMix;
-    budgetGp: number;
-  }>;
-  characters: TreasureAuditCharacter[];
-}
-
-export interface CampaignThread {
-  id: string;
-  text: string;
-  done: boolean;
-  visible: boolean;
-}
-
-export type SessionStatus = "scheduled" | "played" | "canceled";
-export type SessionAttendanceStatus = "attended" | "late" | "absent" | "excused" | "unmarked";
-
-export interface SessionAgendaItem {
-  id: string;
-  text: string;
-  done: boolean;
-}
-
-export type SessionCheckinStatus = "yes" | "maybe" | "no" | "unanswered";
-
-export interface SessionCheckin {
-  userId: string;
-  displayName: string;
-  avatarUrl: string | null;
-  status: SessionCheckinStatus;
-}
-
-export interface SessionAttendance {
-  userId: string;
-  displayName: string;
-  avatarUrl: string | null;
-  status: SessionAttendanceStatus;
-  note: string;
-}
-
-export type SessionRecurrence = "none" | "weekly" | "biweekly" | "monthly";
-
-export interface CampaignSession {
-  id: string;
-  campaignId: string;
-  title: string;
-  scheduledAt: number;
-  durationMinutes: number;
-  /** GM-only session notes. */
-  notes: string;
-  /** GM-only prep checklist. */
-  agenda: SessionAgendaItem[];
-  status: SessionStatus;
-  /** How the next session should be scheduled when this one is marked played. */
-  recurrence: SessionRecurrence;
-  attendance: SessionAttendance[];
-  checkins: SessionCheckin[];
-  createdAt: number;
-  updatedAt: number;
 }
 
 export type NpcAttitude = "hostile" | "unfriendly" | "indifferent" | "friendly" | "helpful";
@@ -1767,39 +1458,6 @@ export interface CampaignNotesView {
   notes: CampaignPlayerNote[];
   /** Shared lore entries; hidden entries are GM-only. */
   knowledge: CampaignKnowledgeEntry[];
-}
-
-export interface CampaignDashboard {
-  campaignId: string;
-  lastSessionSummary: string;
-  nextSessionAt: number | null;
-  nextSessionTeaser: string;
-  nextSessionNotes: string;
-  threads: CampaignThread[];
-  updatedAt: number;
-}
-
-export interface SessionRecapStats {
-  messages: number;
-  rolls: number;
-  successes: number;
-  failures: number;
-  criticalSuccesses: number;
-  criticalFailures: number;
-  journalEntries: number;
-  handouts: number;
-  lootParcels: number;
-  openThreads: number;
-}
-
-export interface SessionRecap {
-  campaignId: string;
-  from: number;
-  to: number;
-  sessionTitle: string | null;
-  sessionAt: number | null;
-  stats: SessionRecapStats;
-  draft: string;
 }
 
 export type EncounterDifficulty = "trivial" | "low" | "moderate" | "severe" | "extreme" | "beyond";
@@ -2088,7 +1746,6 @@ export interface CampaignTable {
     ruleset: CampaignRuleset;
     xpMode: XpMode;
     advancementSpeed: AdvancementSpeed;
-    settlementLevel: number;
   };
   members: CampaignMember[];
   characters: CharacterRecord[];
@@ -2325,8 +1982,6 @@ export interface ServerToClientEvents {
   "journal:created": (entry: JournalEntry) => void;
   "journal:updated": (entry: JournalEntry) => void;
   "journal:deleted": (payload: { entryId: string }) => void;
-  "sessions:changed": (payload: { campaignId: string }) => void;
-  "dashboard:updated": (payload: { campaignId: string }) => void;
   "join-request:created": (payload: {
     requestId: string;
     characterName: string;
@@ -2346,7 +2001,6 @@ export interface ServerToClientEvents {
     requestId: string;
     status: CampaignRequestStatus;
   }) => void;
-  "clocks:changed": (payload: { campaignId: string }) => void;
   "campaign:revision": (payload: { revision: number }) => void;
   "campaign:updated": (campaign: CampaignSummary) => void;
   "safety:signal": (payload: { message: string; createdAt: number }) => void;

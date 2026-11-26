@@ -39,7 +39,7 @@ The follow-up `audit-fixes` pass addressed the P0 findings and the targeted P1/P
 - `My sheet` prefers the selected token's character and offers a picker when the user owns several characters.
 - Socket refreshes are silent, unsaved details survive unrelated saves, sheet rolls have a DC/secret control, and deleting from the embedded builder returns to the table.
 - Dead turn automation, the `initiative:action` socket event, active-movement UI code, and the `.core-sheet-drawer` CSS were removed.
-- Legacy campaign tab URLs now redirect to the table; XP/advancement settings moved behind an advanced disclosure and settlement level left the core Settings page.
+- Legacy campaign tab URLs now redirect to the table; XP/advancement settings moved behind an advanced disclosure.
 - Action filters expose `aria-pressed`, action lists show a count with progressive loading, item-price errors use the shared currency formatter, and the sheet restores the document title on close.
 
 Intentional follow-ups: token owner and temp-HP editing were not added because tokens do not store temp HP; legacy campaign render blocks remain bundled but unreachable; `npm audit` stays a manual periodic check (`npm audit --omit=dev` currently reports 0 vulnerabilities).
@@ -105,15 +105,9 @@ Intentional follow-ups: token owner and temp-HP editing were not added because t
     The quick panel has no way to change token art, name, size, color, owner, temp HP, or condition values/durations. The old token editor was removed wholesale; a compact editor or the Add token flow should cover art and identity.
 
 14. **Campaign import/export is no longer feature-complete.**
-    Besides `playerItemGrant`, review whether the new manual-first settings and sheet fields survive round-trip import. The export format still carries removed features, which is fine only if import stays compatible.
+    Besides `playerItemGrant`, review whether the new manual-first settings and sheet fields survive round-trip import. The export format is versioned, so import must stay compatible with older archives.
 
-15. **Hidden legacy campaign pages are still reachable and bundled.**
-    The tab bar only exposes Table, Party, Journal, and Settings, but direct `?tab=overview`, `?tab=travel`, `?tab=loot`, and other old routes still render. `CampaignPage` imports and ships all of them. Either redirect those tabs to the table or delete the dormant render blocks in a focused cleanup.
-
-16. **Settings still exposes removed concepts.**
-    Settlement level, XP mode, advancement speed, and shop settings remain on the Settings page even though the shop and most of that automation are not in the core UI. This is confusing product surface and should be reduced or moved behind an “advanced” section.
-
-17. **Full-sheet reload flashes on socket updates.**
+15. **Full-sheet reload flashes on socket updates.**
     `load()` always sets `loading = true`; the `character:updated` listener calls it. A GM changing token HP while a player has the sheet open briefly replaces the sheet with a spinner. Use a silent refresh path for socket-driven updates.
 
 18. **Unsaved detail edits can be reset by unrelated saves.**

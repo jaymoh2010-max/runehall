@@ -164,7 +164,7 @@ In **Campaign → Settings → Campaign archive**, the GM can export a JSON file
 - scenes, tokens, and fog state,
 - chat and dice log,
 - journal entries and handouts,
-- encounters, loot, dashboard, NPCs, and sessions,
+- encounters, session-zero notes, NPCs, factions, knowledge, and chapters,
 - active scene and initiative state,
 - an asset URL list.
 

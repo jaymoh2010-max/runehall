@@ -4,7 +4,7 @@
 **Scope:** PF2e Remastered play from session zero through level 20, compared with GM Core, Player Core, and the practical needs of a long-running table.  
 **Verification:** `npm run check`, `npm run smoke`, `npm run e2e`, and `npm run simulate:campaign`.
 
-> **Current status:** Runehall can run a full 1–20 campaign with a GM and roughly 4–10 players. The core loop — invite, party, builder, sheet, table, encounter, initiative, conditions, rest, loot, journal, sessions, downtime, travel, clocks, archive, and restore — is implemented and covered by tests. Free Archetype and Automatic Bonus Progression are supported as campaign variants; multiclass-archetype spellcasting remains manual.
+> **Current status:** Runehall can run a full 1-20 campaign with a GM and roughly 4-10 players. The core loop - invite, party, builder, sheet, table, encounter, initiative, conditions, rest, journal, archive, and restore - is implemented and covered by tests. Free Archetype and Automatic Bonus Progression are supported as campaign variants; multiclass-archetype spellcasting remains manual.
 
 ---
 
@@ -12,8 +12,8 @@
 
 Runehall is a complete **campaign table**, with a few deliberate boundaries:
 
-- **Ready:** accounts and invites, campaign membership, 1–20 character building, live sheets, server-rolled combat, HP/dying/wounded, conditions, afflictions, item activation, prepared/spontaneous/focus/innate casting, loot and shops, downtime, travel, sessions, safety tools, journal/handouts, victory-point clocks, export/import, backup/restore, and administrator moderation.
-- **GM-facing preparation:** encounters, waves, hazards-as-XP, custom hazards, NPCs, factions, merchants, scenes, chapter/arc scaffolding, optional tracked stock, and a live GM screen.
+- **Ready:** accounts and invites, campaign membership, 1-20 character building, live sheets, server-rolled combat, HP/dying/wounded, conditions, afflictions, item activation, prepared/spontaneous/focus/innate casting, journal/handouts, export/import, backup/restore, and administrator moderation.
+- **GM-facing preparation:** encounters, waves, hazards-as-XP, scenes, and the campaign journal.
 - **Manual by design:** optional variant rules, unusual feat/item effects, published-adventure conversion, hex-grid mapping, and long-running project bookkeeping.
 
 The rest of this document records what is verified and what remains manual, so a GM can decide before session zero.
@@ -25,8 +25,8 @@ The rest of this document records what is verified and what remains manual, so a
 | Check | Result |
 | --- | --- |
 | `npm run check` | Typecheck, lint, formatting, unit tests, production build, and bundle budget pass |
-| Unit tests | 822 passing |
-| `npm run e2e` | 36 passing browser scenarios |
+| Unit tests | 759 passing |
+| `npm run e2e` | 37 passing browser scenarios |
 | `npm run smoke` | End-to-end smoke suite passes |
 | `npm run simulate` | 2,337 characters, 145 class/level matrix builds, 578 option builds, 38 ancestries × 269 backgrounds; 0 problems |
 | `npm run simulate:feats` | 144,565 class/feat combinations checked; 39,166 accessible feats reflected on the sheet; 0 failures |
@@ -65,12 +65,8 @@ The campaign simulation exercises two complete 1-20 campaigns per run, one XP an
 
 ### Campaign play
 
-- Party requests with GM approval: level-up, downtime, and player-written journal entries. Nothing changes until the GM approves or denies it; players can withdraw pending requests.
-- Victory-point clocks with 1–12 segments, GM-only or player-visible clocks, optional player ticks, and live updates.
-- Downtime days, cost of living, Earn Income, Subsist, Craft/Retrain trackers, and server-charged upkeep.
-- Travel planning with PF2e pace, terrain, weather, four watches, exploration activities, a linear pointcrawl, per-day logs, encounter checks, and calendar advancement.
-- Sessions, attendance, check-ins, recap drafts, session zero/safety tools, private notes, shared knowledge, factions, NPCs, quests, handouts, and merchant stock.
-- Loot parcels, treasure-by-level audit, replacement wealth, shops, transfers, and campaign export/import.
+- Party requests with GM approval: level-up and player-written journal entries. Nothing changes until the GM approves or denies it; players can withdraw pending requests.
+- Session zero and safety tools, quests, handouts, and campaign export/import.
 - Golarion calendar with leap day and GM time controls.
 
 ### Operations and security
@@ -90,21 +86,17 @@ The campaign simulation exercises two complete 1-20 campaigns per run, one XP an
 | Stage | Support | Status |
 | --- | --- | --- |
 | Session zero | Shared charter, genre/tone, content limits, safety tools, private lines/veils, anonymous pause signal, allowed sources, party goal/hooks | Strong |
-| Scheduling | Sessions, check-ins, attendance, recurrence, .ics export, next-session date, live updates | Strong; no email/push reminders |
 | Onboarding | Registration/invites, join requests, Pathbuilder import, character assignment | Strong |
 | Character build | 1–20 builder, prerequisites, slots, runes, companions, budget, import, Free Archetype and ABP | Strong; uncommon effects remain manual |
-| Advancement | Milestone or XP, GM approval, player requests, catch-up, wealth top-up | Strong |
+| Advancement | Milestone or XP, GM approval, and player requests | Strong |
 | Combat | Budgets, waves, initiative, actions, conditions, typed damage, IWR, death/recovery, afflictions | Strong with manual edge cases |
-| Exploration | Travel pace, terrain, weather, watches, activities, linear pointcrawl, per-day log, encounter checks, calendar | Strong; no hex grid or automatic weather damage |
-| Social | NPCs, factions, attitude, reputation, secrets, public views, shops | Strong for a campaign ledger |
-| Downtime | Days, upkeep, Earn Income, Subsist, Craft/Retrain | Partial; rituals and full crafting costs manual |
-| Treasure | Parcels, audit, shops, tracked stock, transfers, wealth benchmarks, ABP option | Strong; ABP replaces fundamental rune math |
-| Campaign log | Journal, handouts, quests, recap, knowledge, private notes | Strong |
-| World clock | Golarion date, leap day, downtime, travel, sessions | Strong |
-| Table | Maps, fog, walls, lighting, tokens, chat, dice, music, clocks | Strong |
+| Treasure | Inventory, transfers, wealth benchmarks, ABP option | Strong; ABP replaces fundamental rune math |
+| Campaign log | Journal, handouts, and quests | Strong |
+| Calendar | Golarion date and leap day | Strong |
+| Table | Maps, fog, walls, lighting, tokens, chat, dice, music | Strong |
 | Archive/portability | JSON export/import, embedded assets, SQLite backup/restore, verified manifests | Strong |
 | Safety/access | GM/player views, private limits, anonymous signal, admin moderation | Strong; no third-party anonymous channel |
-| Adventure path | Arc chapters, level bands, encounters, treasure, NPCs, quests | Partial; no automated AP import |
+| Adventure path | Encounters, NPCs, and quests | Partial; no automated AP import |
 
 ---
 
@@ -129,8 +121,6 @@ These are optional campaign variants; the base Remastered rules do not require t
 
 ### Campaign depth
 
-- No hex-grid map, chase track, or automated foraging/tracking checks. A linear pointcrawl and per-day travel log are supported, and weather worsens encounter checks without applying automatic weather damage.
-- No email/push reminders, time-zone-specific scheduling, or third-party calendar sync. Recurring sessions and a downloadable .ics feed are supported.
 - No published-adventure importer, kingdom building, vehicles, mass combat, or automated companion advancement.
 - No third-party anonymous safety channel; the GM-only pause signal is the supported path.
 - Public hosting still needs TLS, a reverse proxy, off-machine backups, and the deployment checklist in `docs/DEPLOY.md`. Session revocation, moderation, invite limits, and backup atomicity are in place.
@@ -171,7 +161,6 @@ See [BACKUP.md](BACKUP.md), [DEPLOY.md](DEPLOY.md), and [FIRST-CAMPAIGN.md](FIRS
 - Encounter budgets: <https://2e.aonprd.com/Rules.aspx?ID=2716>
 - Treasure by level: <https://2e.aonprd.com/Rules.aspx?ID=2656>
 - Rest and daily preparations: <https://2e.aonprd.com/Rules.aspx?ID=2443>
-- Victory points/subsystems: <https://2e.aonprd.com/Rules.aspx?ID=3028>
 - Afflictions: <https://2e.aonprd.com/Rules.aspx?ID=2749>
 - Bulk and encumbrance: <https://2e.aonprd.com/Rules.aspx?ID=2581>
 - Automatic bonus progression: <https://2e.aonprd.com/Rules.aspx?ID=2741>

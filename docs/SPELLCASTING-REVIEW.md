@@ -260,7 +260,7 @@ Learn a Spell is implemented for spellbook, familiar, and dirge classes:
 - The picker shows the cost and DC for the selected spell before confirming.
 - Cost is 1 gp per rank for common spells, 2 gp for uncommon, 5 gp for rare, and 10 gp for unique; cantrips use rank-1 pricing.
 - The rank-based DC follows the Learn a Spell table.
-- Confirming deducts the gold and adds the spell to the character's known list. The check and downtime day remain manual; remove the spell if the check fails.
+- Confirming deducts the gold and adds the spell to the character's known list. The check remains manual; remove the spell if the check fails.
 - Starting-spellbook value, the two-free-spells-per-level budget, and a full spellbook/known split remain open.
 
 ## Sprint 21 implementation status (2026-11-26)
@@ -371,7 +371,7 @@ Legend: Yes = modeled and usable; Partial = some support with known gaps; No = n
 | Wizard curriculum | Partial | Extra slot and rank-1 validation; higher-rank curriculum lists remain manual |
 | Prepared cantrips | Yes | Daily prepared list, class caps, and the wizard curriculum extra |
 | Spell source presentation | Partial | Class-specific spellbook/familiar/dirge/spell-list/repertoire labels and starting-contents guidance; the full spellbook/known data split remains open |
-| Learn a Spell | Partial | Cost by rank/rarity, rank DC, gold deduction, known-list addition, and starting-contents guidance; the check, downtime day, and strict starting budget remain manual |
+| Learn a Spell | Partial | Cost by rank/rarity, rank DC, gold deduction, known-list addition, and starting-contents guidance; the check and strict starting budget remain manual |
 | Spontaneous repertoire limits | Yes | Bard, oracle, sorcerer, summoner, and psychic; rank copies count against each learned rank |
 | Spontaneous heightening by learned rank | Yes | Known ranks are tracked; signature spells heighten upward and non-signature spells can downcast from higher slots |
 | Signature spells | Yes | One per rank, level 3 gate, validation |
@@ -741,7 +741,7 @@ Tasks:
 
 4. **Spellbook and learning**
    - Add starting spellbook contents and two-spells-per-level accounting.
-   - Add Learn a Spell downtime cost and a way to add a found scroll to the book.
+   - Add a way to add a found scroll to the book.
 
 5. **Multiclass spellcasting**
    - Add a secondary caster profile for spellcasting dedication feats.

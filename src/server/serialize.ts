@@ -2,7 +2,6 @@ import type {
   AudioLibraryTrack,
   CampaignAudioState,
   CampaignAudioTrack,
-  CampaignDashboard,
   CampaignJoinRequest,
   CampaignMember,
   CampaignNpc,
@@ -11,9 +10,7 @@ import type {
   CampaignChapter,
   CampaignPlayerNote,
   CampaignRequest,
-  CampaignSession,
   CampaignSummary,
-  CampaignTravel,
   CampaignSessionZero,
   SafetyPreference,
   SafetyResponse,
@@ -23,7 +20,6 @@ import type {
   EncounterCombatant,
   InitiativeEntry,
   JournalEntry,
-  LootParcel,
   PathbuilderImportReport,
   RollRequest,
   RollResult,
@@ -34,7 +30,6 @@ import type {
 } from "../shared/types";
 import { normalizeCampaignRuleset, normalizeXpMode } from "../shared/content";
 import { normalizeAdvancementSpeed, normalizeXpAwardKind } from "../shared/xp";
-import { normalizeSettlementLevel, normalizeShopStockMode } from "../shared/shop";
 import { normalizeTokenTurnEffects } from "../shared/tokenTurnEffects";
 import { isAudioMood } from "../shared/audio";
 import {
@@ -43,28 +38,18 @@ import {
   normalizePartyVisionScope,
   normalizeTokenVisionMode,
 } from "../shared/lighting";
-import { normalizeLootItems } from "../shared/loot";
 import {
   normalizeJournalAttachments,
   normalizeJournalKind,
   normalizeQuestStatus,
   normalizeQuestXp,
 } from "../shared/journal";
-import { normalizeCampaignThreads } from "../shared/dashboard";
 import { normalizeWalls } from "../shared/walls";
 import { normalizeSceneProps } from "../shared/props";
 import { normalizeSceneDrawings } from "../shared/drawings";
 import {
-  isSessionCheckinStatus,
-  normalizeAttendanceStatus,
-  normalizeSessionAgenda,
-  normalizeSessionRecurrence,
-  normalizeSessionStatus,
-} from "../shared/sessions";
-import {
   db,
   type AudioLibraryTrackRow,
-  type CampaignDashboardRow,
   type AudioTrackRow,
   type CampaignNpcRow,
   type CampaignFactionRow,
@@ -73,18 +58,13 @@ import {
   type CampaignPlayerNoteRow,
   type CampaignRequestRow,
   type CampaignRow,
-  type CampaignSessionRow,
   type CampaignSessionZeroRow,
   type CampaignSafetyPreferenceRow,
-  type CampaignTravelRow,
   type CharacterRow,
   type EncounterCombatantRow,
   type EncounterRow,
   type JournalRow,
-  type LootParcelRow,
   type MessageRow,
-  type SessionAttendanceRow,
-  type SessionCheckinRow,
   type SceneRow,
   type TokenRow,
   type UserRow,
@@ -98,19 +78,6 @@ import { creatureAvatarUrl } from "../shared/creatureAvatar";
 import { normalizeTokenConditions } from "../shared/tokens";
 import { normalizeAoeTemplates } from "../shared/templates";
 import { normalizeGolarionDate } from "../shared/calendar";
-import {
-  normalizeTravelActivities,
-  normalizeTravelEncounterChecks,
-  normalizeTravelHistory,
-  normalizeTravelMiles,
-  normalizeTravelTerrain,
-  normalizeTravelWatches,
-  normalizeTravelWaypoints,
-  normalizeTravelWeather,
-  normalizeTravelSpeed,
-  travelMilesPerDay,
-  travelStatus,
-} from "../shared/travel";
 import { normalizeSessionZeroChecklist } from "../shared/sessionZero";
 import {
   normalizeHazardComplexity,
@@ -140,11 +107,9 @@ export function serializeCampaignSummary(
     ruleset: normalizeCampaignRuleset(campaign.ruleset),
     xpMode: normalizeXpMode(campaign.xp_mode),
     advancementSpeed: normalizeAdvancementSpeed(campaign.advancement_speed),
-    settlementLevel: normalizeSettlementLevel(campaign.settlement_level),
     freeArchetype: Boolean(campaign.free_archetype),
     automaticBonusProgression: Boolean(campaign.automatic_bonus_progression),
     playerItemGrant: Boolean(campaign.player_item_grant),
-    shopMode: normalizeShopStockMode(campaign.shop_mode),
     worldDate: normalizeGolarionDate({
       year: campaign.world_year,
       month: campaign.world_month,
@@ -157,42 +122,6 @@ export function serializeCampaignSummary(
     updatedAt: campaign.updated_at,
     lastPlayedAt: campaign.last_played_at,
   };
-}
-
-export function serializeCampaignTravel(
-  row: CampaignTravelRow,
-  characterIds: Set<string>,
-  privateView = false
-): CampaignTravel {
-  const distanceMiles = normalizeTravelMiles(row.distance_miles);
-  const progressMiles = Math.min(distanceMiles, normalizeTravelMiles(row.progress_miles));
-  const partySpeed = normalizeTravelSpeed(row.party_speed);
-  const terrain = normalizeTravelTerrain(row.terrain);
-  const travel: CampaignTravel = {
-    campaignId: row.campaign_id,
-    origin: row.origin,
-    destination: row.destination,
-    terrain,
-    distanceMiles,
-    progressMiles,
-    partySpeed,
-    weather: normalizeTravelWeather(row.weather),
-    notes: row.notes,
-    watches: normalizeTravelWatches(parseJson(row.watches, {}), characterIds),
-    activities: normalizeTravelActivities(parseJson(row.activities, {}), characterIds),
-    waypoints: normalizeTravelWaypoints(parseJson(row.waypoints, []))
-      .filter((waypoint) => privateView || waypoint.visible)
-      .map((waypoint) => ({ ...waypoint, reached: waypoint.miles <= progressMiles })),
-    history: normalizeTravelHistory(parseJson(row.history, [])),
-    daysTravelled: Math.max(0, Math.round(row.days_travelled)),
-    dailyMiles: travelMilesPerDay(partySpeed, terrain),
-    status: travelStatus(distanceMiles, progressMiles),
-    updatedAt: row.updated_at,
-  };
-  if (privateView) {
-    travel.encounterChecks = normalizeTravelEncounterChecks(parseJson(row.encounter_checks, []));
-  }
-  return travel;
 }
 
 export function serializeCampaignSessionZero(
@@ -366,13 +295,12 @@ export function serializeCharacter(
   const campaignRow = row.campaign_id
     ? (db
         .prepare(
-          "SELECT ruleset, advancement_speed, settlement_level, free_archetype, automatic_bonus_progression, player_item_grant FROM campaigns WHERE id = ?"
+          "SELECT ruleset, advancement_speed, free_archetype, automatic_bonus_progression, player_item_grant FROM campaigns WHERE id = ?"
         )
         .get(row.campaign_id) as
         | {
             ruleset: string;
             advancement_speed: string;
-            settlement_level: number;
             free_archetype: number;
             automatic_bonus_progression: number;
             player_item_grant: number;
@@ -383,9 +311,6 @@ export function serializeCharacter(
   const campaignAdvancementSpeed = campaignRow
     ? normalizeAdvancementSpeed(campaignRow.advancement_speed)
     : null;
-  const campaignSettlementLevel = campaignRow
-    ? normalizeSettlementLevel(campaignRow.settlement_level)
-    : null;
   return {
     id: row.id,
     userId: row.user_id,
@@ -395,7 +320,6 @@ export function serializeCharacter(
     summary: summary as CharacterRecord["summary"],
     campaignRuleset,
     campaignAdvancementSpeed,
-    campaignSettlementLevel,
     campaignFreeArchetype: campaignRow ? Boolean(campaignRow.free_archetype) : null,
     campaignAutomaticBonusProgression: campaignRow
       ? Boolean(campaignRow.automatic_bonus_progression)
@@ -561,51 +485,6 @@ export function serializeEncounter(row: EncounterRow): Encounter {
   };
 }
 
-export function serializeCampaignSession(
-  row: CampaignSessionRow,
-  members: { id: string; display_name: string; avatar_url: string | null }[],
-  attendanceRows: SessionAttendanceRow[],
-  checkinRows: SessionCheckinRow[],
-  role: "gm" | "player",
-  userId: string
-): CampaignSession {
-  const attendanceByUser = new Map(attendanceRows.map((entry) => [entry.user_id, entry]));
-  const checkinByUser = new Map(checkinRows.map((entry) => [entry.user_id, entry]));
-  const visibleMembers = role === "gm" ? members : members.filter((member) => member.id === userId);
-  return {
-    id: row.id,
-    campaignId: row.campaign_id,
-    title: row.title,
-    scheduledAt: row.scheduled_at,
-    durationMinutes: row.duration_minutes,
-    notes: role === "gm" ? row.notes : "",
-    agenda: role === "gm" ? normalizeSessionAgenda(parseJson(row.agenda, [])) : [],
-    status: normalizeSessionStatus(row.status),
-    recurrence: normalizeSessionRecurrence(row.recurrence),
-    attendance: visibleMembers.map((member) => {
-      const attendance = attendanceByUser.get(member.id);
-      return {
-        userId: member.id,
-        displayName: member.display_name,
-        avatarUrl: member.avatar_url,
-        status: normalizeAttendanceStatus(attendance?.status),
-        note: attendance?.note ?? "",
-      };
-    }),
-    checkins: members.map((member) => {
-      const checkin = checkinByUser.get(member.id);
-      return {
-        userId: member.id,
-        displayName: member.display_name,
-        avatarUrl: member.avatar_url,
-        status: isSessionCheckinStatus(checkin?.status) ? checkin.status : "unanswered",
-      };
-    }),
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  };
-}
-
 export function serializeCampaignNpc(row: CampaignNpcRow, privateView = true): CampaignNpc {
   const npc: CampaignNpc = {
     id: row.id,
@@ -703,43 +582,6 @@ export function serializeCampaignChapter(
   };
   if (privateView) chapter.gmNotes = row.gm_notes ?? "";
   return chapter;
-}
-
-export function serializeCampaignDashboard(
-  row: CampaignDashboardRow,
-  role: "gm" | "player"
-): CampaignDashboard {
-  const threads = normalizeCampaignThreads(parseJson(row.threads, []));
-  return {
-    campaignId: row.campaign_id,
-    lastSessionSummary: row.last_session_summary,
-    nextSessionAt: row.next_session_at,
-    nextSessionTeaser: row.next_session_teaser,
-    nextSessionNotes: role === "gm" ? row.next_session_notes : "",
-    threads: role === "gm" ? threads : threads.filter((thread) => thread.visible),
-    updatedAt: row.updated_at,
-  };
-}
-
-export function serializeLootParcel(row: LootParcelRow): LootParcel {
-  return {
-    id: row.id,
-    campaignId: row.campaign_id,
-    name: row.name,
-    description: row.description,
-    items: normalizeLootItems(parseJson(row.items, [])),
-    level: normalizeChapterLevel(row.level, 1),
-    gp: Math.max(0, row.gp),
-    sp: Math.max(0, row.sp),
-    cp: Math.max(0, row.cp),
-    status: row.status === "distributed" ? "distributed" : "open",
-    distributedTo: row.distributed_to,
-    distributedToName: row.distributed_to_name,
-    distributedAt: row.distributed_at,
-    sortOrder: row.sort_order,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  };
 }
 
 export function serializeXpAward(row: XpAwardRow): XpAward {

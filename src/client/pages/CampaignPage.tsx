@@ -612,7 +612,6 @@ export function CampaignPage() {
                 ruleset: result.campaign.ruleset,
                 xpMode: result.campaign.xpMode,
                 advancementSpeed: result.campaign.advancementSpeed,
-                settlementLevel: result.campaign.settlementLevel,
                 freeArchetype: result.campaign.freeArchetype,
                 automaticBonusProgression: result.campaign.automaticBonusProgression,
                 playerItemGrant: result.campaign.playerItemGrant,
@@ -949,7 +948,7 @@ export function CampaignPage() {
                   <PageEyebrow>Chronicle</PageEyebrow>
                   <h2 style={{ marginTop: 5 }}>Journal</h2>
                   <p className="tiny muted" style={{ marginTop: 4 }}>
-                    Session recaps, handouts, and quests.
+                    Shared notes, handouts, and quests.
                   </p>
                 </div>
                 <div className="row wrap" style={{ gap: 8 }}>

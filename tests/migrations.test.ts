@@ -89,13 +89,7 @@ describe("migrations", () => {
       .prepare("SELECT name FROM sqlite_master WHERE type = 'table'")
       .all() as { name: string }[];
     expect(tablesAfterAssets.map((table) => table.name)).toContain("uploaded_assets");
-    expect(tablesAfterAssets.map((table) => table.name)).toContain("session_checkins");
     expect(tablesAfterAssets.map((table) => table.name)).toContain("campaign_requests");
-    const sessionColumns = db.prepare("PRAGMA table_info(campaign_sessions)").all() as {
-      name: string;
-    }[];
-    expect(sessionColumns.map((column) => column.name)).toContain("agenda");
-    expect(sessionColumns.map((column) => column.name)).toContain("recurrence");
     const tokenColumns = db.prepare("PRAGMA table_info(tokens)").all() as {
       name: string;
     }[];
@@ -116,10 +110,10 @@ describe("migrations", () => {
       name: string;
     }[];
     expect(campaignColumns.map((column) => column.name)).toContain("advancement_speed");
-    expect(campaignColumns.map((column) => column.name)).toContain("settlement_level");
     expect(campaignColumns.map((column) => column.name)).toContain("free_archetype");
     expect(campaignColumns.map((column) => column.name)).toContain("automatic_bonus_progression");
-    expect(campaignColumns.map((column) => column.name)).toContain("shop_mode");
+    expect(campaignColumns.map((column) => column.name)).not.toContain("settlement_level");
+    expect(campaignColumns.map((column) => column.name)).not.toContain("shop_mode");
 
     const columns = db.prepare("PRAGMA table_info(users)").all() as { name: string }[];
     expect(columns.map((column) => column.name)).toContain("is_admin");
@@ -154,24 +148,27 @@ describe("migrations", () => {
         "audio_library_tracks",
         "xp_awards",
         "campaign_turn_marks",
-        "campaign_shop_stock",
-        "campaign_travel",
         "campaign_session_zero",
         "campaign_safety_preferences",
         "campaign_factions",
         "campaign_player_notes",
         "campaign_knowledge",
         "campaign_chapters",
-        "campaign_merchants",
       ])
     );
-
-    const travelColumns = db.prepare("PRAGMA table_info(campaign_travel)").all() as {
-      name: string;
-    }[];
-    expect(travelColumns.map((column) => column.name)).toContain("waypoints");
-    expect(travelColumns.map((column) => column.name)).toContain("encounter_checks");
-    expect(travelColumns.map((column) => column.name)).toContain("history");
+    expect(names).not.toEqual(
+      expect.arrayContaining([
+        "campaign_shop_stock",
+        "campaign_travel",
+        "campaign_merchants",
+        "loot_parcels",
+        "campaign_clocks",
+        "campaign_dashboard",
+        "campaign_sessions",
+        "session_attendance",
+        "session_checkins",
+      ])
+    );
 
     const sessionZeroColumns = db.prepare("PRAGMA table_info(campaign_session_zero)").all() as {
       name: string;
@@ -179,11 +176,6 @@ describe("migrations", () => {
     expect(sessionZeroColumns.map((column) => column.name)).toContain("allowed_sources");
     expect(sessionZeroColumns.map((column) => column.name)).toContain("party_goal");
     expect(sessionZeroColumns.map((column) => column.name)).toContain("party_hooks");
-
-    const lootColumns = db.prepare("PRAGMA table_info(loot_parcels)").all() as {
-      name: string;
-    }[];
-    expect(lootColumns.map((column) => column.name)).toContain("level");
 
     db.close();
   });

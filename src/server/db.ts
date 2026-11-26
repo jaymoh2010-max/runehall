@@ -138,11 +138,9 @@ export interface CampaignRow {
   ruleset: string;
   xp_mode: string;
   advancement_speed: string;
-  settlement_level: number;
   free_archetype: number;
   automatic_bonus_progression: number;
   player_item_grant: number;
-  shop_mode: string;
   world_year: number;
   world_month: number;
   world_day: number;
@@ -154,34 +152,6 @@ export interface CampaignRow {
   created_at: number;
   updated_at: number;
   last_played_at: number | null;
-}
-
-export interface CampaignShopStockRow {
-  campaign_id: string;
-  item_id: string;
-  quantity: number;
-  created_at: number;
-  updated_at: number;
-}
-
-export interface CampaignTravelRow {
-  campaign_id: string;
-  origin: string;
-  destination: string;
-  terrain: string;
-  distance_miles: number;
-  progress_miles: number;
-  party_speed: number;
-  weather: string;
-  notes: string;
-  watches: string;
-  activities: string;
-  waypoints: string;
-  encounter_checks: string;
-  history: string;
-  days_travelled: number;
-  created_at: number;
-  updated_at: number;
 }
 
 export interface CampaignSessionZeroRow {
@@ -363,20 +333,6 @@ export interface XpAwardRow {
   created_at: number;
 }
 
-export interface CampaignClockRow {
-  id: string;
-  campaign_id: string;
-  name: string;
-  description: string;
-  segments: number;
-  filled: number;
-  visible: number;
-  player_editable: number;
-  sort_order: number;
-  created_at: number;
-  updated_at: number;
-}
-
 export interface CampaignRequestRow {
   id: string;
   campaign_id: string;
@@ -419,35 +375,6 @@ export interface EncounterCombatantRow {
   wave: number;
   sort_order: number;
   created_at: number;
-  updated_at: number;
-}
-
-export interface CampaignSessionRow {
-  id: string;
-  campaign_id: string;
-  title: string;
-  scheduled_at: number;
-  duration_minutes: number;
-  notes: string;
-  agenda: string;
-  status: string;
-  recurrence: string;
-  created_at: number;
-  updated_at: number;
-}
-
-export interface SessionCheckinRow {
-  session_id: string;
-  user_id: string;
-  status: string;
-  updated_at: number;
-}
-
-export interface SessionAttendanceRow {
-  session_id: string;
-  user_id: string;
-  status: string;
-  note: string;
   updated_at: number;
 }
 
@@ -532,29 +459,6 @@ export interface CampaignChapterRow {
   updated_at: number;
 }
 
-export interface CampaignMerchantRow {
-  id: string;
-  campaign_id: string;
-  name: string;
-  description: string;
-  mode: string;
-  stock: string;
-  active: number;
-  sort_order: number;
-  created_at: number;
-  updated_at: number;
-}
-
-export interface CampaignDashboardRow {
-  campaign_id: string;
-  last_session_summary: string;
-  next_session_at: number | null;
-  next_session_teaser: string;
-  next_session_notes: string;
-  threads: string;
-  updated_at: number;
-}
-
 export interface UploadedAssetRow {
   id: string;
   filename: string;
@@ -564,25 +468,6 @@ export interface UploadedAssetRow {
   campaign_id: string | null;
   uploaded_by: string | null;
   created_at: number;
-}
-
-export interface LootParcelRow {
-  id: string;
-  campaign_id: string;
-  name: string;
-  description: string;
-  items: string;
-  level: number;
-  gp: number;
-  sp: number;
-  cp: number;
-  status: string;
-  distributed_to: string | null;
-  distributed_to_name: string | null;
-  distributed_at: number | null;
-  sort_order: number;
-  created_at: number;
-  updated_at: number;
 }
 
 export function transaction<T>(fn: () => T): T {

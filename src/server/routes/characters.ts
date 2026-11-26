@@ -55,8 +55,6 @@ import {
   stabilizeDc,
   type RecoveryActivity,
 } from "../../shared/recovery";
-import { lifestyleRate, upkeepCostCp } from "../../shared/upkeep";
-import { performDowntimeDay, type DowntimeActivityInput } from "../downtime";
 import { logAudit } from "../audit";
 import { newId, now, parseJson, safeInt, safeString, sanitizeUserText } from "../util";
 
@@ -73,7 +71,7 @@ function summarize(draft: CharacterDraft, campaignId: string | null = null): Cha
   return characterSummary(draft, contextForCampaign(campaignId, draft));
 }
 
-/** Downtime and long rests consume in-world days, not just character resources. */
+/** Long rests consume in-world days, not just character resources. */
 function advanceCampaignDate(app: FastifyInstance, campaignId: string, days: number): void {
   if (days <= 0) return;
   const campaign = getCampaign(campaignId);
@@ -394,11 +392,6 @@ export async function registerCharacterRoutes(app: FastifyInstance): Promise<voi
     }
     const existingDraft = parseDraft(parseJson(row.data, {}), row.name);
     const draft = parseDraft(body.data, row.name);
-    if (draft.play.downtimeDays < existingDraft.play.downtimeDays) {
-      return reply.code(400).send({
-        error: "Spend downtime days from the sheet's Downtime action so upkeep is paid.",
-      });
-    }
     if (draft.level !== existingDraft.level && !canAdvanceCharacter(row, request.user.id)) {
       return reply
         .code(403)
@@ -508,150 +501,6 @@ export async function registerCharacterRoutes(app: FastifyInstance): Promise<voi
       }),
       spent: result.spent,
       notes: result.notes,
-    });
-  });
-
-  app.post("/api/characters/:id/downtime/spend", async (request, reply) => {
-    if (!request.user) return reply.code(401).send({ error: "Sign in to continue." });
-    const { id } = request.params as { id: string };
-    const character = getCharacter(id);
-    if (!character) return reply.code(404).send({ error: "Character not found." });
-    if (!canEditCharacter(character, request.user.id)) {
-      return reply.code(403).send({ error: "You can't spend downtime for that character." });
-    }
-    let draft: CharacterDraft;
-    try {
-      draft = normalizeCharacterDraft(JSON.parse(character.data), character.name);
-    } catch {
-      return reply.code(400).send({ error: "That character's draft could not be read." });
-    }
-    const body = (request.body ?? {}) as Record<string, unknown>;
-    const rawActivity =
-      body.activity && typeof body.activity === "object" && !Array.isArray(body.activity)
-        ? (body.activity as Record<string, unknown>)
-        : null;
-    if (rawActivity) {
-      const input: DowntimeActivityInput = {
-        activityId: safeString(rawActivity.activityId, "", 80) || undefined,
-        kind: safeString(rawActivity.kind, "", 40) || undefined,
-        skill: safeString(rawActivity.skill, "", 120) || undefined,
-        taskLevel:
-          rawActivity.taskLevel === undefined
-            ? undefined
-            : safeInt(rawActivity.taskLevel, 0, 0, 20),
-        dc: rawActivity.dc === undefined ? undefined : safeInt(rawActivity.dc, 15, 1, 100),
-        label: safeString(rawActivity.label, "", 120) || undefined,
-        daysRequired:
-          rawActivity.daysRequired === undefined
-            ? undefined
-            : safeInt(rawActivity.daysRequired, 4, 1, 3650),
-        notes:
-          rawActivity.notes === undefined ? undefined : sanitizeUserText(rawActivity.notes, 4000),
-      };
-      const derived = computeCharacter(draft, contextForCharacter(character, draft));
-      const campaign = character.campaign_id ? getCampaign(character.campaign_id) : null;
-      const result = performDowntimeDay({
-        draft,
-        skills: derived.skills,
-        lore: derived.lore,
-        input,
-        settlementLevel: campaign?.settlement_level ?? 1,
-        now: now(),
-        id: newId("downtime"),
-      });
-      if ("error" in result) {
-        return reply.code(result.code).send({ error: result.error });
-      }
-      const rate = lifestyleRate(draft.play.lifestyle);
-      const summary = characterSummary(draft, contextForCharacter(character, draft));
-      db.prepare(
-        "UPDATE characters SET data = ?, summary = ?, updated_at = ?, revision = revision + 1 WHERE id = ?"
-      ).run(JSON.stringify(draft), JSON.stringify(summary), now(), character.id);
-      syncCharacterDraft(app, character, draft, summary);
-      if (character.campaign_id) {
-        touchCampaign(character.campaign_id);
-        advanceCampaignDate(app, character.campaign_id, 1);
-      }
-      const activity = result.activity;
-      logAudit({
-        action: "character.downtime_activity",
-        actor: request.user,
-        targetType: "character",
-        targetId: character.id,
-        detail: `${draft.name}: ${activity?.kind ?? "downtime"} day${
-          result.earnedCp ? `, earned ${result.earnedCp} cp` : ""
-        }${result.paidCp ? `, paid ${result.paidCp} cp upkeep` : ""}`,
-        request,
-      });
-      const updated = getCharacter(character.id)!;
-      const owner = getUser(updated.user_id);
-      return reply.send({
-        character: serializeCharacter(updated, owner?.display_name ?? "", {
-          canEdit: true,
-          canView: true,
-          canAdvance: canAdvanceCharacter(updated, request.user.id),
-        }),
-        days: 1,
-        paidCp: result.paidCp,
-        lifestyle: rate.id,
-        label: rate.label,
-        activity,
-        roll: result.roll,
-        degree: result.degree,
-        earnedCp: result.earnedCp,
-        upkeepWaived: result.upkeepWaived,
-        completed: result.completed,
-      });
-    }
-    const days = safeInt(body.days, 1, 1, 3650);
-    if (draft.play.downtimeDays < days) {
-      return reply.code(400).send({
-        error: `That character only has ${draft.play.downtimeDays} downtime day${
-          draft.play.downtimeDays === 1 ? "" : "s"
-        } left.`,
-      });
-    }
-    const rate = lifestyleRate(draft.play.lifestyle);
-    const paidCp = upkeepCostCp(rate.id, days);
-    const currency = spendCurrency(draft.currency, paidCp);
-    if (!currency) {
-      return reply.code(400).send({
-        error: `You need ${paidCp} cp for ${days} day${days === 1 ? "" : "s"} of ${rate.label.toLowerCase()} living, but your purse holds ${currencyToCp(draft.currency)} cp.`,
-      });
-    }
-    draft.currency = currency;
-    draft.play.downtimeDays -= days;
-    const summary = characterSummary(draft, contextForCharacter(character, draft));
-    db.prepare(
-      "UPDATE characters SET data = ?, summary = ?, updated_at = ?, revision = revision + 1 WHERE id = ?"
-    ).run(JSON.stringify(draft), JSON.stringify(summary), now(), character.id);
-    syncCharacterDraft(app, character, draft, summary);
-    if (character.campaign_id) {
-      touchCampaign(character.campaign_id);
-      advanceCampaignDate(app, character.campaign_id, days);
-    }
-    logAudit({
-      action: "character.downtime_spend",
-      actor: request.user,
-      targetType: "character",
-      targetId: character.id,
-      detail: `${draft.name}: spent ${days} downtime day${
-        days === 1 ? "" : "s"
-      } and ${paidCp} cp on ${rate.label.toLowerCase()} living`,
-      request,
-    });
-    const updated = getCharacter(character.id)!;
-    const owner = getUser(updated.user_id);
-    return reply.send({
-      character: serializeCharacter(updated, owner?.display_name ?? "", {
-        canEdit: true,
-        canView: true,
-        canAdvance: canAdvanceCharacter(updated, request.user.id),
-      }),
-      days,
-      paidCp,
-      lifestyle: rate.id,
-      label: rate.label,
     });
   });
 

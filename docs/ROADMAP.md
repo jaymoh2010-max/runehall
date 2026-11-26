@@ -18,7 +18,7 @@
 ### What is still prototype-level
 - **Rules automation is partial.** Feat prerequisites are enforced for mechanical requirements, while complex/story prerequisites are flagged for review; some subclass/feature/item effects are manual; companions and split-caster casting restrictions are not automated. This can make a sheet look correct while missing situational bonuses.
 - **Realtime recovery is revision-aware.** Reconnects refetch the authoritative table, campaign revisions detect missed events, character saves reject stale writes, and the table socket/state layer now lives in a tested hook with pure event reducers.
-- **Table polish is deep.** AoE templates, condition values/durations, multi-select, group drag, bulk actions, scene playlists, generated thumbnails, combat-log filters, group checks, delay/ready/ties, first-run setup, GM-drawn walls/doors, line-of-sight fog, per-token vision radii, light sources, normal/low-light/darkvision senses, shared/per-player vision, explored-area memory, ten categorized built-in battle maps, layered scene props, wall/closed-door movement collision, per-token light colors, cover/concealment readouts, shared freehand drawing tools with GM erase/clear controls, a Golarion calendar with per-character downtime, quest handouts with one-time XP rewards, and a campaign soundtrack are built. Sample-accurate audio sync and full dynamic shadow-casting remain future work.
+- **Table polish is deep.** AoE templates, condition values/durations, multi-select, group drag, bulk actions, scene playlists, generated thumbnails, combat-log filters, group checks, delay/ready/ties, first-run setup, GM-drawn walls/doors, line-of-sight fog, per-token vision radii, light sources, normal/low-light/darkvision senses, shared/per-player vision, explored-area memory, ten categorized built-in battle maps, layered scene props, wall/closed-door movement collision, per-token light colors, cover/concealment readouts, shared freehand drawing tools with GM erase/clear controls, a Golarion calendar, quest handouts with one-time XP rewards, and a campaign soundtrack are built. Sample-accurate audio sync and full dynamic shadow-casting remain future work.
 - **Content volume needs curation.** The builder exposes 540 backgrounds and 29 classes by default. That is impressive, but overwhelming; not every option has the same automation quality.
 - **Test coverage is unit + smoke + browser E2E + simulation.** Dice, rules math, compendium integrity, content tiers, security, and migrations are unit-tested; the GM/player campaign flow and registration/admin flows have an automated smoke test; Playwright covers registration, admin audit controls, campaign creation, the character builder and sheet, compendium routes, player-safe campaign access, and table interactions (token placement, chat, dice rolls, and the scenes manager). Upload edge cases (bad signatures, mismatched/unsupported types, empty files, oversized files and dimensions, foreign campaigns, and cleanup after rejection) are covered by the smoke test.
 - **Code health has guardrails.** Route-level splitting keeps the entry bundle near 107–122 KB gzip, and `npm run check` now covers types, lint (ESLint), formatting (Prettier), tests, build, and bundle budgets. The table state layer is tested; some large components remain.
@@ -197,7 +197,7 @@ The character builder is already good enough for a core campaign at low levels. 
    - Cleric domains cover Domain Initiate, Expanded Domain Initiate, and repeated Advanced Domain picks, including alternate domains and rank-4 advanced focus spells.
    - Oracle mystery domains cover Domain Acumen and Domain Fluency, limited to the domains associated with the chosen mystery.
    - Prepared casters use class-specific source labels: spellbook for wizard/magus, familiar for witch, dirge for necromancer, and spell list for cleric/druid/animist; spontaneous casters keep repertoire.
-   - Learn a Spell computes the rank/rarity gold cost and rank DC, deducts the gold, and adds the spell to a spellbook/familiar/dirge; spellbook classes also show starting-contents guidance and current counts, while the check, downtime day, and strict budget remain manual.
+   - Learn a Spell computes the rank/rarity gold cost and rank DC, deducts the gold, and adds the spell to a spellbook/familiar/dirge; spellbook classes also show starting-contents guidance and current counts, while the check and strict budget remain manual.
    - Fixed-tradition spellcasting dedications grant a separate dedication-cantrip list, ranked dedication spells, Basic/Expert/Master slot pools, and higher-slot heightening; sorcerer, witch, and summoner dedications ask for their tradition in the builder.
    - Sustained spells are recorded when cast, listed on the sheet, and can be ended; ritual rows open a detail card with cost, requirements, full text, and a primary-check skill override, then roll the chosen skill.
    - Magus studious slots scale at 7th/11th/13th level; the builder and daily preparations only allow Gecko Grip, Haste, Fly, and the chosen hybrid study's studious spells.
@@ -240,25 +240,12 @@ Then immediately add **guided level-up**: a dedicated “Level up” flow that e
 - [x] **GM party advancement**
   - **Level up party** on the Party tab advances every campaign character by one level and refreshes sheets and linked tokens.
   - Players finish their new feat, skill, and spell choices in the builder.
-- [x] **Loot parcels (core)**
-  - GM-only treasury with saved parcels, item rows, quantities, and coin totals.
-  - Equipment search respects the campaign ruleset and adds items from the compendium.
-  - **Give loot** merges equipment stacks into the chosen character, adds coins, recomputes the sheet, and refreshes linked tokens.
-  - Distributed parcels stay as a record and cannot be edited or handed out twice.
-  - Campaign export now includes loot parcels.
 - [x] **Handouts and journal attachments (core)**
   - Journal entries can be **entries** or **handouts**.
   - Attach up to 12 local images with a thumbnail gallery and a full-size preview.
   - Shared entries expose their images to players; GM-only handouts and their images stay hidden.
   - Journal filter for **All / Entries / Handouts**, visible to the whole table.
   - Campaign export includes journal kinds and attachments.
-- [x] **Campaign dashboard (core)**
-  - New **Overview** tab with last-session summary, next-session date, shared teaser, and GM-only notes.
-  - Party status cards show level, HP, AC, conditions, and a **Needs choices** count for unfinished builds.
-  - Clue/quest threads can be marked done, shared with players, or kept GM-only.
-  - Quick actions jump to the table, party, journal, encounters, or loot.
-  - Players receive a filtered read-only view; GM-only notes and threads never leave the server.
-  - Campaign export includes the dashboard.
 - [x] **Bestiary grouping (core)**
   - Bestiary tokens can be placed as a group of 1–20 with numbered names and shared group metadata.
   - Dragging any group member moves the whole formation.
@@ -272,16 +259,6 @@ Then immediately add **guided level-up**: a dedicated “Level up” flow that e
   - **Place token** creates a token on the active or chosen scene with the saved combat basics.
   - Hidden entries never reach players; visible NPCs are shared through the People tab, while hazards stay GM-only.
   - Remaining: import/duplicate an NPC from the bestiary in one step, and bundle compendium hazard presets.
-- [x] **Session scheduling and attendance**
-  - Shared **Sessions** tab with upcoming and past sessions, dates, duration, and status.
-  - GM can schedule, edit, delete, and mark sessions played.
-  - Sessions can repeat weekly, every two weeks, or monthly; marking one played schedules the next occurrence.
-  - Any member can download a player-safe .ics calendar feed; GM notes and the agenda are excluded.
-  - GM records attendance as attended, late, absent, excused, or unmarked.
-  - Players see the schedule and their own attendance only; GM notes stay hidden.
-  - The next scheduled session syncs to the Overview dashboard automatically.
-  - Campaign export includes sessions, attendance, and recurrence.
-  - Remaining: email/push reminders and time-zone-specific display.
 - [x] **GM screen**
   - Quick level-based DC reference with Easy/Normal/Hard/Very Hard/Incredibly Hard adjustments.
   - Simple DCs for Untrained through Legendary, clickable into the roll form.
@@ -290,9 +267,9 @@ Then immediately add **guided level-up**: a dedicated “Level up” flow that e
   - Live socket status and last secret-roll result.
 - [x] **Campaign import (core)**
   - Imports a `.runehall.json` export as a new campaign.
-  - Remaps campaign, scene, token, character, loot, encounter, and session IDs.
+  - Remaps campaign, scene, token, character, encounter, and message IDs.
   - Matches player accounts by username; unmatched character owners fall back to the importing GM.
-  - Imports characters, scenes, tokens, journal/handouts, encounters, loot, dashboard, NPCs, sessions, attendance, messages, and initiative state.
+  - Imports characters, scenes, tokens, journal/handouts, encounters, NPCs, messages, and initiative state.
   - Uploaded image files are not copied; use a full backup archive to move assets between machines.
 - [x] **Pathbuilder 2e character import**
   - The dashboard's Characters section accepts a pathbuilder2e.com JSON export.
@@ -422,39 +399,19 @@ Acceptance: a GM can prepare a full session in Runehall and start it with one �
 
 - [x] **Live sheet state and table rolls**
   - The open character sheet joins the campaign room and refreshes on `character:updated` when it has no unsaved edits.
-  - Party cards also consume live character summaries, so token damage, rests, loot, and level-ups do not require a reload.
+  - Party cards also consume live character summaries, so token damage, rests, and level-ups do not require a reload.
   - A target DC/AC field resolves PF2e degrees of success; a secret toggle keeps the roll GM-only.
   - Attacks expose second/third-attack MAP buttons (agile-adjusted) and a critical-damage shortcut.
   - Direct HP corrections apply dying/unconscious and wounded-on-recovery without silently consuming temporary HP.
   - Sheet, token editor, token panel, group actions, and unlinked monsters share one HP edit helper (damage, heal, or direct correction).
 - [x] **Starting wealth budget**
   - A fresh level-1 character’s 15 gp budget covers both equipment value and carried coins, with a one-click **Take remaining as coins** action.
-  - Pathbuilder, loot, and transfer characters are explicitly unbudgeted so play-history wealth does not trigger false creation warnings.
-- [x] **Treasure audit and replacement wealth**
-  - Loot parcels show compendium item value plus coins instead of a coin-only total.
-  - The Loot tab shows the GM Core treasure-by-level budget (total and coin portion) for the current party level, the value of open and distributed parcels, and each character’s committed wealth against the table 10-10 lump-sum benchmark.
-  - A GM can top up a replacement or catch-up character to the level benchmark with one action; only the difference is granted, and the result becomes play-history wealth.
-  - The audit is advisory: parcels are not tagged by level and the permanent/consumable item mix is not enforced.
-- [x] **Settlement shop**
-  - Campaigns store a settlement level that controls shop stock: common items of that level or lower, at full price.
-  - A Shop action on the character sheet opens buy and sell tabs with compendium search, quantity controls, and the character’s current purse.
-  - Sales pay half price for gear and magic items, full price for treasure, and include attached runes when the whole stack is sold.
-  - The server validates item level, rarity, quantity, price, ownership, and revision; players cannot shop for characters they do not control.
-  - The GM can switch to tracked merchant stock, curate finite quantities from the compendium (including uncommon or above-level items), and restock by editing quantities. Purchases decrement stock and sales add items back; open-market mode remains the default.
-  - Shopping is abstract rather than downtime-gated; automatic restock schedules and multiple merchants per settlement are not simulated.
+  - Pathbuilder and transfer characters are explicitly unbudgeted so play-history wealth does not trigger false creation warnings.
 - [x] **Session zero and safety**
   - A shared Session zero tab publishes the campaign pitch, genre, tone, themes, expectations, house rules, content limits, safety tools, and a GM checklist.
   - Each member can save private lines, veils, and notes. Anonymous responses hide the player's name from the GM's response list; private safety preferences are never included in campaign export.
   - The GM receives a live pause/X-card signal as a toast and GM-only chat card, without the player's identity attached.
   - No automated source checklist, party-hook questionnaire, or third-party anonymous channel yet.
-- [x] **Campaign travel planner**
-  - A Travel tab stores one journey per campaign: origin, destination, distance, terrain, party speed, weather metadata, notes, four watches, and per-character exploration activities.
-  - Daily mileage follows PF2e Travel Speed (Speed × 0.8), halved for difficult terrain and one-third for greater difficult terrain; the GM can override party speed.
-  - Advancing a travel day adds progress, increments the day count, and moves the Golarion calendar forward one day.
-  - Players see the route, progress, ETA, watches, and activities; only the GM can edit or advance the journey.
-  - A linear pointcrawl shows shared waypoints and the party marker; each elapsed day is recorded with mileage, terrain, weather, and Golarion date.
-  - Encounter checks roll against a terrain/weather threshold and keep a GM-only history.
-  - Remaining: hex-grid maps, chase tracks, and automatic weather damage.
 - [x] **Area templates**
   - Burst, emanation, cone, line, and square templates with size in feet.
   - Click-drag placement on the map, with a live preview and a size label.
@@ -556,18 +513,6 @@ Acceptance: a GM can prepare a full session in Runehall and start it with one �
   - Reinforcements roll initiative into the existing order while preserving the current round and active turn.
   - Launched tokens carry encounter provenance. A fresh launch replaces that encounter's earlier tokens on the scene, and **Clear launched** removes its tokens and initiative entries without touching linked or manual tokens.
   - Party-size presets offer Auto plus 3, 4, 5, and 6 characters.
-- [x] **Session recap draft**
-  - The GM can generate an editable recap from the selected time window.
-  - It draws on shared rolls, visible journal entries and handouts, loot parcels, the played session, and open shared threads.
-  - GM-only chat, hidden handouts, and GM-only threads are excluded.
-  - The draft can be saved as the dashboard session summary or as a shared handout.
-- [x] **Session agenda and check-in reminders**
-  - Each session can carry a GM-only agenda checklist with done state.
-  - Players and the GM can check in as in, maybe, or can't make it.
-  - Check-ins are shared with the table; GM notes and the agenda stay private.
-  - Scheduled sessions stay in **Upcoming & current** with check-ins available until the GM marks them played or canceled, showing **In progress** or **Overdue** as time passes.
-  - The Sessions calendar is the single source for the Overview's next-session date; session and dashboard changes broadcast to open tabs.
-  - The Overview shows a next-session check-in reminder and outstanding replies.
 - [x] **Reusable handouts**
   - The GM can duplicate any journal entry or handout in one click.
   - Duplicates preserve content, kind, visibility, and attachments.
@@ -593,15 +538,13 @@ Acceptance: a GM can prepare a full session in Runehall and start it with one �
   - A player can give an item stack or coins to another character in the same campaign.
   - Transfers are server-side, revision-checked, and applied to both sheets atomically.
   - Received items arrive unequipped; transferring a whole stack moves its runes.
-- [x] **In-world calendar and downtime**
+- [x] **In-world calendar**
   - Campaigns track a Golarion date in Absalom Reckoning with the standard month lengths and a leap day in Calistril every four years.
-  - The Overview shows the current in-world date; the GM can set it or advance it by 1 or 7 days.
+  - The GM can set the date or advance it by 1 or 7 days.
   - Calendar changes broadcast a role-safe campaign summary, so players viewing the campaign see the new date without switching tabs.
   - Partial calendar updates preserve omitted fields, and blank or non-numeric values are rejected.
-  - The GM grants per-character downtime days from the Party tab, and players spend them from the character sheet.
-  - Downtime is stored in character play data, so it is preserved by saves, duplication, export, and import; the date is preserved by campaign export/import.
-  - Downtime activities such as Earn Income and crafting remain manual table calls.
-  - Covered by calendar unit tests, a two-socket smoke check, and a browser date/downtime flow.
+  - The date is preserved by campaign export/import.
+  - Covered by calendar unit tests and a two-socket smoke check.
 - [x] **Campaign asset library**
   - Uploaded images are tracked with their campaign, original name, type, and size.
   - The GM-only Assets tab lists scene art, token art, portraits, NPC art, and handout images with usage labels.
@@ -610,7 +553,7 @@ Acceptance: a GM can prepare a full session in Runehall and start it with one �
   - The cleanup CLI remains available for orphaned legacy files.
 - [ ] Optional automatic XP only if it still matters after milestone play.
 
-**Acceptance:** prep a three-scene session with encounters, loot, handouts, and a recap in one flow.
+**Acceptance:** prep a three-scene session with encounters and handouts in one flow.
 
 ---
 
@@ -773,4 +716,4 @@ A campaign-level review compared Runehall against PF2e GM Core/Player Core progr
 
 - Full report: [CAMPAIGN-READINESS.md](CAMPAIGN-READINESS.md)
 - Repeatable simulation: `npm run simulate:campaign`
-- Next priority: hex-grid travel, AP scaffolding, and deeper rules automation.
+- Next priority: AP scaffolding and deeper rules automation.

@@ -13,12 +13,8 @@ const GLOBAL_TABLES = [
   "journal_entries",
   "messages",
   "campaign_npcs",
-  "loot_parcels",
   "encounters",
   "encounter_combatants",
-  "campaign_dashboard",
-  "campaign_sessions",
-  "session_attendance",
   "campaign_audio_tracks",
 ];
 const IMAGE_MIME: Record<string, string> = {
