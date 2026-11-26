@@ -16,7 +16,11 @@ export type CompendiumEntryKind =
   | "domain"
   | "condition"
   | "action"
-  | "monster";
+  | "monster"
+  | "hazard"
+  | "vehicle"
+  | "familiarAbility"
+  | "boonCurse";
 
 export const COMPENDIUM_KIND_ORDER: CompendiumEntryKind[] = [
   "feat",
@@ -32,6 +36,10 @@ export const COMPENDIUM_KIND_ORDER: CompendiumEntryKind[] = [
   "domain",
   "condition",
   "action",
+  "hazard",
+  "vehicle",
+  "familiarAbility",
+  "boonCurse",
 ];
 
 export const COMPENDIUM_KIND_LABELS: Record<CompendiumEntryKind, string> = {
@@ -48,6 +56,10 @@ export const COMPENDIUM_KIND_LABELS: Record<CompendiumEntryKind, string> = {
   condition: "Condition",
   action: "Action",
   monster: "Creature",
+  hazard: "Hazard",
+  vehicle: "Vehicle",
+  familiarAbility: "Familiar ability",
+  boonCurse: "Boon or curse",
 };
 
 export const COMPENDIUM_KIND_PLURALS: Record<CompendiumEntryKind, string> = {
@@ -64,6 +76,10 @@ export const COMPENDIUM_KIND_PLURALS: Record<CompendiumEntryKind, string> = {
   condition: "Conditions",
   action: "Actions",
   monster: "Creatures",
+  hazard: "Hazards",
+  vehicle: "Vehicles",
+  familiarAbility: "Familiar abilities",
+  boonCurse: "Boons & curses",
 };
 
 export interface CompendiumSearchItem {
@@ -101,6 +117,10 @@ const ID_PREFIXES: Record<string, CompendiumEntryKind> = {
   cond: "condition",
   act: "action",
   mon: "monster",
+  haz: "hazard",
+  veh: "vehicle",
+  fam: "familiarAbility",
+  boon: "boonCurse",
 };
 
 export function isCompendiumEntryKind(value: unknown): value is CompendiumEntryKind {

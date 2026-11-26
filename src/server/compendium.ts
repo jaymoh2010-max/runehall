@@ -16,6 +16,10 @@ import type {
   Heritage,
   Monster,
   Spell,
+  Hazard,
+  Vehicle,
+  FamiliarAbility,
+  BoonCurse,
 } from "../shared/types";
 import type { DomainEntry } from "../shared/domains";
 import { isCoreSource } from "../shared/content";
@@ -86,6 +90,10 @@ export const domains = readArray<DomainEntry>("domains.json");
 export const conditions = readArray<ConditionRef>("conditions.json");
 export const actions = readArray<ActionRef>("actions.json");
 export const monsters = readArray<Monster>("monsters.json");
+export const hazards = readArray<Hazard>("hazards.json");
+export const vehicles = readArray<Vehicle>("vehicles.json");
+export const familiarAbilities = readArray<FamiliarAbility>("familiarAbilities.json");
+export const boonsAndCurses = readArray<BoonCurse>("boonsAndCurses.json");
 
 const maps = {
   ancestry: new Map(ancestries.map((item) => [item.id, item])),
@@ -101,6 +109,10 @@ const maps = {
   condition: new Map(conditions.map((item) => [item.id, item])),
   action: new Map(actions.map((item) => [item.id, item])),
   monster: new Map(monsters.map((item) => [item.id, item])),
+  hazard: new Map(hazards.map((item) => [item.id, item])),
+  vehicle: new Map(vehicles.map((item) => [item.id, item])),
+  familiarAbility: new Map(familiarAbilities.map((item) => [item.id, item])),
+  boonCurse: new Map(boonsAndCurses.map((item) => [item.id, item])),
 };
 
 function normalizedSpellName(name: string): string {
@@ -373,6 +385,22 @@ export function searchActions(opts: SearchOptions) {
   return searchList(actions, opts);
 }
 
+export function searchHazards(opts: SearchOptions) {
+  return searchList(hazards, opts, (hazard) => hazard.level);
+}
+
+export function searchVehicles(opts: SearchOptions) {
+  return searchList(vehicles, opts, (vehicle) => vehicle.level);
+}
+
+export function searchFamiliarAbilities(opts: SearchOptions) {
+  return searchList(familiarAbilities, opts);
+}
+
+export function searchBoonsAndCurses(opts: SearchOptions) {
+  return searchList(boonsAndCurses, opts);
+}
+
 export function searchDeities(q?: string, limit = 80) {
   const filtered = deities.filter((deity) =>
     matchesText(`${deity.name} ${deity.traits.join(" ")} ${deity.source}`, q)
@@ -457,6 +485,10 @@ const searchCandidates: SearchCandidate[] = (() => {
   add(conditions, "condition", () => null);
   add(actions, "action", () => null);
   add(monsters, "monster", (item: Monster) => item.level);
+  add(hazards, "hazard", (item: Hazard) => item.level);
+  add(vehicles, "vehicle", (item: Vehicle) => item.level);
+  add(familiarAbilities, "familiarAbility", () => null);
+  add(boonsAndCurses, "boonCurse", () => null);
   return candidates;
 })();
 
@@ -740,4 +772,8 @@ export const compendiumCounts = {
   conditions: conditions.length,
   actions: actions.length,
   monsters: monsters.length,
+  hazards: hazards.length,
+  vehicles: vehicles.length,
+  familiarAbilities: familiarAbilities.length,
+  boonsAndCurses: boonsAndCurses.length,
 };

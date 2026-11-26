@@ -589,6 +589,81 @@ export interface Monster extends Publication {
   description: string;
 }
 
+export interface ReferenceAbility {
+  name: string;
+  type: string;
+  actions: string | number | null;
+  actionType: string | null;
+  traits: string[];
+  description: string;
+}
+
+export interface Hazard extends Publication {
+  id: string;
+  name: string;
+  type: "hazard";
+  level: number;
+  complexity: "simple" | "complex";
+  stealth: number | null;
+  ac: number | null;
+  hardness: number;
+  hp: number;
+  fortitude: number;
+  reflex: number;
+  will: number;
+  rarity: string;
+  traits: string[];
+  description: string;
+  disable: string;
+  reset: string;
+  routine: string;
+  abilities: ReferenceAbility[];
+}
+
+export interface Vehicle extends Publication {
+  id: string;
+  name: string;
+  type: "vehicle";
+  level: number;
+  priceGp: number;
+  ac: number;
+  hardness: number;
+  hp: number;
+  speed: string;
+  crew: string;
+  passengers: string;
+  pilotingCheck: string;
+  collisionDC: number;
+  collisionDamage: string;
+  size: string;
+  rarity: string;
+  traits: string[];
+  description: string;
+  immunities: { type: string }[];
+  abilities: ReferenceAbility[];
+}
+
+export interface FamiliarAbility extends Publication {
+  id: string;
+  name: string;
+  type: "familiarAbility";
+  rarity: string;
+  traits: string[];
+  description: string;
+}
+
+export interface BoonCurse extends Publication {
+  id: string;
+  name: string;
+  type: "boonCurse";
+  category: "boon" | "curse";
+  tier: string;
+  deity: string;
+  rarity: string;
+  traits: string[];
+  description: string;
+}
+
 export interface Compendium {
   ancestries: Ancestry[];
   heritages: Heritage[];
@@ -602,6 +677,10 @@ export interface Compendium {
   conditions: ConditionRef[];
   actions: ActionRef[];
   monsters: Monster[];
+  hazards: Hazard[];
+  vehicles: Vehicle[];
+  familiarAbilities: FamiliarAbility[];
+  boonsAndCurses: BoonCurse[];
 }
 
 // ---------------------------------------------------------------------------

@@ -11,6 +11,10 @@ import type {
   Heritage,
   Monster,
   Spell,
+  Hazard,
+  Vehicle,
+  FamiliarAbility,
+  BoonCurse,
 } from "../src/shared/types";
 import type { DomainEntry } from "../src/shared/domains";
 
@@ -33,6 +37,10 @@ const domains = read<DomainEntry>("domains.json");
 const monsters = read<Monster>("monsters.json");
 const classFeatures = read<{ name: string; description: string }>("classFeatures.json");
 const actions = read<{ name: string; description: string }>("actions.json");
+const hazards = read<Hazard>("hazards.json");
+const vehicles = read<Vehicle>("vehicles.json");
+const familiarAbilities = read<FamiliarAbility>("familiarAbilities.json");
+const boonsAndCurses = read<BoonCurse>("boonsAndCurses.json");
 
 const byName = <T extends { name: string }>(items: T[], name: string): T => {
   const found = items.find((item) => item.name === name);
@@ -53,6 +61,10 @@ describe("compendium data", () => {
       ["deities", deities],
       ["domains", domains],
       ["monsters", monsters],
+      ["hazards", hazards],
+      ["vehicles", vehicles],
+      ["familiarAbilities", familiarAbilities],
+      ["boonsAndCurses", boonsAndCurses],
     ];
     for (const [key, items] of files) {
       expect(manifest.count[key], `${key} manifest count`).toBe(items.length);
@@ -562,6 +574,25 @@ describe("compendium data", () => {
       perception: 7,
       reflex: 6,
       will: 5,
+    });
+  });
+
+  it("includes reference hazards, vehicles, familiars, and boons/curses", () => {
+    expect(byName(hazards, "Armageddon Orb")).toMatchObject({
+      level: 23,
+      complexity: "simple",
+    });
+    expect(byName(vehicles, "Airship")).toMatchObject({
+      level: 12,
+      ac: 28,
+      hp: 210,
+      priceGp: 6000,
+    });
+    expect(byName(familiarAbilities, "Absorb Familiar").description).toContain("mark");
+    expect(byName(boonsAndCurses, "Abadar - Major Boon")).toMatchObject({
+      category: "boon",
+      deity: "Abadar",
+      tier: "major",
     });
   });
 });

@@ -33,6 +33,10 @@ const files = [
   { key: "conditions", prefix: "cond", label: "Conditions" },
   { key: "actions", prefix: "act", label: "Actions" },
   { key: "monsters", prefix: "mon", label: "Creatures" },
+  { key: "hazards", prefix: "haz", label: "Hazards" },
+  { key: "vehicles", prefix: "veh", label: "Vehicles" },
+  { key: "familiarAbilities", prefix: "fam", label: "Familiar abilities" },
+  { key: "boonsAndCurses", prefix: "boon", label: "Boons & curses" },
 ];
 
 const errors = [];
@@ -219,6 +223,10 @@ requireFields("monsters", [
   "description",
   "source",
 ]);
+requireFields("hazards", ["name", "level", "complexity", "description", "source"]);
+requireFields("vehicles", ["name", "level", "priceGp", "ac", "hp", "source"]);
+requireFields("familiarAbilities", ["name", "description", "source"]);
+requireFields("boonsAndCurses", ["name", "category", "description", "source"]);
 
 // --- Cross references ------------------------------------------------------
 const ancestryNames = new Set((data.ancestries ?? []).map((item) => item.name.toLowerCase()));
@@ -468,6 +476,34 @@ for (const monster of data.monsters ?? []) {
       );
     }
   }
+}
+for (const hazard of data.hazards ?? []) {
+  if (!Number.isFinite(hazard.level) || hazard.level < -1 || hazard.level > 30) {
+    fail(`hazard ${hazard.name}: invalid level ${hazard.level}`);
+  }
+  if (!["simple", "complex"].includes(hazard.complexity)) {
+    fail(`hazard ${hazard.name}: invalid complexity ${hazard.complexity}`);
+  }
+  if (!Number.isFinite(hazard.hp) || hazard.hp < 0) fail(`hazard ${hazard.name}: invalid HP`);
+  if (!Number.isFinite(hazard.hardness) || hazard.hardness < 0) {
+    fail(`hazard ${hazard.name}: invalid hardness`);
+  }
+}
+for (const vehicle of data.vehicles ?? []) {
+  if (!Number.isFinite(vehicle.level) || vehicle.level < -1 || vehicle.level > 30) {
+    fail(`vehicle ${vehicle.name}: invalid level ${vehicle.level}`);
+  }
+  if (!Number.isFinite(vehicle.ac) || vehicle.ac <= 0) fail(`vehicle ${vehicle.name}: invalid AC`);
+  if (!Number.isFinite(vehicle.hp) || vehicle.hp <= 0) fail(`vehicle ${vehicle.name}: invalid HP`);
+  if (!Number.isFinite(vehicle.priceGp) || vehicle.priceGp < 0) {
+    fail(`vehicle ${vehicle.name}: invalid price`);
+  }
+}
+for (const boon of data.boonsAndCurses ?? []) {
+  if (!["boon", "curse"].includes(boon.category)) {
+    fail(`boon/curse ${boon.name}: invalid category ${boon.category}`);
+  }
+  if (!boon.deity) fail(`boon/curse ${boon.name}: missing deity`);
 }
 const attacksWithoutDamage = (data.monsters ?? []).flatMap((monster) =>
   (monster.attacks ?? [])

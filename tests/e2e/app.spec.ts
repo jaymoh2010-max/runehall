@@ -468,6 +468,41 @@ test("lazy library, compendium entry, rules, and account routes load", async ({ 
     .click();
   await expect(page.getByRole("heading", { name: "Frightened", level: 2 })).toBeVisible();
 
+  await page.getByRole("tab", { name: "Hazards" }).click();
+  await page.getByPlaceholder(/Search hazards/).fill("Hidden Pit");
+  await page
+    .getByRole("button", { name: /Hidden Pit/ })
+    .first()
+    .click();
+  await expect(page.getByRole("heading", { name: "Hidden Pit", level: 2 })).toBeVisible();
+
+  await page.getByRole("tab", { name: "Vehicles" }).click();
+  await page.getByPlaceholder(/Search vehicles/).fill("Airship");
+  await page
+    .getByRole("button", { name: /Airship/ })
+    .first()
+    .click();
+  await expect(page.getByRole("heading", { name: "Airship", level: 2 })).toBeVisible();
+  await expect(page.getByText("210", { exact: true })).toBeVisible();
+
+  await page.getByRole("tab", { name: "Familiars" }).click();
+  await page.getByPlaceholder(/Search familiars/).fill("Absorb Familiar");
+  await page
+    .getByRole("button", { name: /Absorb Familiar/ })
+    .first()
+    .click();
+  await expect(page.getByRole("heading", { name: "Absorb Familiar", level: 2 })).toBeVisible();
+
+  await page.getByRole("tab", { name: "Boons & Curses" }).click();
+  await page.getByPlaceholder(/Search boons/).fill("Achaekek - Major Boon");
+  await page
+    .getByRole("button", { name: /Achaekek - Major Boon/ })
+    .first()
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Achaekek - Major Boon", level: 2 })
+  ).toBeVisible();
+
   await page.goto("/rules");
   await expect(page.getByRole("heading", { name: "Rules at the table" })).toBeVisible();
   await page.getByRole("tab", { name: "Actions" }).click();

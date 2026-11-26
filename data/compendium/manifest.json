@@ -17,7 +17,11 @@
     "domains": 61,
     "conditions": 43,
     "actions": 592,
-    "monsters": 2384
+    "monsters": 2384,
+    "hazards": 53,
+    "vehicles": 100,
+    "familiarAbilities": 117,
+    "boonsAndCurses": 240
   },
   "remasterOnlyCount": {
     "ancestries": 38,
