@@ -856,6 +856,34 @@ async function runCampaignA(gm: Account, players: Account[]): Promise<void> {
     }
   });
 
+  await check(campaignName, "XP campaign advances to level 20 and enforces the cap", async () => {
+    for (let level = 3; level <= 20; level++) {
+      const leveled = await api(`/api/campaigns/${campaignId}/level-up`, {
+        method: "POST",
+        cookie: gm.cookie,
+        body: {},
+      });
+      assertEqual(leveled.payload.leveled, 4, `Party level-up to ${level}`);
+      assertEqual(leveled.payload.atMaxLevel, 0, `Unexpected max-level count at ${level}`);
+    }
+    const after = await getTable(campaignId, gm.cookie);
+    for (const hero of heroes) {
+      const summary = summaryFor(after, hero.id);
+      assertEqual(summary.level, 20, `${hero.name} level at cap`);
+      const token = (after.tokens as Json[]).find((entry) => entry.id === tokens.get(hero.id)?.id);
+      assert(token, `${hero.name} token missing at level 20`);
+      assertEqual(token.hpMax, summary.hp, `${hero.name} level-20 token max HP`);
+      assertEqual(token.ac, summary.ac, `${hero.name} level-20 token AC`);
+    }
+    const capped = await api(`/api/campaigns/${campaignId}/level-up`, {
+      method: "POST",
+      cookie: gm.cookie,
+      body: {},
+    });
+    assertEqual(capped.payload.leveled, 0, "Level 20 cap: no characters advanced");
+    assertEqual(capped.payload.atMaxLevel, 4, "Level 20 cap: party counted");
+  });
+
   await check(campaignName, "handouts and quest rewards respect player visibility", async () => {
     const shared = (
       await api(`/api/campaigns/${campaignId}/journal`, {
@@ -932,8 +960,8 @@ async function runCampaignA(gm: Account, players: Account[]): Promise<void> {
       assertEqual(payload.format, "runehall-campaign", "Export format");
       assertEqual(payload.characters.length, 4, "Export character count");
       assert(
-        (payload.characters as Json[]).every((character) => character.data.level === 2),
-        "Export did not preserve level 2"
+        (payload.characters as Json[]).every((character) => character.data.level === 20),
+        "Export did not preserve level 20"
       );
       assert((payload.scenes as Json[]).length >= 1, "Export did not include scenes");
       assert((payload.journal as Json[]).length >= 2, "Export did not include journal entries");
@@ -951,7 +979,7 @@ async function runCampaignA(gm: Account, players: Account[]): Promise<void> {
       const importedTable = await getTable(importedCampaign.id, gm.cookie);
       assertEqual(importedTable.characters.length, 4, "Imported table party size");
       assert(
-        (importedTable.characters as Json[]).every((character) => character.summary.level === 2),
+        (importedTable.characters as Json[]).every((character) => character.summary.level === 20),
         "Imported characters lost their level"
       );
       metric("campaignA.importedCampaignId", importedCampaign.id);
