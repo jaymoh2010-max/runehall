@@ -454,6 +454,8 @@ export function CharacterSheetView({
   const pendingDraftRef = useRef<CharacterDraft | null>(null);
   const saveWaitersRef = useRef<Array<(ok: boolean) => void>>([]);
   const conflictDraftRef = useRef<CharacterDraft | null>(null);
+  const conflictWasDetailsRef = useRef(false);
+  const detailsSaveInFlightRef = useRef(false);
   const forceSaveRef = useRef(false);
   const canEdit = Boolean(character?.permissions?.canEdit);
 
@@ -785,6 +787,7 @@ export function CharacterSheetView({
           : null;
       if (payload?.character) {
         conflictDraftRef.current = draftRef.current;
+        conflictWasDetailsRef.current = detailsSaveInFlightRef.current;
         pendingDraftRef.current = null;
         setSaveError("");
         setConflict(payload.character);
@@ -807,6 +810,7 @@ export function CharacterSheetView({
     if (!conflict) return;
     const server = conflict;
     conflictDraftRef.current = null;
+    conflictWasDetailsRef.current = false;
     pendingDraftRef.current = null;
     forceSaveRef.current = false;
     setConflict(null);
@@ -822,13 +826,16 @@ export function CharacterSheetView({
 
   const keepLocalVersion = async () => {
     const localDraft = conflictDraftRef.current ?? draftRef.current;
+    const detailsConflict = conflictWasDetailsRef.current;
     conflictDraftRef.current = null;
+    conflictWasDetailsRef.current = false;
     pendingDraftRef.current = null;
     setConflict(null);
     setSaveError("");
     if (!localDraft) return;
     forceSaveRef.current = true;
-    await persist(localDraft);
+    const saved = await persist(localDraft);
+    if (saved && detailsConflict) setDetailsDirty(false);
   };
 
   const retrySave = () => {
@@ -853,6 +860,7 @@ export function CharacterSheetView({
   const saveDetails = async () => {
     if (!canEdit || !draft) return;
     setDetailsSaving(true);
+    detailsSaveInFlightRef.current = true;
     try {
       const saved = await persist((currentDraft) => ({
         ...currentDraft,
@@ -872,6 +880,7 @@ export function CharacterSheetView({
       }));
       if (saved) setDetailsDirty(false);
     } finally {
+      detailsSaveInFlightRef.current = false;
       setDetailsSaving(false);
     }
   };
