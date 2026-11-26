@@ -514,7 +514,25 @@ function chooseSpells(
       context.spells[spell.id] = spell;
     }
     if (prepared && slotLimit) {
-      const preparedIds = known.slice(0, slotLimit).map((spell) => spell.id);
+      const curriculumIds = new Set(
+        classGrantSpells
+          .filter((spell) => spell.kind === "curriculum" && spell.rank === rank)
+          .map((spell) => spell.id)
+      );
+      const curriculum = known.find((spell) => curriculumIds.has(spell.id)) ?? null;
+      const ordered = curriculum
+        ? [curriculum, ...known.filter((spell) => spell.id !== curriculum.id)]
+        : known;
+      const maxNonCurriculum = curriculumIds.size ? Math.max(0, slotLimit - 1) : slotLimit;
+      const preparedIds: string[] = [];
+      let nonCurriculum = 0;
+      for (const spell of ordered) {
+        if (preparedIds.length >= slotLimit) break;
+        const isCurriculum = curriculumIds.has(spell.id);
+        if (!isCurriculum && nonCurriculum >= maxNonCurriculum) continue;
+        preparedIds.push(spell.id);
+        if (!isCurriculum) nonCurriculum += 1;
+      }
       if (preparedIds.length) {
         draft.spells.preparedByRank[String(rank)] = preparedIds;
         draft.spells.prepared.push(...preparedIds);
@@ -1082,14 +1100,31 @@ function advanceSpells(
         ...eligible.filter((id) => rankOf(id) === rank),
         ...eligible.filter((id) => rankOf(id) < rank),
       ];
+      const curriculumIds = new Set(
+        classGrantSpells
+          .filter((spell) => spell.kind === "curriculum" && spell.rank === rank)
+          .map((spell) => spell.id)
+      );
+      const curriculumPick = ordered.find((id) => curriculumIds.has(id)) ?? null;
+      const reordered = curriculumPick
+        ? [curriculumPick, ...ordered.filter((id) => id !== curriculumPick)]
+        : ordered;
+      const maxNonCurriculum = curriculumIds.size ? Math.max(0, slotLimit - 1) : slotLimit;
       const picks: string[] = [];
+      let nonCurriculum = 0;
       for (const id of previousByRank[String(rank)] ?? []) {
         if (picks.length >= slotLimit) break;
-        if (ordered.includes(id) && !picks.includes(id)) picks.push(id);
+        if (!reordered.includes(id) || picks.includes(id)) continue;
+        if (!curriculumIds.has(id) && nonCurriculum >= maxNonCurriculum) continue;
+        picks.push(id);
+        if (!curriculumIds.has(id)) nonCurriculum += 1;
       }
-      for (const id of ordered) {
+      for (const id of reordered) {
         if (picks.length >= slotLimit) break;
-        if (!picks.includes(id)) picks.push(id);
+        if (picks.includes(id)) continue;
+        if (!curriculumIds.has(id) && nonCurriculum >= maxNonCurriculum) continue;
+        picks.push(id);
+        if (!curriculumIds.has(id)) nonCurriculum += 1;
       }
       if (picks.length) byRank[String(rank)] = picks;
     }

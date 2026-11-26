@@ -3,6 +3,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { contextForDraft } from "../src/server/compendium";
 import { CLASS_GRANTS, selectedClassGrants } from "../src/shared/classGrants";
+import { activeGrantChoiceGroups, GRANT_CHOICE_KEYS } from "../src/shared/classGrantChoices";
 import {
   casterTraditionFor,
   computeCharacter,
@@ -84,7 +85,10 @@ describe("class-choice grants", () => {
         const spell = spells.find((entry) => entry.id === item.id);
         expect(spell, `${item.name} (${item.id})`).toBeTruthy();
         expect(spell!.name).toBe(item.name);
-        expect(spell!.rank).toBe(item.rank);
+        // A bloodline can grant a spell at a higher rank than its printed
+        // minimum (for example the Phoenix bloodline's 4th-rank Cleanse
+        // Affliction), so the granted slot rank is a floor, not an equality.
+        expect(spell!.rank, `${item.name} printed rank`).toBeLessThanOrEqual(item.rank);
         if (item.kind === "focus") expect(spell!.traits).toContain("focus");
       }
     }
@@ -314,6 +318,184 @@ describe("class-choice grants", () => {
     expect(
       derived.grantedSpells.filter((spell) => spell.id === "spell:4gBIw4IDrSfFHik4")
     ).toHaveLength(1);
+  });
+
+  it("grants higher-rank bloodline gifts as soon as their rank unlocks", () => {
+    const draft = draftFor(sorcerer);
+    chooseOption(draft, sorcerer, "cf:3qqvnC2U8W26yae7");
+    draft.level = 7;
+    const level7 = selectedClassGrants(draft, sorcerer).spells;
+    expect(level7).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: "Stupefy", rank: 2, kind: "repertoire" }),
+        expect.objectContaining({ name: "Vampiric Feast", rank: 3, kind: "repertoire" }),
+        expect.objectContaining({ name: "Confusion", rank: 4, kind: "repertoire" }),
+      ])
+    );
+    expect(level7.some((spell) => spell.name === "Slither")).toBe(false);
+
+    draft.level = 11;
+    const level11 = selectedClassGrants(draft, sorcerer).spells;
+    expect(level11).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: "Slither", rank: 5, kind: "repertoire" }),
+        expect.objectContaining({ name: "Never Mind", rank: 6, kind: "repertoire" }),
+      ])
+    );
+    expect(level11.some((spell) => spell.name === "Warp Mind")).toBe(false);
+  });
+
+  it("fills variable bloodline gifts from the element, genie, or draconic choice", () => {
+    const elemental = draftFor(sorcerer);
+    elemental.level = 11;
+    chooseOption(elemental, sorcerer, "cf:RXRnJcG4XSabZ35a");
+    elemental.grantChoices[GRANT_CHOICE_KEYS.sorcererElement] = ["fire"];
+    const elementalGrants = selectedClassGrants(elemental, sorcerer).spells;
+    expect(elementalGrants).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: "Breathe Fire", rank: 1 }),
+        expect.objectContaining({ name: "Fireball", rank: 3 }),
+        expect.objectContaining({ name: "Resist Energy", rank: 2 }),
+        expect.objectContaining({ name: "Tree of Seasons", rank: 6 }),
+      ])
+    );
+
+    const genie = draftFor(sorcerer);
+    genie.level = 15;
+    chooseOption(genie, sorcerer, "cf:tYOMBiH3HbViNWwn");
+    genie.grantChoices[GRANT_CHOICE_KEYS.sorcererGenie] = ["janni"];
+    const genieGrants = selectedClassGrants(genie, sorcerer).spells;
+    expect(genieGrants).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: "Create Food", rank: 2 }),
+        expect.objectContaining({ name: "Banishment", rank: 5 }),
+        expect.objectContaining({ name: "Confusing Colors", rank: 8 }),
+      ])
+    );
+
+    const draconic = draftFor(sorcerer);
+    draconic.level = 15;
+    chooseOption(draconic, sorcerer, "cf:ZHabYxSgYK0XbjhM");
+    draconic.grantChoices[GRANT_CHOICE_KEYS.sorcererDraconic] = ["occult"];
+    const draconicGrants = selectedClassGrants(draconic, sorcerer).spells;
+    expect(draconicGrants).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: "Blood Vendetta", rank: 2 }),
+        expect.objectContaining({ name: "Slither", rank: 5 }),
+        expect.objectContaining({ name: "Unrelenting Observation", rank: 8 }),
+      ])
+    );
+  });
+
+  it("grants advanced and greater bloodline spells when their feats are chosen", () => {
+    const draft = draftFor(sorcerer);
+    draft.level = 10;
+    chooseOption(draft, sorcerer, "cf:3qqvnC2U8W26yae7");
+    draft.feats.class["6"] = "feat:eZrftEihfuJBldG5";
+    draft.feats.class["10"] = "feat:DpRMdytpPiCypmkJ";
+    const groups = activeGrantChoiceGroups(draft, sorcerer);
+    const advanced = groups.find(
+      (group) => group.key === GRANT_CHOICE_KEYS.sorcererAdvancedBloodline
+    );
+    const greater = groups.find(
+      (group) => group.key === GRANT_CHOICE_KEYS.sorcererGreaterBloodline
+    );
+    expect(advanced?.options.map((option) => option.name)).toEqual(["Aberrant Whispers"]);
+    expect(greater?.options.map((option) => option.name)).toEqual(["Unusual Anatomy"]);
+    draft.grantChoices[GRANT_CHOICE_KEYS.sorcererAdvancedBloodline] = [
+      "advanced-bloodline:cf:3qqvnC2U8W26yae7",
+    ];
+    draft.grantChoices[GRANT_CHOICE_KEYS.sorcererGreaterBloodline] = [
+      "greater-bloodline:cf:3qqvnC2U8W26yae7",
+    ];
+    const derived = computeCharacter(draft, contextForDraft(draft));
+    expect(derived.grantedSpells).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: "Aberrant Whispers", kind: "focus" }),
+        expect.objectContaining({ name: "Unusual Anatomy", kind: "focus" }),
+      ])
+    );
+    expect(derived.focusPointsMax).toBe(3);
+  });
+
+  it("grants oracle mystery spells and advanced and greater revelations", () => {
+    const draft = draftFor(oracle);
+    draft.level = 12;
+    const mystery = oracle.choiceGroups.find((group) => group.tag === "oracle-mystery")!;
+    draft.classChoices[mystery.key] = ["cf:qvRlih3u7vK3FYUR"];
+    const grants = selectedClassGrants(draft, oracle).spells;
+    expect(grants).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: "Guidance", rank: 0, kind: "repertoire" }),
+        expect.objectContaining({ name: "Ill Omen", rank: 1, kind: "repertoire" }),
+        expect.objectContaining({ name: "Ghostly Carrier", rank: 2, kind: "repertoire" }),
+        expect.objectContaining({ name: "Dreaming Potential", rank: 5, kind: "repertoire" }),
+      ])
+    );
+
+    draft.feats.class["6"] = "feat:FPVe3o7YctBicSQa";
+    draft.feats.class["12"] = "feat:HSW3N9pfHhM7upRB";
+    const groups = activeGrantChoiceGroups(draft, oracle);
+    const advanced = groups.find(
+      (group) => group.key === GRANT_CHOICE_KEYS.oracleAdvancedRevelation
+    );
+    const greater = groups.find((group) => group.key === GRANT_CHOICE_KEYS.oracleGreaterRevelation);
+    expect(advanced?.options.map((option) => option.name)).toEqual(["Ancestral Defense"]);
+    expect(greater?.options.map((option) => option.name)).toEqual(["Ancestral Form"]);
+    draft.grantChoices[GRANT_CHOICE_KEYS.oracleAdvancedRevelation] = [
+      "advanced-revelation:cf:qvRlih3u7vK3FYUR",
+    ];
+    draft.grantChoices[GRANT_CHOICE_KEYS.oracleGreaterRevelation] = [
+      "greater-revelation:cf:qvRlih3u7vK3FYUR",
+    ];
+    const derived = computeCharacter(draft, contextForDraft(draft));
+    expect(derived.grantedSpells).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: "Ancestral Defense", kind: "focus" }),
+        expect.objectContaining({ name: "Ancestral Form", kind: "focus" }),
+      ])
+    );
+  });
+
+  it("grants higher-rank Wizard curriculum, Rooted Wisdom branches, and full sin spells", () => {
+    const battle = draftFor(wizard);
+    battle.level = 9;
+    chooseOption(battle, wizard, "cf:E4GZDMn4DYk6qSEV");
+    const battleGrants = selectedClassGrants(battle, wizard).spells;
+    expect(battleGrants).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: "Mist", rank: 2, kind: "curriculum" }),
+        expect.objectContaining({ name: "Fireball", rank: 3, kind: "curriculum" }),
+        expect.objectContaining({ name: "Howling Blizzard", rank: 5, kind: "curriculum" }),
+      ])
+    );
+    expect(battleGrants.some((spell) => spell.name === "Chain Lightning")).toBe(false);
+
+    const rooted = draftFor(wizard);
+    rooted.level = 9;
+    chooseOption(rooted, wizard, "cf:KGkWSv9rARpwWzXW");
+    rooted.grantChoices[GRANT_CHOICE_KEYS.wizardRootedBranch] = ["cf:4fmks2barqWlLtik"];
+    const rootedGrants = selectedClassGrants(rooted, wizard).spells;
+    expect(rootedGrants).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: "Telekinetic Projectile", rank: 0 }),
+        expect.objectContaining({ name: "Telekinetic Maneuver", rank: 2 }),
+        expect.objectContaining({ name: "Telekinetic Haul", rank: 5 }),
+      ])
+    );
+
+    const runelord = draftFor(wizard);
+    runelord.level = 9;
+    chooseOption(runelord, wizard, "cf:HYTaibaCGE85rhbZ");
+    runelord.grantChoices[GRANT_CHOICE_KEYS.runelordSin] = ["envy"];
+    const runelordGrants = selectedClassGrants(runelord, wizard).spells;
+    expect(runelordGrants).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: "Darkvision", rank: 2 }),
+        expect.objectContaining({ name: "Thief of Fortune", rank: 3 }),
+        expect.objectContaining({ name: "Banishment", rank: 5 }),
+      ])
+    );
   });
 
   it("grants fixed rank-0 and rank-1 Wizard school curriculum", () => {

@@ -189,13 +189,13 @@ The character builder is already good enough for a core campaign at low levels. 
    - Spell slot pips can be reset in one click; cleric divine font and wizard curriculum slots are shown in the slot totals.
    - Sorcerer and Oracle now use the correct level-1 three-slot spontaneous table.
    - A bloodline/patron/eidolon-derived tradition is required before ordinary spells can be added, class cantrip caps are shown, and Cleric non-font preparation produces an advisory warning.
-   - Fixed class-choice grants apply Druid order feats/focus spells, Bard muse feats/repertoire spells, Wizard school focus spells and thesis feats, Sorcerer bloodline focus spells, and Cleric doctrine feats.
+   - Fixed class-choice grants apply Druid order feats/focus spells, Bard muse feats/repertoire spells, Wizard school focus spells and thesis feats, Sorcerer bloodline focus spells, and Cleric doctrine feats. Higher-rank bloodline gifts, Sorcerer/Wizard advanced focus spells, Oracle mystery spells and revelations, full school curricula, Runelord sins, and Rooted Wisdom branches are granted automatically.
    - Spontaneous repertoire limits and prepared-slot validation are covered by shared tests.
    - Character sheets take a long rest, preview the reset, and open daily preparations; prepared casters choose ranked spells and prepared cantrips, with pending reminders in the sheet, builder, party rail, dashboard, and campaign party cards.
    - Focus-only classes get their own spell attack/DC, innate spells use a separate Charisma-based profile, and the sheet uses the correct source per spell row.
    - Class grants cover psychic conscious minds and psi cantrips, necromancer grave spells, summoner link spells, and cleric deity spells.
    - Cleric domains cover Domain Initiate, Expanded Domain Initiate, and repeated Advanced Domain picks, including alternate domains and rank-4 advanced focus spells.
-   - Oracle mystery domains cover Domain Acumen and Domain Fluency, limited to the domains associated with the chosen mystery.
+   - Oracle mysteries grant their listed granted spells, and Advanced/Greater Revelation grant their focus spells; Domain Acumen and Domain Fluency remain limited to the domains associated with the chosen mystery.
    - Prepared casters use class-specific source labels: spellbook for wizard/magus, familiar for witch, dirge for necromancer, and spell list for cleric/druid/animist; spontaneous casters keep repertoire.
    - Learn a Spell computes the rank/rarity gold cost and rank DC, deducts the gold, and adds the spell to a spellbook/familiar/dirge; spellbook classes also show starting-contents guidance and current counts, while the check, downtime day, and strict budget remain manual.
    - Fixed-tradition spellcasting dedications grant a separate dedication-cantrip list, ranked dedication spells, Basic/Expert/Master slot pools, and higher-slot heightening; sorcerer, witch, and summoner dedications ask for their tradition in the builder.
@@ -209,7 +209,7 @@ The character builder is already good enough for a core campaign at low levels. 
    - Generic Magic Wands expose a Cast wand action that filters by the wand's rank and records one daily use until a long rest; fixed-spell specific wands cast directly; flexible wands open the picker at their listed rank with the special effect left manual; Cyrusian wands filter to illusions.
    - Staves expose parsed spell lists and a manual charge pool, charge in daily preparations, spend charges by spell rank, can spend a spell slot instead of charges, and empty on a long rest; plain-text lists and referenced staff lists are covered, while fine-grained staff special effects remain manual.
    - Verified in-browser: a wizard with four rank-1 slots showed 4/4 prepared and disabled a fifth preparation; an animist cast Sure Strike from an apparition slot while the prepared rank-1 slot stayed full; a sorcerer learned Fireball at ranks 3 and 5, downcast it from a rank-4 slot, cast it from a rank-3 scroll that was consumed, cast it from a generic rank-3 wand that showed Used today, cast Lightning Bolt directly from a specific rank-3 wand, cast Grease from a flexible rank-1 wand, and charged and cast Heal from a Staff of Healing; a psychic amped Telekinetic Projectile and spent one focus point; a sustained Flaming Sphere produced a table reminder and ended cleanly.
-   - Remaining: later domain feats, devotion spells, variable bloodline gifts, curriculum variants, structured ritual source data, and a full spellbook/known split with enforced starting budgets.
+   - Remaining: later domain feats, devotion spell variants, structured ritual source data, and a full spellbook/known split with enforced starting budgets.
 
 7. **Companions and print (manual roster complete)**
    - Animal companions, familiars, eidolons, and summons can be recorded with name, kind, level, HP, AC, and attack notes.
@@ -399,8 +399,8 @@ Acceptance: a GM can prepare a full session in Runehall and start it with one â€
   - Prepared casters label their spell lists as **spellbook** and show prepared counts; spontaneous casters use **repertoire**.
   - The sheet shows the same separation and labels.
   - Heal, Harm, and Force Barrage expose 1/2/3-action formulas and rolls, including rank-scaled 2-action healing and Force Barrage's +2 shard heightening.
-  - Dual-font deities now require an explicit Heal or Harm choice, and the rank-1 Wizard extra slot is restricted to curriculum spells.
-  - Remaining: curate higher-rank Wizard curriculum lists and fully separate spellbook from known lists for every prepared class.
+  - Dual-font deities now require an explicit Heal or Harm choice, and the Wizard extra slot is restricted to curriculum spells at every rank.
+  - Remaining: fully separate spellbook from known lists for every prepared class and enforce the starting budget.
 - [x] **Companion support (first pass)**
   - Companions can link to a bestiary entry, which prefills name, level, HP, AC, and attack notes.
   - Linked statblocks show saves, perception, attacks, and abilities in the builder and sheet.
