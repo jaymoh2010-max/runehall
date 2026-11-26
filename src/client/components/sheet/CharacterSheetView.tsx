@@ -40,9 +40,11 @@ import {
   normalizeCharacterDraft,
   preparedCantripIds,
   signed,
+  spellSourceLabel,
   titleCase,
 } from "../../../shared/rules";
-import { currencyToCp } from "../../../shared/inventory";
+import { currencyToCp, spendCurrency } from "../../../shared/inventory";
+import { learnSpellCostCp, learnSpellDc } from "../../../shared/spellLearning";
 import {
   flexibleWandRank,
   scrollSpellRank,
@@ -421,6 +423,7 @@ export function CharacterSheetView({
   } | null>(null);
   const [staffCharge, setStaffCharge] = useState<Equipment | null>(null);
   const [ritualView, setRitualView] = useState<Spell | null>(null);
+  const [learnOpen, setLearnOpen] = useState(false);
   const characterRef = useRef<CharacterRecord | null>(null);
   const loadedCharacterIdRef = useRef<string | null>(null);
   const draftRef = useRef<CharacterDraft | null>(null);
@@ -1369,6 +1372,40 @@ export function CharacterSheetView({
     });
   };
 
+  const learnSpell = async (spell: Spell) => {
+    if (!canEdit) return;
+    setLearnOpen(false);
+    const current = draftRef.current;
+    if (!current) return;
+    const cost = learnSpellCostCp(spell);
+    const currency = spendCurrency(current.currency, cost);
+    if (!currency) {
+      toast(
+        `Learning ${spell.name} costs ${formatCp(cost)}; the character does not have enough.`,
+        "error"
+      );
+      return;
+    }
+    const saved = await persist((currentDraft) => ({
+      ...currentDraft,
+      currency,
+      spells: {
+        ...currentDraft.spells,
+        known: currentDraft.spells.known.includes(spell.id)
+          ? currentDraft.spells.known
+          : [...currentDraft.spells.known, spell.id],
+      },
+    }));
+    if (!saved) return;
+    setContext((current) =>
+      current ? { ...current, spells: { ...current.spells, [spell.id]: spell } } : current
+    );
+    toast(
+      `Learned ${spell.name} for ${formatCp(cost)}. Attempt the DC ${learnSpellDc(spell.rank)} check with your GM; remove it if the check fails.`,
+      "success"
+    );
+  };
+
   const takeLongRest = async (result: LongRestResult) => {
     const saved = await persist(result.draft);
     if (!saved) return;
@@ -1417,6 +1454,7 @@ export function CharacterSheetView({
 
   const classData = context.classData ?? null;
   const preparedCaster = isPreparedCasterClass(classData?.name);
+  const canLearnSpells = ["spellbook", "familiar", "dirge"].includes(spellSourceLabel(classData));
   const preparationsPending = preparedCaster && draft.spells.preparationsPending;
   const spellProfileFor = (group: string): { attack: number | null; dc: number | null } => {
     if (group === "Focus") {
@@ -2576,6 +2614,21 @@ export function CharacterSheetView({
                     ) : null}
                   </div>
                 ) : null}
+                {canLearnSpells && canEdit ? (
+                  <div className="row-between pb-prep-actions">
+                    <span className="tiny muted">
+                      Downtime: learn a spell from a scroll, teacher, or another{" "}
+                      {spellSourceLabel(classData)}.
+                    </span>
+                    <button
+                      type="button"
+                      className="pb-small-button"
+                      onClick={() => setLearnOpen(true)}
+                    >
+                      <BookOpen size={12} /> Learn spell
+                    </button>
+                  </div>
+                ) : null}
                 {draft.play.sustainedSpells.length ? (
                   <div className="pb-sustain-list" data-testid="sustained-spells">
                     <span className="tiny muted">Sustained</span>
@@ -3544,6 +3597,26 @@ export function CharacterSheetView({
           </Field>
         </div>
       </Modal>
+      {learnOpen ? (
+        <SpellPicker
+          open
+          onClose={() => setLearnOpen(false)}
+          rank={null}
+          maxRank={derived.maxSpellRank}
+          tradition={derived.casterTradition}
+          classTrait={context.classData?.name.toLowerCase()}
+          expanded={draft.contentMode === "expanded"}
+          onExpandedChange={() => undefined}
+          contentModeLocked
+          legacyDefault={draft.includeLegacy}
+          legacyLocked
+          excludeIds={[...draft.spells.known, ...derived.grantedSpells.map((spell) => spell.id)]}
+          confirmLabelFor={(spell) =>
+            `Learn for ${formatCp(learnSpellCostCp(spell))} · DC ${learnSpellDc(spell.rank)}`
+          }
+          onSelect={(spell) => void learnSpell(spell)}
+        />
+      ) : null}
       {itemCast ? (
         <SpellPicker
           open

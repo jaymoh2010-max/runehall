@@ -493,6 +493,7 @@ export function SpellPicker({
   excludeIds,
   requiredTrait,
   confirmLabel,
+  confirmLabelFor,
   onSelect,
 }: PickerBase & {
   rank: number | null;
@@ -511,6 +512,8 @@ export function SpellPicker({
   /** Restrict results to spells carrying this trait (for example, illusion). */
   requiredTrait?: string;
   confirmLabel?: string;
+  /** Dynamic confirmation label, used for costs that depend on the spell. */
+  confirmLabelFor?: (spell: Spell) => string;
   onSelect: (spell: Spell) => void;
 }) {
   const [query, setQuery] = useState("");
@@ -769,7 +772,7 @@ export function SpellPicker({
                     onClose();
                   }}
                 >
-                  {confirmLabel ?? `Learn ${selected.name}`}
+                  {confirmLabelFor?.(selected) ?? confirmLabel ?? `Learn ${selected.name}`}
                 </Button>
               </div>
             </>
