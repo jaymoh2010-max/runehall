@@ -1963,6 +1963,10 @@ test("builder completes a level-1 Wizard using granted curriculum spells", async
   await expect(rankOne.getByText("Mystic Armor", { exact: true })).toBeVisible();
   await expect(rankOne.getByText("Breathe Fire", { exact: true })).toBeVisible();
 
+  await expect(page.getByTestId("spellbook-budget")).toContainText(
+    /Free picks: 0 \/ 10 cantrips, 0 \/ 5 ranked spells/
+  );
+
   // A granted curriculum spell cannot be added again from the picker.
   await rankOne.getByRole("button", { name: "Add rank 1 spell to spellbook" }).click();
   await page.getByPlaceholder(/Search spells/).fill("Force Barrage");

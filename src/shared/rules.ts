@@ -612,6 +612,123 @@ export function cantripPreparedLimitFor(classData: ClassData | null | undefined)
   return PREPARED_CANTRIP_LIMITS[name] ?? null;
 }
 
+export interface SpellbookBudget {
+  startingCantrips: number;
+  startingRanked: number;
+  perLevel: number;
+  cantrips: number;
+  ranked: number;
+}
+
+export interface SpellbookUsage {
+  budget: SpellbookBudget;
+  freeCantrips: number;
+  freeRanked: number;
+  learnedCantrips: number;
+  learnedRanked: number;
+  grantedCantrips: number;
+  grantedRanked: number;
+  overCantrips: number;
+  overRanked: number;
+}
+
+const SPELLBOOK_START: Record<string, { cantrips: number; ranked: number }> = {
+  wizard: { cantrips: 10, ranked: 5 },
+  magus: { cantrips: 8, ranked: 5 },
+  witch: { cantrips: 10, ranked: 5 },
+  necromancer: { cantrips: 8, ranked: 5 },
+};
+
+/** The free starting spellbook/familiar/dirge budget for book casters. */
+export function spellbookBudgetFor(
+  classData: ClassData | null | undefined,
+  level: number
+): SpellbookBudget | null {
+  const name = classData?.name.toLowerCase() ?? "";
+  const start = SPELLBOOK_START[name];
+  if (!start) return null;
+  const perLevel = 2;
+  const ranked = start.ranked + Math.max(0, Math.floor(level) - 1) * perLevel;
+  return {
+    startingCantrips: start.cantrips,
+    startingRanked: start.ranked,
+    perLevel,
+    cantrips: start.cantrips,
+    ranked,
+  };
+}
+
+/**
+ * Compare the character's manually chosen book contents with the free
+ * starting/level-up budget. Granted spells and paid Learn a Spell additions
+ * are excluded from the free count.
+ */
+export function spellbookUsage(
+  draft: CharacterDraft,
+  classData: ClassData | null | undefined,
+  spellMap: Record<string, Spell>,
+  deity?: Pick<Deity, "domains" | "alternateDomains" | "font"> | null
+): SpellbookUsage | null {
+  const budget = spellbookBudgetFor(classData, draft.level);
+  if (!budget) return null;
+  const granted = selectedClassGrants(draft, classData, deity as Deity | null | undefined).spells;
+  const grantedIds = new Set(granted.map((spell) => spell.id));
+  const studious = studiousSlotInfoFor(draft, classData)?.spells ?? [];
+  for (const spell of studious) {
+    grantedIds.add(spell.id);
+  }
+  const grantedCantrips = [
+    ...new Set(
+      granted
+        .filter((spell) => spell.rank === 0 && spell.kind !== "focusCantrip")
+        .map((spell) => spell.id)
+    ),
+  ].length;
+  const grantedRanked = [
+    ...new Set([
+      ...granted
+        .filter((spell) => spell.rank > 0 && spell.kind !== "focus")
+        .map((spell) => spell.id),
+      ...studious.map((spell) => spell.id),
+    ]),
+  ].length;
+  const learned = new Set(draft.spells.learned ?? []);
+  const idsByKind = (ids: Iterable<string>) => {
+    let cantrips = 0;
+    let ranked = 0;
+    let learnedCantrips = 0;
+    let learnedRanked = 0;
+    for (const id of new Set(ids)) {
+      const spell = spellMap[id];
+      if (!spell) continue;
+      const rank = Number(spell.rank ?? 0);
+      if (rank <= 0) {
+        if (!grantedIds.has(id)) {
+          if (learned.has(id)) learnedCantrips += 1;
+          else cantrips += 1;
+        }
+      } else if (!grantedIds.has(id)) {
+        if (learned.has(id)) learnedRanked += 1;
+        else ranked += 1;
+      }
+    }
+    return { cantrips, ranked, learnedCantrips, learnedRanked };
+  };
+  const cantripCounts = idsByKind(draft.spells.cantrips);
+  const rankedCounts = idsByKind(draft.spells.known);
+  return {
+    budget,
+    freeCantrips: cantripCounts.cantrips,
+    freeRanked: rankedCounts.ranked,
+    learnedCantrips: cantripCounts.learnedCantrips,
+    learnedRanked: rankedCounts.learnedRanked,
+    grantedCantrips,
+    grantedRanked,
+    overCantrips: Math.max(0, cantripCounts.cantrips - budget.cantrips),
+    overRanked: Math.max(0, rankedCounts.ranked - budget.ranked),
+  };
+}
+
 type CantripContext = Pick<CharacterContext, "spells" | "deity" | "classData">;
 
 /**
@@ -1559,6 +1676,7 @@ export function emptyCharacterDraft(name = "New Hero"): CharacterDraft {
       tradition: null,
       cantrips: [],
       known: [],
+      learned: [],
       knownRanks: {},
       prepared: [],
       preparedByRank: {},
@@ -1837,6 +1955,13 @@ export function normalizeCharacterDraft(input: unknown, fallbackName = "New Hero
         : null,
       cantrips: arr<string>(spells.cantrips).filter((x) => typeof x === "string"),
       known: arr<string>(spells.known).filter((x) => typeof x === "string"),
+      learned: [
+        ...new Set(
+          arr<string>(spells.learned).filter(
+            (x) => typeof x === "string" && arr<string>(spells.known).includes(x)
+          )
+        ),
+      ].slice(0, 200),
       knownRanks: Object.fromEntries(
         Object.entries(obj(spells.knownRanks))
           .filter(([, value]) => Array.isArray(value))
@@ -4245,12 +4370,30 @@ export function computeCharacter(
     const baseCantripCount = draft.spells.cantrips.filter(
       (spellId) => !grantedKnownSpellIds.has(spellId)
     ).length;
-    if (cantripLimit !== null && baseCantripCount > cantripLimit) {
+    const bookUsage = spellbookUsage(draft, classData, context.spells, context.deity);
+    if (cantripLimit !== null && baseCantripCount > cantripLimit && !bookUsage) {
       issue(
         "warning",
         `${classData?.name ?? "This class"} has ${baseCantripCount} cantrips selected; the level-${draft.level} limit is ${cantripLimit}.`,
         "spells"
       );
+    }
+    if (bookUsage) {
+      const source = spellSourceLabel(classData);
+      if (bookUsage.overCantrips > 0) {
+        issue(
+          "warning",
+          `${classData?.name ?? "This class"} free ${source} cantrips: ${bookUsage.freeCantrips} selected, but the starting budget is ${bookUsage.budget.cantrips}. Paid Learn a Spell additions are excluded.`,
+          "spells"
+        );
+      }
+      if (bookUsage.overRanked > 0) {
+        issue(
+          "warning",
+          `${classData?.name ?? "This class"} free ${source} spells: ${bookUsage.freeRanked} selected, but the level-${draft.level} budget is ${bookUsage.budget.ranked} (${bookUsage.budget.startingRanked} starting + ${bookUsage.budget.perLevel} per level). Paid Learn a Spell additions are excluded.`,
+          "spells"
+        );
+      }
     }
     const preparedCantripLimit = cantripPreparedLimitFor(classData);
     const preparedCantrips = draft.spells.preparedCantrips;
