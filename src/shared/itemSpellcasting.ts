@@ -106,6 +106,47 @@ export interface StaffSpell {
 }
 
 const STAFF_LIST_ITEM = /<li>\s*(?:<p>)?\s*<strong>([^<]+)<\/strong>([\s\S]*?)<\/li>/gi;
+const STAFF_RANK_LABEL = /\b(Cantrips?|\d+(?:st|nd|rd|th))\b\s+/gi;
+
+const STAFF_SPELL_FALLBACKS: Record<string, StaffSpell[]> = {
+  "bounty's light": [
+    { name: "Ignition", rank: 0 },
+    { name: "Breathe Fire", rank: 1 },
+    { name: "Breathe Fire", rank: 2 },
+    { name: "Floating Flame", rank: 2 },
+    { name: "Floating Flame", rank: 3 },
+    { name: "Fireball", rank: 3 },
+  ],
+};
+
+function cleanStaffSpellName(rawName: string): string {
+  return rawName
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;|&#160;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/\s+/g, " ")
+    .replace(/\s*\([^)]*\)\s*$/, "")
+    .trim();
+}
+
+function plainStaffSpells(text: string): StaffSpell[] {
+  const start = text.search(/\bCantrips?\b\s+[A-Z]/i);
+  if (start < 0) return [];
+  const segment = text.slice(start).split(/Craft Requirements/i)[0];
+  const matches = [...segment.matchAll(STAFF_RANK_LABEL)];
+  const spells: StaffSpell[] = [];
+  for (let index = 0; index < matches.length; index += 1) {
+    const rank = staffRank(matches[index][1]);
+    if (rank === null) continue;
+    const contentStart = (matches[index].index ?? 0) + matches[index][0].length;
+    const contentEnd = matches[index + 1]?.index ?? segment.length;
+    for (const rawName of segment.slice(contentStart, contentEnd).split(/,|\s+or\s+/i)) {
+      const name = cleanStaffSpellName(rawName);
+      if (name) spells.push({ name, rank });
+    }
+  }
+  return spells;
+}
 
 function staffRank(label: string): number | null {
   const value = label.trim();
@@ -118,26 +159,32 @@ function staffRank(label: string): number | null {
 
 /** Spells listed in a staff's activation block, grouped by their staff rank. */
 export function staffSpells(
-  item: Pick<Equipment, "traits" | "description"> | null | undefined
+  item: Pick<Equipment, "name" | "traits" | "description"> | null | undefined
 ): StaffSpell[] {
   if (!item?.traits?.includes("staff")) return [];
   const text = String(item.description ?? "");
   const seen = new Set<string>();
   const spells: StaffSpell[] = [];
+  const add = (name: string, rank: number) => {
+    const key = `${rank}:${name.toLowerCase()}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    spells.push({ name, rank });
+  };
   for (const match of text.matchAll(STAFF_LIST_ITEM)) {
     const rank = staffRank(match[1]);
     if (rank === null) continue;
     for (const rawName of match[2].split(/,|\s+or\s+/i)) {
-      const name = rawName
-        .replace(/<[^>]+>/g, " ")
-        .replace(/&nbsp;|&#160;/gi, " ")
-        .replace(/\s+/g, " ")
-        .trim();
-      if (!name) continue;
-      const key = `${rank}:${name.toLowerCase()}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      spells.push({ name, rank });
+      const name = cleanStaffSpellName(rawName);
+      if (name) add(name, rank);
+    }
+  }
+  if (!spells.length) {
+    for (const spell of plainStaffSpells(plainText(text))) add(spell.name, spell.rank);
+  }
+  if (!spells.length) {
+    for (const spell of STAFF_SPELL_FALLBACKS[item.name.toLowerCase()] ?? []) {
+      add(spell.name, spell.rank);
     }
   }
   return spells;

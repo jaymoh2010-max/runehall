@@ -184,11 +184,33 @@ describe("staff spell lists", () => {
     ]);
   });
 
-  it("returns no list for non-staff items or staves without embedded spells", () => {
+  it("reads plain-text staff lists and referenced staff lists", () => {
+    const sverenagati = equipment.find((entry) => entry.name === "Staff of Sverenagati")!;
+    const spells = staffSpells(sverenagati);
+    expect(spells).toEqual(
+      expect.arrayContaining([
+        { name: "Puff of Poison", rank: 0 },
+        { name: "Animal Allies", rank: 1 },
+        { name: "Spider Sting", rank: 1 },
+        { name: "Enthrall", rank: 3 },
+        { name: "Hypnotize", rank: 3 },
+      ])
+    );
+
+    const bounty = equipment.find((entry) => entry.name === "Bounty's Light")!;
+    expect(staffSpells(bounty)).toEqual([
+      { name: "Ignition", rank: 0 },
+      { name: "Breathe Fire", rank: 1 },
+      { name: "Breathe Fire", rank: 2 },
+      { name: "Floating Flame", rank: 2 },
+      { name: "Floating Flame", rank: 3 },
+      { name: "Fireball", rank: 3 },
+    ]);
+  });
+
+  it("returns no list for non-staff items", () => {
     const sword = equipment.find((entry) => entry.name === "Longsword")!;
     expect(staffSpells(sword)).toEqual([]);
-    const listless = equipment.find((entry) => entry.name === "Bounty's Light")!;
-    expect(staffSpells(listless)).toEqual([]);
     expect(staffSpells(null)).toEqual([]);
   });
 });
