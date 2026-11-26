@@ -980,6 +980,8 @@ export interface CharacterDraft {
     tradition: SpellTradition | null;
     cantrips: string[];
     known: string[];
+    /** Spell IDs added with the paid Learn a Spell activity. */
+    learned: string[];
     /**
      * Ranks at which each spontaneous spell is known, keyed by spell id.
      * Missing entries fall back to the spell's printed rank.

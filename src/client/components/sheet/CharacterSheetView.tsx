@@ -1577,6 +1577,9 @@ export function CharacterSheetView({
         known: currentDraft.spells.known.includes(spell.id)
           ? currentDraft.spells.known
           : [...currentDraft.spells.known, spell.id],
+        learned: currentDraft.spells.known.includes(spell.id)
+          ? currentDraft.spells.learned
+          : [...(currentDraft.spells.learned ?? []), spell.id],
       },
     }));
     if (!saved) return;

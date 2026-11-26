@@ -100,6 +100,7 @@ import {
   skillRankCap,
   spellRepertoireLimits,
   spellSlotsFor,
+  spellbookUsage,
   spellSourceLabel,
   startingWealthCp,
   titleCase,
@@ -251,6 +252,7 @@ export function SpellsStep({ draft, update, derived, context, setStep, openPicke
   const bookRankedCount = draft.spells.known.filter(
     (id) => (context.spells[id]?.rank ?? 0) > 0
   ).length;
+  const bookUsage = spellbookUsage(draft, classData, context.spells, context.deity);
   const cantripContext = { spells: context.spells, deity: context.deity, classData };
   const preparedCantripList = preparedCantripIds(draft, cantripContext);
   const preparedCantripSet = new Set(preparedCantripList);
@@ -329,6 +331,10 @@ export function SpellsStep({ draft, update, derived, context, setStep, openPicke
         spells: {
           ...cleared.spells,
           knownRanks,
+          learned:
+            target === "known"
+              ? cleared.spells.learned.filter((spellId) => spellId !== id)
+              : cleared.spells.learned,
           [target]: cleared.spells[target].filter((s) => s !== id),
         },
       };
@@ -1134,6 +1140,24 @@ export function SpellsStep({ draft, update, derived, context, setStep, openPicke
                 {draft.spells.cantrips.length === 1 ? "" : "s"} · {bookRankedCount} ranked spell
                 {bookRankedCount === 1 ? "" : "s"}.
               </p>
+              {bookUsage ? (
+                <p className="tiny muted" data-testid="spellbook-budget">
+                  Free picks: {bookUsage.freeCantrips} / {bookUsage.budget.cantrips} cantrips,{" "}
+                  {bookUsage.freeRanked} / {bookUsage.budget.ranked} ranked spells. Paid additions:{" "}
+                  {bookUsage.learnedCantrips + bookUsage.learnedRanked}. Granted extras:{" "}
+                  {bookUsage.grantedCantrips + bookUsage.grantedRanked}.
+                </p>
+              ) : null}
+              {bookUsage && (bookUsage.overCantrips > 0 || bookUsage.overRanked > 0) ? (
+                <p className="tiny" style={{ color: "var(--danger, #d66)" }}>
+                  {bookUsage.overCantrips > 0
+                    ? `${bookUsage.overCantrips} cantrip${bookUsage.overCantrips === 1 ? "" : "s"} over the starting budget. `
+                    : ""}
+                  {bookUsage.overRanked > 0
+                    ? `${bookUsage.overRanked} ranked spell${bookUsage.overRanked === 1 ? "" : "s"} over the free level-up budget.`
+                    : ""}
+                </p>
+              ) : null}
             </Card>
           ) : null}
 
