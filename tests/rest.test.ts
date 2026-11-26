@@ -186,7 +186,7 @@ describe("PF2e long rest", () => {
     ];
     const result = applyLongRest(draft, derived);
     expect(result.draft.play.hp).toBe(10);
-    expect(result.draft.play.conditions).toEqual([]);
+    expect(result.draft.play.conditions).toEqual([{ name: "Wounded", value: 1, duration: null }]);
     expect(result.summary.removedConditions).toEqual(["Dying", "Unconscious"]);
   });
 

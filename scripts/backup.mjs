@@ -60,10 +60,50 @@ try {
   source.close();
 }
 
+const stagedUploads = path.join(staging, "uploads");
 if (fs.existsSync(uploadsDir)) {
-  fs.cpSync(uploadsDir, path.join(staging, "uploads"), { recursive: true });
+  fs.cpSync(uploadsDir, stagedUploads, { recursive: true });
 } else {
-  fs.mkdirSync(path.join(staging, "uploads"), { recursive: true });
+  fs.mkdirSync(stagedUploads, { recursive: true });
+}
+
+// A backup must not contain a database row that points at an upload the copy
+// missed. The snapshot and file copy are separate operations; this check
+// catches an asset deleted between them (or pre-existing orphan rows).
+try {
+  const snapshot = new DatabaseSync(snapshotPath, { readOnly: true });
+  const referenced = new Set();
+  try {
+    const tables = snapshot
+      .prepare("SELECT name FROM sqlite_master WHERE type = 'table'")
+      .all()
+      .map((row) => String(Object.values(row)[0]));
+    for (const table of tables) {
+      for (const row of snapshot.prepare(`SELECT * FROM "${table}"`).all()) {
+        for (const match of JSON.stringify(row).matchAll(/\/uploads\/([A-Za-z0-9._-]+)/g)) {
+          referenced.add(match[1]);
+        }
+      }
+    }
+  } finally {
+    snapshot.close();
+  }
+  const missing = [...referenced].filter(
+    (filename) => !fs.existsSync(path.join(stagedUploads, filename))
+  );
+  if (missing.length) {
+    console.warn(
+      `WARNING: ${missing.length} referenced upload(s) are missing from this backup: ${missing
+        .slice(0, 8)
+        .join(", ")}${missing.length > 8 ? ", …" : ""}`
+    );
+  }
+} catch (error) {
+  console.warn(
+    `WARNING: could not verify backup upload references: ${
+      error instanceof Error ? error.message : String(error)
+    }`
+  );
 }
 
 // The compendium is required for the server to start and for the builder to

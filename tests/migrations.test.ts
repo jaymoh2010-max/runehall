@@ -34,7 +34,7 @@ describe("migrations", () => {
     const versions = migrations.map((migration) => migration.version);
     expect(versions).toEqual([...versions].sort((a, b) => a - b));
     expect(new Set(versions).size).toBe(versions.length);
-    expect(versions[0]).toBe(1);
+    expect(versions).toEqual(Array.from({ length: versions.length }, (_, index) => index + 1));
   });
 
   it("upgrades an existing v10 database and promotes the oldest account to admin", () => {

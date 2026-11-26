@@ -487,6 +487,19 @@ if (fs.existsSync(databasePath)) {
     if (new Set(versions).size !== versions.length) {
       fail("SQLite schema_migrations contains duplicate versions");
     }
+    try {
+      const source = fs.readFileSync(path.join(root, "src", "server", "migrations.ts"), "utf8");
+      const known = [...source.matchAll(/version:\s*(\d+)/g)].map((match) => Number(match[1]));
+      const latest = known.length ? Math.max(...known) : 0;
+      const appliedLatest = versions.length ? Math.max(...versions) : 0;
+      if (latest > appliedLatest) {
+        warn(
+          `Database has ${latest - appliedLatest} pending migration(s): applied ${appliedLatest}, code ${latest}. The server applies them on next start.`
+        );
+      }
+    } catch {
+      // Missing source only affects this advisory check.
+    }
     const counts = {};
     for (const table of [
       "users",

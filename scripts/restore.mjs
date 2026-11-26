@@ -29,6 +29,14 @@ const databasePath = process.env.DATABASE_PATH
 const uploadsDir = path.join(dataDir, "uploads");
 const compendiumDir = path.resolve(process.env.COMPENDIUM_DIR || path.join(dataDir, "compendium"));
 const port = Number(process.env.PORT || 3001);
+const configuredHost = process.env.HOST || "127.0.0.1";
+const probeHosts = [
+  ...new Set([
+    configuredHost === "0.0.0.0" || configuredHost === "::" ? "127.0.0.1" : configuredHost,
+    "127.0.0.1",
+    "::1",
+  ]),
+];
 
 if (!fromArg) {
   console.error("Usage: npm run restore -- --from <backup-directory> --yes");
@@ -36,8 +44,19 @@ if (!fromArg) {
 }
 const backupDir = path.resolve(fromArg);
 const backupDb = path.join(backupDir, "runehall.db");
+const backupUploads = path.join(backupDir, "uploads");
+const backupCompendium = path.join(backupDir, "compendium");
 if (!fs.existsSync(backupDb)) {
   console.error(`No runehall.db found in ${backupDir}`);
+  process.exit(1);
+}
+if (
+  path.resolve(backupDir) === path.resolve(dataDir) ||
+  path.resolve(backupDb) === path.resolve(databasePath) ||
+  path.resolve(backupUploads) === path.resolve(uploadsDir) ||
+  path.resolve(backupCompendium) === path.resolve(compendiumDir)
+) {
+  console.error("Refusing to restore a backup that overlaps the live data directory.");
   process.exit(1);
 }
 if (!assumeYes) {
@@ -65,15 +84,55 @@ if (!manifest) {
     process.exit(1);
   }
   if (verification.legacy) {
+    if (!allowUnverified) {
+      console.error(
+        "This is a legacy backup without per-file checksums; add --allow-unverified to restore it."
+      );
+      process.exit(1);
+    }
     console.warn("WARNING: this is a legacy backup without per-file checksums.");
   } else {
+    const hasDatabase = manifest.files?.some(
+      (file) => path.normalize(String(file?.path ?? "")) === "runehall.db"
+    );
+    if (!hasDatabase) {
+      console.error("The backup manifest does not include runehall.db.");
+      process.exit(1);
+    }
     console.log(`Verified ${verification.checked} files against the backup manifest.`);
   }
 }
 
-function portIsOpen() {
+function verifyDatabase(file) {
+  const database = new DatabaseSync(file, { readOnly: true });
+  try {
+    const integrity = database
+      .prepare("PRAGMA integrity_check")
+      .all()
+      .map((row) => Object.values(row)[0]);
+    if (!integrity.every((value) => value === "ok")) {
+      throw new Error(`SQLite integrity check failed: ${integrity.join(", ")}`);
+    }
+    const foreignKeys = database.prepare("PRAGMA foreign_key_check").all();
+    if (foreignKeys.length) {
+      throw new Error(`SQLite foreign key check found ${foreignKeys.length} issue(s)`);
+    }
+  } finally {
+    database.close();
+  }
+}
+
+try {
+  verifyDatabase(backupDb);
+} catch (error) {
+  console.error(`Backup database check failed: ${error instanceof Error ? error.message : error}`);
+  console.error("Nothing was changed.");
+  process.exit(1);
+}
+
+function portIsOpen(host) {
   return new Promise((resolve) => {
-    const socket = net.createConnection({ host: "127.0.0.1", port, timeout: 600 });
+    const socket = net.createConnection({ host, port, timeout: 600 });
     socket.once("connect", () => {
       socket.destroy();
       resolve(true);
@@ -86,9 +145,10 @@ function portIsOpen() {
   });
 }
 
-if (await portIsOpen()) {
+for (const host of probeHosts) {
+  if (!(await portIsOpen(host))) continue;
   console.error(
-    `Runehall appears to be running on port ${port}. Stop the server before restoring.`
+    `Runehall appears to be running on ${host}:${port}. Stop the server before restoring.`
   );
   process.exit(1);
 }
@@ -122,14 +182,12 @@ for (const suffix of ["", "-wal", "-shm"]) {
 fs.mkdirSync(path.dirname(databasePath), { recursive: true });
 fs.copyFileSync(backupDb, databasePath);
 
-const backupUploads = path.join(backupDir, "uploads");
 if (fs.existsSync(uploadsDir)) fs.rmSync(uploadsDir, { recursive: true, force: true });
 fs.mkdirSync(uploadsDir, { recursive: true });
 if (fs.existsSync(backupUploads)) {
   fs.cpSync(backupUploads, uploadsDir, { recursive: true });
 }
 
-const backupCompendium = path.join(backupDir, "compendium");
 let restoredCompendium = false;
 if (fs.existsSync(backupCompendium)) {
   if (fs.existsSync(compendiumDir)) fs.rmSync(compendiumDir, { recursive: true, force: true });

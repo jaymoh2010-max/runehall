@@ -71,6 +71,14 @@ export function registerSecurity(app: FastifyInstance): void {
     max: integerEnv(env, "UPLOAD_RATE_LIMIT_MAX", 60, 1, 10_000),
     windowMs: integerEnv(env, "UPLOAD_RATE_LIMIT_WINDOW_MS", 10 * 60_000, 1_000, 86_400_000),
   });
+  const passwordLimiter = createRateLimiter({
+    max: integerEnv(env, "PASSWORD_RATE_LIMIT_MAX", 10, 1, 10_000),
+    windowMs: integerEnv(env, "PASSWORD_RATE_LIMIT_WINDOW_MS", 5 * 60_000, 1_000, 86_400_000),
+  });
+  const importLimiter = createRateLimiter({
+    max: integerEnv(env, "IMPORT_RATE_LIMIT_MAX", 5, 1, 10_000),
+    windowMs: integerEnv(env, "IMPORT_RATE_LIMIT_WINDOW_MS", 10 * 60_000, 1_000, 86_400_000),
+  });
   const enforceOrigin = env.NODE_ENV === "production" || env.ENFORCE_ORIGIN === "1";
   const headers = buildSecurityHeaders(env);
 
@@ -101,6 +109,22 @@ export function registerSecurity(app: FastifyInstance): void {
       if (!result.allowed) {
         reply.header("Retry-After", String(result.retryAfterSec));
         return reply.code(429).send({ error: "Too many uploads. Try again later." });
+      }
+    }
+
+    if (method === "POST" && path === "/api/auth/password") {
+      const result = passwordLimiter.check(`${request.ip}:password`);
+      if (!result.allowed) {
+        reply.header("Retry-After", String(result.retryAfterSec));
+        return reply.code(429).send({ error: "Too many password attempts. Try again later." });
+      }
+    }
+
+    if (method === "POST" && path === "/api/campaigns/import") {
+      const result = importLimiter.check(`${request.ip}:import`);
+      if (!result.allowed) {
+        reply.header("Retry-After", String(result.retryAfterSec));
+        return reply.code(429).send({ error: "Too many campaign imports. Try again later." });
       }
     }
   });

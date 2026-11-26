@@ -141,6 +141,7 @@ async function main() {
       NODE_ENV: "production",
       ENABLE_CSP: "1",
       COOKIE_SECURE: "0",
+      REGISTRATION_MODE: "open",
     },
     stdio: ["ignore", "pipe", "pipe"],
   });
@@ -623,6 +624,7 @@ async function main() {
       itemId: sword.id,
       quantity: 1,
       currency: { gp: 2, sp: 0, cp: 0 },
+      force: true,
     },
   });
   const transferredFrom = transferResult.payload.from;

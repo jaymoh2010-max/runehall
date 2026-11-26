@@ -6,10 +6,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
-  abilityMod,
   animistApparitionLimit,
   automaticSkillRanks,
-  baseAbilityScores,
   cantripLimitFor,
   cantripPreparedLimitFor,
   casterInfo,
@@ -23,6 +21,7 @@ import {
   grantedTrainedSkills,
   normalizeCharacterDraft,
   ordinarySpellSlotsFor,
+  requiredExtraSkills,
   skillRankCap,
   spellRepertoireLimits,
   spellSlotsFor,
@@ -248,13 +247,8 @@ function chooseBoosts(rng: () => number, draft: CharacterDraft, context: Charact
 }
 
 function chooseSkills(rng: () => number, draft: CharacterDraft, context: CharacterContext) {
-  const classData = context.classData!;
   const fixed = grantedTrainedSkills(draft, context);
-  const required = Math.max(
-    0,
-    classData.trainedSkills.additional +
-      Math.max(0, abilityMod(baseAbilityScores(draft, context).int))
-  );
+  const required = requiredExtraSkills(draft, context);
   const candidates = SKILLS.map((skill) => skill.id).filter((id) => !fixed.has(id));
   draft.skills.trained = sample(rng, candidates, Math.min(required, candidates.length));
 }
@@ -309,13 +303,8 @@ function rebalanceTrainedSkills(
   draft: CharacterDraft,
   context: CharacterContext
 ) {
-  const classData = context.classData!;
   const fixed = grantedTrainedSkills(draft, context);
-  const required = Math.max(
-    0,
-    classData.trainedSkills.additional +
-      Math.max(0, abilityMod(baseAbilityScores(draft, context).int))
-  );
+  const required = requiredExtraSkills(draft, context);
   const selected = [
     ...new Set(
       draft.skills.trained.filter((skill) => SKILL_BY_ID[skill as SkillId] && !fixed.has(skill))

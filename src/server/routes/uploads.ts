@@ -319,13 +319,18 @@ export async function registerUploadRoutes(app: FastifyInstance): Promise<void> 
     // Remove the backing file when nothing else references it. If a player is
     // still streaming it, keep the file and let `cleanup-assets` retry later.
     const filename = track.url.startsWith("/uploads/") ? track.url.slice("/uploads/".length) : "";
-    if (
-      filename &&
-      /^[A-Za-z0-9._-]+$/.test(filename) &&
-      filename !== "." &&
-      filename !== ".." &&
-      !globalAssetReferences().has(filename)
-    ) {
+    const asset =
+      filename && /^[A-Za-z0-9._-]+$/.test(filename) && filename !== "." && filename !== ".."
+        ? (db
+            .prepare("SELECT campaign_id, uploaded_by FROM uploaded_assets WHERE filename = ?")
+            .get(filename) as
+            { campaign_id: string | null; uploaded_by: string | null } | undefined)
+        : undefined;
+    const ownsAsset =
+      asset &&
+      (asset.campaign_id === id ||
+        (asset.campaign_id === null && asset.uploaded_by === request.user.id));
+    if (filename && ownsAsset && !globalAssetReferences().has(filename)) {
       try {
         fs.rmSync(path.join(uploadsDir(), filename), { force: true });
         db.prepare("DELETE FROM uploaded_assets WHERE filename = ?").run(filename);

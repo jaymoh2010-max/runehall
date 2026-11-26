@@ -30,11 +30,11 @@ const token = (overrides: Partial<Token> = {}): Token => ({
   ...overrides,
 });
 
-function collect() {
+function collect(isSceneVisible: (sceneId: string) => boolean = () => true) {
   const events: { event: string; target: string | undefined; payload: unknown }[] = [];
   const eventsFor = tokenBroadcaster((event, payload, target) => {
     events.push({ event, target, payload });
-  });
+  }, isSceneVisible);
   return { events, eventsFor };
 }
 
@@ -89,6 +89,15 @@ describe("hidden token broadcasts", () => {
     eventsFor.updated(token(), true);
     eventsFor.moved({ tokenId: "tok_hidden", sceneId: "scene_1", x: 200, y: 100 }, true);
     expect(events.map((entry) => entry.target)).toEqual(["gm", "gm"]);
+  });
+
+  it("never targets players with token events from a GM-only scene", () => {
+    const { events, eventsFor } = collect(() => false);
+    eventsFor.created(token({ hidden: false }));
+    eventsFor.updated(token({ hidden: false }), false);
+    eventsFor.moved({ tokenId: "tok_hidden", sceneId: "scene_1", x: 200, y: 100 }, false);
+    eventsFor.deleted({ tokenId: "tok_hidden", sceneId: "scene_1" }, false);
+    expect(events.every((entry) => entry.target === "gm")).toBe(true);
   });
 
   it("broadcasts visible updates with GM stats and player redaction, moves, and deletions", () => {

@@ -651,7 +651,12 @@ describe("PF2e character rules", () => {
     const weak = build(false);
     expect(weak.abilities.str).toBe(12);
     expect(weak.speed).toBe(20);
-    expect(weak.skills.find((skill) => skill.id === "athletics")?.mod).toBe(2);
+    // Chain Mail is flexible: Acrobatics and Athletics ignore its check
+    // penalty, while noisy still penalizes Stealth.
+    expect(weak.skills.find((skill) => skill.id === "athletics")?.mod).toBe(4);
+    expect(weak.skills.find((skill) => skill.id === "stealth")?.mod).toBe(
+      Math.floor((weak.abilities.dex - 10) / 2) - 2
+    );
   });
 
   it("uses Intelligence for a magus's spell DC and attack", () => {

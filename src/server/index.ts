@@ -27,7 +27,9 @@ import { uploadsDir } from "./util";
 
 // Local-first: the compendium is read from data/compendium at boot.
 const port = Number(process.env.PORT || 3001);
-const host = process.env.HOST || "0.0.0.0";
+// Loopback by default for native installs. Docker and reverse-proxy setups
+// set HOST=0.0.0.0 explicitly.
+const host = process.env.HOST || "127.0.0.1";
 
 const app = Fastify({
   logger: {
@@ -40,10 +42,10 @@ const app = Fastify({
             options: { colorize: true, translateTime: "HH:MM:ss", ignore: "pid,hostname" },
           },
   },
-  // Trust exactly one reverse proxy by default; set TRUST_PROXY_HOPS=0 if the
-  // app is exposed directly, or 2 for a CDN + reverse proxy chain.
+  // Trust no proxy unless explicitly configured. Set TRUST_PROXY_HOPS=1 for a
+  // single Caddy/Nginx, or 2 for a CDN + reverse proxy chain.
   trustProxy: (_address, hop) => {
-    const hops = Number(process.env.TRUST_PROXY_HOPS ?? 1);
+    const hops = Number(process.env.TRUST_PROXY_HOPS ?? 0);
     return Number.isFinite(hops) && hop < hops;
   },
   bodyLimit: 3 * 1024 * 1024,
@@ -107,10 +109,24 @@ app.addHook("preHandler", async (request, reply) => {
     return reply.code(404).send({ error: "Not found." });
   }
   const asset = db
-    .prepare("SELECT campaign_id FROM uploaded_assets WHERE filename = ?")
-    .get(filename) as { campaign_id: string | null } | undefined;
-  if (asset?.campaign_id && !getMembership(asset.campaign_id, request.user.id)) {
-    return reply.code(403).send({ error: "You can't view that asset." });
+    .prepare("SELECT campaign_id, uploaded_by FROM uploaded_assets WHERE filename = ?")
+    .get(filename) as { campaign_id: string | null; uploaded_by: string | null } | undefined;
+  if (!asset) return reply.code(404).send({ error: "Not found." });
+  if (asset.campaign_id) {
+    if (!getMembership(asset.campaign_id, request.user.id)) {
+      return reply.code(403).send({ error: "You can't view that asset." });
+    }
+  } else {
+    // A campaign-less upload is normally a profile portrait. Avatars are
+    // visible to signed-in users; every other orphaned upload stays with its
+    // uploader (or an administrator) instead of becoming globally readable.
+    const isAvatar = db
+      .prepare("SELECT 1 AS ok FROM users WHERE avatar_url = ? LIMIT 1")
+      .get(`/uploads/${filename}`);
+    const ownsAsset = Boolean(asset.uploaded_by && asset.uploaded_by === request.user.id);
+    if (!isAvatar && !ownsAsset && !request.user.isAdmin) {
+      return reply.code(403).send({ error: "You can't view that asset." });
+    }
   }
   reply.header("Cache-Control", "private, no-store");
 });

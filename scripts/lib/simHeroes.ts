@@ -20,6 +20,7 @@ import {
   grantedTrainedSkills,
   isPreparedCasterClass,
   ordinarySpellSlotsFor,
+  requiredExtraSkills,
 } from "../../src/shared/rules";
 import { featAllowedByHeritageGrant, heritageFeatGrant } from "../../src/shared/heritage";
 import { activeGrantChoiceGroups } from "../../src/shared/classGrantChoices";
@@ -233,10 +234,7 @@ export function buildSimulatedHero(options: SimulatedHeroOptions): CharacterDraf
   }
 
   const granted = grantedTrainedSkills(draft, context);
-  const additional = Math.max(
-    0,
-    classData.trainedSkills.additional + Math.max(0, abilityModOf(draft, context, "int"))
-  );
+  const additional = requiredExtraSkills(draft, context);
   const candidates = SKILLS.map((skill) => skill.id).filter((id) => !granted.has(id));
   draft.skills.trained = candidates.slice(0, additional);
 
@@ -270,15 +268,6 @@ export function buildSimulatedHero(options: SimulatedHeroOptions): CharacterDraf
 
   draft.currency = { gp: 10, sp: 0, cp: 0 };
   return draft;
-}
-
-function abilityModOf(
-  draft: CharacterDraft,
-  context: CharacterContext,
-  ability: AbilityKey
-): number {
-  const score = computeCharacter(draft, context).abilities[ability];
-  return Math.floor((score - 10) / 2);
 }
 
 export function contextForDraft(draft: CharacterDraft): CharacterContext {

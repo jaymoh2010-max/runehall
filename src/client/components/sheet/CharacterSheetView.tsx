@@ -54,7 +54,7 @@ import {
 } from "../../../shared/itemSpellcasting";
 import { SpellPicker } from "../builder/pickers";
 import { applyHpEditToDraft } from "../../../shared/damage";
-import { rollFormula } from "../../../shared/dice";
+import { applyAttackPenalty, rollFormula } from "../../../shared/dice";
 import type { LongRestResult } from "../../../shared/rest";
 import {
   canRestoreSpellUse,
@@ -376,6 +376,7 @@ export function CharacterSheetView({
   const [castChoices, setCastChoices] = useState<Record<string, string>>({});
   const [lastRoll, setLastRoll] = useState<LastRoll | null>(null);
   const [hpInput, setHpInput] = useState("");
+  const hpInputRef = useRef<HTMLInputElement>(null);
   const [trayOpen, setTrayOpen] = useState(false);
   const [trayFormula, setTrayFormula] = useState("1d20");
   const [conditionName, setConditionName] = useState("");
@@ -401,6 +402,16 @@ export function CharacterSheetView({
   });
   const [detailsSaving, setDetailsSaving] = useState(false);
   const [detailsDirty, setDetailsDirty] = useState(false);
+
+  useEffect(() => {
+    if (!detailsDirty) return;
+    const warn = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [detailsDirty]);
   const [sheetDc, setSheetDc] = useState("");
   const [sheetSecret, setSheetSecret] = useState(false);
   const [itemQuery, setItemQuery] = useState("");
@@ -488,7 +499,9 @@ export function CharacterSheetView({
   }, []);
 
   useEffect(() => {
-    if (derived) setHpInput(String(derived.currentHp));
+    if (derived && document.activeElement !== hpInputRef.current) {
+      setHpInput(String(derived.currentHp));
+    }
   }, [derived?.currentHp, derived]);
 
   useEffect(() => {
@@ -839,6 +852,16 @@ export function CharacterSheetView({
 
   const toggleEquipment = (itemId: string, field: "equipped" | "invested") => {
     if (!canEdit || !draft) return;
+    const entry = draft.equipment.find((candidate) => candidate.itemId === itemId);
+    if (field === "invested" && entry && !entry.invested && derived) {
+      const invested = draft.equipment.filter((candidate) => candidate.invested).length;
+      if (invested >= derived.investedLimit) {
+        setItemError(
+          `You can invest at most ${derived.investedLimit} items. Uninvest another item first.`
+        );
+        return;
+      }
+    }
     void persist((currentDraft) => ({
       ...currentDraft,
       equipment: currentDraft.equipment.map((entry) =>
@@ -1554,7 +1577,10 @@ export function CharacterSheetView({
               type="button"
               className="pb-icon-button"
               aria-label="Minimize sheet"
-              onClick={onClose}
+              onClick={() => {
+                if (detailsDirty && !window.confirm("Discard unsaved character details?")) return;
+                onClose();
+              }}
             >
               <ChevronDown size={18} />
             </button>
@@ -1621,7 +1647,10 @@ export function CharacterSheetView({
               type="button"
               className="pb-icon-button"
               aria-label="Close sheet"
-              onClick={onClose}
+              onClick={() => {
+                if (detailsDirty && !window.confirm("Discard unsaved character details?")) return;
+                onClose();
+              }}
             >
               <X size={18} />
             </button>
@@ -1815,12 +1844,19 @@ export function CharacterSheetView({
                   <Minus size={12} />
                 </button>
                 <input
+                  ref={hpInputRef}
                   type="number"
                   aria-label="Current hit points"
                   value={hpInput}
                   disabled={!canEdit}
                   onChange={(event) => setHpInput(event.target.value)}
-                  onBlur={() => changeHp(Number(hpInput) || 0)}
+                  onBlur={() => {
+                    if (!hpInput.trim()) {
+                      setHpInput(String(derived.currentHp));
+                      return;
+                    }
+                    changeHp(Number(hpInput) || 0);
+                  }}
                   onKeyDown={(event) => {
                     if (event.key === "Enter") event.currentTarget.blur();
                   }}
@@ -2034,10 +2070,9 @@ export function CharacterSheetView({
                           title="Second attack with the multiple attack penalty"
                           onClick={() =>
                             postRoll(
-                              attack.attackFormula.replace(
-                                /([+-]?\d+)$/,
-                                (match) =>
-                                  `${Number(match) - (attack.traits.includes("agile") ? 4 : 5)}`
+                              applyAttackPenalty(
+                                attack.attackFormula,
+                                attack.traits.includes("agile") ? 4 : 5
                               ),
                               `${attack.name} attack (2nd)`
                             )
@@ -2051,10 +2086,9 @@ export function CharacterSheetView({
                           title="Third attack with the multiple attack penalty"
                           onClick={() =>
                             postRoll(
-                              attack.attackFormula.replace(
-                                /([+-]?\d+)$/,
-                                (match) =>
-                                  `${Number(match) - (attack.traits.includes("agile") ? 8 : 10)}`
+                              applyAttackPenalty(
+                                attack.attackFormula,
+                                attack.traits.includes("agile") ? 8 : 10
                               ),
                               `${attack.name} attack (3rd)`
                             )

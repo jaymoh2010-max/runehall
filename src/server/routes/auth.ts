@@ -24,7 +24,8 @@ import {
   registrationStatus,
   requireRegistrationInvite,
 } from "../registration";
-import { newId, now, safeString } from "../util";
+import { newId, now, safeString, sha256 } from "../util";
+import { disconnectUserSockets } from "../socketSessions";
 
 function isUniqueViolation(error: unknown): boolean {
   return error instanceof Error && /UNIQUE|constraint/i.test(error.message);
@@ -160,8 +161,12 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
   });
 
   app.post("/api/auth/logout", async (request, reply) => {
-    destroySession(getSessionToken(request));
+    const token = getSessionToken(request);
+    destroySession(token);
     if (request.user) {
+      disconnectUserSockets(app, request.user.id, {
+        sessionHash: token ? sha256(token) : undefined,
+      });
       logAudit({
         action: "auth.logout",
         actor: request.user,
@@ -189,6 +194,17 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
         : safeString(body.avatarUrl, request.user.avatarUrl ?? "", 500);
     if (displayName.length < 2)
       return reply.code(400).send({ error: "Display name is too short." });
+    if (
+      body.avatarUrl !== undefined &&
+      body.avatarUrl !== null &&
+      avatarUrl &&
+      !avatarUrl.startsWith("/uploads/") &&
+      !avatarUrl.startsWith("/portraits/")
+    ) {
+      return reply.code(400).send({
+        error: "Choose an uploaded portrait or a built-in portrait.",
+      });
+    }
     db.prepare("UPDATE users SET display_name = ?, avatar_url = ? WHERE id = ?").run(
       displayName,
       avatarUrl,
@@ -222,6 +238,7 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
     );
     if (!target) return reply.code(404).send({ error: "Session not found." });
     revokeSession(request.user.id, sessionId);
+    disconnectUserSockets(app, request.user.id, { sessionHash: sessionId });
     if (target.current && current) {
       destroySession(current);
       clearSessionCookie(reply);
@@ -239,7 +256,11 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
 
   app.post("/api/auth/sessions/revoke-others", async (request, reply) => {
     if (!request.user) return reply.code(401).send({ error: "Sign in to continue." });
-    const removed = revokeOtherSessions(request.user.id, getSessionToken(request));
+    const current = getSessionToken(request);
+    const removed = revokeOtherSessions(request.user.id, current);
+    disconnectUserSockets(app, request.user.id, {
+      exceptSessionHash: current ? sha256(current) : undefined,
+    });
     logAudit({
       action: "auth.sessions_revoke_others",
       actor: request.user,
@@ -284,6 +305,7 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
       // Sign out every other device; then issue a fresh session for this one.
       db.prepare("DELETE FROM sessions WHERE user_id = ?").run(request.user!.id);
     });
+    disconnectUserSockets(app, request.user.id);
     const token = createSession(request.user.id, sessionMeta(request));
     setSessionCookie(reply, token);
     logAudit({
