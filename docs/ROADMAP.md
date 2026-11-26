@@ -452,10 +452,12 @@ Acceptance: a GM can prepare a full session in Runehall and start it with one â€
   - Encounter checks roll against a terrain/weather threshold and keep a GM-only history.
   - Remaining: hex-grid maps, chase tracks, and automatic weather damage.
 - [x] **Area templates**
-  - Burst, emanation, cone, and line templates with size in feet.
+  - Burst, emanation, cone, line, and square templates with size in feet.
   - Click-drag placement on the map, with a live preview and a size label.
-  - Templates are persisted per scene and shared with every connected client.
-  - Remaining: rotate handles and optional save/roll cards.
+  - Casting an area spell from the table sheet switches to placement mode automatically with the spell's size and damage-type colour.
+  - Templates store the spell name, save/damage summary, caster, and duration; affected tokens are listed in chat and the active-area panel.
+  - Round-based durations expire as initiative advances, and owners or the GM can clear individual areas.
+  - Remaining: rotate handles and automatic per-target save/damage application cards.
 - [x] **Conditions with values and durations**
   - Token conditions store name, optional value, and optional duration in rounds.
   - Legacy string conditions are normalized automatically on load.
