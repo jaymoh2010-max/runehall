@@ -176,20 +176,21 @@ export function spellCastOptions(
   }
 
   if (opts.multiclass) {
-    const rank = Math.max(1, spell.rank);
     const slots = opts.multiclassSlots ?? [];
-    const slotCount = Math.max(0, Math.round(slots[rank - 1] ?? 0));
-    const used = clampInt(opts.multiclassSlotsUsed?.[String(rank)], 0, slotCount);
-    const remaining = Math.max(0, slotCount - used);
-    if (remaining <= 0) return [];
-    return [
-      {
+    const options: SpellCastOption[] = [];
+    for (let rank = Math.max(1, spell.rank); rank <= slots.length; rank += 1) {
+      const slotCount = Math.max(0, Math.round(slots[rank - 1] ?? 0));
+      const used = clampInt(opts.multiclassSlotsUsed?.[String(rank)], 0, slotCount);
+      const remaining = Math.max(0, slotCount - used);
+      if (remaining <= 0) continue;
+      options.push({
         rank,
         resource: "multiclass",
         remaining,
         label: `Dedication rank ${rank} slot`,
-      },
-    ];
+      });
+    }
+    return options;
   }
 
   const caster = casterInfo(context.classData);
