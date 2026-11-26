@@ -1180,7 +1180,12 @@ test("builder completes a level-1 Fighter and reaches the sheet", async ({ page 
     .filter({ hasText: "Skilled Human training" })
     .getByRole("combobox")
     .selectOption("stealth");
-  await trainClassSkills(page, ["Athletics", "Acrobatics", "Medicine"]);
+  await page
+    .locator(".skill-picker")
+    .filter({ hasText: "Fighter training" })
+    .getByRole("combobox")
+    .selectOption("athletics");
+  await trainClassSkills(page, ["Acrobatics", "Medicine", "Survival"]);
 
   await goToStep(page, "Feats");
   await pickFeat(page, "Ancestry feat", "Haughty Obstinacy");

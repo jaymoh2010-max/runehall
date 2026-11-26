@@ -134,6 +134,11 @@ export function AncestryStep({
   }, [legacyDefault]);
   const expanded = contentMode === "expanded";
   const selected = staticData.ancestries.find((a) => a.id === draft.ancestryId) ?? null;
+  const hpLabel = (ancestry: Ancestry) =>
+    ancestry.hpBySize
+      ? `${Math.min(...Object.values(ancestry.hpBySize))}–${Math.max(...Object.values(ancestry.hpBySize))} HP`
+      : `${ancestry.hp} HP`;
+  const speedLabel = (ancestry: Ancestry) => ancestry.speedNote || `${ancestry.speed} ft.`;
   const visible = staticData.ancestries.filter((ancestry) => {
     if (!legacy && !ancestry.remaster) return false;
     if (!expanded && ancestry.id !== draft.ancestryId && !isCoreSource(ancestry.source))
@@ -202,6 +207,7 @@ export function AncestryStep({
                 return {
                   ...current,
                   ancestryId: same ? null : ancestry.id,
+                  ancestrySize: null,
                   heritageId: same
                     ? null
                     : currentHeritage?.versatile ||
@@ -221,7 +227,8 @@ export function AncestryStep({
             <span className="selection-copy">
               <span className="selection-name">{ancestry.name}</span>
               <span className="selection-sub">
-                {ancestry.hp} HP · {ancestry.speed} ft. · {SIZES[ancestry.size] || ancestry.size}
+                {hpLabel(ancestry)} · {speedLabel(ancestry)} ·{" "}
+                {ancestry.sizeChoices ? "choose a size" : SIZES[ancestry.size] || ancestry.size}
               </span>
               <span className="selection-source">{ancestry.source}</span>
             </span>
@@ -242,14 +249,16 @@ export function AncestryStep({
               </p>
             </div>
             <div className="chip-row">
-              <Tag tone="gold">{selected.hp} HP</Tag>
-              <Tag tone="gold">{selected.speed} ft.</Tag>
+              <Tag tone="gold">{hpLabel(selected)}</Tag>
+              <Tag tone="gold">{speedLabel(selected)}</Tag>
               {(selected.otherSpeeds ?? []).map((entry) => (
                 <Tag key={entry.type} tone="gold">
                   {titleCase(entry.type)} {entry.value} ft.
                 </Tag>
               ))}
-              <Tag>{SIZES[selected.size] || selected.size}</Tag>
+              <Tag>
+                {selected.sizeChoices ? "Variable size" : SIZES[selected.size] || selected.size}
+              </Tag>
               <Tag>{VISION_LABELS[selected.vision] || selected.vision}</Tag>
             </div>
           </div>
@@ -271,6 +280,26 @@ export function AncestryStep({
               </p>
             </div>
             <div>
+              {selected.sizeChoices?.length ? (
+                <Field label="Size">
+                  <Select
+                    value={draft.ancestrySize ?? ""}
+                    onChange={(event) =>
+                      update((current) => ({
+                        ...current,
+                        ancestrySize: event.target.value || null,
+                      }))
+                    }
+                  >
+                    <option value="">Choose a size…</option>
+                    {selected.sizeChoices.map((size) => (
+                      <option key={size} value={size}>
+                        {SIZES[size] || size}
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
+              ) : null}
               <h3 style={{ marginBottom: 9 }}>Ability boosts</h3>
               <div className="boost-summary">
                 {selected.boosts.map((boost, index) =>

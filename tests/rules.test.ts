@@ -978,6 +978,58 @@ describe("PF2e character rules", () => {
     expect(derived.attacks.find((attack) => attack.name === "Sawtooth Saber")?.attackBonus).toBe(5);
   });
 
+  it("applies a Fighter's fixed class skill choice", () => {
+    const fighter = classes.find((entry) => entry.name === "Fighter")!;
+    const { draft, context } = buildCleric();
+    draft.classId = fighter.id;
+    draft.classChoices = {};
+    draft.deityId = null;
+    draft.deitySkill = null;
+    draft.skills.classSkills = [];
+    const fighterContext: CharacterContext = {
+      ...context,
+      classData: fighter,
+      deity: null,
+    };
+    const missing = computeCharacter(draft, fighterContext);
+    expect(
+      missing.validation.some((issue) => issue.message.includes("Acrobatics or Athletics"))
+    ).toBe(true);
+    draft.skills.classSkills = ["athletics"];
+    const chosen = computeCharacter(draft, fighterContext);
+    expect([...grantedTrainedSkills(draft, fighterContext)]).toContain("athletics");
+    expect(
+      chosen.validation.filter(
+        (issue) => issue.step === "skills" && issue.message.includes("Acrobatics or Athletics")
+      )
+    ).toEqual([]);
+  });
+
+  it("uses the chosen Awakened Animal size and heritage speed", () => {
+    const awakened = ancestries.find((entry) => entry.name === "Awakened Animal")!;
+    const running = heritages.find((entry) => entry.name === "Running Animal")!;
+    const { draft, context } = buildCleric();
+    draft.ancestryId = awakened.id;
+    draft.heritageId = running.id;
+    draft.ancestrySize = "lg";
+    const awakenedContext: CharacterContext = {
+      ...context,
+      ancestry: awakened,
+      heritage: running,
+    };
+    const large = computeCharacter(draft, awakenedContext);
+    expect(large.size).toBe("lg");
+    expect(large.speed).toBe(30);
+    draft.ancestrySize = "tiny";
+    const tiny = computeCharacter(draft, awakenedContext);
+    expect(large.maxHp - tiny.maxHp).toBe(4);
+    draft.ancestrySize = null;
+    const missing = computeCharacter(draft, awakenedContext);
+    expect(missing.validation.some((issue) => issue.message.includes("choose your size"))).toBe(
+      true
+    );
+  });
+
   it("applies the Encumbered condition when carried Bulk exceeds capacity", () => {
     const { draft, context } = buildCleric();
     const chainMail = equipment.find((entry) => entry.name === "Chain Mail")!;

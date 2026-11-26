@@ -229,8 +229,14 @@ export interface Ancestry extends Publication {
   name: string;
   type: "ancestry";
   hp: number;
+  /** Ancestries such as Awakened Animal choose their size. */
+  sizeChoices?: string[];
+  /** Ancestries whose HP depends on the chosen size. */
+  hpBySize?: Record<string, number>;
   size: string;
   speed: number;
+  /** Set when the ancestry's Speed comes from its heritage. */
+  speedNote?: string;
   otherSpeeds: { type: string; value: number }[];
   vision: string;
   boosts: BoostEntry[];
@@ -257,6 +263,8 @@ export interface Heritage extends Publication {
   ancestrySlug: string;
   /** Versatile heritages can be selected by any ancestry. */
   versatile: boolean;
+  /** Some heritages, such as Awakened Animal, set the ancestry's Speed. */
+  speeds?: { base?: number; other?: { type: string; value: number }[] };
   rarity: string;
   traits: string[];
   otherTags?: string[];
@@ -326,6 +334,8 @@ export interface ClassData extends Publication {
   attacks: Record<string, number | { name?: string; rank?: number }>;
   defenses: Record<string, number>;
   trainedSkills: { value: string[]; additional: number; custom?: string };
+  /** Fixed class training choices, such as the Fighter's Acrobatics/Athletics choice. */
+  skillChoices?: { prompt: string; options: string[]; count: number }[];
   featLevels: {
     ancestry: number[];
     class: number[];
@@ -505,6 +515,8 @@ export interface Deity extends Publication {
   /** Deity-granted cleric spells, keyed by spell rank. */
   spells: Record<string, { id: string | null; name: string }>;
   sanctification: Record<string, unknown>;
+  /** Conditional sanctification text, such as Hei Feng's tengu exception. */
+  sanctificationNote?: string;
   rarity: string;
   traits: string[];
   otherTags?: string[];
@@ -833,6 +845,8 @@ export interface CharacterDraft {
   /** Whether pre-remaster legacy options are allowed for this character. */
   includeLegacy: boolean;
   ancestryId: string | null;
+  /** Chosen size for ancestries with a size choice (Awakened Animal). */
+  ancestrySize: string | null;
   heritageId: string | null;
   backgroundId: string | null;
   classId: string | null;
@@ -854,6 +868,8 @@ export interface CharacterDraft {
     lore: string[];
     /** Player picks for background-granted skill choices. */
     background: string[];
+    /** Player picks for class-granted fixed skill choices (Fighter, Runesmith). */
+    classSkills: string[];
     /** Player picks for background-granted Lore choices. */
     backgroundLore: string[];
   };

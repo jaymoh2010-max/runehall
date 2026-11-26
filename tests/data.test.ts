@@ -206,6 +206,9 @@ describe("compendium data", () => {
 
     const shelyn = byName(deities, "Shelyn");
     expect(shelyn.skill).toEqual(["crafting", "performance"]);
+    const heiFeng = byName(deities, "Hei Feng");
+    expect(heiFeng.sanctificationNote).toMatch(/tengu/i);
+    expect(heiFeng.sanctification).toMatchObject({ modal: "can", what: ["unholy", "holy"] });
 
     const skillIds = new Set([
       "acrobatics",
@@ -306,7 +309,15 @@ describe("compendium data", () => {
     const merfolk = byName(ancestries, "Merfolk");
     expect(merfolk.otherSpeeds).toContainEqual({ type: "swim", value: 25 });
     const awakened = byName(ancestries, "Awakened Animal");
-    expect(awakened.speed).toBe(20);
+    expect(awakened.speed).toBe(0);
+    expect(awakened.speedNote).toMatch(/heritage/i);
+    expect(awakened.sizeChoices).toEqual(["tiny", "sm", "med", "lg"]);
+    expect(awakened.hpBySize).toMatchObject({ tiny: 6, sm: 6, med: 8, lg: 10 });
+    expect(byName(heritages, "Climbing Animal").speeds).toMatchObject({
+      base: 20,
+      other: [{ type: "climb", value: 20 }],
+    });
+    expect(byName(heritages, "Running Animal").speeds).toMatchObject({ base: 30 });
     const minotaur = byName(ancestries, "Minotaur");
     expect(minotaur.features.map((feature) => feature.name)).toContain("Horns (Minotaur)");
 
@@ -345,6 +356,21 @@ describe("compendium data", () => {
       "Battle Creed",
       "Cloistered Cleric",
       "Warpriest",
+    ]);
+
+    const fighter = byName(classes, "Fighter");
+    expect(fighter.skillChoices).toEqual([
+      {
+        prompt: "Choose Acrobatics or Athletics",
+        options: ["acrobatics", "athletics"],
+        count: 1,
+      },
+    ]);
+    expect(byName(classes, "Runesmith").skillChoices?.[0].options).toEqual([
+      "arcana",
+      "nature",
+      "occultism",
+      "religion",
     ]);
 
     const psychic = byName(classes, "Psychic");
@@ -521,6 +547,21 @@ describe("compendium data", () => {
       reflex: 0,
       will: 2,
       perception: 0,
+    });
+
+    // Values confirmed against the Monster Core 2 entries; the Foundry export
+    // had a shield HP value in place of the creature's HP and several drifted
+    // statblocks.
+    expect(byName(monsters, "Totum Font")).toMatchObject({ hp: 325 });
+    expect(byName(monsters, "Adlet")).toMatchObject({ level: 9 });
+    expect(byName(monsters, "Zebub")).toMatchObject({ hp: 45 });
+    expect(byName(monsters, "Oread Guard")).toMatchObject({
+      ac: 17,
+      fortitude: 7,
+      hp: 20,
+      perception: 7,
+      reflex: 6,
+      will: 5,
     });
   });
 });

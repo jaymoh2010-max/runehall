@@ -124,7 +124,7 @@ Added structured choices that were only present in prose:
 | Command | Result |
 | --- | --- |
 | `npm run verify:data` | Pass; 4 expected content warnings |
-| `npm run check` | Pass; 823 tests, typecheck, lint, format, build, bundle budget |
+| `npm run check` | Pass; 825 tests, typecheck, lint, format, build, bundle budget |
 | `npm run smoke` | Pass |
 | `npm run e2e` | 37 passed |
 | `npm run simulate:campaign` | 18 passed, 0 failed |
@@ -134,39 +134,47 @@ The SQLite database in the main checkout passes `PRAGMA integrity_check` and
 across 39 tables with no duplicates. The database contains no users, campaigns,
 or characters, so there is no user content to reconcile.
 
+## Follow-up pass: resolved gaps
+
+A second pass closed the builder-facing gaps from the list above:
+
+- **Awakened Animal** now carries `sizeChoices` (Tiny/Small/Medium/Large) and
+  `hpBySize` (6/6/8/10). The Builder asks for a size and derives HP and size from
+  it. Its Speed is now heritage-driven: Climbing (20 ft., climb 20), Flying
+  (20 ft.), Running (30 ft.), and Swimming (20 ft., swim 20) carry structured
+  speeds. The ancestry itself shows "Determined by heritage" instead of a false
+  fixed Speed.
+- **Fighter and Runesmith** now carry `skillChoices`, and the Skills step offers
+  the fixed Acrobatics/Athletics or Arcana/Nature/Occultism/Religion choice. The
+  choice is automatic training and does not consume an additional skill slot.
+- **Prose-only Lore** is now backfilled automatically: a background with no
+  structured Lore gets a free-text Lore choice, and concrete names such as
+  "Genealogy Lore or Heraldry Lore" become a select. Bachuan Revolutionary and
+  Bekyar Restorer were corrected to Law Lore and Abyss Lore.
+- **Confirmed creature transcriptions** were fixed against their AoN pages:
+  Totum Font (325 HP, not its shield's 104), Adlet (level 9), Zebub (45 HP), and
+  Oread Guard (20 HP, AC 17, Fort +7, Ref +6, Will +5, Perception +7, Society +3).
+- **Hei Feng** now stores a `sanctificationNote` for the tengu-only holy option,
+  and the deity page displays it beside the allowed sanctifications.
+- The verifier now checks size choices, heritage speeds, class skill choices,
+  and remains strict about divine fonts/sanctification and attack types.
+
 ## Known remaining differences
 
-These are real differences between the local compendium and AoN that were not
-changed because they need a product decision or a schema/UI change:
-
-1. **Awakened Animal is variable.** The ancestry's HP depends on its chosen size
-   (6/8/10), its size is chosen from Tiny/Small/Medium/Large, and its Speed comes
-   from its heritage. The current data stores Medium/6 HP and cannot represent
-   the choice.
-2. **Class skill choices.** Fighter (Acrobatics or Athletics) and Runesmith
-   (Arcana, Nature, Occultism, or Religion) grant one fixed choice that the class
-   schema does not represent; the builder currently offers only the additional
-   skill slots. Cleric and Champion deity skills are handled separately through
-   the deity data.
-3. **Prose-only background grants.** About 80 backgrounds have a Lore skill
-   whose exact name is chosen in prose (for example "a Lore skill for your
-   home city"). The builder can accept a custom Lore entry, but the compendium
-   cannot enumerate every legal name.
-4. **Creature stat drift.** Most creatures match AoN exactly. A small set,
-   especially in Monster Core 2, differs in HP/AC/saves/size/speed. Examples
-   include Totum Font (Foundry 104 HP vs AoN 325), Adlet (level 10 vs 9), Zebub
-   (30 vs 45 HP), and Oread Guard (16/15 vs 20/17 HP/AC). These look like
-   upstream data-entry differences; they should be reconciled against the
-   printed books before changing, because AoN is not always the newer source.
-5. **Legacy/remaster equipment.** Some Guns & Gears and Treasure Vault items
+1. **Creature stat drift.** Most creatures match AoN exactly. A small set,
+   especially in Monster Core 2, still differs in HP/AC/saves/size/speed. The
+   clearest transcription errors above are fixed; the rest should be reconciled
+   against the printed books before changing, because AoN is not always the
+   newer source.
+2. **Legacy/remaster equipment.** Some Guns & Gears and Treasure Vault items
    have legacy prices/levels alongside remastered groups or bulk. The local
    compendium intentionally keeps both eras, so source matching can show a
    difference without the local value being wrong.
-6. **Conditional sanctification.** Hei Feng can choose unholy, and can choose
-   holy only for tengu. The schema has no conditional sanctification field, so
-   the local entry remains permissive.
-7. **Reference coverage.** Traits are labels only; hazards, vehicles, familiar
+3. **Reference coverage.** Traits are labels only; hazards, vehicles, familiar
    abilities, afflictions, and a trait glossary are still outside the compendium.
+   The Foundry source has hazards and vehicles packs, but adding them needs new
+   compendium types, loader routes, and library/detail UI rather than a data-only
+   fix.
 
 ## References
 

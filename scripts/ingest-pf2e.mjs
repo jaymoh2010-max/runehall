@@ -16,9 +16,13 @@ import sanitizeHtml from "sanitize-html";
 import {
   ANCESTRY_OVERRIDES,
   BACKGROUND_OVERRIDES,
+  CLASS_OVERRIDES,
   DEITY_OVERRIDES,
   EQUIPMENT_OVERRIDES,
+  HERITAGE_OVERRIDES,
+  MONSTER_OVERRIDES,
   SPELL_OVERRIDES,
+  addProseLoreChoices,
   applyNameOverrides,
   normalizeDeityWeapons,
   normalizeMonsterAttackTypes,
@@ -1389,6 +1393,7 @@ const classes = raw.classes
         additional: Number(s.trainedSkills?.additional ?? 0),
         custom: typeof s.trainedSkills?.custom === "string" ? s.trainedSkills.custom : "",
       },
+      skillChoices: skillChoicesFromRules(s.rules),
       featLevels: {
         ancestry: (s.ancestryFeatLevels?.value ?? [1, 5, 9, 13, 17]).map(Number),
         class: (s.classFeatLevels?.value ?? []).map(Number),
@@ -1932,9 +1937,12 @@ console.log("\nWriting compendium:");
 normalizeDeityWeapons(deities, equipment);
 normalizeMonsterAttackTypes(monsters);
 write("ancestries.json", applyNameOverrides(ancestries, ANCESTRY_OVERRIDES));
-write("heritages.json", heritages);
-write("backgrounds.json", applyNameOverrides(backgrounds, BACKGROUND_OVERRIDES));
-write("classes.json", classes);
+write("heritages.json", applyNameOverrides(heritages, HERITAGE_OVERRIDES));
+write(
+  "backgrounds.json",
+  addProseLoreChoices(applyNameOverrides(backgrounds, BACKGROUND_OVERRIDES))
+);
+write("classes.json", applyNameOverrides(classes, CLASS_OVERRIDES));
 write("classFeatures.json", classFeatures);
 write("feats.json", feats);
 write("spells.json", applyNameOverrides(spells, SPELL_OVERRIDES));
@@ -1943,7 +1951,7 @@ write("deities.json", applyNameOverrides(deities, DEITY_OVERRIDES));
 write("domains.json", domains);
 write("conditions.json", conditions);
 write("actions.json", actions);
-write("monsters.json", monsters);
+write("monsters.json", applyNameOverrides(monsters, MONSTER_OVERRIDES));
 
 function gitOutput(gitArgs) {
   try {
