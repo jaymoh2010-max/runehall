@@ -252,6 +252,26 @@ for (const deity of data.deities ?? []) {
       fail(`deity ${deity.name}: domain "${key}" has no reference entry`);
     }
   }
+  for (const font of deity.font ?? []) {
+    if (!["heal", "harm"].includes(String(font).toLowerCase())) {
+      fail(`deity ${deity.name}: unknown divine font "${font}"`);
+    }
+  }
+  const sanctification = deity.sanctification ?? {};
+  if (sanctification.modal && !["can", "must"].includes(sanctification.modal)) {
+    fail(`deity ${deity.name}: unknown sanctification mode "${sanctification.modal}"`);
+  }
+  if (sanctification.what !== undefined) {
+    if (!Array.isArray(sanctification.what)) {
+      fail(`deity ${deity.name}: sanctification.what must be an array`);
+    } else {
+      for (const what of sanctification.what) {
+        if (!["holy", "unholy"].includes(String(what).toLowerCase())) {
+          fail(`deity ${deity.name}: unknown sanctification "${what}"`);
+        }
+      }
+    }
+  }
 }
 
 const featIds = new Set((data.feats ?? []).map((item) => item.id));
@@ -358,6 +378,11 @@ for (const spell of data.spells ?? []) {
   if (!Number.isFinite(spell.rank) || spell.rank < 0 || spell.rank > 10) {
     fail(`spell ${spell.name}: invalid rank ${spell.rank}`);
   }
+  if (spell.actionType !== spell.actions) {
+    fail(
+      `spell ${spell.name}: actionType "${spell.actionType}" does not match actions "${spell.actions}"`
+    );
+  }
   for (const tradition of spell.traditions ?? []) {
     if (!["arcane", "divine", "occult", "primal"].includes(tradition)) {
       fail(`spell ${spell.name}: unknown tradition "${tradition}"`);
@@ -389,6 +414,13 @@ for (const monster of data.monsters ?? []) {
   for (const attack of monster.attacks ?? []) {
     if (!Number.isFinite(attack.bonus))
       fail(`creature ${monster.name}/${attack.name}: invalid attack bonus`);
+    const ranged = attack.range != null && Number(attack.range) > 0;
+    const expectedType = ranged ? "ranged" : "melee";
+    if (attack.type !== expectedType) {
+      fail(
+        `creature ${monster.name}/${attack.name}: attack type ${attack.type} should be ${expectedType}`
+      );
+    }
   }
 }
 const attacksWithoutDamage = (data.monsters ?? []).flatMap((monster) =>
