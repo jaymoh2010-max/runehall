@@ -1836,6 +1836,15 @@ test("builder completes a level-1 Wizard using granted curriculum spells", async
   await expect(page.getByRole("heading", { name: "E2E Wizard" })).toBeVisible();
   await page.getByRole("button", { name: "Spells", exact: true }).click();
   await expect(page.getByRole("link", { name: /Force Barrage/ })).toBeVisible();
+  await page.getByRole("button", { name: "Learn spell" }).click();
+  await page.getByPlaceholder(/Search spells/).fill("Grease");
+  await page
+    .locator(".picker-item-name", { hasText: /^Grease$/ })
+    .first()
+    .click();
+  await page.getByRole("button", { name: /Learn for 1 gp · DC 15/ }).click();
+  await expect(page.getByText(/Learned Grease for 1 gp/)).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole("link", { name: /Grease/ }).first()).toBeVisible();
 
   await page.getByRole("button", { name: "Long rest" }).click();
   const restDialog = page.getByRole("dialog", { name: "Take a long rest" });

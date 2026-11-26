@@ -2,7 +2,7 @@
 
 Date: 2026-11-23
 
-Status: review complete. Sprint 1 (the daily spellcasting loop), the class-grant portion of Sprint 2, the first table-magic pass of Sprint 3, the magus studious-slot pass of Sprint 4, the animist prepared/spontaneous split of Sprint 5, the spontaneous known-at-rank pass of Sprint 6, the psychic psi-amp pass of Sprint 7, the table Sustain-reminder pass of Sprint 8, the higher-slot downcast pass of Sprint 9, the scroll-spellcasting pass of Sprint 10, the Magic Wand spellcasting pass of Sprint 11, the fixed-spell specific-wand pass of Sprint 12, the expanded/advanced domain pass of Sprint 13, the flexible-wand pass of Sprint 14, the staff/trait-restricted wand pass of Sprint 15, the ritual-detail pass of Sprint 16, the spell-source label pass of Sprint 17, the staff-slot/repeated-domain pass of Sprint 18, and the oracle mystery-domain pass of Sprint 19 were implemented on 2026-11-23 through 2026-11-24. The findings below describe the pre-Sprint state; the implementation status sections record what changed, and the remaining class and table gaps stay in the backlog.
+Status: review complete. Sprint 1 (the daily spellcasting loop), the class-grant portion of Sprint 2, the first table-magic pass of Sprint 3, the magus studious-slot pass of Sprint 4, the animist prepared/spontaneous split of Sprint 5, the spontaneous known-at-rank pass of Sprint 6, the psychic psi-amp pass of Sprint 7, the table Sustain-reminder pass of Sprint 8, the higher-slot downcast pass of Sprint 9, the scroll-spellcasting pass of Sprint 10, the Magic Wand spellcasting pass of Sprint 11, the fixed-spell specific-wand pass of Sprint 12, the expanded/advanced domain pass of Sprint 13, the flexible-wand pass of Sprint 14, the staff/trait-restricted wand pass of Sprint 15, the ritual-detail pass of Sprint 16, the spell-source label pass of Sprint 17, the staff-slot/repeated-domain pass of Sprint 18, the oracle mystery-domain pass of Sprint 19, and the Learn-a-Spell pass of Sprint 20 were implemented on 2026-11-23 through 2026-11-26. The findings below describe the pre-Sprint state; the implementation status sections record what changed, and the remaining class and table gaps stay in the backlog.
 
 > **Follow-up (2026-11-23):** `docs/RULES-AUDIT.md` corrected two table errors
 > this review did not catch: bards use the 2/3 full-caster slot table (not the
@@ -252,6 +252,17 @@ Oracle mystery-domain choices are implemented:
 - Domain Acumen can be taken multiple times; each pick must be a different mystery domain.
 - Later oracle domain feats and non-mystery domain access remain manual.
 
+## Sprint 20 implementation status (2026-11-26)
+
+Learn a Spell is implemented for spellbook, familiar, and dirge classes:
+
+- The sheet's Spells tab exposes **Learn spell**.
+- The picker shows the cost and DC for the selected spell before confirming.
+- Cost is 1 gp per rank for common spells, 2 gp for uncommon, 5 gp for rare, and 10 gp for unique; cantrips use rank-1 pricing.
+- The rank-based DC follows the Learn a Spell table.
+- Confirming deducts the gold and adds the spell to the character's known list. The check and downtime day remain manual; remove the spell if the check fails.
+- Starting-spellbook value, the two-free-spells-per-level budget, and a full spellbook/known split remain open.
+
 ## Rules baseline
 
 ### Core spellcasting
@@ -312,7 +323,8 @@ Legend: Yes = modeled and usable; Partial = some support with known gaps; No = n
 | Divine font | Yes | Rank, slot count, dual-font choice, separate usage |
 | Wizard curriculum | Partial | Extra slot and rank-1 validation; higher-rank curriculum lists remain manual |
 | Prepared cantrips | Yes | Daily prepared list, class caps, and the wizard curriculum extra |
-| Spell source presentation | Partial | Class-specific spellbook/familiar/dirge/spell-list/repertoire labels; full spellbook/known data split and Learn a Spell remain open |
+| Spell source presentation | Partial | Class-specific spellbook/familiar/dirge/spell-list/repertoire labels; the full spellbook/known data split remains open |
+| Learn a Spell | Partial | Cost by rank/rarity, rank DC, gold deduction, and known-list addition; the check, downtime day, and starting-spellbook budget remain manual |
 | Spontaneous repertoire limits | Yes | Bard, oracle, sorcerer, summoner, and psychic; rank copies count against each learned rank |
 | Spontaneous heightening by learned rank | Yes | Known ranks are tracked; signature spells heighten upward and non-signature spells can downcast from higher slots |
 | Signature spells | Yes | One per rank, level 3 gate, validation |
@@ -517,7 +529,7 @@ Fix: Treat this as a larger rules-engine feature. Add a secondary caster profile
 
 ### F14. Spellbook capacity and spell learning are not enforced (P2)
 
-The builder has no starting-spellbook check, no two-spells-per-level accounting, and no Learn a Spell cost. This is lower priority for a table tool because players often import or hand-wave spell acquisition, but it is part of the prepared-caster rules.
+Status: partly fixed in Sprint 20. The sheet's Learn a Spell picker computes the rank/rarity cost and DC, deducts gold, and adds the spell to the known list. The check, downtime day, starting-spellbook value, and two-free-spells-per-level budget remain manual.
 
 ## Sprint plan
 
