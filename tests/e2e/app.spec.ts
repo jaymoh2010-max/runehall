@@ -1012,6 +1012,67 @@ test("players add and remove custom inventory items", async ({ page }) => {
   await expect(plateRow.getByRole("button", { name: "Buy" })).toBeDisabled();
 });
 
+test("players adjust, sell, and drop inventory stacks and track afflictions", async ({ page }) => {
+  test.setTimeout(90_000);
+  await signIn(page, importer);
+  const campaignId = campaignPath.split("/").pop();
+  const listResponse = await page.request.get(`/api/characters?campaignId=${campaignId}`);
+  const list = (await listResponse.json()) as {
+    characters: { id: string; name: string }[];
+  };
+  const hero = list.characters.find((character) => character.name === "Pathbuilder E2E Hero");
+  expect(hero).toBeTruthy();
+
+  await page.goto(`/characters/${hero!.id}`);
+  await page.getByRole("button", { name: "Gear", exact: true }).click();
+  await page.getByPlaceholder("Search the item database").fill("Rope");
+  const searchRow = page.locator(".pb-item-row").filter({ hasText: "Rope" }).first();
+  await expect(searchRow).toBeVisible({ timeout: 15_000 });
+  await searchRow.getByRole("button", { name: "Buy" }).click();
+  await expect(page.getByText(/Bought 1× Rope/).first()).toBeVisible({ timeout: 15_000 });
+
+  const inventoryRow = page.locator(".pb-inventory-row").filter({ hasText: "Rope" }).first();
+  await inventoryRow.getByRole("button", { name: "Increase quantity" }).click();
+  await expect(inventoryRow).toContainText("×2");
+  await inventoryRow.getByRole("button", { name: "Decrease quantity" }).click();
+  await expect(inventoryRow).toContainText("×1");
+
+  page.once("dialog", (dialog) => dialog.accept());
+  await inventoryRow.getByRole("button", { name: "Sell", exact: true }).click();
+  await expect(page.getByText(/Sold 1× Rope for/)).toBeVisible({ timeout: 15_000 });
+  await expect(inventoryRow).toHaveCount(0);
+
+  await searchRow.getByRole("button", { name: "Buy" }).click();
+  await expect(page.getByText(/Bought 1× Rope/).first()).toBeVisible({ timeout: 15_000 });
+  page.once("dialog", (dialog) => dialog.accept());
+  await page
+    .locator(".pb-inventory-row")
+    .filter({ hasText: "Rope" })
+    .first()
+    .getByRole("button", { name: "Drop", exact: true })
+    .click();
+  await expect(page.getByText(/Dropped 1× Rope/)).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator(".pb-inventory-row").filter({ hasText: "Rope" })).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Status", exact: true }).click();
+  await page.getByRole("button", { name: "Add affliction" }).click();
+  const afflictionDialog = page.getByRole("dialog", { name: "Add affliction" });
+  await expect(afflictionDialog).toBeVisible();
+  await afflictionDialog.getByLabel("Name").fill("E2E venom");
+  await afflictionDialog.getByLabel("Recovery DC").fill("16");
+  await afflictionDialog.getByRole("button", { name: "Add affliction" }).click();
+  await expect(afflictionDialog).toBeHidden({ timeout: 15_000 });
+
+  const afflictionCard = page.locator(".pb-affliction").filter({ hasText: "E2E venom" });
+  await expect(afflictionCard).toContainText("Stage 1/3");
+  await afflictionCard.getByRole("button", { name: /save/ }).click();
+  await expect(page.getByText(/vs DC 16/)).toBeVisible({ timeout: 15_000 });
+  if (await afflictionCard.count()) {
+    await afflictionCard.getByRole("button", { name: "Remove", exact: true }).click();
+  }
+  await expect(page.getByText("No active afflictions.")).toBeVisible({ timeout: 15_000 });
+});
+
 test("Pathbuilder JSON import creates a character from the dashboard", async ({ page }) => {
   await signIn(page, admin);
   await page.getByRole("button", { name: "Import Pathbuilder" }).click();
@@ -1254,6 +1315,12 @@ test("GM adds an elite monster token from the bestiary", async ({ page }) => {
   await expect(quickPanel).toContainText("Goblin Warrior (Elite)");
   await expect(quickPanel.getByLabel("Armor class")).toBeVisible();
   await expect(quickPanel.getByRole("button", { name: "Add to initiative" })).toBeVisible();
+  const hpField = quickPanel.getByLabel("Current hit points");
+  const beforeHp = Number(await hpField.inputValue());
+  await quickPanel.getByLabel("Damage amount").fill("4");
+  await quickPanel.getByLabel("Damage type").selectOption("fire");
+  await quickPanel.getByRole("button", { name: "Apply", exact: true }).click();
+  await expect(hpField).toHaveValue(String(beforeHp - 4), { timeout: 15_000 });
 });
 
 test("builder completes a level-1 Fighter and reaches the sheet", async ({ page }) => {

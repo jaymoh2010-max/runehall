@@ -24,11 +24,13 @@ import {
 import type {
   AbilityKey,
   ActionRef,
+  CharacterAffliction,
   CharacterCondition,
   CharacterContext,
   CharacterCustomItem,
   CharacterDraft,
   CharacterRecord,
+  DegreeOfSuccess,
   DerivedCharacter,
   Equipment,
   SaveKey,
@@ -45,7 +47,20 @@ import {
   titleCase,
   withSourceSpellIds,
 } from "../../../shared/rules";
-import { currencyToCp, spendCurrency } from "../../../shared/inventory";
+import {
+  currencyToCp,
+  sellItemQuantity,
+  setItemQuantity,
+  spendCurrency,
+} from "../../../shared/inventory";
+import {
+  AFFLICTION_PRESETS,
+  afflictionTypeLabel,
+  applyAfflictionSave,
+  formatAfflictionDuration,
+  newAfflictionId,
+  normalizeAffliction,
+} from "../../../shared/afflictions";
 import { learnSpellCostCp, learnSpellDc } from "../../../shared/spellLearning";
 import {
   flexibleWandRank,
@@ -107,6 +122,7 @@ import {
   Spinner,
   Tag,
   Textarea,
+  Toggle,
 } from "../ui";
 
 type SheetTab =
@@ -386,6 +402,15 @@ export function CharacterSheetView({
   const [conditionName, setConditionName] = useState("");
   const [conditionValue, setConditionValue] = useState("");
   const [conditionDuration, setConditionDuration] = useState("");
+  const [afflictionOpen, setAfflictionOpen] = useState(false);
+  const [afflictionPresetId, setAfflictionPresetId] = useState(AFFLICTION_PRESETS[0]?.id ?? "");
+  const [afflictionName, setAfflictionName] = useState("");
+  const [afflictionDc, setAfflictionDc] = useState("16");
+  const [afflictionSave, setAfflictionSave] = useState<SaveKey>("fortitude");
+  const [afflictionOnset, setAfflictionOnset] = useState("");
+  const [afflictionInterval, setAfflictionInterval] = useState("");
+  const [afflictionDuration, setAfflictionDuration] = useState("");
+  const [afflictionVirulent, setAfflictionVirulent] = useState(false);
   const conditions = useConditionOptions();
   const [actions, setActions] = useState<ActionRef[]>([]);
   const [actionQuery, setActionQuery] = useState("");
@@ -940,6 +965,127 @@ export function CharacterSheetView({
     }));
   };
 
+  const selectAfflictionPreset = (presetId: string) => {
+    setAfflictionPresetId(presetId);
+    const preset = AFFLICTION_PRESETS.find((entry) => entry.id === presetId);
+    if (!preset) return;
+    setAfflictionName(preset.label.replace(/ template$/i, ""));
+    setAfflictionDc(String(preset.dc));
+    setAfflictionSave(preset.save);
+    setAfflictionOnset(preset.onset);
+    setAfflictionInterval(preset.interval);
+    setAfflictionDuration(preset.duration);
+    setAfflictionVirulent(preset.virulent);
+  };
+
+  const openAfflictionForm = () => {
+    selectAfflictionPreset(afflictionPresetId || AFFLICTION_PRESETS[0]?.id || "");
+    setAfflictionOpen(true);
+  };
+
+  const addAffliction = async () => {
+    if (!canEdit || !draft) return;
+    const preset = AFFLICTION_PRESETS.find((entry) => entry.id === afflictionPresetId);
+    const entry = normalizeAffliction({
+      id: newAfflictionId(),
+      name: afflictionName.trim() || preset?.label.replace(/ template$/i, ""),
+      type: preset?.type ?? "poison",
+      dc: Number(afflictionDc) || preset?.dc || 15,
+      save: afflictionSave,
+      stage: 1,
+      stageMax: preset?.stageMax ?? 3,
+      interval: afflictionInterval,
+      duration: afflictionDuration,
+      onset: afflictionOnset,
+      virulent: afflictionVirulent,
+      notes: preset?.notes ?? "",
+    });
+    if (!entry) return;
+    const saved = await persist((currentDraft) => ({
+      ...currentDraft,
+      play: {
+        ...currentDraft.play,
+        afflictions: [...currentDraft.play.afflictions, entry],
+      },
+    }));
+    if (!saved) return;
+    setAfflictionOpen(false);
+    toast(`${entry.name} added to the sheet.`, "success");
+  };
+
+  const removeAffliction = async (affliction: CharacterAffliction) => {
+    if (!canEdit) return;
+    const saved = await persist((currentDraft) => ({
+      ...currentDraft,
+      play: {
+        ...currentDraft.play,
+        afflictions: currentDraft.play.afflictions.filter((entry) => entry.id !== affliction.id),
+      },
+    }));
+    if (saved) toast(`${affliction.name} removed.`, "success");
+  };
+
+  const applyAfflictionSaveResult = async (
+    affliction: CharacterAffliction,
+    degree: DegreeOfSuccess,
+    detail: string
+  ) => {
+    const result = applyAfflictionSave(affliction, degree);
+    const nextAffliction = result.affliction;
+    const saved = await persist((currentDraft) => ({
+      ...currentDraft,
+      play: {
+        ...currentDraft.play,
+        afflictions: nextAffliction
+          ? currentDraft.play.afflictions.map((entry) =>
+              entry.id === affliction.id ? nextAffliction : entry
+            )
+          : currentDraft.play.afflictions.filter((entry) => entry.id !== affliction.id),
+      },
+    }));
+    if (!saved) return;
+    toast(`${detail} · ${result.message}`, result.outcome === "worsened" ? "error" : "success");
+  };
+
+  const rollAfflictionSave = (affliction: CharacterAffliction) => {
+    if (!canEdit || !derived) return;
+    const bonus = Math.round(derived.saves[affliction.save] ?? 0);
+    const formula = `1d20${signed(bonus)}`;
+    const label = `${affliction.name} ${titleCase(affliction.save)} save`;
+    if (!character?.campaignId) {
+      const roll = rollFormula(formula, { dc: affliction.dc, label });
+      void applyAfflictionSaveResult(
+        affliction,
+        roll.degree ?? "failure",
+        `${roll.total} vs DC ${affliction.dc}`
+      );
+      return;
+    }
+    getSocket().emit(
+      "dice:roll",
+      {
+        campaignId: character.campaignId,
+        formula,
+        label,
+        dc: affliction.dc,
+        visibility: sheetSecret ? "gm" : "all",
+        characterId: character.id,
+        requestId: null,
+      },
+      (message) => {
+        if (!message?.data || !("total" in message.data)) {
+          toast("That save could not be rolled.", "error");
+          return;
+        }
+        void applyAfflictionSaveResult(
+          affliction,
+          message.data.degree ?? "failure",
+          `${message.data.total} vs DC ${affliction.dc}`
+        );
+      }
+    );
+  };
+
   const buyItem = async (item: Equipment, mode: "buy" | "grant") => {
     if (!canEdit || !character || itemBusy) return;
     setItemBusy(item.id);
@@ -1033,6 +1179,52 @@ export function CharacterSheetView({
     setCustomItemView(null);
     toast("Custom item removed.", "success");
     if (characterRef.current) await applyRecord(characterRef.current);
+  };
+
+  const changeItemQuantity = async (itemId: string, nextQuantity: number) => {
+    if (!canEdit) return;
+    const entry = draftRef.current?.equipment.find((candidate) => candidate.itemId === itemId);
+    if (!entry) return;
+    const next = Math.max(1, Math.min(9999, Math.round(nextQuantity)));
+    if (next === entry.quantity) return;
+    await persist((currentDraft) => setItemQuantity(currentDraft, itemId, next));
+  };
+
+  const sellItemStack = async (
+    itemId: string,
+    quantity: number,
+    name: string,
+    unitPriceCp: number
+  ) => {
+    if (!canEdit) return;
+    const count = Math.max(1, Math.round(quantity));
+    const earnedCp = Math.floor((Math.max(0, unitPriceCp) * count) / 2);
+    if (earnedCp <= 0) {
+      toast(`${name} has no resale value.`, "info");
+      return;
+    }
+    if (!window.confirm(`Sell ${count}× ${name} for ${formatCp(earnedCp)}?`)) return;
+    const saved = await persist(
+      (currentDraft) => sellItemQuantity(currentDraft, itemId, count, unitPriceCp).draft
+    );
+    if (saved) toast(`Sold ${count}× ${name} for ${formatCp(earnedCp)}.`, "success");
+  };
+
+  const dropItemStack = async (itemId: string, quantity: number, name: string) => {
+    if (!canEdit) return;
+    const entry = draftRef.current?.equipment.find((candidate) => candidate.itemId === itemId);
+    if (!entry) return;
+    const count = Math.max(1, Math.min(entry.quantity, Math.round(quantity)));
+    if (!window.confirm(`Drop ${count}× ${name}? This removes it from the sheet.`)) return;
+    const saved = await persist((currentDraft) => ({
+      ...currentDraft,
+      equipment: currentDraft.equipment.flatMap((candidate) => {
+        if (candidate.itemId !== itemId) return [candidate];
+        const remaining = candidate.quantity - count;
+        return remaining > 0 ? [{ ...candidate, quantity: remaining }] : [];
+      }),
+    }));
+    if (saved) toast(`Dropped ${count}× ${name}.`, "info");
   };
 
   const openAreaPlacement = (spell: Spell, rank: number): void => {
@@ -2568,6 +2760,7 @@ export function CharacterSheetView({
                           const custom = entry.itemId.startsWith("custom:")
                             ? (customItemsById.get(entry.itemId) ?? null)
                             : null;
+                          const displayName = custom?.name ?? item?.name ?? entry.itemId;
                           const scrollRank = item ? scrollSpellRank(item) : null;
                           const wandRank = item ? wandSpellRank(item) : null;
                           const flexibleRank = item ? flexibleWandRank(item) : null;
@@ -2628,6 +2821,37 @@ export function CharacterSheetView({
                                 </Link>
                               )}
                               <div className="pb-row-actions">
+                                <div
+                                  className="pb-item-quantity"
+                                  role="group"
+                                  aria-label={`Quantity for ${displayName}`}
+                                >
+                                  <button
+                                    type="button"
+                                    className="pb-small-button"
+                                    disabled={!canEdit || entry.quantity <= 1}
+                                    aria-label="Decrease quantity"
+                                    title={`Decrease ${displayName} quantity`}
+                                    onClick={() =>
+                                      void changeItemQuantity(entry.itemId, entry.quantity - 1)
+                                    }
+                                  >
+                                    <Minus size={11} />
+                                  </button>
+                                  <span className="pb-item-quantity-value">{entry.quantity}</span>
+                                  <button
+                                    type="button"
+                                    className="pb-small-button"
+                                    disabled={!canEdit}
+                                    aria-label="Increase quantity"
+                                    title={`Increase ${displayName} quantity`}
+                                    onClick={() =>
+                                      void changeItemQuantity(entry.itemId, entry.quantity + 1)
+                                    }
+                                  >
+                                    <Plus size={11} />
+                                  </button>
+                                </div>
                                 {custom ? (
                                   <button
                                     type="button"
@@ -2779,6 +3003,43 @@ export function CharacterSheetView({
                                       onClick={() => toggleEquipment(entry.itemId, "invested")}
                                     >
                                       {entry.invested ? "Invested" : "Invest"}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="pb-small-button"
+                                      disabled={!canEdit || !item || item.price.cpTotal <= 0}
+                                      title={
+                                        item && item.price.cpTotal > 0
+                                          ? `Sell the stack for ${formatCp(
+                                              Math.floor((item.price.cpTotal * entry.quantity) / 2)
+                                            )}`
+                                          : "This item has no resale value."
+                                      }
+                                      onClick={() =>
+                                        void sellItemStack(
+                                          entry.itemId,
+                                          entry.quantity,
+                                          displayName,
+                                          item?.price.cpTotal ?? 0
+                                        )
+                                      }
+                                    >
+                                      Sell
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="pb-small-button"
+                                      disabled={!canEdit}
+                                      title="Drop the whole stack"
+                                      onClick={() =>
+                                        void dropItemStack(
+                                          entry.itemId,
+                                          entry.quantity,
+                                          displayName
+                                        )
+                                      }
+                                    >
+                                      Drop
                                     </button>
                                   </>
                                 )}
@@ -3675,10 +3936,95 @@ export function CharacterSheetView({
                   manual.
                 </p>
                 <div className="pb-subsection">
-                  <h3>Ongoing effects</h3>
+                  <div className="pb-status-head">
+                    <h3>Afflictions</h3>
+                    {canEdit ? (
+                      <button
+                        type="button"
+                        className="pb-small-button"
+                        onClick={openAfflictionForm}
+                      >
+                        <Plus size={12} /> Add affliction
+                      </button>
+                    ) : null}
+                  </div>
+                  {draft.play.afflictions.length ? (
+                    <div className="pb-affliction-list">
+                      {draft.play.afflictions.map((affliction) => (
+                        <div className="pb-affliction" key={affliction.id}>
+                          <div className="pb-affliction-head">
+                            <Tag
+                              tone={
+                                affliction.type === "curse"
+                                  ? "violet"
+                                  : affliction.type === "disease"
+                                    ? "green"
+                                    : "red"
+                              }
+                            >
+                              {afflictionTypeLabel(affliction.type)}
+                            </Tag>
+                            <strong>{affliction.name}</strong>
+                            <span className="tiny muted">
+                              Stage {affliction.stage}/{affliction.stageMax} · DC {affliction.dc}{" "}
+                              {titleCase(affliction.save)}
+                            </span>
+                          </div>
+                          <div className="pb-affliction-meta">
+                            {affliction.onsetRemaining !== null && affliction.onsetRemaining > 0 ? (
+                              <span className="tiny muted">
+                                Onset: {affliction.onsetRemaining} round
+                                {affliction.onsetRemaining === 1 ? "" : "s"} left
+                              </span>
+                            ) : affliction.interval ? (
+                              <span className="tiny muted">Save every {affliction.interval}</span>
+                            ) : (
+                              <span className="tiny muted">No periodic save</span>
+                            )}
+                            <span className="tiny muted">
+                              {affliction.duration
+                                ? affliction.durationRemaining === null
+                                  ? `Max ${affliction.duration} (manual)`
+                                  : formatAfflictionDuration(affliction.durationRemaining)
+                                : "Until cured"}
+                            </span>
+                            {affliction.virulent ? (
+                              <span className="tiny muted">
+                                Virulent
+                                {affliction.virulentSuccesses ? " · one success banked" : ""}
+                              </span>
+                            ) : null}
+                          </div>
+                          {affliction.notes ? (
+                            <p className="tiny muted">{affliction.notes}</p>
+                          ) : null}
+                          <div className="pb-affliction-actions">
+                            <button
+                              type="button"
+                              className="pb-small-button"
+                              disabled={!canEdit}
+                              onClick={() => rollAfflictionSave(affliction)}
+                            >
+                              <Dices size={12} /> Roll {titleCase(affliction.save)} save
+                            </button>
+                            <button
+                              type="button"
+                              className="pb-small-button"
+                              disabled={!canEdit}
+                              onClick={() => void removeAffliction(affliction)}
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="pb-empty">No active afflictions.</p>
+                  )}
                   <p className="pb-hint">
-                    Fast healing, persistent damage, and afflictions are tracked in the dice log and
-                    notes.
+                    A long rest advances timed maximum durations by eight hours and ends an
+                    affliction whose maximum duration runs out.
                   </p>
                 </div>
               </div>
@@ -3768,6 +4114,106 @@ export function CharacterSheetView({
         preparedCaster={preparedCaster}
         onRest={(result) => void takeLongRest(result)}
       />
+      <Modal
+        open={afflictionOpen}
+        onClose={() => setAfflictionOpen(false)}
+        title="Add affliction"
+        subtitle="Track a poison, disease, or curse with its recovery saves."
+        elevated={mode === "overlay"}
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setAfflictionOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              disabled={!afflictionName.trim()}
+              onClick={() => void addAffliction()}
+            >
+              Add affliction
+            </Button>
+          </>
+        }
+      >
+        <div className="stack">
+          <Field
+            label="Template"
+            hint="Templates fill the recovery frame. Every field stays editable."
+          >
+            <Select
+              value={afflictionPresetId}
+              onChange={(event) => selectAfflictionPreset(event.target.value)}
+            >
+              {AFFLICTION_PRESETS.map((preset) => (
+                <option key={preset.id} value={preset.id}>
+                  {preset.label}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Field label="Name">
+            <Input
+              value={afflictionName}
+              maxLength={80}
+              onChange={(event) => setAfflictionName(event.target.value)}
+            />
+          </Field>
+          <div className="pb-affliction-form-grid">
+            <Field label="Recovery DC">
+              <Input
+                type="number"
+                min={1}
+                max={60}
+                value={afflictionDc}
+                onChange={(event) => setAfflictionDc(event.target.value)}
+              />
+            </Field>
+            <Field label="Save">
+              <Select
+                value={afflictionSave}
+                onChange={(event) => setAfflictionSave(event.target.value as SaveKey)}
+              >
+                <option value="fortitude">Fortitude</option>
+                <option value="reflex">Reflex</option>
+                <option value="will">Will</option>
+              </Select>
+            </Field>
+            <Field label="Onset">
+              <Input
+                value={afflictionOnset}
+                placeholder="e.g. 1 round"
+                maxLength={40}
+                onChange={(event) => setAfflictionOnset(event.target.value)}
+              />
+            </Field>
+            <Field label="Save interval">
+              <Input
+                value={afflictionInterval}
+                placeholder="e.g. 1 day"
+                maxLength={40}
+                onChange={(event) => setAfflictionInterval(event.target.value)}
+              />
+            </Field>
+            <Field label="Maximum duration">
+              <Input
+                value={afflictionDuration}
+                placeholder="e.g. 7 days"
+                maxLength={40}
+                onChange={(event) => setAfflictionDuration(event.target.value)}
+              />
+            </Field>
+          </div>
+          <Toggle
+            checked={afflictionVirulent}
+            onChange={setAfflictionVirulent}
+            label="Virulent (two consecutive successes per stage)"
+          />
+          <p className="tiny muted">
+            Round-based onset and intervals can be advanced in the dice log. Day- or hour-based
+            intervals stay manual; a long rest advances the maximum duration by eight hours.
+          </p>
+        </div>
+      </Modal>
       <DailyPreparationsModal
         open={prepOpen}
         onClose={() => setPrepOpen(false)}
