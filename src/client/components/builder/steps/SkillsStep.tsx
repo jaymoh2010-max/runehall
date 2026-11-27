@@ -419,7 +419,7 @@ export function SkillsStep({ draft, update, derived, context, setStep }: Builder
             input.value = "";
           }}
         >
-          <Input name="lore" placeholder="e.g. Absalom Lore" />
+          <Input name="lore" placeholder="e.g. Absalom Lore" aria-label="New lore skill" />
           <Button type="submit" icon={<Plus size={14} />}>
             Add lore
           </Button>

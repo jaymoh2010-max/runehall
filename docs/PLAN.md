@@ -111,7 +111,7 @@ The target table size is one GM plus 4–10 players. That means the product shou
 ### Phase 7 — Desktop performance and polish (built)
 - Route-level code splitting and an enforced entry JS/CSS gzip budget.
 - Generated scene thumbnails plus lazy image loading across pickers, avatars, and attachment galleries.
-- Focus-trapped dialogs, focus restoration, a skip link, reduced-motion support, and improved secondary-text contrast.
+- Focus-trapped dialogs and the in-table sheet overlay, focus restoration, a skip link, reduced-motion support, improved secondary-text contrast, status/alert toasts, and a browser audit that checks accessible names across the main pages and tabs.
 - First-run campaign setup checklist.
 - Desktop-first scope; mobile and tablet layouts are intentionally deferred.
 
