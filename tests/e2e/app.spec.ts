@@ -1404,6 +1404,80 @@ test("builder completes a level-1 Fighter and reaches the sheet", async ({ page 
   await expect(page.getByText("Fighter").first()).toBeVisible();
 });
 
+test("builder tracks commander tactics and prepares the daily folio", async ({ page }) => {
+  test.setTimeout(90_000);
+  await signIn(page, admin);
+  const expandedCampaign = `E2E Commander ${runId}`;
+  const created = await page.request.post("/api/campaigns", {
+    data: { name: expandedCampaign, ruleset: "expanded" },
+  });
+  expect(created.ok()).toBe(true);
+  await openNewCharacterInCampaign(page, "E2E Commander", expandedCampaign);
+
+  await goToStep(page, "Ancestry");
+  await page.locator(".ancestry-grid .selection-card").filter({ hasText: "Human" }).first().click();
+  await goToStep(page, "Heritage");
+  await page
+    .locator(".selection-grid .selection-card")
+    .filter({ hasText: "Skilled Human" })
+    .click();
+  await goToStep(page, "Background");
+  await page
+    .locator(".selection-grid .selection-card")
+    .filter({ hasText: "Warrior" })
+    .first()
+    .click();
+  await goToStep(page, "Class");
+  await page
+    .locator(".class-grid")
+    .getByRole("button", { name: /Commander/ })
+    .click();
+
+  await goToStep(page, "Abilities");
+  await setBoost(page, "Ancestry boosts", ["str", "con"]);
+  await setBoost(page, "Background boosts", ["str", "con"]);
+  for (const [index, ability] of ["int", "str", "con", "wis"].entries()) {
+    await page.getByLabel(`Free boost ${index + 1}`).selectOption(ability);
+  }
+
+  await goToStep(page, "Skills");
+  await page
+    .locator(".skill-picker")
+    .filter({ hasText: "Skilled Human training" })
+    .getByRole("combobox")
+    .selectOption("stealth");
+  await trainClassSkills(page, ["Acrobatics", "Medicine"]);
+
+  await goToStep(page, "Feats");
+  await pickFeat(page, "Ancestry feat", "Haughty Obstinacy");
+  await pickFeat(page, "Class feat", "Plant Banner");
+  const tacticsCard = page.locator(".commander-tactics");
+  await expect(tacticsCard).toBeVisible();
+  for (const tactic of ["Alley-Oop", "Double Team", "Reload!"]) {
+    await tacticsCard.getByLabel("Add tactic to folio").selectOption({ label: tactic });
+  }
+  await expect(tacticsCard).toContainText("3/5 folio");
+  for (let index = 0; index < 3; index += 1) {
+    await tacticsCard.getByRole("button", { name: "Prepare", exact: true }).first().click();
+  }
+  await expect(tacticsCard).toContainText("3/3 prepared");
+
+  await goToStep(page, "Spells");
+  await expect(page.getByText("No spellcasting preparation required.")).toBeVisible();
+  await goToStep(page, "Gear");
+  await page.getByRole("button", { name: /Take .* as coins/ }).click();
+  await goToStep(page, "Review");
+  await page.getByRole("link", { name: "Open character sheet" }).click();
+  await expect(page).toHaveURL(/\/characters\/[^/]+$/, { timeout: 15_000 });
+  await expect(page.getByRole("heading", { name: "E2E Commander" })).toBeVisible();
+  await page.getByRole("button", { name: "Actions", exact: true }).click();
+  const prepared = page.locator(".pb-subsection").filter({ hasText: "Prepared tactics" });
+  await expect(prepared).toContainText("3/3");
+  await expect(prepared).toContainText("Alley-Oop");
+  await expect(prepared).toContainText("Double Team");
+  await expect(prepared).toContainText("Reload!");
+});
+
 test("builder warns before replacing a class with dependent choices", async ({ page }) => {
   await signIn(page, admin);
   await page.goto(`${fighterSheetPath}/edit`);

@@ -24,15 +24,16 @@ This is the working list for the P2 items in `docs/AUDIT.md` and
 | Read-only compendium types | Done | Hazards, vehicles, familiars, boons/curses, traits, and afflictions are in the library. |
 | Wizard higher-rank curriculum data | Done | The generated school data includes ranks 0-9 and is wired into class grants. |
 | Innate spell frequency | Done | `spells.innateMax` stores an explicit daily maximum; the builder exposes 1-5/day and prose remains the fallback. |
-| Commander tactics and Runesmith runes | Open | Need pickers and repertoire tracking. |
+| Commander tactics | Done | Folio and daily preparation limits, builder picker, sheet prepared-tactics list, and validation. Tactic tiers stay manual. |
+| Runesmith runes | Open | The compendium does not expose a structured rune list; needs data before a picker. |
 | Background prose-only grants | Open | Needs curated overrides for backgrounds whose choices exist only in prose. |
 
 ## Suggested next batches
 
-1. **Commander and Runesmith:** add tactic/rune pickers, separate resources, and
-   sheet tracking. Treat as a feature batch, not a data patch.
-2. **Background prose grants:** add curated overrides for backgrounds whose
+1. **Background prose grants:** add curated overrides for backgrounds whose
    choices exist only in prose.
+2. **Runesmith runes:** source a structured rune list, then add repertoire,
+   etching, and invocation tracking. Treat as a feature batch.
 
 Before starting a rules batch, check `git worktree list` and the open branches
 so two sessions do not edit the same sheet or rules files concurrently.
