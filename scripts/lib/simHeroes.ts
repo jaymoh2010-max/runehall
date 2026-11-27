@@ -25,6 +25,7 @@ import {
 import { featAllowedByHeritageGrant, heritageFeatGrant } from "../../src/shared/heritage";
 import { activeGrantChoiceGroups } from "../../src/shared/classGrantChoices";
 import { selectedClassGrants } from "../../src/shared/classGrants";
+import { applyBackgroundGrantOverrides } from "../../src/shared/backgroundGrants";
 import { SKILLS } from "../../src/shared/types";
 import type {
   AbilityKey,
@@ -76,7 +77,10 @@ export function buildSimulatedHero(options: SimulatedHeroOptions): CharacterDraf
         (entry) =>
           entry.ancestry === ancestry.name || entry.ancestrySlug === ancestry.name.toLowerCase()
       ) ?? null);
-  const background = byName(backgrounds, options.backgroundName ?? "Warrior") ?? backgrounds[0];
+  const background =
+    applyBackgroundGrantOverrides(
+      byName(backgrounds, options.backgroundName ?? "Warrior") ?? backgrounds[0]
+    ) ?? backgrounds[0];
   const classData = byName(classes, options.className);
   if (!classData) throw new Error(`Unknown class in compendium: ${options.className}`);
 
@@ -92,6 +96,22 @@ export function buildSimulatedHero(options: SimulatedHeroOptions): CharacterDraf
   draft.skills.classSkills = (classData.skillChoices ?? []).flatMap((group) =>
     group.options.slice(0, group.count)
   );
+
+  for (const group of background.skillChoices) {
+    for (const skill of group.options.slice(0, group.count)) {
+      if (!draft.skills.background.includes(skill)) draft.skills.background.push(skill);
+    }
+  }
+  for (const group of background.loreChoices) {
+    const options = group.options.length
+      ? group.options
+      : Array.from({ length: group.count }, (_, index) => `Simulation ${index + 1} Lore`);
+    for (const lore of options.slice(0, group.count)) {
+      if (!draft.skills.backgroundLore.includes(lore)) draft.skills.backgroundLore.push(lore);
+    }
+  }
+  const backgroundFeat = background.featChoices[0]?.options[0];
+  if (backgroundFeat) draft.backgroundFeat = backgroundFeat.id;
 
   if (heritage?.name === "Skilled Human") {
     draft.featChoices[heritage.id] = ["stealth"];
@@ -297,7 +317,9 @@ export function contextForDraft(draft: CharacterDraft): CharacterContext {
   return {
     ancestry: ancestries.find((entry) => entry.id === draft.ancestryId) ?? null,
     heritage: heritages.find((entry) => entry.id === draft.heritageId) ?? null,
-    background: backgrounds.find((entry) => entry.id === draft.backgroundId) ?? null,
+    background: applyBackgroundGrantOverrides(
+      backgrounds.find((entry) => entry.id === draft.backgroundId) ?? null
+    ),
     classData: classes.find((entry) => entry.id === draft.classId) ?? null,
     deity: deities.find((entry) => entry.id === draft.deityId) ?? null,
     feats: Object.fromEntries(
