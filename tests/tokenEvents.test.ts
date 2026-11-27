@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { tokenBroadcaster } from "../src/server/tokenEvents";
+import { tokenBroadcaster } from "../src/shared/tokenBroadcast";
 import type { Token } from "../src/shared/types";
 
 const token = (overrides: Partial<Token> = {}): Token => ({
