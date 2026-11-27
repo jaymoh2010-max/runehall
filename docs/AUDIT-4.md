@@ -2,7 +2,7 @@
 
 Audit date: 2026-11-27
 
-Reviewed commits: `3065879` (initial audit) and `5b1d050` (second pass merged over the background-grant and Runesmith work)
+Reviewed commits: `3065879` (initial audit) and `de78752` (fourth pass, after background grants, Runesmith, and inventory lifecycle)
 
 Scope: database and migrations, backups/restore, rules engine and spellcasting, items and inventory, compendium data, server/socket authorization, and the table/sheet client. The initial read-only audit and the second fix pass ran on dedicated worktrees; the second pass is on `audit/gaps-2-2026-11-27`.
 
@@ -10,9 +10,9 @@ Scope: database and migrations, backups/restore, rules engine and spellcasting, 
 
 | Command | Result |
 | --- | --- |
-| `npm run check` | Pass (typecheck, lint, 840 unit tests, build, bundle budget) |
+| `npm run check` | Pass (typecheck, lint, 850 unit tests, build, bundle budget) |
 | `npm run smoke` | Pass, including persistent-damage automation |
-| `npm run e2e` | 43 passed |
+| `npm run e2e` | 44 passed |
 | `npm run simulate:campaign` | 18 passed, 0 failed |
 | `npm run simulate` | 2,337 characters; 0 problems |
 | `npm run simulate:parties` | 23 passed, 0 failed |
@@ -89,6 +89,15 @@ The post-P2 inventory batch closed the remaining item lifecycle findings:
 - **Staff daily reset.** `staffBaseCharges` records the base daily pool; a long rest discards extra expended-slot charges.
 - **Item transfers.** The sheet exposes a Give modal; custom-item definitions are copied to the receiver and removed from the source when the stack is gone.
 
+## Fourth pass
+
+The P3 affliction batch closed the remaining published-affliction gap:
+
+- **Compendium affliction picker.** The sheet searches the 215 published poisons, diseases, and curses, prefills DC, save, onset, interval, duration, and stage count, keeps stage text in notes, and stores the compendium source id for a library link (`src/client/components/sheet/AfflictionPicker.tsx`, `src/shared/afflictions.ts`).
+- **Poison item link.** Poison-trait inventory entries expose a Track action that opens the picker with the item name.
+- **Per-category search.** The affliction API now filters by poison/disease/curse (`src/server/compendium.ts`).
+- **Coverage.** Added conversion and normalization tests plus an E2E flow that adds Lich Dust from the compendium.
+
 ## Remaining findings
 
 No critical or high-severity findings remain from this audit. The items below are medium/low, optional features, or deliberate trust-model decisions.
@@ -96,7 +105,6 @@ No critical or high-severity findings remain from this audit. The items below ar
 ### Medium
 
 - **Rune etch/detach is still builder-only.** Sale/drop now warns and includes rune value, but there is no live etch/detach action that consumes the matching rune item. Minimal fix: add the action and block invalid double-payment.
-- **Compendium afflictions and poisons are not linked to the tracker.** The Add Affliction form only offers six generic presets; 107 poisons exist as equipment, and 13 poison afflictions have no equipment entry. Minimal fix: add an affliction picker that prefills DC/onset/interval/stages and link poison items to it.
 - **Migration 55 was reused in an abandoned branch.** A database from that branch records `campaign_player_item_grant` as version 55; current `travel_day_history` then retries 55 and fails on every start. The runner only selects `version`, not name/checksum. Minimal fix: store/verify migration names and emit an actionable conflict error; never reuse versions.
 - **Asset/audio bookkeeping is not fully atomic.** Audio upload/delete can leave stale rows (`src/server/routes/uploads.ts:205-350`), and `cleanup-assets --delete` can race an in-flight upload. A shared reference scanner and transactional deletion/trash staging would close these.
 - **Large imports still hold the event loop and write lock.** Quotas now apply, but a 50 MB embedded archive remains a synchronous transaction. Add a rate limit or background import if large imports are expected.

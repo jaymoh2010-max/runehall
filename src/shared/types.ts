@@ -911,6 +911,8 @@ export type AfflictionType = "poison" | "disease" | "curse";
 
 export interface CharacterAffliction {
   id: string;
+  /** Compendium affliction id when this tracker came from a published statblock. */
+  sourceId?: string | null;
   name: string;
   type: AfflictionType;
   /** Recovery-check DC. */

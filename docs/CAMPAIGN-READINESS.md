@@ -126,7 +126,7 @@ These are optional campaign variants; the base Remastered rules do not require t
 
 - Unusual feat, item, heritage, and class effects may remain prose-only. Automation badges are conservative. Common situational feats such as Shield Block, Ride, Assurance, Trick Magic Item, and Quick Identification now record their table rules as partial automation notes; Skill Training applies its first chosen skill.
 - Compendium hazard statblocks and ready-made hazard presets are not bundled. GMs can save custom hazards in the NPC & hazard library with trigger, disable, and routine text, then award hazard XP separately.
-- Compendium affliction statblocks are not bundled. Built-in recovery-frame templates cover common poison, disease, and curse shapes; stage effects remain manual.
+- Compendium affliction statblocks are available in the library and can prefill the recovery tracker from the sheet; stage effects and unusual removal conditions remain manual.
 - Some action-count spell variants, fixed-rank heightening, and data conflicts stay manual.
 - Difficult terrain, elevation/flying, squeezing, forced movement, flanking automation, and token-to-token collision are not automated.
 - AoE templates list affected tokens and track round durations, but do not apply saves or damage automatically.

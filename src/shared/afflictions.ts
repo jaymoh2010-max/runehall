@@ -1,5 +1,6 @@
 import { rollFormula } from "./dice";
 import type {
+  Affliction,
   AfflictionType,
   CharacterAffliction,
   CharacterDraft,
@@ -261,8 +262,65 @@ export function normalizeAffliction(input: unknown): CharacterAffliction | null 
     virulentSuccesses: virulent ? clampInt(raw.virulentSuccesses, 0, 1, 0) : 0,
     virulentCrit: raw.virulentCrit === "streak" ? "streak" : "reduce",
     savesCanEnd: raw.savesCanEnd !== false,
+    ...(typeof raw.sourceId === "string" && raw.sourceId.trim()
+      ? { sourceId: raw.sourceId.trim().slice(0, 120) }
+      : {}),
     notes: typeof raw.notes === "string" ? raw.notes.slice(0, 1_000) : "",
   };
+}
+
+function plainStageText(value: string): string {
+  return String(value ?? "")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;|&#160;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function stageInterval(stages: string[]): string {
+  const first = stages[0] ?? "";
+  const match = first.match(/\(([^)]+)\)\s*$/);
+  return match ? match[1].trim().slice(0, 40) : "";
+}
+
+function parseSavingThrow(value: string): { dc: number; save: SaveKey } {
+  const match = String(value ?? "").match(/DC\s*(\d+)\s*(fortitude|reflex|will)/i);
+  return {
+    dc: match ? clampInt(match[1], 1, 60, 15) : 15,
+    save: normalizeSave(match?.[2]?.toLowerCase()),
+  };
+}
+
+/**
+ * Convert a published affliction statblock into a tracker. Stage text stays in
+ * notes because the sheet does not automate stage effects.
+ */
+export function afflictionFromCompendium(record: Affliction): CharacterAffliction | null {
+  const name = String(record.name ?? "").trim();
+  if (!name) return null;
+  const stages = Array.isArray(record.stages) ? record.stages : [];
+  const savingThrow = parseSavingThrow(record.savingThrow);
+  const stageNotes = stages
+    .map((stage, index) => `${index + 1}) ${plainStageText(stage)}`)
+    .join("; ");
+  return normalizeAffliction({
+    id: newAfflictionId(),
+    sourceId: record.id,
+    name,
+    type: record.category,
+    dc: savingThrow.dc,
+    save: savingThrow.save,
+    stage: 1,
+    stageMax: Math.max(1, Math.min(10, stages.length)),
+    interval: stageInterval(stages),
+    onset: record.onset ?? "",
+    duration: record.duration ?? "",
+    virulent:
+      record.traits.some((trait) => /virulent/i.test(trait)) ||
+      /virulent/i.test(record.description ?? ""),
+    notes: stageNotes ? `Stages: ${stageNotes}` : "",
+  });
 }
 
 export function normalizeAfflictions(input: unknown): CharacterAffliction[] {

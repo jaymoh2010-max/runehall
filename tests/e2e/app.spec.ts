@@ -1071,6 +1071,25 @@ test("players adjust, sell, and drop inventory stacks and track afflictions", as
   await page.getByRole("button", { name: "Add affliction" }).click();
   const afflictionDialog = page.getByRole("dialog", { name: "Add affliction" });
   await expect(afflictionDialog).toBeVisible();
+  await afflictionDialog.getByRole("button", { name: "Browse compendium" }).click();
+  const afflictionPicker = page.getByRole("dialog", { name: "Add from compendium" });
+  await expect(afflictionPicker).toBeVisible();
+  await afflictionPicker.getByLabel("Search compendium afflictions").fill("Lich Dust");
+  const lichResult = afflictionPicker.locator(".picker-item").filter({ hasText: "Lich Dust" });
+  await expect(lichResult).toBeVisible({ timeout: 15_000 });
+  await lichResult.click();
+  await expect(afflictionDialog).toBeVisible();
+  await expect(afflictionDialog.getByLabel("Name")).toHaveValue("Lich Dust");
+  await expect(afflictionDialog.getByLabel("Recovery DC")).toHaveValue("28");
+  await afflictionDialog.getByRole("button", { name: "Add affliction" }).click();
+  const lichCard = page.locator(".pb-affliction").filter({ hasText: "Lich Dust" });
+  await expect(lichCard).toContainText("Stage 1/2");
+  await expect(lichCard).toContainText("DC 28");
+  await lichCard.getByRole("button", { name: "Remove", exact: true }).click();
+  await expect(lichCard).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Add affliction" }).click();
+  await expect(afflictionDialog).toBeVisible();
   await afflictionDialog.getByLabel("Name").fill("E2E venom");
   await afflictionDialog.getByLabel("Recovery DC").fill("16");
   await afflictionDialog.getByRole("button", { name: "Add affliction" }).click();

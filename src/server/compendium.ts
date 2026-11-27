@@ -440,7 +440,11 @@ export function searchTraits(opts: SearchOptions) {
 }
 
 export function searchAfflictions(opts: SearchOptions) {
-  return searchList(afflictions, opts, (affliction) => affliction.level);
+  const categories = (opts.category ?? []).map((category) => category.toLowerCase());
+  const filtered = categories.length
+    ? afflictions.filter((affliction) => categories.includes(affliction.category))
+    : afflictions;
+  return searchList(filtered, opts, (affliction) => affliction.level);
 }
 
 export function searchDeities(q?: string, limit = 80) {

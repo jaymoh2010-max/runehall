@@ -4,6 +4,7 @@ import {
   AFFLICTION_TYPES,
   advanceAfflictionDuration,
   afflictionDurationSeconds,
+  afflictionFromCompendium,
   afflictionOnsetPassed,
   afflictionRounds,
   applyAfflictionSave,
@@ -16,7 +17,7 @@ import {
   resolveAfflictionTurnEnd,
 } from "../src/shared/afflictions";
 import { emptyCharacterDraft } from "../src/shared/rules";
-import type { CharacterAffliction, CharacterDraft } from "../src/shared/types";
+import type { Affliction, CharacterAffliction, CharacterDraft } from "../src/shared/types";
 
 describe("affliction templates", () => {
   it("bundles unique, valid recovery frames", () => {
@@ -69,6 +70,46 @@ function withAffliction(overrides: Partial<CharacterAffliction> = {}): Character
   draft.play.afflictions = [affliction(overrides)];
   return draft;
 }
+
+describe("compendium afflictions", () => {
+  it("converts a published statblock into an editable tracker", () => {
+    const record = {
+      id: "aff:equipment-121",
+      name: "Lich Dust",
+      type: "affliction",
+      category: "poison",
+      level: 9,
+      rarity: "common",
+      traits: ["Alchemical", "Consumable", "Ingested", "Poison"],
+      description: "<p>Dust with paralytic properties.</p>",
+      savingThrow: "DC 28 Fortitude",
+      onset: "10 minutes",
+      stages: ["fatigued (1 minute)", "5d6 poison damage, fatigued, and paralyzed (1 minute)"],
+      usage: "held in 1 hand",
+      duration: "6 minutes",
+      source: "Core Rulebook",
+      license: "ORC",
+      remaster: true,
+      playtest: false,
+    } as Affliction;
+    const tracker = afflictionFromCompendium(record);
+    expect(tracker).toMatchObject({
+      sourceId: "aff:equipment-121",
+      name: "Lich Dust",
+      type: "poison",
+      dc: 28,
+      save: "fortitude",
+      stage: 1,
+      stageMax: 2,
+      interval: "1 minute",
+      onset: "10 minutes",
+      duration: "6 minutes",
+      virulent: false,
+    });
+    expect(tracker?.notes).toContain("5d6 poison damage");
+    expect(normalizeAffliction(tracker)?.sourceId).toBe("aff:equipment-121");
+  });
+});
 
 describe("afflictions", () => {
   it("normalizes untrusted affliction data and clamps values", () => {

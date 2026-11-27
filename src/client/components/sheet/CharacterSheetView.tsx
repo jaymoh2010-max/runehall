@@ -24,6 +24,7 @@ import {
 import type {
   AbilityKey,
   ActionRef,
+  Affliction,
   CharacterAffliction,
   CharacterCondition,
   CharacterContext,
@@ -59,6 +60,7 @@ import {
 } from "../../../shared/inventory";
 import {
   AFFLICTION_PRESETS,
+  afflictionFromCompendium,
   afflictionTypeLabel,
   applyAfflictionSave,
   formatAfflictionDuration,
@@ -114,6 +116,7 @@ import { useConditionOptions } from "../../conditionOptions";
 import { errorMessage, useToasts } from "../../stores";
 import { DailyPreparationsModal } from "../DailyPreparationsModal";
 import { LongRestModal } from "../LongRestModal";
+import { AfflictionPicker } from "./AfflictionPicker";
 
 const CharacterBuilderPage = lazy(() =>
   import("../../pages/CharacterBuilderPage").then((module) => ({
@@ -421,11 +424,16 @@ export function CharacterSheetView({
   const [afflictionPresetId, setAfflictionPresetId] = useState(AFFLICTION_PRESETS[0]?.id ?? "");
   const [afflictionName, setAfflictionName] = useState("");
   const [afflictionDc, setAfflictionDc] = useState("16");
+  const [afflictionStageMax, setAfflictionStageMax] = useState(3);
   const [afflictionSave, setAfflictionSave] = useState<SaveKey>("fortitude");
   const [afflictionOnset, setAfflictionOnset] = useState("");
   const [afflictionInterval, setAfflictionInterval] = useState("");
   const [afflictionDuration, setAfflictionDuration] = useState("");
   const [afflictionVirulent, setAfflictionVirulent] = useState(false);
+  const [afflictionNotes, setAfflictionNotes] = useState("");
+  const [afflictionSourceId, setAfflictionSourceId] = useState<string | null>(null);
+  const [afflictionPickerOpen, setAfflictionPickerOpen] = useState(false);
+  const [afflictionPickerQuery, setAfflictionPickerQuery] = useState("");
   const conditions = useConditionOptions();
   const [actions, setActions] = useState<ActionRef[]>([]);
   const [actionQuery, setActionQuery] = useState("");
@@ -1056,19 +1064,45 @@ export function CharacterSheetView({
 
   const selectAfflictionPreset = (presetId: string) => {
     setAfflictionPresetId(presetId);
+    setAfflictionSourceId(null);
     const preset = AFFLICTION_PRESETS.find((entry) => entry.id === presetId);
     if (!preset) return;
     setAfflictionName(preset.label.replace(/ template$/i, ""));
     setAfflictionDc(String(preset.dc));
+    setAfflictionStageMax(preset.stageMax);
     setAfflictionSave(preset.save);
     setAfflictionOnset(preset.onset);
     setAfflictionInterval(preset.interval);
     setAfflictionDuration(preset.duration);
     setAfflictionVirulent(preset.virulent);
+    setAfflictionNotes(preset.notes);
   };
 
   const openAfflictionForm = () => {
     selectAfflictionPreset(afflictionPresetId || AFFLICTION_PRESETS[0]?.id || "");
+    setAfflictionOpen(true);
+  };
+
+  const openAfflictionPicker = (query = "") => {
+    setAfflictionPickerQuery(query);
+    setAfflictionPickerOpen(true);
+  };
+
+  const applyCompendiumAffliction = (record: Affliction) => {
+    const entry = afflictionFromCompendium(record);
+    if (!entry) return;
+    setAfflictionPresetId("");
+    setAfflictionSourceId(entry.sourceId ?? null);
+    setAfflictionName(entry.name);
+    setAfflictionDc(String(entry.dc));
+    setAfflictionStageMax(entry.stageMax);
+    setAfflictionSave(entry.save);
+    setAfflictionOnset(entry.onset);
+    setAfflictionInterval(entry.interval);
+    setAfflictionDuration(entry.duration);
+    setAfflictionVirulent(entry.virulent);
+    setAfflictionNotes(entry.notes);
+    setAfflictionPickerOpen(false);
     setAfflictionOpen(true);
   };
 
@@ -1082,12 +1116,13 @@ export function CharacterSheetView({
       dc: Number(afflictionDc) || preset?.dc || 15,
       save: afflictionSave,
       stage: 1,
-      stageMax: preset?.stageMax ?? 3,
+      stageMax: afflictionStageMax,
       interval: afflictionInterval,
       duration: afflictionDuration,
       onset: afflictionOnset,
       virulent: afflictionVirulent,
-      notes: preset?.notes ?? "",
+      sourceId: afflictionSourceId,
+      notes: afflictionNotes || preset?.notes || "",
     });
     if (!entry) return;
     const saved = await persist((currentDraft) => ({
@@ -3132,6 +3167,9 @@ export function CharacterSheetView({
                           const wandRank = item ? wandSpellRank(item) : null;
                           const flexibleRank = item ? flexibleWandRank(item) : null;
                           const useInfo = item ? itemUseInfo(item) : null;
+                          const poisonItem = Boolean(
+                            item?.traits?.some((trait) => trait.toLowerCase() === "poison")
+                          );
                           const attachedRuneValueCp = (entry.runes ?? []).reduce(
                             (sum, runeId) => sum + (context.equipment[runeId]?.price.cpTotal ?? 0),
                             0
@@ -3386,6 +3424,18 @@ export function CharacterSheetView({
                                         onClick={() => void activateInventoryItem(item)}
                                       >
                                         {useInfo.label}
+                                      </button>
+                                    ) : null}
+                                    {item && poisonItem ? (
+                                      <button
+                                        type="button"
+                                        className="pb-small-button"
+                                        disabled={!canEdit}
+                                        aria-label={`Track ${item.name} affliction`}
+                                        title="Open the affliction tracker with this poison"
+                                        onClick={() => openAfflictionPicker(item.name)}
+                                      >
+                                        Track
                                       </button>
                                     ) : null}
                                     {item?.price ? (
@@ -4515,6 +4565,14 @@ export function CharacterSheetView({
                             <p className="tiny muted">{affliction.notes}</p>
                           ) : null}
                           <div className="pb-affliction-actions">
+                            {affliction.sourceId ? (
+                              <Link
+                                className="pb-link tiny"
+                                to={`/library/affliction/${affliction.sourceId}`}
+                              >
+                                Compendium
+                              </Link>
+                            ) : null}
                             <button
                               type="button"
                               className="pb-small-button"
@@ -4631,6 +4689,13 @@ export function CharacterSheetView({
         onRest={(result) => void takeLongRest(result)}
         elevated={mode === "overlay"}
       />
+      <AfflictionPicker
+        open={afflictionPickerOpen}
+        onClose={() => setAfflictionPickerOpen(false)}
+        initialQuery={afflictionPickerQuery}
+        elevated={mode === "overlay"}
+        onSelect={applyCompendiumAffliction}
+      />
       <Modal
         open={afflictionOpen}
         onClose={() => setAfflictionOpen(false)}
@@ -4653,6 +4718,21 @@ export function CharacterSheetView({
         }
       >
         <div className="stack">
+          <div className="row-between">
+            <p className="tiny muted">
+              Pick a published statblock, or start from a recovery-frame template.
+            </p>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => {
+                setAfflictionOpen(false);
+                openAfflictionPicker();
+              }}
+            >
+              Browse compendium
+            </Button>
+          </div>
           <Field
             label="Template"
             hint="Templates fill the recovery frame. Every field stays editable."
@@ -4725,6 +4805,17 @@ export function CharacterSheetView({
             onChange={setAfflictionVirulent}
             label="Virulent (two consecutive successes per stage)"
           />
+          <Field
+            label="Notes / stages"
+            hint="Stage text is kept here; its effects stay manual at the table."
+          >
+            <Textarea
+              value={afflictionNotes}
+              maxLength={1000}
+              rows={3}
+              onChange={(event) => setAfflictionNotes(event.target.value)}
+            />
+          </Field>
           <p className="tiny muted">
             Round-based onset and intervals can be advanced in the dice log. Day- or hour-based
             intervals stay manual; a long rest advances the maximum duration by eight hours.
