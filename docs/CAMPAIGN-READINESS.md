@@ -15,7 +15,7 @@ Runehall is a complete **campaign table**, with a few deliberate boundaries:
 - **Ready:** accounts and invites, campaign membership, 1-20 character building, live sheets, server-rolled combat, HP/dying/wounded, conditions, afflictions, item activation, prepared/spontaneous/focus/innate casting, journal/handouts, export/import, backup/restore, and administrator moderation.
 - **Campaign surface:** Table, Party, Journal, and Settings only. Removed-feature tables are gone; legacy session-zero, faction, lore, and chapter data is export/import-only archive data with no live UI or mutation endpoint.
 - **GM-facing preparation:** encounters, waves, hazards-as-XP, scenes, and the campaign journal.
-- **Manual by design:** optional variant rules, unusual feat/item effects, published-adventure conversion, hex-grid mapping, and long-running project bookkeeping.
+- **Manual by design:** optional variant rules, unusual feat/item effects, published-adventure conversion, hex-grid mapping, and long-running project bookkeeping. Condition application, durations, and ambiguous interactions stay with the GM; the sheet applies the numeric modifiers for tracked conditions.
 
 The rest of this document records what is verified and what remains manual, so a GM can decide before session zero.
 
@@ -29,6 +29,7 @@ The rest of this document records what is verified and what remains manual, so a
 | Unit tests | 796 passing |
 | `npm run e2e` | 40 passing browser scenarios |
 | `npm run smoke` | End-to-end smoke suite passes |
+| `npm run audit:prod` | 0 production dependency vulnerabilities |
 | `npm run simulate` | 2,337 characters, 145 class/level matrix builds, 578 option builds, 38 ancestries × 269 backgrounds; 0 problems |
 | `npm run simulate:feats` | 144,565 class/feat combinations checked; 39,166 accessible feats reflected on the sheet; 0 failures |
 | `npm run simulate:campaign` | 18 passed, 0 failed, 0 observations per run |
@@ -80,6 +81,7 @@ The campaign simulation exercises two complete 1-20 campaigns per run, one XP an
 - Administrator account moderation: suspend/restore, revoke sessions, and promote/demote administrators with last-admin safeguards. Suspension revokes sessions and disconnects live sockets.
 - Registration modes, a production `BOOTSTRAP_TOKEN` gate for the first administrator, single-use invite codes, expiry, revocation, and a pending-invite cap.
 - Audit log with retention controls and CSV export.
+- Production dependencies are audited in CI with `npm run audit:prod`.
 - Upload quotas, a low-disk guard, and backup/restore checks that refuse archives missing database-referenced uploads.
 - Backup staging publishes a completed archive with a single rename, so interrupted backups are not mistaken for valid ones.
 - Pending schema upgrades take a verified database snapshot first; a failed migration restores it automatically, and older snapshots are pruned with `MIGRATION_BACKUP_KEEP`.
@@ -157,7 +159,7 @@ npm run backup -- --dir D:\RunehallBackups --keep 14
 npm run restore -- --from "D:\RunehallBackups\runehall-..." --yes
 ```
 
-See [BACKUP.md](BACKUP.md), [DEPLOY.md](DEPLOY.md), and [FIRST-CAMPAIGN.md](FIRST-CAMPAIGN.md) for operational steps.
+See [BACKUP.md](BACKUP.md), [DEPLOY.md](DEPLOY.md), and [FIRST-CAMPAIGN.md](FIRST-CAMPAIGN.md) for operational steps, and [P2-BACKLOG.md](P2-BACKLOG.md) for the remaining polish and rules-completeness work.
 
 ---
 

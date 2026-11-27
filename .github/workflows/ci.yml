@@ -29,6 +29,9 @@ jobs:
       - name: Install
         run: npm ci
 
+      - name: Production dependency audit
+        run: npm run audit:prod
+
       - name: Typecheck
         run: npm run typecheck
 
