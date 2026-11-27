@@ -1739,6 +1739,8 @@ export interface InitiativeEntry {
   actionsUsed?: number;
   /** Reactions spent since the start of this combatant's most recent turn, 0-1. */
   reactionsUsed?: number;
+  /** True while the player still needs to roll initiative during combat setup. */
+  pending?: boolean;
 }
 
 export type JournalKind = "note" | "handout";
@@ -2017,6 +2019,26 @@ export interface ClientToServerEvents {
     sceneId: string;
     tokenIds?: string[];
   }) => void;
+  "initiative:start": (
+    payload: { campaignId: string; sceneId?: string },
+    ack?: (result: { ok: boolean; pending?: number; error?: string }) => void
+  ) => void;
+  "initiative:submit": (
+    payload: { campaignId: string; entryId: string },
+    ack?: (result: { ok: boolean; initiative?: number; error?: string }) => void
+  ) => void;
+  "initiative:begin": (
+    payload: { campaignId: string },
+    ack?: (result: { ok: boolean; error?: string }) => void
+  ) => void;
+  "initiative:end-turn": (
+    payload: { campaignId: string },
+    ack?: (result: { ok: boolean; error?: string }) => void
+  ) => void;
+  "initiative:end": (
+    payload: { campaignId: string },
+    ack?: (result: { ok: boolean; error?: string }) => void
+  ) => void;
   "initiative:update": (payload: {
     campaignId: string;
     entries: InitiativeEntry[];

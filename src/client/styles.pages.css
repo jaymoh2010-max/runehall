@@ -10153,6 +10153,57 @@ body.table-fullscreen-active {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.initiative-npc-badge {
+  margin-left: 5px;
+  padding: 1px 4px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  color: var(--muted-2);
+  font-size: 0.6rem;
+  letter-spacing: 0.04em;
+}
+.combat-setup-bar {
+  position: relative;
+  z-index: 12;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  padding: 6px 10px;
+  border: 1px solid rgba(200, 169, 107, 0.28);
+  border-radius: 7px;
+  background: #0b1017;
+  flex-wrap: wrap;
+}
+.combat-setup-copy {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 0.78rem;
+}
+.combat-setup-copy strong {
+  color: var(--gold-bright);
+}
+.combat-setup-copy span {
+  color: var(--muted);
+}
+.combat-setup-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.initiative-pending {
+  padding: 2px 6px;
+  border: 1px solid rgba(200, 169, 107, 0.3);
+  border-radius: 999px;
+  color: var(--gold);
+  font-size: 0.65rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
 
 .core-audio {
   border-bottom: 1px solid var(--line);

@@ -491,6 +491,64 @@ export function VttTable({ initial, campaignId, user, isGm, active }: VttTablePr
     getSocket().emit("initiative:roll", { campaignId, sceneId: activeSceneId });
   };
 
+  const startCombat = () => {
+    if (!activeSceneId) {
+      toast("Choose a scene before starting combat.", "info");
+      return;
+    }
+    if (
+      (initiative.length || round > 0) &&
+      !window.confirm("Start a new combat? This replaces the current initiative order.")
+    ) {
+      return;
+    }
+    getSocket().emit("initiative:start", { campaignId, sceneId: activeSceneId }, (result) => {
+      if (!result?.ok) {
+        toast(result?.error ?? "Could not start combat.", "error");
+        return;
+      }
+      toast(
+        result.pending
+          ? `Combat setup: waiting for ${result.pending} initiative roll${
+              result.pending === 1 ? "" : "s"
+            }.`
+          : "Combat started.",
+        "success"
+      );
+    });
+  };
+
+  const submitInitiative = (entryId: string) => {
+    getSocket().emit("initiative:submit", { campaignId, entryId }, (result) => {
+      if (result?.ok) toast(`Initiative ${result.initiative}.`, "success");
+    });
+  };
+
+  const beginCombat = () => {
+    getSocket().emit("initiative:begin", { campaignId }, (result) => {
+      if (!result?.ok) {
+        toast(result?.error ?? "Could not begin combat.", "error");
+        return;
+      }
+      toast("Combat started. Round 1.", "success");
+    });
+  };
+
+  const endTurn = () => {
+    getSocket().emit("initiative:end-turn", { campaignId });
+  };
+
+  const endCombat = () => {
+    if (!window.confirm("End combat and clear the initiative order?")) return;
+    getSocket().emit("initiative:end", { campaignId }, (result) => {
+      if (!result?.ok) {
+        toast(result?.error ?? "Could not end combat.", "error");
+        return;
+      }
+      toast("Combat ended.", "success");
+    });
+  };
+
   const emitInitiative = (entries: InitiativeEntry[], nextRound = round, nextTurn = turnIndex) => {
     getSocket().emit("initiative:update", {
       campaignId,
@@ -498,11 +556,6 @@ export function VttTable({ initial, campaignId, user, isGm, active }: VttTablePr
       round: nextRound,
       turnIndex: nextTurn,
     });
-  };
-
-  const clearInitiative = () => {
-    if (!window.confirm("Clear the entire initiative order?")) return;
-    emitInitiative([], 1, 0);
   };
 
   const addSelectedToInitiative = () => {
@@ -751,6 +804,8 @@ export function VttTable({ initial, campaignId, user, isGm, active }: VttTablePr
         onNextScene={nextScene ? () => activateScene(nextScene.id) : undefined}
         onOpenScenes={() => setSceneManagerOpen(true)}
         onAddToken={() => setAddTokenOpen(true)}
+        onStartCombat={startCombat}
+        combatSetup={round === 0}
         bestiaryOpen={bestiaryOpen}
         onToggleBestiary={() => {
           setBestiaryOpen((open) => !open);
@@ -816,8 +871,13 @@ export function VttTable({ initial, campaignId, user, isGm, active }: VttTablePr
             round={round}
             turnIndex={turnIndex}
             isGm={isGm}
+            myUserId={user.id}
+            onStartCombat={startCombat}
+            onSubmitInitiative={submitInitiative}
+            onBeginCombat={beginCombat}
+            onEndTurn={endTurn}
+            onEndCombat={endCombat}
             onRoll={rollInitiative}
-            onClear={clearInitiative}
             onEndRound={() => emitInitiative(initiative, round + 1, 0)}
             onRemove={(entryId) => getSocket().emit("initiative:remove", { campaignId, entryId })}
             onReroll={(entryId) => getSocket().emit("initiative:reroll", { campaignId, entryId })}

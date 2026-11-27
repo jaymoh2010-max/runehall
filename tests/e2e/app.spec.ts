@@ -1161,6 +1161,21 @@ test("GM places a token, chats, rolls, and opens the scenes manager", async ({ p
   await page.getByRole("menuitem", { name: /End round/ }).click();
   await expect(page.locator(".initiative-round strong")).toHaveText(String(roundBefore + 1));
 
+  page.once("dialog", (dialog) => dialog.accept());
+  await initiativeControls.getByRole("button", { name: "GM", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Start combat" }).click();
+  await expect(page.locator(".combat-setup-bar")).toContainText("Combat setup");
+  await page.getByRole("button", { name: "Begin combat" }).click();
+  await expect(page.locator(".initiative-round strong")).toHaveText("1");
+  await page.getByRole("button", { name: "End turn" }).click();
+  await expect(page.locator(".initiative-round strong")).toHaveText("2");
+
+  page.once("dialog", (dialog) => dialog.accept());
+  await initiativeControls.getByRole("button", { name: "GM", exact: true }).click();
+  await page.getByRole("menuitem", { name: "End combat" }).click();
+  await expect(page.locator(".initiative-chip")).toHaveCount(0);
+  await expect(page.locator(".initiative-round strong")).toHaveText("1");
+
   await page.getByRole("button", { name: /E2E Hero, character token/ }).click();
   const quickPanel = page.locator(".core-token-panel");
   await expect(quickPanel).toBeVisible();

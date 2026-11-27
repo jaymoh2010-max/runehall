@@ -588,6 +588,7 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
                 diagonalSteps: numberValue(entry.diagonalSteps, 0, 0, 10_000),
                 actionsUsed: clamp(numberValue(entry.actionsUsed, 0, 0, 3), 0, 3),
                 reactionsUsed: clamp(numberValue(entry.reactionsUsed, 0, 0, 1), 0, 1),
+                pending: entry.pending === true,
               };
             })
         : [];

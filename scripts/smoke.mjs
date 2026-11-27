@@ -2153,6 +2153,63 @@ async function main() {
   await rerollPromise;
   log("initiative roll and individual reroll reached the player");
 
+  const setupPromise = waitForEvent(
+    playerSocket,
+    "initiative:updated",
+    (payload) =>
+      payload.round === 0 &&
+      payload.entries.some((item) => item.tokenId === token.id && item.pending)
+  );
+  const setupResult = await emitAck(gmSocket, "initiative:start", {
+    campaignId: campaign.id,
+    sceneId: scene.id,
+  });
+  const setup = await setupPromise;
+  if (!setupResult?.ok || setupResult.pending !== 1) {
+    throw new Error("Starting combat did not create one pending player roll");
+  }
+  const pendingEntry = setup.entries.find((item) => item.tokenId === token.id);
+  if (!pendingEntry?.pending) throw new Error("Player token was not pending initiative");
+
+  const submittedPromise = waitForEvent(
+    playerSocket,
+    "initiative:updated",
+    (payload) =>
+      payload.round === 1 &&
+      payload.entries.some((item) => item.id === pendingEntry.id && !item.pending)
+  );
+  const submitted = await emitAck(playerSocket, "initiative:submit", {
+    campaignId: campaign.id,
+    entryId: pendingEntry.id,
+  });
+  await submittedPromise;
+  if (!submitted?.ok || typeof submitted.initiative !== "number") {
+    throw new Error("Player initiative submission did not produce a roll");
+  }
+
+  const endedTurnPromise = waitForEvent(
+    gmSocket,
+    "initiative:updated",
+    (payload) => payload.round === 2
+  );
+  const endedTurn = await emitAck(playerSocket, "initiative:end-turn", {
+    campaignId: campaign.id,
+  });
+  await endedTurnPromise;
+  if (!endedTurn?.ok) throw new Error("The active player could not end their turn");
+
+  const endedCombatPromise = waitForEvent(
+    playerSocket,
+    "initiative:updated",
+    (payload) => payload.entries.length === 0
+  );
+  const endedCombat = await emitAck(gmSocket, "initiative:end", {
+    campaignId: campaign.id,
+  });
+  await endedCombatPromise;
+  if (!endedCombat?.ok) throw new Error("The GM could not end combat");
+  log("combat setup, player initiative, end turn, and end combat work");
+
   const smokeGroup = "grp_smoke";
   const goblinOne = await emitAck(gmSocket, "token:create", {
     campaignId: campaign.id,

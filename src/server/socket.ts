@@ -426,7 +426,48 @@ function groupTokens(sceneId: string, groupId: string): TokenRow[] {
     .all(sceneId, groupId) as TokenRow[];
 }
 
-function initiativeEntriesForTokens(tokens: TokenRow[]): InitiativeEntry[] {
+/** A player-owned combatant waits for its owner to roll initiative. */
+function pendingInitiativeEntryForToken(row: TokenRow): InitiativeEntry {
+  const bonus = row.initiative_bonus ?? initiativeBonusForToken(row);
+  return {
+    id: newId("init"),
+    tokenId: row.id,
+    name: row.name,
+    initiative: 0,
+    color: row.color,
+    ownerId: row.owner_id,
+    sceneId: row.scene_id,
+    groupId: row.group_id,
+    perception: bonus,
+    pending: true,
+    movementUsed: 0,
+    diagonalSteps: 0,
+    actionsUsed: 0,
+    reactionsUsed: 0,
+  };
+}
+
+function initiativeEntryForCombatToken(
+  row: TokenRow,
+  campaignId: string,
+  pendingPlayers: boolean
+): InitiativeEntry {
+  if (pendingPlayers && row.owner_id) {
+    const ownerRole = getCampaignRole(campaignId, row.owner_id);
+    // Player-controlled tokens, plus a GM's own linked character, roll their
+    // own initiative. Unlinked NPC/monster tokens still auto-roll.
+    if (ownerRole === "player" || (ownerRole === "gm" && row.character_id)) {
+      return pendingInitiativeEntryForToken(row);
+    }
+  }
+  return initiativeEntryForToken(row);
+}
+
+function initiativeEntriesForTokens(
+  tokens: TokenRow[],
+  campaignId?: string,
+  pendingPlayers = false
+): InitiativeEntry[] {
   const groups = new Map<string, TokenRow[]>();
   const singles: TokenRow[] = [];
   for (const token of tokens) {
@@ -439,7 +480,11 @@ function initiativeEntriesForTokens(tokens: TokenRow[]): InitiativeEntry[] {
     groups.set(token.group_id, members);
   }
   return [
-    ...singles.map((token) => initiativeEntryForToken(token)),
+    ...singles.map((token) =>
+      campaignId
+        ? initiativeEntryForCombatToken(token, campaignId, pendingPlayers)
+        : initiativeEntryForToken(token)
+    ),
     ...[...groups.values()].map((members) =>
       members.length > 1 ? initiativeEntryForGroup(members) : initiativeEntryForToken(members[0])
     ),
@@ -556,6 +601,7 @@ function createToken(
   const row = tokenRow(id)!;
   const token = tokenWithOwner(row);
   socketTokenEvents(io, campaignId).created(token);
+  addTokenToSetup(io, campaignId, row);
   touchCampaign(campaignId);
   return token;
 }
@@ -571,10 +617,126 @@ function rollInitiative(
     .all(sceneId) as TokenRow[];
   const chosen = tokenIds?.length ? tokens.filter((token) => tokenIds.includes(token.id)) : tokens;
   const entries = sortInitiative(initiativeEntriesForTokens(chosen));
-  const state = ensureState(campaignId);
+  ensureState(campaignId);
   db.prepare(
     "UPDATE campaign_state SET initiative = ?, round = 1, turn_index = 0, active_scene_id = ?, updated_at = ? WHERE campaign_id = ?"
   ).run(JSON.stringify(entries), sceneId, now(), campaignId);
+  broadcastInitiative(io, campaignId, ensureState(campaignId));
+}
+
+/**
+ * Enter combat setup. Monsters and GM-controlled tokens roll immediately;
+ * player-owned tokens stay pending until their owner rolls from the table UI.
+ */
+function startCombat(io: TypedServer, campaignId: string, sceneId: string): number {
+  const tokens = db
+    .prepare("SELECT * FROM tokens WHERE scene_id = ? AND hidden = 0")
+    .all(sceneId) as TokenRow[];
+  const entries = sortInitiative(initiativeEntriesForTokens(tokens, campaignId, true));
+  const pending = entries.filter((entry) => entry.pending).length;
+  ensureState(campaignId);
+  db.prepare(
+    "UPDATE campaign_state SET initiative = ?, round = ?, turn_index = 0, active_scene_id = ?, updated_at = ? WHERE campaign_id = ?"
+  ).run(JSON.stringify(entries), pending ? 0 : 1, sceneId, now(), campaignId);
+  broadcastInitiative(io, campaignId, ensureState(campaignId));
+  return pending;
+}
+
+/** Fill any outstanding player rolls and begin round one. */
+function beginCombat(io: TypedServer, campaignId: string): void {
+  const state = ensureState(campaignId);
+  const entries = serializeInitiative(JSON.parse(state.initiative || "[]"));
+  for (const entry of entries) {
+    if (!entry.pending) continue;
+    const rolled = rollFormula("1d20", {}).d20 ?? 10;
+    entry.initiative = rolled + (entry.perception ?? 0);
+    entry.pending = false;
+  }
+  const sorted = sortInitiative(entries);
+  db.prepare(
+    "UPDATE campaign_state SET initiative = ?, round = 1, turn_index = 0, updated_at = ? WHERE campaign_id = ?"
+  ).run(JSON.stringify(sorted), now(), campaignId);
+  broadcastInitiative(io, campaignId, ensureState(campaignId));
+}
+
+function submitInitiativeRoll(
+  io: TypedServer,
+  campaignId: string,
+  entryId: string,
+  userId: string,
+  role: "gm" | "player" | null
+): { ok: boolean; initiative?: number; error?: string } {
+  const state = ensureState(campaignId);
+  if (state.round !== 0) {
+    return { ok: false, error: "Combat is already underway." };
+  }
+  const entries = serializeInitiative(JSON.parse(state.initiative || "[]"));
+  const entry = entries.find((candidate) => candidate.id === entryId);
+  if (!entry || !entry.pending) {
+    return { ok: false, error: "That initiative roll is no longer pending." };
+  }
+  if (role !== "gm" && entry.ownerId !== userId) {
+    return { ok: false, error: "You can only roll initiative for your own token." };
+  }
+  const rolled = rollFormula("1d20", {}).d20 ?? 10;
+  entry.initiative = rolled + (entry.perception ?? 0);
+  entry.pending = false;
+  const sorted = sortInitiative(entries);
+  const stillPending = sorted.some((candidate) => candidate.pending);
+  db.prepare(
+    "UPDATE campaign_state SET initiative = ?, round = ?, turn_index = 0, updated_at = ? WHERE campaign_id = ?"
+  ).run(JSON.stringify(sorted), stillPending ? 0 : 1, now(), campaignId);
+  broadcastInitiative(io, campaignId, ensureState(campaignId));
+  return { ok: true, initiative: entry.initiative };
+}
+
+/** Advance the active marker, wrapping into the next round. */
+function advanceInitiativeTurn(io: TypedServer, campaignId: string, direction: 1 | -1): boolean {
+  const state = ensureState(campaignId);
+  if (state.round === 0) return false;
+  const entries = serializeInitiative(JSON.parse(state.initiative || "[]"));
+  if (!entries.length) return false;
+  let turn = state.turn_index + direction;
+  let round = state.round;
+  if (turn >= entries.length) {
+    turn = 0;
+    round += 1;
+  } else if (turn < 0) {
+    turn = entries.length - 1;
+    round = Math.max(1, round - 1);
+  }
+  db.prepare(
+    "UPDATE campaign_state SET turn_index = ?, round = ?, updated_at = ? WHERE campaign_id = ?"
+  ).run(turn, round, now(), campaignId);
+  broadcastInitiative(io, campaignId, ensureState(campaignId));
+  if (round > state.round) expireSceneTemplates(io, campaignId, round);
+  return true;
+}
+
+/** Add a token placed during combat setup without restarting the encounter. */
+function addTokenToSetup(io: TypedServer, campaignId: string, row: TokenRow): void {
+  if (row.hidden) return;
+  const state = ensureState(campaignId);
+  if (state.round !== 0 || state.active_scene_id !== row.scene_id) return;
+  const entries = serializeInitiative(JSON.parse(state.initiative || "[]"));
+  if (row.group_id) {
+    if (entries.some((entry) => entry.groupId === row.group_id)) return;
+    const members = groupTokens(row.scene_id, row.group_id);
+    entries.push(
+      members.length > 1
+        ? initiativeEntryForGroup(members)
+        : initiativeEntryForCombatToken(row, campaignId, true)
+    );
+  } else {
+    if (entries.some((entry) => entry.tokenId === row.id)) return;
+    entries.push(initiativeEntryForCombatToken(row, campaignId, true));
+  }
+  const sorted = sortInitiative(entries);
+  db.prepare("UPDATE campaign_state SET initiative = ?, updated_at = ? WHERE campaign_id = ?").run(
+    JSON.stringify(sorted),
+    now(),
+    campaignId
+  );
   broadcastInitiative(io, campaignId, ensureState(campaignId));
 }
 
@@ -1674,6 +1836,83 @@ export function registerSocketServer(io: TypedServer): void {
       touchCampaign(campaignId);
     });
 
+    on("initiative:start", ({ campaignId, sceneId }, ack) => {
+      if (!requireGm(socket, campaignId)) {
+        ack?.({ ok: false, error: "Only the GM can start combat." });
+        return;
+      }
+      const state = ensureState(campaignId);
+      const chosenScene = sceneId || state.active_scene_id;
+      if (!chosenScene || !sceneBelongs(chosenScene, campaignId)) {
+        ack?.({ ok: false, error: "Choose a scene before starting combat." });
+        return;
+      }
+      const pending = startCombat(io, campaignId, chosenScene);
+      touchCampaign(campaignId);
+      ack?.({ ok: true, pending });
+    });
+
+    on("initiative:submit", ({ campaignId, entryId }, ack) => {
+      const role = getCampaignRole(campaignId, socket.data.user.id);
+      if (!role) {
+        ack?.({ ok: false, error: "You're not a member of that campaign." });
+        return;
+      }
+      const result = submitInitiativeRoll(io, campaignId, entryId, socket.data.user.id, role);
+      if (result.ok) touchCampaign(campaignId);
+      else if (result.error) sendError(socket, result.error);
+      ack?.(result);
+    });
+
+    on("initiative:begin", ({ campaignId }, ack) => {
+      if (!requireGm(socket, campaignId)) {
+        ack?.({ ok: false, error: "Only the GM can begin combat." });
+        return;
+      }
+      beginCombat(io, campaignId);
+      touchCampaign(campaignId);
+      ack?.({ ok: true });
+    });
+
+    on("initiative:end-turn", ({ campaignId }, ack) => {
+      const state = ensureState(campaignId);
+      const entries = serializeInitiative(JSON.parse(state.initiative || "[]"));
+      const active = entries[state.turn_index] ?? null;
+      if (!active || state.round === 0) {
+        ack?.({ ok: false, error: "Combat is not active." });
+        return;
+      }
+      const role = getCampaignRole(campaignId, socket.data.user.id);
+      if (!role) {
+        ack?.({ ok: false, error: "You're not a member of that campaign." });
+        return;
+      }
+      if (role !== "gm" && active.ownerId !== socket.data.user.id) {
+        ack?.({ ok: false, error: "It is not your turn." });
+        sendError(socket, "It is not your turn.");
+        return;
+      }
+      if (!advanceInitiativeTurn(io, campaignId, 1)) {
+        ack?.({ ok: false, error: "Combat is not active." });
+        return;
+      }
+      touchCampaign(campaignId);
+      ack?.({ ok: true });
+    });
+
+    on("initiative:end", ({ campaignId }, ack) => {
+      if (!requireGm(socket, campaignId)) {
+        ack?.({ ok: false, error: "Only the GM can end combat." });
+        return;
+      }
+      db.prepare(
+        "UPDATE campaign_state SET initiative = '[]', round = 1, turn_index = 0, updated_at = ? WHERE campaign_id = ?"
+      ).run(now(), campaignId);
+      broadcastInitiative(io, campaignId, ensureState(campaignId));
+      touchCampaign(campaignId);
+      ack?.({ ok: true });
+    });
+
     on("initiative:update", ({ campaignId, entries, round, turnIndex }) => {
       if (!requireGm(socket, campaignId)) return;
       ensureState(campaignId);
@@ -1704,11 +1943,12 @@ export function registerSocketServer(io: TypedServer): void {
               diagonalSteps: safeInt(entry.diagonalSteps, 0, 0, 10_000),
               actionsUsed: safeInt(entry.actionsUsed, 0, 0, 3),
               reactionsUsed: safeInt(entry.reactionsUsed, 0, 0, 1),
+              pending: entry.pending === true,
             }))
         : [];
       const current = ensureState(campaignId);
       const nextTurn = safeInt(turnIndex, 0, 0, Math.max(0, clean.length - 1));
-      const nextRound = safeInt(round, current.round, 1, 999);
+      const nextRound = safeInt(round, current.round, 0, 999);
       // The order is a reference, not a rules engine. Changing it (including
       // the active marker) never applies damage, conditions, or turn effects.
       db.prepare(
@@ -1721,24 +1961,7 @@ export function registerSocketServer(io: TypedServer): void {
 
     on("initiative:next", ({ campaignId, direction }) => {
       if (!requireGm(socket, campaignId)) return;
-      const state = ensureState(campaignId);
-      const entries = serializeInitiative(JSON.parse(state.initiative || "[]"));
-      if (!entries.length) return;
-      const dir = direction === -1 ? -1 : 1;
-      let turn = state.turn_index + dir;
-      let round = state.round;
-      if (turn >= entries.length) {
-        turn = 0;
-        round += 1;
-      } else if (turn < 0) {
-        turn = entries.length - 1;
-        round = Math.max(1, round - 1);
-      }
-      db.prepare(
-        "UPDATE campaign_state SET turn_index = ?, round = ?, updated_at = ? WHERE campaign_id = ?"
-      ).run(turn, round, now(), campaignId);
-      broadcastInitiative(io, campaignId, ensureState(campaignId));
-      if (round > state.round) expireSceneTemplates(io, campaignId, round);
+      if (!advanceInitiativeTurn(io, campaignId, direction === -1 ? -1 : 1)) return;
       touchCampaign(campaignId);
     });
 
@@ -1747,6 +1970,7 @@ export function registerSocketServer(io: TypedServer): void {
       const row = tokenRow(tokenId);
       if (!row || !sceneBelongs(row.scene_id, campaignId)) return;
       const state = ensureState(campaignId);
+      const setup = state.round === 0;
       const entries = serializeInitiative(JSON.parse(state.initiative || "[]"));
       const activeId = entries[state.turn_index]?.id ?? null;
       if (row.group_id) {
@@ -1755,11 +1979,17 @@ export function registerSocketServer(io: TypedServer): void {
         entries.push(
           members.length > 1
             ? initiativeEntryForGroup(members)
-            : initiativeEntryForToken(row, typeof value === "number" ? value : undefined)
+            : setup && typeof value !== "number"
+              ? initiativeEntryForCombatToken(row, campaignId, true)
+              : initiativeEntryForToken(row, typeof value === "number" ? value : undefined)
         );
       } else {
         if (entries.some((entry) => entry.tokenId === tokenId)) return;
-        entries.push(initiativeEntryForToken(row, typeof value === "number" ? value : undefined));
+        entries.push(
+          setup && typeof value !== "number"
+            ? initiativeEntryForCombatToken(row, campaignId, true)
+            : initiativeEntryForToken(row, typeof value === "number" ? value : undefined)
+        );
       }
       entries.sort((a, b) => b.initiative - a.initiative || a.name.localeCompare(b.name));
       const nextTurn = activeId

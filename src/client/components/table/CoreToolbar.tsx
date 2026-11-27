@@ -12,6 +12,7 @@ import {
   Minimize2,
   Plus,
   Ruler,
+  Swords,
   UserRound,
   Users,
 } from "lucide-react";
@@ -25,6 +26,8 @@ export function CoreToolbar({
   onNextScene,
   onOpenScenes,
   onAddToken,
+  onStartCombat,
+  combatSetup,
   bestiaryOpen,
   onToggleBestiary,
   fogBrush,
@@ -54,6 +57,8 @@ export function CoreToolbar({
   onNextScene?: () => void;
   onOpenScenes: () => void;
   onAddToken: () => void;
+  onStartCombat: () => void;
+  combatSetup: boolean;
   bestiaryOpen: boolean;
   onToggleBestiary: () => void;
   fogBrush: "reveal" | "hide" | null;
@@ -114,6 +119,16 @@ export function CoreToolbar({
               title="Open the bestiary"
             >
               Bestiary
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              className={combatSetup ? "is-active" : ""}
+              icon={<Swords size={14} />}
+              onClick={onStartCombat}
+              title="Start combat and call for player initiative"
+            >
+              {combatSetup ? "Combat setup" : "Start combat"}
             </Button>
           </>
         ) : null}

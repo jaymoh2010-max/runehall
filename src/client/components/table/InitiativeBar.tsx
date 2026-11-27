@@ -52,8 +52,13 @@ export function InitiativeBar({
   round,
   turnIndex,
   isGm,
+  myUserId,
+  onStartCombat,
+  onSubmitInitiative,
+  onBeginCombat,
+  onEndTurn,
+  onEndCombat,
   onRoll,
-  onClear,
   onEndRound,
   onRemove,
   onReroll,
@@ -66,8 +71,13 @@ export function InitiativeBar({
   round: number;
   turnIndex: number;
   isGm: boolean;
+  myUserId: string;
+  onStartCombat: () => void;
+  onSubmitInitiative: (entryId: string) => void;
+  onBeginCombat: () => void;
+  onEndTurn: () => void;
+  onEndCombat: () => void;
   onRoll: () => void;
-  onClear: () => void;
   onEndRound: () => void;
   onRemove: (entryId: string) => void;
   onReroll: (entryId: string) => void;
@@ -81,8 +91,12 @@ export function InitiativeBar({
   const [manualName, setManualName] = useState("");
   const [manualValue, setManualValue] = useState("10");
   const menuRef = useRef<HTMLDivElement>(null);
-  const active = entries[turnIndex] ?? null;
+  const setup = round === 0;
+  const active = setup ? null : (entries[turnIndex] ?? null);
   const activeIndex = active ? entries.findIndex((entry) => entry.id === active.id) : -1;
+  const pendingEntries = entries.filter((entry) => entry.pending);
+  const myPendingEntries = pendingEntries.filter((entry) => entry.ownerId === myUserId);
+  const canEndTurn = Boolean(active && (isGm || active.ownerId === myUserId));
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -116,15 +130,26 @@ export function InitiativeBar({
         <div className="initiative-round">
           <Swords size={15} />
           <div>
-            <span className="tiny muted">Round</span>
-            <strong>{round}</strong>
+            <span className="tiny muted">{setup ? "Combat" : "Round"}</span>
+            <strong>{setup ? "Setup" : round}</strong>
           </div>
         </div>
         <div className="initiative-meta">
           {active ? (
             <span className="core-initiative-current tiny muted" title="Current combatant">
               Current: <strong>{active.name}</strong>
+              {active.ownerId ? null : <span className="initiative-npc-badge">NPC</span>}
             </span>
+          ) : null}
+          {canEndTurn ? (
+            <Button
+              size="sm"
+              variant="primary"
+              icon={<SkipForward size={14} />}
+              onClick={onEndTurn}
+            >
+              End turn
+            </Button>
           ) : null}
           {isGm ? (
             <div className="initiative-gm-menu" ref={menuRef}>
@@ -149,12 +174,38 @@ export function InitiativeBar({
                     role="menuitem"
                     onClick={() => {
                       setMenuOpen(false);
-                      onRoll();
+                      onStartCombat();
                     }}
                   >
-                    <Dices size={14} />
-                    <span>Roll initiative</span>
+                    <Swords size={14} />
+                    <span>Start combat</span>
                   </button>
+                  {setup ? (
+                    <button
+                      type="button"
+                      role="menuitem"
+                      disabled={!entries.length}
+                      onClick={() => {
+                        setMenuOpen(false);
+                        onBeginCombat();
+                      }}
+                    >
+                      <SkipForward size={14} />
+                      <span>Begin combat</span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        setMenuOpen(false);
+                        onRoll();
+                      }}
+                    >
+                      <Dices size={14} />
+                      <span>Roll initiative</span>
+                    </button>
+                  )}
                   <button
                     type="button"
                     role="menuitem"
@@ -191,18 +242,20 @@ export function InitiativeBar({
                       </div>
                     </form>
                   ) : null}
-                  <button
-                    type="button"
-                    role="menuitem"
-                    disabled={!entries.length}
-                    onClick={() => {
-                      setMenuOpen(false);
-                      onEndRound();
-                    }}
-                  >
-                    <SkipForward size={14} />
-                    <span>End round (start round {round + 1})</span>
-                  </button>
+                  {!setup ? (
+                    <button
+                      type="button"
+                      role="menuitem"
+                      disabled={!entries.length}
+                      onClick={() => {
+                        setMenuOpen(false);
+                        onEndRound();
+                      }}
+                    >
+                      <SkipForward size={14} />
+                      <span>End round (start round {round + 1})</span>
+                    </button>
+                  ) : null}
                   {active ? (
                     <>
                       <button
@@ -234,14 +287,14 @@ export function InitiativeBar({
                   <button
                     type="button"
                     role="menuitem"
-                    disabled={!entries.length}
+                    disabled={!entries.length && !setup}
                     onClick={() => {
                       setMenuOpen(false);
-                      onClear();
+                      onEndCombat();
                     }}
                   >
                     <Trash2 size={14} />
-                    <span>Clear initiative</span>
+                    <span>End combat</span>
                   </button>
                 </div>
               ) : null}
@@ -250,24 +303,74 @@ export function InitiativeBar({
         </div>
       </div>
 
+      {setup ? (
+        <div className="combat-setup-bar">
+          <div className="combat-setup-copy">
+            <strong>Combat setup</strong>
+            <span>
+              {pendingEntries.length
+                ? `Waiting for ${pendingEntries.length} initiative roll${
+                    pendingEntries.length === 1 ? "" : "s"
+                  }.`
+                : "All initiative rolled. Begin when ready."}
+            </span>
+          </div>
+          <div className="combat-setup-actions">
+            {myPendingEntries.map((entry) => (
+              <Button
+                key={entry.id}
+                size="sm"
+                variant="primary"
+                icon={<Dices size={14} />}
+                onClick={() => onSubmitInitiative(entry.id)}
+              >
+                Roll {entry.name}
+              </Button>
+            ))}
+            {isGm ? (
+              <Button
+                size="sm"
+                variant="secondary"
+                icon={<SkipForward size={14} />}
+                disabled={!entries.length}
+                onClick={onBeginCombat}
+              >
+                Begin combat
+              </Button>
+            ) : null}
+            {!isGm && !myPendingEntries.length ? (
+              <span className="tiny muted">Waiting for the GM to begin.</span>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+
       <div className="initiative-track" aria-label="Initiative order">
         {entries.length ? (
           entries.map((entry, index) => (
             <div
               key={entry.id}
-              className={`initiative-chip core-initiative-row ${index === turnIndex ? "is-active" : ""}`}
+              className={`initiative-chip core-initiative-row ${
+                !setup && index === turnIndex ? "is-active" : ""
+              }`}
             >
-              <button
-                type="button"
-                className="initiative-order"
-                title={`Set ${entry.name} as the active combatant`}
-                onClick={() => onSetTurn(index)}
-              >
-                {index + 1}
-              </button>
+              {isGm ? (
+                <button
+                  type="button"
+                  className="initiative-order"
+                  title={`Set ${entry.name} as the active combatant`}
+                  onClick={() => onSetTurn(index)}
+                >
+                  {index + 1}
+                </button>
+              ) : (
+                <span className="initiative-order">{index + 1}</span>
+              )}
               <span className="initiative-color" style={{ background: entry.color }} />
               <span className="initiative-name">{entry.name}</span>
-              {isGm ? (
+              {entry.pending ? (
+                <span className="initiative-pending">Pending</span>
+              ) : isGm ? (
                 <InitiativeScore entry={entry} onSetValue={onSetValue} />
               ) : (
                 <strong>{entry.initiative}</strong>
@@ -292,7 +395,7 @@ export function InitiativeBar({
           ))
         ) : (
           <span className="initiative-empty tiny muted">
-            No combatants yet. Roll the scene or add names by hand.
+            No combatants yet. Place tokens, then start combat.
           </span>
         )}
       </div>
