@@ -6,6 +6,8 @@ import {
   currencyToCp,
   customItemToEquipment,
   removeItemQuantity,
+  sellItemQuantity,
+  setItemQuantity,
   spendCurrency,
   splitCurrencyEvenly,
 } from "../src/shared/inventory";
@@ -66,6 +68,41 @@ describe("character inventory", () => {
     expect(next.equipment).toEqual([
       { itemId: "shield", quantity: 2, equipped: false, invested: false, runes: ["rune_a"] },
     ]);
+  });
+
+  it("sets stack quantities and drops empty stacks", () => {
+    const source = draftWith([
+      { itemId: "potion", quantity: 2, equipped: false },
+      { itemId: "rope", quantity: 1, equipped: false },
+    ]);
+    expect(setItemQuantity(source, "potion", 5).equipment).toEqual([
+      { itemId: "potion", quantity: 5, equipped: false },
+      { itemId: "rope", quantity: 1, equipped: false },
+    ]);
+    expect(setItemQuantity(source, "potion", 0).equipment).toEqual([
+      { itemId: "rope", quantity: 1, equipped: false },
+    ]);
+  });
+
+  it("sells stacks at half price and adds the coins", () => {
+    const source = draftWith([{ itemId: "longsword", quantity: 2, equipped: false }], {
+      gp: 1,
+      sp: 0,
+      cp: 0,
+    });
+    const result = sellItemQuantity(source, "longsword", 2, 201);
+    expect(result.earnedCp).toBe(201);
+    expect(result.sold?.quantity).toBe(2);
+    expect(result.draft.equipment).toEqual([]);
+    expect(result.draft.currency).toEqual({ gp: 3, sp: 0, cp: 1 });
+  });
+
+  it("does not sell items that are not on the sheet", () => {
+    const source = draftWith([], { gp: 0, sp: 0, cp: 0 });
+    const result = sellItemQuantity(source, "longsword", 1, 100);
+    expect(result.sold).toBeNull();
+    expect(result.earnedCp).toBe(0);
+    expect(result.draft.currency).toEqual({ gp: 0, sp: 0, cp: 0 });
   });
 });
 

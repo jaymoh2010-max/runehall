@@ -330,6 +330,22 @@ export function VttTable({ initial, campaignId, user, isGm, active }: VttTablePr
     getSocket().emit("token:update", { campaignId, token: { id: tokenId, ...patch } });
   };
 
+  const damageToken = (tokenId: string, amount: number, damageType: string, nonlethal: boolean) => {
+    getSocket().emit(
+      "token:damage",
+      { campaignId, tokenId, amount, damageType, nonlethal },
+      (result) => {
+        if (!result) {
+          toast("That damage could not be applied.", "error");
+          return;
+        }
+        if (result.notes.length) {
+          toast(result.notes.join(" "), result.applied > 0 ? "info" : "error");
+        }
+      }
+    );
+  };
+
   const deleteToken = (tokenId: string) => {
     setTokens((current) => current.filter((token) => token.id !== tokenId));
     setSelectedTokenId(null);
@@ -1012,6 +1028,9 @@ export function VttTable({ initial, campaignId, user, isGm, active }: VttTablePr
               canManage={isGm || selectedToken.ownerId === user.id}
               onClose={() => setSelectedTokenId(null)}
               onUpdate={(patch) => updateToken(selectedToken.id, patch)}
+              onDamage={(amount, damageType, nonlethal) =>
+                damageToken(selectedToken.id, amount, damageType, nonlethal)
+              }
               onDelete={() => deleteToken(selectedToken.id)}
               onOpenCharacter={setSheetCharacterId}
               onAddToInitiative={addSelectedToInitiative}

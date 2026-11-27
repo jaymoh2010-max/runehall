@@ -29,6 +29,7 @@ export function LongRestModal({
 
   if (!draft || !derived) return null;
   const preview = applyLongRest(draft, derived, { rough, preparedCaster });
+  const remainingAfflictions = preview.draft.play.afflictions;
 
   return (
     <Modal
@@ -98,6 +99,12 @@ export function LongRestModal({
               </strong>
             </li>
           ) : null}
+          {preview.summary.afflictionsEnded.length ? (
+            <li>
+              <span>Afflictions ending</span>
+              <strong>{preview.summary.afflictionsEnded.join(", ")}</strong>
+            </li>
+          ) : null}
           {preview.summary.shieldLowered ? (
             <li>
               <span>Stance</span>
@@ -119,8 +126,14 @@ export function LongRestModal({
         </p>
         {draft.play.afflictions.length ? (
           <p className="tiny muted">
-            Afflictions remain active and need their own stage saves:{" "}
-            {draft.play.afflictions.map((entry) => entry.name).join(", ")}.
+            {remainingAfflictions.length
+              ? `Afflictions still active and due their own stage saves: ${remainingAfflictions
+                  .map((entry) => entry.name)
+                  .join(", ")}.`
+              : "Every timed affliction ends with this rest."}
+            {remainingAfflictions.length && preview.summary.afflictionsEnded.length
+              ? ` Afflictions ending: ${preview.summary.afflictionsEnded.join(", ")}.`
+              : ""}
           </p>
         ) : null}
         {preview.summary.hpBefore === 0 ? (

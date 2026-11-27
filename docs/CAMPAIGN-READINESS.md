@@ -25,8 +25,8 @@ The rest of this document records what is verified and what remains manual, so a
 | Check | Result |
 | --- | --- |
 | `npm run check` | Typecheck, lint, formatting, unit tests, production build, and bundle budget pass |
-| Unit tests | 784 passing |
-| `npm run e2e` | 38 passing browser scenarios |
+| Unit tests | 789 passing |
+| `npm run e2e` | 39 passing browser scenarios |
 | `npm run smoke` | End-to-end smoke suite passes |
 | `npm run simulate` | 2,337 characters, 145 class/level matrix builds, 578 option builds, 38 ancestries × 269 backgrounds; 0 problems |
 | `npm run simulate:feats` | 144,565 class/feat combinations checked; 39,166 accessible feats reflected on the sheet; 0 failures |
@@ -92,7 +92,7 @@ The campaign simulation exercises two complete 1-20 campaigns per run, one XP an
 | Character build | 1–20 builder, prerequisites, slots, runes, companions, budget, import, Free Archetype and ABP | Strong; uncommon effects remain manual |
 | Advancement | Milestone or XP, GM approval, and player requests | Strong |
 | Combat | Budgets, waves, initiative, actions, conditions, typed damage, IWR, death/recovery, afflictions | Strong with manual edge cases |
-| Treasure | Inventory, transfers, wealth benchmarks, ABP option | Strong; ABP replaces fundamental rune math |
+| Treasure | Inventory (quantities, sell, drop), transfers, wealth benchmarks, ABP option | Strong; ABP replaces fundamental rune math |
 | Campaign log | Journal, handouts, and quests | Strong |
 | Calendar | Golarion date and leap day | Strong |
 | Table | Maps, fog, walls, lighting, tokens, chat, dice, music | Strong |

@@ -119,6 +119,48 @@ export function removeItemQuantity(
   return { draft: { ...draft, equipment }, moved };
 }
 
+/** Set a stack's quantity; zero or less removes the stack from the sheet. */
+export function setItemQuantity(
+  draft: CharacterDraft,
+  itemId: string,
+  quantity: number
+): CharacterDraft {
+  const target = Math.max(0, Math.min(MAX_ITEM_QUANTITY, Math.floor(Number(quantity) || 0)));
+  if (target <= 0) {
+    return {
+      ...draft,
+      equipment: draft.equipment.filter((entry) => entry.itemId !== itemId),
+    };
+  }
+  return {
+    ...draft,
+    equipment: draft.equipment.map((entry) =>
+      entry.itemId === itemId ? { ...entry, quantity: target } : entry
+    ),
+  };
+}
+
+/**
+ * Sell a quantity of one item at half its purchase price and add the coins.
+ * The caller supplies the unit price because it comes from the compendium.
+ */
+export function sellItemQuantity(
+  draft: CharacterDraft,
+  itemId: string,
+  quantity: number,
+  unitPriceCp: number
+): { draft: CharacterDraft; sold: CharacterEquipment | null; earnedCp: number } {
+  const { draft: next, moved } = removeItemQuantity(draft, itemId, quantity);
+  if (!moved) return { draft, sold: null, earnedCp: 0 };
+  const unitPrice = Math.max(0, Math.round(Number(unitPriceCp) || 0));
+  const earnedCp = Math.floor((unitPrice * moved.quantity) / 2);
+  return {
+    draft: { ...next, currency: addCurrency(next.currency, earnedCp) },
+    sold: moved,
+    earnedCp,
+  };
+}
+
 /**
  * Add a transferred stack. Existing stacks keep their equipped/invested state
  * and gain the moved runes; a new stack arrives unequipped.

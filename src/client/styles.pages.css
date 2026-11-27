@@ -9927,6 +9927,32 @@ body.table-fullscreen-active {
   width: 52px;
   text-align: center;
 }
+.core-token-damage {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 5px;
+}
+.core-token-damage input[type="number"] {
+  width: 64px;
+}
+.core-token-damage select {
+  min-width: 0;
+  flex: 1 1 96px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: #080b10;
+  color: var(--text);
+  padding: 4px 6px;
+  font: inherit;
+}
+.core-token-damage label {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  white-space: nowrap;
+}
 .core-token-actions {
   display: flex;
   flex-wrap: wrap;
@@ -10958,6 +10984,22 @@ body.table-fullscreen-active {
   gap: 4px;
   flex: none;
 }
+.pb-item-quantity {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.pb-item-quantity .pb-small-button {
+  width: 25px;
+  padding: 0;
+  justify-content: center;
+}
+.pb-item-quantity-value {
+  min-width: 20px;
+  color: var(--pb-muted);
+  font-size: 0.7rem;
+  text-align: center;
+}
 .pb-die-button,
 .pb-small-button {
   display: inline-flex;
@@ -11474,6 +11516,48 @@ body.table-fullscreen-active {
 }
 .pb-condition-form input[type="number"] {
   flex: 0 0 62px;
+}
+.pb-affliction-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.pb-affliction {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 7px 9px;
+  border: 1px solid var(--pb-line-soft);
+  border-radius: 4px;
+  background: var(--pb-panel);
+}
+.pb-affliction-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.pb-affliction-head strong {
+  font-size: 0.8rem;
+}
+.pb-affliction-meta,
+.pb-affliction-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.pb-affliction p {
+  margin: 0;
+  line-height: 1.45;
+}
+.pb-affliction-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.pb-affliction-form-grid .field:last-child:nth-child(odd) {
+  grid-column: 1 / -1;
 }
 .pb-dice-wrap {
   position: fixed;

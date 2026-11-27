@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type InputHTMLAttributes } from "react";
 import { Dices, Eye, EyeOff, ImagePlus, Lock, Unlock, Trash2, UserRound, X } from "lucide-react";
 import type { CharacterRecord, Token } from "../../../shared/types";
 import { creatureAvatarDataUrl } from "../../../shared/creatureAvatar";
+import { DAMAGE_TYPE_GROUPS, DEFAULT_DAMAGE_TYPE } from "../../../shared/damageDefenses";
 import { canSeeCreatureStats } from "../../../shared/tokenVisibility";
 import { uploadImage } from "../../api";
 import { useConditionOptions } from "../../conditionOptions";
@@ -52,6 +53,7 @@ export function TokenQuickPanel({
   canManage,
   onClose,
   onUpdate,
+  onDamage,
   onDelete,
   onOpenCharacter,
   onAddToInitiative,
@@ -63,11 +65,15 @@ export function TokenQuickPanel({
   canManage: boolean;
   onClose: () => void;
   onUpdate: (patch: Partial<Token>) => void;
+  onDamage: (amount: number, damageType: string, nonlethal: boolean) => void;
   onDelete: () => void;
   onOpenCharacter: (characterId: string) => void;
   onAddToInitiative: () => void;
 }) {
   const [condition, setCondition] = useState("");
+  const [damage, setDamage] = useState("");
+  const [damageType, setDamageType] = useState(DEFAULT_DAMAGE_TYPE);
+  const [nonlethal, setNonlethal] = useState(false);
   const [imageBusy, setImageBusy] = useState(false);
   const [imageError, setImageError] = useState("");
   const [portraitOpen, setPortraitOpen] = useState(false);
@@ -91,6 +97,13 @@ export function TokenQuickPanel({
         ? Math.max(0, Math.min(maxHp, Math.round(value)))
         : Math.max(0, Math.round(value));
     onUpdate({ hpCurrent: next });
+  };
+
+  const applyDamage = () => {
+    const amount = Math.max(0, Math.round(Number(damage) || 0));
+    if (!amount) return;
+    onDamage(amount, damageType, nonlethal);
+    setDamage("");
   };
 
   const addCondition = () => {
@@ -173,6 +186,51 @@ export function TokenQuickPanel({
                 +5
               </Button>
             </div>
+            {canManage ? (
+              <form
+                className="core-token-damage"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  applyDamage();
+                }}
+              >
+                <input
+                  type="number"
+                  min={0}
+                  value={damage}
+                  placeholder="Damage"
+                  aria-label="Damage amount"
+                  onChange={(event) => setDamage(event.target.value)}
+                />
+                <select
+                  value={damageType}
+                  aria-label="Damage type"
+                  onChange={(event) => setDamageType(event.target.value)}
+                >
+                  <option value={DEFAULT_DAMAGE_TYPE}>Untyped</option>
+                  {DAMAGE_TYPE_GROUPS.map((group) => (
+                    <optgroup key={group.label} label={group.label}>
+                      {group.types.map((type) => (
+                        <option key={type} value={type}>
+                          {type[0].toUpperCase() + type.slice(1)}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </select>
+                <label className="tiny">
+                  <input
+                    type="checkbox"
+                    checked={nonlethal}
+                    onChange={(event) => setNonlethal(event.target.checked)}
+                  />{" "}
+                  Nonlethal
+                </label>
+                <Button size="sm" type="submit" variant="secondary" disabled={!Number(damage)}>
+                  Apply
+                </Button>
+              </form>
+            ) : null}
           </div>
           <div className="core-token-ac">
             <span className="tiny muted">AC</span>
