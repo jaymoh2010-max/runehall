@@ -5,8 +5,10 @@ import { contextForDraft } from "../src/server/compendium";
 import {
   computeCharacter,
   emptyCharacterDraft,
+  sourceSpellIds,
   spellbookBudgetFor,
   spellbookUsage,
+  withSourceSpellIds,
 } from "../src/shared/rules";
 import type { ClassData, Spell } from "../src/shared/types";
 
@@ -97,6 +99,24 @@ describe("spellbook budgets", () => {
     const withPaid = spellbookUsage(draft, wizard, context.spells, context.deity)!;
     expect(withPaid.freeRanked).toBe(4);
     expect(withPaid.learnedRanked).toBe(1);
+  });
+
+  it("uses the dedicated spellbook and migrates legacy known book spells", () => {
+    const { draft, wizard } = wizardDraft();
+    draft.spells.spellbook = ["spell:fear"];
+    draft.spells.known = ["spell:command"];
+    expect(sourceSpellIds(draft, wizard)).toEqual(["spell:fear"]);
+
+    const migrated = withSourceSpellIds(draft, wizard, ["spell:fear", "spell:command"]);
+    expect(migrated.spells.spellbook).toEqual(["spell:fear", "spell:command"]);
+    expect(migrated.spells.known).toEqual([]);
+
+    const legacy = {
+      ...draft,
+      spells: { ...draft.spells, spellbook: [], known: ["spell:command"] },
+    };
+    expect(sourceSpellIds(legacy, wizard)).toEqual(["spell:command"]);
+    expect(sourceSpellIds(draft, byName(classes, "Sorcerer"))).toEqual(["spell:command"]);
   });
 
   it("warns when free picks exceed the level budget", () => {

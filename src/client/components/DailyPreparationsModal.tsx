@@ -20,6 +20,7 @@ import {
   removePreparedCantrip,
   removePreparedCopy,
   removeStudiousSpell,
+  sourceSpellIds,
   spellSourceLabel,
   type DivineFontChoice,
 } from "../../shared/rules";
@@ -123,7 +124,7 @@ export function DailyPreparationsModal({
 
   const availableAtRank = (rank: number): Spell[] => {
     const ids = new Set<string>([
-      ...working.spells.known,
+      ...sourceSpellIds(working, classData),
       ...preparedRows.map((row) => row.id),
       ...derived.grantedSpells
         .filter((spell) => spell.kind !== "focus" && spell.rank > 0)

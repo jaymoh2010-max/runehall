@@ -102,10 +102,12 @@ import {
   spellSlotsFor,
   spellbookUsage,
   spellSourceLabel,
+  sourceSpellIds,
   startingWealthCp,
   titleCase,
   traitLabel,
   weaponDamageLabel,
+  withSourceSpellIds,
   type DivineFontChoice,
 } from "../../../../shared/rules";
 import { api, formatCp, uploadImage } from "../../../api";
@@ -178,7 +180,8 @@ export function SpellsStep({ draft, update, derived, context, setStep, openPicke
     0
   );
   const multiclassSlotTotal = multiclassSlots.reduce((sum, count) => sum + count, 0);
-  const known = draft.spells.known
+  const sourceIds = sourceSpellIds(draft, classData);
+  const known = sourceIds
     .map((id) => context.spells[id])
     .filter((spell): spell is Spell => Boolean(spell));
   const focus = draft.spells.focus
@@ -249,9 +252,7 @@ export function SpellsStep({ draft, update, derived, context, setStep, openPicke
       "Your dirge starts with eight occult cantrips, Harm, and four other 1st-rank occult spells. Add two spells each level.",
   };
   const bookText = bookGuidance[bookClassName] ?? null;
-  const bookRankedCount = draft.spells.known.filter(
-    (id) => (context.spells[id]?.rank ?? 0) > 0
-  ).length;
+  const bookRankedCount = known.filter((spell) => spell.rank > 0).length;
   const bookUsage = spellbookUsage(draft, classData, context.spells, context.deity);
   const cantripContext = { spells: context.spells, deity: context.deity, classData };
   const preparedCantripList = preparedCantripIds(draft, cantripContext);
@@ -308,6 +309,11 @@ export function SpellsStep({ draft, update, derived, context, setStep, openPicke
   }
   const addSpell = (spell: Spell, target: "cantrips" | "known" | "focus") =>
     update((current) => {
+      if (target === "known") {
+        const currentIds = sourceSpellIds(current, classData);
+        if (currentIds.includes(spell.id)) return current;
+        return withSourceSpellIds(current, classData, [...currentIds, spell.id]);
+      }
       const key = target;
       if (current.spells[key].includes(spell.id)) return current;
       let next: CharacterDraft = {
@@ -324,17 +330,27 @@ export function SpellsStep({ draft, update, derived, context, setStep, openPicke
   const removeSpell = (id: string, target: "cantrips" | "known" | "focus" | "rituals" | "innate") =>
     update((current) => {
       const cleared = removePreparedSpellEverywhere(current, id);
-      const knownRanks = { ...cleared.spells.knownRanks };
-      if (target === "known") delete knownRanks[id];
+      if (target === "known") {
+        const next = withSourceSpellIds(
+          cleared,
+          classData,
+          sourceSpellIds(cleared, classData).filter((spellId) => spellId !== id)
+        );
+        const knownRanks = { ...next.spells.knownRanks };
+        delete knownRanks[id];
+        return {
+          ...next,
+          spells: {
+            ...next.spells,
+            knownRanks,
+            learned: next.spells.learned.filter((spellId) => spellId !== id),
+          },
+        };
+      }
       let next: CharacterDraft = {
         ...cleared,
         spells: {
           ...cleared.spells,
-          knownRanks,
-          learned:
-            target === "known"
-              ? cleared.spells.learned.filter((spellId) => spellId !== id)
-              : cleared.spells.learned,
           [target]: cleared.spells[target].filter((s) => s !== id),
         },
       };
@@ -1661,7 +1677,7 @@ export function SpellsStep({ draft, update, derived, context, setStep, openPicke
           legacyLocked
           excludeIds={[
             ...draft.spells.cantrips,
-            ...draft.spells.known,
+            ...sourceIds,
             ...draft.spells.multiclassCantrips,
             ...draft.spells.multiclassSpells,
             ...derived.grantedSpells.map((spell) => spell.id),

@@ -86,10 +86,12 @@ import {
   skillRankCap,
   spellRepertoireLimits,
   spellSlotsFor,
+  sourceSpellIds,
   startingWealthCp,
   titleCase,
   traitLabel,
   weaponDamageLabel,
+  withSourceSpellIds,
 } from "../../shared/rules";
 import { api, ApiError, formatCp } from "../api";
 import { errorMessage } from "../stores";
@@ -1201,7 +1203,7 @@ export function CharacterBuilderPage({
                               ? knownSpellRanks(draft, spell).includes(picker.learnRank!)
                               : (draft.spells.knownRanks[id] ?? []).includes(picker.learnRank!);
                           })
-                        : draft.spells.known),
+                        : sourceSpellIds(draft, context.classData)),
             ])
           )}
           onSelect={(spell) => {
@@ -1212,6 +1214,11 @@ export function CharacterBuilderPage({
             update((current) => {
               if (picker.target === "knownAtRank") {
                 return addKnownSpellAtRank(current, spell, picker.learnRank ?? spell.rank);
+              }
+              if (picker.target === "known") {
+                const currentIds = sourceSpellIds(current, context.classData);
+                if (currentIds.includes(spell.id)) return current;
+                return withSourceSpellIds(current, context.classData, [...currentIds, spell.id]);
               }
               if (picker.target === "cantrips" && spell.rank !== 0) return current;
               const target =
