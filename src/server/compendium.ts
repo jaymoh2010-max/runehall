@@ -26,6 +26,7 @@ import type {
 } from "../shared/types";
 import type { DomainEntry } from "../shared/domains";
 import { isCoreSource } from "../shared/content";
+import { applyBackgroundGrantOverrides } from "../shared/backgroundGrants";
 import { selectedFeatGrantInstances } from "../shared/effects";
 import {
   featAllowedByHeritageGrant,
@@ -94,7 +95,9 @@ function readObject<T>(file: string): Record<string, T> {
 
 export const ancestries = readArray<Ancestry>("ancestries.json");
 export const heritages = readArray<Heritage>("heritages.json");
-export const backgrounds = readArray<Background>("backgrounds.json");
+export const backgrounds = readArray<Background>("backgrounds.json").map(
+  (background) => applyBackgroundGrantOverrides(background) ?? background
+);
 export const classes = readArray<ClassData>("classes.json");
 export const classFeatures = readArray<ClassFeature>("classFeatures.json");
 export const feats = readArray<Feat>("feats.json");

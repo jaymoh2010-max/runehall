@@ -40,6 +40,7 @@ import { SKILLS, SKILL_BY_ID, type SkillId } from "../src/shared/types";
 import { activeGrantChoiceGroups, deitySupportsClass } from "../src/shared/classGrantChoices";
 import { selectedClassGrants } from "../src/shared/classGrants";
 import { attachRuneIds } from "../src/shared/runes";
+import { applyBackgroundGrantOverrides } from "../src/shared/backgroundGrants";
 import { contextForDraft } from "../src/server/compendium";
 import type {
   Ancestry,
@@ -112,7 +113,9 @@ function contextFor(
   return {
     ancestry: ancestries.find((entry) => entry.id === draft.ancestryId) ?? null,
     heritage: heritages.find((entry) => entry.id === draft.heritageId) ?? null,
-    background: backgrounds.find((entry) => entry.id === draft.backgroundId) ?? null,
+    background: applyBackgroundGrantOverrides(
+      backgrounds.find((entry) => entry.id === draft.backgroundId) ?? null
+    ),
     classData: classes.find((entry) => entry.id === draft.classId) ?? null,
     deity: deities.find((entry) => entry.id === draft.deityId) ?? null,
     feats: Object.fromEntries(selectedFeats.map((feat) => [feat.id, feat])),
@@ -791,7 +794,8 @@ function buildDraftFrom(
       : heritageChoices.length
         ? pick(rng, heritageChoices)
         : null;
-  const background = forcedBackground ?? pick(rng, remasterBackgrounds);
+  const rawBackground = forcedBackground ?? pick(rng, remasterBackgrounds);
+  const background = applyBackgroundGrantOverrides(rawBackground) ?? rawBackground;
   const classData = forcedClass ?? pick(rng, remasterClasses);
   const level = forcedLevel ?? pick(rng, [1, 5, 10, 15, 20]);
 
