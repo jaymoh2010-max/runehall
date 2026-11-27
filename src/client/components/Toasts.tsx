@@ -4,9 +4,14 @@ import { useToasts } from "../stores";
 export function Toasts() {
   const { toasts, remove } = useToasts();
   return (
-    <div className="toast-stack" aria-live="polite">
+    <div className="toast-stack">
       {toasts.map((toast) => (
-        <div key={toast.id} className={`toast toast-${toast.kind}`}>
+        <div
+          key={toast.id}
+          className={`toast toast-${toast.kind}`}
+          role={toast.kind === "error" ? "alert" : "status"}
+          aria-atomic="true"
+        >
           {toast.kind === "success" ? (
             <CheckCircle2 size={17} color="var(--green)" />
           ) : toast.kind === "error" ? (

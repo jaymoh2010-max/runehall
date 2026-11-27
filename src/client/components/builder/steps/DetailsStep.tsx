@@ -403,7 +403,12 @@ export function DetailsStep({ draft, update, context, setStep, onChoosePortrait 
               input.value = "";
             }}
           >
-            <Input name="language" placeholder="e.g. Elven" list="builder-language-options" />
+            <Input
+              name="language"
+              placeholder="e.g. Elven"
+              aria-label="New language"
+              list="builder-language-options"
+            />
             <datalist id="builder-language-options">
               {languageOptions.map((language) => (
                 <option key={language} value={language} />

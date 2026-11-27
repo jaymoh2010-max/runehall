@@ -182,6 +182,7 @@ export function SearchInput({
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
+        aria-label={placeholder.replace(/…$/, "")}
       />
     </div>
   );

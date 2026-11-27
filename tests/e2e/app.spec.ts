@@ -2410,3 +2410,170 @@ test("GM enables Automatic Bonus Progression and a character chooses its skill",
   await page.getByLabel("Skill potency").selectOption("athletics");
   await expect(page.getByLabel("Skill potency")).toHaveValue("athletics");
 });
+
+async function accessibleNameIssues(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    const clean = (value: string | null | undefined) => (value ?? "").replace(/\s+/g, " ").trim();
+    const labelText = (element: Element) => {
+      if (
+        element instanceof HTMLInputElement ||
+        element instanceof HTMLSelectElement ||
+        element instanceof HTMLTextAreaElement
+      ) {
+        return clean(
+          Array.from(element.labels ?? [])
+            .map((label) => label.textContent)
+            .join(" ")
+        );
+      }
+      return "";
+    };
+    const nameFor = (element: Element) => {
+      let name = clean(element.getAttribute("aria-label"));
+      if (!name) {
+        const ids = clean(element.getAttribute("aria-labelledby")).split(" ").filter(Boolean);
+        name = clean(ids.map((id) => document.getElementById(id)?.textContent ?? "").join(" "));
+      }
+      if (!name) name = labelText(element);
+      if (!name) name = clean(element.textContent);
+      if (!name) {
+        name = clean(
+          Array.from(element.querySelectorAll("img[alt]"))
+            .map((img) => img.getAttribute("alt") ?? "")
+            .join(" ")
+        );
+      }
+      if (!name) name = clean(element.getAttribute("title"));
+      if (!name && element instanceof HTMLInputElement && element.type === "image") {
+        name = clean(element.alt);
+      }
+      return name;
+    };
+    const selector =
+      "button, a[href], input:not([type='hidden']), select, textarea, [role='button'], [role='link']";
+    return Array.from(document.querySelectorAll<HTMLElement>(selector))
+      .filter(
+        (element) => element.getClientRects().length > 0 && !element.closest("[aria-hidden='true']")
+      )
+      .filter((element) => !nameFor(element))
+      .map(
+        (element) =>
+          `${element.tagName.toLowerCase()} .${element.className || "(no class)"} ${element.outerHTML.slice(0, 180)}`
+      );
+  });
+}
+
+test("key pages give every visible control an accessible name", async ({ page }) => {
+  test.setTimeout(120_000);
+  await signIn(page, admin);
+  const campaignId = campaignPath.split("/").pop();
+  const list = await page.request.get(`/api/characters?campaignId=${campaignId}`);
+  const characters = (await list.json()) as { characters: { id: string; name: string }[] };
+  const hero = characters.characters.find((entry) => entry.name === "E2E Hero");
+  expect(hero).toBeTruthy();
+
+  const spots: { label: string; url: string }[] = [
+    { label: "dashboard", url: "/campaigns" },
+    { label: "table", url: campaignPath },
+    { label: "party", url: `${campaignPath}?tab=party` },
+    { label: "journal", url: `${campaignPath}?tab=journal` },
+    { label: "settings", url: `${campaignPath}?tab=settings` },
+    { label: "sheet", url: `/characters/${hero!.id}` },
+    { label: "builder", url: `/characters/${hero!.id}/edit` },
+    { label: "library", url: "/library" },
+    { label: "rules", url: "/rules" },
+    { label: "account", url: "/account" },
+    { label: "admin", url: "/admin" },
+  ];
+  const issues: string[] = [];
+  const scan = async (label: string) => {
+    const found = await accessibleNameIssues(page);
+    if (found.length) issues.push(`${label}:\n  ${found.join("\n  ")}`);
+  };
+  for (const spot of spots) {
+    await page.goto(spot.url);
+    await page.waitForTimeout(900);
+    const found = await accessibleNameIssues(page);
+    if (found.length) issues.push(`${spot.label} (${spot.url}):\n  ${found.join("\n  ")}`);
+  }
+
+  await page.goto(`/characters/${hero!.id}`);
+  await page.waitForTimeout(900);
+  for (const tab of [
+    "Weapons",
+    "Defense",
+    "Gear",
+    "Spells",
+    "Feats",
+    "Actions",
+    "Details",
+    "Status",
+  ]) {
+    await page.getByRole("button", { name: tab, exact: true }).click();
+    await page.waitForTimeout(250);
+    await scan(`sheet ${tab} tab`);
+  }
+  await page.getByRole("button", { name: "Long rest" }).click();
+  await expect(page.getByRole("dialog", { name: "Take a long rest" })).toBeVisible();
+  await scan("long rest dialog");
+  await page
+    .getByRole("dialog", { name: "Take a long rest" })
+    .getByRole("button", { name: "Cancel" })
+    .click();
+
+  await page.goto(`/characters/${hero!.id}/edit`);
+  await page.waitForTimeout(900);
+  for (const step of [
+    "Ancestry",
+    "Heritage",
+    "Background",
+    "Class",
+    "Abilities",
+    "Skills",
+    "Feats",
+    "Spells",
+    "Gear",
+    "Details",
+    "Review",
+  ]) {
+    await goToStep(page, step);
+    await page.waitForTimeout(250);
+    await scan(`builder ${step} step`);
+  }
+
+  await page.goto(campaignPath);
+  await page.waitForTimeout(1200);
+  const heroToken = page.getByRole("button", { name: /E2E Hero, character token/ });
+  if (await heroToken.count()) {
+    await heroToken.first().click();
+    await page.waitForTimeout(300);
+    await scan("token quick panel");
+
+    const quickPanel = page.locator(".core-token-panel");
+    await quickPanel.getByRole("button", { name: "Open sheet" }).click();
+    const sheet = page.locator(".pb-sheet-overlay");
+    await expect(sheet).toBeVisible({ timeout: 15_000 });
+    await expect
+      .poll(() =>
+        page.evaluate(() => document.activeElement?.classList.contains("pb-sheet-overlay") ?? false)
+      )
+      .toBe(true);
+    await page.keyboard.press("Tab");
+    await expect
+      .poll(() =>
+        page.evaluate(() => document.activeElement?.closest(".pb-sheet-overlay") !== null)
+      )
+      .toBe(true);
+    await page.keyboard.press("Escape");
+    await expect(sheet).toHaveCount(0);
+    await expect(quickPanel.getByRole("button", { name: "Open sheet" })).toBeFocused();
+
+    await page.getByRole("button", { name: "Close token details" }).click();
+  }
+  await page.getByRole("button", { name: "Add token", exact: true }).click();
+  await expect(page.getByRole("dialog", { name: "Add a token" })).toBeVisible();
+  await scan("add token dialog");
+  await page.keyboard.press("Escape");
+
+  expect(issues, issues.join("\n")).toEqual([]);
+});

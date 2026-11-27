@@ -27,7 +27,7 @@ The rest of this document records what is verified and what remains manual, so a
 | --- | --- |
 | `npm run check` | Typecheck, lint, formatting, unit tests, production build, and bundle budget pass |
 | Unit tests | 796 passing |
-| `npm run e2e` | 39 passing browser scenarios |
+| `npm run e2e` | 40 passing browser scenarios |
 | `npm run smoke` | End-to-end smoke suite passes |
 | `npm run simulate` | 2,337 characters, 145 class/level matrix builds, 578 option builds, 38 ancestries × 269 backgrounds; 0 problems |
 | `npm run simulate:feats` | 144,565 class/feat combinations checked; 39,166 accessible feats reflected on the sheet; 0 failures |
@@ -68,7 +68,9 @@ The campaign simulation exercises two complete 1-20 campaigns per run, one XP an
 ### Campaign play
 
 - Party requests with GM approval: level-up and player-written journal entries. Nothing changes until the GM approves or denies it; players can withdraw pending requests.
-- Session zero and safety tools, quests, handouts, and campaign export/import.
+- Session zero and safety tools were retired with the hidden campaign tabs; legacy session-zero, faction, lore, and chapter data round-trips through campaign export/import only.
+- Quests, handouts, and campaign export/import.
+- Accessibility: visible controls across the dashboard, table, party, journal, settings, sheet tabs, builder steps, library, rules, account, and admin expose accessible names. The in-table character sheet traps focus, restores it on close, and toasts use status/alert roles.
 - Golarion calendar with leap day and GM time controls.
 
 ### Operations and security
