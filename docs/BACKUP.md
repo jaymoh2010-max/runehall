@@ -42,9 +42,13 @@ and published atomically. A fresh database and a start with no pending
 migrations skip this step.
 
 - If the snapshot cannot be created, startup stops before changing the schema.
+- Before applying anything, the runner verifies recorded migration names and
+  SHA-256 checksums. A database from another branch, or an edited shipped
+  migration, fails with an actionable conflict instead of retrying or silently
+  drifting.
 - If a migration fails, the server closes the database, restores the snapshot
-  (including removing stale `-wal`/`-shm` files), and exits with the migration
-  error. The next start retries the upgrade from the restored schema.
+  (including removing stale `-wal`/`-shm`/`-journal` files), and exits with the
+  migration error. The next start retries the upgrade from the restored schema.
 - Uploaded files are not touched by migrations, so they do not need to be in
   this snapshot.
 - `MIGRATION_BACKUP_DIR` changes the snapshot directory. It defaults to

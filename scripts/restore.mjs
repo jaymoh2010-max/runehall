@@ -178,7 +178,8 @@ try {
 
 function portIsOpen(host) {
   return new Promise((resolve) => {
-    const socket = net.createConnection({ host, port, timeout: 600 });
+    const socket = net.createConnection({ host, port, timeout: 1500 });
+    socket.setNoDelay(true);
     socket.once("connect", () => {
       socket.destroy();
       resolve(true);
@@ -191,8 +192,17 @@ function portIsOpen(host) {
   });
 }
 
+// A stopped server can still take a moment to release the listener. Check each
+// host three times before deciding the port is free.
 for (const host of probeHosts) {
-  if (!(await portIsOpen(host))) continue;
+  let open = false;
+  for (let attempt = 0; attempt < 3 && !open; attempt += 1) {
+    open = await portIsOpen(host);
+    if (!open && attempt < 2) {
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
+  }
+  if (!open) continue;
   console.error(
     `Runehall appears to be running on ${host}:${port}. Stop the server before restoring.`
   );

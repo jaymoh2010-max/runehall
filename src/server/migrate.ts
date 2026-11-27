@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 import { migrations, type Migration } from "./migrations";
 import {
@@ -26,6 +27,70 @@ export interface MigrationRunResult {
 
 function describe(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+function migrationChecksum(migration: Migration): string {
+  return crypto.createHash("sha256").update(migration.sql).digest("hex");
+}
+
+function tableColumns(connection: DatabaseSync, table: string): Set<string> {
+  return new Set(
+    (
+      connection.prepare(`PRAGMA table_info("${table.replace(/"/g, '""')}")`).all() as {
+        name: string;
+      }[]
+    ).map((column) => column.name)
+  );
+}
+
+interface AppliedMigrationRow {
+  version: number;
+  name: string;
+  checksum?: string;
+}
+
+/**
+ * Refuse to run against a schema history created by a different branch or an
+ * edited migration. This is checked before any pending migration or backup so
+ * a reused version number cannot silently apply the wrong SQL.
+ */
+function validateAppliedMigrations(
+  connection: DatabaseSync,
+  list: Migration[]
+): AppliedMigrationRow[] {
+  const columns = tableColumns(connection, "schema_migrations");
+  const checksumSelect = columns.has("checksum") ? ", checksum" : "";
+  const rows = connection
+    .prepare(`SELECT version, name${checksumSelect} FROM schema_migrations ORDER BY version`)
+    .all() as unknown as AppliedMigrationRow[];
+  for (const row of rows) {
+    const known = list.find((migration) => migration.version === Number(row.version));
+    if (!known) continue;
+    if (row.name && row.name !== known.name) {
+      throw new Error(
+        `Schema history conflict at migration ${known.version}: database recorded "${row.name}", this build expects "${known.name}". This database was created by a different branch or an edited migration. Restore a matching backup or reconcile schema_migrations before starting.`
+      );
+    }
+    if (columns.has("checksum") && row.checksum) {
+      const expected = migrationChecksum(known);
+      if (row.checksum !== expected) {
+        throw new Error(
+          `Schema checksum mismatch at migration ${known.version} (${known.name}). The migration SQL changed after it was applied. Restore a matching backup or add a new migration instead of editing history.`
+        );
+      }
+    }
+  }
+  return rows;
+}
+
+function backfillMigrationMetadata(connection: DatabaseSync, list: Migration[]): void {
+  if (!tableColumns(connection, "schema_migrations").has("checksum")) return;
+  const update = connection.prepare(
+    "UPDATE schema_migrations SET name = ?, checksum = ? WHERE version = ?"
+  );
+  for (const migration of list) {
+    update.run(migration.name, migrationChecksum(migration), migration.version);
+  }
 }
 
 function rollbackDatabase(
@@ -74,16 +139,12 @@ export function applyMigrationsTo(
       applied_at INTEGER NOT NULL
     );
   `);
-  const appliedVersions = new Set(
-    (
-      connection.prepare("SELECT version FROM schema_migrations ORDER BY version").all() as {
-        version: number;
-      }[]
-    ).map((row) => Number(row.version))
-  );
+  const appliedRows = validateAppliedMigrations(connection, list);
+  const appliedVersions = new Set(appliedRows.map((row) => Number(row.version)));
   const pending = list.filter((migration) => !appliedVersions.has(migration.version));
   const current = list.length ? list[list.length - 1].version : 0;
   if (!pending.length) {
+    backfillMigrationMetadata(connection, list);
     connection.exec(`PRAGMA user_version = ${current};`);
     return { applied: [], current, backupPath: null };
   }
@@ -143,6 +204,7 @@ export function applyMigrationsTo(
       );
     }
   }
+  backfillMigrationMetadata(connection, list);
   connection.exec(`PRAGMA user_version = ${current};`);
   return { applied, current, backupPath };
 }

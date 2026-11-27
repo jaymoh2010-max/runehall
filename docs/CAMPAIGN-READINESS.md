@@ -88,7 +88,7 @@ The campaign simulation exercises two complete 1-20 campaigns per run, one XP an
 - Production dependencies are audited in CI with `npm run audit:prod`.
 - Upload quotas, a low-disk guard, and backup/restore checks that refuse archives missing database-referenced uploads.
 - Backup staging publishes a completed archive with a single rename, so interrupted backups are not mistaken for valid ones.
-- Pending schema upgrades take a verified database snapshot first; a failed migration restores it automatically, and older snapshots are pruned with `MIGRATION_BACKUP_KEEP`.
+- Pending schema upgrades take a verified database snapshot first; a failed migration restores it automatically, migration names/checksums reject reused or edited history, and older snapshots are pruned with `MIGRATION_BACKUP_KEEP`.
 - Compendium version metadata is exposed by `/api/health` and recorded in campaign archives.
 
 ---

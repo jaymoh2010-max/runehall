@@ -4,7 +4,13 @@ import path from "node:path";
 import { pipeline } from "node:stream/promises";
 import type { FastifyInstance } from "fastify";
 import { getCampaign, getCampaignRole } from "../access";
-import { db, type AudioLibraryTrackRow, type AudioTrackRow, type CampaignRow } from "../db";
+import {
+  db,
+  transaction,
+  type AudioLibraryTrackRow,
+  type AudioTrackRow,
+  type CampaignRow,
+} from "../db";
 import { globalAssetReferences } from "../assets";
 import { newId, now, safeString, uploadsDir } from "../util";
 import { inspectImage } from "../imageMeta";
@@ -203,32 +209,44 @@ export async function registerUploadRoutes(app: FastifyInstance): Promise<void> 
     }
     const ts = now();
     const trackId = newId("audio");
+    const userId = request.user.id;
     const name = safeString(file.filename.replace(/\.[^.]+$/, ""), "Soundtrack", 140);
     try {
-      db.prepare(
-        `INSERT INTO uploaded_assets
-          (id, filename, original_name, mime_type, size, campaign_id, uploaded_by, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-      ).run(
-        newId("asset"),
-        filename,
-        safeString(file.filename, "Soundtrack", 200),
-        file.mimetype,
-        size,
-        campaignId,
-        request.user.id,
-        ts
-      );
-      const order = db
-        .prepare(
-          "SELECT COALESCE(MAX(sort_order), 0) + 1 AS next FROM campaign_audio_tracks WHERE campaign_id = ?"
-        )
-        .get(campaignId) as { next: number };
-      db.prepare(
-        `INSERT INTO campaign_audio_tracks
-          (id, campaign_id, name, url, mime_type, size, sort_order, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-      ).run(trackId, campaignId, name, `/uploads/${filename}`, file.mimetype, size, order.next, ts);
+      transaction(() => {
+        db.prepare(
+          `INSERT INTO uploaded_assets
+            (id, filename, original_name, mime_type, size, campaign_id, uploaded_by, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+        ).run(
+          newId("asset"),
+          filename,
+          safeString(file.filename, "Soundtrack", 200),
+          file.mimetype,
+          size,
+          campaignId,
+          userId,
+          ts
+        );
+        const order = db
+          .prepare(
+            "SELECT COALESCE(MAX(sort_order), 0) + 1 AS next FROM campaign_audio_tracks WHERE campaign_id = ?"
+          )
+          .get(campaignId) as { next: number };
+        db.prepare(
+          `INSERT INTO campaign_audio_tracks
+            (id, campaign_id, name, url, mime_type, size, sort_order, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+        ).run(
+          trackId,
+          campaignId,
+          name,
+          `/uploads/${filename}`,
+          file.mimetype,
+          size,
+          order.next,
+          ts
+        );
+      });
     } catch {
       return reject(500, "Could not record the audio file.");
     }
@@ -323,12 +341,6 @@ export async function registerUploadRoutes(app: FastifyInstance): Promise<void> 
       .prepare("SELECT * FROM campaign_audio_tracks WHERE id = ? AND campaign_id = ?")
       .get(trackId, id) as AudioTrackRow | undefined;
     if (!track) return reply.code(404).send({ error: "Soundtrack not found." });
-    db.prepare("DELETE FROM campaign_audio_tracks WHERE id = ?").run(trackId);
-    if (campaign.audio_track_id === trackId) {
-      db.prepare(
-        "UPDATE campaigns SET audio_track_id = NULL, audio_playing = 0, audio_position = 0, audio_updated_at = ?, updated_at = ? WHERE id = ?"
-      ).run(now(), now(), id);
-    }
     // Remove the backing file when nothing else references it. If a player is
     // still streaming it, keep the file and let `cleanup-assets` retry later.
     const filename = track.url.startsWith("/uploads/") ? track.url.slice("/uploads/".length) : "";
@@ -343,12 +355,25 @@ export async function registerUploadRoutes(app: FastifyInstance): Promise<void> 
       asset &&
       (asset.campaign_id === id ||
         (asset.campaign_id === null && asset.uploaded_by === request.user.id));
-    if (filename && ownsAsset && !globalAssetReferences().has(filename)) {
+    let removeAsset = false;
+    transaction(() => {
+      db.prepare("DELETE FROM campaign_audio_tracks WHERE id = ?").run(trackId);
+      if (campaign.audio_track_id === trackId) {
+        db.prepare(
+          "UPDATE campaigns SET audio_track_id = NULL, audio_playing = 0, audio_position = 0, audio_updated_at = ?, updated_at = ? WHERE id = ?"
+        ).run(now(), now(), id);
+      }
+      if (filename && ownsAsset && !globalAssetReferences().has(filename)) {
+        db.prepare("DELETE FROM uploaded_assets WHERE filename = ?").run(filename);
+        removeAsset = true;
+      }
+    });
+    if (removeAsset) {
       try {
         fs.rmSync(path.join(uploadsDir(), filename), { force: true });
-        db.prepare("DELETE FROM uploaded_assets WHERE filename = ?").run(filename);
       } catch {
-        // The operating system may still have the audio file open.
+        // The operating system may still have the audio file open; the orphan
+        // file is left for `cleanup-assets`.
       }
     }
     const updated = db.prepare("SELECT * FROM campaigns WHERE id = ?").get(id) as CampaignRow;

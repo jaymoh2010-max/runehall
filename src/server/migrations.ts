@@ -972,4 +972,11 @@ export const migrations: Migration[] = [
       ALTER TABLE campaigns DROP COLUMN shop_mode;
     `,
   },
+  {
+    version: 59,
+    name: "schema_migration_checksums",
+    sql: `
+      ALTER TABLE schema_migrations ADD COLUMN checksum TEXT NOT NULL DEFAULT '';
+    `,
+  },
 ];

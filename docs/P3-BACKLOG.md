@@ -29,15 +29,20 @@ This is the working list for post-P2 work. The source findings are in
 | Slot validation | Done | Property runes require an open potency slot; reducing potency cannot strand existing property runes. |
 | Runesmith etch/re-etch | Done | The sheet can etch a new base rune or replace an etched rune from the repertoire, resetting its target and diacritic. |
 
+## Operational hardening (Done)
+
+| Item | Status | Notes |
+| --- | --- | --- |
+| Migration history verification | Done | Migration 59 stores a SHA-256 checksum; the runner rejects reused version names or edited SQL before applying anything. |
+| Audio bookkeeping | Done | Audio upload writes the asset and track rows in one transaction; delete commits row changes before removing the backing file. |
+| Restore server check | Done | Each probe host is checked three times with a 1.5-second timeout before restore proceeds. |
+
 ## Next P3 batches
 
-1. **Operational hardening:** store migration names/checksums to reject reused
-   versions, make asset/audio bookkeeping transactional, and strengthen the
-   restore running-server check.
-2. **Trust-model decisions:** decide whether character duplication may clone
+1. **Trust-model decisions:** decide whether character duplication may clone
    campaign gear/currency and whether free quantity edits should use the
    purchase ledger.
-3. **Large campaign imports:** add rate limiting or background processing for
+2. **Large campaign imports:** add rate limiting or background processing for
    archives that still hold the event loop and write lock.
 
 Before starting a batch, check `git worktree list` and open branches so two

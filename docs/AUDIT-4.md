@@ -2,7 +2,7 @@
 
 Audit date: 2026-11-27
 
-Reviewed commits: `3065879` (initial audit) and `2936e14` (fifth pass, after background grants, Runesmith, inventory lifecycle, and the affliction picker)
+Reviewed commits: `3065879` (initial audit) and `62d34a9` (sixth pass, after background grants, Runesmith, inventory lifecycle, the affliction picker, and live runes)
 
 Scope: database and migrations, backups/restore, rules engine and spellcasting, items and inventory, compendium data, server/socket authorization, and the table/sheet client. The initial read-only audit and the second fix pass ran on dedicated worktrees; the second pass is on `audit/gaps-2-2026-11-27`.
 
@@ -10,7 +10,7 @@ Scope: database and migrations, backups/restore, rules engine and spellcasting, 
 
 | Command | Result |
 | --- | --- |
-| `npm run check` | Pass (typecheck, lint, 855 unit tests, build, bundle budget) |
+| `npm run check` | Pass (typecheck, lint, 857 unit tests, build, bundle budget) |
 | `npm run smoke` | Pass, including persistent-damage automation |
 | `npm run e2e` | 45 passed |
 | `npm run simulate:campaign` | 18 passed, 0 failed |
@@ -108,14 +108,21 @@ The live rune batch closed the remaining rune lifecycle gap:
 - **Runesmith etch/re-etch.** The sheet can add a base rune or replace an etched rune from the repertoire; replacement resets the target and clears the diacritic (`src/shared/runesmith.ts`, `CharacterSheetView.tsx`).
 - **Coverage.** Added five rune-lifecycle unit tests and E2E coverage for equipment etch/detach and Runesmith re-etching.
 
+## Sixth pass
+
+The operational hardening batch closed the migration and audio bookkeeping gaps:
+
+- **Migration history verification.** Migration 59 adds a checksum column. The runner validates recorded names before applying anything and checks SHA-256 checksums for applied migrations; a reused version or edited SQL now fails with an actionable conflict instead of retrying or silently drifting (`src/server/migrate.ts`, `migrations.ts`).
+- **Audio bookkeeping.** Audio upload inserts the asset row and track row in one transaction; delete commits the track/campaign cleanup before removing the file, so a failure leaves no stale row and an orphan file is cleaned later (`src/server/routes/uploads.ts`).
+- **Restore server check.** The running-server probe now waits 1.5 seconds per attempt and retries three times per host before restoring (`scripts/restore.mjs`).
+- **Coverage.** Added migration name-conflict and checksum-mismatch tests; smoke and restore drill pass.
+
 ## Remaining findings
 
 No critical or high-severity findings remain from this audit. The items below are medium/low, optional features, or deliberate trust-model decisions.
 
 ### Medium
 
-- **Migration 55 was reused in an abandoned branch.** A database from that branch records `campaign_player_item_grant` as version 55; current `travel_day_history` then retries 55 and fails on every start. The runner only selects `version`, not name/checksum. Minimal fix: store/verify migration names and emit an actionable conflict error; never reuse versions.
-- **Asset/audio bookkeeping is not fully atomic.** Audio upload/delete can leave stale rows (`src/server/routes/uploads.ts:205-350`), and `cleanup-assets --delete` can race an in-flight upload. A shared reference scanner and transactional deletion/trash staging would close these.
 - **Large imports still hold the event loop and write lock.** Quotas now apply, but a 50 MB embedded archive remains a synchronous transaction. Add a rate limit or background import if large imports are expected.
 - **Duplicating a character clones campaign gear and currency.** `src/server/routes/characters.ts:1093` copies the full draft and keeps `campaign_id`. Under the documented trust model this may be intended, but it is a direct wealth-duplication path. Decide whether duplicates should be build templates (clear campaign/inventory) or GM-only.
 - **Free quantity increases bypass the purchase ledger.** The sheet's +/- controls can set any quantity without paying, while the purchase endpoint enforces coins. `docs/PLAN.md` explicitly says the product is not anti-cheat, so this may be an accepted trust model; if not, route price-bearing increases through the purchase endpoint or reject unexplained server-side deltas.
@@ -124,7 +131,7 @@ No critical or high-severity findings remain from this audit. The items below ar
 
 - Campaign creation inserts the campaign, membership, scene, and state separately (`src/server/routes/campaigns.ts:404-427`); wrap them in a transaction.
 - Import/export fidelity gaps: export omits some thumbnail/attachment URLs, import does not remap message request ids, and imported audio sort order is replaced by the import counter.
-- The restore running-server check probes only one host/port with a 600 ms timeout; require explicit confirmation or a lockfile check.
+- `cleanup-assets --delete` can still race an in-flight upload. Require the server to be stopped or add a grace-period check before deletion.
 - The migration snapshot is taken after `schema_migrations` is created; the ordering is benign but the snapshot is not literally pre-DDL.
 - The overlay focus effect now runs after async load, but the same pattern should be checked if the sheet is remounted with a different character id while open.
 
