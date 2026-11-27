@@ -13,6 +13,7 @@
 Runehall is a complete **campaign table**, with a few deliberate boundaries:
 
 - **Ready:** accounts and invites, campaign membership, 1-20 character building, live sheets, server-rolled combat, HP/dying/wounded, conditions, afflictions, item activation, prepared/spontaneous/focus/innate casting, journal/handouts, export/import, backup/restore, and administrator moderation.
+- **Campaign surface:** Table, Party, Journal, and Settings only. Removed-feature tables are gone; legacy session-zero, faction, lore, and chapter data is export/import-only archive data with no live UI or mutation endpoint.
 - **GM-facing preparation:** encounters, waves, hazards-as-XP, scenes, and the campaign journal.
 - **Manual by design:** optional variant rules, unusual feat/item effects, published-adventure conversion, hex-grid mapping, and long-running project bookkeeping.
 
@@ -25,7 +26,7 @@ The rest of this document records what is verified and what remains manual, so a
 | Check | Result |
 | --- | --- |
 | `npm run check` | Typecheck, lint, formatting, unit tests, production build, and bundle budget pass |
-| Unit tests | 789 passing |
+| Unit tests | 796 passing |
 | `npm run e2e` | 39 passing browser scenarios |
 | `npm run smoke` | End-to-end smoke suite passes |
 | `npm run simulate` | 2,337 characters, 145 class/level matrix builds, 578 option builds, 38 ancestries × 269 backgrounds; 0 problems |
@@ -79,6 +80,7 @@ The campaign simulation exercises two complete 1-20 campaigns per run, one XP an
 - Audit log with retention controls and CSV export.
 - Upload quotas, a low-disk guard, and backup/restore checks that refuse archives missing database-referenced uploads.
 - Backup staging publishes a completed archive with a single rename, so interrupted backups are not mistaken for valid ones.
+- Pending schema upgrades take a verified database snapshot first; a failed migration restores it automatically, and older snapshots are pruned with `MIGRATION_BACKUP_KEEP`.
 - Compendium version metadata is exposed by `/api/health` and recorded in campaign archives.
 
 ---

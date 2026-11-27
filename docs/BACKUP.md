@@ -33,6 +33,35 @@ The backup refuses to publish if the database references an upload that is missi
 
 The snapshot is created with SQLite `VACUUM INTO`, so it is safe to run while the server is active. Every file is hashed into `backup.json`, and the manifest digest covers the sorted file list.
 
+### Automatic pre-migration backup and rollback
+
+Before applying pending schema migrations, the server creates a database-only
+snapshot at `backups/pre-migration/runehall-pre-migration-<timestamp>-<from>-to-<to>.db`.
+The snapshot is written with `VACUUM INTO`, verified with `PRAGMA integrity_check`,
+and published atomically. A fresh database and a start with no pending
+migrations skip this step.
+
+- If the snapshot cannot be created, startup stops before changing the schema.
+- If a migration fails, the server closes the database, restores the snapshot
+  (including removing stale `-wal`/`-shm` files), and exits with the migration
+  error. The next start retries the upgrade from the restored schema.
+- Uploaded files are not touched by migrations, so they do not need to be in
+  this snapshot.
+- `MIGRATION_BACKUP_DIR` changes the snapshot directory. It defaults to
+  `$BACKUP_DIR/pre-migration`, or `backups/pre-migration` when `BACKUP_DIR` is
+  unset.
+- `MIGRATION_BACKUP_KEEP` keeps the newest N snapshots (default 5; `0` keeps
+  every snapshot).
+- `MIGRATION_BACKUP=off` skips the snapshot. Use it only for disposable test or
+  development databases; a failed upgrade will not roll back automatically.
+- `MIGRATION_ROLLBACK=off` keeps the failed database in place for inspection
+  instead of restoring the snapshot.
+
+To roll back a failed upgrade manually, stop the server, copy the chosen
+`runehall-pre-migration-*.db` over `data/runehall.db`, and delete any
+`data/runehall.db-wal` or `data/runehall.db-shm` files. For a full restore that
+also replaces uploads, use `npm run restore` with a normal backup archive.
+
 ### Off-machine shipping
 
 Copy the newest archive to another disk, NAS mount, OneDrive folder, or other filesystem path:

@@ -1,12 +1,22 @@
+import fs from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 import path from "node:path";
 import { dataDir, now } from "./util";
-import { migrations } from "./migrations";
+import { applyMigrationsTo, type MigrationRunResult } from "./migrate";
 
 const databasePath = process.env.DATABASE_PATH
   ? path.resolve(process.env.DATABASE_PATH)
   : path.join(dataDir(), "runehall.db");
 
+function databaseHasContent(filePath: string): boolean {
+  try {
+    return fs.statSync(filePath).size > 0;
+  } catch {
+    return false;
+  }
+}
+
+const databaseExistedAtStart = databaseHasContent(databasePath);
 const sqlite = new DatabaseSync(databasePath);
 
 // node:sqlite's generated types are intentionally conservative about row
@@ -31,55 +41,15 @@ db.exec("PRAGMA foreign_keys = ON;");
 db.exec("PRAGMA busy_timeout = 5000;");
 
 /**
- * Apply pending migrations in order. The schema_migrations table is created
- * before the first migration so existing databases that predate the migration
- * runner are upgraded safely.
+ * Apply pending migrations in order. A verified pre-migration snapshot is
+ * created before the first pending migration; if an upgrade fails, the
+ * snapshot is restored automatically and startup aborts.
  */
-export function applyMigrations(): { applied: number[]; current: number } {
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS schema_migrations (
-      version INTEGER PRIMARY KEY,
-      name TEXT NOT NULL,
-      applied_at INTEGER NOT NULL
-    );
-  `);
-  const appliedVersions = new Set(
-    (
-      db.prepare("SELECT version FROM schema_migrations ORDER BY version").all() as {
-        version: number;
-      }[]
-    ).map((row) => Number(row.version))
-  );
-  const applied: number[] = [];
-  for (const migration of migrations) {
-    if (appliedVersions.has(migration.version)) continue;
-    db.exec("BEGIN");
-    try {
-      db.exec(migration.sql);
-      db.prepare("INSERT INTO schema_migrations (version, name, applied_at) VALUES (?, ?, ?)").run(
-        migration.version,
-        migration.name,
-        now()
-      );
-      db.exec("COMMIT");
-      applied.push(migration.version);
-      console.log(`[db] applied migration ${migration.version}: ${migration.name}`);
-    } catch (error) {
-      try {
-        db.exec("ROLLBACK");
-      } catch {
-        // ignore rollback failures; the original error is more useful
-      }
-      throw new Error(
-        `Migration ${migration.version} (${migration.name}) failed: ${
-          error instanceof Error ? error.message : String(error)
-        }`
-      );
-    }
-  }
-  const current = migrations.length ? migrations[migrations.length - 1].version : 0;
-  db.exec(`PRAGMA user_version = ${current};`);
-  return { applied, current };
+export function applyMigrations(): MigrationRunResult {
+  return applyMigrationsTo(sqlite, {
+    databasePath,
+    databaseExisted: databaseExistedAtStart,
+  });
 }
 
 export const migrationStatus = applyMigrations();
@@ -169,17 +139,6 @@ export interface CampaignSessionZeroRow {
   party_hooks: string;
   gm_notes: string;
   checklist: string;
-  created_at: number;
-  updated_at: number;
-}
-
-export interface CampaignSafetyPreferenceRow {
-  campaign_id: string;
-  user_id: string;
-  lines: string;
-  veils: string;
-  notes: string;
-  anonymous: number;
   created_at: number;
   updated_at: number;
 }
@@ -419,16 +378,6 @@ export interface CampaignFactionRow {
   visible: number;
   gm_notes: string;
   sort_order: number;
-  created_at: number;
-  updated_at: number;
-}
-
-export interface CampaignPlayerNoteRow {
-  id: string;
-  campaign_id: string;
-  user_id: string;
-  title: string;
-  content: string;
   created_at: number;
   updated_at: number;
 }
