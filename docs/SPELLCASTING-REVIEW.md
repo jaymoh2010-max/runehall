@@ -2,7 +2,7 @@
 
 Date: 2026-11-23
 
-Status: review complete. Sprint 1 (the daily spellcasting loop), the class-grant portion of Sprint 2, the first table-magic pass of Sprint 3, the magus studious-slot pass of Sprint 4, the animist prepared/spontaneous split of Sprint 5, the spontaneous known-at-rank pass of Sprint 6, the psychic psi-amp pass of Sprint 7, the table Sustain-reminder pass of Sprint 8, the higher-slot downcast pass of Sprint 9, the scroll-spellcasting pass of Sprint 10, the Magic Wand spellcasting pass of Sprint 11, the fixed-spell specific-wand pass of Sprint 12, the expanded/advanced domain pass of Sprint 13, the flexible-wand pass of Sprint 14, the staff/trait-restricted wand pass of Sprint 15, the ritual-detail pass of Sprint 16, the spell-source label pass of Sprint 17, the staff-slot/repeated-domain pass of Sprint 18, the oracle mystery-domain pass of Sprint 19, the Learn-a-Spell pass of Sprint 20, the last-staff-list pass of Sprint 21, the multiclass-dedication pass of Sprint 22, the multiclass-slot pass of Sprint 23, the variable-tradition dedication pass of Sprint 24, the heightening/starting-budget pass of Sprint 25, the higher-rank class-choice pass of Sprint 26, the later-domain-feat pass of Sprint 27, the structured-ritual-data pass of Sprint 28, the spellbook-budget pass of Sprint 29, and the staff-effect-visibility pass of Sprint 30 were implemented on 2026-11-23 through 2026-11-26. The findings below describe the pre-Sprint state; the implementation status sections record what changed, and the remaining class and table gaps stay in the backlog.
+Status: review complete. Sprint 1 (the daily spellcasting loop), the class-grant portion of Sprint 2, the first table-magic pass of Sprint 3, the magus studious-slot pass of Sprint 4, the animist prepared/spontaneous split of Sprint 5, the spontaneous known-at-rank pass of Sprint 6, the psychic psi-amp pass of Sprint 7, the table Sustain-reminder pass of Sprint 8, the higher-slot downcast pass of Sprint 9, the scroll-spellcasting pass of Sprint 10, the Magic Wand spellcasting pass of Sprint 11, the fixed-spell specific-wand pass of Sprint 12, the expanded/advanced domain pass of Sprint 13, the flexible-wand pass of Sprint 14, the staff/trait-restricted wand pass of Sprint 15, the ritual-detail pass of Sprint 16, the spell-source label pass of Sprint 17, the staff-slot/repeated-domain pass of Sprint 18, the oracle mystery-domain pass of Sprint 19, the Learn-a-Spell pass of Sprint 20, the last-staff-list pass of Sprint 21, the multiclass-dedication pass of Sprint 22, the multiclass-slot pass of Sprint 23, the variable-tradition dedication pass of Sprint 24, the heightening/starting-budget pass of Sprint 25, the higher-rank class-choice pass of Sprint 26, the later-domain-feat pass of Sprint 27, the structured-ritual-data pass of Sprint 28, the spellbook-budget pass of Sprint 29, the staff-effect-visibility pass of Sprint 30, and the full ritual-coverage pass of Sprint 31 were implemented on 2026-11-23 through 2026-11-27. The findings below describe the pre-Sprint state; the implementation status sections record what changed, and the remaining class and table gaps stay in the backlog.
 
 > **Follow-up (2026-11-23):** `docs/RULES-AUDIT.md` corrected two table errors
 > this review did not catch: bards use the 2/3 full-caster slot table (not the
@@ -338,7 +338,7 @@ Structured ritual data is implemented:
 - The server merges that data into spell context; the sheet uses it before falling back to prose detection.
 - Ritual detail cards show the printed primary check and the secondary casters/checks, and the primary-check picker keeps every printed skill option.
 - Rolling a ritual uses the character's override first, then the first printed skill the character actually has.
-- 168 of 174 rituals have structured data. Six newer rituals remain prose/manual because the source clone predates them; costs and outcomes remain prose.
+- 168 of 174 rituals had structured data in Sprint 28; Sprint 31 filled the six newer rituals in rank subfolders, so all 174 now have structured checks. Costs and outcomes remain prose.
 
 ## Sprint 29 implementation status (2026-11-26)
 
@@ -358,6 +358,14 @@ Staff special effects are visible at the table:
 - Staves expose an **Effects** action that shows the non-spell prose from the item's description before its Activate block.
 - The modal calls out that bonuses and triggered effects remain manual and links to the full item page.
 - Staff spell lists, charges, charge spending, and spell-slot casting remain tracked as before.
+
+## Sprint 31 implementation status (2026-11-27)
+
+Ritual coverage is complete:
+
+- The six rituals stored in rank subfolders now have structured primary and secondary checks.
+- All 174 ritual entries resolve to structured data with no missing primary checks.
+- The data test now requires every ritual in the compendium to have a structured entry.
 
 ## Rules baseline
 
@@ -435,7 +443,7 @@ Legend: Yes = modeled and usable; Partial = some support with known gaps; No = n
 | Summoner link spells | Yes | Evolution Surge and Boost Eidolon granted; eidolon actions remain manual |
 | Magus studious slots | Yes | Two special slots at 7th, rank 3 at 11th, rank 4 at 13th; hybrid-study list and preparation UI |
 | Animist prepared/spontaneous split | Yes | Prepared animist slots and spontaneous apparition slots, attunement, repertoire, and vessel focus spells |
-| Rituals | Partial | Structured primary and secondary checks for 168 of 174 rituals, with prose fallback and manual override; costs and outcomes remain prose |
+| Rituals | Partial | Structured primary and secondary checks for all 174 rituals, with manual override; costs and outcomes remain prose |
 | Sustained spells | Yes | Casting starts sustain, the sheet and table list active spells, Sustain/End actions are available, and Restore clears them |
 | Spellbook capacity and learning | Partial | Starting contents and the two-free-spells-per-level budget are tracked; paid Learn a Spell additions are marked and excluded; the shared `known` list still serves as both book and repertoire |
 | Item spellcasting | Partial | Scrolls cast from the character's spell list and consume on use; generic Magic Wands cast at their rank once per day; fixed-spell specific wands cast directly; flexible wands cast a chosen spell at their listed rank; staves track parsed spell lists, charge pools, spell-slot casting, and show their special-effect prose; bonuses and triggered effects remain manual |
@@ -601,7 +609,7 @@ Fix: The table reminder now appears below the initiative bar for an active chara
 
 Status: partly fixed in Sprint 3, Sprint 16, and Sprint 28. Ritual rows expose a Details card and a Primary check action. The card shows the structured primary check and secondary casters when the compendium provides them, falls back to prose detection, and lets the player override the skill.
 
-`src/shared/ritual.ts` reads structured `ritualData` first and falls back to the printed prose. The compendium provides structured checks for 168 of 174 rituals; six newer rituals remain manual. Costs and outcomes remain prose.
+`src/shared/ritual.ts` reads structured `ritualData` first and falls back to the printed prose. The compendium now provides structured checks for all 174 rituals. Costs and outcomes remain prose.
 
 Impact: Any ritual can be given a usable primary check at the table, and most now use structured source data.
 
