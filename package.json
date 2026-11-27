@@ -38,7 +38,8 @@
     "e2e:headed": "npm run build && playwright test --headed",
     "check": "npm run typecheck && npm run lint && npm run format:check && npm test && npm run build && npm run check:bundle",
     "check:bundle": "node scripts/check-bundle.mjs",
-    "check:full": "npm run check && npm run smoke"
+    "check:full": "npm run check && npm run smoke",
+    "ingest:runes": "node scripts/ingest-runesmith-runes.mjs"
   },
   "keywords": [
     "pathfinder",

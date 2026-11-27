@@ -107,6 +107,7 @@ import {
 import { DeityPicker, EquipmentPicker, FeatPicker, SpellPicker } from "../pickers";
 import { ContentSourceToggle } from "../ContentSourceToggle";
 import { RunePicker } from "../RunePicker";
+import { RunesmithRunesCard } from "../RunesmithRunesCard";
 import {
   isCoreSource,
   rulesetContentMode,
@@ -580,6 +581,9 @@ export function ClassStep({
               features={selected.features.filter((feature) => feature.level <= draft.level)}
             />
           </Card>
+          {selected.name.toLowerCase() === "runesmith" ? (
+            <RunesmithRunesCard draft={draft} update={update} runes={staticData.runes} />
+          ) : null}
           <ValidationNote issues={derived.validation.filter((issue) => issue.step === "class")} />
           <div className="step-actions">
             <Button variant="ghost" onClick={() => setStep("background")}>

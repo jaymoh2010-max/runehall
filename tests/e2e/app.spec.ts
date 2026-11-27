@@ -533,9 +533,10 @@ test("lazy library, compendium entry, rules, and account routes load", async ({ 
     .first()
     .click();
   await expect(page.getByRole("heading", { name: "Airship", level: 2 })).toBeVisible();
-  await expect(page.getByText("210", { exact: true })).toBeVisible();
+  const vehicleDetail = page.getByRole("region", { name: "Entry detail" });
+  await expect(vehicleDetail.getByText("210", { exact: true })).toBeVisible();
   // Vehicles without source prose show a derived statblock summary instead.
-  await expect(page.getByText(/Level 12 Gargantuan vehicle/)).toBeVisible();
+  await expect(vehicleDetail.getByText(/Level 12 Gargantuan vehicle/)).toBeVisible();
 
   await page.getByRole("tab", { name: "Familiars" }).click();
   await page.getByPlaceholder(/Search familiars/).fill("Absorb Familiar");
@@ -1476,6 +1477,70 @@ test("builder tracks commander tactics and prepares the daily folio", async ({ p
   await expect(prepared).toContainText("Alley-Oop");
   await expect(prepared).toContainText("Double Team");
   await expect(prepared).toContainText("Reload!");
+});
+
+test("builder tracks the Runesmith repertoire and invokes etched runes", async ({ page }) => {
+  test.setTimeout(90_000);
+  await signIn(page, admin);
+  const expandedCampaign = `E2E Runesmith ${runId}`;
+  const created = await page.request.post("/api/campaigns", {
+    data: { name: expandedCampaign, ruleset: "expanded" },
+  });
+  expect(created.ok()).toBe(true);
+  await openNewCharacterInCampaign(page, "E2E Runesmith", expandedCampaign);
+
+  await goToStep(page, "Ancestry");
+  await page.locator(".ancestry-grid .selection-card").filter({ hasText: "Human" }).first().click();
+  await goToStep(page, "Heritage");
+  await page
+    .locator(".selection-grid .selection-card")
+    .filter({ hasText: "Skilled Human" })
+    .click();
+  await goToStep(page, "Background");
+  await page
+    .locator(".selection-grid .selection-card")
+    .filter({ hasText: "Warrior" })
+    .first()
+    .click();
+  await goToStep(page, "Class");
+  await page
+    .locator(".class-grid")
+    .getByRole("button", { name: /Runesmith/ })
+    .click();
+
+  const runesCard = page.locator(".runesmith-runes");
+  await expect(runesCard).toBeVisible();
+  const repertoireSelect = runesCard.getByLabel("Add rune to repertoire");
+  for (const rune of [
+    "Atryl, Rune of Fire",
+    "Baruiel, Rune of Hold's Bravery",
+    "Camonica, Rune of Perplexity",
+    "Esvadir, Rune of Whetstones",
+  ]) {
+    await repertoireSelect.selectOption({ label: `${rune} (level 1)` });
+  }
+  await expect(runesCard).toContainText("4/4 known");
+
+  const etchSelect = runesCard.getByLabel("Etch a rune");
+  await etchSelect.selectOption({ label: "Atryl, Rune of Fire" });
+  await etchSelect.selectOption({ label: "Baruiel, Rune of Hold's Bravery" });
+  await expect(runesCard).toContainText("2/2 etched");
+  await runesCard.getByLabel("Target").nth(0).fill("Self");
+  await runesCard.getByLabel("Target").nth(1).fill("My longsword");
+
+  await goToStep(page, "Review");
+  await page.getByRole("link", { name: "Open character sheet" }).click();
+  await expect(page).toHaveURL(/\/characters\/[^/]+$/, { timeout: 15_000 });
+  await page.getByRole("button", { name: "Actions", exact: true }).click();
+  const etched = page.locator(".pb-subsection").filter({ hasText: "Etched runes" });
+  await expect(etched).toContainText("Atryl, Rune of Fire");
+  await expect(etched).toContainText("My longsword");
+  await etched.getByRole("button", { name: "Invoke" }).first().click();
+  await expect(etched).toContainText("1/2");
+  const etchedRows = etched.locator(".pb-feat-row");
+  await expect(etchedRows).toHaveCount(1);
+  await expect(etchedRows).toContainText("Baruiel, Rune of Hold's Bravery");
+  await expect(etchedRows).not.toContainText("Atryl, Rune of Fire");
 });
 
 test("prose-only backgrounds fill their curated skill and feat grants", async ({ page }) => {

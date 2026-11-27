@@ -65,6 +65,11 @@ import {
   commanderPreparedLimit,
 } from "./commander";
 import {
+  normalizeRunesmithState,
+  runesmithEtchedLimit,
+  runesmithRepertoireLimit,
+} from "./runesmith";
+import {
   featAllowedByHeritageGrant,
   heritageChosenFeatId,
   heritageEffects,
@@ -1717,6 +1722,10 @@ export function emptyCharacterDraft(name = "New Hero"): CharacterDraft {
       folio: [],
       prepared: [],
     },
+    runesmith: {
+      repertoire: [],
+      etched: [],
+    },
     spells: {
       tradition: null,
       cantrips: [],
@@ -1889,6 +1898,7 @@ export function normalizeCharacterDraft(input: unknown, fallbackName = "New Hero
       ...new Set(arr<string>(commanderRaw.prepared).filter((x) => typeof x === "string")),
     ].slice(0, 10),
   };
+  const runesmith = normalizeRunesmithState(raw.runesmith);
 
   type NormalizedEquipment = {
     itemId: string;
@@ -2013,6 +2023,7 @@ export function normalizeCharacterDraft(input: unknown, fallbackName = "New Hero
     grantChoices,
     featChoices,
     commander,
+    runesmith,
     spells: {
       tradition: TRADITIONS.includes(spells.tradition as SpellTradition)
         ? (spells.tradition as SpellTradition)
@@ -3626,6 +3637,94 @@ export function computeCharacter(
     }
     if (draft.commander.folio.some((id) => !COMMANDER_TACTICS_BY_ID.has(id))) {
       issue("warning", "Commander: the folio contains an unknown tactic.", "feats");
+    }
+  }
+  if (classData?.name.toLowerCase() === "runesmith") {
+    const repertoireLimit = runesmithRepertoireLimit(draft.level);
+    const etchedLimit = runesmithEtchedLimit(draft.level);
+    if (draft.runesmith.repertoire.length > repertoireLimit) {
+      issue(
+        "error",
+        `Runesmith: the repertoire holds ${draft.runesmith.repertoire.length} runes but only ${repertoireLimit} fit at this level.`,
+        "class"
+      );
+    }
+    if (draft.runesmith.repertoire.length < repertoireLimit) {
+      issue(
+        "warning",
+        `Runesmith: choose ${repertoireLimit - draft.runesmith.repertoire.length} more rune${
+          repertoireLimit - draft.runesmith.repertoire.length === 1 ? "" : "s"
+        } for the repertoire.`,
+        "class"
+      );
+    }
+    if (draft.runesmith.etched.length > etchedLimit) {
+      issue(
+        "error",
+        `Runesmith: ${draft.runesmith.etched.length} runes are etched but only ${etchedLimit} can be sustained at this level.`,
+        "class"
+      );
+    }
+    for (const id of draft.runesmith.repertoire) {
+      const rune = context.runes?.[id];
+      if (!rune) {
+        issue("warning", "Runesmith: the repertoire contains an unknown rune.", "class");
+      } else if (rune.level > draft.level) {
+        issue(
+          "warning",
+          `Runesmith: ${rune.name} is a level ${rune.level} rune and is above your level.`,
+          "class"
+        );
+      }
+    }
+    for (const etched of draft.runesmith.etched) {
+      const rune = context.runes?.[etched.runeId];
+      if (!rune) {
+        issue("warning", "Runesmith: an etched rune is missing from the compendium.", "class");
+      } else {
+        if (rune.diacritic) {
+          issue(
+            "error",
+            `Runesmith: ${rune.name} is a diacritic and must be applied to a base rune.`,
+            "class"
+          );
+        }
+        if (!draft.runesmith.repertoire.includes(etched.runeId)) {
+          issue("warning", `Runesmith: ${rune.name} is etched but not in the repertoire.`, "class");
+        }
+      }
+      if (!etched.target.trim()) {
+        issue(
+          "warning",
+          `Runesmith: record a target for ${rune?.name ?? "an etched rune"}.`,
+          "class"
+        );
+      }
+      if (etched.diacriticId) {
+        const diacritic = context.runes?.[etched.diacriticId];
+        if (!diacritic) {
+          issue(
+            "warning",
+            "Runesmith: an attached diacritic is missing from the compendium.",
+            "class"
+          );
+        } else {
+          if (!diacritic.diacritic) {
+            issue(
+              "warning",
+              `Runesmith: ${diacritic.name} is attached as a diacritic but isn't one.`,
+              "class"
+            );
+          }
+          if (!draft.runesmith.repertoire.includes(etched.diacriticId)) {
+            issue(
+              "warning",
+              `Runesmith: ${diacritic.name} is attached but not in the repertoire.`,
+              "class"
+            );
+          }
+        }
+      }
     }
   }
 

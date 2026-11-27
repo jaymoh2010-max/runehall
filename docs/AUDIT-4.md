@@ -2,7 +2,7 @@
 
 Audit date: 2026-11-27
 
-Reviewed commits: `3065879` (initial audit) and `86df928` (second pass, including the background-grant work)
+Reviewed commits: `3065879` (initial audit) and `5b1d050` (second pass merged over the background-grant and Runesmith work)
 
 Scope: database and migrations, backups/restore, rules engine and spellcasting, items and inventory, compendium data, server/socket authorization, and the table/sheet client. The initial read-only audit and the second fix pass ran on dedicated worktrees; the second pass is on `audit/gaps-2-2026-11-27`.
 
@@ -10,9 +10,9 @@ Scope: database and migrations, backups/restore, rules engine and spellcasting, 
 
 | Command | Result |
 | --- | --- |
-| `npm run check` | Pass (typecheck, lint, 826 unit tests, build, bundle budget) |
+| `npm run check` | Pass (typecheck, lint, 840 unit tests, build, bundle budget) |
 | `npm run smoke` | Pass, including persistent-damage automation |
-| `npm run e2e` | 42 passed |
+| `npm run e2e` | 43 passed |
 | `npm run simulate:campaign` | 18 passed, 0 failed |
 | `npm run simulate` | 2,337 characters; 0 problems |
 | `npm run simulate:parties` | 23 passed, 0 failed |

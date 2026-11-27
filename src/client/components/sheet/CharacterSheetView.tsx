@@ -96,6 +96,7 @@ import {
   commanderFeatIds,
   commanderPreparedLimit,
 } from "../../../shared/commander";
+import { runesmithEtchedLimit, runesmithRepertoireLimit } from "../../../shared/runesmith";
 import { psiAmpFor } from "../../../shared/psiAmps";
 import { ritualPrimaryCheckInfo, ritualPrimarySkillNames } from "../../../shared/ritual";
 import {
@@ -393,6 +394,7 @@ export function CharacterSheetView({
   const [derived, setDerived] = useState<DerivedCharacter | null>(null);
   const classData = context?.classData ?? null;
   const isCommander = classData?.name.toLowerCase() === "commander";
+  const isRunesmith = classData?.name.toLowerCase() === "runesmith";
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -1853,6 +1855,18 @@ export function CharacterSheetView({
     if (!currentDraft) return;
     const saved = await persist(endSustainedSpell(currentDraft, spellId));
     if (saved) toast("Sustain ended.", "info");
+  };
+
+  const invokeRune = async (etchedId: string, name: string) => {
+    if (!canEdit) return;
+    const saved = await persist((currentDraft) => ({
+      ...currentDraft,
+      runesmith: {
+        ...currentDraft.runesmith,
+        etched: currentDraft.runesmith.etched.filter((entry) => entry.id !== etchedId),
+      },
+    }));
+    if (saved) toast(`${name} invoked and faded.`, "success");
   };
 
   const rollRitual = (spell: Spell) => {
@@ -3809,6 +3823,66 @@ export function CharacterSheetView({
                       Drill for 10 minutes to swap the prepared list; limited-use tactics still
                       track their own daily use.
                     </p>
+                  </div>
+                ) : null}
+                {isRunesmith ? (
+                  <div className="pb-subsection">
+                    <div className="pb-status-head">
+                      <h3>Etched runes</h3>
+                      <span>
+                        {draft.runesmith.etched.length}/{runesmithEtchedLimit(draft.level)}
+                      </span>
+                    </div>
+                    <p className="pb-hint">
+                      Invoke Rune is one action and can invoke up to two runes within 30 feet. An
+                      invoked rune fades; re-etch it during daily preparations or with 10 minutes of
+                      work.
+                    </p>
+                    {draft.runesmith.etched.length ? (
+                      <div className="pb-stack">
+                        {draft.runesmith.etched.map((entry) => {
+                          const rune = context?.runes?.[entry.runeId];
+                          const diacritic = entry.diacriticId
+                            ? context?.runes?.[entry.diacriticId]
+                            : null;
+                          if (!rune) return null;
+                          return (
+                            <div className="pb-feat-row" key={entry.id}>
+                              <div>
+                                <strong>{rune.name}</strong>
+                                <span>
+                                  Target: {entry.target || "unrecorded"} · Level {rune.level}
+                                  {diacritic ? ` · ${diacritic.name}` : ""}
+                                </span>
+                                <div className="pb-hint">
+                                  <RichText html={rune.invocation || rune.description} />
+                                </div>
+                              </div>
+                              <Button
+                                variant="ghost"
+                                onClick={() => void invokeRune(entry.id, rune.name)}
+                              >
+                                Invoke
+                              </Button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <p className="pb-empty">No runes etched.</p>
+                    )}
+                    <details className="runesmith-sheet-repertoire">
+                      <summary>
+                        Repertoire ({draft.runesmith.repertoire.length}/
+                        {runesmithRepertoireLimit(draft.level)})
+                      </summary>
+                      <div className="chip-row">
+                        {draft.runesmith.repertoire.map((runeId) => {
+                          const rune = context?.runes?.[runeId];
+                          return rune ? <Tag key={runeId}>{rune.name}</Tag> : null;
+                        })}
+                      </div>
+                    </details>
                   </div>
                 ) : null}
                 <div className="pb-action-search">

@@ -23,6 +23,7 @@ const files = [
   { key: "ancestries", prefix: "anc", label: "Ancestries" },
   { key: "heritages", prefix: "her", label: "Heritages" },
   { key: "backgrounds", prefix: "bg", label: "Backgrounds" },
+  { key: "runes", prefix: "rune", label: "Runesmith runes" },
   { key: "classes", prefix: "cls", label: "Classes" },
   { key: "classFeatures", prefix: "cf", label: "Class features" },
   { key: "feats", prefix: "feat", label: "Feats" },
