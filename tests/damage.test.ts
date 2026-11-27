@@ -287,6 +287,29 @@ describe("damage and dying", () => {
     expect(result.draft.play.conditions.some((entry) => entry.name === "Dying")).toBe(false);
   });
 
+  it("does not stabilize a dying character with nonlethal damage", () => {
+    const result = applyDamageToDraft(
+      draftWith({
+        hp: 0,
+        conditions: [
+          { name: "Dying", value: 2, duration: null },
+          { name: "Unconscious", value: null, duration: null },
+        ],
+      }),
+      20,
+      5,
+      { nonlethal: true }
+    );
+    expect(result.dying).toBe(2);
+    expect(result.dead).toBe(false);
+    expect(result.draft.play.conditions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: "Dying", value: 2 }),
+        expect.objectContaining({ name: "Unconscious" }),
+      ])
+    );
+  });
+
   it("reduces dying on a successful recovery check and keeps unconscious at 0 HP", () => {
     const draft = draftWith({
       hp: 0,

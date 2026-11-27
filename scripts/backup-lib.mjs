@@ -76,6 +76,26 @@ export function verifyBackupManifest(root, manifest) {
   return { ok: errors.length === 0, legacy: false, checked, errors };
 }
 
+/** Fail before publishing an archive that restore would refuse. */
+export function verifyDatabaseFile(file) {
+  const database = new DatabaseSync(file, { readOnly: true });
+  try {
+    const integrity = database
+      .prepare("PRAGMA integrity_check")
+      .all()
+      .map((row) => Object.values(row)[0]);
+    if (!integrity.every((value) => value === "ok")) {
+      throw new Error(`SQLite integrity check failed: ${integrity.join(", ")}`);
+    }
+    const foreignKeys = database.prepare("PRAGMA foreign_key_check").all();
+    if (foreignKeys.length) {
+      throw new Error(`SQLite foreign key check found ${foreignKeys.length} issue(s)`);
+    }
+  } finally {
+    database.close();
+  }
+}
+
 /**
  * Every /uploads/... filename referenced by the database. Backups and restores
  * use this to prove the file copy actually covers the rows they restore.
@@ -103,6 +123,110 @@ export function referencedUploads(databaseFile) {
 
 export function missingReferencedUploads(databaseFile, uploadsDir) {
   return [...referencedUploads(databaseFile)].filter(
+    (filename) => !fs.existsSync(path.join(uploadsDir, filename))
+  );
+}
+
+const UPLOAD_URL = /\/uploads\/([A-Za-z0-9._-]+)/g;
+const STRUCTURED_COLUMNS = {
+  users: ["avatar_url"],
+  scenes: ["image_url", "thumbnail_url", "props"],
+  tokens: ["image_url"],
+  characters: ["data", "summary"],
+  journal_entries: ["attachments"],
+  campaign_npcs: ["image_url"],
+  campaign_audio_tracks: ["url"],
+};
+const JSON_UPLOAD_COLUMNS = new Set(["props", "data", "summary", "attachments"]);
+const URL_KEY = /(url|image|thumbnail|avatar|portrait|attachment)/i;
+
+function addUploadNames(target, value) {
+  for (const match of String(value ?? "").matchAll(UPLOAD_URL)) target.add(match[1]);
+}
+
+function addJsonUploads(target, value) {
+  if (typeof value === "string") {
+    addUploadNames(target, value);
+    return;
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) addJsonUploads(target, item);
+    return;
+  }
+  if (!value || typeof value !== "object") return;
+  for (const [key, child] of Object.entries(value)) {
+    if (typeof child === "string") {
+      if (URL_KEY.test(key) || child.startsWith("/uploads/")) addUploadNames(target, child);
+    } else {
+      addJsonUploads(target, child);
+    }
+  }
+}
+
+/**
+ * Uploads that structured data actually needs in order to restore. Free-text
+ * fields (chat, journal prose, notes) are intentionally excluded: a player
+ * typing /uploads/foo must not be able to block every backup and restore.
+ */
+export function structuredReferencedUploads(databaseFile) {
+  const database = new DatabaseSync(databaseFile, { readOnly: true });
+  const referenced = new Set();
+  try {
+    for (const [table, columns] of Object.entries(STRUCTURED_COLUMNS)) {
+      const exists = database
+        .prepare("SELECT 1 AS ok FROM sqlite_master WHERE type = 'table' AND name = ?")
+        .get(table);
+      if (!exists) continue;
+      const available = new Set(
+        database
+          .prepare(`PRAGMA table_info("${table.replace(/"/g, '""')}")`)
+          .all()
+          .map((column) => String(column.name))
+      );
+      const selected = columns.filter((column) => available.has(column));
+      if (!selected.length) continue;
+      for (const row of database
+        .prepare(
+          `SELECT ${selected
+            .map((column) => `"${column.replace(/"/g, '""')}"`)
+            .join(", ")} FROM "${table.replace(/"/g, '""')}"`
+        )
+        .all()) {
+        for (const column of selected) {
+          const value = row[column];
+          if (value === null || value === undefined) continue;
+          if (JSON_UPLOAD_COLUMNS.has(column)) {
+            try {
+              addJsonUploads(referenced, JSON.parse(String(value)));
+            } catch {
+              // Malformed JSON is not a reason to lose the backup.
+            }
+          } else {
+            addUploadNames(referenced, value);
+          }
+        }
+      }
+    }
+    // uploaded_assets.filename is a bare filename rather than a /uploads/ URL.
+    if (
+      database
+        .prepare(
+          "SELECT 1 AS ok FROM sqlite_master WHERE type = 'table' AND name = 'uploaded_assets'"
+        )
+        .get()
+    ) {
+      for (const row of database.prepare("SELECT filename FROM uploaded_assets").all()) {
+        if (typeof row.filename === "string" && row.filename) referenced.add(row.filename);
+      }
+    }
+  } finally {
+    database.close();
+  }
+  return referenced;
+}
+
+export function missingStructuredUploads(databaseFile, uploadsDir) {
+  return [...structuredReferencedUploads(databaseFile)].filter(
     (filename) => !fs.existsSync(path.join(uploadsDir, filename))
   );
 }

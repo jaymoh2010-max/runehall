@@ -129,7 +129,86 @@ function cleanStaffSpellName(rawName: string): string {
     .trim();
 }
 
-function plainStaffSpells(text: string): StaffSpell[] {
+/**
+ * Expand a staff list entry into spell names. The compendium usually separates
+ * spells with commas or "or", but some entries concatenate names without a
+ * separator (for example "Runic Body Summon Animal"). When the caller supplies
+ * the spell list, split concatenations against known names; otherwise keep the
+ * raw entry and let the caller resolve it.
+ */
+function splitTopLevelCommas(text: string): string[] {
+  const parts: string[] = [];
+  let depth = 0;
+  let current = "";
+  for (const character of text) {
+    if (character === "(") depth += 1;
+    if (character === ")") depth = Math.max(0, depth - 1);
+    if (character === "," && depth === 0) {
+      parts.push(current);
+      current = "";
+      continue;
+    }
+    current += character;
+  }
+  parts.push(current);
+  return parts;
+}
+
+function staffSpellNames(rawName: string, knownSpells: Map<string, string> | null): string[] {
+  const cleaned = cleanStaffSpellName(rawName);
+  if (!cleaned) return [];
+  // Check the whole entry first so spell names containing "or" (such as
+  // "Summon Plant or Fungus") are not split into two spells.
+  const whole = knownSpells?.get(cleaned.toLowerCase());
+  if (whole) return [whole];
+  const parts = splitTopLevelCommas(cleaned)
+    .flatMap((part) => {
+      const trimmed = cleanStaffSpellName(part);
+      if (!trimmed) return [];
+      if (knownSpells?.has(trimmed.toLowerCase())) return [trimmed];
+      return trimmed
+        .split(/\s+or\s+/i)
+        .map((candidate) => cleanStaffSpellName(candidate))
+        .filter(Boolean);
+    })
+    .filter(Boolean);
+  if (!knownSpells) return parts;
+  return parts.flatMap((part) => {
+    const exact = knownSpells.get(part.toLowerCase());
+    if (exact) return [exact];
+    const split = splitKnownSpellNames(part, knownSpells);
+    return split.length ? split : [part];
+  });
+}
+
+function splitKnownSpellNames(text: string, knownSpells: Map<string, string>): string[] {
+  const memo = new Map<string, string[] | null>();
+  const names = [...knownSpells.keys()].sort((left, right) => right.length - left.length);
+  const solve = (value: string): string[] | null => {
+    const key = value.toLowerCase();
+    const cached = memo.get(key);
+    if (cached !== undefined) return cached;
+    for (const name of names) {
+      if (!key.startsWith(name)) continue;
+      if (key.length !== name.length && key[name.length] !== " ") continue;
+      if (key.length === name.length) {
+        memo.set(key, [knownSpells.get(name)!]);
+        return [knownSpells.get(name)!];
+      }
+      const rest = solve(value.slice(name.length).trim());
+      if (rest) {
+        const result = [knownSpells.get(name)!, ...rest];
+        memo.set(key, result);
+        return result;
+      }
+    }
+    memo.set(key, null);
+    return null;
+  };
+  return solve(text) ?? [];
+}
+
+function plainStaffSpells(text: string, knownSpells: Map<string, string> | null): StaffSpell[] {
   const start = text.search(/\bCantrips?\b\s+[A-Z]/i);
   if (start < 0) return [];
   const segment = text.slice(start).split(/Craft Requirements/i)[0];
@@ -140,8 +219,8 @@ function plainStaffSpells(text: string): StaffSpell[] {
     if (rank === null) continue;
     const contentStart = (matches[index].index ?? 0) + matches[index][0].length;
     const contentEnd = matches[index + 1]?.index ?? segment.length;
-    for (const rawName of segment.slice(contentStart, contentEnd).split(/,|\s+or\s+/i)) {
-      const name = cleanStaffSpellName(rawName);
+    const content = segment.slice(contentStart, contentEnd);
+    for (const name of staffSpellNames(content, knownSpells)) {
       if (name) spells.push({ name, rank });
     }
   }
@@ -159,10 +238,14 @@ function staffRank(label: string): number | null {
 
 /** Spells listed in a staff's activation block, grouped by their staff rank. */
 export function staffSpells(
-  item: Pick<Equipment, "name" | "traits" | "description"> | null | undefined
+  item: Pick<Equipment, "name" | "traits" | "description"> | null | undefined,
+  knownSpellNames?: Iterable<string>
 ): StaffSpell[] {
   if (!item?.traits?.includes("staff")) return [];
   const text = String(item.description ?? "");
+  const knownSpells = knownSpellNames
+    ? new Map([...knownSpellNames].map((name) => [name.toLowerCase(), name]))
+    : null;
   const seen = new Set<string>();
   const spells: StaffSpell[] = [];
   const add = (name: string, rank: number) => {
@@ -174,13 +257,14 @@ export function staffSpells(
   for (const match of text.matchAll(STAFF_LIST_ITEM)) {
     const rank = staffRank(match[1]);
     if (rank === null) continue;
-    for (const rawName of match[2].split(/,|\s+or\s+/i)) {
-      const name = cleanStaffSpellName(rawName);
+    for (const name of staffSpellNames(match[2], knownSpells)) {
       if (name) add(name, rank);
     }
   }
   if (!spells.length) {
-    for (const spell of plainStaffSpells(plainText(text))) add(spell.name, spell.rank);
+    for (const spell of plainStaffSpells(plainText(text), knownSpells)) {
+      add(spell.name, spell.rank);
+    }
   }
   if (!spells.length) {
     for (const spell of STAFF_SPELL_FALLBACKS[item.name.toLowerCase()] ?? []) {

@@ -7,10 +7,13 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   manifestDigest,
   missingReferencedUploads,
+  missingStructuredUploads,
   readManifest,
   referencedUploads,
   sha256File,
+  structuredReferencedUploads,
   verifyBackupManifest,
+  verifyDatabaseFile,
 } from "../scripts/backup-lib.mjs";
 
 const directories: string[] = [];
@@ -109,6 +112,31 @@ describe("backup manifests", () => {
   });
 });
 
+describe("backup database checks", () => {
+  it("accepts a healthy database and rejects foreign-key damage", () => {
+    const directory = temporaryDirectory();
+    const healthy = path.join(directory, "healthy.db");
+    const database = new DatabaseSync(healthy);
+    database.exec("CREATE TABLE parent (id TEXT PRIMARY KEY);");
+    database.close();
+    expect(() => verifyDatabaseFile(healthy)).not.toThrow();
+
+    const broken = path.join(directory, "broken.db");
+    const damaged = new DatabaseSync(broken);
+    try {
+      damaged.exec("PRAGMA foreign_keys = OFF;");
+      damaged.exec(`
+        CREATE TABLE parent (id TEXT PRIMARY KEY);
+        CREATE TABLE child (parent_id TEXT REFERENCES parent(id));
+      `);
+      damaged.prepare("INSERT INTO child (parent_id) VALUES (?)").run("missing");
+    } finally {
+      damaged.close();
+    }
+    expect(() => verifyDatabaseFile(broken)).toThrow(/foreign key/i);
+  });
+});
+
 describe("backup upload references", () => {
   it("finds database-referenced uploads and reports missing files", () => {
     const directory = temporaryDirectory();
@@ -125,5 +153,43 @@ describe("backup upload references", () => {
 
     expect([...referencedUploads(databaseFile)].sort()).toEqual(["kept.png", "missing.png"]);
     expect(missingReferencedUploads(databaseFile, uploads)).toEqual(["missing.png"]);
+  });
+
+  it("requires structured uploads but ignores free-text mentions", () => {
+    const directory = temporaryDirectory();
+    const databaseFile = path.join(directory, "runehall.db");
+    const uploads = path.join(directory, "uploads");
+    fs.mkdirSync(uploads, { recursive: true });
+    for (const filename of ["kept.png", "portrait.png", "library.png"]) {
+      fs.writeFileSync(path.join(uploads, filename), "image");
+    }
+    const database = new DatabaseSync(databaseFile);
+    database.exec(`
+      CREATE TABLE scenes (image_url TEXT, props TEXT);
+      CREATE TABLE messages (content TEXT);
+      CREATE TABLE characters (data TEXT, summary TEXT);
+      CREATE TABLE uploaded_assets (filename TEXT);
+    `);
+    database
+      .prepare("INSERT INTO scenes (image_url, props) VALUES (?, ?)")
+      .run("/uploads/kept.png", JSON.stringify([{ imageUrl: "/uploads/missing.png" }]));
+    database
+      .prepare("INSERT INTO messages (content) VALUES (?)")
+      .run("A chat mention of /uploads/chat-only.png");
+    database.prepare("INSERT INTO characters (data, summary) VALUES (?, ?)").run(
+      JSON.stringify({
+        portraitUrl: "/uploads/portrait.png",
+        notes: "Backstory mentions /uploads/notes-only.png",
+      }),
+      null
+    );
+    database.prepare("INSERT INTO uploaded_assets (filename) VALUES (?)").run("library.png");
+    database.close();
+
+    const structured = [...structuredReferencedUploads(databaseFile)].sort();
+    expect(structured).toEqual(["kept.png", "library.png", "missing.png", "portrait.png"]);
+    expect(structured).not.toContain("chat-only.png");
+    expect(structured).not.toContain("notes-only.png");
+    expect(missingStructuredUploads(databaseFile, uploads)).toEqual(["missing.png"]);
   });
 });

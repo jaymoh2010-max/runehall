@@ -209,6 +209,44 @@ describe("staff spell lists", () => {
     ]);
   });
 
+  it("splits concatenated spell names against the known spell list", () => {
+    const spellNames = read<{ name: string }>("spells.json").map((spell) => spell.name);
+    const animal = equipment.find((entry) => entry.name === "Animal Staff")!;
+    expect(staffSpells(animal, spellNames)).toEqual([
+      { name: "Know the Way", rank: 0 },
+      { name: "Runic Body", rank: 1 },
+      { name: "Summon Animal", rank: 1 },
+    ]);
+
+    const mentalist = equipment.find((entry) => entry.name === "Mentalist's Staff")!;
+    expect(staffSpells(mentalist, spellNames)).toEqual([
+      { name: "Daze", rank: 0 },
+      { name: "Mindlink", rank: 1 },
+      { name: "Phantom Pain", rank: 1 },
+    ]);
+
+    const spore = equipment.find((entry) => entry.name === "Spore Shephard's Staff")!;
+    expect(staffSpells(spore, spellNames)).toEqual([
+      { name: "Puff of Poison", rank: 0 },
+      { name: "Protector Tree", rank: 1 },
+      { name: "Summon Plant or Fungus", rank: 1 },
+    ]);
+  });
+
+  it("resolves every parsed staff spell against the compendium", () => {
+    const spellNames = read<{ name: string }>("spells.json").map((spell) => spell.name);
+    const known = new Set(spellNames.map((name) => name.toLowerCase()));
+    const unresolved: string[] = [];
+    for (const item of equipment.filter((entry) => entry.traits?.includes("staff"))) {
+      for (const spell of staffSpells(item, spellNames)) {
+        if (!known.has(spell.name.toLowerCase())) {
+          unresolved.push(`${item.name}: ${spell.name}`);
+        }
+      }
+    }
+    expect(unresolved.slice(0, 20)).toEqual([]);
+  });
+
   it("returns no list for non-staff items", () => {
     const sword = equipment.find((entry) => entry.name === "Longsword")!;
     expect(staffSpells(sword)).toEqual([]);

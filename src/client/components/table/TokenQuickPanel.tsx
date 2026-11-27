@@ -65,7 +65,7 @@ export function TokenQuickPanel({
   canManage: boolean;
   onClose: () => void;
   onUpdate: (patch: Partial<Token>) => void;
-  onDamage: (amount: number, damageType: string, nonlethal: boolean) => void;
+  onDamage: (amount: number, damageType: string, nonlethal: boolean, critical: boolean) => void;
   onDelete: () => void;
   onOpenCharacter: (characterId: string) => void;
   onAddToInitiative: () => void;
@@ -74,6 +74,7 @@ export function TokenQuickPanel({
   const [damage, setDamage] = useState("");
   const [damageType, setDamageType] = useState(DEFAULT_DAMAGE_TYPE);
   const [nonlethal, setNonlethal] = useState(false);
+  const [critical, setCritical] = useState(false);
   const [imageBusy, setImageBusy] = useState(false);
   const [imageError, setImageError] = useState("");
   const [portraitOpen, setPortraitOpen] = useState(false);
@@ -102,8 +103,9 @@ export function TokenQuickPanel({
   const applyDamage = () => {
     const amount = Math.max(0, Math.round(Number(damage) || 0));
     if (!amount) return;
-    onDamage(amount, damageType, nonlethal);
+    onDamage(amount, damageType, nonlethal, critical);
     setDamage("");
+    setCritical(false);
   };
 
   const addCondition = () => {
@@ -225,6 +227,14 @@ export function TokenQuickPanel({
                     onChange={(event) => setNonlethal(event.target.checked)}
                   />{" "}
                   Nonlethal
+                </label>
+                <label className="tiny">
+                  <input
+                    type="checkbox"
+                    checked={critical}
+                    onChange={(event) => setCritical(event.target.checked)}
+                  />{" "}
+                  Critical
                 </label>
                 <Button size="sm" type="submit" variant="secondary" disabled={!Number(damage)}>
                   Apply

@@ -1758,6 +1758,7 @@ export function SpellsStep({ draft, update, derived, context, setStep, openPicke
           update(() => next);
           setPrepOpen(false);
         }}
+        elevated
       />
       <ValidationNote issues={issues} />
       <div className="step-actions">

@@ -5,6 +5,7 @@
  * Usage:
  *   npm run restore -- --from backups/runehall-2026-01-01T12-00-00-000Z --yes
  *   npm run restore -- --from <dir> --yes --allow-unverified
+ *   npm run restore -- --from <dir> --yes --allow-unsafe (corrupt live DB)
  *
  * The server must be stopped first. The script refuses to restore if the API
  * port is accepting connections, keeps a safety copy of the current DB, and
@@ -14,13 +15,19 @@ import fs from "node:fs";
 import net from "node:net";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import { missingReferencedUploads, readManifest, verifyBackupManifest } from "./backup-lib.mjs";
+import {
+  missingStructuredUploads,
+  readManifest,
+  verifyBackupManifest,
+  verifyDatabaseFile,
+} from "./backup-lib.mjs";
 
 const args = process.argv.slice(2);
 const fromIndex = args.indexOf("--from");
 const fromArg = fromIndex >= 0 ? args[fromIndex + 1] : args.find((arg) => !arg.startsWith("--"));
 const assumeYes = args.includes("--yes");
 const allowUnverified = args.includes("--allow-unverified");
+const allowUnsafe = args.includes("--allow-unsafe");
 const dataDir = path.resolve(process.env.DATA_DIR || "data");
 const backupRoot = path.resolve(process.env.BACKUP_DIR || "backups");
 const databasePath = process.env.DATABASE_PATH
@@ -103,27 +110,8 @@ if (!manifest) {
   }
 }
 
-function verifyDatabase(file) {
-  const database = new DatabaseSync(file, { readOnly: true });
-  try {
-    const integrity = database
-      .prepare("PRAGMA integrity_check")
-      .all()
-      .map((row) => Object.values(row)[0]);
-    if (!integrity.every((value) => value === "ok")) {
-      throw new Error(`SQLite integrity check failed: ${integrity.join(", ")}`);
-    }
-    const foreignKeys = database.prepare("PRAGMA foreign_key_check").all();
-    if (foreignKeys.length) {
-      throw new Error(`SQLite foreign key check found ${foreignKeys.length} issue(s)`);
-    }
-  } finally {
-    database.close();
-  }
-}
-
 try {
-  verifyDatabase(backupDb);
+  verifyDatabaseFile(backupDb);
 } catch (error) {
   console.error(`Backup database check failed: ${error instanceof Error ? error.message : error}`);
   console.error("Nothing was changed.");
@@ -131,7 +119,7 @@ try {
 }
 
 try {
-  const missing = missingReferencedUploads(backupDb, backupUploads);
+  const missing = missingStructuredUploads(backupDb, backupUploads);
   if (missing.length) {
     console.error(
       `Backup is incomplete: ${missing.length} referenced upload(s) are missing: ${missing
@@ -174,24 +162,40 @@ for (const host of probeHosts) {
 
 const stamp = new Date().toISOString().replace(/[:.]/g, "-");
 const safetyDir = path.join(backupRoot, `pre-restore-${stamp}`);
-fs.mkdirSync(safetyDir, { recursive: true });
-if (fs.existsSync(databasePath)) {
-  // Use the same consistent snapshot mechanism as the backup command; a plain
-  // file copy can miss committed pages still sitting in the WAL.
-  const safetyDb = path.join(safetyDir, "runehall.db");
-  const source = new DatabaseSync(databasePath);
-  try {
-    source.exec("PRAGMA busy_timeout = 5000;");
-    source.exec(`VACUUM INTO '${safetyDb.replace(/'/g, "''")}';`);
-  } finally {
-    source.close();
+let safetyError = null;
+try {
+  fs.mkdirSync(safetyDir, { recursive: true });
+  if (fs.existsSync(databasePath)) {
+    // Use the same consistent snapshot mechanism as the backup command; a plain
+    // file copy can miss committed pages still sitting in the WAL.
+    const safetyDb = path.join(safetyDir, "runehall.db");
+    const source = new DatabaseSync(databasePath);
+    try {
+      source.exec("PRAGMA busy_timeout = 5000;");
+      source.exec(`VACUUM INTO '${safetyDb.replace(/'/g, "''")}';`);
+    } finally {
+      source.close();
+    }
   }
+  if (fs.existsSync(uploadsDir)) {
+    fs.cpSync(uploadsDir, path.join(safetyDir, "uploads"), { recursive: true });
+  }
+  if (fs.existsSync(compendiumDir)) {
+    fs.cpSync(compendiumDir, path.join(safetyDir, "compendium"), { recursive: true });
+  }
+} catch (error) {
+  safetyError = error;
 }
-if (fs.existsSync(uploadsDir)) {
-  fs.cpSync(uploadsDir, path.join(safetyDir, "uploads"), { recursive: true });
-}
-if (fs.existsSync(compendiumDir)) {
-  fs.cpSync(compendiumDir, path.join(safetyDir, "compendium"), { recursive: true });
+if (safetyError) {
+  const message = safetyError instanceof Error ? safetyError.message : String(safetyError);
+  if (!allowUnsafe) {
+    console.error(`Could not create a safety copy of the current data: ${message}`);
+    console.error(
+      "Nothing was changed. Fix the live database or pass --allow-unsafe to restore without a safety copy."
+    );
+    process.exit(1);
+  }
+  console.warn(`WARNING: restoring without a complete safety copy: ${message}`);
 }
 
 for (const suffix of ["", "-wal", "-shm"]) {

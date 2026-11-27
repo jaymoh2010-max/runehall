@@ -34,6 +34,8 @@ interface DailyPreparationsModalProps {
   context: CharacterContext | null;
   derived: DerivedCharacter | null;
   onApply: (draft: CharacterDraft) => void;
+  /** Render above the in-table sheet overlay. */
+  elevated?: boolean;
 }
 
 interface PreparedGroup {
@@ -50,6 +52,7 @@ export function DailyPreparationsModal({
   context,
   derived,
   onApply,
+  elevated = false,
 }: DailyPreparationsModalProps) {
   const [working, setWorking] = useState<CharacterDraft | null>(draft);
   const [selected, setSelected] = useState<Record<number, string>>({});
@@ -235,6 +238,7 @@ export function DailyPreparationsModal({
       onClose={onClose}
       title="Daily preparations"
       subtitle="Choose the spells and cantrips you have prepared for the day. Long rest restores HP, spell slots, and focus; this workflow sets today's prepared copies."
+      elevated={elevated}
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>

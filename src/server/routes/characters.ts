@@ -34,6 +34,8 @@ import { tokenEventsFor } from "../tokenEvents";
 import {
   addCurrency,
   addItemToDraft,
+  MAX_ITEM_QUANTITY,
+  remainingStackSpace,
   currencyToCp,
   formatCopper,
   removeItemQuantity,
@@ -774,6 +776,11 @@ export async function registerCharacterRoutes(app: FastifyInstance): Promise<voi
         1,
         Math.min(owned.quantity, Math.floor(Number(body.quantity) || 1))
       );
+      if (remainingStackSpace(targetDraft, itemId) < quantity) {
+        return reply
+          .code(400)
+          .send({ error: `That stack cannot hold ${quantity} more of that item.` });
+      }
       const result = removeItemQuantity(sourceDraft, itemId, quantity);
       if (!result.moved) return reply.code(400).send({ error: "That item is not in this pack." });
       sourceDraft = result.draft;
@@ -913,6 +920,13 @@ export async function registerCharacterRoutes(app: FastifyInstance): Promise<voi
         .code(400)
         .send({ error: "That item is not available under this campaign's ruleset." });
     }
+    if (remainingStackSpace(draft, itemId) < quantity) {
+      return reply.code(400).send({
+        error: `That stack already holds ${
+          MAX_ITEM_QUANTITY - remainingStackSpace(draft, itemId)
+        }; it cannot take ${quantity} more.`,
+      });
+    }
     const costCp = Math.max(0, Math.round(item.price.cpTotal)) * quantity;
     if (mode === "buy") {
       const currency = spendCurrency(draft.currency, costCp);
@@ -1016,6 +1030,16 @@ export async function registerCharacterRoutes(app: FastifyInstance): Promise<voi
       quantity = Math.max(1, Math.min(999, Math.round(Number(body.quantity) || 1)));
     }
 
+    if (kind === "item") {
+      for (const target of targets) {
+        const targetDraft = parseDraft(parseJson(target.data, {}), target.name);
+        if (remainingStackSpace(targetDraft, awardedItem!.id) < quantity) {
+          return reply.code(400).send({
+            error: `${target.name}'s stack cannot hold ${quantity} more of that item.`,
+          });
+        }
+      }
+    }
     const shares = kind === "gold" ? splitCurrencyEvenly(amountCp, targets.length) : [];
     const updates: { row: CharacterRow; draft: CharacterDraft; summary: CharacterSummary }[] = [];
     const updatedAt = now();

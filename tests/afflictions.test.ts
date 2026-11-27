@@ -138,6 +138,28 @@ describe("afflictions", () => {
     expect(result.notes.join(" ")).toContain("maximum duration");
   });
 
+  it("does not spend maximum duration before the onset ends", () => {
+    const draft = withAffliction({
+      duration: "2 rounds",
+      durationRemaining: 12,
+      onset: "1 round",
+      onsetRemaining: 1,
+      interval: "",
+      intervalRemaining: null,
+    });
+    const saves = { fortitude: 10, reflex: 0, will: 0 };
+    const first = resolveAfflictionTurnEnd(draft, saves, { rng: () => 0.5 });
+    expect(first.draft.play.afflictions[0].onsetRemaining).toBe(0);
+    expect(first.draft.play.afflictions[0].durationRemaining).toBe(12);
+
+    const second = resolveAfflictionTurnEnd(first.draft, saves, { rng: () => 0.5 });
+    expect(second.draft.play.afflictions[0].durationRemaining).toBe(6);
+
+    const third = resolveAfflictionTurnEnd(second.draft, saves, { rng: () => 0.5 });
+    expect(third.draft.play.afflictions).toHaveLength(0);
+    expect(third.notes.join(" ")).toContain("maximum duration");
+  });
+
   it("parses only round-based onset and interval timers", () => {
     expect(afflictionRounds("1 round")).toBe(1);
     expect(afflictionRounds(" 2 Rounds ")).toBe(2);

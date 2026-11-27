@@ -23,6 +23,7 @@ export function PortraitPicker({
   campaignId,
   onSelect,
   title = "Choose a portrait",
+  elevated = false,
 }: {
   open: boolean;
   onClose: () => void;
@@ -31,6 +32,8 @@ export function PortraitPicker({
   campaignId?: string | null;
   onSelect: (url: string | null) => Promise<void> | void;
   title?: string;
+  /** Render above the in-table sheet or builder overlay. */
+  elevated?: boolean;
 }) {
   const [tab, setTab] = useState<"library" | "crop">("library");
   const [ancestry, setAncestry] = useState("all");
@@ -310,6 +313,7 @@ export function PortraitPicker({
       open={open}
       onClose={onClose}
       title={title}
+      elevated={elevated}
       subtitle={`Choose a portrait for ${name || "this character"}, or upload an image and crop it to a square.`}
       wide
       footer={footer}

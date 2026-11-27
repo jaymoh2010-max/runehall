@@ -117,7 +117,9 @@ const DEDICATIONS: Record<string, DedicationData> = {
     tradition: null,
     variableTradition: true,
     ability: "int",
-    cantripLimit: 2,
+    // The dedication's familiar knows two cantrips, but the character can
+    // prepare only one of them each day.
+    cantripLimit: 1,
     basicFeatId: "feat:nU5Pow4HMzoDHa8Z",
     expertFeatId: "feat:x7vMKBSrxXmfs5C2",
     masterFeatId: "feat:i7ibUqJCl1GXRFEa",
@@ -169,9 +171,16 @@ export function multiclassSlotCounts(
   return slots;
 }
 
-/** Multiclass archetype spell proficiency is trained, then expert at 12 and master at 18. */
-export function multiclassProficiencyRank(level: number): number {
-  if (level >= 18) return 3;
-  if (level >= 12) return 2;
+/**
+ * Multiclass archetype spell proficiency starts trained, then improves only
+ * when the matching Expert/Master Spellcasting feat is present. Levels alone
+ * must not promote the dedication's DC or spell attack.
+ */
+export function multiclassProficiencyRank(
+  level: number,
+  feats: { expert: boolean; master: boolean }
+): number {
+  if (feats.master && level >= 18) return 3;
+  if (feats.expert && level >= 12) return 2;
   return 1;
 }

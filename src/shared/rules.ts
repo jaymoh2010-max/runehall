@@ -47,6 +47,7 @@ import { normalizePersistentDamageList } from "./persistentDamage";
 import { clampHeroPoints } from "./heroPoints";
 import { normalizeCharacterTurnEffects } from "./characterTurnEffects";
 import { INVESTED_LIMIT, investedCount } from "./itemActivation";
+import { currencyBulk } from "./inventory";
 import { normalizeSustainedSpells } from "./sustain";
 import {
   FEAT_CHOICES,
@@ -2750,13 +2751,19 @@ export function checkFeatPrerequisite(
     return derived.focusPointsMax > 0 ? "met" : "unmet";
   }
   if (/^(you have( a| the)? )?spellcasting class feature$/.test(lower)) {
-    return derived.spellSlots?.some((count) => count > 0) ? "met" : "unmet";
+    const hasSlots =
+      derived.spellSlots?.some((count) => count > 0) ||
+      derived.multiclassCaster?.spellSlots.some((count) => count > 0);
+    return hasSlots ? "met" : "unmet";
   }
   if (/^(you have( a| the)? )?versatile heritage$/.test(lower)) {
     return context.heritage?.versatile ? "met" : "unmet";
   }
   if (lower === "ability to cast spells from spell slots") {
-    return (derived.spellSlots?.length ?? 0) > 0 ? "met" : "unmet";
+    const hasSlots =
+      derived.spellSlots?.some((count) => count > 0) ||
+      derived.multiclassCaster?.spellSlots.some((count) => count > 0);
+    return hasSlots ? "met" : "unmet";
   }
   if (lower === "ability to cast focus spells") return derived.focusPointsMax > 0 ? "met" : "unmet";
   if (
@@ -2764,7 +2771,10 @@ export function checkFeatPrerequisite(
       lower
     )
   ) {
-    return derived.casterProgression !== "none" ? "met" : "unmet";
+    return derived.casterProgression !== "none" ||
+      derived.multiclassCaster?.spellSlots.some((count) => count > 0)
+      ? "met"
+      : "unmet";
   }
   if (/^(arcane|divine|occult|primal) spells$/.test(lower)) {
     return derived.casterTradition === lower.split(" ")[0] ? "met" : "unmet";
@@ -3548,7 +3558,7 @@ export function computeCharacter(
     const wornArmorReduction = entry.equipped && item.armor ? 1 : 0;
     const unitBulk = Math.max(0, (item.bulk || 0) - wornArmorReduction);
     return sum + unitBulk * entry.quantity;
-  }, 0);
+  }, currencyBulk(draft.currency));
   const capacity = 5 + abilityMods.str;
   const maxBulk = 10 + abilityMods.str;
   const carriesEncumberedCondition = draft.play.conditions.some(
@@ -4121,7 +4131,8 @@ export function computeCharacter(
       ? null
       : proficiencyBonus(prof.spellcasting, draft.level) +
         spellMod +
-        (spellAbility ? conditionEffects.checks[spellAbility] : conditionEffects.allChecks);
+        (spellAbility ? conditionEffects.checks[spellAbility] : conditionEffects.allChecks) +
+        conditionEffects.attackCircumstance;
 
   const multiclassFeatIds = [
     ...Object.values(draft.feats.ancestry),
@@ -4148,7 +4159,12 @@ export function computeCharacter(
   const multiclassCondition = multiclass
     ? conditionEffects.checks[multiclass.ability]
     : conditionEffects.allChecks;
-  const multiclassRank = multiclassProficiencyRank(draft.level);
+  const multiclassRank = multiclass
+    ? multiclassProficiencyRank(draft.level, {
+        expert: multiclassFeatSet.has(multiclass.expertFeatId),
+        master: multiclassFeatSet.has(multiclass.masterFeatId),
+      })
+    : 1;
   const multiclassSpellDc = multiclass
     ? 10 +
       proficiencyBonus(multiclassRank, draft.level) +
@@ -4158,7 +4174,8 @@ export function computeCharacter(
   const multiclassSpellAttack = multiclass
     ? proficiencyBonus(multiclassRank, draft.level) +
       abilityMods[multiclass.ability] +
-      multiclassCondition
+      multiclassCondition +
+      conditionEffects.attackCircumstance
     : null;
 
   // Focus spells from a class without spell slots use the proficiency and
@@ -4182,20 +4199,27 @@ export function computeCharacter(
     ? 10 + proficiencyBonus(focusRank, draft.level) + focusMod + focusCondition
     : null;
   const focusSpellAttack = hasFocusSpells
-    ? proficiencyBonus(focusRank, draft.level) + focusMod + focusCondition
+    ? proficiencyBonus(focusRank, draft.level) +
+      focusMod +
+      focusCondition +
+      conditionEffects.attackCircumstance
     : null;
 
-  // Innate spells use their own trained (expert at 12th) Charisma-based
-  // proficiency. They do not inherit the class's spellcasting proficiency.
+  // Innate spells use the better of their own trained (expert at 12th)
+  // Charisma-based proficiency and any higher spellcasting proficiency the
+  // character already has. They never lower an existing proficiency.
   const hasInnateSpells = draft.spells.innate.length > 0;
-  const innateRank = draft.level >= 12 ? 2 : 1;
+  const innateRank = Math.max(draft.level >= 12 ? 2 : 1, prof.spellcasting, focusRank);
   const innateMod = abilityMods.cha;
   const innateCondition = conditionEffects.checks.cha;
   const innateSpellDc = hasInnateSpells
     ? 10 + proficiencyBonus(innateRank, draft.level) + innateMod + innateCondition
     : null;
   const innateSpellAttack = hasInnateSpells
-    ? proficiencyBonus(innateRank, draft.level) + innateMod + innateCondition
+    ? proficiencyBonus(innateRank, draft.level) +
+      innateMod +
+      innateCondition +
+      conditionEffects.attackCircumstance
     : null;
 
   // --- Equipment -----------------------------------------------------------

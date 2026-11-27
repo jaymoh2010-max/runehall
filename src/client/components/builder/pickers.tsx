@@ -112,7 +112,7 @@ function PickerShell({
   onClose: () => void;
 }) {
   return (
-    <Modal open title={title} subtitle={subtitle} onClose={onClose} extraWide>
+    <Modal open title={title} subtitle={subtitle} onClose={onClose} extraWide elevated>
       {children}
     </Modal>
   );

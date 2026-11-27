@@ -16,7 +16,7 @@ import {
   validateUsername,
   verifyPassword,
 } from "../auth";
-import { getUserByUsername } from "../access";
+import { getMembership, getUserByUsername } from "../access";
 import { logAudit } from "../audit";
 import { db, transaction } from "../db";
 import {
@@ -209,6 +209,21 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
       return reply.code(400).send({
         error: "Choose an uploaded portrait or a built-in portrait.",
       });
+    }
+    if (avatarUrl && avatarUrl.startsWith("/uploads/") && avatarUrl !== request.user.avatarUrl) {
+      const filename = avatarUrl.slice("/uploads/".length).split("?")[0];
+      const asset = db
+        .prepare("SELECT campaign_id, uploaded_by FROM uploaded_assets WHERE filename = ?")
+        .get(filename) as { campaign_id: string | null; uploaded_by: string | null } | undefined;
+      const owns = asset?.uploaded_by === request.user.id;
+      const campaignMember = Boolean(
+        asset?.campaign_id && getMembership(asset.campaign_id, request.user.id)
+      );
+      if (!asset || (!owns && !campaignMember)) {
+        return reply.code(403).send({
+          error: "Choose a portrait you uploaded or can access in your campaign.",
+        });
+      }
     }
     db.prepare("UPDATE users SET display_name = ?, avatar_url = ? WHERE id = ?").run(
       displayName,

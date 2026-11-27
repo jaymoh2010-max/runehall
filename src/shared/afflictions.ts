@@ -423,16 +423,9 @@ export function resolveAfflictionTurnEnd(
 
   for (const affliction of draft.play.afflictions) {
     let entry = affliction;
-    if (entry.durationRemaining !== null) {
-      const remaining = entry.durationRemaining - 6;
-      changed = true;
-      if (remaining <= 0) {
-        notes.push(`${entry.name} reaches its maximum duration and ends.`);
-        continue;
-      }
-      entry = { ...entry, durationRemaining: remaining };
-    }
     if (entry.onsetRemaining === null) {
+      // A non-round onset is adjudicated manually. Do not consume the
+      // maximum duration while the affliction has not started yet.
       next.push(entry);
       continue;
     }
@@ -449,6 +442,16 @@ export function resolveAfflictionTurnEnd(
       }
       next.push(entry);
       continue;
+    }
+
+    if (entry.durationRemaining !== null) {
+      const remaining = entry.durationRemaining - 6;
+      changed = true;
+      if (remaining <= 0) {
+        notes.push(`${entry.name} reaches its maximum duration and ends.`);
+        continue;
+      }
+      entry = { ...entry, durationRemaining: remaining };
     }
 
     if (entry.intervalRemaining !== null && entry.intervalRemaining > 0) {

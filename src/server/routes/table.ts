@@ -475,6 +475,47 @@ export async function registerTableRoutes(app: FastifyInstance): Promise<void> {
     } else {
       broadcastScene(app, row.campaign_id, "scene:updated", updated);
     }
+    if (wasVisible !== isVisible) {
+      // Scene visibility changes the player-safe initiative order. Refresh it
+      // immediately instead of waiting for the next combat event.
+      const state = ensureState(row.campaign_id);
+      const entries = serializeInitiative(JSON.parse(state.initiative || "[]"));
+      const hiddenTokenIds = new Set(
+        (
+          db
+            .prepare(
+              `SELECT t.id FROM tokens t JOIN scenes s ON s.id = t.scene_id
+               WHERE s.campaign_id = ? AND (t.hidden = 1 OR s.visible = 0)`
+            )
+            .all(row.campaign_id) as { id: string }[]
+        ).map((token) => token.id)
+      );
+      const hiddenSceneIds = new Set(
+        (
+          db
+            .prepare("SELECT id FROM scenes WHERE campaign_id = ? AND visible = 0")
+            .all(row.campaign_id) as { id: string }[]
+        ).map((hiddenScene) => hiddenScene.id)
+      );
+      const playerOrder = filterInitiativeForPlayers(
+        entries,
+        hiddenTokenIds,
+        state.turn_index,
+        hiddenSceneIds
+      );
+      app.broadcastCampaign(
+        row.campaign_id,
+        "initiative:updated",
+        { entries: playerOrder.entries, round: state.round, turnIndex: playerOrder.turnIndex },
+        "players"
+      );
+      app.broadcastCampaign(
+        row.campaign_id,
+        "initiative:updated",
+        { entries, round: state.round, turnIndex: state.turn_index },
+        "gm"
+      );
+    }
     touchCampaign(row.campaign_id);
     return reply.send({ scene });
   });

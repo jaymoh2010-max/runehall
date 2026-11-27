@@ -11,6 +11,8 @@ interface LongRestModalProps {
   derived: DerivedCharacter | null;
   preparedCaster: boolean;
   onRest: (result: LongRestResult) => void;
+  /** Render above the in-table sheet overlay. */
+  elevated?: boolean;
 }
 
 export function LongRestModal({
@@ -20,6 +22,7 @@ export function LongRestModal({
   derived,
   preparedCaster,
   onRest,
+  elevated = false,
 }: LongRestModalProps) {
   const [rough, setRough] = useState(false);
 
@@ -37,6 +40,7 @@ export function LongRestModal({
       onClose={onClose}
       title="Take a long rest"
       subtitle="Eight hours of rest followed by daily preparations."
+      elevated={elevated}
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>

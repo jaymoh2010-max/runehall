@@ -573,9 +573,20 @@ export function applyDamageToDraft(
 
   if (nextHp === 0) {
     if (options.nonlethal) {
-      conditions = conditions.filter((condition) => conditionBaseName(condition.name) !== "dying");
-      conditions = upsertCondition(conditions, "Unconscious", null);
-      notes.push("Nonlethal damage: the character is unconscious at 0 HP, not dying.");
+      const existingDying = conditionValue(conditions, "dying");
+      if (existingDying > 0) {
+        // Nonlethal damage never increases dying, but it also does not
+        // stabilize a creature that is already dying.
+        dying = existingDying;
+        conditions = upsertCondition(conditions, "Unconscious", null);
+        notes.push("Nonlethal damage: the character remains dying at the same value.");
+      } else {
+        conditions = conditions.filter(
+          (condition) => conditionBaseName(condition.name) !== "dying"
+        );
+        conditions = upsertCondition(conditions, "Unconscious", null);
+        notes.push("Nonlethal damage: the character is unconscious at 0 HP, not dying.");
+      }
     } else {
       const existingDying = conditionValue(conditions, "dying");
       const wounded = conditionValue(conditions, "wounded");

@@ -1,7 +1,11 @@
 import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { multiclassDedicationFor, multiclassSlotCounts } from "../src/shared/multiclass";
+import {
+  multiclassDedicationFor,
+  multiclassProficiencyRank,
+  multiclassSlotCounts,
+} from "../src/shared/multiclass";
 import { emptyCharacterDraft } from "../src/shared/rules";
 import { contextForDraft } from "../src/server/compendium";
 import { computeCharacter } from "../src/shared/rules";
@@ -30,6 +34,11 @@ describe("multiclass dedication cantrips", () => {
       className: "Psychic",
       cantripLimit: 1,
     });
+    expect(multiclassDedicationFor(["feat:y0vdu6DGhKKElmE6"])).toMatchObject({
+      className: "Witch",
+      // The familiar knows two cantrips, but only one can be prepared each day.
+      cantripLimit: 1,
+    });
     expect(multiclassDedicationFor(["feat:5UQagWB13Z8xR5Z6"])).toMatchObject({
       className: "Sorcerer",
       tradition: null,
@@ -51,6 +60,32 @@ describe("multiclass dedication cantrips", () => {
     expect(multiclassSlotCounts(20, { basic: true, expert: true, master: true })).toEqual([
       1, 1, 1, 1, 1, 1, 1, 1,
     ]);
+  });
+
+  it("only promotes dedication proficiency when the expert or master feat is taken", () => {
+    expect(multiclassProficiencyRank(12, { expert: false, master: false })).toBe(1);
+    expect(multiclassProficiencyRank(12, { expert: true, master: false })).toBe(2);
+    expect(multiclassProficiencyRank(18, { expert: true, master: false })).toBe(2);
+    expect(multiclassProficiencyRank(18, { expert: true, master: true })).toBe(3);
+  });
+
+  it("keeps the dedication DC and attack at trained until Expert Spellcasting", () => {
+    const base = emptyCharacterDraft("Dedicated Fighter");
+    base.classId = fighter.id;
+    base.keyAbility = "str";
+    base.level = 12;
+    base.feats.class["2"] = "feat:oQ6EZRFXbHWCx08C";
+    base.feats.class["4"] = "feat:SHUfHzElHZPXJFiP";
+    const trained = computeCharacter(base, contextForDraft(base));
+
+    const expertDraft = structuredClone(base);
+    expertDraft.feats.class["12"] = "feat:hpCBELEKGA4ynYv4";
+    const expert = computeCharacter(expertDraft, contextForDraft(expertDraft));
+
+    expect(expert.multiclassCaster?.spellDc).toBe((trained.multiclassCaster?.spellDc ?? 0) + 2);
+    expect(expert.multiclassCaster?.spellAttack).toBe(
+      (trained.multiclassCaster?.spellAttack ?? 0) + 2
+    );
   });
 
   it("derives a separate spell DC for a dedication cantrip", () => {

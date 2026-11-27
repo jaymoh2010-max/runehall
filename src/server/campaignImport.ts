@@ -598,7 +598,9 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
         campaignId,
         activeSceneId,
         JSON.stringify(initiative),
-        numberValue(stateData.round, 1, 1, 999),
+        // Round 0 is the combat-setup phase and must survive an archive
+        // round-trip; older archives without a round still default to 1.
+        numberValue(stateData.round, 1, 0, 999),
         numberValue(stateData.turnIndex, 0, 0, 200),
         ts
       );

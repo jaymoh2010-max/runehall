@@ -199,6 +199,47 @@ describe("PF2e character rules", () => {
     ).toBe("met");
   });
 
+  it("uses the higher spell proficiency for innate DCs and applies prone to spell attacks", () => {
+    const sorcerer = classes.find((entry) => entry.name === "Sorcerer")!;
+    const light = spells.find((entry) => entry.name === "Light")!;
+    const forceBolt = spells.find((entry) => entry.name === "Force Bolt")!;
+    const draft = emptyCharacterDraft("Innate Sorcerer");
+    draft.classId = sorcerer.id;
+    draft.keyAbility = "cha";
+    draft.level = 7;
+    draft.spells.innate = [light.id];
+    draft.spells.focus = [forceBolt.id];
+    const context = contextForDraft(draft);
+    const derived = computeCharacter(draft, context);
+    expect(derived.innateSpellDc).toBe(derived.spellDc);
+    expect(derived.innateSpellAttack).toBe(derived.spellAttack);
+
+    draft.play.conditions = [{ name: "Prone", value: null, duration: null }];
+    const prone = computeCharacter(draft, context);
+    expect(prone.spellAttack).toBe((derived.spellAttack ?? 0) - 2);
+    expect(prone.innateSpellAttack).toBe((derived.innateSpellAttack ?? 0) - 2);
+    expect(prone.focusSpellAttack).toBe((derived.focusSpellAttack ?? 0) - 2);
+  });
+
+  it("treats archetype spell slots as a spellcasting class feature", () => {
+    const fighter = classes.find((entry) => entry.name === "Fighter")!;
+    const draft = emptyCharacterDraft("Dedicated Fighter");
+    draft.classId = fighter.id;
+    draft.keyAbility = "str";
+    draft.level = 4;
+    draft.feats.class["2"] = "feat:oQ6EZRFXbHWCx08C";
+    draft.feats.class["4"] = "feat:SHUfHzElHZPXJFiP";
+    const context = contextForDraft(draft);
+    const derived = computeCharacter(draft, context);
+    expect(derived.multiclassCaster?.spellSlots.some((count) => count > 0)).toBe(true);
+    expect(
+      checkFeatPrerequisite("You have a spellcasting class feature", draft, context, derived)
+    ).toBe("met");
+    expect(
+      checkFeatPrerequisite("Ability to cast spells from spell slots", draft, context, derived)
+    ).toBe("met");
+  });
+
   it("blocks class feats that belong to another class", () => {
     const reachSpell = read<Feat>("feats.json").find((feat) => feat.name === "Reach Spell")!;
     const classes = read<ClassData>("classes.json");
@@ -1050,6 +1091,14 @@ describe("PF2e character rules", () => {
     expect(
       encumbered.validation.some((issue) => issue.message.includes("above your maximum"))
     ).toBe(true);
+  });
+
+  it("counts every thousand carried coins as one Bulk", () => {
+    const { draft, context } = buildCleric();
+    draft.equipment = [];
+    draft.currency = { gp: 2_500, sp: 0, cp: 0 };
+    const derived = computeCharacter(draft, context);
+    expect(derived.bulk.total).toBe(2);
   });
 
   it("applies warpriest doctrine armor proficiency", () => {

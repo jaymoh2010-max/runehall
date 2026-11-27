@@ -57,7 +57,9 @@ export async function registerUploadRoutes(app: FastifyInstance): Promise<void> 
       return reply.code(403).send({ error: "You are not a member of that campaign." });
     }
     if (!request.isMultipart()) return reply.code(400).send({ error: "Upload an image file." });
-    const earlyQuota = checkUploadQuota(campaignId, request.user.id, MAX_IMAGE_BYTES);
+    // Only reject before streaming when storage is already exhausted; the
+    // exact file-size check runs after the upload is measured.
+    const earlyQuota = checkUploadQuota(campaignId, request.user.id, 0);
     if (!earlyQuota.ok) return reply.code(earlyQuota.status).send({ error: earlyQuota.error });
     let file;
     try {
@@ -157,7 +159,7 @@ export async function registerUploadRoutes(app: FastifyInstance): Promise<void> 
       return reply.code(403).send({ error: "Only the GM can upload soundtracks." });
     }
     if (!request.isMultipart()) return reply.code(400).send({ error: "Upload an audio file." });
-    const earlyQuota = checkUploadQuota(campaignId, request.user.id, MAX_AUDIO_BYTES);
+    const earlyQuota = checkUploadQuota(campaignId, request.user.id, 0);
     if (!earlyQuota.ok) return reply.code(earlyQuota.status).send({ error: earlyQuota.error });
     let file;
     try {

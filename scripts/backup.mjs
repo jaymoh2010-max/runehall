@@ -12,7 +12,12 @@
 import fs from "node:fs";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import { manifestDigest, sha256File } from "./backup-lib.mjs";
+import {
+  manifestDigest,
+  missingStructuredUploads,
+  sha256File,
+  verifyDatabaseFile,
+} from "./backup-lib.mjs";
 
 const args = process.argv.slice(2);
 const dirArg = args.indexOf("--dir");
@@ -60,6 +65,15 @@ try {
   source.close();
 }
 
+try {
+  verifyDatabaseFile(snapshotPath);
+} catch (error) {
+  console.error(
+    `Backup failed: database check failed: ${error instanceof Error ? error.message : error}`
+  );
+  process.exit(1);
+}
+
 const stagedUploads = path.join(staging, "uploads");
 if (fs.existsSync(uploadsDir)) {
   fs.cpSync(uploadsDir, stagedUploads, { recursive: true });
@@ -67,30 +81,11 @@ if (fs.existsSync(uploadsDir)) {
   fs.mkdirSync(stagedUploads, { recursive: true });
 }
 
-// A backup must not contain a database row that points at an upload the copy
-// missed. The snapshot and file copy are separate operations; this check
-// catches an asset deleted between them (or pre-existing orphan rows).
+// A backup must not contain a structured row that points at an upload the copy
+// missed. Free-text mentions (chat, notes, journal prose) are deliberately
+// ignored so one player cannot block every backup with a /uploads/ string.
 try {
-  const snapshot = new DatabaseSync(snapshotPath, { readOnly: true });
-  const referenced = new Set();
-  try {
-    const tables = snapshot
-      .prepare("SELECT name FROM sqlite_master WHERE type = 'table'")
-      .all()
-      .map((row) => String(Object.values(row)[0]));
-    for (const table of tables) {
-      for (const row of snapshot.prepare(`SELECT * FROM "${table}"`).all()) {
-        for (const match of JSON.stringify(row).matchAll(/\/uploads\/([A-Za-z0-9._-]+)/g)) {
-          referenced.add(match[1]);
-        }
-      }
-    }
-  } finally {
-    snapshot.close();
-  }
-  const missing = [...referenced].filter(
-    (filename) => !fs.existsSync(path.join(stagedUploads, filename))
-  );
+  const missing = missingStructuredUploads(snapshotPath, stagedUploads);
   if (missing.length) {
     console.error(
       `Backup failed: ${missing.length} referenced upload(s) are missing: ${missing

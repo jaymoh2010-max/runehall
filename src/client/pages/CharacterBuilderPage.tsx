@@ -1308,10 +1308,12 @@ export function CharacterBuilderPage({
         value={draft.portraitUrl}
         campaignId={character?.campaignId}
         onSelect={choosePortrait}
+        elevated
       />
       <Modal
         open={levelUpOpen}
         onClose={() => setLevelUpOpen(false)}
+        elevated
         title={`Level ${draft.level} → ${nextLevel}`}
         subtitle={`Step ${Math.min(levelUpStep + 1, levelUpWizard.length)} of ${levelUpWizard.length} · ${currentLevelUpStep.title}`}
         footer={
@@ -1441,6 +1443,7 @@ export function CharacterBuilderPage({
         open={Boolean(conflict)}
         onClose={() => setConflict(null)}
         closeOnBackdrop={false}
+        elevated
         title="This sheet changed elsewhere"
         subtitle="Another tab, device, or the GM saved this character while you were editing."
         footer={

@@ -241,7 +241,11 @@ export function resetItemUses(draft: CharacterDraft): CharacterDraft {
 }
 
 export function investedCount(draft: CharacterDraft): number {
-  return draft.equipment.filter((entry) => entry.invested).length;
+  return draft.equipment.reduce(
+    (total, entry) =>
+      entry.invested ? total + Math.max(0, Math.floor(Number(entry.quantity) || 0)) : total,
+    0
+  );
 }
 
 export interface InvestItemResult {

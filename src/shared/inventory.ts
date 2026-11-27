@@ -6,7 +6,13 @@ import type {
   Equipment,
 } from "./types";
 
-const MAX_ITEM_QUANTITY = 9999;
+export const MAX_ITEM_QUANTITY = 9999;
+
+/** How many more of an item fit in an existing stack before it is full. */
+export function remainingStackSpace(draft: CharacterDraft, itemId: string): number {
+  const existing = draft.equipment.find((entry) => entry.itemId === itemId)?.quantity ?? 0;
+  return Math.max(0, MAX_ITEM_QUANTITY - Math.max(0, Math.floor(existing)));
+}
 
 function coin(value: unknown): number {
   const number = typeof value === "number" ? value : Number(value);
@@ -24,6 +30,14 @@ export function cpToCurrency(copper: number): CharacterCurrency {
     sp: Math.floor((total % 100) / 10),
     cp: total % 10,
   };
+}
+
+/**
+ * PF2e counts 1,000 carried coins of any denomination as 1 Bulk. Only whole
+ * thousands are added; fractional coin weight is left to the table.
+ */
+export function currencyBulk(currency: Partial<CharacterCurrency>): number {
+  return Math.floor((coin(currency.gp) + coin(currency.sp) + coin(currency.cp)) / 1000);
 }
 
 export function formatCopper(cp: number): string {

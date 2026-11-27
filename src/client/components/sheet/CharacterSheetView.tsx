@@ -64,12 +64,14 @@ import {
 import { learnSpellCostCp, learnSpellDc } from "../../../shared/spellLearning";
 import {
   flexibleWandRank,
+  isSpellScroll,
   scrollSpellRank,
   specificWandSpell,
   staffSpells,
   staffSpecialEffect,
   wandSpellRank,
 } from "../../../shared/itemSpellcasting";
+import { activateItemOnDraft, itemUseInfo } from "../../../shared/itemActivation";
 import { SpellPicker } from "../builder/pickers";
 import { applyHpEditToDraft } from "../../../shared/damage";
 import { applyAttackPenalty, rollFormula } from "../../../shared/dice";
@@ -563,7 +565,9 @@ export function CharacterSheetView({
       document.removeEventListener("keydown", onKeyDown);
       if (previous && document.contains(previous)) previous.focus();
     };
-  }, [mode]);
+    // The loading branch does not render the sheet container. Re-run once the
+    // character and its final container mount, otherwise the trap never arms.
+  }, [mode, character?.id]);
 
   const applyRecord = useCallback(async (record: CharacterRecord) => {
     const normalized = normalizeCharacterDraft(record.data, record.name);
@@ -1232,6 +1236,23 @@ export function CharacterSheetView({
     if (characterRef.current) await applyRecord(characterRef.current);
   };
 
+  const activateInventoryItem = async (item: Equipment) => {
+    if (!canEdit) return;
+    const current = draftRef.current;
+    if (!current) return;
+    const result = activateItemOnDraft(current, item.id, item);
+    if (result.blocked) {
+      toast(result.blocked, "error");
+      return;
+    }
+    const saved = await persist(result.draft);
+    if (!saved) return;
+    for (const note of result.notes) toast(note, "success");
+    if (result.healingFormula) {
+      postRoll(result.healingFormula, `${item.name} healing`);
+    }
+  };
+
   const changeItemQuantity = async (itemId: string, nextQuantity: number) => {
     if (!canEdit) return;
     const entry = draftRef.current?.equipment.find((candidate) => candidate.itemId === itemId);
@@ -1446,7 +1467,9 @@ export function CharacterSheetView({
 
   const chargeStaff = async (item: Equipment, rank: number) => {
     if (!canEdit) return;
-    const max = Math.max(0, Math.min(5, Math.round(rank)));
+    // Staves are not capped at 5 charges: a staff can hold as many charges as
+    // the slot expended to charge it (up to a 10th-rank slot).
+    const max = Math.max(0, Math.min(20, Math.round(rank)));
     const saved = await persist((currentDraft) => ({
       ...currentDraft,
       equipment: currentDraft.equipment.map((candidate) =>
@@ -1888,7 +1911,14 @@ export function CharacterSheetView({
   }
   if (error || !character || !draft || !context || !derived) {
     return (
-      <div className={mode === "overlay" ? "pb-sheet-overlay" : "pb-sheet-page"}>
+      <div
+        ref={sheetRef}
+        tabIndex={mode === "overlay" ? -1 : undefined}
+        className={mode === "overlay" ? "pb-sheet-overlay" : "pb-sheet-page"}
+        role={mode === "overlay" ? "dialog" : undefined}
+        aria-modal={mode === "overlay" ? true : undefined}
+        aria-label={mode === "overlay" ? "Character sheet" : undefined}
+      >
         <div className="pb-error">
           <CircleAlert size={22} />
           <p>{error || "That character could not be loaded."}</p>
@@ -2817,8 +2847,9 @@ export function CharacterSheetView({
                           const scrollRank = item ? scrollSpellRank(item) : null;
                           const wandRank = item ? wandSpellRank(item) : null;
                           const flexibleRank = item ? flexibleWandRank(item) : null;
+                          const useInfo = item ? itemUseInfo(item) : null;
                           const staffEntries = item
-                            ? staffSpells(item).flatMap((staffSpell) => {
+                            ? staffSpells(item, spellsByName.keys()).flatMap((staffSpell) => {
                                 const spell = spellsByName.get(staffSpell.name.toLowerCase());
                                 return spell ? [{ spell, rank: staffSpell.rank }] : [];
                               })
@@ -3033,6 +3064,29 @@ export function CharacterSheetView({
                                           Cast staff
                                         </button>
                                       </>
+                                    ) : null}
+                                    {item &&
+                                    useInfo &&
+                                    !item.weapon &&
+                                    !isSpellScroll(item) &&
+                                    !wandRank &&
+                                    !flexibleRank &&
+                                    !fixedWandSpell &&
+                                    !staffEntries.length ? (
+                                      <button
+                                        type="button"
+                                        className="pb-small-button"
+                                        disabled={!canEdit}
+                                        aria-label={`${useInfo.label} ${item.name}`}
+                                        title={
+                                          useInfo.frequency
+                                            ? `${useInfo.label} (${useInfo.frequency})`
+                                            : useInfo.label
+                                        }
+                                        onClick={() => void activateInventoryItem(item)}
+                                      >
+                                        {useInfo.label}
+                                      </button>
                                     ) : null}
                                     {item?.price ? (
                                       <span>{formatCp(item.price.cpTotal)} each</span>
@@ -4208,6 +4262,7 @@ export function CharacterSheetView({
         derived={derived}
         preparedCaster={preparedCaster}
         onRest={(result) => void takeLongRest(result)}
+        elevated={mode === "overlay"}
       />
       <Modal
         open={afflictionOpen}
@@ -4316,6 +4371,7 @@ export function CharacterSheetView({
         context={context}
         derived={derived}
         onApply={(next) => void applyPreparations(next)}
+        elevated={mode === "overlay"}
       />
       <Modal
         open={customItemOpen}
@@ -4525,12 +4581,13 @@ export function CharacterSheetView({
         >
           <div className="stack">
             <p className="muted small">
-              A staff holds up to 5 charges. Choose the rank of the spell slot you expend; mark the
-              slot manually if your table tracks it.
+              Choose the rank of the spell slot you expend to charge the staff. This sets the
+              staff's charge pool to that rank; mark the spent slot manually. Charges from daily
+              preparation are tracked manually at the table.
             </p>
             <div className="chip-row">
               {Array.from(
-                { length: Math.min(5, Math.max(0, derived.maxSpellRank)) },
+                { length: Math.min(10, Math.max(0, derived.maxSpellRank)) },
                 (_, index) => index + 1
               ).map((rank) => (
                 <Button key={rank} size="sm" onClick={() => void chargeStaff(staffCharge, rank)}>

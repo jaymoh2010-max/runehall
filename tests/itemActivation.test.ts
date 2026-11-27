@@ -212,6 +212,13 @@ describe("invested items", () => {
     expect(blocked.draft).toBe(draft);
   });
 
+  it("counts each item in an invested stack", () => {
+    const draft = draftWith([
+      { itemId: "item:rings", quantity: 3, equipped: true, invested: true },
+    ]);
+    expect(investedCount(draft)).toBe(3);
+  });
+
   it("invests and uninvests an item below the limit", () => {
     const draft = draftWith([{ itemId: "item:ring", quantity: 1, equipped: true }]);
     const invested = setItemInvested(draft, "item:ring", true);

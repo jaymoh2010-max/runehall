@@ -5,6 +5,7 @@ import {
   addItemToDraft,
   currencyToCp,
   customItemToEquipment,
+  remainingStackSpace,
   removeItemQuantity,
   sellItemQuantity,
   setItemQuantity,
@@ -55,6 +56,12 @@ describe("character inventory", () => {
     expect(next.equipment).toEqual([
       { itemId: "potion", quantity: 3, equipped: false, runes: ["rune_a"] },
     ]);
+  });
+
+  it("reports how much room an existing stack has left", () => {
+    const draft = draftWith([{ itemId: "potion", quantity: 9_998, equipped: false }]);
+    expect(remainingStackSpace(draft, "potion")).toBe(1);
+    expect(remainingStackSpace(draft, "rope")).toBe(9_999);
   });
 
   it("adds new stacks unequipped", () => {

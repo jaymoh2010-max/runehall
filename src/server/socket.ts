@@ -720,13 +720,27 @@ function addTokenToSetup(io: TypedServer, campaignId: string, row: TokenRow): vo
   if (state.round !== 0 || state.active_scene_id !== row.scene_id) return;
   const entries = serializeInitiative(JSON.parse(state.initiative || "[]"));
   if (row.group_id) {
-    if (entries.some((entry) => entry.groupId === row.group_id)) return;
     const members = groupTokens(row.scene_id, row.group_id);
-    entries.push(
-      members.length > 1
-        ? initiativeEntryForGroup(members)
-        : initiativeEntryForCombatToken(row, campaignId, true)
-    );
+    const existingIndex = entries.findIndex((entry) => entry.groupId === row.group_id);
+    if (members.length > 1) {
+      // Bulk monster creation inserts one token at a time. Rebuild the group
+      // entry only after the member count changes so the chip shows xN.
+      const groupEntry = initiativeEntryForGroup(members);
+      const existing = existingIndex >= 0 ? entries[existingIndex] : null;
+      if (existing) {
+        if (existing.name === groupEntry.name && existing.tokenId === groupEntry.tokenId) return;
+        groupEntry.id = existing.id;
+        groupEntry.initiative = existing.initiative;
+        groupEntry.pending = existing.pending;
+        groupEntry.ownerId = existing.ownerId;
+        entries[existingIndex] = groupEntry;
+      } else {
+        entries.push(groupEntry);
+      }
+    } else {
+      if (existingIndex >= 0) return;
+      entries.push(initiativeEntryForCombatToken(row, campaignId, true));
+    }
   } else {
     if (entries.some((entry) => entry.tokenId === row.id)) return;
     entries.push(initiativeEntryForCombatToken(row, campaignId, true));
@@ -1098,6 +1112,7 @@ export function registerSocketServer(io: TypedServer): void {
             amount: damage,
             critical: Boolean(critical),
             nonlethal: Boolean(nonlethal),
+            damageTypes: damageType ? [String(damageType)] : undefined,
           });
           const summary = characterSummary(
             result.draft,
@@ -1129,7 +1144,7 @@ export function registerSocketServer(io: TypedServer): void {
           }
           io.to(room(campaignId)).emit(
             "character:updated",
-            characterUpdatedPayload(character.id, draft, summary)
+            characterUpdatedPayload(character.id, result.draft, summary)
           );
           ack?.({ applied: damage, notes: [] });
           touchCampaign(campaignId);
@@ -1867,6 +1882,10 @@ export function registerSocketServer(io: TypedServer): void {
     on("initiative:begin", ({ campaignId }, ack) => {
       if (!requireGm(socket, campaignId)) {
         ack?.({ ok: false, error: "Only the GM can begin combat." });
+        return;
+      }
+      if (ensureState(campaignId).round !== 0) {
+        ack?.({ ok: false, error: "Combat already began." });
         return;
       }
       beginCombat(io, campaignId);
