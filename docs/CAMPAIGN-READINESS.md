@@ -25,7 +25,7 @@ The rest of this document records what is verified and what remains manual, so a
 | Check | Result |
 | --- | --- |
 | `npm run check` | Typecheck, lint, formatting, unit tests, production build, and bundle budget pass |
-| Unit tests | 778 passing |
+| Unit tests | 784 passing |
 | `npm run e2e` | 38 passing browser scenarios |
 | `npm run smoke` | End-to-end smoke suite passes |
 | `npm run simulate` | 2,337 characters, 145 class/level matrix builds, 578 option builds, 38 ancestries × 269 backgrounds; 0 problems |
@@ -45,6 +45,7 @@ The campaign simulation exercises two complete 1-20 campaigns per run, one XP an
 - Optional **Free Archetype** campaign variant: an extra archetype feat slot at every even level, an archetype-only picker, and validation that the chosen feat has the archetype trait and fits the slot level.
 - Optional **Automatic Bonus Progression** campaign variant: level-based attack potency, devastating attack dice, defense potency, save potency, Perception potency, a chosen skill potency, and a 17th-level ability apex. Fundamental rune bonuses do not stack with ABP; property runes still apply.
 - PF2e prerequisites, class access, feat-slot categories, spell repertoires, prepared slots, divine font, focus, innate spells, rituals, and cantrip limits.
+- Campaign content scope is enforced for builder pickers, sheet gear search, and server-side item purchases and grants.
 - Derived HP, AC, saves, Perception, class/spell DCs, attacks, damage, skills, lore, speed, senses, Bulk, invested items, and wealth.
 - Encumbrance: carrying more than `5 + Strength` Bulk automatically applies Encumbered (Clumsy 1 and −10 ft Speed); exceeding the hard maximum adds a validation warning.
 - Milestone or XP advancement with fast/medium/slow thresholds, hazard and accomplishment awards, catch-up, level-20 cap, and an XP ledger.
@@ -72,10 +73,11 @@ The campaign simulation exercises two complete 1-20 campaigns per run, one XP an
 ### Operations and security
 
 - Local accounts with scrypt hashes and HTTP-only session cookies.
-- Session metadata (device, IP, last seen), per-device sign-out, and “sign out other devices”.
+- Session metadata (device, IP, last seen), per-device sign-out, and "sign out other devices". Revoked or expired sessions close live sockets within 30 seconds.
 - Administrator account moderation: suspend/restore, revoke sessions, and promote/demote administrators with last-admin safeguards. Suspension revokes sessions and disconnects live sockets.
 - Registration modes, a production `BOOTSTRAP_TOKEN` gate for the first administrator, single-use invite codes, expiry, revocation, and a pending-invite cap.
 - Audit log with retention controls and CSV export.
+- Upload quotas, a low-disk guard, and backup/restore checks that refuse archives missing database-referenced uploads.
 - Backup staging publishes a completed archive with a single rename, so interrupted backups are not mistaken for valid ones.
 - Compendium version metadata is exposed by `/api/health` and recorded in campaign archives.
 

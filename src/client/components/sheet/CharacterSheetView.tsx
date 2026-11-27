@@ -40,8 +40,10 @@ import {
   normalizeCharacterDraft,
   preparedCantripIds,
   signed,
+  sourceSpellIds,
   spellSourceLabel,
   titleCase,
+  withSourceSpellIds,
 } from "../../../shared/rules";
 import { currencyToCp, spendCurrency } from "../../../shared/inventory";
 import { learnSpellCostCp, learnSpellDc } from "../../../shared/spellLearning";
@@ -365,6 +367,7 @@ export function CharacterSheetView({
   const [draft, setDraft] = useState<CharacterDraft | null>(null);
   const [context, setContext] = useState<CharacterContext | null>(null);
   const [derived, setDerived] = useState<DerivedCharacter | null>(null);
+  const classData = context?.classData ?? null;
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -605,6 +608,8 @@ export function CharacterSheetView({
         const params = new URLSearchParams();
         params.set("q", itemQuery);
         params.set("limit", String(itemLimit));
+        if ((draft?.contentMode ?? "core") !== "expanded") params.set("core", "1");
+        params.set("legacy", draft?.includeLegacy ? "1" : "0");
         const category = ITEM_CATEGORIES.find((entry) => entry.id === itemCategory);
         if (category?.type) params.set("type", category.type);
         if (category?.runeOnly) params.set("runeOnly", "1");
@@ -633,7 +638,17 @@ export function CharacterSheetView({
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [itemCategory, itemLevelFilter, itemLimit, itemMagicOnly, itemQuery, itemSubcategory, tab]);
+  }, [
+    draft?.contentMode,
+    draft?.includeLegacy,
+    itemCategory,
+    itemLevelFilter,
+    itemLimit,
+    itemMagicOnly,
+    itemQuery,
+    itemSubcategory,
+    tab,
+  ]);
 
   const inventoryGroups = useMemo(() => {
     if (!draft || !context) return [];
@@ -1274,7 +1289,7 @@ export function CharacterSheetView({
         label: "Apparition",
         ids: (derived?.animistApparitions?.repertoire ?? []).map((entry) => entry.spell.id),
       },
-      { label: "Spells", ids: draft.spells.known },
+      { label: "Spells", ids: sourceSpellIds(draft, classData) },
       {
         label: "Multiclass",
         ids: [...draft.spells.multiclassCantrips, ...draft.spells.multiclassSpells],
@@ -1303,7 +1318,7 @@ export function CharacterSheetView({
           id,
         }))
     );
-  }, [context, derived?.animistApparitions?.repertoire, derived?.grantedSpells, draft]);
+  }, [context, derived?.animistApparitions?.repertoire, derived?.grantedSpells, draft, classData]);
 
   const featName = useCallback(
     (id: string | null | undefined) => (id ? (context?.feats[id]?.name ?? id) : ""),
@@ -1571,19 +1586,21 @@ export function CharacterSheetView({
       );
       return;
     }
-    const saved = await persist((currentDraft) => ({
-      ...currentDraft,
-      currency,
-      spells: {
-        ...currentDraft.spells,
-        known: currentDraft.spells.known.includes(spell.id)
-          ? currentDraft.spells.known
-          : [...currentDraft.spells.known, spell.id],
-        learned: currentDraft.spells.known.includes(spell.id)
-          ? currentDraft.spells.learned
-          : [...(currentDraft.spells.learned ?? []), spell.id],
-      },
-    }));
+    const saved = await persist((currentDraft) => {
+      const source = sourceSpellIds(currentDraft, classData);
+      const alreadyKnown = source.includes(spell.id);
+      const next = alreadyKnown
+        ? currentDraft
+        : withSourceSpellIds(currentDraft, classData, [...source, spell.id]);
+      return {
+        ...next,
+        currency,
+        spells: {
+          ...next.spells,
+          learned: alreadyKnown ? next.spells.learned : [...(next.spells.learned ?? []), spell.id],
+        },
+      };
+    });
     if (!saved) return;
     setContext((current) =>
       current ? { ...current, spells: { ...current.spells, [spell.id]: spell } } : current
@@ -1640,7 +1657,6 @@ export function CharacterSheetView({
     );
   }
 
-  const classData = context.classData ?? null;
   const preparedCaster = isPreparedCasterClass(classData?.name);
   const canLearnSpells = ["spellbook", "familiar", "dirge"].includes(spellSourceLabel(classData));
   const preparationsPending = preparedCaster && draft.spells.preparationsPending;
@@ -3829,7 +3845,10 @@ export function CharacterSheetView({
           contentModeLocked
           legacyDefault={draft.includeLegacy}
           legacyLocked
-          excludeIds={[...draft.spells.known, ...derived.grantedSpells.map((spell) => spell.id)]}
+          excludeIds={[
+            ...sourceSpellIds(draft, classData),
+            ...derived.grantedSpells.map((spell) => spell.id),
+          ]}
           confirmLabelFor={(spell) =>
             `Learn for ${formatCp(learnSpellCostCp(spell))} · DC ${learnSpellDc(spell.rank)}`
           }

@@ -24,11 +24,12 @@ Optional flags:
 
 ```bash
 npm run backup -- --dir D:\RunehallBackups
-npm run backup -- --with-compendium
 npm run backup -- --keep 14
 ```
 
 `--keep N` keeps the newest N `runehall-*` archives in the backup directory and removes older ones after a successful snapshot. The fresh snapshot is never pruned.
+
+The backup refuses to publish if the database references an upload that is missing from the archive. Restore performs the same reference check before touching live data.
 
 The snapshot is created with SQLite `VACUUM INTO`, so it is safe to run while the server is active. Every file is hashed into `backup.json`, and the manifest digest covers the sorted file list.
 
@@ -65,6 +66,7 @@ npm run restore -- --from "backups/runehall-2026-11-03T19-42-05-738Z" --yes
 
 Restore:
 - verifies the archive's SHA-256 manifest before changing anything; corrupted archives are refused,
+- verifies every database-referenced upload exists in the archive,
 - keeps a safety copy of the current database and uploads under `backups/pre-restore-<timestamp>/`,
 - replaces `data/runehall.db`,
 - replaces `data/uploads/`.

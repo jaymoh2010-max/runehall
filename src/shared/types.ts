@@ -983,6 +983,8 @@ export interface CharacterDraft {
     tradition: SpellTradition | null;
     cantrips: string[];
     known: string[];
+    /** Spellbook, familiar, or dirge contents for book casters. */
+    spellbook: string[];
     /** Spell IDs added with the paid Learn a Spell activity. */
     learned: string[];
     /**

@@ -119,6 +119,11 @@
     "secondaryCasters": 1,
     "secondaryChecks": "Fungus Lore (trained), Nature (expert)"
   },
+  "spell:6ukJR0Qbq8fq5VKs": {
+    "primaryCheck": "Nature (master) or Occultism (master)",
+    "secondaryCasters": 3,
+    "secondaryChecks": "Diplomacy, Nature, or Occultism (whichever isn't used for the primary check), Survival"
+  },
   "spell:7DN13ILADW2N9Z1t": {
     "primaryCheck": "Nature (master), Occultism (master) or Religion (master)",
     "secondaryCasters": 1,
@@ -208,6 +213,11 @@
     "primaryCheck": "Religion (expert; you must be a div)",
     "secondaryCasters": 0,
     "secondaryChecks": ""
+  },
+  "spell:DCC7RFqc0CQTzld8": {
+    "primaryCheck": "Nature (expert)",
+    "secondaryCasters": 1,
+    "secondaryChecks": "Crafting, Diplomacy, or Society"
   },
   "spell:DPjhtfAjFQVQwZH2": {
     "primaryCheck": "Occultism or Religion (expert)",
@@ -419,6 +429,11 @@
     "secondaryCasters": 0,
     "secondaryChecks": ""
   },
+  "spell:W9fqUhauejx6Zz6I": {
+    "primaryCheck": "Nature (legendary) or Occultism (legendary)",
+    "secondaryCasters": 3,
+    "secondaryChecks": "Diplomacy, First World Lore, Nature, or Occultism (whichever isn't used for the primary check)"
+  },
   "spell:WRRbNyGam4ytTRgr": {
     "primaryCheck": "Deception (expert), Maze Lore (trained), or Religion (expert)",
     "secondaryCasters": 2,
@@ -569,6 +584,11 @@
     "secondaryCasters": 1,
     "secondaryChecks": "Deception, Performance, Occultism, or Thievery"
   },
+  "spell:duTRHPoB4ZT6F9Uq": {
+    "primaryCheck": "Occultism (master)",
+    "secondaryCasters": 3,
+    "secondaryChecks": "Nature, Performance, Society"
+  },
   "spell:ehd9PtifLMwjk4ep": {
     "primaryCheck": "Occultism",
     "secondaryCasters": 3,
@@ -583,6 +603,16 @@
     "primaryCheck": "Arcana (mythic)",
     "secondaryCasters": 2,
     "secondaryChecks": "Religion, Occultism, Society"
+  },
+  "spell:fr95Jlz6cZ9Kw0bq": {
+    "primaryCheck": "Nature (expert)",
+    "secondaryCasters": 1,
+    "secondaryChecks": "Diplomacy or Performance"
+  },
+  "spell:gC8aBNZsqO95XBCs": {
+    "primaryCheck": "Nature (expert)",
+    "secondaryCasters": 2,
+    "secondaryChecks": "Diplomacy, Society"
   },
   "spell:gIVaSCrLhhBzGHQY": {
     "primaryCheck": "Nature (expert)",

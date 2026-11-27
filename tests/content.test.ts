@@ -3,6 +3,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   isCoreSource,
+  itemAllowedByContent,
   normalizeCampaignRuleset,
   rulesetContentMode,
   rulesetIncludesLegacy,
@@ -64,5 +65,16 @@ describe("content tiers", () => {
     expect(rulesetIncludesLegacy("core")).toBe(false);
     expect(rulesetIncludesLegacy("expanded")).toBe(false);
     expect(rulesetIncludesLegacy("legacy")).toBe(true);
+  });
+
+  it("enforces content scope for purchased and granted items", () => {
+    const coreItem = { source: "Pathfinder Player Core", remaster: true };
+    const expandedItem = { source: "Pathfinder Treasure Vault (Remastered)", remaster: true };
+    const legacyItem = { source: "Pathfinder Core Rulebook", remaster: false };
+    expect(itemAllowedByContent(coreItem, "core", false)).toBe(true);
+    expect(itemAllowedByContent(expandedItem, "core", false)).toBe(false);
+    expect(itemAllowedByContent(expandedItem, "expanded", false)).toBe(true);
+    expect(itemAllowedByContent(legacyItem, "expanded", false)).toBe(false);
+    expect(itemAllowedByContent(legacyItem, "expanded", true)).toBe(true);
   });
 });

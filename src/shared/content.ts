@@ -29,6 +29,16 @@ export function allowsExpanded(mode: ContentMode | undefined): boolean {
   return mode === "expanded";
 }
 
+/** Whether an item may be bought or granted under a character's content scope. */
+export function itemAllowedByContent(
+  item: { source: string; remaster: boolean },
+  mode: ContentMode,
+  includeLegacy: boolean
+): boolean {
+  if (!item.remaster && !includeLegacy) return false;
+  return mode === "expanded" || isCoreSource(item.source);
+}
+
 export const CAMPAIGN_RULESET_OPTIONS: {
   value: CampaignRuleset;
   label: string;

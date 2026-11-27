@@ -163,6 +163,9 @@ Runehall already enables `trustProxy`, so keep `Host`, `X-Forwarded-For`, and `X
 | `TRUST_PROXY_HOPS` | `1` for one Caddy/Nginx | How many proxy hops may set the client IP. Use `0` when exposing directly. |
 | `AUTH_RATE_LIMIT_MAX` | `30` | Login/register attempts per IP per window. |
 | `UPLOAD_RATE_LIMIT_MAX` | `60` | Uploads per IP per window. |
+| `UPLOAD_CAMPAIGN_QUOTA_MB` | `1024` | Total uploaded bytes per campaign; `0` disables the cap. |
+| `UPLOAD_USER_QUOTA_MB` | `512` | Total uploaded bytes per account; `0` disables the cap. |
+| `UPLOAD_MIN_FREE_MB` | `512` | Refuse uploads when the data volume has less free space than this. |
 
 Security headers are always sent: `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy`, and cross-origin isolation headers. Production also sends CSP; `COOKIE_SECURE=1` adds HSTS. Uploaded campaign files under `/uploads/` require a signed-in session and, when the file belongs to a campaign, that campaign's membership.
 
@@ -221,7 +224,7 @@ docker compose exec runehall npm run reset-password -- --username alice
 npm run reset-password -- --username alice
 ```
 
-The command prints a temporary password once, signs out every session for that account, and writes an audit entry. Add `--password "<value>"` to supply your own, `--admin` to grant administrator, or `--list` to list accounts.
+The command prints a temporary password once, signs out every session for that account, closes its live sockets within 30 seconds, and writes an audit entry. Add `--password "<value>"` to supply your own, `--admin` to grant administrator, or `--list` to list accounts.
 
 Signed-in users can change their own password from **Account & security**. Other sessions are signed out.
 

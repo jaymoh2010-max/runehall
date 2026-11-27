@@ -2,7 +2,7 @@
 
 Date: 2026-11-23
 
-Status: review complete. Sprint 1 (the daily spellcasting loop), the class-grant portion of Sprint 2, the first table-magic pass of Sprint 3, the magus studious-slot pass of Sprint 4, the animist prepared/spontaneous split of Sprint 5, the spontaneous known-at-rank pass of Sprint 6, the psychic psi-amp pass of Sprint 7, the table Sustain-reminder pass of Sprint 8, the higher-slot downcast pass of Sprint 9, the scroll-spellcasting pass of Sprint 10, the Magic Wand spellcasting pass of Sprint 11, the fixed-spell specific-wand pass of Sprint 12, the expanded/advanced domain pass of Sprint 13, the flexible-wand pass of Sprint 14, the staff/trait-restricted wand pass of Sprint 15, the ritual-detail pass of Sprint 16, the spell-source label pass of Sprint 17, the staff-slot/repeated-domain pass of Sprint 18, the oracle mystery-domain pass of Sprint 19, the Learn-a-Spell pass of Sprint 20, the last-staff-list pass of Sprint 21, the multiclass-dedication pass of Sprint 22, the multiclass-slot pass of Sprint 23, the variable-tradition dedication pass of Sprint 24, the heightening/starting-budget pass of Sprint 25, the higher-rank class-choice pass of Sprint 26, the later-domain-feat pass of Sprint 27, the structured-ritual-data pass of Sprint 28, the spellbook-budget pass of Sprint 29, and the staff-effect-visibility pass of Sprint 30 were implemented on 2026-11-23 through 2026-11-26. The findings below describe the pre-Sprint state; the implementation status sections record what changed, and the remaining class and table gaps stay in the backlog.
+Status: review complete. Sprint 1 (the daily spellcasting loop), the class-grant portion of Sprint 2, the first table-magic pass of Sprint 3, the magus studious-slot pass of Sprint 4, the animist prepared/spontaneous split of Sprint 5, the spontaneous known-at-rank pass of Sprint 6, the psychic psi-amp pass of Sprint 7, the table Sustain-reminder pass of Sprint 8, the higher-slot downcast pass of Sprint 9, the scroll-spellcasting pass of Sprint 10, the Magic Wand spellcasting pass of Sprint 11, the fixed-spell specific-wand pass of Sprint 12, the expanded/advanced domain pass of Sprint 13, the flexible-wand pass of Sprint 14, the staff/trait-restricted wand pass of Sprint 15, the ritual-detail pass of Sprint 16, the spell-source label pass of Sprint 17, the staff-slot/repeated-domain pass of Sprint 18, the oracle mystery-domain pass of Sprint 19, the Learn-a-Spell pass of Sprint 20, the last-staff-list pass of Sprint 21, the multiclass-dedication pass of Sprint 22, the multiclass-slot pass of Sprint 23, the variable-tradition dedication pass of Sprint 24, the heightening/starting-budget pass of Sprint 25, the higher-rank class-choice pass of Sprint 26, the later-domain-feat pass of Sprint 27, the structured-ritual-data pass of Sprint 28, the spellbook-budget pass of Sprint 29, the staff-effect-visibility pass of Sprint 30, the full ritual-coverage pass of Sprint 31, and the dedicated spellbook pass of Sprint 32 were implemented on 2026-11-23 through 2026-11-27. The findings below describe the pre-Sprint state; the implementation status sections record what changed, and the remaining class and table gaps stay in the backlog.
 
 > **Follow-up (2026-11-23):** `docs/RULES-AUDIT.md` corrected two table errors
 > this review did not catch: bards use the 2/3 full-caster slot table (not the
@@ -338,7 +338,7 @@ Structured ritual data is implemented:
 - The server merges that data into spell context; the sheet uses it before falling back to prose detection.
 - Ritual detail cards show the printed primary check and the secondary casters/checks, and the primary-check picker keeps every printed skill option.
 - Rolling a ritual uses the character's override first, then the first printed skill the character actually has.
-- 168 of 174 rituals have structured data. Six newer rituals remain prose/manual because the source clone predates them; costs and outcomes remain prose.
+- 168 of 174 rituals had structured data in Sprint 28; Sprint 31 filled the six newer rituals in rank subfolders, so all 174 now have structured checks. Costs and outcomes remain prose.
 
 ## Sprint 29 implementation status (2026-11-26)
 
@@ -349,7 +349,7 @@ Spellbook budget accounting is implemented:
 - Validation warns when free picks exceed the starting or level-up budget; paid additions do not count.
 - Learn a Spell now marks newly added spells in `spells.learned`, so later budget checks exclude them.
 - Curriculum, patron, studious, and other class-granted spells are excluded from the free count.
-- The shared `known` list still stores both a book caster's book and a spontaneous caster's repertoire; a dedicated `spellbook` field remains a future migration.
+- The shared `known` list still stores both a book caster's book and a spontaneous caster's repertoire; a dedicated `spellbook` field remains a future migration. (Completed in Sprint 32.)
 
 ## Sprint 30 implementation status (2026-11-26)
 
@@ -358,6 +358,24 @@ Staff special effects are visible at the table:
 - Staves expose an **Effects** action that shows the non-spell prose from the item's description before its Activate block.
 - The modal calls out that bonuses and triggered effects remain manual and links to the full item page.
 - Staff spell lists, charges, charge spending, and spell-slot casting remain tracked as before.
+
+## Sprint 31 implementation status (2026-11-27)
+
+Ritual coverage is complete:
+
+- The six rituals stored in rank subfolders now have structured primary and secondary checks.
+- All 174 ritual entries resolve to structured data with no missing primary checks.
+- The data test now requires every ritual in the compendium to have a structured entry.
+
+## Sprint 32 implementation status (2026-11-27)
+
+The spellbook/repertoire split is implemented:
+
+- Wizard, magus, witch, and necromancer store their book, familiar, or dirge contents in `spells.spellbook`; spontaneous casters keep `spells.known` as their repertoire.
+- `sourceSpellIds` and `withSourceSpellIds` read and write the right field, with a fallback for legacy drafts that only have `known`.
+- The builder, sheet, daily preparations, server spell context, and Pathbuilder import use the class-aware source list.
+- Adding or removing a book spell migrates legacy `known` contents into `spellbook` and clears the old field.
+- Cleric, druid, and animist continue to use `known` as their practical prepared list.
 
 ## Rules baseline
 
@@ -419,8 +437,8 @@ Legend: Yes = modeled and usable; Partial = some support with known gaps; No = n
 | Divine font | Yes | Rank, slot count, dual-font choice, separate usage |
 | Wizard curriculum | Partial | Extra slot and rank-aware validation; all schools grant rank-0 through rank-9 curriculum, including Runelord sins and Rooted Wisdom branches; Unified Magical Theory's free feat/spell remains manual |
 | Prepared cantrips | Yes | Daily prepared list, class caps, and the wizard curriculum extra |
-| Spell source presentation | Partial | Class-specific spellbook/familiar/dirge/spell-list/repertoire labels and starting-contents guidance; the full spellbook/known data split remains open |
-| Learn a Spell | Partial | Cost by rank/rarity, rank DC, gold deduction, known-list addition, and starting-contents guidance; the check and strict starting budget remain manual |
+| Spell source presentation | Yes | Class-specific spellbook/familiar/dirge/spell-list/repertoire labels and separate book and repertoire storage |
+| Learn a Spell | Partial | Cost by rank/rarity, rank DC, gold deduction, source-list addition, paid marking, and starting-budget tracking; the check and downtime day remain manual |
 | Spontaneous repertoire limits | Yes | Bard, oracle, sorcerer, summoner, and psychic; rank copies count against each learned rank |
 | Spontaneous heightening by learned rank | Yes | Known ranks are tracked; signature spells heighten upward and non-signature spells can downcast from higher slots |
 | Signature spells | Yes | One per rank, level 3 gate, validation |
@@ -435,9 +453,9 @@ Legend: Yes = modeled and usable; Partial = some support with known gaps; No = n
 | Summoner link spells | Yes | Evolution Surge and Boost Eidolon granted; eidolon actions remain manual |
 | Magus studious slots | Yes | Two special slots at 7th, rank 3 at 11th, rank 4 at 13th; hybrid-study list and preparation UI |
 | Animist prepared/spontaneous split | Yes | Prepared animist slots and spontaneous apparition slots, attunement, repertoire, and vessel focus spells |
-| Rituals | Partial | Structured primary and secondary checks for 168 of 174 rituals, with prose fallback and manual override; costs and outcomes remain prose |
+| Rituals | Partial | Structured primary and secondary checks for all 174 rituals, with manual override; costs and outcomes remain prose |
 | Sustained spells | Yes | Casting starts sustain, the sheet and table list active spells, Sustain/End actions are available, and Restore clears them |
-| Spellbook capacity and learning | Partial | Starting contents and the two-free-spells-per-level budget are tracked; paid Learn a Spell additions are marked and excluded; the shared `known` list still serves as both book and repertoire |
+| Spellbook capacity and learning | Partial | Starting contents and the two-free-spells-per-level budget are tracked; paid Learn a Spell additions are marked and excluded; book and repertoire storage are separate |
 | Item spellcasting | Partial | Scrolls cast from the character's spell list and consume on use; generic Magic Wands cast at their rank once per day; fixed-spell specific wands cast directly; flexible wands cast a chosen spell at their listed rank; staves track parsed spell lists, charge pools, spell-slot casting, and show their special-effect prose; bonuses and triggered effects remain manual |
 | Multiclass spellcasting archetypes | Partial | Spellcasting dedications grant cantrips, ranked spells, Basic/Expert/Master slot pools, variable traditions, and higher-slot heightening; other archetype details remain manual |
 
@@ -601,7 +619,7 @@ Fix: The table reminder now appears below the initiative bar for an active chara
 
 Status: partly fixed in Sprint 3, Sprint 16, and Sprint 28. Ritual rows expose a Details card and a Primary check action. The card shows the structured primary check and secondary casters when the compendium provides them, falls back to prose detection, and lets the player override the skill.
 
-`src/shared/ritual.ts` reads structured `ritualData` first and falls back to the printed prose. The compendium provides structured checks for 168 of 174 rituals; six newer rituals remain manual. Costs and outcomes remain prose.
+`src/shared/ritual.ts` reads structured `ritualData` first and falls back to the printed prose. The compendium now provides structured checks for all 174 rituals. Costs and outcomes remain prose.
 
 Impact: Any ritual can be given a usable primary check at the table, and most now use structured source data.
 
@@ -627,7 +645,7 @@ Fix: Variable traditions are now chosen in the builder, and dedication spells ca
 
 ### F14. Spellbook capacity and spell learning are not enforced (P2)
 
-Status: partly fixed in Sprint 20, Sprint 25, and Sprint 29. The sheet's Learn a Spell picker computes the rank/rarity cost and DC, deducts gold, adds the spell to the known list, and marks it as a paid addition. Spellbook/familiar/dirge classes see starting-contents guidance, current free-pick counts, the two-free-spells-per-level budget, paid additions, and granted extras. Validation warns when free picks exceed the budget. The shared `known` field still serves as both a book caster's book and a spontaneous caster's repertoire.
+Status: partly fixed in Sprint 20, Sprint 25, Sprint 29, and Sprint 32. The sheet's Learn a Spell picker computes the rank/rarity cost and DC, deducts gold, adds the spell to the class's source list, and marks it as a paid addition. Spellbook/familiar/dirge classes see starting-contents guidance, current free-pick counts, the two-free-spells-per-level budget, paid additions, and granted extras. Validation warns when free picks exceed the budget. Book casters use a dedicated `spells.spellbook` field; spontaneous casters keep `spells.known`.
 
 ## Sprint plan
 

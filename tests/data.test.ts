@@ -233,7 +233,7 @@ describe("compendium data", () => {
       expect(Number.isInteger(entry.secondaryCasters), id).toBe(true);
       expect(entry.secondaryCasters, id).toBeGreaterThanOrEqual(0);
     }
-    expect(Object.keys(ritualChecks).length).toBeGreaterThan(150);
+    expect(Object.keys(ritualChecks).length).toBe(spells.filter((spell) => spell.ritual).length);
   });
 
   it("normalizes deity domains, alternate domains, and skill choices", () => {

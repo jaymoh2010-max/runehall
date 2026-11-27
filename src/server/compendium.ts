@@ -36,6 +36,7 @@ import { selectedClassGrants } from "../shared/classGrants";
 import { APPARITION_BY_ID } from "../shared/apparitions";
 import { customItemToEquipment } from "../shared/inventory";
 import { specificWandSpell, staffSpells } from "../shared/itemSpellcasting";
+import { sourceSpellIds } from "../shared/rules";
 import {
   COMPENDIUM_KIND_ORDER,
   compendiumKindFromId,
@@ -697,7 +698,7 @@ export function contextForDraft(
   const spellMap: Record<string, Spell> = {};
   for (const id of [
     ...draft.spells.cantrips,
-    ...draft.spells.known,
+    ...sourceSpellIds(draft, classData),
     ...draft.spells.prepared,
     ...Object.values(draft.spells.preparedByRank ?? {}).flat(),
     ...draft.spells.focus,

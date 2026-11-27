@@ -9,6 +9,7 @@ import { globalAssetReferences } from "../assets";
 import { newId, now, safeString, uploadsDir } from "../util";
 import { inspectImage } from "../imageMeta";
 import { inspectAudio } from "../audioMeta";
+import { checkUploadQuota } from "../uploadQuota";
 import {
   serializeAudioLibraryTrack,
   serializeAudioState,
@@ -34,6 +35,8 @@ const AUDIO_MIME_EXT: Record<string, string> = {
 const MAX_DIMENSION = 12_000;
 const MAX_PIXELS = 100_000_000;
 const MAX_HEADER_BYTES = 2 * 1024 * 1024;
+const MAX_IMAGE_BYTES = 15 * 1024 * 1024;
+const MAX_AUDIO_BYTES = 25 * 1024 * 1024;
 
 function audioTracksFor(campaignId: string): CampaignAudioTrack[] {
   const rows = db
@@ -54,9 +57,11 @@ export async function registerUploadRoutes(app: FastifyInstance): Promise<void> 
       return reply.code(403).send({ error: "You are not a member of that campaign." });
     }
     if (!request.isMultipart()) return reply.code(400).send({ error: "Upload an image file." });
+    const earlyQuota = checkUploadQuota(campaignId, request.user.id, MAX_IMAGE_BYTES);
+    if (!earlyQuota.ok) return reply.code(earlyQuota.status).send({ error: earlyQuota.error });
     let file;
     try {
-      file = await request.file({ limits: { fileSize: 15 * 1024 * 1024, files: 1 } });
+      file = await request.file({ limits: { fileSize: MAX_IMAGE_BYTES, files: 1 } });
     } catch {
       return reply.code(400).send({ error: "Upload an image file smaller than 15 MB." });
     }
@@ -83,6 +88,8 @@ export async function registerUploadRoutes(app: FastifyInstance): Promise<void> 
     if (size === 0) {
       return reject(400, "The image was empty.");
     }
+    const quota = checkUploadQuota(campaignId, request.user.id, size);
+    if (!quota.ok) return reject(quota.status, quota.error);
 
     const header = Buffer.alloc(Math.min(MAX_HEADER_BYTES, size));
     try {
@@ -150,9 +157,11 @@ export async function registerUploadRoutes(app: FastifyInstance): Promise<void> 
       return reply.code(403).send({ error: "Only the GM can upload soundtracks." });
     }
     if (!request.isMultipart()) return reply.code(400).send({ error: "Upload an audio file." });
+    const earlyQuota = checkUploadQuota(campaignId, request.user.id, MAX_AUDIO_BYTES);
+    if (!earlyQuota.ok) return reply.code(earlyQuota.status).send({ error: earlyQuota.error });
     let file;
     try {
-      file = await request.file({ limits: { fileSize: 25 * 1024 * 1024, files: 1 } });
+      file = await request.file({ limits: { fileSize: MAX_AUDIO_BYTES, files: 1 } });
     } catch {
       return reply.code(400).send({ error: "Upload an audio file smaller than 25 MB." });
     }
@@ -177,6 +186,8 @@ export async function registerUploadRoutes(app: FastifyInstance): Promise<void> 
     }
     const size = fs.statSync(destination).size;
     if (size === 0) return reject(400, "The audio file was empty.");
+    const quota = checkUploadQuota(campaignId, request.user.id, size);
+    if (!quota.ok) return reject(quota.status, quota.error);
     const header = Buffer.alloc(Math.min(512, size));
     try {
       const fd = fs.openSync(destination, "r");

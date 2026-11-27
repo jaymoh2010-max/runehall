@@ -137,6 +137,40 @@ export function spellSourceLabel(classData: ClassData | null | undefined): strin
   return "repertoire";
 }
 
+const SPELLBOOK_CLASS_NAMES = new Set(["wizard", "magus", "witch", "necromancer"]);
+
+/** Whether this class keeps spells in a spellbook, familiar, or dirge. */
+export function isSpellbookClass(classData: ClassData | null | undefined): boolean {
+  return SPELLBOOK_CLASS_NAMES.has(classData?.name.toLowerCase() ?? "");
+}
+
+/**
+ * The class's full source list: spellbook/familiar/dirge for book casters,
+ * repertoire for spontaneous casters, and the prepared list for cleric,
+ * druid, and animist. Legacy drafts with only `known` still read correctly.
+ */
+export function sourceSpellIds(
+  draft: Pick<CharacterDraft, "spells">,
+  classData: ClassData | null | undefined
+): string[] {
+  if (!isSpellbookClass(classData)) return draft.spells.known;
+  const book = draft.spells.spellbook ?? [];
+  return book.length ? book : draft.spells.known;
+}
+
+/** Write the class's source list, migrating legacy `known` book contents once. */
+export function withSourceSpellIds(
+  draft: CharacterDraft,
+  classData: ClassData | null | undefined,
+  ids: string[]
+): CharacterDraft {
+  const unique = [...new Set(ids.filter((id) => typeof id === "string"))];
+  if (!isSpellbookClass(classData)) {
+    return { ...draft, spells: { ...draft.spells, known: unique } };
+  }
+  return { ...draft, spells: { ...draft.spells, spellbook: unique, known: [] } };
+}
+
 interface CasterInfo {
   progression: CasterProgression;
   tradition: SpellTradition | null;
@@ -715,7 +749,7 @@ export function spellbookUsage(
     return { cantrips, ranked, learnedCantrips, learnedRanked };
   };
   const cantripCounts = idsByKind(draft.spells.cantrips);
-  const rankedCounts = idsByKind(draft.spells.known);
+  const rankedCounts = idsByKind(sourceSpellIds(draft, classData));
   return {
     budget,
     freeCantrips: cantripCounts.cantrips,
@@ -1676,6 +1710,7 @@ export function emptyCharacterDraft(name = "New Hero"): CharacterDraft {
       tradition: null,
       cantrips: [],
       known: [],
+      spellbook: [],
       learned: [],
       knownRanks: {},
       prepared: [],
@@ -1955,10 +1990,13 @@ export function normalizeCharacterDraft(input: unknown, fallbackName = "New Hero
         : null,
       cantrips: arr<string>(spells.cantrips).filter((x) => typeof x === "string"),
       known: arr<string>(spells.known).filter((x) => typeof x === "string"),
+      spellbook: arr<string>(spells.spellbook).filter((x) => typeof x === "string"),
       learned: [
         ...new Set(
           arr<string>(spells.learned).filter(
-            (x) => typeof x === "string" && arr<string>(spells.known).includes(x)
+            (x) =>
+              typeof x === "string" &&
+              (arr<string>(spells.known).includes(x) || arr<string>(spells.spellbook).includes(x))
           )
         ),
       ].slice(0, 200),
@@ -4343,6 +4381,7 @@ export function computeCharacter(
   const grantedKnownSpellIds = new Set(
     classGrants.spells.filter((spell) => spell.kind !== "focus").map((spell) => spell.id)
   );
+  const sourceSpells = sourceSpellIds(draft, classData);
   if (caster.progression !== "none" && caster.progression !== "focus") {
     const cantripIds = new Set([
       ...draft.spells.cantrips,
@@ -4353,7 +4392,7 @@ export function computeCharacter(
       issue("error", "Choose at least one cantrip.", "spells");
     }
     const hasRankedSpell =
-      [...draft.spells.known, ...draft.spells.prepared].some(
+      [...sourceSpells, ...draft.spells.prepared].some(
         (id) => (context.spells[id]?.rank ?? 0) > 0
       ) || classGrants.spells.some((spell) => spell.rank > 0);
     if (maxSpellRank >= 1 && !hasRankedSpell) {
@@ -4457,7 +4496,7 @@ export function computeCharacter(
       }
     }
   }
-  for (const spellId of [...draft.spells.cantrips, ...draft.spells.known]) {
+  for (const spellId of [...draft.spells.cantrips, ...sourceSpells]) {
     const spell = context.spells[spellId];
     if (!spell) continue;
     if (spell.rank > maxSpellRank) {
@@ -4469,7 +4508,7 @@ export function computeCharacter(
     }
   }
   if (caster.progression !== "none") {
-    for (const spellId of draft.spells.known) {
+    for (const spellId of sourceSpells) {
       if (!context.spells[spellId])
         issue("warning", "A selected spell is missing from the compendium.", "spells");
     }
@@ -4613,7 +4652,7 @@ export function computeCharacter(
       }
       if (
         !entry.font &&
-        !draft.spells.known.includes(entry.id) &&
+        !sourceSpells.includes(entry.id) &&
         !draft.spells.cantrips.includes(entry.id) &&
         !grantedSpellIds.has(entry.id)
       ) {
