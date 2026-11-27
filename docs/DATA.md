@@ -25,17 +25,18 @@ The generated compendium is currently tracked in Git so a fresh clone is runnabl
 - localization: `static/lang/en.json`, `re-en.json`, `action-en.json`
 
 ### Archives of Nethys reference files
-The Foundry packs do not contain a trait glossary or afflictions. Those two
-files are generated separately from the live Archives of Nethys index:
+The Foundry packs do not contain a trait glossary or afflictions. These files
+are generated separately from the live Archives of Nethys index:
 
 ```bash
 npm run ingest:aon
 ```
 
 This writes `traits.json` and `afflictions.json` and records an `aonSource`
-block in `manifest.json`. The remaining files are Foundry-sourced. Trait and
-affliction rules text is Pathfinder ORC/OGL content published by Paizo and
-indexed by Archives of Nethys; see `THIRD_PARTY_NOTICES.md`.
+block in `manifest.json`. Afflictions include diseases, curses, and poisons.
+The remaining files are Foundry-sourced. Trait and affliction rules text is
+Pathfinder ORC/OGL content published by Paizo and indexed by Archives of Nethys;
+see `THIRD_PARTY_NOTICES.md`.
 
 ## Rebuild the data
 
@@ -120,7 +121,7 @@ The script writes:
 | `familiarAbilities.json` | Familiar ability rules text |
 | `boonsAndCurses.json` | Deity boons and curses by tier |
 | `traits.json` | Trait glossary from Archives of Nethys |
-| `afflictions.json` | Diseases and curses with saves, onset, and stages from Archives of Nethys |
+| `afflictions.json` | Diseases, curses, and poisons with saves, onset, stages, and prices from Archives of Nethys |
 | `manifest.json` | Counts, generated timestamp, source, `sourceCommit`, `sourceRef`, `sourceDirty` |
 
 ## Verify the data
@@ -155,6 +156,9 @@ The verifier checks manifest counts, unique and prefixed IDs, required fields, c
 - **Background lore:** values that already end in “Lore” are not suffixed again.
 - **Monsters:** source/license come from `system.details.publication`; attacks and abilities come from embedded items. Foundry icon paths are not copied, so tokens use initials unless the GM supplies art.
 - **Deduplication:** monsters use name + level, preferring Monster Core over NPC Core; legacy/remaster duplicates remain available and default to remaster in most pickers.
+- **Creature reconciliation:** `scripts/monster-overrides.json` applies AoN-verified HP, AC, saves, Perception, size, skills, and rarity corrections. Speed and attack-list differences are left to their source representation because they often encode alternate forms or abilities.
+- **Equipment editions:** each item keeps its `remaster` flag, and the gear picker and character-sheet item browser display a Remastered or Legacy label so mixed-era prices and groups are explicit.
+- **Vehicles:** when a source vehicle has no prose description, the UI derives a statblock summary (level, size, HP, AC, hardness, speed, crew, passengers, and price).
 
 ## Licensing
 

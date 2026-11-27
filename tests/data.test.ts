@@ -20,6 +20,7 @@ import type {
   Affliction,
 } from "../src/shared/types";
 import type { DomainEntry } from "../src/shared/domains";
+import { vehicleSummary } from "../src/shared/compendium";
 
 function read<T>(file: string): T[] {
   return JSON.parse(fs.readFileSync(path.resolve("data", "compendium", file), "utf8")) as T[];
@@ -624,6 +625,7 @@ describe("compendium data", () => {
       hp: 210,
       priceGp: 6000,
     });
+    expect(vehicleSummary(byName(vehicles, "Airship"))).toContain("210 HP");
     expect(byName(familiarAbilities, "Absorb Familiar").description).toContain("mark");
     expect(byName(boonsAndCurses, "Abadar - Major Boon")).toMatchObject({
       category: "boon",
@@ -642,5 +644,15 @@ describe("compendium data", () => {
       onset: "1 day",
     });
     expect(byName(afflictions, "Bog Rot").stages.length).toBeGreaterThan(1);
+    expect(byName(afflictions, "Arsenic")).toMatchObject({
+      category: "poison",
+      level: 1,
+      priceCp: 300,
+    });
+    expect(byName(afflictions, "Arsenic").stages.length).toBeGreaterThan(1);
+    // AoN stores this poison's shared stage range outside the structured stage field.
+    expect(byName(afflictions, "Unending Itch").stages).toEqual([
+      "Stages 1–5: 1d6 poison damage (1 round)",
+    ]);
   });
 });

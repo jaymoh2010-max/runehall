@@ -2456,7 +2456,8 @@ export function CharacterSheetView({
                             <strong>{item.name}</strong>
                             <span>
                               {equipmentTypeLabel(item)} · Level {item.level} ·{" "}
-                              {formatCp(item.price.cpTotal)}
+                              {formatCp(item.price.cpTotal)} ·{" "}
+                              {item.remaster ? "Remastered" : "Legacy"}
                               {quantity > 1 ? ` · ${formatCp(costCp)} total` : ""}
                             </span>
                           </Link>

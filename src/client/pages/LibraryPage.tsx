@@ -50,6 +50,7 @@ import {
   compendiumKindFromId,
   spellTraditionLabel,
   stripHtml,
+  vehicleSummary,
   type CompendiumEntryKind,
 } from "../../shared/compendium";
 import { api, formatCp } from "../api";
@@ -205,8 +206,12 @@ function entrySubtitle(item: Entry, tab: Tab): string {
       const spell = item as Spell;
       return `${spell.rank === 0 ? "Cantrip" : `Rank ${spell.rank}`} · ${spellTraditionLabel(spell)}`;
     }
-    case "equipment":
-      return `${(item as Equipment).type} · level ${(item as Equipment).level} · ${formatCp((item as Equipment).price.cpTotal)}`;
+    case "equipment": {
+      const itemData = item as Equipment;
+      return `${itemData.type} · level ${itemData.level} · ${formatCp(itemData.price.cpTotal)} · ${
+        itemData.remaster ? "Remastered" : "Legacy"
+      }`;
+    }
     case "monster":
       return `Level ${(item as Monster).level} · ${(item as Monster).hp} HP · AC ${(item as Monster).ac}`;
     case "deity":
@@ -239,7 +244,13 @@ function entrySubtitle(item: Entry, tab: Tab): string {
       return (item as TraitEntry).group.join(", ") || (item as TraitEntry).source;
     case "affliction": {
       const affliction = item as Affliction;
-      return `${affliction.category === "disease" ? "Disease" : "Curse"} · level ${affliction.level}`;
+      const label =
+        affliction.category === "disease"
+          ? "Disease"
+          : affliction.category === "poison"
+            ? "Poison"
+            : "Curse";
+      return `${label} · level ${affliction.level}`;
     }
     default:
       return item.name;
@@ -247,6 +258,10 @@ function entrySubtitle(item: Entry, tab: Tab): string {
 }
 
 function entryDescription(item: Entry): string {
+  if (compendiumKindFromId(item.id) === "vehicle") {
+    const vehicle = item as Vehicle;
+    return stripHtml(vehicle.description || vehicleSummary(vehicle), 240);
+  }
   const description =
     "description" in item && item.description
       ? item.description

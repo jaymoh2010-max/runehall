@@ -1,7 +1,7 @@
 // ---------------------------------------------------------------------------
 // Compendium-wide vocabulary shared by the server, client, and data checks.
 // ---------------------------------------------------------------------------
-import type { Spell } from "./types";
+import { SIZES, type Spell, type Vehicle } from "./types";
 
 export type CompendiumEntryKind =
   | "ancestry"
@@ -176,6 +176,23 @@ export function truncateText(value: string, maxLength: number): string {
   const lastSpace = candidate.lastIndexOf(" ");
   const cut = lastSpace > candidate.length * 0.6 ? candidate.slice(0, lastSpace) : candidate;
   return `${cut.trimEnd()}…`;
+}
+
+/** Derived summary for vehicle entries, which have statblocks but often no prose. */
+export function vehicleSummary(vehicle: Vehicle): string {
+  const size = SIZES[vehicle.size] ?? vehicle.size;
+  return [
+    `Level ${vehicle.level} ${size} vehicle`,
+    `${vehicle.hp} HP`,
+    `AC ${vehicle.ac}`,
+    `hardness ${vehicle.hardness}`,
+    vehicle.speed ? `Speed ${vehicle.speed}` : "",
+    vehicle.crew ? `Crew ${vehicle.crew}` : "",
+    vehicle.passengers ? `Passengers ${vehicle.passengers}` : "",
+    vehicle.priceGp ? `${vehicle.priceGp.toLocaleString()} gp` : "",
+  ]
+    .filter(Boolean)
+    .join(" · ");
 }
 
 /**

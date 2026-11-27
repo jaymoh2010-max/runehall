@@ -23,7 +23,7 @@
     "familiarAbilities": 117,
     "boonsAndCurses": 240,
     "traits": 571,
-    "afflictions": 95
+    "afflictions": 215
   },
   "remasterOnlyCount": {
     "ancestries": 38,
@@ -34,11 +34,16 @@
     "monsters": 1736
   },
   "aonSource": {
-    "generatedAt": "2026-11-26T17:20:57.221Z",
+    "generatedAt": "2026-11-27T08:21:08.907Z",
     "url": "https://2e.aonprd.com",
     "counts": {
       "traits": 571,
-      "afflictions": 95
+      "afflictions": 215,
+      "afflictionKinds": {
+        "disease": 29,
+        "curse": 66,
+        "poison": 120
+      }
     }
   }
 }
