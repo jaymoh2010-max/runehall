@@ -48,6 +48,15 @@ describe("innate spell uses", () => {
     expect(innateUsesMax(spell({ description: "Use this once per hour." }))).toBe(1);
   });
 
+  it("prefers an explicit daily maximum over the spell prose", () => {
+    expect(innateUsesMax(spell(), 3)).toBe(3);
+    expect(innateUsesMax(spell({ rank: 0 }), 3)).toBeNull();
+    const draft = emptyCharacterDraft("Innate");
+    draft.spells.innateMax = { "spell:innate": 2 };
+    draft.spells.innateUsed = { "spell:innate": 1 };
+    expect(innateUsesRemaining(draft, spell())).toBe(1);
+  });
+
   it("tracks remaining uses on the character", () => {
     const draft = emptyCharacterDraft("Innate");
     draft.spells.innateUsed = { "spell:innate": 1 };
@@ -62,6 +71,7 @@ describe("innate spell uses", () => {
       innateRemaining: 1,
     });
     expect(options).toMatchObject([{ resource: "innate", remaining: 1 }]);
+    expect(options[0].label).toBe("Innate use (1 left)");
     expect(spellCastOptionAvailable(options[0])).toBe(true);
     const result = castSpell(
       draft,

@@ -9,12 +9,19 @@ const WORD_NUMBERS: Record<string, number> = {
 };
 
 /**
- * Innate cantrips are at will. Most granted spells say "once per day"; a few
- * allow two or three uses. Hourly and weekly abilities are reset on daily
+ * Innate cantrips are at will. A ranked spell uses its explicit daily maximum
+ * when the builder or a granting ability sets one; otherwise fall back to the
+ * frequency in the spell prose. Hourly and weekly abilities are reset on daily
  * preparations because the sheet does not track exploration time precisely.
  */
-export function innateUsesMax(spell: Pick<Spell, "rank" | "description">): number | null {
+export function innateUsesMax(
+  spell: Pick<Spell, "rank" | "description">,
+  explicitMax?: number | null
+): number | null {
   if (spell.rank === 0) return null;
+  if (typeof explicitMax === "number" && Number.isFinite(explicitMax)) {
+    return Math.max(1, Math.min(20, Math.round(explicitMax)));
+  }
   const text = String(spell.description || "");
   const numeric = text.match(/(\d+)\s+times?\s+per\s+(?:day|hour|week)/i);
   if (numeric) return Math.max(1, Math.min(20, Number(numeric[1])));
@@ -29,7 +36,7 @@ export function innateUsesRemaining(
   draft: Pick<CharacterDraft, "spells">,
   spell: Pick<Spell, "id" | "rank" | "description">
 ): number | null {
-  const max = innateUsesMax(spell);
+  const max = innateUsesMax(spell, draft.spells.innateMax?.[spell.id]);
   if (max === null) return null;
   const used = Math.max(0, Math.round(Number(draft.spells.innateUsed[spell.id]) || 0));
   return Math.max(0, max - used);

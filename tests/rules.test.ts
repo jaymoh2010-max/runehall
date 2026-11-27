@@ -514,11 +514,13 @@ describe("PF2e character rules", () => {
         rituals: ["spell:a", "spell:a", 7],
         innate: ["spell:b", "spell:b"],
         innateUsed: { "spell:b": 2.9, "spell:c": -1, bad: "x" },
+        innateMax: { "spell:b": 2.9, "spell:c": 0, bad: "x" },
       },
     });
     expect(draft.spells.rituals).toEqual(["spell:a"]);
     expect(draft.spells.innate).toEqual(["spell:b"]);
     expect(draft.spells.innateUsed).toEqual({ "spell:b": 2, "spell:c": 0 });
+    expect(draft.spells.innateMax).toEqual({ "spell:b": 2, "spell:c": 1 });
   });
 
   it("normalizes the daily-preparation pending flag", () => {

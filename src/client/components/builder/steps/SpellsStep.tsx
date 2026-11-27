@@ -110,6 +110,7 @@ import {
   withSourceSpellIds,
   type DivineFontChoice,
 } from "../../../../shared/rules";
+import { innateUsesMax } from "../../../../shared/innate";
 import { api, formatCp, uploadImage } from "../../../api";
 import { AnimistApparitionsCard } from "../../AnimistApparitionsCard";
 import { errorMessage } from "../../../stores";
@@ -357,8 +358,30 @@ export function SpellsStep({ draft, update, derived, context, setStep, openPicke
       if (target === "cantrips") {
         next = removePreparedCantrip(next, cantripContext, id);
       }
+      if (target === "innate") {
+        const innateUsed = { ...next.spells.innateUsed };
+        const innateMax = { ...(next.spells.innateMax ?? {}) };
+        delete innateUsed[id];
+        delete innateMax[id];
+        next = {
+          ...next,
+          spells: { ...next.spells, innateUsed, innateMax },
+        };
+      }
       return next;
     });
+
+  const setInnateMax = (spellId: string, uses: number) =>
+    update((current) => ({
+      ...current,
+      spells: {
+        ...current.spells,
+        innateMax: {
+          ...(current.spells.innateMax ?? {}),
+          [spellId]: Math.max(1, Math.min(20, Math.round(uses))),
+        },
+      },
+    }));
 
   const extraSpells = (
     <Card className="spell-section">
@@ -425,6 +448,21 @@ export function SpellsStep({ draft, update, derived, context, setStep, openPicke
                 · {spell.rank === 0 ? "cantrip" : `rank ${spell.rank}`}
               </span>
             </span>
+            {spell.rank > 0 ? (
+              <select
+                className="spell-chip-uses"
+                aria-label={`Daily uses for ${spell.name}`}
+                title="Daily uses"
+                value={String(draft.spells.innateMax[spell.id] ?? innateUsesMax(spell) ?? 1)}
+                onChange={(event) => setInnateMax(spell.id, Number(event.target.value))}
+              >
+                {[1, 2, 3, 4, 5].map((uses) => (
+                  <option key={uses} value={uses}>
+                    {uses}/day
+                  </option>
+                ))}
+              </select>
+            ) : null}
             <button
               type="button"
               className="icon-btn"

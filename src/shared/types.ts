@@ -1044,6 +1044,8 @@ export interface CharacterDraft {
     innate: string[];
     /** Innate spell uses spent today, keyed by spell id. */
     innateUsed: Record<string, number>;
+    /** Explicit daily uses for an innate spell; missing values use spell prose. */
+    innateMax: Record<string, number>;
     /** True after a long rest until a prepared caster confirms today's spells. */
     preparationsPending: boolean;
   };

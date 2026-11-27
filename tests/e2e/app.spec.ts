@@ -2007,11 +2007,17 @@ test("sheet tracks rituals and innate spells", async ({ page }) => {
   expect(full.ok()).toBe(true);
   const record = (await full.json()) as { character: { data: Record<string, unknown> } };
   const draft = structuredClone(record.character.data) as {
-    spells: { rituals: string[]; innate: string[]; innateUsed: Record<string, number> };
+    spells: {
+      rituals: string[];
+      innate: string[];
+      innateUsed: Record<string, number>;
+      innateMax: Record<string, number>;
+    };
   };
   draft.spells.rituals = ["spell:joEruBVz31Uxczzq", "spell:kqhPt9344UkcGVYO"];
-  draft.spells.innate = ["spell:gpzpAAAJ1Lza2JVl"];
+  draft.spells.innate = ["spell:gpzpAAAJ1Lza2JVl", "spell:TFitdEOpQC4SzKQQ"];
   draft.spells.innateUsed = {};
+  draft.spells.innateMax = { "spell:TFitdEOpQC4SzKQQ": 2 };
   const saved = await page.request.put(`/api/characters/${cleric!.id}`, {
     data: { data: draft, force: true },
   });
@@ -2053,6 +2059,15 @@ test("sheet tracks rituals and innate spells", async ({ page }) => {
     .filter({ hasText: "Innate" });
   await expect(innateRow).toBeVisible();
   await expect(innateRow).toContainText("Innate");
+  await expect(innateRow).toContainText("At will");
+  const runicWeaponRow = page
+    .locator(".pb-spell-row")
+    .filter({ hasText: "Runic Weapon" })
+    .filter({ hasText: "Innate" });
+  await expect(runicWeaponRow).toBeVisible();
+  await expect(runicWeaponRow).toContainText("2 left");
+  await runicWeaponRow.getByRole("button", { name: "Cast" }).click();
+  await expect(runicWeaponRow).toContainText("1 left", { timeout: 15_000 });
 });
 
 test("builder completes a level-1 Wizard using granted curriculum spells", async ({ page }) => {

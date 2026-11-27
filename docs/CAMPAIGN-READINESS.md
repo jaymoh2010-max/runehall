@@ -26,7 +26,7 @@ The rest of this document records what is verified and what remains manual, so a
 | Check | Result |
 | --- | --- |
 | `npm run check` | Typecheck, lint, formatting, unit tests, production build, and bundle budget pass |
-| Unit tests | 796 passing |
+| Unit tests | 797 passing |
 | `npm run e2e` | 40 passing browser scenarios |
 | `npm run smoke` | End-to-end smoke suite passes |
 | `npm run audit:prod` | 0 production dependency vulnerabilities |
@@ -63,7 +63,7 @@ The campaign simulation exercises two complete 1-20 campaigns per run, one XP an
 - Staged poisons, diseases, and curses with onset, intervals, virulent successes, and **maximum durations**. Round durations advance at end of turn; an eight-hour long rest advances longer durations.
 - Treat Wounds, Battle Medicine, Stabilize, immunities, Robust Health, Continual Recovery, and Evasion/Juggernaut save upgrades.
 - Item activation, consumable healing, wands, per-day uses, invested items, and daily resets.
-- Sustained spells, counteract checks, incapacitation, rituals, and innate spellcasting.
+- Sustained spells, counteract checks, incapacitation, rituals, and innate spellcasting. Innate daily uses can be set explicitly per spell, with spell prose as the fallback.
 - Monster Elite/Weak templates, statblock attacks, damage, and ability sharing from the token panel.
 
 ### Campaign play

@@ -3523,6 +3523,13 @@ export function CharacterSheetView({
                               })}
                             </select>
                           ) : null}
+                          {group === "Innate" && options[0] ? (
+                            <span className="tiny muted">
+                              {options[0].remaining === null
+                                ? "At will"
+                                : `${options[0].remaining} left`}
+                            </span>
+                          ) : null}
                           {canEdit && spell && group !== "Rituals" && available.length ? (
                             <button
                               type="button"
