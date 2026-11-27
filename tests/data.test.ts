@@ -18,6 +18,7 @@ import type {
   BoonCurse,
   TraitEntry,
   Affliction,
+  RunesmithRune,
 } from "../src/shared/types";
 import type { DomainEntry } from "../src/shared/domains";
 import { vehicleSummary } from "../src/shared/compendium";
@@ -32,6 +33,7 @@ const manifest = JSON.parse(
 const ancestries = read<Ancestry>("ancestries.json");
 const heritages = read<Heritage>("heritages.json");
 const backgrounds = read<Background>("backgrounds.json");
+const runes = read<RunesmithRune>("runes.json");
 const classes = read<ClassData>("classes.json");
 const feats = read<Feat>("feats.json");
 const spells = read<Spell>("spells.json");
@@ -63,6 +65,7 @@ describe("compendium data", () => {
       ["ancestries", ancestries],
       ["heritages", heritages],
       ["backgrounds", backgrounds],
+      ["runes", runes],
       ["classes", classes],
       ["feats", feats],
       ["spells", spells],
@@ -80,6 +83,27 @@ describe("compendium data", () => {
     for (const [key, items] of files) {
       expect(manifest.count[key], `${key} manifest count`).toBe(items.length);
       expect(new Set(items.map((item) => item.id)).size, `${key} ids`).toBe(items.length);
+    }
+  });
+
+  it("keeps the complete Runesmith rune list", () => {
+    expect(runes).toHaveLength(44);
+    expect(new Set(runes.map((rune) => rune.aonId)).size).toBe(44);
+    expect(runes.filter((rune) => rune.level === 1)).toHaveLength(16);
+    expect(runes.filter((rune) => rune.level === 5)).toHaveLength(8);
+    expect(runes.filter((rune) => rune.level === 9)).toHaveLength(12);
+    expect(runes.filter((rune) => rune.level === 13)).toHaveLength(4);
+    expect(runes.filter((rune) => rune.level === 17)).toHaveLength(4);
+    expect(runes.filter((rune) => rune.diacritic)).toHaveLength(12);
+    for (const rune of runes) {
+      expect(rune.traits).toContain("Rune");
+      expect(rune.traits).toContain("Runesmith");
+      expect(rune.usage).toBeTruthy();
+      expect(rune.description).toBeTruthy();
+      expect(rune.source).toBe("Pathfinder Impossible Magic");
+      expect(rune.license).toBe("ORC");
+      expect(rune.diacritic).toBe(rune.traits.some((trait) => trait.toLowerCase() === "diacritic"));
+      if (!rune.diacritic) expect(rune.invocation).toBeTruthy();
     }
   });
 

@@ -25,6 +25,7 @@ import type {
   ContentMode,
   DerivedCharacter,
   Heritage,
+  RunesmithRune,
 } from "../../../shared/types";
 import { ABILITY_LABELS } from "../../../shared/types";
 import { Input, PageEyebrow, RichText, Select } from "../ui";
@@ -69,6 +70,7 @@ export interface StaticData {
   heritages: Heritage[];
   backgrounds: Background[];
   classes: ClassData[];
+  runes: RunesmithRune[];
 }
 
 export const STEPS: { id: StepId; label: string; short: string; icon: ReactNode }[] = [

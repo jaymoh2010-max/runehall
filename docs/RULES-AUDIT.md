@@ -134,9 +134,9 @@ current data model or intentionally manual:
 - **Adventure-path bestiaries** (thousands of creatures) are not loaded. The
   core legacy and major expansion bestiaries now are, but the bestiary UI does
   not filter legacy creatures by campaign ruleset; all 2,384 are available.
-- **Commander tactics** and **Runesmith runes** are class content without
-  first-class pickers. The classes and feats are present; the build choices are
-  manual.
+- **Commander tactics and Runesmith runes:** both classes now have first-class
+  build pickers. Commander expert/master/legendary tactic tiers stay manual, and
+  individual rune effects remain prose rather than automated modifiers.
 - **Background grants:** 41 backgrounds have no trained skill and 78 have no
   granted/choice feat in the raw Foundry data. Runtime overrides in
   `src/shared/backgroundGrants.ts` fill the remaining prose-only skill and feat
@@ -293,7 +293,7 @@ current data model or intentionally manual:
   attack/DC; non-casters with focus or innate spells should derive their own.
 - Innate spell frequency is inferred from the spell description instead of the
   granting ability, and innate spells use the class spell attack/DC.
-- Commander tactics and Runesmith runes need pickers and repertoire tracking.
+- Commander tactic tiers and individual Runesmith rune effects remain manual.
 - Background skill/feat grants need curated overrides for the prose-only cases.
 - Add hazards, vehicles, familiar abilities, afflictions, boons/curses, and a
   trait glossary as read-only compendium types.

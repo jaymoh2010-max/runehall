@@ -12,6 +12,7 @@ import {
   searchActions,
   searchAncestries,
   searchBackgrounds,
+  searchRunes,
   searchClasses,
   searchClassFeatures,
   searchConditions,
@@ -94,6 +95,11 @@ export async function registerCompendiumRoutes(app: FastifyInstance): Promise<vo
   app.get("/api/compendium/backgrounds", async (request, reply) => {
     const query = request.query as Record<string, unknown>;
     return reply.send(searchBackgrounds(parseSearch(query)));
+  });
+
+  app.get("/api/compendium/runes", async (request, reply) => {
+    const query = request.query as Record<string, unknown>;
+    return reply.send(searchRunes(parseSearch(query)));
   });
 
   app.get("/api/compendium/classes", async (request, reply) => {
