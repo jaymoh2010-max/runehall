@@ -240,6 +240,23 @@ describe("Pathbuilder import", () => {
     expect(report.warnings.join(" ")).toContain("prepared list");
   });
 
+  it("imports a book caster's spells into the dedicated spellbook", () => {
+    const { draft } = importPathbuilder({
+      ...build,
+      class: "Wizard",
+      spellCasters: [
+        {
+          name: "Wizard",
+          magicTradition: "arcane",
+          spellcastingType: "prepared",
+          spells: [{ spellLevel: 1, list: ["Heal"] }],
+        },
+      ],
+    });
+    expect(draft.spells.spellbook).toContain(heal.id);
+    expect(draft.spells.known).toEqual([]);
+  });
+
   it("maps a Cleric font caster into prepared slots at the font rank", () => {
     const { draft } = importPathbuilder({
       ...build,

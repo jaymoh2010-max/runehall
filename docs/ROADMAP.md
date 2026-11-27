@@ -196,7 +196,7 @@ The character builder is already good enough for a core campaign at low levels. 
    - Class grants cover psychic conscious minds and psi cantrips, necromancer grave spells, summoner link spells, and cleric deity spells.
    - Cleric domains cover Domain Initiate, Expanded Domain Initiate, and repeated Advanced Domain picks, including alternate domains and rank-4 advanced focus spells. Domain Spirit and Advanced Domain Spirit grant a spirit-linked initial and advanced domain spell, and Domain Focus is documented.
    - Oracle mysteries grant their listed granted spells, and Advanced/Greater Revelation grant their focus spells; Domain Acumen and Domain Fluency remain limited to the domains associated with the chosen mystery.
-   - Prepared casters use class-specific source labels: spellbook for wizard/magus, familiar for witch, dirge for necromancer, and spell list for cleric/druid/animist; spontaneous casters keep repertoire.
+   - Prepared casters use class-specific source labels: spellbook for wizard/magus, familiar for witch, dirge for necromancer, and spell list for cleric/druid/animist; spontaneous casters keep repertoire. Book casters store their contents in a dedicated spellbook field.
    - Learn a Spell computes the rank/rarity gold cost and rank DC, deducts the gold, adds the spell to a spellbook/familiar/dirge, and marks it as a paid addition; spellbook classes show starting contents, free-pick counts, the two-free-spells-per-level budget, and a warning when free picks exceed it.
    - Fixed-tradition spellcasting dedications grant a separate dedication-cantrip list, ranked dedication spells, Basic/Expert/Master slot pools, and higher-slot heightening; sorcerer, witch, and summoner dedications ask for their tradition in the builder.
    - Sustained spells are recorded when cast, listed on the sheet, and can be ended; ritual rows open a detail card with cost, requirements, full text, structured primary and secondary checks, and a primary-check skill override, then roll the chosen skill.
@@ -209,7 +209,7 @@ The character builder is already good enough for a core campaign at low levels. 
    - Generic Magic Wands expose a Cast wand action that filters by the wand's rank and records one daily use until a long rest; fixed-spell specific wands cast directly; flexible wands open the picker at their listed rank with the special effect left manual; Cyrusian wands filter to illusions.
    - Staves expose parsed spell lists and a manual charge pool, charge in daily preparations, spend charges by spell rank, can spend a spell slot instead of charges, and empty on a long rest; plain-text lists and referenced staff lists are covered, and each staff shows its special-effect prose. Bonuses and triggered effects remain manual.
    - Verified in-browser: a wizard with four rank-1 slots showed 4/4 prepared and disabled a fifth preparation; an animist cast Sure Strike from an apparition slot while the prepared rank-1 slot stayed full; a sorcerer learned Fireball at ranks 3 and 5, downcast it from a rank-4 slot, cast it from a rank-3 scroll that was consumed, cast it from a generic rank-3 wand that showed Used today, cast Lightning Bolt directly from a specific rank-3 wand, cast Grease from a flexible rank-1 wand, and charged and cast Heal from a Staff of Healing; a psychic amped Telekinetic Projectile and spent one focus point; a sustained Flaming Sphere produced a table reminder and ended cleanly.
-   - Remaining: devotion spell variants, automated staff bonuses/triggers, and a dedicated spellbook/repertoire data split.
+   - Remaining: devotion spell variants and automated staff bonuses/triggers.
 
 7. **Companions and print (manual roster complete)**
    - Animal companions, familiars, eidolons, and summons can be recorded with name, kind, level, HP, AC, and attack notes.
@@ -377,7 +377,7 @@ Acceptance: a GM can prepare a full session in Runehall and start it with one â€
   - The sheet shows the same separation and labels.
   - Heal, Harm, and Force Barrage expose 1/2/3-action formulas and rolls, including rank-scaled 2-action healing and Force Barrage's +2 shard heightening.
   - Dual-font deities now require an explicit Heal or Harm choice, and the Wizard extra slot is restricted to curriculum spells at every rank.
-  - Remaining: split the shared known list into dedicated spellbook and repertoire fields.
+  - The shared known list is split into a dedicated spellbook field for book casters and the repertoire field for spontaneous casters.
 - [x] **Companion support (first pass)**
   - Companions can link to a bestiary entry, which prefills name, level, HP, AC, and attack notes.
   - Linked statblocks show saves, perception, attacks, and abilities in the builder and sheet.

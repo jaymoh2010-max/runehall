@@ -5,6 +5,7 @@ import {
   flattenPreparedByRank,
   flexibleBoosts,
   isPreparedCasterClass,
+  isSpellbookClass,
   ordinarySpellSlotsFor,
 } from "../shared/rules";
 import { newId } from "./util";
@@ -700,7 +701,12 @@ export function importPathbuilder(
   draft.spells.preparedCantrips = isPreparedCasterClass(classData?.name)
     ? [...spellSets.cantrips]
     : null;
-  draft.spells.known = [...spellSets.known];
+  if (isSpellbookClass(classData)) {
+    draft.spells.spellbook = [...spellSets.known];
+    draft.spells.known = [];
+  } else {
+    draft.spells.known = [...spellSets.known];
+  }
   draft.spells.preparedByRank = preparedByRank;
   draft.spells.prepared = flattenPreparedByRank(preparedByRank);
   draft.spells.focus = [...spellSets.focus];
