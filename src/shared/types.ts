@@ -979,6 +979,11 @@ export interface CharacterDraft {
   grantChoices: Record<string, string[]>;
   /** Per-feat option picks for choice-driven feats, keyed by feat id. */
   featChoices: Record<string, string[]>;
+  /** Commander tactics known in the folio and prepared for the day. */
+  commander: {
+    folio: string[];
+    prepared: string[];
+  };
   spells: {
     tradition: SpellTradition | null;
     cantrips: string[];

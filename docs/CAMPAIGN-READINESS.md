@@ -26,8 +26,8 @@ The rest of this document records what is verified and what remains manual, so a
 | Check | Result |
 | --- | --- |
 | `npm run check` | Typecheck, lint, formatting, unit tests, production build, and bundle budget pass |
-| Unit tests | 797 passing |
-| `npm run e2e` | 40 passing browser scenarios |
+| Unit tests | 800 passing |
+| `npm run e2e` | 41 passing browser scenarios |
 | `npm run smoke` | End-to-end smoke suite passes |
 | `npm run audit:prod` | 0 production dependency vulnerabilities |
 | `npm run simulate` | 2,337 characters, 145 class/level matrix builds, 578 option builds, 38 ancestries × 269 backgrounds; 0 problems |
@@ -52,6 +52,7 @@ The campaign simulation exercises two complete 1-20 campaigns per run, one XP an
 - Encumbrance: carrying more than `5 + Strength` Bulk automatically applies Encumbered (Clumsy 1 and −10 ft Speed); exceeding the hard maximum adds a validation warning.
 - Milestone or XP advancement with fast/medium/slow thresholds, hazard and accomplishment awards, catch-up, level-20 cap, and an XP ledger.
 - GM-controlled level-up with linked-token HP/AC sync and a guided level-up checklist.
+- Commander tactics: a 5-11 tactic folio, 3-6 daily preparations, builder picker, validation, and a prepared-tactics list on the sheet. Expert/master/legendary tier access stays manual because the compendium does not tag it.
 
 ### Table and combat
 

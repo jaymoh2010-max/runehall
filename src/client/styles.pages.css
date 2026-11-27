@@ -908,6 +908,13 @@
   padding: 6px 8px;
   font-size: 0.82rem;
 }
+.spell-chip.is-prepared {
+  border-color: rgba(214, 178, 95, 0.55);
+  background: rgba(214, 178, 95, 0.08);
+}
+.commander-tactics {
+  margin-bottom: 14px;
+}
 .spell-chip-uses {
   height: 24px;
   padding: 0 4px;

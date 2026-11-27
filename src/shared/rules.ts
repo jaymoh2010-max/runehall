@@ -57,6 +57,7 @@ import {
   mergeEffects,
   selectedFeatGrantInstances,
 } from "./effects";
+import { COMMANDER_TACTICS_BY_ID, commanderFolioLimit, commanderPreparedLimit } from "./commander";
 import {
   featAllowedByHeritageGrant,
   heritageChosenFeatId,
@@ -1706,6 +1707,10 @@ export function emptyCharacterDraft(name = "New Hero"): CharacterDraft {
     classChoices: {},
     grantChoices: {},
     featChoices: {},
+    commander: {
+      folio: [],
+      prepared: [],
+    },
     spells: {
       tradition: null,
       cantrips: [],
@@ -1868,6 +1873,16 @@ export function normalizeCharacterDraft(input: unknown, fallbackName = "New Hero
   const featChoices: Record<string, string[]> = {};
   for (const [key, value] of Object.entries(featChoicesRaw))
     featChoices[key] = arr<string>(value).filter((x) => typeof x === "string");
+  const commanderRaw = obj(raw.commander);
+  const commander = {
+    folio: [...new Set(arr<string>(commanderRaw.folio).filter((x) => typeof x === "string"))].slice(
+      0,
+      20
+    ),
+    prepared: [
+      ...new Set(arr<string>(commanderRaw.prepared).filter((x) => typeof x === "string")),
+    ].slice(0, 10),
+  };
 
   type NormalizedEquipment = {
     itemId: string;
@@ -1985,6 +2000,7 @@ export function normalizeCharacterDraft(input: unknown, fallbackName = "New Hero
     classChoices,
     grantChoices,
     featChoices,
+    commander,
     spells: {
       tradition: TRADITIONS.includes(spells.tradition as SpellTradition)
         ? (spells.tradition as SpellTradition)
@@ -3565,6 +3581,30 @@ export function computeCharacter(
     issue("error", "Choose your key ability score.", "abilities");
   if (classData && keyOptions.length === 0 && !key)
     issue("warning", "This class needs a key ability score; select one manually.", "abilities");
+  if (classData?.name.toLowerCase() === "commander") {
+    const folioLimit = commanderFolioLimit(draft.level);
+    const preparedLimit = commanderPreparedLimit(draft.level);
+    if (draft.commander.folio.length > folioLimit) {
+      issue(
+        "error",
+        `Commander: the folio holds ${draft.commander.folio.length} tactics but only ${folioLimit} fit at this level.`,
+        "feats"
+      );
+    }
+    if (draft.commander.prepared.length > preparedLimit) {
+      issue(
+        "error",
+        `Commander: ${draft.commander.prepared.length} tactics are prepared but only ${preparedLimit} can be prepared.`,
+        "feats"
+      );
+    }
+    if (draft.commander.prepared.some((id) => !draft.commander.folio.includes(id))) {
+      issue("warning", "Commander: a prepared tactic is not in the folio.", "feats");
+    }
+    if (draft.commander.folio.some((id) => !COMMANDER_TACTICS_BY_ID.has(id))) {
+      issue("warning", "Commander: the folio contains an unknown tactic.", "feats");
+    }
+  }
 
   const heritage = context.heritage ?? null;
   if (ancestry && heritage) {

@@ -81,6 +81,12 @@ import {
   traitLabel,
   weaponDamageLabel,
 } from "../../../../shared/rules";
+import {
+  COMMANDER_TACTICS,
+  COMMANDER_TACTICS_BY_ID,
+  commanderFolioLimit,
+  commanderPreparedLimit,
+} from "../../../../shared/commander";
 import { api, formatCp, uploadImage } from "../../../api";
 import { errorMessage } from "../../../stores";
 import { useToasts } from "../../../stores";
@@ -146,6 +152,56 @@ export function FeatsStep({
   const slots = featSlotsFor(classData, draft.level, Boolean(context.freeArchetype));
   const ancestryTrait = heritageFeatTraits(context.heritage, ancestry).join(",");
   const classTrait = classData?.name.toLowerCase();
+  const commanderFolioLimitForLevel = commanderFolioLimit(draft.level);
+  const commanderPreparedLimitForLevel = commanderPreparedLimit(draft.level);
+  const addTactic = (tacticId: string) =>
+    update((current) => {
+      const limit = commanderFolioLimit(current.level);
+      if (
+        !tacticId ||
+        current.commander.folio.includes(tacticId) ||
+        current.commander.folio.length >= limit
+      ) {
+        return current;
+      }
+      return {
+        ...current,
+        commander: {
+          ...current.commander,
+          folio: [...current.commander.folio, tacticId],
+        },
+      };
+    });
+  const removeTactic = (tacticId: string) =>
+    update((current) => ({
+      ...current,
+      commander: {
+        folio: current.commander.folio.filter((id) => id !== tacticId),
+        prepared: current.commander.prepared.filter((id) => id !== tacticId),
+      },
+    }));
+  const togglePreparedTactic = (tacticId: string) =>
+    update((current) => {
+      if (current.commander.prepared.includes(tacticId)) {
+        return {
+          ...current,
+          commander: {
+            ...current.commander,
+            prepared: current.commander.prepared.filter((id) => id !== tacticId),
+          },
+        };
+      }
+      if (current.commander.prepared.length >= commanderPreparedLimit(current.level)) {
+        return current;
+      }
+      return {
+        ...current,
+        commander: {
+          ...current.commander,
+          prepared: [...current.commander.prepared, tacticId],
+        },
+      };
+    });
   const issues = derived.validation.filter((issue) => issue.step === "feats");
   const selectedFeatList = [
     ...Object.values(draft.feats.ancestry),
@@ -435,6 +491,86 @@ export function FeatsStep({
               </Select>
             </Field>
           ) : null}
+        </Card>
+      ) : null}
+      {classTrait === "commander" ? (
+        <Card className="commander-tactics">
+          <div className="row-between">
+            <div>
+              <h3>Tactics</h3>
+              <p className="muted small">
+                Choose your folio, then prepare up to {commanderPreparedLimitForLevel} tactics for
+                the day. Drill for 10 minutes to swap them.
+              </p>
+            </div>
+            <Tag tone="gold">
+              {draft.commander.folio.length}/{commanderFolioLimitForLevel} folio
+            </Tag>
+          </div>
+          <div className="prepared-adder">
+            <Select
+              aria-label="Add tactic to folio"
+              value=""
+              disabled={draft.commander.folio.length >= commanderFolioLimitForLevel}
+              onChange={(event) => addTactic(event.target.value)}
+            >
+              <option value="">Add a tactic…</option>
+              {COMMANDER_TACTICS.filter((tactic) => !draft.commander.folio.includes(tactic.id)).map(
+                (tactic) => (
+                  <option key={tactic.id} value={tactic.id}>
+                    {tactic.name}
+                  </option>
+                )
+              )}
+            </Select>
+            <Tag
+              tone={
+                draft.commander.prepared.length >= commanderPreparedLimitForLevel ? "gold" : "blue"
+              }
+            >
+              {draft.commander.prepared.length}/{commanderPreparedLimitForLevel} prepared
+            </Tag>
+          </div>
+          <div className="spell-chip-grid">
+            {draft.commander.folio.map((tacticId) => {
+              const tactic = COMMANDER_TACTICS_BY_ID.get(tacticId);
+              if (!tactic) return null;
+              const prepared = draft.commander.prepared.includes(tacticId);
+              return (
+                <div key={tacticId} className={prepared ? "spell-chip is-prepared" : "spell-chip"}>
+                  <span>
+                    <strong>{tactic.name}</strong>
+                    <span className="tiny muted"> {prepared ? "Prepared" : "Folio"}</span>
+                  </span>
+                  <button
+                    type="button"
+                    className={prepared ? "pb-small-button is-primary" : "pb-small-button"}
+                    disabled={
+                      !prepared && draft.commander.prepared.length >= commanderPreparedLimitForLevel
+                    }
+                    onClick={() => togglePreparedTactic(tacticId)}
+                  >
+                    {prepared ? "Prepared" : "Prepare"}
+                  </button>
+                  <button
+                    type="button"
+                    className="icon-btn"
+                    aria-label={`Remove ${tactic.name} from folio`}
+                    onClick={() => removeTactic(tacticId)}
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+          {!draft.commander.folio.length ? (
+            <p className="muted small">No tactics in the folio yet.</p>
+          ) : null}
+          <p className="tiny muted">
+            Expert, master, and legendary tactic tiers remain manual because the compendium does not
+            tag them.
+          </p>
         </Card>
       ) : null}
       <div className="feat-slots">

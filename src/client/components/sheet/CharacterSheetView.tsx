@@ -89,6 +89,7 @@ import {
   type CastAreaRequest,
 } from "../../../shared/templates";
 import { innateUsesRemaining } from "../../../shared/innate";
+import { COMMANDER_TACTICS_BY_ID, commanderPreparedLimit } from "../../../shared/commander";
 import { psiAmpFor } from "../../../shared/psiAmps";
 import { ritualPrimaryCheckInfo, ritualPrimarySkillNames } from "../../../shared/ritual";
 import {
@@ -385,6 +386,7 @@ export function CharacterSheetView({
   const [context, setContext] = useState<CharacterContext | null>(null);
   const [derived, setDerived] = useState<DerivedCharacter | null>(null);
   const classData = context?.classData ?? null;
+  const isCommander = classData?.name.toLowerCase() === "commander";
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -3627,6 +3629,40 @@ export function CharacterSheetView({
 
             {tab === "actions" ? (
               <div className="pb-stack">
+                {isCommander ? (
+                  <div className="pb-subsection">
+                    <div className="pb-status-head">
+                      <h3>Prepared tactics</h3>
+                      <span>
+                        {draft.commander.prepared.length}/{commanderPreparedLimit(draft.level)}
+                      </span>
+                    </div>
+                    {draft.commander.prepared.length ? (
+                      <div className="chip-row">
+                        {draft.commander.prepared.map((tacticId) => {
+                          const tactic = COMMANDER_TACTICS_BY_ID.get(tacticId);
+                          if (!tactic) return null;
+                          return (
+                            <Link
+                              key={tacticId}
+                              className="pb-small-button"
+                              to={`/library/action/${tacticId}`}
+                            >
+                              {tactic.name}
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <p className="pb-empty">No tactics prepared.</p>
+                    )}
+                    <p className="pb-hint">
+                      Up to {commanderPreparedLimit(draft.level)} tactics can be prepared at this
+                      level. Drill for 10 minutes to swap the prepared list; limited-use tactics
+                      still track their own daily use.
+                    </p>
+                  </div>
+                ) : null}
                 <div className="pb-action-search">
                   <div className="pb-search-row">
                     <Search size={14} />
