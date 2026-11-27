@@ -291,6 +291,7 @@ export function ChatPanel({
           value={text}
           onChange={(event) => setText(event.target.value)}
           placeholder={tab === "dice" ? "Send a message to the table…" : "Message the table…"}
+          aria-label={tab === "dice" ? "Dice log message" : "Table message"}
           rows={2}
           onKeyDown={(event) => {
             if (event.key === "Enter" && !event.shiftKey) {

@@ -293,6 +293,7 @@ export function GearStep({
                 <div className="qty-control">
                   <button
                     type="button"
+                    aria-label={`Decrease ${item.name} quantity`}
                     onClick={() =>
                       update((current) => ({
                         ...current,
@@ -309,6 +310,7 @@ export function GearStep({
                   <span>{entry.quantity}</span>
                   <button
                     type="button"
+                    aria-label={`Increase ${item.name} quantity`}
                     onClick={() =>
                       update((current) => ({
                         ...current,

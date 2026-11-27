@@ -381,6 +381,7 @@ export function CharacterSheetView({
   const navigate = useNavigate();
   const [character, setCharacter] = useState<CharacterRecord | null>(null);
   const [draft, setDraft] = useState<CharacterDraft | null>(null);
+  const sheetRef = useRef<HTMLDivElement | null>(null);
   const [context, setContext] = useState<CharacterContext | null>(null);
   const [derived, setDerived] = useState<DerivedCharacter | null>(null);
   const classData = context?.classData ?? null;
@@ -513,6 +514,54 @@ export function CharacterSheetView({
     window.addEventListener("keydown", onKeyDown, true);
     return () => window.removeEventListener("keydown", onKeyDown, true);
   }, [mode, onClose, requestClose]);
+
+  useEffect(() => {
+    if (mode !== "overlay") return;
+    const container = sheetRef.current;
+    if (!container) return;
+    const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const frame = window.requestAnimationFrame(() => {
+      if (!container.contains(document.activeElement)) container.focus();
+    });
+    const selector = [
+      "a[href]",
+      "button:not([disabled])",
+      "textarea:not([disabled])",
+      "input:not([disabled])",
+      "select:not([disabled])",
+      "[tabindex]:not([tabindex='-1'])",
+    ].join(",");
+    const focusable = () =>
+      Array.from(container.querySelectorAll<HTMLElement>(selector)).filter(
+        (element) => element.getClientRects().length > 0
+      );
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Tab" || event.defaultPrevented) return;
+      if (document.querySelector(".modal-backdrop")) return;
+      const items = focusable();
+      if (!items.length) {
+        event.preventDefault();
+        container.focus();
+        return;
+      }
+      const first = items[0];
+      const last = items[items.length - 1];
+      const active = document.activeElement;
+      if (event.shiftKey && (active === first || active === container)) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && active === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      document.removeEventListener("keydown", onKeyDown);
+      if (previous && document.contains(previous)) previous.focus();
+    };
+  }, [mode]);
 
   const applyRecord = useCallback(async (record: CharacterRecord) => {
     const normalized = normalizeCharacterDraft(record.data, record.name);
@@ -1884,6 +1933,8 @@ export function CharacterSheetView({
 
   return (
     <div
+      ref={sheetRef}
+      tabIndex={mode === "overlay" ? -1 : undefined}
       className={mode === "overlay" ? "pb-sheet-overlay" : "pb-sheet-page"}
       role={mode === "overlay" ? "dialog" : undefined}
       aria-modal={mode === "overlay" ? true : undefined}
@@ -3071,6 +3122,7 @@ export function CharacterSheetView({
                     {derived.spellAttack !== null ? (
                       <button
                         type="button"
+                        aria-label="Roll spell attack"
                         onClick={() =>
                           postRoll(`1d20${signed(derived.spellAttack ?? 0)}`, "Spell attack")
                         }

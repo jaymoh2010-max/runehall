@@ -706,6 +706,7 @@ export function AdminPage() {
                   value={auditFilter}
                   onChange={(event) => setAuditFilter(event.target.value)}
                   placeholder="Filter action, e.g. auth.login"
+                  aria-label="Filter audit actions"
                 />
                 <Button type="submit" size="sm">
                   Filter
