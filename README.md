@@ -171,7 +171,7 @@ npm run verify:data  # compendium and SQLite integrity
 | `npm run reset-password -- --username <name>` | Issue a temporary password |
 | `npm run cleanup-assets` | Scan for unused uploaded files |
 
-Environment variables: `PORT`, `HOST`, `COOKIE_SECURE`, `NODE_ENV`, `ENABLE_CSP`, `ENFORCE_ORIGIN`, `TRUST_PROXY_HOPS`, `REGISTRATION_MODE` (`open`, `invite`, or `closed`), `BOOTSTRAP_TOKEN`, `AUTH_RATE_LIMIT_MAX`, `AUTH_RATE_LIMIT_WINDOW_MS`, `UPLOAD_RATE_LIMIT_MAX`, `UPLOAD_RATE_LIMIT_WINDOW_MS`, `TRUSTED_ORIGINS`, `DATA_DIR`, `DATABASE_PATH`, `COMPENDIUM_DIR`, `BACKUP_DIR`, `LOG_LEVEL`.
+Environment variables: `PORT`, `HOST`, `COOKIE_SECURE`, `NODE_ENV`, `ENABLE_CSP`, `ENFORCE_ORIGIN`, `TRUST_PROXY_HOPS`, `REGISTRATION_MODE` (`open`, `invite`, or `closed`), `BOOTSTRAP_TOKEN`, `AUTH_RATE_LIMIT_MAX`, `AUTH_RATE_LIMIT_WINDOW_MS`, `UPLOAD_RATE_LIMIT_MAX`, `UPLOAD_RATE_LIMIT_WINDOW_MS`, `UPLOAD_CAMPAIGN_QUOTA_MB`, `UPLOAD_USER_QUOTA_MB`, `UPLOAD_MIN_FREE_MB`, `TRUSTED_ORIGINS`, `DATA_DIR`, `DATABASE_PATH`, `COMPENDIUM_DIR`, `BACKUP_DIR`, `LOG_LEVEL`.
 
 ---
 

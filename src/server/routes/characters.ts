@@ -18,6 +18,7 @@ import {
   pendingJoinRequest,
 } from "../access";
 import {
+  itemAllowedByContent,
   normalizeCampaignRuleset,
   rulesetContentMode,
   rulesetIncludesLegacy,
@@ -904,6 +905,14 @@ export async function registerCharacterRoutes(app: FastifyInstance): Promise<voi
     }
 
     const draft = parseDraft(parseJson(row.data, {}), row.name);
+    const ruleset = campaign ? normalizeCampaignRuleset(campaign.ruleset) : null;
+    const contentMode = ruleset ? rulesetContentMode(ruleset) : draft.contentMode;
+    const includeLegacy = ruleset ? rulesetIncludesLegacy(ruleset) : draft.includeLegacy;
+    if (!itemAllowedByContent(item, contentMode, includeLegacy)) {
+      return reply
+        .code(400)
+        .send({ error: "That item is not available under this campaign's ruleset." });
+    }
     const costCp = Math.max(0, Math.round(item.price.cpTotal)) * quantity;
     if (mode === "buy") {
       const currency = spendCurrency(draft.currency, costCp);

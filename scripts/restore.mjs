@@ -14,7 +14,7 @@ import fs from "node:fs";
 import net from "node:net";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import { readManifest, verifyBackupManifest } from "./backup-lib.mjs";
+import { missingReferencedUploads, readManifest, verifyBackupManifest } from "./backup-lib.mjs";
 
 const args = process.argv.slice(2);
 const fromIndex = args.indexOf("--from");
@@ -126,6 +126,25 @@ try {
   verifyDatabase(backupDb);
 } catch (error) {
   console.error(`Backup database check failed: ${error instanceof Error ? error.message : error}`);
+  console.error("Nothing was changed.");
+  process.exit(1);
+}
+
+try {
+  const missing = missingReferencedUploads(backupDb, backupUploads);
+  if (missing.length) {
+    console.error(
+      `Backup is incomplete: ${missing.length} referenced upload(s) are missing: ${missing
+        .slice(0, 8)
+        .join(", ")}${missing.length > 8 ? ", …" : ""}`
+    );
+    console.error("Nothing was changed.");
+    process.exit(1);
+  }
+} catch (error) {
+  console.error(
+    `Backup upload check failed: ${error instanceof Error ? error.message : String(error)}`
+  );
   console.error("Nothing was changed.");
   process.exit(1);
 }

@@ -2,6 +2,7 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import { DatabaseSync } from "node:sqlite";
 
 export function sha256File(filename) {
   const hash = crypto.createHash("sha256");
@@ -73,6 +74,37 @@ export function verifyBackupManifest(root, manifest) {
     checked += 1;
   }
   return { ok: errors.length === 0, legacy: false, checked, errors };
+}
+
+/**
+ * Every /uploads/... filename referenced by the database. Backups and restores
+ * use this to prove the file copy actually covers the rows they restore.
+ */
+export function referencedUploads(databaseFile) {
+  const database = new DatabaseSync(databaseFile, { readOnly: true });
+  const referenced = new Set();
+  try {
+    const tables = database
+      .prepare("SELECT name FROM sqlite_master WHERE type = 'table'")
+      .all()
+      .map((row) => String(Object.values(row)[0]));
+    for (const table of tables) {
+      for (const row of database.prepare(`SELECT * FROM "${table}"`).all()) {
+        for (const match of JSON.stringify(row).matchAll(/\/uploads\/([A-Za-z0-9._-]+)/g)) {
+          referenced.add(match[1]);
+        }
+      }
+    }
+  } finally {
+    database.close();
+  }
+  return referenced;
+}
+
+export function missingReferencedUploads(databaseFile, uploadsDir) {
+  return [...referencedUploads(databaseFile)].filter(
+    (filename) => !fs.existsSync(path.join(uploadsDir, filename))
+  );
 }
 
 export function newestBackup(directory) {

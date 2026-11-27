@@ -142,6 +142,19 @@ function requireGm(socket: TypedSocket, campaignId: string): boolean {
  */
 const socketEventBuckets = new WeakMap<object, { count: number; resetAt: number }>();
 
+function socketSessionActive(socket: TypedSocket): boolean {
+  if (!socket.data.sessionHash) return false;
+  const row = db
+    .prepare(
+      `SELECT 1 AS active FROM sessions s
+       JOIN users u ON u.id = s.user_id
+       WHERE s.token_hash = ? AND s.user_id = ? AND s.expires_at > ?
+         AND u.disabled_at IS NULL`
+    )
+    .get(socket.data.sessionHash, socket.data.user.id, now()) as { active: number } | undefined;
+  return Boolean(row?.active);
+}
+
 function onSocket<E extends keyof ClientToServerEvents>(
   socket: TypedSocket,
   event: E,
@@ -587,6 +600,19 @@ export function registerSocketServer(io: TypedServer): void {
       event: E,
       handler: ClientToServerEvents[E]
     ): void => onSocket(socket, event, handler);
+
+    // CLI password resets and natural session expiry must eventually close
+    // already-open sockets, not just future handshakes.
+    const sessionTimer = setInterval(() => {
+      try {
+        if (socketSessionActive(socket)) return;
+      } catch {
+        return;
+      }
+      sendError(socket, "Your session expired. Sign in again.");
+      socket.disconnect(true);
+    }, 30_000);
+    socket.on("disconnect", () => clearInterval(sessionTimer));
 
     on("campaign:join", ({ campaignId }, ack) => {
       const role = getCampaignRole(campaignId, socket.data.user.id);

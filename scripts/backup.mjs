@@ -92,18 +92,20 @@ try {
     (filename) => !fs.existsSync(path.join(stagedUploads, filename))
   );
   if (missing.length) {
-    console.warn(
-      `WARNING: ${missing.length} referenced upload(s) are missing from this backup: ${missing
+    console.error(
+      `Backup failed: ${missing.length} referenced upload(s) are missing: ${missing
         .slice(0, 8)
         .join(", ")}${missing.length > 8 ? ", …" : ""}`
     );
+    process.exit(1);
   }
 } catch (error) {
-  console.warn(
-    `WARNING: could not verify backup upload references: ${
+  console.error(
+    `Backup failed: could not verify upload references: ${
       error instanceof Error ? error.message : String(error)
     }`
   );
+  process.exit(1);
 }
 
 // The compendium is required for the server to start and for the builder to

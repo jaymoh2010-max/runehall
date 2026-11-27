@@ -800,6 +800,7 @@ function buildDraftFrom(
   draft.includeLegacy = true;
   draft.level = level;
   draft.ancestryId = ancestry.id;
+  draft.ancestrySize = ancestry.sizeChoices?.[0] ?? null;
   draft.heritageId = heritage?.id ?? null;
   draft.backgroundId = background.id;
   draft.classId = classData.id;

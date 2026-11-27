@@ -1,11 +1,14 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { DatabaseSync } from "node:sqlite";
 import { afterEach, describe, expect, it } from "vitest";
 // @ts-expect-error JavaScript helper used by the CLI scripts.
 import {
   manifestDigest,
+  missingReferencedUploads,
   readManifest,
+  referencedUploads,
   sha256File,
   verifyBackupManifest,
 } from "../scripts/backup-lib.mjs";
@@ -103,5 +106,24 @@ describe("backup manifests", () => {
     expect(readManifest(directory)).toBeNull();
     fs.writeFileSync(path.join(directory, "backup.json"), "{not json");
     expect(readManifest(directory)).toBeNull();
+  });
+});
+
+describe("backup upload references", () => {
+  it("finds database-referenced uploads and reports missing files", () => {
+    const directory = temporaryDirectory();
+    const databaseFile = path.join(directory, "runehall.db");
+    const uploads = path.join(directory, "uploads");
+    fs.mkdirSync(uploads, { recursive: true });
+    fs.writeFileSync(path.join(uploads, "kept.png"), "image");
+    const database = new DatabaseSync(databaseFile);
+    database.exec("CREATE TABLE scenes (image_url TEXT, props TEXT);");
+    database
+      .prepare("INSERT INTO scenes (image_url, props) VALUES (?, ?)")
+      .run("/uploads/kept.png", JSON.stringify({ image: "/uploads/missing.png" }));
+    database.close();
+
+    expect([...referencedUploads(databaseFile)].sort()).toEqual(["kept.png", "missing.png"]);
+    expect(missingReferencedUploads(databaseFile, uploads)).toEqual(["missing.png"]);
   });
 });

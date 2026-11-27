@@ -605,6 +605,8 @@ export function CharacterSheetView({
         const params = new URLSearchParams();
         params.set("q", itemQuery);
         params.set("limit", String(itemLimit));
+        if ((draft?.contentMode ?? "core") !== "expanded") params.set("core", "1");
+        params.set("legacy", draft?.includeLegacy ? "1" : "0");
         const category = ITEM_CATEGORIES.find((entry) => entry.id === itemCategory);
         if (category?.type) params.set("type", category.type);
         if (category?.runeOnly) params.set("runeOnly", "1");
@@ -633,7 +635,17 @@ export function CharacterSheetView({
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [itemCategory, itemLevelFilter, itemLimit, itemMagicOnly, itemQuery, itemSubcategory, tab]);
+  }, [
+    draft?.contentMode,
+    draft?.includeLegacy,
+    itemCategory,
+    itemLevelFilter,
+    itemLimit,
+    itemMagicOnly,
+    itemQuery,
+    itemSubcategory,
+    tab,
+  ]);
 
   const inventoryGroups = useMemo(() => {
     if (!draft || !context) return [];
