@@ -71,7 +71,9 @@ function markdownToHtml(value) {
     allowedAttributes: {},
     disallowedTagsMode: "discard",
   })
+    .replace(/<p>\s*(?:---|—)\s*<\/p>/g, "")
     .replace(/<p>\s*<\/p>/g, "")
+    .replace(/<hr\s*\/?>/g, "")
     .trim();
 }
 
@@ -92,6 +94,18 @@ function cleanText(value) {
     .replace(/<\/?[^>]+>/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+/** AoN occasionally leaves `stage` empty for poisons whose stages share one effect. */
+function stagesFromMarkdown(markdown) {
+  const text = stripSource(markdown);
+  return [...text.matchAll(/\*\*(Stages?)\s*([0-9][0-9–—\-, ]*)?\*\*\s*([^*\n]+)/gi)]
+    .map(([, label, range, effect]) => {
+      const cleaned = cleanText(effect).replace(/[;\s]+$/, "");
+      if (!cleaned) return "";
+      return range ? `${label} ${range.trim()}: ${cleaned}` : cleaned;
+    })
+    .filter(Boolean);
 }
 
 async function fetchCategory(category) {
@@ -134,6 +148,39 @@ const rawTraits = await fetchCategory("trait");
 const rawDiseases = await fetchCategory("disease");
 const rawCurses = await fetchCategory("curse");
 
+async function fetchPoisons() {
+  const all = [];
+  const size = 1000;
+  for (let from = 0; ; from += size) {
+    const res = await fetch(API, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        size,
+        from,
+        _source: { excludes: ["text", "search_markdown"] },
+        sort: [{ "id.keyword": { order: "asc", unmapped_type: "keyword" } }],
+        query: {
+          bool: {
+            must: [
+              { term: { category: "equipment" } },
+              { match_phrase: { item_subcategory: "Poisons" } },
+            ],
+          },
+        },
+      }),
+    });
+    if (!res.ok) throw new Error(`poisons: HTTP ${res.status} ${await res.text()}`);
+    const json = await res.json();
+    const hits = json.hits.hits.map((hit) => hit._source);
+    all.push(...hits);
+    if (hits.length < size) break;
+  }
+  return all;
+}
+
+const rawPoisons = await fetchPoisons();
+
 const traitsByName = new Map();
 for (const entry of rawTraits) {
   const key = traitKey(entry);
@@ -144,6 +191,11 @@ for (const entry of rawTraits) {
 const afflictionsByKey = new Map();
 for (const entry of [...rawDiseases, ...rawCurses]) {
   const key = afflictionKey(entry);
+  const current = afflictionsByKey.get(key);
+  if (!current || newestFirst(entry, current) < 0) afflictionsByKey.set(key, entry);
+}
+for (const entry of rawPoisons) {
+  const key = `poison:${entry.name.trim().toLowerCase()}`;
   const current = afflictionsByKey.get(key);
   if (!current || newestFirst(entry, current) < 0) afflictionsByKey.set(key, entry);
 }
@@ -166,8 +218,9 @@ const traits = [...traitsByName.values()]
 
 const afflictions = [...afflictionsByKey.values()]
   .map((entry) => {
-    const category = entry.category === "curse" ? "curse" : "disease";
-    const description = stripSource(entry.markdown);
+    const category =
+      entry.category === "curse" ? "curse" : entry.category === "equipment" ? "poison" : "disease";
+    const description = stripSource(entry.markdown).split(/\*\*Saving Throw\*\*/i)[0] ?? "";
     const savingThrow = cleanText(entry.saving_throw);
     return {
       id: `aff:${entry.id}`,
@@ -180,8 +233,13 @@ const afflictions = [...afflictionsByKey.values()]
       description: markdownToHtml(description),
       savingThrow: /DC\s*-1\b/i.test(savingThrow) ? "" : savingThrow,
       onset: cleanText(entry.onset_raw),
-      stages: Array.isArray(entry.stage) ? entry.stage.map(cleanText) : [],
+      stages:
+        Array.isArray(entry.stage) && entry.stage.length
+          ? entry.stage.map(cleanText)
+          : stagesFromMarkdown(entry.markdown),
       usage: cleanText(entry.usage),
+      duration: cleanText(entry.duration_raw),
+      priceCp: entry.category === "equipment" ? Number(entry.price) || undefined : undefined,
       source: entry.primary_source ?? "Unknown",
       license: "ORC",
       remaster: true,
@@ -205,7 +263,15 @@ manifest.count.afflictions = afflictions.length;
 manifest.aonSource = {
   generatedAt: new Date().toISOString(),
   url: "https://2e.aonprd.com",
-  counts: { traits: traits.length, afflictions: afflictions.length },
+  counts: {
+    traits: traits.length,
+    afflictions: afflictions.length,
+    afflictionKinds: {
+      disease: afflictions.filter((entry) => entry.category === "disease").length,
+      curse: afflictions.filter((entry) => entry.category === "curse").length,
+      poison: afflictions.filter((entry) => entry.category === "poison").length,
+    },
+  },
 };
 fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
 console.log(`Updated ${manifestPath}`);

@@ -350,6 +350,7 @@ test("GM creates a campaign and builds a character through the lazy routes", asy
   await expect(backpackRow).toBeVisible({
     timeout: 15_000,
   });
+  await expect(backpackRow).toContainText(/Remastered|Legacy/);
   await backpackRow.getByRole("link").click();
   const itemPreview = page.getByRole("dialog", { name: "Item" });
   await expect(itemPreview).toBeVisible();
@@ -533,6 +534,8 @@ test("lazy library, compendium entry, rules, and account routes load", async ({ 
     .click();
   await expect(page.getByRole("heading", { name: "Airship", level: 2 })).toBeVisible();
   await expect(page.getByText("210", { exact: true })).toBeVisible();
+  // Vehicles without source prose show a derived statblock summary instead.
+  await expect(page.getByText(/Level 12 Gargantuan vehicle/)).toBeVisible();
 
   await page.getByRole("tab", { name: "Familiars" }).click();
   await page.getByPlaceholder(/Search familiars/).fill("Absorb Familiar");
@@ -568,6 +571,16 @@ test("lazy library, compendium entry, rules, and account routes load", async ({ 
     .click();
   await expect(page.getByRole("heading", { name: "Bog Rot", level: 2 })).toBeVisible();
   await expect(page.getByText("DC 13 Fortitude")).toBeVisible();
+
+  await page.getByPlaceholder(/Search afflictions/).fill("Arsenic");
+  await page
+    .getByRole("button", { name: /Arsenic/ })
+    .first()
+    .click();
+  await expect(page.getByRole("heading", { name: "Arsenic", level: 2 })).toBeVisible();
+  await expect(page.locator(".spell-meta-grid strong").filter({ hasText: "Poison" })).toBeVisible();
+  await expect(page.getByText("DC 18 Fortitude")).toBeVisible();
+  await expect(page.getByText("3 gp", { exact: true })).toBeVisible();
 
   await page.goto("/rules");
   await expect(page.getByRole("heading", { name: "Rules at the table" })).toBeVisible();

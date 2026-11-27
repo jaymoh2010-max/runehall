@@ -1,0 +1,302 @@
+{
+  "Aapoph Serpentfolk": {
+    "rarity": "common"
+  },
+  "Abrikandilu": {
+    "fortitude": 14
+  },
+  "Air Scamp": {
+    "fortitude": 2
+  },
+  "Amphisbaena": {
+    "fortitude": 11,
+    "perception": 11
+  },
+  "Anadi Hunter": {
+    "ac": 17,
+    "fortitude": 4
+  },
+  "Anadi Sage": {
+    "ac": 20
+  },
+  "Animate Dream": {
+    "perception": 16,
+    "skills": {
+      "acrobatics": {
+        "base": 16
+      }
+    }
+  },
+  "Animated Kite": {
+    "hp": 15
+  },
+  "Arboreal Archive": {
+    "size": "lg"
+  },
+  "Arboreal Reaper": {
+    "ac": 24
+  },
+  "Azuretzi": {
+    "hp": 65
+  },
+  "Baomal": {
+    "skills": {
+      "athletics": {
+        "base": 34
+      }
+    }
+  },
+  "Beetle Carapace": {
+    "size": "med"
+  },
+  "Berberoka": {
+    "skills": {
+      "athletics": {
+        "base": 27
+      }
+    }
+  },
+  "Bison": {
+    "skills": {
+      "athletics": {
+        "base": 12
+      }
+    }
+  },
+  "Bone Prophet": {
+    "rarity": "common"
+  },
+  "Bul-Gae": {
+    "rarity": "common"
+  },
+  "Centaur Herbalist": {
+    "hp": 36,
+    "will": 10
+  },
+  "Charau-ka Acolyte of Angazhan": {
+    "perception": 8
+  },
+  "Charau-ka Warrior": {
+    "ac": 16
+  },
+  "Coil Spy": {
+    "rarity": "common"
+  },
+  "Conspirator Archdragon": {
+    "size": "grg"
+  },
+  "Deific Vessel of Urgathoa": {
+    "rarity": "common"
+  },
+  "Dero Stalker": {
+    "ac": 18
+  },
+  "Dig-Widget": {
+    "ac": 22
+  },
+  "Doprillu": {
+    "ac": 35,
+    "skills": {
+      "athletics": {
+        "base": 28
+      }
+    }
+  },
+  "Giant Crab": {
+    "will": 7
+  },
+  "Giant Hippocampus": {
+    "rarity": "common"
+  },
+  "Gliminal": {
+    "size": "lg"
+  },
+  "Grandmaster": {
+    "rarity": "common"
+  },
+  "Great White Shark": {
+    "size": "lg"
+  },
+  "Hadrinnex": {
+    "hp": 120,
+    "reflex": 13
+  },
+  "Iruxi Masked Mummer": {
+    "rarity": "common"
+  },
+  "Kithangian": {
+    "hp": 180,
+    "ac": 27,
+    "skills": {
+      "athletics": {
+        "base": 18
+      }
+    }
+  },
+  "Kobold Earth Diver": {
+    "rarity": "common"
+  },
+  "Legion Archon": {
+    "skills": {
+      "religion": {
+        "base": 13
+      }
+    }
+  },
+  "Living Grove": {
+    "ac": 24
+  },
+  "Maliadi": {
+    "rarity": "uncommon"
+  },
+  "Megalania": {
+    "ac": 24,
+    "skills": {
+      "athletics": {
+        "base": 15
+      }
+    }
+  },
+  "Megalodon": {
+    "rarity": "common"
+  },
+  "Mobogo": {
+    "skills": {
+      "athletics": {
+        "base": 19
+      }
+    }
+  },
+  "Mocking Archdragon": {
+    "rarity": "rare"
+  },
+  "Mocking Chorus": {
+    "rarity": "common",
+    "size": "lg"
+  },
+  "Munsahir Trooper": {
+    "hp": 85,
+    "reflex": 10,
+    "will": 10
+  },
+  "Murajau": {
+    "size": "med"
+  },
+  "Narrik": {
+    "size": "lg"
+  },
+  "Ort Mob": {
+    "rarity": "uncommon"
+  },
+  "Ostovite": {
+    "size": "sm"
+  },
+  "Pagulin": {
+    "size": "lg"
+  },
+  "Peerless Duelist": {
+    "rarity": "common"
+  },
+  "Pelegox Cube": {
+    "rarity": "uncommon"
+  },
+  "Peng": {
+    "rarity": "common"
+  },
+  "Rancorous Priesthood": {
+    "rarity": "common"
+  },
+  "Ratfolk Grenadier": {
+    "size": "med"
+  },
+  "Redcap Brigade": {
+    "rarity": "common"
+  },
+  "Rune Giant": {
+    "rarity": "common"
+  },
+  "Sandpoint Devil": {
+    "rarity": "unique"
+  },
+  "Sepid": {
+    "skills": {
+      "deception": {
+        "base": 23
+      }
+    }
+  },
+  "Silvanshee": {
+    "ac": 16
+  },
+  "Skymetal Striker": {
+    "size": "lg"
+  },
+  "Sootsoldiers": {
+    "size": "grg"
+  },
+  "Sordesdaemon": {
+    "reflex": 23
+  },
+  "Soul Skelm": {
+    "rarity": "common"
+  },
+  "Spinosaurus": {
+    "skills": {
+      "acrobatics": {
+        "base": 18
+      },
+      "athletics": {
+        "base": 22
+      }
+    }
+  },
+  "Storm Snake": {
+    "size": "lg"
+  },
+  "Sublime Breath": {
+    "rarity": "unique"
+  },
+  "Sykever": {
+    "hp": 310
+  },
+  "Sylph Sneak": {
+    "ac": 16
+  },
+  "Tehialai-Thief-of-Ships": {
+    "ac": 36
+  },
+  "Tikbalang": {
+    "size": "med"
+  },
+  "Trilobite": {
+    "size": "tiny"
+  },
+  "Vampire Count": {
+    "rarity": "common"
+  },
+  "Vampire Mastermind": {
+    "rarity": "common"
+  },
+  "Vanyver": {
+    "skills": {
+      "acrobatics": {
+        "base": 25
+      }
+    }
+  },
+  "Veiled Current": {
+    "size": "lg"
+  },
+  "Veranallia": {
+    "fortitude": 33,
+    "reflex": 30,
+    "will": 36
+  },
+  "Weretiger": {
+    "size": "med"
+  },
+  "Zuhra Shuyookh": {
+    "rarity": "rare",
+    "size": "lg"
+  }
+}

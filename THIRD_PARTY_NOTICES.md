@@ -12,8 +12,8 @@ The generated compendium preserves `source`, `license`, and `remaster` metadata 
 
 ## Archives of Nethys
 
-The trait glossary (`traits.json`) and afflictions (`afflictions.json`) are
-generated from the Archives of Nethys index:
+The trait glossary (`traits.json`) and afflictions (`afflictions.json`, covering
+diseases, curses, and poisons) are generated from the Archives of Nethys index:
 
 - https://2e.aonprd.com
 - Pathfinder Second Edition rules content, published by Paizo under the ORC License.

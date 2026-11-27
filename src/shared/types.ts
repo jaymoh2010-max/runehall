@@ -688,7 +688,7 @@ export interface Affliction extends Publication {
   id: string;
   name: string;
   type: "affliction";
-  category: "disease" | "curse";
+  category: "disease" | "curse" | "poison";
   level: number;
   rarity: string;
   traits: string[];
@@ -697,6 +697,9 @@ export interface Affliction extends Publication {
   onset: string;
   stages: string[];
   usage: string;
+  /** Poisons are also items, so they retain their price and duration. */
+  priceCp?: number;
+  duration?: string;
 }
 
 export interface Compendium {

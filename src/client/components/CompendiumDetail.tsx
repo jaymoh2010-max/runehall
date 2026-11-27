@@ -34,6 +34,7 @@ import {
   compendiumEntryPath,
   compendiumKindFromId,
   spellTraditionLabel,
+  vehicleSummary,
   type CompendiumEntryKind,
 } from "../../shared/compendium";
 import { formatCp } from "../api";
@@ -901,10 +902,7 @@ function renderBody(kind: CompendiumEntryKind, entry: CompendiumEntry): ReactNod
             <Meta label="Collision">{vehicle.collisionDC || "—"}</Meta>
             <Meta label="Collision damage">{vehicle.collisionDamage || "—"}</Meta>
           </MetaGrid>
-          <Description
-            html={vehicle.description}
-            empty="No description is stored for this vehicle."
-          />
+          <Description html={vehicle.description} empty={vehicleSummary(vehicle)} />
           {vehicle.abilities.length ? (
             <section className="monster-abilities">
               <h3>
@@ -955,14 +953,24 @@ function renderBody(kind: CompendiumEntryKind, entry: CompendiumEntry): ReactNod
     }
     case "affliction": {
       const affliction = entry as Affliction;
+      const label =
+        affliction.category === "disease"
+          ? "Disease"
+          : affliction.category === "poison"
+            ? "Poison"
+            : "Curse";
       return (
         <>
           <MetaGrid>
-            <Meta label="Type">{affliction.category === "disease" ? "Disease" : "Curse"}</Meta>
+            <Meta label="Type">{label}</Meta>
             <Meta label="Level">{affliction.level}</Meta>
             <Meta label="Saving throw">{affliction.savingThrow || "—"}</Meta>
             <Meta label="Onset">{affliction.onset || "—"}</Meta>
+            <Meta label="Duration">{affliction.duration || "—"}</Meta>
             <Meta label="Usage">{affliction.usage || "—"}</Meta>
+            {affliction.priceCp != null ? (
+              <Meta label="Price">{formatCp(affliction.priceCp)}</Meta>
+            ) : null}
           </MetaGrid>
           <Description html={affliction.description} />
           {affliction.stages.length ? (

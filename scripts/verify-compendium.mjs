@@ -547,7 +547,7 @@ for (const trait of data.traits ?? []) {
   if (!String(trait.description ?? "").trim()) fail(`trait ${trait.name}: missing description`);
 }
 for (const affliction of data.afflictions ?? []) {
-  if (!["disease", "curse"].includes(affliction.category)) {
+  if (!["disease", "curse", "poison"].includes(affliction.category)) {
     fail(`affliction ${affliction.name}: invalid category ${affliction.category}`);
   }
   if (!Number.isFinite(affliction.level) || affliction.level < 0 || affliction.level > 30) {

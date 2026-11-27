@@ -155,6 +155,7 @@ describe("compendium search", () => {
       ["Abadar - Major Boon", "boonCurse"],
       ["Aberration", "trait"],
       ["Bog Rot", "affliction"],
+      ["Arsenic", "affliction"],
     ];
     for (const [query, kind] of cases) {
       const result = globalSearch(query, 60);

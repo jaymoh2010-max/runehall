@@ -1,3 +1,12 @@
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const OVERRIDE_DIR = path.dirname(fileURLToPath(import.meta.url));
+const generatedMonsterOverrides = JSON.parse(
+  fs.readFileSync(path.join(OVERRIDE_DIR, "monster-overrides.json"), "utf8")
+);
+
 /**
  * Curated corrections for PF2e compendium entries where the upstream Foundry
  * data disagrees with the published rules. Keep this file small and cite the
@@ -258,6 +267,7 @@ export const BACKGROUND_OVERRIDES = {
 
 /** Creature entries with confirmed transcription errors in the Foundry export. */
 export const MONSTER_OVERRIDES = {
+  ...generatedMonsterOverrides,
   "Totum Font": { hp: 325 },
   Adlet: { level: 9 },
   Zebub: { hp: 45 },

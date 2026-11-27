@@ -955,6 +955,7 @@ export function EquipmentPicker({
                   </div>
                   <div className="picker-item-tags">
                     <AutomationTag level={automationForEquipment(item).level} />
+                    <Tag>{item.remaster ? "Remastered" : "Legacy"}</Tag>
                     {item.rarity !== "common" ? <RarityTag rarity={item.rarity} /> : null}
                     {item.traits.slice(0, 3).map((trait) => (
                       <Tag key={trait}>{trait}</Tag>
@@ -986,6 +987,7 @@ export function EquipmentPicker({
                 </div>
                 <div className="chip-row">
                   <ContentTierTag source={selected.source} />
+                  <Tag>{selected.remaster ? "Remastered" : "Legacy"}</Tag>
                   <RarityTag rarity={selected.rarity} />
                   <AutomationTag level={automationForEquipment(selected).level} />
                 </div>

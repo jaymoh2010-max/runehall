@@ -159,24 +159,33 @@ A second pass closed the builder-facing gaps from the list above:
 - **Hazards, vehicles, familiar abilities, boons/curses, traits, and
   afflictions** are now ingested and exposed as Library tabs with detail pages.
   Counts: 53 hazards, 100 vehicles, 117 familiar abilities, 240 boons/curses,
-  571 traits, and 95 afflictions.
+  571 traits, and 215 afflictions (120 poisons plus diseases and curses).
+- **Creature stats** were reconciled against AoN for 78 records: HP, AC,
+  Fortitude/Reflex/Will, Perception, size, skills, and rarity. Speed and
+  attack-list differences were left alone where they represent alternate forms,
+  abilities, or incomplete structured speed modes.
+- **Vehicle descriptions** fall back to a derived statblock summary when the
+  source has no prose.
+- **Equipment** now shows a Remastered/Legacy label in the gear picker and
+  character-sheet item browser, making mixed-era prices and groups explicit.
 - The verifier now checks size choices, heritage speeds, class skill choices,
   and remains strict about divine fonts/sanctification and attack types.
 
 ## Known remaining differences
 
-1. **Creature stat drift.** Most creatures match AoN exactly. A small set,
-   especially in Monster Core 2, still differs in HP/AC/saves/size/speed. The
-   clearest transcription errors above are fixed; the rest should be reconciled
-   against the printed books before changing, because AoN is not always the
-   newer source.
+1. **Creature speed, attack-list, and trait differences.** HP, AC, saves,
+   Perception, size, skills, and rarity now match AoN for the matched core
+   entries. Speeds and attack lists still differ where Foundry represents
+   alternate forms or abilities structurally and AoN does not (or vice versa).
+   Trait lists also differ for legacy alignment traits and remastered trait
+   names, which are descriptive rather than statblock values.
 2. **Legacy/remaster equipment.** Some Guns & Gears and Treasure Vault items
    have legacy prices/levels alongside remastered groups or bulk. The local
-   compendium intentionally keeps both eras, so source matching can show a
-   difference without the local value being wrong.
-3. **Remaining reference gaps.** The trait glossary and disease/curse
-   afflictions are now present. Poisons and other affliction templates still
-   need their own import if the AoN index exposes them consistently.
+   compendium intentionally keeps both eras, and the UI now labels which edition
+   an item belongs to.
+3. **Reference gaps.** Trait glossary, diseases, curses, and poisons are now
+   present. Other affliction-like templates such as haunts remain hazards rather
+   than afflictions.
 
 ## References
 
