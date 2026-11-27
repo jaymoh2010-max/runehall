@@ -1478,6 +1478,28 @@ test("builder tracks commander tactics and prepares the daily folio", async ({ p
   await expect(prepared).toContainText("Reload!");
 });
 
+test("prose-only backgrounds fill their curated skill and feat grants", async ({ page }) => {
+  test.setTimeout(60_000);
+  await signIn(page, admin);
+  const expandedCampaign = `E2E Backgrounds ${runId}`;
+  const created = await page.request.post("/api/campaigns", {
+    data: { name: expandedCampaign, ruleset: "expanded" },
+  });
+  expect(created.ok()).toBe(true);
+  await openNewCharacterInCampaign(page, "E2E Backgrounds", expandedCampaign);
+
+  await goToStep(page, "Background");
+  await page.getByPlaceholder(/Search backgrounds/).fill("Beast Seeker");
+  await page.locator(".selection-grid .selection-card").filter({ hasText: "Beast Seeker" }).click();
+  const detail = page.locator(".selection-detail");
+  await expect(detail).toContainText("Titan Wrestler");
+  await expect(detail).toContainText("Legendary Beast Lore");
+  await detail.getByLabel("Choose Athletics or Thievery").selectOption("athletics");
+  await expect(detail.getByLabel("Choose Athletics or Thievery")).toHaveValue("athletics");
+  await detail.getByLabel("Choose your starting feat").selectOption("feat:KxaYlC50zzHysJj8");
+  await expect(detail.getByLabel("Choose your starting feat")).toHaveValue("feat:KxaYlC50zzHysJj8");
+});
+
 test("builder warns before replacing a class with dependent choices", async ({ page }) => {
   await signIn(page, admin);
   await page.goto(`${fighterSheetPath}/edit`);

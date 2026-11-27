@@ -138,8 +138,10 @@ current data model or intentionally manual:
   first-class pickers. The classes and feats are present; the build choices are
   manual.
 - **Background grants:** 41 backgrounds have no trained skill and 78 have no
-  granted/choice feat in the raw Foundry data. Some are genuinely choice-only or
-  prose-only, but a curated override table would improve the builder.
+  granted/choice feat in the raw Foundry data. Runtime overrides in
+  `src/shared/backgroundGrants.ts` fill the remaining prose-only skill and feat
+  choices. Deity-, rival-, campaign-, and past-life-dependent choices stay
+  manual, as do category-wide picks such as Kaiju Stalker's Athletics feat.
 - **Action categories:** 21 actions have an empty category; the Rules page still
   displays them, but category filters are inconsistent.
 
