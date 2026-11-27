@@ -37,12 +37,17 @@ This is the working list for post-P2 work. The source findings are in
 | Audio bookkeeping | Done | Audio upload writes the asset and track rows in one transaction; delete commits row changes before removing the backing file. |
 | Restore server check | Done | Each probe host is checked three times with a 1.5-second timeout before restore proceeds. |
 
+## Trust model (Done)
+
+| Item | Status | Notes |
+| --- | --- | --- |
+| Character duplication | Done | Full-copy duplication is the documented decision: the owner or campaign GM may copy a campaign character with its gear and coins. The dashboard confirms the copy, and campaign duplicates write an audit entry. |
+| Manual quantity edits | Done | The sheet's +/- controls are accepted manual adjustments and do not charge coins. The purchase route still enforces price and ruleset legality, and the UI labels the difference. |
+| Boundary documentation | Done | `docs/TRUST-MODEL.md` records what the server enforces, what the table is trusted to do, and what untrusted hosting would require. |
+
 ## Next P3 batches
 
-1. **Trust-model decisions:** decide whether character duplication may clone
-   campaign gear/currency and whether free quantity edits should use the
-   purchase ledger.
-2. **Large campaign imports:** add rate limiting or background processing for
+1. **Large campaign imports:** add rate limiting or background processing for
    archives that still hold the event loop and write lock.
 
 Before starting a batch, check `git worktree list` and open branches so two

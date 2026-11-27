@@ -27,7 +27,7 @@ Runehall is the single browser tab a Pathfinder 2e group keeps open all session:
 - **The GM** prepares maps and tokens, reveals the dungeon, runs initiative and monsters, writes session notes, and keeps the party's data in one place.
 - **The table** runs locally first. Hosting is a deployment detail, not a prerequisite.
 
-The target table size is one GM plus 4–10 players. That means the product should optimize for trust, low friction, and fast local operations rather than competitive anti-cheat or massive-scale infrastructure.
+The target table size is one GM plus 4-10 players. That means the product should optimize for trust, low friction, and fast local operations rather than competitive anti-cheat or massive-scale infrastructure. The exact boundary between server-enforced rules and table-trusted bookkeeping is documented in [TRUST-MODEL.md](TRUST-MODEL.md).
 
 ### Principles
 1. **Local-first and portable.** SQLite + JSON compendium + uploaded files. No cloud account required.

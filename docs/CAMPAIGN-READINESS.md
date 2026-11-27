@@ -85,6 +85,7 @@ The campaign simulation exercises two complete 1-20 campaigns per run, one XP an
 - Administrator account moderation: suspend/restore, revoke sessions, and promote/demote administrators with last-admin safeguards. Suspension revokes sessions and disconnects live sockets.
 - Registration modes, a production `BOOTSTRAP_TOKEN` gate for the first administrator, single-use invite codes, expiry, revocation, and a pending-invite cap.
 - Audit log with retention controls and CSV export.
+- The boundary between server-enforced structure and table-trusted bookkeeping is documented in [TRUST-MODEL.md](TRUST-MODEL.md), including campaign character duplication and manual inventory counts.
 - Production dependencies are audited in CI with `npm run audit:prod`.
 - Upload quotas, a low-disk guard, and backup/restore checks that refuse archives missing database-referenced uploads.
 - Backup staging publishes a completed archive with a single rename, so interrupted backups are not mistaken for valid ones.

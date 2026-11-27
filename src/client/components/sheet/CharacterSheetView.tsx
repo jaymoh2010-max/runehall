@@ -3267,6 +3267,10 @@ export function CharacterSheetView({
                       ) : null}
                     </div>
                   </div>
+                  <p className="pb-hint">
+                    The +/- controls adjust inventory manually and do not charge coins. Use the gear
+                    browser to buy items at their listed price.
+                  </p>
                   {inventoryGroups.length ? (
                     inventoryGroups.map((group) => (
                       <section
@@ -3362,7 +3366,7 @@ export function CharacterSheetView({
                                     className="pb-small-button"
                                     disabled={!canEdit || entry.quantity <= 1}
                                     aria-label="Decrease quantity"
-                                    title={`Decrease ${displayName} quantity`}
+                                    title={`Decrease ${displayName} quantity (manual adjustment)`}
                                     onClick={() =>
                                       void changeItemQuantity(entry.itemId, entry.quantity - 1)
                                     }
@@ -3375,7 +3379,7 @@ export function CharacterSheetView({
                                     className="pb-small-button"
                                     disabled={!canEdit}
                                     aria-label="Increase quantity"
-                                    title={`Increase ${displayName} quantity`}
+                                    title={`Increase ${displayName} quantity (manual adjustment; no coin cost)`}
                                     onClick={() =>
                                       void changeItemQuantity(entry.itemId, entry.quantity + 1)
                                     }

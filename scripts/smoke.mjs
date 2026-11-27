@@ -714,6 +714,42 @@ async function main() {
   }
   log("inventory stacks and coins transferred between campaign characters");
 
+  const characterDuplicateResult = await api(`/api/characters/${character.id}/duplicate`, {
+    method: "POST",
+    cookie: playerCookie,
+  });
+  const duplicateCharacterRecord = characterDuplicateResult.payload.character;
+  if (
+    duplicateCharacterRecord.id === character.id ||
+    duplicateCharacterRecord.name !== `${transferredFrom.data.name} (copy)` ||
+    duplicateCharacterRecord.campaignId !== campaign.id ||
+    duplicateCharacterRecord.data.currency.gp !== transferredFrom.data.currency.gp ||
+    duplicateCharacterRecord.data.equipment.find((entry) => entry.itemId === sword.id)?.quantity !==
+      1
+  ) {
+    throw new Error("Character duplication did not copy the campaign gear and coins");
+  }
+  const duplicateAudit = await api("/api/admin/audit?action=character.duplicate&limit=10", {
+    cookie: gmCookie,
+  });
+  if (
+    !duplicateAudit.payload.entries.some((entry) => entry.targetId === duplicateCharacterRecord.id)
+  ) {
+    throw new Error("Character duplication was not recorded in the audit log");
+  }
+  const stolenDuplicate = await fetch(`${base}/api/characters/${quartermaster.id}/duplicate`, {
+    method: "POST",
+    headers: { cookie: playerCookie },
+  });
+  if (stolenDuplicate.status !== 403) {
+    throw new Error("Player could duplicate a character they do not control");
+  }
+  await api(`/api/characters/${duplicateCharacterRecord.id}`, {
+    method: "DELETE",
+    cookie: playerCookie,
+  });
+  log("character duplication copies campaign gear and coins and is audit logged");
+
   await api(`/api/campaigns/${campaign.id}/journal`, {
     method: "POST",
     cookie: gmCookie,

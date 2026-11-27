@@ -2,7 +2,7 @@
 
 Audit date: 2026-11-27
 
-Reviewed commits: `3065879` (initial audit) and `62d34a9` (sixth pass, after background grants, Runesmith, inventory lifecycle, the affliction picker, and live runes)
+Reviewed commits: `3065879` (initial audit), `a1c5dac` (sixth pass, after background grants, Runesmith, inventory lifecycle, the affliction picker, live runes, and operational hardening), and the trust-model batch (seventh pass)
 
 Scope: database and migrations, backups/restore, rules engine and spellcasting, items and inventory, compendium data, server/socket authorization, and the table/sheet client. The initial read-only audit and the second fix pass ran on dedicated worktrees; the second pass is on `audit/gaps-2-2026-11-27`.
 
@@ -117,6 +117,14 @@ The operational hardening batch closed the migration and audio bookkeeping gaps:
 - **Restore server check.** The running-server probe now waits 1.5 seconds per attempt and retries three times per host before restoring (`scripts/restore.mjs`).
 - **Coverage.** Added migration name-conflict and checksum-mismatch tests; smoke and restore drill pass.
 
+## Seventh pass
+
+The trust-model batch made the economic boundary explicit instead of adding anti-cheat:
+
+- **Character duplication.** Full-copy behavior is now the documented decision: the owner or campaign GM can duplicate a character into the same campaign with its gear and coins. The dashboard confirms a campaign copy, and campaign duplicates write a `character.duplicate` audit entry (`src/server/routes/characters.ts`, `DashboardPage.tsx`).
+- **Manual inventory counts.** The sheet's +/- controls remain free manual adjustments, now labelled as such. The purchase route still enforces coin cost and ruleset legality, which preserves loot, rewards, crafting, and corrections without a server-side ledger (`CharacterSheetView.tsx`).
+- **Boundary documentation and coverage.** Added `docs/TRUST-MODEL.md`; the smoke test now verifies that duplication copies campaign gear/coins, rejects a player duplicating someone else's character, and writes the audit entry.
+
 ## Remaining findings
 
 No critical or high-severity findings remain from this audit. The items below are medium/low, optional features, or deliberate trust-model decisions.
@@ -124,8 +132,6 @@ No critical or high-severity findings remain from this audit. The items below ar
 ### Medium
 
 - **Large imports still hold the event loop and write lock.** Quotas now apply, but a 50 MB embedded archive remains a synchronous transaction. Add a rate limit or background import if large imports are expected.
-- **Duplicating a character clones campaign gear and currency.** `src/server/routes/characters.ts:1093` copies the full draft and keeps `campaign_id`. Under the documented trust model this may be intended, but it is a direct wealth-duplication path. Decide whether duplicates should be build templates (clear campaign/inventory) or GM-only.
-- **Free quantity increases bypass the purchase ledger.** The sheet's +/- controls can set any quantity without paying, while the purchase endpoint enforces coins. `docs/PLAN.md` explicitly says the product is not anti-cheat, so this may be an accepted trust model; if not, route price-bearing increases through the purchase endpoint or reject unexplained server-side deltas.
 
 ### Low
 

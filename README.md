@@ -8,7 +8,7 @@ An all-in-one, local-first **Pathfinder Second Edition** table. Runehall combine
 
 ## What Runehall is now
 
-The app is deliberately **manual-first**. It keeps the math, content, and bookkeeping, and leaves combat decisions to the table.
+The app is deliberately **manual-first**. It keeps the math, content, and bookkeeping, and leaves combat decisions to the table. The boundary between server-enforced rules and table-trusted bookkeeping is documented in [docs/TRUST-MODEL.md](docs/TRUST-MODEL.md).
 
 Four campaign sections:
 

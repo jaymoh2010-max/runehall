@@ -1163,6 +1163,18 @@ export async function registerCharacterRoutes(app: FastifyInstance): Promise<voi
       ts,
       ts
     );
+    if (row.campaign_id) {
+      logAudit({
+        action: "character.duplicate",
+        actor: request.user,
+        targetType: "character",
+        targetId: newCharacterId,
+        detail: `Duplicated ${row.name} as ${draft.name} in the same campaign; copied ${
+          draft.equipment.length
+        } inventory stack(s) and ${formatCopper(currencyToCp(draft.currency))}.`,
+        request,
+      });
+    }
     const created = getCharacter(newCharacterId)!;
     const serialized = serializeCharacter(created, request.user.displayName, {
       canEdit: true,

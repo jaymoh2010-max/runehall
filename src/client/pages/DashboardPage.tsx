@@ -280,6 +280,16 @@ export function DashboardPage() {
   };
 
   const duplicateCharacter = async (character: CharacterRecord) => {
+    if (character.campaignId) {
+      const campaignName = campaignNames.get(character.campaignId) || "this campaign";
+      if (
+        !window.confirm(
+          `Duplicate ${character.name} into ${campaignName}? The copy keeps its gear and coins.`
+        )
+      ) {
+        return;
+      }
+    }
     try {
       const result = await api<{ character: CharacterRecord }>(
         `/api/characters/${character.id}/duplicate`,
@@ -545,7 +555,7 @@ export function DashboardPage() {
                   <button
                     type="button"
                     className="icon-btn"
-                    title="Duplicate"
+                    title="Duplicate (copies gear and coins)"
                     aria-label={`Duplicate ${character.name}`}
                     onClick={() => duplicateCharacter(character)}
                   >
