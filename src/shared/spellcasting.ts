@@ -132,7 +132,10 @@ export function spellCastOptions(
         rank: spell.rank === 0 ? cantripCastRank(level) : Math.max(1, spell.rank),
         resource: "innate",
         remaining,
-        label: remaining === null ? "Innate (at will)" : "Innate use",
+        label:
+          remaining === null
+            ? "Innate (at will)"
+            : `Innate use (${Math.max(0, Math.round(remaining))} left)`,
       },
     ];
   }

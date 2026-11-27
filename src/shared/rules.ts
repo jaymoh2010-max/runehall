@@ -1735,6 +1735,7 @@ export function emptyCharacterDraft(name = "New Hero"): CharacterDraft {
       multiclassTradition: null,
       innate: [],
       innateUsed: {},
+      innateMax: {},
       preparationsPending: false,
     },
     equipment: [],
@@ -2093,6 +2094,11 @@ export function normalizeCharacterDraft(input: unknown, fallbackName = "New Hero
         Object.entries(obj(spells.innateUsed))
           .filter(([, value]) => typeof value === "number" && Number.isFinite(value))
           .map(([key, value]) => [key, Math.max(0, Math.min(20, Math.floor(value as number)))])
+      ) as Record<string, number>,
+      innateMax: Object.fromEntries(
+        Object.entries(obj(spells.innateMax))
+          .filter(([, value]) => typeof value === "number" && Number.isFinite(value))
+          .map(([key, value]) => [key, Math.max(1, Math.min(20, Math.floor(value as number)))])
       ) as Record<string, number>,
       divineFontUsed: Math.max(0, Math.min(10, Math.round(num(spells.divineFontUsed, 0)))),
       fontChoice:

@@ -22,19 +22,17 @@ This is the working list for the P2 items in `docs/AUDIT.md` and
 | --- | --- | --- |
 | Focus-only class spell DC/attack | Done | Focus and innate spells derive their own DC/attack. |
 | Read-only compendium types | Done | Hazards, vehicles, familiars, boons/curses, traits, and afflictions are in the library. |
-| Wizard higher-rank curriculum data | Partial | The engine supports rank-aware curriculum slots, but curated grants stop at rank 0/1. |
-| Innate spell frequency | Open | Uses are inferred from spell prose; there is no granting-ability frequency field. |
+| Wizard higher-rank curriculum data | Done | The generated school data includes ranks 0-9 and is wired into class grants. |
+| Innate spell frequency | Done | `spells.innateMax` stores an explicit daily maximum; the builder exposes 1-5/day and prose remains the fallback. |
 | Commander tactics and Runesmith runes | Open | Need pickers and repertoire tracking. |
 | Background prose-only grants | Open | Needs curated overrides for backgrounds whose choices exist only in prose. |
 
 ## Suggested next batches
 
-1. **Data curation:** extend wizard curriculum grants by rank and add curated
-   background grants. This is content work with focused rules tests.
-2. **Commander and Runesmith:** add tactic/rune pickers, separate resources, and
+1. **Commander and Runesmith:** add tactic/rune pickers, separate resources, and
    sheet tracking. Treat as a feature batch, not a data patch.
-3. **Innate frequency:** add an explicit per-grant or per-spell frequency field
-   and use it instead of prose inference.
+2. **Background prose grants:** add curated overrides for backgrounds whose
+   choices exist only in prose.
 
 Before starting a rules batch, check `git worktree list` and the open branches
 so two sessions do not edit the same sheet or rules files concurrently.
