@@ -1,3 +1,5 @@
+import type { CharacterDraft } from "./types";
+
 /**
  * Commander tactics are actions with the `tactic` trait in the Battlecry!
  * data. The compendium does not mark expert/master/legendary tiers, so the
@@ -7,6 +9,11 @@ export interface CommanderTactic {
   id: string;
   name: string;
 }
+
+const TACTICAL_EXPANSION = "feat:7CbjQCIEiGRp9Q2n";
+const TACTICAL_EXCELLENCE = "feat:a7sCZ2ehfsLQutvO";
+const EFFICIENT_PREPARATION = "feat:UvQjCHNAQVhKvTWb";
+const COMMANDER_DEDICATION = "feat:e9iVLfL7KIfUG3NV";
 
 export const COMMANDER_TACTICS: ReadonlyArray<CommanderTactic> = [
   { id: "act:Z0HyZyvCe3Y1Chaa", name: "Alley-Oop" },
@@ -52,16 +59,45 @@ export const COMMANDER_TACTICS_BY_ID = new Map(
   COMMANDER_TACTICS.map((tactic) => [tactic.id, tactic])
 );
 
-export function commanderFolioLimit(level: number): number {
-  if (level >= 19) return 11;
-  if (level >= 15) return 9;
-  if (level >= 7) return 7;
-  return 5;
+/** All feat ids selected by the character, including repeatable slots. */
+export function commanderFeatIds(draft: CharacterDraft): string[] {
+  return [
+    ...Object.values(draft.feats.ancestry),
+    ...Object.values(draft.feats.class),
+    ...Object.values(draft.feats.skill),
+    ...Object.values(draft.feats.general),
+    ...Object.values(draft.feats.freeArchetype),
+    ...draft.feats.extras,
+    ...Object.values(draft.featChoices).flat(),
+    ...(draft.backgroundFeat ? [draft.backgroundFeat] : []),
+  ];
 }
 
-export function commanderPreparedLimit(level: number): number {
-  if (level >= 19) return 6;
-  if (level >= 15) return 5;
-  if (level >= 7) return 4;
-  return 3;
+export interface CommanderLimitBonuses {
+  folio: number;
+  prepared: number;
+}
+
+/** Bonuses from feats and the Commander Dedication. */
+export function commanderLimitBonuses(featIds: Iterable<string>): CommanderLimitBonuses {
+  const counts = new Map<string, number>();
+  for (const id of featIds) counts.set(id, (counts.get(id) ?? 0) + 1);
+  const expansion = Math.min(20, counts.get(TACTICAL_EXPANSION) ?? 0);
+  const excellence = Math.min(2, counts.get(TACTICAL_EXCELLENCE) ?? 0);
+  const efficient = Math.min(1, counts.get(EFFICIENT_PREPARATION) ?? 0);
+  const dedication = Math.min(1, counts.get(COMMANDER_DEDICATION) ?? 0);
+  return {
+    folio: expansion * 2 + excellence * 2 + dedication * 2,
+    prepared: excellence + efficient + dedication,
+  };
+}
+
+export function commanderFolioLimit(level: number, featIds: Iterable<string> = []): number {
+  const base = level >= 19 ? 11 : level >= 15 ? 9 : level >= 7 ? 7 : 5;
+  return base + commanderLimitBonuses(featIds).folio;
+}
+
+export function commanderPreparedLimit(level: number, featIds: Iterable<string> = []): number {
+  const base = level >= 19 ? 6 : level >= 15 ? 5 : level >= 7 ? 4 : 3;
+  return base + commanderLimitBonuses(featIds).prepared;
 }

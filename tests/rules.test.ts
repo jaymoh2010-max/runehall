@@ -29,6 +29,7 @@ import {
   normalizeCharacterDraft,
   ordinarySpellSlotsFor,
   preparedSlotSplits,
+  proficiencyBonus,
   saveUpgradesFrom,
   spellRepertoireLimits,
   spellSlotsFor,
@@ -219,6 +220,34 @@ describe("PF2e character rules", () => {
     expect(prone.spellAttack).toBe((derived.spellAttack ?? 0) - 2);
     expect(prone.innateSpellAttack).toBe((derived.innateSpellAttack ?? 0) - 2);
     expect(prone.focusSpellAttack).toBe((derived.focusSpellAttack ?? 0) - 2);
+  });
+
+  it("advances monk and ranger focus proficiency at 9th and 17th level", () => {
+    const monk = classes.find((entry) => entry.name === "Monk")!;
+    const ranger = classes.find((entry) => entry.name === "Ranger")!;
+    const forceBolt = spells.find((entry) => entry.name === "Force Bolt")!;
+
+    const monkDraft = emptyCharacterDraft("Focus Monk 9");
+    monkDraft.classId = monk.id;
+    monkDraft.keyAbility = "wis";
+    monkDraft.level = 9;
+    monkDraft.spells.focus = [forceBolt.id];
+    const monkDerived = computeCharacter(monkDraft, contextForDraft(monkDraft));
+    expect(monkDerived.focusSpellAttack).toBe(proficiencyBonus(2, 9) + monkDerived.abilityMods.wis);
+
+    monkDraft.level = 17;
+    const legend = computeCharacter(monkDraft, contextForDraft(monkDraft));
+    expect(legend.focusSpellAttack).toBe(proficiencyBonus(3, 17) + legend.abilityMods.wis);
+
+    const rangerDraft = emptyCharacterDraft("Focus Ranger 9");
+    rangerDraft.classId = ranger.id;
+    rangerDraft.keyAbility = "dex";
+    rangerDraft.level = 9;
+    rangerDraft.spells.focus = [forceBolt.id];
+    const rangerDerived = computeCharacter(rangerDraft, contextForDraft(rangerDraft));
+    expect(rangerDerived.focusSpellAttack).toBe(
+      proficiencyBonus(2, 9) + rangerDerived.abilityMods.wis
+    );
   });
 
   it("treats archetype spell slots as a spellcasting class feature", () => {
@@ -561,7 +590,7 @@ describe("PF2e character rules", () => {
     expect(draft.spells.rituals).toEqual(["spell:a"]);
     expect(draft.spells.innate).toEqual(["spell:b"]);
     expect(draft.spells.innateUsed).toEqual({ "spell:b": 2, "spell:c": 0 });
-    expect(draft.spells.innateMax).toEqual({ "spell:b": 2, "spell:c": 1 });
+    expect(draft.spells.innateMax).toEqual({ "spell:b": 2, "spell:c": 0 });
   });
 
   it("normalizes the daily-preparation pending flag", () => {

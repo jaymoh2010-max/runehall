@@ -132,6 +132,30 @@ describe("using and activating items", () => {
     expect(last.draft.equipment).toHaveLength(0);
   });
 
+  it("tracks multiple uses on one consumable container", () => {
+    const horn = item({
+      name: "Black Powder Horn",
+      consumable: { category: "other", uses: 3, duration: "" },
+      traits: ["consumable"],
+    });
+    const draft = draftWith([{ itemId: horn.id, quantity: 2, equipped: false }]);
+    const first = activateItemOnDraft(draft, horn.id, horn);
+    expect(first.consumed).toBe(false);
+    expect(first.draft.equipment[0]).toMatchObject({
+      quantity: 2,
+      usesKind: "consumable",
+      usesMax: 3,
+      usesUsed: 1,
+    });
+    expect(resetItemUses(first.draft).equipment[0].usesUsed).toBe(1);
+
+    const second = activateItemOnDraft(first.draft, horn.id, horn);
+    expect(second.draft.equipment[0].usesUsed).toBe(2);
+    const third = activateItemOnDraft(second.draft, horn.id, horn);
+    expect(third.consumed).toBe(true);
+    expect(third.draft.equipment[0]).toMatchObject({ quantity: 1, usesUsed: 0 });
+  });
+
   it("tracks one daily charge on a wand and blocks a second use", () => {
     const wand = item({
       name: "Wand of Heal",

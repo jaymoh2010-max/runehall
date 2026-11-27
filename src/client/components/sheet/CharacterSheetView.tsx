@@ -91,7 +91,11 @@ import {
   type CastAreaRequest,
 } from "../../../shared/templates";
 import { innateUsesRemaining } from "../../../shared/innate";
-import { COMMANDER_TACTICS_BY_ID, commanderPreparedLimit } from "../../../shared/commander";
+import {
+  COMMANDER_TACTICS_BY_ID,
+  commanderFeatIds,
+  commanderPreparedLimit,
+} from "../../../shared/commander";
 import { psiAmpFor } from "../../../shared/psiAmps";
 import { ritualPrimaryCheckInfo, ritualPrimarySkillNames } from "../../../shared/ritual";
 import {
@@ -1275,7 +1279,18 @@ export function CharacterSheetView({
       toast(`${name} has no resale value.`, "info");
       return;
     }
-    if (!window.confirm(`Sell ${count}× ${name} for ${formatCp(earnedCp)}?`)) return;
+    const hasRunes = Boolean(
+      draftRef.current?.equipment.find((candidate) => candidate.itemId === itemId)?.runes?.length
+    );
+    if (
+      !window.confirm(
+        `Sell ${count}× ${name} for ${formatCp(earnedCp)}?${
+          hasRunes ? " Attached runes are included and will be lost." : ""
+        }`
+      )
+    ) {
+      return;
+    }
     const saved = await persist(
       (currentDraft) => sellItemQuantity(currentDraft, itemId, count, unitPriceCp).draft
     );
@@ -1287,7 +1302,15 @@ export function CharacterSheetView({
     const entry = draftRef.current?.equipment.find((candidate) => candidate.itemId === itemId);
     if (!entry) return;
     const count = Math.max(1, Math.min(entry.quantity, Math.round(quantity)));
-    if (!window.confirm(`Drop ${count}× ${name}? This removes it from the sheet.`)) return;
+    if (
+      !window.confirm(
+        `Drop ${count}× ${name}? This removes it from the sheet.${
+          entry.runes?.length ? " Its attached runes will be lost." : ""
+        }`
+      )
+    ) {
+      return;
+    }
     const saved = await persist((currentDraft) => ({
       ...currentDraft,
       equipment: currentDraft.equipment.flatMap((candidate) => {
@@ -1465,11 +1488,18 @@ export function CharacterSheetView({
     openAreaPlacement(spell, rank);
   };
 
-  const chargeStaff = async (item: Equipment, rank: number) => {
+  const chargeStaff = async (item: Equipment, mode: "prepare" | "expend" | "clear", rank = 0) => {
     if (!canEdit) return;
-    // Staves are not capped at 5 charges: a staff can hold as many charges as
-    // the slot expended to charge it (up to a 10th-rank slot).
-    const max = Math.max(0, Math.min(20, Math.round(rank)));
+    const base = Math.max(0, Math.min(20, Math.round(derived?.maxSpellRank ?? 0)));
+    // Daily preparation grants charges equal to the highest spell slot. A
+    // prepared caster may expend one additional slot; staves have no 5-charge
+    // cap. A prepared staff starts at full, so preparing anew resets the pool.
+    const max =
+      mode === "clear"
+        ? 0
+        : mode === "prepare"
+          ? base
+          : Math.min(20, base + Math.max(0, Math.round(rank)));
     const saved = await persist((currentDraft) => ({
       ...currentDraft,
       equipment: currentDraft.equipment.map((candidate) =>
@@ -1480,10 +1510,14 @@ export function CharacterSheetView({
     }));
     if (!saved) return;
     setStaffCharge(null);
+    if (mode === "clear") {
+      toast(`Cleared ${item.name} charges.`, "success");
+      return;
+    }
     toast(
-      max
-        ? `Charged ${item.name} with ${max} charge${max === 1 ? "" : "s"}. Mark the spent spell slot manually.`
-        : `Cleared ${item.name} charges.`,
+      mode === "prepare"
+        ? `Prepared ${item.name} with ${max} charge${max === 1 ? "" : "s"}.`
+        : `Charged ${item.name} with ${max} charge${max === 1 ? "" : "s"}. Mark the spent spell slot manually.`,
       "success"
     );
   };
@@ -1498,8 +1532,16 @@ export function CharacterSheetView({
 
   const castStaffSpellWithSlot = async (item: Equipment, spell: Spell, rank: number) => {
     if (!canEdit || rank < 1) return;
+    if (isPreparedCasterClass(context?.classData?.name)) {
+      toast("Prepared casters charge a staff; they do not cast from it with a slot.", "error");
+      return;
+    }
     if (staffSlotRemaining(rank) <= 0) {
       toast(`No rank ${rank} spell slot remains.`, "error");
+      return;
+    }
+    if (staffPool(item).remaining < 1) {
+      toast(`${item.name} needs at least 1 charge to use a slot.`, "error");
       return;
     }
     const used = Math.max(
@@ -1515,15 +1557,29 @@ export function CharacterSheetView({
           [String(rank)]: used + 1,
         },
       },
+      equipment: currentDraft.equipment.map((candidate) => {
+        if (candidate.itemId !== item.id) return candidate;
+        const max = Math.max(0, Math.round(candidate.usesMax ?? 0));
+        const usedCharges = Math.max(0, Math.round(candidate.usesUsed ?? 0));
+        return {
+          ...candidate,
+          usesKind: "charges",
+          usesMax: max,
+          usesUsed: Math.min(max, usedCharges + 1),
+        };
+      }),
     }));
     if (!saved) return;
     setStaffCast(null);
-    toast(`Cast ${spell.name} from ${item.name} using a rank ${rank} spell slot.`, "success");
+    toast(
+      `Cast ${spell.name} from ${item.name} using a rank ${rank} spell slot and 1 staff charge.`,
+      "success"
+    );
     const current = characterRef.current;
     if (current?.campaignId) {
       getSocket().emit("chat:send", {
         campaignId: current.campaignId,
-        content: `${current.name} casts ${spell.name} from ${item.name} using a rank ${rank} spell slot.`,
+        content: `${current.name} casts ${spell.name} from ${item.name} using a rank ${rank} spell slot and 1 staff charge.`,
         visibility: "all",
       });
     }
@@ -1931,6 +1987,10 @@ export function CharacterSheetView({
   }
 
   const preparedCaster = isPreparedCasterClass(classData?.name);
+  const commanderPreparedLimitForDraft = commanderPreparedLimit(
+    draft.level,
+    commanderFeatIds(draft)
+  );
   const canLearnSpells = ["spellbook", "familiar", "dirge"].includes(spellSourceLabel(classData));
   const preparationsPending = preparedCaster && draft.spells.preparationsPending;
   const spellProfileFor = (group: string): { attack: number | null; dc: number | null } => {
@@ -2473,6 +2533,11 @@ export function CharacterSheetView({
                           {attack.traits.slice(0, 4).map((trait) => (
                             <Tag key={trait}>{titleCase(trait)}</Tag>
                           ))}
+                          {attack.extraDamage?.map((extra, index) => (
+                            <Tag key={`${extra.label}:${index}`}>
+                              {extra.formula} {extra.type}
+                            </Tag>
+                          ))}
                         </span>
                       </div>
                       <div className="pb-row-actions">
@@ -2523,6 +2588,23 @@ export function CharacterSheetView({
                         >
                           {attack.damageFormula} {attack.damageType}
                         </button>
+                        {attack.extraDamage?.map((extra, index) => (
+                          <button
+                            key={`${extra.label}:${index}`}
+                            type="button"
+                            className="pb-small-button"
+                            aria-label={`Roll ${attack.name} ${extra.label}`}
+                            title={`${extra.label} (${extra.type})`}
+                            onClick={() =>
+                              postRoll(
+                                extra.formula,
+                                `${attack.name} ${extra.label} (${extra.type})`
+                              )
+                            }
+                          >
+                            +{extra.formula} {extra.type}
+                          </button>
+                        ))}
                       </div>
                     </div>
                   ))
@@ -2848,6 +2930,11 @@ export function CharacterSheetView({
                           const wandRank = item ? wandSpellRank(item) : null;
                           const flexibleRank = item ? flexibleWandRank(item) : null;
                           const useInfo = item ? itemUseInfo(item) : null;
+                          const attachedRuneValueCp = (entry.runes ?? []).reduce(
+                            (sum, runeId) => sum + (context.equipment[runeId]?.price.cpTotal ?? 0),
+                            0
+                          );
+                          const saleUnitCp = (item?.price.cpTotal ?? 0) + attachedRuneValueCp;
                           const staffEntries = item
                             ? staffSpells(item, spellsByName.keys()).flatMap((staffSpell) => {
                                 const spell = spellsByName.get(staffSpell.name.toLowerCase());
@@ -3089,7 +3176,10 @@ export function CharacterSheetView({
                                       </button>
                                     ) : null}
                                     {item?.price ? (
-                                      <span>{formatCp(item.price.cpTotal)} each</span>
+                                      <span>
+                                        {formatCp(saleUnitCp)} each
+                                        {attachedRuneValueCp ? " (includes runes)" : ""}
+                                      </span>
                                     ) : null}
                                     <button
                                       type="button"
@@ -3114,12 +3204,12 @@ export function CharacterSheetView({
                                     <button
                                       type="button"
                                       className="pb-small-button"
-                                      disabled={!canEdit || !item || item.price.cpTotal <= 0}
+                                      disabled={!canEdit || saleUnitCp <= 0}
                                       title={
-                                        item && item.price.cpTotal > 0
+                                        saleUnitCp > 0
                                           ? `Sell the stack for ${formatCp(
-                                              Math.floor((item.price.cpTotal * entry.quantity) / 2)
-                                            )}`
+                                              Math.floor((saleUnitCp * entry.quantity) / 2)
+                                            )}${attachedRuneValueCp ? " (includes runes)" : ""}`
                                           : "This item has no resale value."
                                       }
                                       onClick={() =>
@@ -3127,7 +3217,7 @@ export function CharacterSheetView({
                                           entry.itemId,
                                           entry.quantity,
                                           displayName,
-                                          item?.price.cpTotal ?? 0
+                                          saleUnitCp
                                         )
                                       }
                                     >
@@ -3137,7 +3227,11 @@ export function CharacterSheetView({
                                       type="button"
                                       className="pb-small-button"
                                       disabled={!canEdit}
-                                      title="Drop the whole stack"
+                                      title={
+                                        entry.runes?.length
+                                          ? "Drop the whole stack and its attached runes"
+                                          : "Drop the whole stack"
+                                      }
                                       onClick={() =>
                                         void dropItemStack(
                                           entry.itemId,
@@ -3688,7 +3782,7 @@ export function CharacterSheetView({
                     <div className="pb-status-head">
                       <h3>Prepared tactics</h3>
                       <span>
-                        {draft.commander.prepared.length}/{commanderPreparedLimit(draft.level)}
+                        {draft.commander.prepared.length}/{commanderPreparedLimitForDraft}
                       </span>
                     </div>
                     {draft.commander.prepared.length ? (
@@ -3711,9 +3805,9 @@ export function CharacterSheetView({
                       <p className="pb-empty">No tactics prepared.</p>
                     )}
                     <p className="pb-hint">
-                      Up to {commanderPreparedLimit(draft.level)} tactics can be prepared at this
-                      level. Drill for 10 minutes to swap the prepared list; limited-use tactics
-                      still track their own daily use.
+                      Up to {commanderPreparedLimitForDraft} tactics can be prepared at this level.
+                      Drill for 10 minutes to swap the prepared list; limited-use tactics still
+                      track their own daily use.
                     </p>
                   </div>
                 ) : null}
@@ -4491,7 +4585,10 @@ export function CharacterSheetView({
               <div className="stack">
                 <p className="muted small">
                   {pool.remaining} / {pool.max} charges. Cantrips are free; ranked spells cost
-                  charges equal to their rank or one spell slot of that rank.
+                  charges equal to their rank.
+                  {isPreparedCasterClass(classData?.name)
+                    ? ""
+                    : " A spontaneous caster can spend 1 charge and a slot of that rank."}
                 </p>
                 {ranks.map((rank) => (
                   <div key={rank}>
@@ -4514,12 +4611,17 @@ export function CharacterSheetView({
                                 ? ` · ${spellRank} charge${spellRank === 1 ? "" : "s"}`
                                 : ""}
                             </Button>
-                            {spellRank ? (
+                            {spellRank && !isPreparedCasterClass(classData?.name) ? (
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                disabled={!canEdit || staffSlotRemaining(spellRank) <= 0}
-                                title={`Use a rank ${spellRank} spell slot`}
+                                disabled={
+                                  !canEdit ||
+                                  pool.remaining < 1 ||
+                                  staffSlotRemaining(spellRank) <= 0
+                                }
+                                aria-label={`Cast ${spell.name} using a rank ${spellRank} slot`}
+                                title={`Use a rank ${spellRank} spell slot and 1 staff charge`}
                                 onClick={() =>
                                   void castStaffSpellWithSlot(staffCast.item, spell, spellRank)
                                 }
@@ -4571,7 +4673,7 @@ export function CharacterSheetView({
           open
           onClose={() => setStaffCharge(null)}
           title={`Charge ${staffCharge.name}`}
-          subtitle="Expend a spell slot during daily preparations"
+          subtitle="Prepare the staff for the day"
           elevated={mode === "overlay"}
           footer={
             <Button variant="ghost" onClick={() => setStaffCharge(null)}>
@@ -4581,22 +4683,38 @@ export function CharacterSheetView({
         >
           <div className="stack">
             <p className="muted small">
-              Choose the rank of the spell slot you expend to charge the staff. This sets the
-              staff's charge pool to that rank; mark the spent slot manually. Charges from daily
-              preparation are tracked manually at the table.
+              Daily preparation gives the staff charges equal to your highest spell slot. A prepared
+              caster can expend one additional slot to add its rank; mark the spent slot manually.
             </p>
             <div className="chip-row">
-              {Array.from(
-                { length: Math.min(10, Math.max(0, derived.maxSpellRank)) },
-                (_, index) => index + 1
-              ).map((rank) => (
-                <Button key={rank} size="sm" onClick={() => void chargeStaff(staffCharge, rank)}>
-                  Expend rank {rank}
-                </Button>
-              ))}
+              <Button
+                size="sm"
+                aria-label={`Prepare ${staffCharge.name} for today`}
+                onClick={() => void chargeStaff(staffCharge, "prepare")}
+              >
+                Prepare for today ({Math.max(0, derived.maxSpellRank)})
+              </Button>
+              {isPreparedCasterClass(classData?.name)
+                ? Array.from(
+                    { length: Math.min(10, Math.max(0, derived.maxSpellRank)) },
+                    (_, index) => index + 1
+                  ).map((rank) => (
+                    <Button
+                      key={rank}
+                      size="sm"
+                      onClick={() => void chargeStaff(staffCharge, "expend", rank)}
+                    >
+                      Expend rank {rank}
+                    </Button>
+                  ))
+                : null}
             </div>
             <div>
-              <Button variant="ghost" size="sm" onClick={() => void chargeStaff(staffCharge, 0)}>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => void chargeStaff(staffCharge, "clear")}
+              >
                 Clear charges
               </Button>
             </div>

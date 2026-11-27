@@ -58,7 +58,12 @@ import {
   mergeEffects,
   selectedFeatGrantInstances,
 } from "./effects";
-import { COMMANDER_TACTICS_BY_ID, commanderFolioLimit, commanderPreparedLimit } from "./commander";
+import {
+  COMMANDER_TACTICS_BY_ID,
+  commanderFeatIds,
+  commanderFolioLimit,
+  commanderPreparedLimit,
+} from "./commander";
 import {
   featAllowedByHeritageGrant,
   heritageChosenFeatId,
@@ -1892,7 +1897,7 @@ export function normalizeCharacterDraft(input: unknown, fallbackName = "New Hero
     invested: boolean;
     usesUsed: number;
     usesMax?: number;
-    usesKind?: "daily" | "charges";
+    usesKind?: "daily" | "charges" | "consumable";
     runes: string[];
   };
   const equipmentMap = new Map<string, NormalizedEquipment>();
@@ -1914,7 +1919,11 @@ export function normalizeCharacterDraft(input: unknown, fallbackName = "New Hero
       if (typeof item.usesMax === "number" && Number.isFinite(item.usesMax)) {
         existing.usesMax = Math.max(0, Math.min(999, Math.floor(item.usesMax)));
       }
-      if (item.usesKind === "daily" || item.usesKind === "charges") {
+      if (
+        item.usesKind === "daily" ||
+        item.usesKind === "charges" ||
+        item.usesKind === "consumable"
+      ) {
         existing.usesKind = item.usesKind;
       }
       existing.runes = [...new Set([...existing.runes, ...runes])].slice(0, 12);
@@ -1928,8 +1937,10 @@ export function normalizeCharacterDraft(input: unknown, fallbackName = "New Hero
         ...(typeof item.usesMax === "number" && Number.isFinite(item.usesMax)
           ? { usesMax: Math.max(0, Math.min(999, Math.floor(item.usesMax))) }
           : {}),
-        ...(item.usesKind === "daily" || item.usesKind === "charges"
-          ? { usesKind: item.usesKind as "daily" | "charges" }
+        ...(item.usesKind === "daily" ||
+        item.usesKind === "charges" ||
+        item.usesKind === "consumable"
+          ? { usesKind: item.usesKind as "daily" | "charges" | "consumable" }
           : {}),
         runes,
       });
@@ -2115,7 +2126,8 @@ export function normalizeCharacterDraft(input: unknown, fallbackName = "New Hero
       innateMax: Object.fromEntries(
         Object.entries(obj(spells.innateMax))
           .filter(([, value]) => typeof value === "number" && Number.isFinite(value))
-          .map(([key, value]) => [key, Math.max(1, Math.min(20, Math.floor(value as number)))])
+          // 0 is the at-will sentinel for a ranked innate spell.
+          .map(([key, value]) => [key, Math.max(0, Math.min(20, Math.floor(value as number)))])
       ) as Record<string, number>,
       divineFontUsed: Math.max(0, Math.min(10, Math.round(num(spells.divineFontUsed, 0)))),
       fontChoice:
@@ -3592,8 +3604,9 @@ export function computeCharacter(
   if (classData && keyOptions.length === 0 && !key)
     issue("warning", "This class needs a key ability score; select one manually.", "abilities");
   if (classData?.name.toLowerCase() === "commander") {
-    const folioLimit = commanderFolioLimit(draft.level);
-    const preparedLimit = commanderPreparedLimit(draft.level);
+    const commanderFeats = commanderFeatIds(draft);
+    const folioLimit = commanderFolioLimit(draft.level, commanderFeats);
+    const preparedLimit = commanderPreparedLimit(draft.level, commanderFeats);
     if (draft.commander.folio.length > folioLimit) {
       issue(
         "error",
@@ -4156,8 +4169,14 @@ export function computeCharacter(
         master: multiclassFeatSet.has(multiclass.masterFeatId),
       })
     : [];
-  const multiclassCondition = multiclass
-    ? conditionEffects.checks[multiclass.ability]
+  const multiclassAbility = multiclass
+    ? (multiclass.variableAbility?.reduce(
+        (best, key) => (abilityMods[key] > abilityMods[best] ? key : best),
+        multiclass.ability
+      ) ?? multiclass.ability)
+    : null;
+  const multiclassCondition = multiclassAbility
+    ? conditionEffects.checks[multiclassAbility]
     : conditionEffects.allChecks;
   const multiclassRank = multiclass
     ? multiclassProficiencyRank(draft.level, {
@@ -4165,18 +4184,20 @@ export function computeCharacter(
         master: multiclassFeatSet.has(multiclass.masterFeatId),
       })
     : 1;
-  const multiclassSpellDc = multiclass
-    ? 10 +
-      proficiencyBonus(multiclassRank, draft.level) +
-      abilityMods[multiclass.ability] +
-      multiclassCondition
-    : null;
-  const multiclassSpellAttack = multiclass
-    ? proficiencyBonus(multiclassRank, draft.level) +
-      abilityMods[multiclass.ability] +
-      multiclassCondition +
-      conditionEffects.attackCircumstance
-    : null;
+  const multiclassSpellDc =
+    multiclass && multiclassAbility
+      ? 10 +
+        proficiencyBonus(multiclassRank, draft.level) +
+        abilityMods[multiclassAbility] +
+        multiclassCondition
+      : null;
+  const multiclassSpellAttack =
+    multiclass && multiclassAbility
+      ? proficiencyBonus(multiclassRank, draft.level) +
+        abilityMods[multiclassAbility] +
+        multiclassCondition +
+        conditionEffects.attackCircumstance
+      : null;
 
   // Focus spells from a class without spell slots use the proficiency and
   // tradition of the ability that granted them. Monk ki and ranger warden
@@ -4190,7 +4211,16 @@ export function computeCharacter(
         : "wis";
   const classFocusGrants = classGrants.spells.filter((spell) => spell.kind === "focus");
   const hasFocusSpells = draft.spells.focus.length > 0 || classFocusGrants.length > 0;
-  const focusRank = caster.progression !== "none" ? Math.max(1, prof.spellcasting) : 1;
+  const focusRank =
+    caster.progression !== "none"
+      ? Math.max(1, prof.spellcasting)
+      : focusCasterClass === "monk" || focusCasterClass === "ranger"
+        ? draft.level >= 17
+          ? 3
+          : draft.level >= 9
+            ? 2
+            : 1
+        : 1;
   const focusMod = focusAbility ? abilityMods[focusAbility] : 0;
   const focusCondition = focusAbility
     ? conditionEffects.checks[focusAbility]
@@ -4638,6 +4668,34 @@ export function computeCharacter(
         issue(
           "warning",
           `${spell.name} is not a ${multiclassTradition} spell for the ${multiclass.className} Dedication.`,
+          "spells"
+        );
+      }
+    }
+    for (let rank = 1; rank <= multiclassSlots.length; rank += 1) {
+      const count = draft.spells.multiclassSpells.filter(
+        (spellId) => context.spells[spellId]?.rank === rank
+      ).length;
+      const slots = multiclassSlots[rank - 1] ?? 0;
+      if (count > slots) {
+        issue(
+          "warning",
+          `${multiclass.className} Dedication has ${count} rank ${rank} spell${
+            count === 1 ? "" : "s"
+          } but only ${slots} rank ${rank} slot${slots === 1 ? "" : "s"}.`,
+          "spells"
+        );
+      }
+    }
+    for (const [rank, used] of Object.entries(draft.spells.multiclassSlotsUsed)) {
+      const index = Number(rank) - 1;
+      const slots = Number.isInteger(index) ? (multiclassSlots[index] ?? 0) : 0;
+      if (used > slots) {
+        issue(
+          "warning",
+          `${multiclass.className} Dedication has ${used} rank ${rank} slot${
+            used === 1 ? "" : "s"
+          } marked used but only ${slots} available.`,
           "spells"
         );
       }
@@ -5301,6 +5359,7 @@ export function computeCharacter(
       multiclass && multiclassSpellDc !== null && multiclassSpellAttack !== null
         ? {
             ...multiclass,
+            ability: multiclassAbility ?? multiclass.ability,
             tradition: multiclassTradition,
             spellSlots: multiclassSlots,
             spellDc: multiclassSpellDc,

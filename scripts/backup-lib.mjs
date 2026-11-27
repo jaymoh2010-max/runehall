@@ -235,7 +235,12 @@ export function newestBackup(directory) {
   if (!fs.existsSync(directory)) return null;
   const archives = fs
     .readdirSync(directory, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory() && entry.name.startsWith("runehall-"))
+    .filter(
+      (entry) =>
+        entry.isDirectory() &&
+        entry.name.startsWith("runehall-") &&
+        !entry.name.endsWith(".partial")
+    )
     .map((entry) => entry.name)
     .sort()
     .reverse();

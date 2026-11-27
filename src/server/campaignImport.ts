@@ -48,6 +48,7 @@ import {
   sanitizeUserText,
   uploadsDir,
 } from "./util";
+import { checkUploadQuota } from "./uploadQuota";
 
 type RecordValue = Record<string, unknown>;
 
@@ -287,6 +288,8 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
           storedFilename = uniqueAssetFilename(uploadsDir(), filename);
           assetUrlRemap.set(assetUrl, `/uploads/${storedFilename}`);
         }
+        const quota = checkUploadQuota(campaignId, userId, data.length);
+        if (!quota.ok) throw new Error(quota.error);
         fs.writeFileSync(path.join(uploadsDir(), storedFilename), data);
         writtenAssets.push(storedFilename);
         db.prepare(

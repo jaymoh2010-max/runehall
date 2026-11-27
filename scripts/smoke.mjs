@@ -2210,6 +2210,82 @@ async function main() {
   if (!endedCombat?.ok) throw new Error("The GM could not end combat");
   log("combat setup, player initiative, end turn, and end combat work");
 
+  const automationSheet = await api(`/api/characters/${character.id}`, {
+    cookie: playerCookie,
+  });
+  const automationDraft = JSON.parse(JSON.stringify(automationSheet.payload.character.data));
+  automationDraft.play.hp = automationSheet.payload.character.summary.hp;
+  automationDraft.play.tempHp = 0;
+  automationDraft.play.conditions = [];
+  automationDraft.play.persistentDamage = [
+    { id: "pd_smoke", formula: "1d6", type: "fire", dc: 15 },
+  ];
+  await api(`/api/characters/${character.id}`, {
+    method: "PUT",
+    cookie: playerCookie,
+    body: { data: automationDraft, force: true },
+  });
+
+  const automationSetupPromise = waitForEvent(
+    playerSocket,
+    "initiative:updated",
+    (payload) =>
+      payload.round === 0 &&
+      payload.entries.some((entry) => entry.tokenId === token.id && entry.pending)
+  );
+  const automationSetup = await emitAck(gmSocket, "initiative:start", {
+    campaignId: campaign.id,
+    sceneId: scene.id,
+  });
+  const automationOrder = await automationSetupPromise;
+  const automationEntry = automationOrder.entries.find((entry) => entry.tokenId === token.id);
+  if (!automationSetup?.ok || !automationEntry?.pending) {
+    throw new Error("Persistent-damage combat setup did not create a pending player roll");
+  }
+  const automationSubmitPromise = waitForEvent(
+    playerSocket,
+    "initiative:updated",
+    (payload) =>
+      payload.round === 1 &&
+      payload.entries.some((entry) => entry.id === automationEntry.id && !entry.pending)
+  );
+  await emitAck(playerSocket, "initiative:submit", {
+    campaignId: campaign.id,
+    entryId: automationEntry.id,
+  });
+  await automationSubmitPromise;
+
+  const automationChatPromise = waitForEvent(
+    playerSocket,
+    "chat:message",
+    (message) => message.authorName === "Combat automation" && /end of turn/i.test(message.content)
+  );
+  const automationHpPromise = waitForEvent(
+    playerSocket,
+    "character:updated",
+    (payload) =>
+      payload.characterId === character.id &&
+      payload.summary.currentHp < automationSheet.payload.character.summary.hp
+  );
+  const automationTurn = await emitAck(playerSocket, "initiative:end-turn", {
+    campaignId: campaign.id,
+  });
+  await automationHpPromise;
+  await automationChatPromise;
+  if (!automationTurn?.ok) throw new Error("The active player could not end their turn");
+  const automationAfter = await api(`/api/characters/${character.id}`, {
+    cookie: playerCookie,
+  });
+  if (
+    automationAfter.payload.character.summary.currentHp >=
+    automationSheet.payload.character.summary.hp
+  ) {
+    throw new Error("End turn did not apply persistent damage to the linked character");
+  }
+  gmSocket.emit("initiative:end", { campaignId: campaign.id });
+  await delay(150);
+  log("end turn applies persistent damage and posts combat automation");
+
   const smokeGroup = "grp_smoke";
   const goblinOne = await emitAck(gmSocket, "token:create", {
     campaignId: campaign.id,

@@ -152,7 +152,7 @@ export function restoreDatabaseBackup(databasePath: string, backupPath: string):
     throw new Error(`backup not found at ${backupPath}`);
   }
   verifyDatabaseFile(backupPath);
-  for (const suffix of ["-wal", "-shm"]) {
+  for (const suffix of ["-wal", "-shm", "-journal"]) {
     fs.rmSync(`${databasePath}${suffix}`, { force: true });
   }
   const temporary = `${databasePath}.restore-${process.pid}.tmp`;

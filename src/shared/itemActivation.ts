@@ -76,7 +76,7 @@ export function itemUseInfo(item: Equipment | null | undefined): ItemUseInfo | n
     return {
       kind: "consumable",
       label: "Use",
-      usesMax: Math.max(1, Math.min(20, Math.round(item.consumable?.uses ?? 1))),
+      usesMax: Math.max(1, Math.min(999, Math.round(item.consumable?.uses ?? 1))),
       frequency: null,
       healingFormula,
     };
@@ -156,6 +156,70 @@ export function activateItemOnDraft(
   const name = item?.name ?? itemId;
   if (info.kind === "consumable") {
     if (entry.quantity < 1) return { ...base, blocked: `${name} is out of stock.` };
+    const usesMax = Math.max(1, Math.min(999, Math.round(info.usesMax || 1)));
+    const healingFormula = options.targetsSelf === false ? null : info.healingFormula;
+    if (usesMax > 1) {
+      const storedMax =
+        entry.usesKind === "consumable" && (entry.usesMax ?? 0) > 0
+          ? Math.max(1, Math.min(999, Math.round(entry.usesMax!)))
+          : usesMax;
+      const used =
+        entry.usesKind === "consumable"
+          ? Math.max(0, Math.min(storedMax, Math.round(entry.usesUsed ?? 0)))
+          : 0;
+      if (used + 1 >= storedMax) {
+        const equipment =
+          entry.quantity > 1
+            ? draft.equipment.map((candidate) =>
+                candidate.itemId === itemId
+                  ? {
+                      ...candidate,
+                      quantity: candidate.quantity - 1,
+                      usesKind: "consumable" as const,
+                      usesMax: storedMax,
+                      usesUsed: 0,
+                    }
+                  : candidate
+              )
+            : equipmentWithout(draft.equipment, itemId);
+        return {
+          draft: { ...draft, equipment },
+          blocked: null,
+          consumed: true,
+          usedCharge: false,
+          healingFormula,
+          notes: [
+            `Used the last of ${name}.${
+              entry.quantity > 1 ? ` ${entry.quantity - 1} left.` : " The stack is empty."
+            }`,
+            ...(healingFormula ? [`Roll ${healingFormula} healing.`] : []),
+          ],
+        };
+      }
+      const equipment = draft.equipment.map((candidate) =>
+        candidate.itemId === itemId
+          ? {
+              ...candidate,
+              usesKind: "consumable" as const,
+              usesMax: storedMax,
+              usesUsed: used + 1,
+            }
+          : candidate
+      );
+      return {
+        draft: { ...draft, equipment },
+        blocked: null,
+        consumed: false,
+        usedCharge: false,
+        healingFormula,
+        notes: [
+          `Used ${name}. ${storedMax - used - 1} use${
+            storedMax - used - 1 === 1 ? "" : "s"
+          } left on this item.`,
+          ...(healingFormula ? [`Roll ${healingFormula} healing.`] : []),
+        ],
+      };
+    }
     const equipment =
       entry.quantity > 1
         ? draft.equipment.map((candidate) =>
@@ -169,12 +233,10 @@ export function activateItemOnDraft(
       blocked: null,
       consumed: true,
       usedCharge: false,
-      healingFormula: options.targetsSelf === false ? null : info.healingFormula,
+      healingFormula,
       notes: [
         `Used ${name}.${entry.quantity > 1 ? ` ${entry.quantity - 1} left.` : " The stack is empty."}`,
-        ...(info.healingFormula && options.targetsSelf !== false
-          ? [`Roll ${info.healingFormula} healing.`]
-          : []),
+        ...(healingFormula ? [`Roll ${healingFormula} healing.`] : []),
       ],
     };
   }
@@ -235,6 +297,8 @@ export function resetItemUses(draft: CharacterDraft): CharacterDraft {
         const max = Math.max(0, Math.round(entry.usesMax ?? 0));
         return entry.usesUsed === max ? entry : { ...entry, usesUsed: max };
       }
+      // Multi-use consumables do not refill at daily preparation.
+      if (entry.usesKind === "consumable") return entry;
       return (entry.usesUsed ?? 0) > 0 ? { ...entry, usesUsed: 0 } : entry;
     }),
   };

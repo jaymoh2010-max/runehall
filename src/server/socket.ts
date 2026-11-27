@@ -45,6 +45,12 @@ import {
 import { normalizeLightColor, normalizeTokenVisionMode } from "../shared/lighting";
 import { normalizeTokenTurnEffects } from "../shared/tokenTurnEffects";
 import { characterTokenTurnEffects } from "../shared/characterTurnEffects";
+import {
+  resolveEndOfTurn,
+  resolveStartOfTurn,
+  resolveTokenEndOfTurn,
+} from "../shared/turnAutomation";
+import { resolveAfflictionTurnEnd } from "../shared/afflictions";
 import type {
   CharacterDraft,
   CharacterSummary,
@@ -52,6 +58,7 @@ import type {
   InitiativeEntry,
   PresenceUser,
   PublicUser,
+  RollResult,
   ServerToClientEvents,
   Token,
 } from "../shared/types";
@@ -690,12 +697,293 @@ function submitInitiativeRoll(
   return { ok: true, initiative: entry.initiative };
 }
 
+function automationRollLines(rolls: RollResult[]): string[] {
+  return rolls.map(
+    (roll) =>
+      `${roll.label || roll.formula}: ${roll.total}${
+        roll.degree ? ` (${roll.degree.replace("-", " ")})` : ""
+      }`
+  );
+}
+
+function postCombatAutomation(
+  io: TypedServer,
+  campaignId: string,
+  lines: string[],
+  gmOnly: boolean
+): void {
+  const content = lines
+    .map((line) => String(line).trim())
+    .filter(Boolean)
+    .join("\n")
+    .slice(0, 4_900);
+  if (!content) return;
+  const id = newId("msg");
+  const ts = now();
+  const visibility = gmOnly ? "gm" : "all";
+  db.prepare(
+    "INSERT INTO messages (id, campaign_id, scene_id, user_id, author_name, type, content, data, visibility, created_at) VALUES (?, ?, NULL, NULL, ?, 'chat', ?, NULL, ?, ?)"
+  ).run(id, campaignId, "Combat automation", content, visibility, ts);
+  const row = db.prepare("SELECT * FROM messages WHERE id = ?").get(id) as MessageRow;
+  const message = serializeMessage(row);
+  if (gmOnly) io.to(gmRoom(campaignId)).emit("chat:message", message);
+  else io.to(room(campaignId)).emit("chat:message", message);
+}
+
+function applyCharacterTurnDraft(
+  io: TypedServer,
+  campaignId: string,
+  characterId: string,
+  tokenId: string,
+  nextDraft: CharacterDraft
+): void {
+  const character = getCharacter(characterId);
+  if (!character) return;
+  const summary = characterSummary(nextDraft, contextForCharacter(character, nextDraft));
+  db.prepare(
+    "UPDATE characters SET data = ?, summary = ?, updated_at = ?, revision = revision + 1 WHERE id = ?"
+  ).run(JSON.stringify(nextDraft), JSON.stringify(summary), now(), characterId);
+  const token = tokenRow(tokenId);
+  if (token && token.character_id === characterId) {
+    const conditions = syncLifeConditions(
+      normalizeTokenConditions(parseJson(token.conditions, [])),
+      nextDraft.play.conditions
+    );
+    db.prepare(
+      "UPDATE tokens SET hp_max = ?, hp_current = ?, ac = ?, conditions = ?, turn_effects = ?, updated_at = ? WHERE id = ?"
+    ).run(
+      summary.hp,
+      nextDraft.play.hp ?? summary.hp,
+      summary.ac,
+      JSON.stringify(conditions),
+      JSON.stringify(characterTokenTurnEffects(nextDraft.play)),
+      now(),
+      tokenId
+    );
+    const refreshed = tokenRow(tokenId);
+    if (refreshed) {
+      socketTokenEvents(io, campaignId).updated(
+        tokenWithOwner(refreshed),
+        Boolean(refreshed.hidden)
+      );
+    }
+  }
+  const target = token?.hidden ? gmRoom(campaignId) : room(campaignId);
+  io.to(target).emit("character:updated", characterUpdatedPayload(characterId, nextDraft, summary));
+}
+
+function resolveCharacterEndOfTurn(io: TypedServer, campaignId: string, token: TokenRow): void {
+  if (!token.character_id) return;
+  const character = getCharacter(token.character_id);
+  if (!character) return;
+  if (character.campaign_id && character.campaign_id !== campaignId) return;
+  try {
+    const draft = normalizeCharacterDraft(JSON.parse(character.data), character.name);
+    const context = contextForCharacter(character, draft);
+    const derived = computeCharacter(draft, context);
+    const end = resolveEndOfTurn(draft, derived.maxHp, { labelPrefix: character.name });
+    const affliction = resolveAfflictionTurnEnd(end.draft, derived.saves, {
+      labelPrefix: character.name,
+    });
+    const nextDraft = affliction.draft;
+    const changed = end.changed || affliction.changed;
+    if (changed) {
+      applyCharacterTurnDraft(io, campaignId, character.id, token.id, nextDraft);
+    }
+    const lines = [
+      `${character.name} - end of turn`,
+      ...end.notes,
+      ...affliction.notes,
+      ...automationRollLines([
+        ...end.rolls.map((roll) => roll.damage),
+        ...end.rolls.flatMap((roll) => (roll.flatCheck ? [roll.flatCheck] : [])),
+        ...affliction.rolls,
+      ]),
+    ];
+    if (changed || lines.length > 1) {
+      postCombatAutomation(io, campaignId, lines, Boolean(token.hidden));
+    }
+  } catch {
+    // A malformed draft must not block the turn advance.
+  }
+}
+
+function resolveCharacterStartOfTurn(io: TypedServer, campaignId: string, token: TokenRow): void {
+  if (!token.character_id) return;
+  const character = getCharacter(token.character_id);
+  if (!character) return;
+  if (character.campaign_id && character.campaign_id !== campaignId) return;
+  try {
+    const draft = normalizeCharacterDraft(JSON.parse(character.data), character.name);
+    const context = contextForCharacter(character, draft);
+    const derived = computeCharacter(draft, context);
+    const start = resolveStartOfTurn(draft, derived.maxHp, { labelPrefix: character.name });
+    if (start.changed) {
+      applyCharacterTurnDraft(io, campaignId, character.id, token.id, start.draft);
+    }
+    const lines = [
+      `${character.name} - start of turn`,
+      ...start.notes,
+      ...automationRollLines(start.recovery ? [start.recovery] : []),
+    ];
+    if (start.changed || lines.length > 1) {
+      postCombatAutomation(io, campaignId, lines, Boolean(token.hidden));
+    }
+  } catch {
+    // A malformed draft must not block the turn advance.
+  }
+}
+
+function resolveUnlinkedTokenEndOfTurn(io: TypedServer, campaignId: string, token: TokenRow): void {
+  if (token.character_id) {
+    resolveCharacterEndOfTurn(io, campaignId, token);
+    return;
+  }
+  const effects = normalizeTokenTurnEffects(parseJson(token.turn_effects, {}));
+  const conditions = normalizeTokenConditions(parseJson(token.conditions, []));
+  const dead = conditions.some(
+    (condition) =>
+      condition.name
+        .trim()
+        .toLowerCase()
+        .replace(/\s+\d+$/, "") === "dead"
+  );
+  const result = resolveTokenEndOfTurn(effects, { labelPrefix: token.name }, dead);
+  const lines = [`${token.name} - end of turn`];
+  if (result.totalDamage) lines.push(`Persistent damage: ${result.totalDamage}.`);
+  for (const roll of result.rolls) {
+    if (roll.ended) lines.push(`Persistent ${roll.instance.type} ends.`);
+  }
+  lines.push(
+    ...automationRollLines(
+      result.rolls.flatMap((roll) => [roll.damage, ...(roll.flatCheck ? [roll.flatCheck] : [])])
+    )
+  );
+  let nextHp = token.hp_current;
+  let nextConditions = conditions;
+  if (result.changed) {
+    if (token.hp_max !== null && result.totalDamage > 0) {
+      const state = applyHpEditToState(
+        { hp: token.hp_current ?? token.hp_max, conditions },
+        token.hp_max,
+        {
+          type: "damage",
+          amount: result.totalDamage,
+          damageTypes: [...new Set(result.rolls.map((roll) => roll.instance.type))],
+        }
+      );
+      nextHp = state.draft.play.hp ?? token.hp_max;
+      nextConditions = state.draft.play.conditions;
+    }
+    db.prepare(
+      "UPDATE tokens SET hp_current = ?, conditions = ?, turn_effects = ?, updated_at = ? WHERE id = ?"
+    ).run(
+      nextHp,
+      JSON.stringify(nextConditions),
+      JSON.stringify({ ...effects, persistentDamage: result.remaining }),
+      now(),
+      token.id
+    );
+    const refreshed = tokenRow(token.id);
+    if (refreshed) {
+      socketTokenEvents(io, campaignId).updated(
+        tokenWithOwner(refreshed),
+        Boolean(refreshed.hidden)
+      );
+    }
+  }
+  if (result.changed || lines.length > 1) {
+    postCombatAutomation(io, campaignId, lines, Boolean(token.hidden));
+  }
+}
+
+function resolveCombatantEndOfTurn(
+  io: TypedServer,
+  campaignId: string,
+  entry: InitiativeEntry
+): void {
+  if (!entry.tokenId || entry.groupId) return;
+  const token = tokenRow(entry.tokenId);
+  if (!token) return;
+  resolveUnlinkedTokenEndOfTurn(io, campaignId, token);
+}
+
+function resolveUnlinkedTokenStartOfTurn(
+  io: TypedServer,
+  campaignId: string,
+  token: TokenRow
+): void {
+  if (token.hp_max === null) return;
+  const effects = normalizeTokenTurnEffects(parseJson(token.turn_effects, {}));
+  const conditions = normalizeTokenConditions(parseJson(token.conditions, []));
+  const draft = {
+    play: {
+      hp: token.hp_current ?? token.hp_max,
+      tempHp: 0,
+      conditions,
+      heroPoints: 0,
+      focusPoints: 0,
+      afflictions: [],
+      persistentDamage: [],
+      xp: 0,
+      shieldRaised: false,
+      fastHealing: effects.fastHealing,
+      fastHealingActive: effects.fastHealingActive,
+      fastHealingNote: effects.fastHealingNote,
+      regeneration: effects.regeneration,
+      regenerationActive: effects.regenerationActive,
+      regenerationNote: effects.regenerationNote,
+      regenerationDeactivatedBy: effects.regenerationDeactivatedBy,
+    },
+  } as unknown as CharacterDraft;
+  const start = resolveStartOfTurn(draft, token.hp_max, { labelPrefix: token.name });
+  if (start.changed) {
+    db.prepare("UPDATE tokens SET hp_current = ?, conditions = ?, updated_at = ? WHERE id = ?").run(
+      start.draft.play.hp ?? token.hp_max,
+      JSON.stringify(start.draft.play.conditions),
+      now(),
+      token.id
+    );
+    const refreshed = tokenRow(token.id);
+    if (refreshed) {
+      socketTokenEvents(io, campaignId).updated(
+        tokenWithOwner(refreshed),
+        Boolean(refreshed.hidden)
+      );
+    }
+  }
+  const lines = [
+    `${token.name} - start of turn`,
+    ...start.notes,
+    ...automationRollLines(start.recovery ? [start.recovery] : []),
+  ];
+  if (start.changed || lines.length > 1) {
+    postCombatAutomation(io, campaignId, lines, Boolean(token.hidden));
+  }
+}
+
+function resolveCombatantStartOfTurn(
+  io: TypedServer,
+  campaignId: string,
+  entry: InitiativeEntry
+): void {
+  if (!entry.tokenId || entry.groupId || entry.pending) return;
+  const token = tokenRow(entry.tokenId);
+  if (!token) return;
+  if (token.character_id) resolveCharacterStartOfTurn(io, campaignId, token);
+  else resolveUnlinkedTokenStartOfTurn(io, campaignId, token);
+}
+
 /** Advance the active marker, wrapping into the next round. */
 function advanceInitiativeTurn(io: TypedServer, campaignId: string, direction: 1 | -1): boolean {
   const state = ensureState(campaignId);
   if (state.round === 0) return false;
   const entries = serializeInitiative(JSON.parse(state.initiative || "[]"));
   if (!entries.length) return false;
+  const previous = entries[state.turn_index] ?? null;
+  if (direction === 1 && previous) {
+    resolveCombatantEndOfTurn(io, campaignId, previous);
+  }
   let turn = state.turn_index + direction;
   let round = state.round;
   if (turn >= entries.length) {
@@ -710,6 +998,11 @@ function advanceInitiativeTurn(io: TypedServer, campaignId: string, direction: 1
   ).run(turn, round, now(), campaignId);
   broadcastInitiative(io, campaignId, ensureState(campaignId));
   if (round > state.round) expireSceneTemplates(io, campaignId, round);
+  if (direction === 1 && round > 0) {
+    const nextEntries = serializeInitiative(JSON.parse(ensureState(campaignId).initiative || "[]"));
+    const active = nextEntries[turn] ?? null;
+    if (active) resolveCombatantStartOfTurn(io, campaignId, active);
+  }
   return true;
 }
 

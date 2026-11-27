@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { emptyCharacterDraft } from "../src/shared/rules";
+import { emptyCharacterDraft, normalizeCharacterDraft } from "../src/shared/rules";
 import { consumeInnateUse, innateUsesMax, innateUsesRemaining } from "../src/shared/innate";
 import { castSpell, spellCastOptionAvailable, spellCastOptions } from "../src/shared/spellcasting";
 import type { CharacterContext, Spell } from "../src/shared/types";
@@ -55,6 +55,20 @@ describe("innate spell uses", () => {
     draft.spells.innateMax = { "spell:innate": 2 };
     draft.spells.innateUsed = { "spell:innate": 1 };
     expect(innateUsesRemaining(draft, spell())).toBe(1);
+  });
+
+  it("supports an explicit at-will ranked innate spell", () => {
+    expect(innateUsesMax(spell(), 0)).toBeNull();
+    const draft = emptyCharacterDraft("Innate");
+    draft.spells.innateMax = { "spell:innate": 0 };
+    draft.spells.innateUsed = { "spell:innate": 2 };
+    expect(innateUsesRemaining(draft, spell())).toBeNull();
+    expect(
+      normalizeCharacterDraft({
+        name: "Innate",
+        spells: { innateMax: { "spell:innate": 0 } },
+      }).spells.innateMax["spell:innate"]
+    ).toBe(0);
   });
 
   it("tracks remaining uses on the character", () => {

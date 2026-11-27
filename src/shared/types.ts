@@ -737,9 +737,10 @@ export interface CharacterEquipment {
   usesMax?: number;
   /**
    * How usesUsed/usesMax are interpreted. Charged staff pools are emptied on a
-   * long rest, while daily item uses refill.
+   * long rest, daily item uses refill, and multi-use consumables keep their
+   * remaining uses until the container is spent.
    */
-  usesKind?: "daily" | "charges";
+  usesKind?: "daily" | "charges" | "consumable";
   /** Equipment IDs for runes etched onto this weapon, armor, or shield. */
   runes?: string[];
 }

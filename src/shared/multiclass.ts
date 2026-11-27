@@ -7,6 +7,8 @@ export interface MulticlassDedication {
   /** True when the tradition comes from a bloodline, patron, or eidolon choice. */
   variableTradition?: boolean;
   ability: AbilityKey;
+  /** The dedication allows any of these key abilities (Psychic: Int or Cha). */
+  variableAbility?: AbilityKey[];
   cantripLimit: number;
   basicFeatId: string;
   expertFeatId: string;
@@ -70,6 +72,7 @@ const DEDICATIONS: Record<string, DedicationData> = {
     className: "Psychic",
     tradition: "occult",
     ability: "int",
+    variableAbility: ["int", "cha"],
     cantripLimit: 1,
     basicFeatId: "feat:ePKe13FzKWaQqLo6",
     expertFeatId: "feat:RJmnFuaGLXfhX3It",

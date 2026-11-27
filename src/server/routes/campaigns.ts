@@ -55,6 +55,7 @@ import {
   touchCampaign,
 } from "../serialize";
 import { tokenEventsFor } from "../tokenEvents";
+import { globalAssetReferences } from "../assets";
 import { broadcastCampaignSummary } from "../campaignEvents";
 import {
   isCampaignRuleset,
@@ -902,14 +903,20 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
       for (const match of JSON.stringify(payload).matchAll(/\/uploads\/([A-Za-z0-9._-]+)/g)) {
         referencedUploads.add(match[1]);
       }
+      const memberIds = (
+        db.prepare("SELECT user_id FROM campaign_members WHERE campaign_id = ?").all(id) as {
+          user_id: string;
+        }[]
+      ).map((member) => member.user_id);
       const ownedAssets = new Set(
         (
           db
             .prepare(
               `SELECT filename FROM uploaded_assets
-               WHERE campaign_id = ? OR (campaign_id IS NULL AND uploaded_by = ?)`
+               WHERE campaign_id = ?
+                  OR (campaign_id IS NULL AND uploaded_by IN (${memberIds.map(() => "?").join(",") || "NULL"}))`
             )
-            .all(id, request.user!.id) as { filename: string }[]
+            .all(id, ...memberIds) as { filename: string }[]
         ).map((row) => row.filename)
       );
       let totalBytes = 0;
@@ -1048,8 +1055,25 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
         error: `Type the campaign name "${row.name}" exactly to confirm permanent deletion.`,
       });
     }
+    const campaignAssets = (
+      db.prepare("SELECT filename FROM uploaded_assets WHERE campaign_id = ?").all(id) as {
+        filename: string;
+      }[]
+    ).map((asset) => asset.filename);
     app.broadcastCampaign(id, "campaign:deleted", { campaignId: id });
     db.prepare("DELETE FROM campaigns WHERE id = ?").run(id);
+    if (campaignAssets.length) {
+      const references = globalAssetReferences();
+      for (const filename of campaignAssets) {
+        if (references.has(filename)) continue;
+        try {
+          fs.rmSync(path.join(uploadsDir(), filename), { force: true });
+        } catch {
+          // A file that cannot be removed is still removed from the asset row.
+        }
+        db.prepare("DELETE FROM uploaded_assets WHERE filename = ?").run(filename);
+      }
+    }
     logAudit({
       action: "campaign.delete",
       actor: request.user,

@@ -6,6 +6,7 @@
  *   npm run restore -- --from backups/runehall-2026-01-01T12-00-00-000Z --yes
  *   npm run restore -- --from <dir> --yes --allow-unverified
  *   npm run restore -- --from <dir> --yes --allow-unsafe (corrupt live DB)
+ *   npm run restore -- --from <dir> --yes --allow-newer-schema
  *
  * The server must be stopped first. The script refuses to restore if the API
  * port is accepting connections, keeps a safety copy of the current DB, and
@@ -28,6 +29,7 @@ const fromArg = fromIndex >= 0 ? args[fromIndex + 1] : args.find((arg) => !arg.s
 const assumeYes = args.includes("--yes");
 const allowUnverified = args.includes("--allow-unverified");
 const allowUnsafe = args.includes("--allow-unsafe");
+const allowNewerSchema = args.includes("--allow-newer-schema");
 const dataDir = path.resolve(process.env.DATA_DIR || "data");
 const backupRoot = path.resolve(process.env.BACKUP_DIR || "backups");
 const databasePath = process.env.DATABASE_PATH
@@ -118,6 +120,43 @@ try {
   process.exit(1);
 }
 
+function latestCodeMigration() {
+  try {
+    const source = fs.readFileSync(path.resolve("src", "server", "migrations.ts"), "utf8");
+    const versions = [...source.matchAll(/version:\s*(\d+)/g)].map((match) => Number(match[1]));
+    return versions.length ? Math.max(...versions) : 0;
+  } catch {
+    return null;
+  }
+}
+
+function latestAppliedMigration(file) {
+  const database = new DatabaseSync(file, { readOnly: true });
+  try {
+    const row = database.prepare("SELECT MAX(version) AS version FROM schema_migrations").get();
+    const version = Number(row?.version);
+    return Number.isFinite(version) ? version : null;
+  } catch {
+    return null;
+  } finally {
+    database.close();
+  }
+}
+
+const codeSchema = latestCodeMigration();
+const backupSchema = latestAppliedMigration(backupDb);
+if (codeSchema !== null && backupSchema !== null && backupSchema > codeSchema) {
+  const message = `Backup schema is newer (v${backupSchema}) than this server (v${codeSchema}).`;
+  if (!allowNewerSchema) {
+    console.error(message);
+    console.error(
+      "Nothing was changed. Upgrade Runehall, or pass --allow-newer-schema if you deliberately downgraded."
+    );
+    process.exit(1);
+  }
+  console.warn(`WARNING: ${message} Restoring anyway.`);
+}
+
 try {
   const missing = missingStructuredUploads(backupDb, backupUploads);
   if (missing.length) {
@@ -198,29 +237,88 @@ if (safetyError) {
   console.warn(`WARNING: restoring without a complete safety copy: ${message}`);
 }
 
-for (const suffix of ["", "-wal", "-shm"]) {
-  const file = `${databasePath}${suffix}`;
-  if (fs.existsSync(file)) fs.rmSync(file, { force: true });
-}
-fs.mkdirSync(path.dirname(databasePath), { recursive: true });
-fs.copyFileSync(backupDb, databasePath);
-
-if (fs.existsSync(uploadsDir)) fs.rmSync(uploadsDir, { recursive: true, force: true });
-fs.mkdirSync(uploadsDir, { recursive: true });
-if (fs.existsSync(backupUploads)) {
-  fs.cpSync(backupUploads, uploadsDir, { recursive: true });
-}
-
+// Stage the replacement on the same filesystem, then swap. If a copy or
+// rename fails, the live database and uploads are restored instead of being
+// lost. The previous data is kept in `live/` for a quick local rollback.
+const localSafety = path.join(dataDir, `.restore-${stamp}`);
+const liveDir = path.join(localSafety, "live");
+const stagedDb = path.join(localSafety, "runehall.db");
+const stagedUploads = path.join(localSafety, "uploads");
+const stagedCompendium = path.join(localSafety, "compendium");
 let restoredCompendium = false;
-if (fs.existsSync(backupCompendium)) {
-  if (fs.existsSync(compendiumDir)) fs.rmSync(compendiumDir, { recursive: true, force: true });
-  fs.mkdirSync(path.dirname(compendiumDir), { recursive: true });
-  fs.cpSync(backupCompendium, compendiumDir, { recursive: true });
-  restoredCompendium = true;
-} else {
-  console.warn(
-    `WARNING: this backup has no compendium at ${backupCompendium}. Keep the existing rules data in ${compendiumDir}.`
-  );
+
+const moveIfPresent = (source, name) => {
+  if (!fs.existsSync(source)) return false;
+  const destination = path.join(liveDir, name);
+  fs.renameSync(source, destination);
+  return true;
+};
+
+try {
+  fs.mkdirSync(liveDir, { recursive: true });
+  fs.copyFileSync(backupDb, stagedDb);
+  verifyDatabaseFile(stagedDb);
+  if (fs.existsSync(backupUploads)) {
+    fs.cpSync(backupUploads, stagedUploads, { recursive: true });
+  }
+  if (fs.existsSync(backupCompendium)) {
+    fs.cpSync(backupCompendium, stagedCompendium, { recursive: true });
+  }
+
+  moveIfPresent(databasePath, "runehall.db");
+  for (const suffix of ["-wal", "-shm", "-journal"]) {
+    moveIfPresent(`${databasePath}${suffix}`, `runehall.db${suffix}`);
+  }
+  fs.mkdirSync(path.dirname(databasePath), { recursive: true });
+  fs.renameSync(stagedDb, databasePath);
+
+  moveIfPresent(uploadsDir, "uploads");
+  if (fs.existsSync(stagedUploads)) {
+    fs.renameSync(stagedUploads, uploadsDir);
+  } else {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+  }
+
+  if (fs.existsSync(stagedCompendium)) {
+    moveIfPresent(compendiumDir, "compendium");
+    fs.mkdirSync(path.dirname(compendiumDir), { recursive: true });
+    fs.renameSync(stagedCompendium, compendiumDir);
+    restoredCompendium = true;
+  } else {
+    console.warn(
+      `WARNING: this backup has no compendium at ${backupCompendium}. Keep the existing rules data in ${compendiumDir}.`
+    );
+  }
+} catch (error) {
+  const failures = [];
+  const restoreLive = (current, name, failedName) => {
+    const live = path.join(liveDir, name);
+    if (!fs.existsSync(live)) return;
+    if (fs.existsSync(current)) fs.renameSync(current, path.join(localSafety, failedName));
+    fs.renameSync(live, current);
+  };
+  try {
+    restoreLive(databasePath, "runehall.db", "failed-runehall.db");
+    for (const suffix of ["-wal", "-shm", "-journal"]) {
+      restoreLive(
+        `${databasePath}${suffix}`,
+        `runehall.db${suffix}`,
+        `failed-runehall.db${suffix}`
+      );
+    }
+    restoreLive(uploadsDir, "uploads", "failed-uploads");
+    restoreLive(compendiumDir, "compendium", "failed-compendium");
+  } catch (rollbackError) {
+    failures.push(rollbackError instanceof Error ? rollbackError.message : String(rollbackError));
+  }
+  console.error(`Restore failed: ${error instanceof Error ? error.message : String(error)}`);
+  if (failures.length) {
+    console.error(`Rollback also failed: ${failures.join("; ")}`);
+    console.error(`Recover from the safety copy at ${safetyDir}.`);
+  } else {
+    console.error("The previous database and uploads were restored.");
+  }
+  process.exit(1);
 }
 
 console.log(`Restored ${backupDir}`);
@@ -228,4 +326,5 @@ console.log(`  Database: ${databasePath}`);
 console.log(`  Uploads:  ${uploadsDir}`);
 console.log(`  Compendium: ${restoredCompendium ? compendiumDir : "left unchanged"}`);
 console.log(`  Safety copy of previous data: ${safetyDir}`);
+console.log(`  Local rollback copy: ${liveDir}`);
 console.log("Start Runehall again with: npm run dev");

@@ -84,6 +84,7 @@ import {
 import {
   COMMANDER_TACTICS,
   COMMANDER_TACTICS_BY_ID,
+  commanderFeatIds,
   commanderFolioLimit,
   commanderPreparedLimit,
 } from "../../../../shared/commander";
@@ -152,11 +153,12 @@ export function FeatsStep({
   const slots = featSlotsFor(classData, draft.level, Boolean(context.freeArchetype));
   const ancestryTrait = heritageFeatTraits(context.heritage, ancestry).join(",");
   const classTrait = classData?.name.toLowerCase();
-  const commanderFolioLimitForLevel = commanderFolioLimit(draft.level);
-  const commanderPreparedLimitForLevel = commanderPreparedLimit(draft.level);
+  const commanderFeats = commanderFeatIds(draft);
+  const commanderFolioLimitForLevel = commanderFolioLimit(draft.level, commanderFeats);
+  const commanderPreparedLimitForLevel = commanderPreparedLimit(draft.level, commanderFeats);
   const addTactic = (tacticId: string) =>
     update((current) => {
-      const limit = commanderFolioLimit(current.level);
+      const limit = commanderFolioLimit(current.level, commanderFeatIds(current));
       if (
         !tacticId ||
         current.commander.folio.includes(tacticId) ||
@@ -191,7 +193,10 @@ export function FeatsStep({
           },
         };
       }
-      if (current.commander.prepared.length >= commanderPreparedLimit(current.level)) {
+      if (
+        current.commander.prepared.length >=
+        commanderPreparedLimit(current.level, commanderFeatIds(current))
+      ) {
         return current;
       }
       return {

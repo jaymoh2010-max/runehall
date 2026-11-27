@@ -378,7 +378,7 @@ export function SpellsStep({ draft, update, derived, context, setStep, openPicke
         ...current.spells,
         innateMax: {
           ...(current.spells.innateMax ?? {}),
-          [spellId]: Math.max(1, Math.min(20, Math.round(uses))),
+          [spellId]: Math.max(0, Math.min(20, Math.round(uses))),
         },
       },
     }));
@@ -453,9 +453,10 @@ export function SpellsStep({ draft, update, derived, context, setStep, openPicke
                 className="spell-chip-uses"
                 aria-label={`Daily uses for ${spell.name}`}
                 title="Daily uses"
-                value={String(draft.spells.innateMax[spell.id] ?? innateUsesMax(spell) ?? 1)}
+                value={String(draft.spells.innateMax[spell.id] ?? innateUsesMax(spell) ?? 0)}
                 onChange={(event) => setInnateMax(spell.id, Number(event.target.value))}
               >
+                <option value={0}>At will</option>
                 {[1, 2, 3, 4, 5].map((uses) => (
                   <option key={uses} value={uses}>
                     {uses}/day
@@ -1725,6 +1726,11 @@ export function SpellsStep({ draft, update, derived, context, setStep, openPicke
               if (spell.rank === 0) return current;
               if (current.spells.multiclassSpells.includes(spell.id)) return current;
               if (current.spells.multiclassSpells.length >= multiclassSlotTotal) return current;
+              const rankSlots = multiclassSlots[spell.rank - 1] ?? 0;
+              const rankCount = current.spells.multiclassSpells.filter(
+                (id) => context.spells[id]?.rank === spell.rank
+              ).length;
+              if (rankCount >= rankSlots) return current;
               return {
                 ...current,
                 spells: {

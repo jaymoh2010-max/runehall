@@ -1944,22 +1944,23 @@ test("builder learns a spontaneous spell at more than one rank", async ({ page }
   await page.keyboard.press("Escape");
   await expect(staffEffects).toBeHidden();
   await staffRow.getByRole("button", { name: "Charge Staff of Healing" }).click();
-  await page.getByRole("button", { name: "Expend rank 1" }).click();
-  await expect(page.getByText(/Charged Staff of Healing with 1 charge/)).toBeVisible({
+  await page.getByRole("button", { name: "Prepare Staff of Healing for today" }).click();
+  await expect(page.getByText(/Prepared Staff of Healing with 6 charges/)).toBeVisible({
     timeout: 15_000,
   });
+  await expect(staffRow).toContainText("6 / 6 charges");
   await staffRow.getByRole("button", { name: "Cast spell from Staff of Healing" }).click();
   await page.getByRole("button", { name: /^Heal · 1 charge$/ }).click();
   await expect(page.getByText(/Cast Heal from Staff of Healing using 1 charge/)).toBeVisible({
     timeout: 15_000,
   });
-  await expect(staffRow).toContainText("0 / 1 charges");
+  await expect(staffRow).toContainText("5 / 6 charges");
   await staffRow.getByRole("button", { name: "Cast spell from Staff of Healing" }).click();
-  await page.getByRole("button", { name: "Slot", exact: true }).click();
+  await page.getByRole("button", { name: "Cast Heal using a rank 1 slot" }).click();
   await expect(
-    page.getByText(/Cast Heal from Staff of Healing using a rank 1 spell slot/)
+    page.getByText(/Cast Heal from Staff of Healing using a rank 1 spell slot and 1 staff charge/)
   ).toBeVisible({ timeout: 15_000 });
-  await expect(staffRow).toContainText("0 / 1 charges");
+  await expect(staffRow).toContainText("4 / 6 charges");
   await expect(page.locator(".pb-save")).toHaveText("Saved");
 
   await page.reload();

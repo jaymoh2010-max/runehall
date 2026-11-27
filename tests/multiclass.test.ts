@@ -108,6 +108,18 @@ describe("multiclass dedication cantrips", () => {
     expect(derived.multiclassCaster?.spellAttack).toBeTypeOf("number");
   });
 
+  it("uses the higher qualifying ability for a Psychic dedication", () => {
+    const draft = emptyCharacterDraft("Psychic Fighter");
+    draft.classId = fighter.id;
+    draft.keyAbility = "str";
+    draft.level = 2;
+    draft.feats.class["2"] = "feat:OW3W2vMARiojda7e";
+    draft.boosts.free = ["cha", "cha", "int", "str"];
+    const derived = computeCharacter(draft, contextForDraft(draft));
+    expect(derived.multiclassCaster?.ability).toBe("cha");
+    expect(derived.multiclassCaster?.spellDc).toBe(10 + 4 + derived.abilityMods.cha);
+  });
+
   it("uses the chosen tradition for a variable-tradition dedication", () => {
     const draft = emptyCharacterDraft("Dedicated Sorcerer");
     draft.classId = fighter.id;
@@ -121,6 +133,27 @@ describe("multiclass dedication cantrips", () => {
       tradition: "occult",
       variableTradition: true,
     });
+  });
+
+  it("warns when dedication spells exceed a per-rank slot", () => {
+    const draft = emptyCharacterDraft("Ranked Dedication");
+    draft.classId = fighter.id;
+    draft.keyAbility = "str";
+    draft.level = 6;
+    draft.feats.class["2"] = "feat:oQ6EZRFXbHWCx08C";
+    draft.feats.class["4"] = "feat:SHUfHzElHZPXJFiP";
+    const rankTwo = spells
+      .filter(
+        (spell) =>
+          spell.rank === 2 && spell.traditions.includes("arcane") && spell.id.startsWith("spell:")
+      )
+      .slice(0, 2);
+    expect(rankTwo).toHaveLength(2);
+    draft.spells.multiclassSpells = rankTwo.map((spell) => spell.id);
+    const derived = computeCharacter(draft, contextForDraft(draft));
+    expect(
+      derived.validation.some((entry) => /rank 2 spell.*only 1 rank 2 slot/.test(entry.message))
+    ).toBe(true);
   });
 
   it("offers every available dedication slot rank for heightening", () => {

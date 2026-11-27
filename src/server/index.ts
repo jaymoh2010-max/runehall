@@ -21,6 +21,7 @@ import { registerUploadRoutes } from "./routes/uploads";
 import { isTrustedOrigin, registerSecurity } from "./security";
 import { setRevisionBroadcaster } from "./revisions";
 import { compendiumCounts, compendiumManifest } from "./compendium";
+import { backfillUploadedAssets } from "./assets";
 import { db } from "./db";
 import { registerSocketServer, type TypedServer } from "./socket";
 import { uploadsDir } from "./util";
@@ -82,6 +83,11 @@ app.decorate(
 setRevisionBroadcaster((campaignId, revision) => {
   app.broadcastCampaign(campaignId, "campaign:revision", { revision });
 });
+
+const backfilledUploads = backfillUploadedAssets();
+if (backfilledUploads) {
+  app.log.info({ count: backfilledUploads }, "registered legacy uploads");
+}
 
 await app.register(cookie);
 await app.register(multipart, {
