@@ -3,20 +3,11 @@ import { Trash2 } from "lucide-react";
 import type { CharacterDraft, RunesmithRune } from "../../../shared/types";
 import {
   newRunesmithEtchedId,
+  runesmithDefaultTarget,
   runesmithEtchedLimit,
   runesmithRepertoireLimit,
 } from "../../../shared/runesmith";
 import { Card, Field, Input, RichText, Select, Tag } from "../ui";
-
-function defaultTarget(rune: RunesmithRune): string {
-  const usage = rune.usage.toLowerCase();
-  if (usage.includes("creature")) return "Self";
-  if (usage.includes("weapon")) return "Weapon";
-  if (usage.includes("armor")) return "Armor";
-  if (usage.includes("shield")) return "Shield";
-  if (usage.includes("square")) return "Square";
-  return "";
-}
 
 export function RunesmithRunesCard({
   draft,
@@ -87,7 +78,7 @@ export function RunesmithRunesCard({
             {
               id: newRunesmithEtchedId(),
               runeId,
-              target: defaultTarget(rune),
+              target: runesmithDefaultTarget(rune),
               diacriticId: null,
             },
           ],

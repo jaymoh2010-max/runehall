@@ -36,6 +36,7 @@ import type {
   DerivedAttack,
   DerivedCharacter,
   Equipment,
+  RunesmithRune,
   SaveKey,
   Spell,
 } from "../../../shared/types";
@@ -102,7 +103,23 @@ import {
   commanderFeatIds,
   commanderPreparedLimit,
 } from "../../../shared/commander";
-import { runesmithEtchedLimit, runesmithRepertoireLimit } from "../../../shared/runesmith";
+import {
+  newRunesmithEtchedId,
+  runesmithDefaultTarget,
+  runesmithEtchedLimit,
+  runesmithRepertoireLimit,
+} from "../../../shared/runesmith";
+import {
+  availableRuneItems,
+  detachRuneToInventory,
+  etchRuneFromInventory,
+} from "../../../shared/runeLifecycle";
+import {
+  propertyRuneCount,
+  propertyRuneSlots,
+  runeCategory,
+  runeUsageForTarget,
+} from "../../../shared/runes";
 import { psiAmpFor } from "../../../shared/psiAmps";
 import { ritualPrimaryCheckInfo, ritualPrimarySkillNames } from "../../../shared/ritual";
 import {
@@ -434,6 +451,10 @@ export function CharacterSheetView({
   const [afflictionSourceId, setAfflictionSourceId] = useState<string | null>(null);
   const [afflictionPickerOpen, setAfflictionPickerOpen] = useState(false);
   const [afflictionPickerQuery, setAfflictionPickerQuery] = useState("");
+  const [runeTargetId, setRuneTargetId] = useState<string | null>(null);
+  const [runesmithEtchTarget, setRunesmithEtchTarget] = useState<{
+    replaceId: string | null;
+  } | null>(null);
   const conditions = useConditionOptions();
   const [actions, setActions] = useState<ActionRef[]>([]);
   const [actionQuery, setActionQuery] = useState("");
@@ -2027,6 +2048,84 @@ export function CharacterSheetView({
     if (saved) toast(`${name} invoked and faded.`, "success");
   };
 
+  const etchEquipmentRune = async (targetItemId: string, runeItemId: string) => {
+    if (!canEdit || !context) return;
+    const current = draftRef.current;
+    if (!current) return;
+    const result = etchRuneFromInventory(current, targetItemId, runeItemId, context.equipment);
+    if (result.error) {
+      toast(result.error, "error");
+      return;
+    }
+    const saved = await persist(result.draft);
+    if (saved) toast("Rune etched.", "success");
+  };
+
+  const detachEquipmentRune = async (targetItemId: string, runeId: string, name: string) => {
+    if (!canEdit) return;
+    const current = draftRef.current;
+    if (!current) return;
+    const result = detachRuneToInventory(current, targetItemId, runeId);
+    if (result.error) {
+      toast(result.error, "error");
+      return;
+    }
+    const saved = await persist(result.draft);
+    if (saved) toast(`${name} detached and returned to the pack.`, "success");
+  };
+
+  const etchRunesmithRune = async (runeId: string) => {
+    if (!canEdit || !runesmithEtchTarget || !context) return;
+    const rune = context.runes?.[runeId];
+    if (!rune || rune.diacritic) {
+      toast("Choose a base rune from the repertoire.", "error");
+      return;
+    }
+    const replaceId = runesmithEtchTarget.replaceId;
+    const saved = await persist((currentDraft) => {
+      if (replaceId) {
+        return {
+          ...currentDraft,
+          runesmith: {
+            ...currentDraft.runesmith,
+            etched: currentDraft.runesmith.etched.map((entry) =>
+              entry.id === replaceId
+                ? {
+                    ...entry,
+                    runeId,
+                    target: runesmithDefaultTarget(rune),
+                    diacriticId: null,
+                  }
+                : entry
+            ),
+          },
+        };
+      }
+      if (currentDraft.runesmith.etched.length >= runesmithEtchedLimit(currentDraft.level)) {
+        return currentDraft;
+      }
+      return {
+        ...currentDraft,
+        runesmith: {
+          ...currentDraft.runesmith,
+          etched: [
+            ...currentDraft.runesmith.etched,
+            {
+              id: newRunesmithEtchedId(),
+              runeId,
+              target: runesmithDefaultTarget(rune),
+              diacriticId: null,
+            },
+          ],
+        },
+      };
+    });
+    if (saved) {
+      setRunesmithEtchTarget(null);
+      toast(`${rune.name} ${replaceId ? "re-etched" : "etched"}.`, "success");
+    }
+  };
+
   const rollRitual = (spell: Spell) => {
     const override = draftRef.current?.spells.ritualSkills?.[spell.id];
     const candidates = override
@@ -2179,6 +2278,27 @@ export function CharacterSheetView({
     draft.level,
     commanderFeatIds(draft)
   );
+  const runeTarget = runeTargetId ? (context.equipment[runeTargetId] ?? null) : null;
+  const runeTargetEntry = runeTarget
+    ? (draft.equipment.find((entry) => entry.itemId === runeTarget.id) ?? null)
+    : null;
+  const runeTargetRunes = (runeTargetEntry?.runes ?? [])
+    .map((id) => context.equipment[id])
+    .filter((rune): rune is Equipment => Boolean(rune));
+  const runeTargetAvailable = runeTarget
+    ? availableRuneItems(draft, runeTarget.id, context.equipment)
+    : [];
+  const runeTargetSlots = runeTargetEntry
+    ? propertyRuneSlots(runeTargetEntry.runes, context.equipment)
+    : 0;
+  const runeTargetPropertyCount = runeTargetEntry
+    ? propertyRuneCount(runeTargetEntry.runes, context.equipment)
+    : 0;
+  const runesmithBaseRunes = draft.runesmith.repertoire
+    .map((id) => context.runes?.[id])
+    .filter((rune): rune is RunesmithRune => Boolean(rune))
+    .filter((rune) => !rune.diacritic)
+    .filter((rune) => !draft.runesmith.etched.some((entry) => entry.runeId === rune.id));
   const canLearnSpells = ["spellbook", "familiar", "dirge"].includes(spellSourceLabel(classData));
   const preparationsPending = preparedCaster && draft.spells.preparationsPending;
   const spellProfileFor = (group: string): { attack: number | null; dc: number | null } => {
@@ -3438,6 +3558,17 @@ export function CharacterSheetView({
                                         Track
                                       </button>
                                     ) : null}
+                                    {item && runeUsageForTarget(item) ? (
+                                      <button
+                                        type="button"
+                                        className="pb-small-button"
+                                        disabled={!canEdit}
+                                        aria-label={`Runes for ${item.name}`}
+                                        onClick={() => setRuneTargetId(item.id)}
+                                      >
+                                        Runes
+                                      </button>
+                                    ) : null}
                                     {item?.price ? (
                                       <span>
                                         {formatCp(saleUnitCp)} each
@@ -4078,9 +4209,20 @@ export function CharacterSheetView({
                   <div className="pb-subsection">
                     <div className="pb-status-head">
                       <h3>Etched runes</h3>
-                      <span>
-                        {draft.runesmith.etched.length}/{runesmithEtchedLimit(draft.level)}
-                      </span>
+                      <div className="row" style={{ gap: 8, alignItems: "center" }}>
+                        <span>
+                          {draft.runesmith.etched.length}/{runesmithEtchedLimit(draft.level)}
+                        </span>
+                        {draft.runesmith.etched.length < runesmithEtchedLimit(draft.level) ? (
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => setRunesmithEtchTarget({ replaceId: null })}
+                          >
+                            Etch rune
+                          </Button>
+                        ) : null}
+                      </div>
                     </div>
                     <p className="pb-hint">
                       Invoke Rune is one action and can invoke up to two runes within 30 feet. An
@@ -4112,6 +4254,12 @@ export function CharacterSheetView({
                                 onClick={() => void invokeRune(entry.id, rune.name)}
                               >
                                 Invoke
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                onClick={() => setRunesmithEtchTarget({ replaceId: entry.id })}
+                              >
+                                Re-etch
                               </Button>
                             </div>
                           );
@@ -4689,6 +4837,141 @@ export function CharacterSheetView({
         onRest={(result) => void takeLongRest(result)}
         elevated={mode === "overlay"}
       />
+      {runesmithEtchTarget ? (
+        <Modal
+          open
+          onClose={() => setRunesmithEtchTarget(null)}
+          title={runesmithEtchTarget.replaceId ? "Re-etch rune" : "Etch rune"}
+          subtitle="Choose a base rune from the repertoire."
+          elevated={mode === "overlay"}
+          wide
+          footer={
+            <Button variant="ghost" onClick={() => setRunesmithEtchTarget(null)}>
+              Close
+            </Button>
+          }
+        >
+          <div className="stack">
+            {runesmithBaseRunes.length ? (
+              <div className="pb-stack">
+                {runesmithBaseRunes.map((rune) => (
+                  <div className="pb-feat-row" key={rune.id}>
+                    <div>
+                      <strong>{rune.name}</strong>
+                      <span>Level {rune.level}</span>
+                    </div>
+                    <Button
+                      size="sm"
+                      aria-label={`${
+                        runesmithEtchTarget.replaceId ? "Re-etch with" : "Etch"
+                      } ${rune.name}`}
+                      onClick={() => void etchRunesmithRune(rune.id)}
+                    >
+                      {runesmithEtchTarget.replaceId ? "Re-etch" : "Etch"}
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="pb-empty">
+                No available base runes. Add a base rune to the repertoire, or remove an existing
+                etching first.
+              </p>
+            )}
+            <p className="pb-hint">
+              Re-etching replaces the base rune, clears its diacritic, and resets the target to the
+              rune's default. It takes 10 minutes or happens during daily preparations.
+            </p>
+          </div>
+        </Modal>
+      ) : null}
+      {runeTarget ? (
+        <Modal
+          open
+          onClose={() => setRuneTargetId(null)}
+          title={`Runes for ${runeTarget.name}`}
+          subtitle="Etching consumes one rune item from the pack. Detaching returns it."
+          elevated={mode === "overlay"}
+          wide
+          footer={
+            <Button variant="ghost" onClick={() => setRuneTargetId(null)}>
+              Close
+            </Button>
+          }
+        >
+          <div className="stack">
+            <p className="tiny muted">
+              {runeTargetSlots
+                ? `${runeTargetPropertyCount}/${runeTargetSlots} property rune slots used.`
+                : "No property rune slots; add a potency rune first."}
+            </p>
+            <div className="pb-subsection">
+              <h3>Etched runes</h3>
+              {runeTargetRunes.length ? (
+                <div className="chip-row">
+                  {runeTargetRunes.map((rune) => (
+                    <Tag key={rune.id} tone={runeCategory(rune) === "property" ? "violet" : "gold"}>
+                      {rune.name}
+                      <button
+                        type="button"
+                        className="tag-remove"
+                        aria-label={`Detach ${rune.name}`}
+                        onClick={() => void detachEquipmentRune(runeTarget.id, rune.id, rune.name)}
+                      >
+                        x
+                      </button>
+                    </Tag>
+                  ))}
+                </div>
+              ) : (
+                <p className="pb-empty">No runes etched.</p>
+              )}
+            </div>
+            <div className="pb-subsection">
+              <h3>Runes in pack</h3>
+              {runeTargetAvailable.length ? (
+                <div className="pb-stack">
+                  {runeTargetAvailable.map((rune) => {
+                    const blocked =
+                      rune.category === "property" && runeTargetPropertyCount >= runeTargetSlots;
+                    return (
+                      <div className="pb-feat-row" key={rune.itemId}>
+                        <div>
+                          <strong>{rune.name}</strong>
+                          <span>
+                            Level {rune.level} · x{rune.quantity}
+                          </span>
+                        </div>
+                        <Button
+                          size="sm"
+                          disabled={!canEdit || blocked}
+                          aria-label={`Etch ${rune.name} onto ${runeTarget.name}`}
+                          title={
+                            blocked
+                              ? "Fill or add a potency rune before etching more property runes."
+                              : undefined
+                          }
+                          onClick={() => void etchEquipmentRune(runeTarget.id, rune.itemId)}
+                        >
+                          Etch
+                        </Button>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="pb-empty">
+                  No matching rune items in the pack. Buy runes from the Gear catalogue first.
+                </p>
+              )}
+            </div>
+            <p className="pb-hint">
+              Fundamental runes replace the previous rune of the same category; the replaced rune
+              returns to the pack. Property runes need a potency rune with open slots.
+            </p>
+          </div>
+        </Modal>
+      ) : null}
       <AfflictionPicker
         open={afflictionPickerOpen}
         onClose={() => setAfflictionPickerOpen(false)}

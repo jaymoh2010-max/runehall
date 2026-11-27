@@ -22,6 +22,17 @@ export function newRunesmithEtchedId(): string {
   return `etched-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+/** Default target text for a rune's usage line. */
+export function runesmithDefaultTarget(rune: RunesmithRune): string {
+  const usage = rune.usage.toLowerCase();
+  if (usage.includes("creature")) return "Self";
+  if (usage.includes("weapon")) return "Weapon";
+  if (usage.includes("armor")) return "Armor";
+  if (usage.includes("shield")) return "Shield";
+  if (usage.includes("square")) return "Square";
+  return "";
+}
+
 function stringList(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
   return [...new Set(value.filter((entry): entry is string => typeof entry === "string"))];

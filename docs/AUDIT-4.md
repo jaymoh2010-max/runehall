@@ -2,7 +2,7 @@
 
 Audit date: 2026-11-27
 
-Reviewed commits: `3065879` (initial audit) and `de78752` (fourth pass, after background grants, Runesmith, and inventory lifecycle)
+Reviewed commits: `3065879` (initial audit) and `2936e14` (fifth pass, after background grants, Runesmith, inventory lifecycle, and the affliction picker)
 
 Scope: database and migrations, backups/restore, rules engine and spellcasting, items and inventory, compendium data, server/socket authorization, and the table/sheet client. The initial read-only audit and the second fix pass ran on dedicated worktrees; the second pass is on `audit/gaps-2-2026-11-27`.
 
@@ -10,9 +10,9 @@ Scope: database and migrations, backups/restore, rules engine and spellcasting, 
 
 | Command | Result |
 | --- | --- |
-| `npm run check` | Pass (typecheck, lint, 850 unit tests, build, bundle budget) |
+| `npm run check` | Pass (typecheck, lint, 855 unit tests, build, bundle budget) |
 | `npm run smoke` | Pass, including persistent-damage automation |
-| `npm run e2e` | 44 passed |
+| `npm run e2e` | 45 passed |
 | `npm run simulate:campaign` | 18 passed, 0 failed |
 | `npm run simulate` | 2,337 characters; 0 problems |
 | `npm run simulate:parties` | 23 passed, 0 failed |
@@ -98,13 +98,22 @@ The P3 affliction batch closed the remaining published-affliction gap:
 - **Per-category search.** The affliction API now filters by poison/disease/curse (`src/server/compendium.ts`).
 - **Coverage.** Added conversion and normalization tests plus an E2E flow that adds Lich Dust from the compendium.
 
+## Fifth pass
+
+The live rune batch closed the remaining rune lifecycle gap:
+
+- **Equipment etch/detach.** The sheet's Runes modal lists matching rune items in the pack, consumes one on etch, and returns one on detach (`src/shared/runeLifecycle.ts`, `CharacterSheetView.tsx`).
+- **Fundamental replacement.** Etching a new potency/striking/resilient rune returns the replaced rune to the pack instead of silently losing its value.
+- **Slot safety.** Property runes require an open potency slot, and a lower-potency replacement that would strand property runes is refused.
+- **Runesmith etch/re-etch.** The sheet can add a base rune or replace an etched rune from the repertoire; replacement resets the target and clears the diacritic (`src/shared/runesmith.ts`, `CharacterSheetView.tsx`).
+- **Coverage.** Added five rune-lifecycle unit tests and E2E coverage for equipment etch/detach and Runesmith re-etching.
+
 ## Remaining findings
 
 No critical or high-severity findings remain from this audit. The items below are medium/low, optional features, or deliberate trust-model decisions.
 
 ### Medium
 
-- **Rune etch/detach is still builder-only.** Sale/drop now warns and includes rune value, but there is no live etch/detach action that consumes the matching rune item. Minimal fix: add the action and block invalid double-payment.
 - **Migration 55 was reused in an abandoned branch.** A database from that branch records `campaign_player_item_grant` as version 55; current `travel_day_history` then retries 55 and fails on every start. The runner only selects `version`, not name/checksum. Minimal fix: store/verify migration names and emit an actionable conflict error; never reuse versions.
 - **Asset/audio bookkeeping is not fully atomic.** Audio upload/delete can leave stale rows (`src/server/routes/uploads.ts:205-350`), and `cleanup-assets --delete` can race an in-flight upload. A shared reference scanner and transactional deletion/trash staging would close these.
 - **Large imports still hold the event loop and write lock.** Quotas now apply, but a 50 MB embedded archive remains a synchronous transaction. Add a rate limit or background import if large imports are expected.

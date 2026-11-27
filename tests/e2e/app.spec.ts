@@ -1155,6 +1155,77 @@ test("bomb attacks consume their inventory stack", async ({ page }) => {
   await page.request.delete(`/api/characters/${character.id}`);
 });
 
+test("etches and detaches equipment runes from the sheet", async ({ page }) => {
+  test.setTimeout(60_000);
+  await signIn(page, importer);
+  const campaignId = campaignPath.split("/").pop();
+  const created = await page.request.post("/api/characters", {
+    data: { name: "E2E Rune Lifecycle", campaignId },
+  });
+  expect(created.ok()).toBe(true);
+  const character = ((await created.json()) as { character: { id: string } }).character;
+
+  async function equipmentId(name: string): Promise<string> {
+    const response = await page.request.get(
+      `/api/compendium/equipment?q=${encodeURIComponent(name)}&limit=10`
+    );
+    expect(response.ok()).toBe(true);
+    const payload = (await response.json()) as { items: { id: string; name: string }[] };
+    const match = payload.items.find((item) => item.name === name);
+    expect(match, name).toBeTruthy();
+    return match!.id;
+  }
+
+  const swordId = await equipmentId("Longsword");
+  const potencyId = await equipmentId("Weapon Potency (+1)");
+  const flamingId = await equipmentId("Flaming");
+
+  const recordResponse = await page.request.get(`/api/characters/${character.id}`);
+  const record = ((await recordResponse.json()) as { character: { data: Record<string, unknown> } })
+    .character;
+  const data = {
+    ...record.data,
+    equipment: [
+      { itemId: swordId, quantity: 1, equipped: true, invested: false, runes: [] },
+      { itemId: potencyId, quantity: 1, equipped: false, invested: false, runes: [] },
+      { itemId: flamingId, quantity: 1, equipped: false, invested: false, runes: [] },
+    ],
+    wealthBudgetCp: null,
+  };
+  const saved = await page.request.put(`/api/characters/${character.id}`, {
+    data: { data, force: true },
+  });
+  expect(saved.ok()).toBe(true);
+
+  await page.goto(`/characters/${character.id}`);
+  await page.getByRole("button", { name: "Gear", exact: true }).click();
+  const swordRow = page.locator(".pb-inventory-row").filter({ hasText: "Longsword" });
+  await swordRow.getByRole("button", { name: "Runes for Longsword" }).click();
+  const dialog = page.getByRole("dialog", { name: "Runes for Longsword" });
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole("button", { name: "Etch Weapon Potency (+1) onto Longsword" }).click();
+  await expect(dialog.getByRole("button", { name: "Detach Weapon Potency (+1)" })).toBeVisible();
+  await dialog.getByRole("button", { name: "Etch Flaming onto Longsword" }).click();
+  await expect(dialog.getByRole("button", { name: "Detach Flaming" })).toBeVisible();
+  await dialog.getByRole("button", { name: "Detach Flaming" }).click();
+  await expect(dialog.getByRole("button", { name: "Detach Flaming" })).toHaveCount(0);
+  await expect(dialog.getByRole("button", { name: "Etch Flaming onto Longsword" })).toBeVisible();
+
+  const afterResponse = await page.request.get(`/api/characters/${character.id}`);
+  const after = (
+    (await afterResponse.json()) as {
+      character: {
+        data: {
+          equipment: { itemId: string; quantity: number; runes?: string[] }[];
+        };
+      };
+    }
+  ).character;
+  expect(after.data.equipment.find((item) => item.itemId === swordId)?.runes).toEqual([potencyId]);
+  expect(after.data.equipment.find((item) => item.itemId === flamingId)?.quantity).toBe(1);
+  await page.request.delete(`/api/characters/${character.id}`);
+});
+
 test("Pathbuilder JSON import creates a character from the dashboard", async ({ page }) => {
   await signIn(page, admin);
   await page.getByRole("button", { name: "Import Pathbuilder" }).click();
@@ -1622,6 +1693,27 @@ test("builder tracks the Runesmith repertoire and invokes etched runes", async (
   await expect(etchedRows).toHaveCount(1);
   await expect(etchedRows).toContainText("Baruiel, Rune of Hold's Bravery");
   await expect(etchedRows).not.toContainText("Atryl, Rune of Fire");
+
+  await etched.getByRole("button", { name: "Etch rune" }).click();
+  const etchDialog = page.getByRole("dialog", { name: "Etch rune" });
+  await expect(etchDialog).toBeVisible();
+  await etchDialog.getByRole("button", { name: "Etch Atryl, Rune of Fire" }).click();
+  await expect(etchDialog).toBeHidden();
+  await expect(etchedRows).toHaveCount(2);
+  await expect(etched).toContainText("Atryl, Rune of Fire");
+
+  await etchedRows
+    .filter({ hasText: "Atryl, Rune of Fire" })
+    .getByRole("button", { name: "Re-etch" })
+    .click();
+  const reEtchDialog = page.getByRole("dialog", { name: "Re-etch rune" });
+  await expect(reEtchDialog).toBeVisible();
+  await reEtchDialog
+    .getByRole("button", { name: "Re-etch with Camonica, Rune of Perplexity" })
+    .click();
+  await expect(reEtchDialog).toBeHidden();
+  await expect(etchedRows.filter({ hasText: "Camonica, Rune of Perplexity" })).toHaveCount(1);
+  await expect(etchedRows.filter({ hasText: "Atryl, Rune of Fire" })).toHaveCount(0);
 });
 
 test("prose-only backgrounds fill their curated skill and feat grants", async ({ page }) => {

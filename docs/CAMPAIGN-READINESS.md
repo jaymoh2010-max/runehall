@@ -53,7 +53,7 @@ The campaign simulation exercises two complete 1-20 campaigns per run, one XP an
 - Milestone or XP advancement with fast/medium/slow thresholds, hazard and accomplishment awards, catch-up, level-20 cap, and an XP ledger.
 - GM-controlled level-up with linked-token HP/AC sync and a guided level-up checklist.
 - Commander tactics: a 5-11 tactic folio, 3-6 daily preparations, builder picker, validation, and a prepared-tactics list on the sheet. Expert/master/legendary tier access stays manual because the compendium does not tag it.
-- Runesmith runes: a 44-rune repertoire with printed level limits, etched-rune tracking, diacritic attachment, target notes, and an Invoke button on the sheet. Rune effects and invocation results remain prose for the table.
+- Runesmith runes: a 44-rune repertoire with printed level limits, on-sheet etch/re-etch, diacritic attachment, target notes, and an Invoke button. Equipment runes can be etched from or detached back into the pack, with fundamental replacements returned automatically. Rune effects and invocation results remain prose for the table.
 - Inventory lifecycle: bombs consume their stack when thrown, ranged attacks consume a selected ammunition stack, limited-use stacks pool their charges instead of losing state, staff resets drop extra expended-slot charges, and the sheet can give items or custom items to another campaign character.
 - Background grants: curated overrides fill the remaining prose-only skill and feat choices for 14 backgrounds. Deity-, rival-, campaign-, and past-life-dependent choices stay manual, as do category-wide picks such as Kaiju Stalker's Athletics feat.
 

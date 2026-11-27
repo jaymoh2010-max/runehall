@@ -20,18 +20,24 @@ This is the working list for post-P2 work. The source findings are in
 | Poison item link | Done | Poison-trait inventory items expose a Track action that opens the picker with the item name. |
 | Source link | Done | Tracked compendium afflictions store `sourceId` and link back to the library entry. Stage effects remain manual. |
 
+## Live rune lifecycle (Done)
+
+| Item | Status | Notes |
+| --- | --- | --- |
+| Equipment etch/detach | Done | The sheet lists matching rune items from the pack, consumes one on etch, and returns it on detach. |
+| Fundamental replacement | Done | Etching a higher potency rune returns the replaced fundamental rune to the pack. |
+| Slot validation | Done | Property runes require an open potency slot; reducing potency cannot strand existing property runes. |
+| Runesmith etch/re-etch | Done | The sheet can etch a new base rune or replace an etched rune from the repertoire, resetting its target and diacritic. |
+
 ## Next P3 batches
 
-1. **Live rune lifecycle:** etch and detach equipment runes on the sheet, consume
-   the matching rune item, and block double payment. Add on-sheet Runesmith
-   re-etching alongside the existing Invoke action.
-2. **Operational hardening:** store migration names/checksums to reject reused
+1. **Operational hardening:** store migration names/checksums to reject reused
    versions, make asset/audio bookkeeping transactional, and strengthen the
    restore running-server check.
-3. **Trust-model decisions:** decide whether character duplication may clone
+2. **Trust-model decisions:** decide whether character duplication may clone
    campaign gear/currency and whether free quantity edits should use the
    purchase ledger.
-4. **Large campaign imports:** add rate limiting or background processing for
+3. **Large campaign imports:** add rate limiting or background processing for
    archives that still hold the event loop and write lock.
 
 Before starting a batch, check `git worktree list` and open branches so two
