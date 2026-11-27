@@ -785,6 +785,21 @@ export async function registerCharacterRoutes(app: FastifyInstance): Promise<voi
       if (!result.moved) return reply.code(400).send({ error: "That item is not in this pack." });
       sourceDraft = result.draft;
       targetDraft = addItemToDraft(targetDraft, result.moved);
+      if (itemId.startsWith("custom:")) {
+        const custom = sourceDraft.customItems.find((candidate) => candidate.id === itemId);
+        if (custom && !targetDraft.customItems.some((candidate) => candidate.id === itemId)) {
+          targetDraft = {
+            ...targetDraft,
+            customItems: [...targetDraft.customItems, custom],
+          };
+        }
+        if (!sourceDraft.equipment.some((candidate) => candidate.itemId === itemId)) {
+          sourceDraft = {
+            ...sourceDraft,
+            customItems: sourceDraft.customItems.filter((candidate) => candidate.id !== itemId),
+          };
+        }
+      }
       transferred = true;
     }
 

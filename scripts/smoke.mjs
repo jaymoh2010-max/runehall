@@ -665,6 +665,41 @@ async function main() {
   if (transferredFrom.data.wealthBudgetCp !== null || transferredTo.data.wealthBudgetCp !== null) {
     throw new Error("A transfer did not end the creation wealth budget");
   }
+
+  const customSource = JSON.parse(JSON.stringify(transferredFrom.data));
+  customSource.customItems = [
+    { id: "custom:smoke-token", name: "Smoke Token", description: "A test token." },
+  ];
+  customSource.equipment = [
+    ...customSource.equipment,
+    { itemId: "custom:smoke-token", quantity: 1, equipped: false, runes: [] },
+  ];
+  await api(`/api/characters/${character.id}`, {
+    method: "PUT",
+    cookie: playerCookie,
+    body: { data: customSource, force: true },
+  });
+  const customTransfer = await api(`/api/characters/${character.id}/transfer`, {
+    method: "POST",
+    cookie: playerCookie,
+    body: {
+      toCharacterId: quartermaster.id,
+      itemId: "custom:smoke-token",
+      quantity: 1,
+      force: true,
+    },
+  });
+  if (
+    !customTransfer.payload.to.data.customItems.some((entry) => entry.id === "custom:smoke-token")
+  ) {
+    throw new Error("Custom item definition did not transfer with the item");
+  }
+  if (
+    customTransfer.payload.from.data.customItems.some((entry) => entry.id === "custom:smoke-token")
+  ) {
+    throw new Error("Transferred custom item definition was left on the source");
+  }
+
   const playerTarget = await api(`/api/characters/${quartermaster.id}`, { cookie: playerCookie });
   if (playerTarget.payload.character.name !== "Smoke Quartermaster") {
     throw new Error("Player could not read the receiving character");

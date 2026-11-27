@@ -1055,6 +1055,18 @@ test("players adjust, sell, and drop inventory stacks and track afflictions", as
   await expect(page.getByText(/Dropped 1× Rope/)).toBeVisible({ timeout: 15_000 });
   await expect(page.locator(".pb-inventory-row").filter({ hasText: "Rope" })).toHaveCount(0);
 
+  await searchRow.getByRole("button", { name: "Buy" }).click();
+  await expect(page.getByText(/Bought 1× Rope/).first()).toBeVisible({ timeout: 15_000 });
+  await inventoryRow.getByRole("button", { name: "Give", exact: true }).click();
+  const giveDialog = page.getByRole("dialog", { name: /Give Rope/ });
+  await expect(giveDialog).toBeVisible();
+  const recipient = giveDialog.getByLabel("Recipient");
+  await expect(recipient.locator("option")).not.toHaveCount(1);
+  await recipient.selectOption({ index: 1 });
+  await giveDialog.getByRole("button", { name: "Give item" }).click();
+  await expect(page.getByText(/Gave 1x Rope to/)).toBeVisible({ timeout: 15_000 });
+  await expect(inventoryRow).toHaveCount(0);
+
   await page.getByRole("button", { name: "Status", exact: true }).click();
   await page.getByRole("button", { name: "Add affliction" }).click();
   const afflictionDialog = page.getByRole("dialog", { name: "Add affliction" });
@@ -1072,6 +1084,56 @@ test("players adjust, sell, and drop inventory stacks and track afflictions", as
     await afflictionCard.getByRole("button", { name: "Remove", exact: true }).click();
   }
   await expect(page.getByText("No active afflictions.")).toBeVisible({ timeout: 15_000 });
+});
+
+test("bomb attacks consume their inventory stack", async ({ page }) => {
+  test.setTimeout(60_000);
+  await signIn(page, importer);
+  const campaignId = campaignPath.split("/").pop();
+  const created = await page.request.post("/api/characters", {
+    data: { name: "E2E Bomb Test", campaignId },
+  });
+  expect(created.ok()).toBe(true);
+  const character = ((await created.json()) as { character: { id: string } }).character;
+
+  const search = await page.request.get(
+    `/api/compendium/equipment?q=${encodeURIComponent("Alchemist's Fire (Lesser)")}&limit=10`
+  );
+  const bomb = ((await search.json()) as { items: { id: string; name: string }[] }).items.find(
+    (item) => item.name === "Alchemist's Fire (Lesser)"
+  );
+  expect(bomb).toBeTruthy();
+
+  const recordResponse = await page.request.get(`/api/characters/${character.id}`);
+  const record = ((await recordResponse.json()) as { character: { data: Record<string, unknown> } })
+    .character;
+  const data = {
+    ...record.data,
+    equipment: [{ itemId: bomb!.id, quantity: 2, equipped: true, invested: false, runes: [] }],
+    wealthBudgetCp: null,
+  };
+  const saved = await page.request.put(`/api/characters/${character.id}`, {
+    data: { data, force: true },
+  });
+  expect(saved.ok()).toBe(true);
+
+  await page.goto(`/characters/${character.id}`);
+  await page.getByRole("button", { name: "Weapons", exact: true }).click();
+  const row = page.locator(".pb-weapon-row").filter({ hasText: "Alchemist's Fire (Lesser)" });
+  await expect(row).toBeVisible({ timeout: 15_000 });
+  await row.getByRole("button", { name: "Throw Alchemist's Fire (Lesser)" }).click();
+  await expect(page.getByText(/Used 1 Alchemist's Fire \(Lesser\)/).first()).toBeVisible({
+    timeout: 15_000,
+  });
+
+  const afterResponse = await page.request.get(`/api/characters/${character.id}`);
+  const after = (
+    (await afterResponse.json()) as {
+      character: { data: { equipment: { itemId: string; quantity: number }[] } };
+    }
+  ).character;
+  expect(after.data.equipment.find((entry) => entry.itemId === bomb!.id)?.quantity).toBe(1);
+  await page.request.delete(`/api/characters/${character.id}`);
 });
 
 test("Pathbuilder JSON import creates a character from the dashboard", async ({ page }) => {

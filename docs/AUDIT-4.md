@@ -80,21 +80,26 @@ The first report was followed by a second fix pass. These defects are now closed
 - **Campaign asset cleanup/export.** Deleting a campaign removes unreferenced campaign uploads; self-contained export includes campaign members' pre-campaign portraits; legacy export-only tables are included in the asset reference scan.
 - **Small operational fixes.** Backup/shipping ignores `.partial` staging folders, migration rollback removes `-journal`, and restore checks schema direction.
 
+## Third pass
+
+The post-P2 inventory batch closed the remaining item lifecycle findings:
+
+- **Bombs and ammunition.** Bomb attacks consume one from their stack; ranged attacks offer an ammunition selector and consume one per attack. Bundle sizes and per-bundle pricing remain manual.
+- **Limited-use stack merging.** Daily/staff pools add their caps and spent uses; multi-use consumables pool remaining uses into one container. Normalization and transfers share the same merge helper.
+- **Staff daily reset.** `staffBaseCharges` records the base daily pool; a long rest discards extra expended-slot charges.
+- **Item transfers.** The sheet exposes a Give modal; custom-item definitions are copied to the receiver and removed from the source when the stack is gone.
+
 ## Remaining findings
 
 No critical or high-severity findings remain from this audit. The items below are medium/low, optional features, or deliberate trust-model decisions.
 
 ### Medium
 
-- **Bombs and ammunition are not consumed by attacks.** Equipped bombs remain permanent attacks, ranged attacks never decrement arrows/bolts, and bundle sizes are not modeled. Minimal fix: add a Throw action that decrements bomb quantity and an ammo decrement path (or label both manual).
 - **Rune etch/detach is still builder-only.** Sale/drop now warns and includes rune value, but there is no live etch/detach action that consumes the matching rune item. Minimal fix: add the action and block invalid double-payment.
-- **Item transfers have no sheet UI, and custom-item transfers lose their definition.** The endpoint exists at `src/server/routes/characters.ts:712`, but the client does not expose it; `addItemToDraft` copies equipment fields only, so a transferred `custom:` item arrives without its name/description. Minimal fix: add a give modal and copy the custom definition.
 - **Compendium afflictions and poisons are not linked to the tracker.** The Add Affliction form only offers six generic presets; 107 poisons exist as equipment, and 13 poison afflictions have no equipment entry. Minimal fix: add an affliction picker that prefills DC/onset/interval/stages and link poison items to it.
-- **Stack merging drops limited-use state.** `addItemToDraft` and the normalizer merge identical entries without preserving separate charge pools. Two wands can become one stack with one daily tracker. Minimal fix: do not merge limited-use entries, or define an explicit pooled-charge policy.
 - **Migration 55 was reused in an abandoned branch.** A database from that branch records `campaign_player_item_grant` as version 55; current `travel_day_history` then retries 55 and fails on every start. The runner only selects `version`, not name/checksum. Minimal fix: store/verify migration names and emit an actionable conflict error; never reuse versions.
 - **Asset/audio bookkeeping is not fully atomic.** Audio upload/delete can leave stale rows (`src/server/routes/uploads.ts:205-350`), and `cleanup-assets --delete` can race an in-flight upload. A shared reference scanner and transactional deletion/trash staging would close these.
 - **Large imports still hold the event loop and write lock.** Quotas now apply, but a 50 MB embedded archive remains a synchronous transaction. Add a rate limit or background import if large imports are expected.
-- **Staff daily reset keeps extra expended-slot charges.** The charge dialog correctly builds `base + expended slot`, but `resetItemUses` refills to `usesMax` rather than the base daytime pool. Minimal fix: store the base charge count separately or reset staff charges to the highest spell rank.
 - **Duplicating a character clones campaign gear and currency.** `src/server/routes/characters.ts:1093` copies the full draft and keeps `campaign_id`. Under the documented trust model this may be intended, but it is a direct wealth-duplication path. Decide whether duplicates should be build templates (clear campaign/inventory) or GM-only.
 - **Free quantity increases bypass the purchase ledger.** The sheet's +/- controls can set any quantity without paying, while the purchase endpoint enforces coins. `docs/PLAN.md` explicitly says the product is not anti-cheat, so this may be an accepted trust model; if not, route price-bearing increases through the purchase endpoint or reject unexplained server-side deltas.
 

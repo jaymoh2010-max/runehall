@@ -47,7 +47,7 @@ import { normalizePersistentDamageList } from "./persistentDamage";
 import { clampHeroPoints } from "./heroPoints";
 import { normalizeCharacterTurnEffects } from "./characterTurnEffects";
 import { INVESTED_LIMIT, investedCount } from "./itemActivation";
-import { currencyBulk } from "./inventory";
+import { ammoKindForWeapon, currencyBulk, mergeEquipmentEntries } from "./inventory";
 import { normalizeSustainedSpells } from "./sustain";
 import {
   FEAT_CHOICES,
@@ -1908,6 +1908,7 @@ export function normalizeCharacterDraft(input: unknown, fallbackName = "New Hero
     usesUsed: number;
     usesMax?: number;
     usesKind?: "daily" | "charges" | "consumable";
+    staffBaseCharges?: number;
     runes: string[];
   };
   const equipmentMap = new Map<string, NormalizedEquipment>();
@@ -1917,44 +1918,30 @@ export function normalizeCharacterDraft(input: unknown, fallbackName = "New Hero
     const runes = [
       ...new Set(arr<string>(item.runes).filter((value) => typeof value === "string")),
     ].slice(0, 12);
+    const incoming: NormalizedEquipment = {
+      itemId,
+      quantity: Math.max(1, Math.floor(num(item.quantity, 1))),
+      equipped: Boolean(item.equipped),
+      invested: Boolean(item.invested),
+      usesUsed: Math.max(0, Math.min(999, Math.floor(num(item.usesUsed, 0)))),
+      ...(typeof item.usesMax === "number" && Number.isFinite(item.usesMax)
+        ? { usesMax: Math.max(0, Math.min(999, Math.floor(item.usesMax))) }
+        : {}),
+      ...(item.usesKind === "daily" || item.usesKind === "charges" || item.usesKind === "consumable"
+        ? { usesKind: item.usesKind as "daily" | "charges" | "consumable" }
+        : {}),
+      ...(typeof item.staffBaseCharges === "number" && Number.isFinite(item.staffBaseCharges)
+        ? {
+            staffBaseCharges: Math.max(0, Math.min(20, Math.floor(item.staffBaseCharges))),
+          }
+        : {}),
+      runes,
+    };
     const existing = equipmentMap.get(itemId);
-    if (existing) {
-      existing.quantity += Math.max(1, Math.floor(num(item.quantity, 1)));
-      existing.equipped = existing.equipped || Boolean(item.equipped);
-      existing.invested = existing.invested || Boolean(item.invested);
-      existing.usesUsed = Math.max(
-        existing.usesUsed,
-        Math.max(0, Math.floor(num(item.usesUsed, 0)))
-      );
-      if (typeof item.usesMax === "number" && Number.isFinite(item.usesMax)) {
-        existing.usesMax = Math.max(0, Math.min(999, Math.floor(item.usesMax)));
-      }
-      if (
-        item.usesKind === "daily" ||
-        item.usesKind === "charges" ||
-        item.usesKind === "consumable"
-      ) {
-        existing.usesKind = item.usesKind;
-      }
-      existing.runes = [...new Set([...existing.runes, ...runes])].slice(0, 12);
-    } else {
-      equipmentMap.set(itemId, {
-        itemId,
-        quantity: Math.max(1, Math.floor(num(item.quantity, 1))),
-        equipped: Boolean(item.equipped),
-        invested: Boolean(item.invested),
-        usesUsed: Math.max(0, Math.min(999, Math.floor(num(item.usesUsed, 0)))),
-        ...(typeof item.usesMax === "number" && Number.isFinite(item.usesMax)
-          ? { usesMax: Math.max(0, Math.min(999, Math.floor(item.usesMax))) }
-          : {}),
-        ...(item.usesKind === "daily" ||
-        item.usesKind === "charges" ||
-        item.usesKind === "consumable"
-          ? { usesKind: item.usesKind as "daily" | "charges" | "consumable" }
-          : {}),
-        runes,
-      });
-    }
+    equipmentMap.set(
+      itemId,
+      existing ? (mergeEquipmentEntries(existing, incoming) as NormalizedEquipment) : incoming
+    );
   }
   const equipmentEntries = [...equipmentMap.values()];
   const customItemIds = new Set<string>();
@@ -4506,6 +4493,8 @@ export function computeCharacter(
       hands: weapon.hands,
       ranged,
       notes: notes.join(" · "),
+      consumesSource: isBomb(item),
+      ammoKind: ranged && !isBomb(item) ? ammoKindForWeapon(item) : null,
     });
   }
   const deityFist =

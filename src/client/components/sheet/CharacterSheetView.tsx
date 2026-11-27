@@ -29,8 +29,10 @@ import type {
   CharacterContext,
   CharacterCustomItem,
   CharacterDraft,
+  CharacterEquipment,
   CharacterRecord,
   DegreeOfSuccess,
+  DerivedAttack,
   DerivedCharacter,
   Equipment,
   SaveKey,
@@ -48,6 +50,8 @@ import {
   withSourceSpellIds,
 } from "../../../shared/rules";
 import {
+  ammoKindForAmmo,
+  consumeAttackItem,
   currencyToCp,
   sellItemQuantity,
   setItemQuantity,
@@ -475,6 +479,15 @@ export function CharacterSheetView({
   const [customItemDescription, setCustomItemDescription] = useState("");
   const [customItemQuantity, setCustomItemQuantity] = useState("1");
   const [customItemSaving, setCustomItemSaving] = useState(false);
+  const [ammoChoices, setAmmoChoices] = useState<Record<string, string>>({});
+  const [giveEntry, setGiveEntry] = useState<CharacterEquipment | null>(null);
+  const [giveTargets, setGiveTargets] = useState<
+    { id: string; name: string; ownerName?: string }[]
+  >([]);
+  const [giveTargetId, setGiveTargetId] = useState("");
+  const [giveQuantity, setGiveQuantity] = useState("1");
+  const [giveSaving, setGiveSaving] = useState(false);
+  const [giveError, setGiveError] = useState("");
   const [itemCast, setItemCast] = useState<{
     item: Equipment;
     rank: number;
@@ -613,6 +626,12 @@ export function CharacterSheetView({
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    setAmmoChoices({});
+    setGiveEntry(null);
+    setGiveError("");
+  }, [characterId]);
 
   useEffect(() => {
     const previousTitle = document.title;
@@ -765,6 +784,15 @@ export function CharacterSheetView({
   const customItemsById = useMemo(
     () => new Map((draft?.customItems ?? []).map((item) => [item.id, item])),
     [draft?.customItems]
+  );
+
+  const ammoEntries = useMemo(
+    () =>
+      (draft?.equipment ?? []).flatMap((entry) => {
+        const item = context?.equipment[entry.itemId];
+        return item?.type === "ammo" ? [{ entry, item, kind: ammoKindForAmmo(item) }] : [];
+      }),
+    [draft?.equipment, context?.equipment]
   );
 
   const spellsByName = useMemo(
@@ -1324,6 +1352,95 @@ export function CharacterSheetView({
     if (saved) toast(`Dropped ${count}× ${name}.`, "info");
   };
 
+  const rollWeaponAttack = async (
+    attack: DerivedAttack,
+    formula: string,
+    label: string,
+    ammoItemId?: string | null
+  ) => {
+    if (!canEdit) return;
+    if (attack.consumesSource || (attack.ammoKind && ammoItemId)) {
+      let blocked: string | null = null;
+      let note: string | null = null;
+      const saved = await persist((currentDraft) => {
+        const result = consumeAttackItem(currentDraft, attack, ammoItemId ?? null);
+        blocked = result.blocked;
+        note = result.note;
+        return result.draft;
+      });
+      if (!saved) return;
+      if (blocked) {
+        toast(blocked, "error");
+        return;
+      }
+      if (note) toast(note, "info");
+    }
+    postRoll(formula, label);
+  };
+
+  const openGive = async (entry: CharacterEquipment) => {
+    setGiveEntry(entry);
+    setGiveTargetId("");
+    setGiveQuantity("1");
+    setGiveError("");
+    setGiveTargets([]);
+    const current = characterRef.current;
+    if (!current?.campaignId) return;
+    try {
+      const result = await api<{ characters: CharacterRecord[] }>(
+        `/api/campaigns/${current.campaignId}`
+      );
+      setGiveTargets(
+        result.characters
+          .filter((candidate) => candidate.id !== current.id)
+          .map((candidate) => ({
+            id: candidate.id,
+            name: candidate.name,
+            ownerName: candidate.ownerName,
+          }))
+      );
+    } catch (err) {
+      setGiveError(errorMessage(err));
+    }
+  };
+
+  const giveItem = async () => {
+    const current = characterRef.current;
+    if (!canEdit || !current || !giveEntry || !giveTargetId) return;
+    const target = giveTargets.find((candidate) => candidate.id === giveTargetId);
+    const quantity = Math.max(
+      1,
+      Math.min(giveEntry.quantity, Math.round(Number(giveQuantity) || 1))
+    );
+    const displayName =
+      customItemsById.get(giveEntry.itemId)?.name ??
+      context?.equipment[giveEntry.itemId]?.name ??
+      giveEntry.itemId;
+    setGiveSaving(true);
+    setGiveError("");
+    try {
+      const result = await api<{ from: CharacterRecord; to: CharacterRecord }>(
+        `/api/characters/${current.id}/transfer`,
+        {
+          method: "POST",
+          body: {
+            toCharacterId: giveTargetId,
+            itemId: giveEntry.itemId,
+            quantity,
+            expectedRevision: current.revision,
+          },
+        }
+      );
+      await applyRecord(result.from);
+      setGiveEntry(null);
+      toast(`Gave ${quantity}x ${displayName} to ${target?.name ?? result.to.name}.`, "success");
+    } catch (err) {
+      setGiveError(errorMessage(err));
+    } finally {
+      setGiveSaving(false);
+    }
+  };
+
   const openAreaPlacement = (spell: Spell, rank: number): void => {
     const scaled = spellDamageAtRank(spell, rank);
     const area = parseSpellArea(spell.area, scaled.areaDelta ?? 0);
@@ -1506,7 +1623,13 @@ export function CharacterSheetView({
       ...currentDraft,
       equipment: currentDraft.equipment.map((candidate) =>
         candidate.itemId === item.id
-          ? { ...candidate, usesKind: "charges", usesMax: max, usesUsed: 0 }
+          ? {
+              ...candidate,
+              usesKind: "charges",
+              usesMax: max,
+              usesUsed: 0,
+              staffBaseCharges: mode === "clear" ? 0 : base,
+            }
           : candidate
       ),
     }));
@@ -1971,6 +2094,22 @@ export function CharacterSheetView({
     attackId
       ? `/library/equipment/${attackId}`
       : `/rules?tab=actions&q=${encodeURIComponent(name)}`;
+
+  const ammoIdFor = (attack: DerivedAttack): string => {
+    if (Object.prototype.hasOwnProperty.call(ammoChoices, attack.id)) {
+      return ammoChoices[attack.id];
+    }
+    const matching = ammoEntries.filter(
+      (entry) => !attack.ammoKind || !entry.kind || entry.kind === attack.ammoKind
+    );
+    return matching[0]?.entry.itemId ?? "";
+  };
+
+  const giveDisplayName = giveEntry
+    ? (customItemsById.get(giveEntry.itemId)?.name ??
+      context?.equipment[giveEntry.itemId]?.name ??
+      giveEntry.itemId)
+    : "";
 
   if (loading) {
     return (
@@ -2555,25 +2694,72 @@ export function CharacterSheetView({
                         </span>
                       </div>
                       <div className="pb-row-actions">
+                        {attack.ranged &&
+                        attack.ammoKind &&
+                        !attack.consumesSource &&
+                        ammoEntries.length ? (
+                          <select
+                            className="pb-cast-select"
+                            aria-label={`Ammunition for ${attack.name}`}
+                            title="Each attack consumes 1 ammunition. Bundle pricing is manual."
+                            value={ammoIdFor(attack)}
+                            onChange={(event) =>
+                              setAmmoChoices((current) => ({
+                                ...current,
+                                [attack.id]: event.target.value,
+                              }))
+                            }
+                          >
+                            <option value="">Manual / no ammo</option>
+                            {ammoEntries.map(({ entry, item, kind }) => (
+                              <option key={entry.itemId} value={entry.itemId}>
+                                {item.name} ({entry.quantity}){kind ? ` · ${kind}` : ""}
+                              </option>
+                            ))}
+                          </select>
+                        ) : null}
                         <button
                           type="button"
                           className="pb-die-button"
-                          aria-label={`Roll ${attack.name} attack`}
-                          onClick={() => postRoll(attack.attackFormula, `${attack.name} attack`)}
+                          aria-label={
+                            attack.consumesSource
+                              ? `Throw ${attack.name}`
+                              : `Roll ${attack.name} attack`
+                          }
+                          title={
+                            attack.consumesSource
+                              ? "Throw one bomb; its quantity is consumed."
+                              : attack.ranged && !ammoEntries.length
+                                ? "No ammunition is tracked; resolve ammo manually."
+                                : undefined
+                          }
+                          onClick={() =>
+                            void rollWeaponAttack(
+                              attack,
+                              attack.attackFormula,
+                              attack.consumesSource
+                                ? `${attack.name} throw`
+                                : `${attack.name} attack`,
+                              ammoIdFor(attack) || null
+                            )
+                          }
                         >
-                          <Dices size={14} /> {signed(attack.attackBonus)}
+                          <Dices size={14} />{" "}
+                          {attack.consumesSource ? "Throw" : signed(attack.attackBonus)}
                         </button>
                         <button
                           type="button"
                           className="pb-small-button"
                           title="Second attack with the multiple attack penalty"
                           onClick={() =>
-                            postRoll(
+                            void rollWeaponAttack(
+                              attack,
                               applyAttackPenalty(
                                 attack.attackFormula,
                                 attack.traits.includes("agile") ? 4 : 5
                               ),
-                              `${attack.name} attack (2nd)`
+                              `${attack.name} attack (2nd)`,
+                              ammoIdFor(attack) || null
                             )
                           }
                         >
@@ -2584,12 +2770,14 @@ export function CharacterSheetView({
                           className="pb-small-button"
                           title="Third attack with the multiple attack penalty"
                           onClick={() =>
-                            postRoll(
+                            void rollWeaponAttack(
+                              attack,
                               applyAttackPenalty(
                                 attack.attackFormula,
                                 attack.traits.includes("agile") ? 8 : 10
                               ),
-                              `${attack.name} attack (3rd)`
+                              `${attack.name} attack (3rd)`,
+                              ammoIdFor(attack) || null
                             )
                           }
                         >
@@ -3037,6 +3225,17 @@ export function CharacterSheetView({
                                     <Plus size={11} />
                                   </button>
                                 </div>
+                                {character.campaignId ? (
+                                  <button
+                                    type="button"
+                                    className="pb-small-button"
+                                    disabled={!canEdit}
+                                    title="Give this item to another character in the campaign"
+                                    onClick={() => void openGive(entry)}
+                                  >
+                                    Give
+                                  </button>
+                                ) : null}
                                 {custom ? (
                                   <button
                                     type="button"
@@ -4541,6 +4740,61 @@ export function CharacterSheetView({
         onApply={(next) => void applyPreparations(next)}
         elevated={mode === "overlay"}
       />
+      {giveEntry ? (
+        <Modal
+          open
+          onClose={() => {
+            if (!giveSaving) setGiveEntry(null);
+          }}
+          title={`Give ${giveDisplayName}`}
+          subtitle="Transfer to another character in this campaign."
+          elevated={mode === "overlay"}
+          footer={
+            <>
+              <Button variant="ghost" disabled={giveSaving} onClick={() => setGiveEntry(null)}>
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                loading={giveSaving}
+                disabled={!giveTargetId || giveTargets.length === 0}
+                onClick={() => void giveItem()}
+              >
+                Give item
+              </Button>
+            </>
+          }
+        >
+          <div className="stack">
+            <Field label="Recipient">
+              <Select
+                value={giveTargetId}
+                onChange={(event) => setGiveTargetId(event.target.value)}
+              >
+                <option value="">
+                  {giveTargets.length ? "Choose a character…" : "No other characters found"}
+                </option>
+                {giveTargets.map((target) => (
+                  <option key={target.id} value={target.id}>
+                    {target.name}
+                    {target.ownerName ? ` (${target.ownerName})` : ""}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <Field label="Quantity" hint={`This stack has ${giveEntry.quantity}.`}>
+              <Input
+                type="number"
+                min={1}
+                max={giveEntry.quantity}
+                value={giveQuantity}
+                onChange={(event) => setGiveQuantity(event.target.value)}
+              />
+            </Field>
+            {giveError ? <div className="auth-error">{giveError}</div> : null}
+          </div>
+        </Modal>
+      ) : null}
       <Modal
         open={customItemOpen}
         onClose={() => {
