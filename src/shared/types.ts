@@ -1426,31 +1426,6 @@ export interface CampaignSessionZero {
   updatedAt: number;
 }
 
-export interface SafetyPreference {
-  lines: string;
-  veils: string;
-  notes: string;
-  anonymous: boolean;
-  updatedAt: number;
-}
-
-export interface SafetyResponse {
-  id: string;
-  authorName: string | null;
-  anonymous: boolean;
-  lines: string;
-  veils: string;
-  notes: string;
-  updatedAt: number;
-}
-
-export interface SessionZeroState {
-  profile: CampaignSessionZero;
-  preference: SafetyPreference | null;
-  /** GM-only list. Players receive an empty array. */
-  responses: SafetyResponse[];
-}
-
 export interface EncounterCombatant {
   id: string;
   encounterId: string;
@@ -1548,20 +1523,6 @@ export interface CampaignNpc {
   updatedAt: number;
 }
 
-export interface CampaignPeople {
-  factions: CampaignFaction[];
-  npcs: CampaignNpc[];
-}
-
-export interface CampaignPlayerNote {
-  id: string;
-  campaignId: string;
-  title: string;
-  content: string;
-  createdAt: number;
-  updatedAt: number;
-}
-
 export interface CampaignKnowledgeEntry {
   id: string;
   campaignId: string;
@@ -1590,13 +1551,6 @@ export interface CampaignChapter {
   sortOrder: number;
   createdAt: number;
   updatedAt: number;
-}
-
-export interface CampaignNotesView {
-  /** Only the signed-in member's private notes; never another member's. */
-  notes: CampaignPlayerNote[];
-  /** Shared lore entries; hidden entries are GM-only. */
-  knowledge: CampaignKnowledgeEntry[];
 }
 
 export type EncounterDifficulty = "trivial" | "low" | "moderate" | "severe" | "extreme" | "beyond";

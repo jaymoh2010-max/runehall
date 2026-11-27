@@ -8,12 +8,9 @@ import type {
   CampaignFaction,
   CampaignKnowledgeEntry,
   CampaignChapter,
-  CampaignPlayerNote,
   CampaignRequest,
   CampaignSummary,
   CampaignSessionZero,
-  SafetyPreference,
-  SafetyResponse,
   CharacterRecord,
   ChatMessage,
   Encounter,
@@ -55,11 +52,9 @@ import {
   type CampaignFactionRow,
   type CampaignKnowledgeRow,
   type CampaignChapterRow,
-  type CampaignPlayerNoteRow,
   type CampaignRequestRow,
   type CampaignRow,
   type CampaignSessionZeroRow,
-  type CampaignSafetyPreferenceRow,
   type CharacterRow,
   type EncounterCombatantRow,
   type EncounterRow,
@@ -147,35 +142,6 @@ export function serializeCampaignSessionZero(
   };
   if (isGm) profile.gmNotes = row?.gm_notes ?? "";
   return profile;
-}
-
-export function serializeSafetyPreference(
-  row: CampaignSafetyPreferenceRow | null
-): SafetyPreference | null {
-  if (!row) return null;
-  return {
-    lines: row.lines,
-    veils: row.veils,
-    notes: row.notes,
-    anonymous: Boolean(row.anonymous),
-    updatedAt: row.updated_at,
-  };
-}
-
-export function serializeSafetyResponse(
-  row: CampaignSafetyPreferenceRow,
-  authorName: string | null,
-  index: number
-): SafetyResponse {
-  return {
-    id: `safety_${index}_${row.updated_at}`,
-    authorName: row.anonymous ? null : authorName,
-    anonymous: Boolean(row.anonymous),
-    lines: row.lines,
-    veils: row.veils,
-    notes: row.notes,
-    updatedAt: row.updated_at,
-  };
 }
 
 export function serializeAudioTrack(row: AudioTrackRow): CampaignAudioTrack {
@@ -537,17 +503,6 @@ export function serializeCampaignFaction(
   };
   if (privateView) faction.gmNotes = row.gm_notes;
   return faction;
-}
-
-export function serializeCampaignPlayerNote(row: CampaignPlayerNoteRow): CampaignPlayerNote {
-  return {
-    id: row.id,
-    campaignId: row.campaign_id,
-    title: row.title,
-    content: row.content,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  };
 }
 
 export function serializeCampaignKnowledge(row: CampaignKnowledgeRow): CampaignKnowledgeEntry {

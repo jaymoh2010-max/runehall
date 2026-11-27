@@ -181,6 +181,7 @@ data/
   runehall.db        SQLite database
   uploads/           maps, portraits, token art
 backups/             backup archives created by npm run backup
+  pre-migration/     automatic snapshots taken before schema upgrades
 ```
 
 Back up before updates and before the first asset cleanup:
@@ -200,6 +201,11 @@ docker compose build --pull
 docker compose up -d
 curl http://127.0.0.1:3001/api/health
 ```
+
+Pending schema migrations also take a database-only snapshot in
+`backups/pre-migration/` before they run. If an upgrade fails, the snapshot is
+restored and the server exits with the migration error. See `docs/BACKUP.md`
+for retention and manual rollback steps.
 
 ## Registration, admin recovery, and audit
 

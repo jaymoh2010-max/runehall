@@ -7,6 +7,18 @@
 > Sections below are historical notes; only the current four-section product is
 > supported.
 
+### Retired surfaces
+
+The live campaign surface is exactly Table, Party, Journal, and Settings. Loot,
+shop, downtime, travel, session scheduling, and clocks were removed in migration
+58; their tables, routes, and direct URLs are gone. Session-zero profiles,
+factions, knowledge entries, and chapters remain as export/import-only archive
+data so an old campaign can still move between machines, but no UI or mutation
+endpoint exposes them. Private player notes and per-player safety preferences
+were retired with their serializers; their legacy tables stay inert in existing
+databases so authored safety text is not destroyed. Reactivating any of these
+surfaces requires a new product decision.
+
 ## 1. Vision
 
 Runehall is the single browser tab a Pathfinder 2e group keeps open all session:
