@@ -766,6 +766,8 @@ export interface CharacterEquipment {
    * remaining uses until the container is spent.
    */
   usesKind?: "daily" | "charges" | "consumable";
+  /** The base staff pool restored after a long rest, before expended slots. */
+  staffBaseCharges?: number;
   /** Equipment IDs for runes etched onto this weapon, armor, or shield. */
   runes?: string[];
 }
@@ -1188,6 +1190,8 @@ export interface ValidationIssue {
   step?: string;
 }
 
+export type AmmoKind = "arrows" | "bolts" | "sling" | "firearm";
+
 export interface DerivedAttack {
   id: string;
   name: string;
@@ -1201,6 +1205,10 @@ export interface DerivedAttack {
   hands: number;
   ranged: boolean;
   notes: string;
+  /** Alchemical bombs spend one of their own stack when thrown. */
+  consumesSource?: boolean;
+  /** Ammunition category a ranged weapon uses, when it can be determined. */
+  ammoKind?: AmmoKind | null;
 }
 
 export interface CharacterContext {

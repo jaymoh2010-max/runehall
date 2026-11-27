@@ -26,8 +26,8 @@ The rest of this document records what is verified and what remains manual, so a
 | Check | Result |
 | --- | --- |
 | `npm run check` | Typecheck, lint, formatting, unit tests, production build, and bundle budget pass |
-| Unit tests | 833 passing |
-| `npm run e2e` | 43 passing browser scenarios |
+| Unit tests | 849 passing |
+| `npm run e2e` | 44 passing browser scenarios |
 | `npm run smoke` | End-to-end smoke suite passes |
 | `npm run audit:prod` | 0 production dependency vulnerabilities |
 | `npm run simulate` | 2,337 characters, 145 class/level matrix builds, 578 option builds, 38 ancestries × 269 backgrounds; 0 problems |
@@ -54,6 +54,7 @@ The campaign simulation exercises two complete 1-20 campaigns per run, one XP an
 - GM-controlled level-up with linked-token HP/AC sync and a guided level-up checklist.
 - Commander tactics: a 5-11 tactic folio, 3-6 daily preparations, builder picker, validation, and a prepared-tactics list on the sheet. Expert/master/legendary tier access stays manual because the compendium does not tag it.
 - Runesmith runes: a 44-rune repertoire with printed level limits, etched-rune tracking, diacritic attachment, target notes, and an Invoke button on the sheet. Rune effects and invocation results remain prose for the table.
+- Inventory lifecycle: bombs consume their stack when thrown, ranged attacks consume a selected ammunition stack, limited-use stacks pool their charges instead of losing state, staff resets drop extra expended-slot charges, and the sheet can give items or custom items to another campaign character.
 - Background grants: curated overrides fill the remaining prose-only skill and feat choices for 14 backgrounds. Deity-, rival-, campaign-, and past-life-dependent choices stay manual, as do category-wide picks such as Kaiju Stalker's Athletics feat.
 
 ### Table and combat

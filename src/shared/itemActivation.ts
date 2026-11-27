@@ -294,8 +294,13 @@ export function resetItemUses(draft: CharacterDraft): CharacterDraft {
     ...draft,
     equipment: draft.equipment.map((entry) => {
       if (entry.usesKind === "charges") {
-        const max = Math.max(0, Math.round(entry.usesMax ?? 0));
-        return entry.usesUsed === max ? entry : { ...entry, usesUsed: max };
+        // Extra charges bought with an expended spell slot do not carry over
+        // the rest; return to the staff's base daily pool, empty until the
+        // player prepares it again.
+        const base = Math.max(0, Math.round(entry.staffBaseCharges ?? entry.usesMax ?? 0));
+        return entry.usesMax === base && entry.usesUsed === base
+          ? entry
+          : { ...entry, usesMax: base, usesUsed: base };
       }
       // Multi-use consumables do not refill at daily preparation.
       if (entry.usesKind === "consumable") return entry;

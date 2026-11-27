@@ -30,8 +30,7 @@ This is the working list for the P2 items in `docs/AUDIT.md` and
 
 ## Suggested next batches
 
-All P2 items are closed. Re-check `docs/AUDIT.md`, `docs/RULES-AUDIT.md`, and
-`docs/CAMPAIGN-READINESS.md` before starting P3 work.
+All P2 items are closed. Continue with `docs/P3-BACKLOG.md` for post-P2 work.
 
 Before starting a rules batch, check `git worktree list` and the open branches
 so two sessions do not edit the same sheet or rules files concurrently.
