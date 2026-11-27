@@ -8,6 +8,7 @@
     "ancestries": 54,
     "heritages": 357,
     "backgrounds": 547,
+    "runes": 44,
     "classes": 29,
     "classFeatures": 881,
     "feats": 6486,
@@ -45,5 +46,10 @@
         "poison": 120
       }
     }
+  },
+  "runesSource": {
+    "generatedAt": "2026-11-27T19:09:21.682Z",
+    "url": "https://2e.aonprd.com/RunesmithRunes.aspx",
+    "count": 44
   }
 }

@@ -23,6 +23,7 @@ import type {
   BoonCurse,
   TraitEntry,
   Affliction,
+  RunesmithRune,
 } from "../shared/types";
 import type { DomainEntry } from "../shared/domains";
 import { isCoreSource } from "../shared/content";
@@ -98,6 +99,7 @@ export const heritages = readArray<Heritage>("heritages.json");
 export const backgrounds = readArray<Background>("backgrounds.json").map(
   (background) => applyBackgroundGrantOverrides(background) ?? background
 );
+export const runes = readArray<RunesmithRune>("runes.json");
 export const classes = readArray<ClassData>("classes.json");
 export const classFeatures = readArray<ClassFeature>("classFeatures.json");
 export const feats = readArray<Feat>("feats.json");
@@ -124,6 +126,7 @@ const maps = {
   ancestry: new Map(ancestries.map((item) => [item.id, item])),
   heritage: new Map(heritages.map((item) => [item.id, item])),
   background: new Map(backgrounds.map((item) => [item.id, item])),
+  rune: new Map(runes.map((item) => [item.id, item])),
   class: new Map(classes.map((item) => [item.id, item])),
   classFeature: new Map(classFeatures.map((item) => [item.id, item])),
   feat: new Map(feats.map((item) => [item.id, item])),
@@ -394,6 +397,10 @@ export function searchHeritages(opts: SearchOptions & { ancestry?: string }) {
 
 export function searchBackgrounds(opts: SearchOptions) {
   return searchList(backgrounds, opts);
+}
+
+export function searchRunes(opts: SearchOptions) {
+  return searchList(runes, opts, (rune) => rune.level);
 }
 
 export function searchClasses(opts: SearchOptions) {
@@ -763,6 +770,16 @@ export function contextForDraft(
     if (monster) monsterMap[monster.id] = monster;
   }
 
+  const runeMap: Record<string, RunesmithRune> = {};
+  for (const id of [
+    ...draft.runesmith.repertoire,
+    ...draft.runesmith.etched.flatMap((entry) => [entry.runeId, entry.diacriticId]),
+  ]) {
+    if (!id) continue;
+    const rune = maps.rune.get(id);
+    if (rune) runeMap[id] = rune;
+  }
+
   return {
     ancestry,
     heritage,
@@ -772,6 +789,7 @@ export function contextForDraft(
     feats: featMap,
     spells: spellMap,
     equipment: equipmentMap,
+    runes: runeMap,
     monsters: monsterMap,
     featNames,
     freeArchetype,
@@ -799,6 +817,7 @@ export const compendiumCounts = {
   ancestries: ancestries.length,
   heritages: heritages.length,
   backgrounds: backgrounds.length,
+  runes: runes.length,
   classes: classes.length,
   classFeatures: classFeatures.length,
   feats: feats.length,

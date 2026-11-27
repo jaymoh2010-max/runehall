@@ -61,6 +61,7 @@ import {
   type Equipment,
   type Feat,
   type Heritage,
+  type RunesmithRune,
   type SkillId,
   type Spell,
 } from "../../shared/types";
@@ -182,6 +183,7 @@ export function CharacterBuilderPage({
     feats: {},
     spells: {},
     equipment: {},
+    runes: {},
   });
   const [staticData, setStaticData] = useState<StaticData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -211,13 +213,15 @@ export function CharacterBuilderPage({
     setError("");
     (async () => {
       try {
-        const [ancestries, heritages, backgrounds, classes, characterResult] = await Promise.all([
-          api<{ items: Ancestry[] }>("/api/compendium/ancestries"),
-          api<{ items: Heritage[] }>("/api/compendium/heritages"),
-          api<{ items: Background[] }>("/api/compendium/backgrounds"),
-          api<{ items: ClassData[] }>("/api/compendium/classes"),
-          api<{ character: CharacterRecord }>(`/api/characters/${id}`),
-        ]);
+        const [ancestries, heritages, backgrounds, classes, runes, characterResult] =
+          await Promise.all([
+            api<{ items: Ancestry[] }>("/api/compendium/ancestries"),
+            api<{ items: Heritage[] }>("/api/compendium/heritages"),
+            api<{ items: Background[] }>("/api/compendium/backgrounds"),
+            api<{ items: ClassData[] }>("/api/compendium/classes"),
+            api<{ items: RunesmithRune[] }>("/api/compendium/runes"),
+            api<{ character: CharacterRecord }>(`/api/characters/${id}`),
+          ]);
         if (cancelled) return;
         const normalized = normalizeCharacterDraft(
           characterResult.character.data,
@@ -240,6 +244,7 @@ export function CharacterBuilderPage({
           heritages: heritages.items,
           backgrounds: backgrounds.items,
           classes: classes.items,
+          runes: runes.items,
         });
         setCharacter(characterResult.character);
         characterRef.current = characterResult.character;
@@ -289,6 +294,29 @@ export function CharacterBuilderPage({
       return { ...current, ancestry, heritage, background, classData };
     });
   }, [draft?.ancestryId, draft?.heritageId, draft?.backgroundId, draft?.classId, staticData]);
+
+  // Rune choices are local to the builder until the debounced save refreshes
+  // the server context. Merge the selected rune definitions immediately.
+  useEffect(() => {
+    if (!staticData || !draft) return;
+    const selected = new Set([
+      ...draft.runesmith.repertoire,
+      ...draft.runesmith.etched.flatMap((entry) =>
+        entry.diacriticId ? [entry.runeId, entry.diacriticId] : [entry.runeId]
+      ),
+    ]);
+    setContext((current) => {
+      const runes = { ...(current.runes ?? {}) };
+      let changed = false;
+      for (const rune of staticData.runes) {
+        if (selected.has(rune.id) && runes[rune.id] !== rune) {
+          runes[rune.id] = rune;
+          changed = true;
+        }
+      }
+      return changed ? { ...current, runes } : current;
+    });
+  }, [draft?.runesmith, staticData]);
 
   const derived = useMemo(
     () => (draft ? computeCharacter(draft, context) : null),

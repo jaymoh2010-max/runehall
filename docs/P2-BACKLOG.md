@@ -25,13 +25,13 @@ This is the working list for the P2 items in `docs/AUDIT.md` and
 | Wizard higher-rank curriculum data | Done | The generated school data includes ranks 0-9 and is wired into class grants. |
 | Innate spell frequency | Done | `spells.innateMax` stores an explicit daily maximum; the builder exposes 1-5/day and prose remains the fallback. |
 | Commander tactics | Done | Folio and daily preparation limits, builder picker, sheet prepared-tactics list, and validation. Tactic tiers stay manual. |
-| Runesmith runes | Open | The compendium does not expose a structured rune list; needs data before a picker. |
+| Runesmith runes | Done | 44 Impossible Magic runes with repertoire, etching, diacritic, and invocation tracking in the builder and sheet. Individual rune effects remain prose. |
 | Background prose-only grants | Done | Runtime overrides in `src/shared/backgroundGrants.ts` fill the remaining structured skill and feat choices for 14 backgrounds. Deity-, rival-, campaign-, and past-life-dependent choices stay manual, as do category-wide picks such as Kaiju Stalker's Athletics feat. |
 
 ## Suggested next batches
 
-1. **Runesmith runes:** source a structured rune list, then add repertoire,
-   etching, and invocation tracking. Treat as a feature batch.
+All P2 items are closed. Re-check `docs/AUDIT.md`, `docs/RULES-AUDIT.md`, and
+`docs/CAMPAIGN-READINESS.md` before starting P3 work.
 
 Before starting a rules batch, check `git worktree list` and the open branches
 so two sessions do not edit the same sheet or rules files concurrently.

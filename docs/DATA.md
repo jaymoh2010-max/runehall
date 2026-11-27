@@ -25,18 +25,22 @@ The generated compendium is currently tracked in Git so a fresh clone is runnabl
 - localization: `static/lang/en.json`, `re-en.json`, `action-en.json`
 
 ### Archives of Nethys reference files
-The Foundry packs do not contain a trait glossary or afflictions. These files
-are generated separately from the live Archives of Nethys index:
+The Foundry packs do not contain a trait glossary, afflictions, or the Runesmith
+rune list. These files are generated separately from the live Archives of Nethys
+index:
 
 ```bash
 npm run ingest:aon
+npm run ingest:runes
 ```
 
-This writes `traits.json` and `afflictions.json` and records an `aonSource`
-block in `manifest.json`. Afflictions include diseases, curses, and poisons.
-The remaining files are Foundry-sourced. Trait and affliction rules text is
-Pathfinder ORC/OGL content published by Paizo and indexed by Archives of Nethys;
-see `THIRD_PARTY_NOTICES.md`.
+`ingest:aon` writes `traits.json` and `afflictions.json` and records an
+`aonSource` block in `manifest.json`. `ingest:runes` reads the Runesmith rune
+list, writes `runes.json`, and records `runesSource` plus the rune count in the
+manifest. Afflictions include diseases, curses, and poisons. The remaining files
+are Foundry-sourced. Trait, affliction, and rune rules text is Pathfinder ORC/OGL
+content published by Paizo and indexed by Archives of Nethys; see
+`THIRD_PARTY_NOTICES.md`.
 
 ## Rebuild the data
 
@@ -106,6 +110,7 @@ The script writes:
 | `ancestries.json` | Ancestry boosts, flaws, HP, speed, vision, languages, features |
 | `heritages.json` | Heritage data and ancestry links |
 | `backgrounds.json` | Background boosts, trained skills, lore, granted feats |
+| `runes.json` | Runesmith runes from Archives of Nethys: level, traits, usage, passive and invocation text, diacritic flag |
 | `classes.json` | Class chassis, feature references, feat levels, choice groups |
 | `classFeatures.json` | Flattened class feature data and proficiency subfeatures |
 | `feats.json` | Feats with category, level, traits, rarity, prerequisites, HTML text |

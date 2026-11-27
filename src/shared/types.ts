@@ -291,6 +291,31 @@ export interface Background extends Publication {
   description: string;
 }
 
+/** A rune from the Runesmith class's runic repertoire. */
+export interface RunesmithRune extends Publication {
+  id: string;
+  name: string;
+  type: "rune";
+  level: number;
+  rarity: string;
+  traits: string[];
+  /** The rune's printed Usage entry, such as "drawn on a creature". */
+  usage: string;
+  sourcePage: number | null;
+  /** Diacritics modify a base rune and cannot be applied by themselves. */
+  diacritic: boolean;
+  /** Passive effect while the rune is applied. */
+  description: string;
+  /** Effect when the rune is invoked; empty for most diacritics. */
+  invocation: string;
+  /** Heightening or level-scaling text. */
+  heightening: string;
+  /** Special restrictions or notes. */
+  special: string;
+  /** Archives of Nethys row id, kept for data refreshes. */
+  aonId: number;
+}
+
 export interface ClassChoiceOption {
   id: string;
   name: string;
@@ -920,6 +945,23 @@ export interface CharacterAffliction {
 
 export type PreparedSpellsByRank = Record<string, string[]>;
 
+export interface RunesmithEtchedRune {
+  /** Stable instance id for React keys and sheet edits. */
+  id: string;
+  runeId: string;
+  /** Free-text target, such as "Self", "Torval's longsword", or "the door". */
+  target: string;
+  /** Optional diacritic applied to this base rune. */
+  diacriticId: string | null;
+}
+
+export interface RunesmithState {
+  /** Known runes chosen for the runic repertoire. */
+  repertoire: string[];
+  /** Runes currently etched on creatures or objects. */
+  etched: RunesmithEtchedRune[];
+}
+
 export interface CharacterDraft {
   version: 1;
   name: string;
@@ -984,6 +1026,8 @@ export interface CharacterDraft {
     folio: string[];
     prepared: string[];
   };
+  /** Runesmith runic repertoire and the runes currently etched. */
+  runesmith: RunesmithState;
   spells: {
     tradition: SpellTradition | null;
     cantrips: string[];
@@ -1167,6 +1211,8 @@ export interface CharacterContext {
   feats: Record<string, Feat>;
   spells: Record<string, Spell>;
   equipment: Record<string, Equipment>;
+  /** Selected Runesmith runes for the repertoire and etched applications. */
+  runes?: Record<string, RunesmithRune>;
   /** Bestiary entries linked to companion statblocks. */
   monsters?: Record<string, Monster>;
   /** Lowercased names of every feat in the compendium, used for prerequisite checks. */
