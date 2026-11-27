@@ -215,6 +215,14 @@ The character draft is a versioned JSON document (`CharacterDraft.version = 1`).
 
 These gaps are surfaced in the interface rather than hidden so the table knows what to verify.
 
+### Combat adjudication boundary
+
+Conditions are **manual tracking with automatic math**. The sheet applies the
+numeric effects of tracked conditions and the dying/wounded/doomed track, but
+the table decides when a condition is applied or removed, how long it lasts,
+and how ambiguous interactions resolve. The app is the shared ledger and
+calculator, not an encounter solver.
+
 ---
 
 ## 6. Testing and quality bar
