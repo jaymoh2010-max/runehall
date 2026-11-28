@@ -49,8 +49,17 @@ import {
   uploadsDir,
 } from "./util";
 import { checkUploadQuota } from "./uploadQuota";
+import {
+  MAX_EMBEDDED_ASSET_BYTES,
+  MAX_EMBEDDED_TOTAL_BYTES,
+  embeddedAssetCandidate,
+  preflightCampaignImport,
+  record,
+  records,
+  type CampaignImportRecord,
+} from "./campaignImportLimits";
 
-type RecordValue = Record<string, unknown>;
+type RecordValue = CampaignImportRecord;
 
 /** Resolve a bundled library track in either the source tree or a built client. */
 function bundledAudioFile(filename: string): string | null {
@@ -91,10 +100,6 @@ export interface CampaignImportResult {
   stats: CampaignImportStats;
 }
 
-function record(value: unknown): RecordValue {
-  return value && typeof value === "object" && !Array.isArray(value) ? (value as RecordValue) : {};
-}
-
 function uniqueAssetFilename(uploadsPath: string, filename: string): string {
   const extension = path.extname(filename);
   const base = path.basename(filename, extension);
@@ -118,13 +123,6 @@ function remapUploadUrls(value: unknown, remap: ReadonlyMap<string, string>): un
     );
   }
   return value;
-}
-
-function records(value: unknown, max: number, label: string): RecordValue[] {
-  if (value === undefined || value === null) return [];
-  if (!Array.isArray(value)) throw new Error(`The ${label} section is invalid.`);
-  if (value.length > max) throw new Error(`Too many ${label} to import (maximum ${max}).`);
-  return value.filter((entry): entry is RecordValue => Boolean(entry) && typeof entry === "object");
 }
 
 function text(value: unknown, fallback = "", max = 500): string {
@@ -153,14 +151,10 @@ function uniqueInviteCode(): string {
 }
 
 export function importCampaign(userId: string, raw: unknown): CampaignImportResult {
+  // Validate structure, row limits, and embedded-asset sizes before opening a
+  // write transaction or writing files.
+  preflightCampaignImport(raw);
   let payload = record(raw);
-  if (payload.format !== "runehall-campaign") {
-    throw new Error("That file is not a Runehall campaign export.");
-  }
-  const version = Number(payload.version);
-  if (Number.isFinite(version) && version > 1) {
-    throw new Error("This export was created by a newer Runehall version.");
-  }
   const campaignData = record(payload.campaign);
   const name = text(campaignData.name, "Imported campaign", 80);
   if (!name) throw new Error("The export does not contain a campaign name.");
@@ -189,26 +183,6 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
     xpAwards: 0,
     embeddedAssets: 0,
   };
-
-  // Validate top-level row limits before opening the transaction or writing
-  // embedded files, so a rejected import leaves no orphan assets behind.
-  for (const [key, max, label] of [
-    ["members", 500, "members"],
-    ["audioTracks", 2_000, "audioTracks"],
-    ["characters", 2_000, "characters"],
-    ["scenes", 5_000, "scenes"],
-    ["tokens", 200_000, "tokens"],
-    ["messages", 200_000, "messages"],
-    ["journal", 50_000, "journal"],
-    ["encounters", 20_000, "encounters"],
-    ["factions", 5_000, "factions"],
-    ["knowledge", 20_000, "knowledge entries"],
-    ["chapters", 1_000, "chapters"],
-    ["npcs", 20_000, "NPCs"],
-    ["xpAwards", 50_000, "XP awards"],
-  ] as const) {
-    records(payload[key], max, label);
-  }
 
   const writtenAssets: string[] = [];
   try {
@@ -246,36 +220,19 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
       ).run(campaignId, userId, ts);
 
       const embeddedAssets = record(payload.embeddedAssets);
-      const allowedAssetExtensions = new Map<string, string>([
-        [".png", "image/png"],
-        [".jpg", "image/jpeg"],
-        [".jpeg", "image/jpeg"],
-        [".webp", "image/webp"],
-        [".gif", "image/gif"],
-        [".avif", "image/avif"],
-        [".mp3", "audio/mpeg"],
-        [".ogg", "audio/ogg"],
-        [".wav", "audio/wav"],
-        [".m4a", "audio/mp4"],
-        [".webm", "audio/webm"],
-      ]);
       let embeddedBytes = 0;
       const assetUrlRemap = new Map<string, string>();
       for (const [assetUrl, encoded] of Object.entries(embeddedAssets)) {
-        if (typeof encoded !== "string" || !assetUrl.startsWith("/uploads/")) continue;
-        const filename = assetUrl.slice("/uploads/".length);
-        if (!/^[A-Za-z0-9._-]+$/.test(filename) || filename === "." || filename === "..") {
-          continue;
-        }
-        const mimeType = allowedAssetExtensions.get(path.extname(filename).toLowerCase());
-        if (!mimeType) continue;
+        const candidate = embeddedAssetCandidate(assetUrl);
+        if (!candidate || typeof encoded !== "string") continue;
+        const { filename, mimeType } = candidate;
         const data = Buffer.from(encoded, "base64");
         if (!data.length) continue;
-        if (data.length > 25 * 1024 * 1024) {
+        if (data.length > MAX_EMBEDDED_ASSET_BYTES) {
           throw new Error("An embedded asset in this archive is larger than 25 MB.");
         }
         embeddedBytes += data.length;
-        if (embeddedBytes > 50 * 1024 * 1024) {
+        if (embeddedBytes > MAX_EMBEDDED_TOTAL_BYTES) {
           throw new Error("Embedded campaign assets exceed the 50 MB import limit.");
         }
         // Never overwrite a file that may belong to another campaign. A

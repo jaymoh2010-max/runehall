@@ -83,6 +83,7 @@ import {
 import { compendiumManifest, contextForDraft } from "../compendium";
 import { contextForCampaign } from "../campaignContext";
 import { importCampaign } from "../campaignImport";
+import { campaignImportBodyLimit } from "../campaignImportLimits";
 import { logAudit } from "../audit";
 import {
   inviteCode,
@@ -440,36 +441,56 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
     });
   });
 
-  app.post("/api/campaigns/import", { bodyLimit: 256 * 1024 * 1024 }, async (request, reply) => {
-    if (!request.user) return reply.code(401).send({ error: "Sign in to continue." });
-    try {
-      const result = importCampaign(request.user.id, request.body);
-      const row = getCampaign(result.campaignId);
-      if (!row)
-        return reply.code(500).send({ error: "The imported campaign could not be opened." });
-      logAudit({
-        action: "campaign.import",
-        actor: request.user,
-        targetType: "campaign",
-        targetId: result.campaignId,
-        detail: `${row.name} (${result.stats.characters} characters)`,
-        request,
-      });
-      return reply.code(201).send({
-        campaign: serializeCampaignSummary(
-          row,
-          "gm",
-          campaignCounts(row),
-          request.user.displayName
-        ),
-        stats: result.stats,
-      });
-    } catch (error) {
-      return reply.code(400).send({
-        error: error instanceof Error ? error.message : "That campaign could not be imported.",
-      });
+  app.post(
+    "/api/campaigns/import",
+    { bodyLimit: campaignImportBodyLimit() },
+    async (request, reply) => {
+      if (!request.user) return reply.code(401).send({ error: "Sign in to continue." });
+      const startedAt = Date.now();
+      try {
+        const result = importCampaign(request.user.id, request.body);
+        const durationMs = Date.now() - startedAt;
+        const row = getCampaign(result.campaignId);
+        if (!row)
+          return reply.code(500).send({ error: "The imported campaign could not be opened." });
+        logAudit({
+          action: "campaign.import",
+          actor: request.user,
+          targetType: "campaign",
+          targetId: result.campaignId,
+          detail: `${row.name} (${result.stats.characters} characters, ${durationMs} ms)`,
+          request,
+        });
+        request.log.info(
+          { campaignId: result.campaignId, durationMs, ...result.stats },
+          "campaign import completed"
+        );
+        if (durationMs >= 2_000) {
+          request.log.warn(
+            { campaignId: result.campaignId, durationMs },
+            "campaign import held the server"
+          );
+        }
+        return reply.code(201).send({
+          campaign: serializeCampaignSummary(
+            row,
+            "gm",
+            campaignCounts(row),
+            request.user.displayName
+          ),
+          stats: result.stats,
+        });
+      } catch (error) {
+        request.log.warn(
+          { err: error, durationMs: Date.now() - startedAt },
+          "campaign import failed"
+        );
+        return reply.code(400).send({
+          error: error instanceof Error ? error.message : "That campaign could not be imported.",
+        });
+      }
     }
-  });
+  );
 
   app.post("/api/campaigns/join", async (request, reply) => {
     if (!request.user) return reply.code(401).send({ error: "Sign in to continue." });

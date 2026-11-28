@@ -1,5 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { createRateLimiter } from "./rateLimit";
+import { campaignImportBodyLimit, campaignImportMaxMb } from "./campaignImportLimits";
 
 type Env = Record<string, string | undefined>;
 
@@ -125,6 +126,13 @@ export function registerSecurity(app: FastifyInstance): void {
       if (!result.allowed) {
         reply.header("Retry-After", String(result.retryAfterSec));
         return reply.code(429).send({ error: "Too many campaign imports. Try again later." });
+      }
+      // Reject a declared oversized body before Fastify buffers and parses it.
+      const declaredLength = Number(request.headers["content-length"]);
+      if (Number.isFinite(declaredLength) && declaredLength > campaignImportBodyLimit()) {
+        return reply.code(413).send({
+          error: `Campaign archives are limited to ${campaignImportMaxMb()} MB.`,
+        });
       }
     }
   });

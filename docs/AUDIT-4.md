@@ -2,7 +2,7 @@
 
 Audit date: 2026-11-27
 
-Reviewed commits: `3065879` (initial audit), `a1c5dac` (sixth pass, after background grants, Runesmith, inventory lifecycle, the affliction picker, live runes, and operational hardening), and the trust-model batch (seventh pass)
+Reviewed commits: `3065879` (initial audit), `a1c5dac` (sixth pass, after background grants, Runesmith, inventory lifecycle, the affliction picker, live runes, and operational hardening), `5d3427b` (seventh pass, trust-model decisions), and the large-import batch (eighth pass)
 
 Scope: database and migrations, backups/restore, rules engine and spellcasting, items and inventory, compendium data, server/socket authorization, and the table/sheet client. The initial read-only audit and the second fix pass ran on dedicated worktrees; the second pass is on `audit/gaps-2-2026-11-27`.
 
@@ -10,7 +10,7 @@ Scope: database and migrations, backups/restore, rules engine and spellcasting, 
 
 | Command | Result |
 | --- | --- |
-| `npm run check` | Pass (typecheck, lint, 857 unit tests, build, bundle budget) |
+| `npm run check` | Pass (typecheck, lint, 864 unit tests, build, bundle budget) |
 | `npm run smoke` | Pass, including persistent-damage automation |
 | `npm run e2e` | 45 passed |
 | `npm run simulate:campaign` | 18 passed, 0 failed |
@@ -125,13 +125,18 @@ The trust-model batch made the economic boundary explicit instead of adding anti
 - **Manual inventory counts.** The sheet's +/- controls remain free manual adjustments, now labelled as such. The purchase route still enforces coin cost and ruleset legality, which preserves loot, rewards, crafting, and corrections without a server-side ledger (`CharacterSheetView.tsx`).
 - **Boundary documentation and coverage.** Added `docs/TRUST-MODEL.md`; the smoke test now verifies that duplication copies campaign gear/coins, rejects a player duplicating someone else's character, and writes the audit entry.
 
+## Eighth pass
+
+The large-import batch bounds synchronous campaign imports instead of adding a background job queue:
+
+- **Body cap.** The route uses `CAMPAIGN_IMPORT_MAX_MB` (default 128 MB) instead of a hardcoded 256 MB, and oversized archives get a clear 413 response (`campaignImportLimits.ts`, `index.ts`).
+- **Preflight.** Format, version, row counts, and embedded-asset sizes are validated before the transaction opens or any file is written (`campaignImportLimits.ts`, `campaignImport.ts`).
+- **Visibility.** Import duration is recorded in the audit detail; imports over two seconds emit a warning. The dashboard shows the archive size and warns when a large file will pause the table (`DashboardPage.tsx`).
+- **Decision.** A background import worker is not warranted for the local-first target table. Imports are a rare, rate-limited GM operation (5 per IP per 10 minutes); the bound and preflight keep failures cheap, and the rate limit remains the abuse control. The limit is documented in `README.md`, `docs/DEPLOY.md`, and `docs/BACKUP.md`.
+
 ## Remaining findings
 
-No critical or high-severity findings remain from this audit. The items below are medium/low, optional features, or deliberate trust-model decisions.
-
-### Medium
-
-- **Large imports still hold the event loop and write lock.** Quotas now apply, but a 50 MB embedded archive remains a synchronous transaction. Add a rate limit or background import if large imports are expected.
+No critical, high, or medium-severity findings remain from this audit. The items below are low, optional features, or deliberate boundaries.
 
 ### Low
 

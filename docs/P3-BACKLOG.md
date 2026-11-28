@@ -45,10 +45,18 @@ This is the working list for post-P2 work. The source findings are in
 | Manual quantity edits | Done | The sheet's +/- controls are accepted manual adjustments and do not charge coins. The purchase route still enforces price and ruleset legality, and the UI labels the difference. |
 | Boundary documentation | Done | `docs/TRUST-MODEL.md` records what the server enforces, what the table is trusted to do, and what untrusted hosting would require. |
 
-## Next P3 batches
+## Large campaign imports (Done)
 
-1. **Large campaign imports:** add rate limiting or background processing for
-   archives that still hold the event loop and write lock.
+| Item | Status | Notes |
+| --- | --- | --- |
+| Import rate limit | Done | Campaign imports are limited to 5 per IP per 10 minutes by default (`IMPORT_RATE_LIMIT_MAX` / `IMPORT_RATE_LIMIT_WINDOW_MS`); the existing behavior is now documented. |
+| Bounded archive | Done | The route uses `CAMPAIGN_IMPORT_MAX_MB` (default 128 MB) and returns a clear 413; the 50 MB embedded-asset cap is unchanged. |
+| Preflight validation | Done | Format, version, row counts, and embedded-asset sizes are checked before the transaction opens or any file is written. |
+| Synchronous decision | Done | Imports stay a single synchronous transaction for the local-first target table. Slow imports record their duration in the audit log and emit a warning. |
+
+## Remaining P3 work
+
+No open P3 batches. Further work is optional hardening or new product scope.
 
 Before starting a batch, check `git worktree list` and open branches so two
 sessions do not edit the same sheet or rules files concurrently.

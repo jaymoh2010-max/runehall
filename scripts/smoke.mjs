@@ -143,6 +143,10 @@ async function main() {
       COOKIE_SECURE: "0",
       REGISTRATION_MODE: "open",
       BOOTSTRAP_TOKEN: "smoke-bootstrap-token",
+      // Keep the cap low so the oversized-import rejection stays cheap, and
+      // leave room for the several imports this script performs.
+      CAMPAIGN_IMPORT_MAX_MB: "4",
+      IMPORT_RATE_LIMIT_MAX: "10",
     },
     stdio: ["ignore", "pipe", "pipe"],
   });
@@ -518,6 +522,25 @@ async function main() {
     throw new Error("Imported character ownership was not remapped to the local player");
   }
   log("campaign import created a new campaign and remapped ownership");
+
+  const oversizedImport = await fetch(`${base}/api/campaigns/import`, {
+    method: "POST",
+    headers: { "content-type": "application/json", cookie: gmCookie },
+    body: JSON.stringify({
+      format: "runehall-campaign",
+      padding: "x".repeat(4 * 1024 * 1024),
+    }),
+  });
+  const oversizedImportPayload = await oversizedImport.json().catch(() => ({}));
+  if (
+    oversizedImport.status !== 413 ||
+    !String(oversizedImportPayload.error).includes("limited to 4 MB")
+  ) {
+    throw new Error(
+      `An oversized campaign import was not rejected with a clear limit (${oversizedImport.status}): ${JSON.stringify(oversizedImportPayload)}`
+    );
+  }
+  log("oversized campaign imports are rejected before parsing");
 
   const pathbuilderBuild = {
     name: "Smoke Pathbuilder Hero",

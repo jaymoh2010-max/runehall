@@ -52,6 +52,12 @@ type PathbuilderImport = {
   report: { matched: Record<string, number>; unmatched: string[]; warnings: string[] };
 };
 
+function formatFileSize(bytes: number): string {
+  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  if (bytes >= 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  return `${bytes} B`;
+}
+
 export function DashboardPage() {
   const user = useSession((state) => state.user);
   const toast = useToasts((state) => state.push);
@@ -74,6 +80,7 @@ export function DashboardPage() {
   } | null>(null);
   const [importBusy, setImportBusy] = useState(false);
   const [importError, setImportError] = useState("");
+  const [importFileSize, setImportFileSize] = useState(0);
   const [pathbuilderOpen, setPathbuilderOpen] = useState(false);
   const [pathbuilderJson, setPathbuilderJson] = useState("");
   const [pathbuilderBusy, setPathbuilderBusy] = useState(false);
@@ -124,7 +131,9 @@ export function DashboardPage() {
     setImportError("");
     setImportPayload(null);
     setImportPreview(null);
+    setImportFileSize(0);
     if (!file) return;
+    setImportFileSize(file.size);
     try {
       const parsed = JSON.parse(await file.text()) as Record<string, unknown>;
       if (parsed.format !== "runehall-campaign") {
@@ -141,6 +150,7 @@ export function DashboardPage() {
         ruleset: (campaign.ruleset as CampaignRuleset) ?? "core",
       });
     } catch (error) {
+      setImportFileSize(0);
       setImportError(error instanceof Error ? error.message : "That file could not be read.");
     }
   };
@@ -157,6 +167,7 @@ export function DashboardPage() {
       setImportOpen(false);
       setImportPayload(null);
       setImportPreview(null);
+      setImportFileSize(0);
       toast(`Imported ${result.campaign.name}.`, "success");
       navigate(`/campaigns/${result.campaign.id}`);
     } catch (error) {
@@ -591,6 +602,7 @@ export function DashboardPage() {
           setImportOpen(false);
           setImportPayload(null);
           setImportPreview(null);
+          setImportFileSize(0);
           setImportError("");
         }}
         title="Import a campaign"
@@ -603,6 +615,7 @@ export function DashboardPage() {
                 setImportOpen(false);
                 setImportPayload(null);
                 setImportPreview(null);
+                setImportFileSize(0);
                 setImportError("");
               }}
             >
@@ -642,10 +655,15 @@ export function DashboardPage() {
                 {importPreview.characters === 1 ? "character" : "characters"}
               </p>
               <p className="tiny muted">
-                Characters owned by players without a local account are assigned to you. Uploaded
-                image files are not copied by this import; use a backup archive to move uploads
-                between machines.
+                {formatFileSize(importFileSize)}. Self-contained archives include their uploaded
+                images and audio; standard exports reference files already on this server.
+                Characters owned by players without a local account are assigned to you.
               </p>
+              {importFileSize >= 10 * 1024 * 1024 ? (
+                <p className="tiny muted">
+                  Large archives are imported in one pass and may pause the table for a few seconds.
+                </p>
+              ) : null}
             </div>
           ) : null}
         </div>

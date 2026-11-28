@@ -166,6 +166,11 @@ Runehall already enables `trustProxy`, so keep `Host`, `X-Forwarded-For`, and `X
 | `UPLOAD_CAMPAIGN_QUOTA_MB` | `1024` | Total uploaded bytes per campaign; `0` disables the cap. |
 | `UPLOAD_USER_QUOTA_MB` | `512` | Total uploaded bytes per account; `0` disables the cap. |
 | `UPLOAD_MIN_FREE_MB` | `512` | Refuse uploads when the data volume has less free space than this. |
+| `IMPORT_RATE_LIMIT_MAX` | `5` | Campaign imports per IP per window. |
+| `IMPORT_RATE_LIMIT_WINDOW_MS` | `600000` | Campaign import rate-limit window in milliseconds. |
+| `CAMPAIGN_IMPORT_MAX_MB` | `128` | JSON body cap for a campaign import; keep it large enough for the 50 MB embedded-asset budget. |
+
+Campaign imports are rate limited and bounded. A large archive is imported in one synchronous transaction, so the table can pause briefly; import during downtime rather than mid-session. The importer validates row counts and embedded-asset sizes before opening the transaction.
 
 Security headers are always sent: `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy`, and cross-origin isolation headers. Production also sends CSP; `COOKIE_SECURE=1` adds HSTS. Uploaded campaign files under `/uploads/` require a signed-in session and, when the file belongs to a campaign, that campaign's membership.
 

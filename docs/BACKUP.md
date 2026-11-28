@@ -203,9 +203,11 @@ In **Campaign → Settings → Campaign archive**, the GM can export a JSON file
 - active scene and initiative state,
 - an asset URL list.
 
-The JSON is useful for moving a campaign, inspecting data, or attaching to a bug report. It does **not** embed binary map/portrait files; use the full backup for those.
+The standard JSON is useful for moving a campaign, inspecting data, or attaching to a bug report. It references binary map/portrait files by URL rather than embedding them. The **self-contained** export embeds referenced images and audio as base64, up to the 50 MB asset budget; use the full backup for larger archives.
 
-Import an export from **My Campaigns → Import campaign**. Runehall creates a new campaign, remaps internal IDs, and matches player accounts by username. Characters whose owners do not have a local account are assigned to the importing GM. Uploaded images are not copied by the JSON import.
+Import an export from **My Campaigns → Import campaign**. Runehall creates a new campaign, remaps internal IDs, and matches player accounts by username. Characters whose owners do not have a local account are assigned to the importing GM. A self-contained archive restores its embedded images and audio; a standard export references files already on the server.
+
+Campaign imports are rate limited (5 per IP per 10 minutes by default) and the JSON body is capped by `CAMPAIGN_IMPORT_MAX_MB` (128 MB). The importer validates row and embedded-asset limits before opening its transaction. A large archive is still imported in one synchronous pass, so the table may pause briefly; import between sessions.
 
 ## 3. Unused asset cleanup
 
