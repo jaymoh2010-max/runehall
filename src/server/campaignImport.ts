@@ -38,6 +38,7 @@ import { normalizeAoeTemplates } from "../shared/templates";
 import { normalizeWalls } from "../shared/walls";
 import { normalizeSceneProps } from "../shared/props";
 import { normalizeSceneDrawings } from "../shared/drawings";
+import { remapMessageRequestId } from "../shared/campaignArchive";
 import {
   clamp,
   inviteCode,
@@ -345,7 +346,7 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
             rawUrl,
             mimeType,
             size,
-            stats.audioTracks,
+            numberValue(track.sortOrder, stats.audioTracks, 0, 1_000_000),
             timestamp(track.createdAt, ts)
           );
           stats.audioTracks += 1;
@@ -565,14 +566,24 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
         ts
       );
 
-      for (const message of records(payload.messages, 200_000, "messages")) {
+      const importedMessages = records(payload.messages, 200_000, "messages").map((message) => ({
+        message,
+        id: newId("msg"),
+      }));
+      const messageIds = new Map<string, string>();
+      for (const { message, id } of importedMessages) {
+        const oldId = text(message.id, "", 120);
+        if (oldId) messageIds.set(oldId, id);
+      }
+      for (const { message, id } of importedMessages) {
         const oldScene = text(message.sceneId, "", 120);
         const oldUser = text(message.userId, "", 120);
         const visibility = message.visibility === "gm" ? "gm" : "all";
+        const data = remapMessageRequestId(message.data, messageIds);
         db.prepare(
           "INSERT INTO messages (id, campaign_id, scene_id, user_id, author_name, type, content, data, visibility, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
         ).run(
-          newId("msg"),
+          id,
           campaignId,
           oldScene ? (sceneMap.get(oldScene) ?? null) : null,
           oldUser
@@ -581,7 +592,7 @@ export function importCampaign(userId: string, raw: unknown): CampaignImportResu
           text(message.authorName, "Imported user", 80),
           text(message.type, "chat", 20),
           longText(message.content, "", 5000),
-          message.data && typeof message.data === "object" ? JSON.stringify(message.data) : null,
+          data && typeof data === "object" ? JSON.stringify(data) : null,
           visibility,
           timestamp(message.createdAt, ts)
         );

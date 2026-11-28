@@ -80,6 +80,7 @@ import {
   normalizeAdvancementSpeed,
   type AdvancementSpeed,
 } from "../../shared/xp";
+import { collectUploadUrls } from "../../shared/campaignArchive";
 import { compendiumManifest, contextForDraft } from "../compendium";
 import { contextForCampaign } from "../campaignContext";
 import { importCampaign } from "../campaignImport";
@@ -405,28 +406,23 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
     }
     const id = newId("camp");
     const ts = now();
-    db.prepare(
-      "INSERT INTO campaigns (id, name, description, gm_id, invite_code, ruleset, xp_mode, advancement_speed, created_at, updated_at, last_played_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-    ).run(
-      id,
-      name,
-      description,
-      request.user.id,
-      code,
-      ruleset,
-      xpMode,
-      advancementSpeed,
-      ts,
-      ts,
-      ts
-    );
-    db.prepare(
-      "UPDATE campaigns SET free_archetype = ?, automatic_bonus_progression = ? WHERE id = ?"
-    ).run(body.freeArchetype === true ? 1 : 0, body.automaticBonusProgression === true ? 1 : 0, id);
-    db.prepare(
-      "INSERT INTO campaign_members (campaign_id, user_id, role, joined_at) VALUES (?, ?, 'gm', ?)"
-    ).run(id, request.user.id, ts);
-    createDefaultScene(id, request.user.id);
+    const ownerId = request.user.id;
+    transaction(() => {
+      db.prepare(
+        "INSERT INTO campaigns (id, name, description, gm_id, invite_code, ruleset, xp_mode, advancement_speed, created_at, updated_at, last_played_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+      ).run(id, name, description, ownerId, code, ruleset, xpMode, advancementSpeed, ts, ts, ts);
+      db.prepare(
+        "UPDATE campaigns SET free_archetype = ?, automatic_bonus_progression = ? WHERE id = ?"
+      ).run(
+        body.freeArchetype === true ? 1 : 0,
+        body.automaticBonusProgression === true ? 1 : 0,
+        id
+      );
+      db.prepare(
+        "INSERT INTO campaign_members (campaign_id, user_id, role, joined_at) VALUES (?, ?, 'gm', ?)"
+      ).run(id, ownerId, ts);
+      createDefaultScene(id, ownerId);
+    });
     const row = getCampaign(id)!;
     logAudit({
       action: "campaign.create",
@@ -855,12 +851,14 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
     const state = db.prepare("SELECT * FROM campaign_state WHERE campaign_id = ?").get(id) as
       | { active_scene_id: string | null; initiative: string; round: number; turn_index: number }
       | undefined;
-    const assets = new Set<string>();
-    for (const scene of scenes) if (scene.imageUrl) assets.add(scene.imageUrl);
-    for (const token of tokens) if (token.imageUrl) assets.add(token.imageUrl);
-    for (const character of characters)
-      if (character.summary?.portraitUrl) assets.add(character.summary.portraitUrl);
-    for (const track of audioTracks) assets.add(track.url);
+    const assets = collectUploadUrls({
+      scenes,
+      tokens,
+      characters,
+      journal,
+      npcs,
+      audioTracks,
+    });
 
     const payload: Record<string, unknown> = {
       format: "runehall-campaign",
@@ -889,6 +887,7 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
       messages,
       journal,
       audioTracks,
+      assets,
       xpAwards: (
         db
           .prepare("SELECT * FROM xp_awards WHERE campaign_id = ? ORDER BY created_at ASC")
@@ -900,7 +899,6 @@ export async function registerCampaignRoutes(app: FastifyInstance): Promise<void
         round: state?.round ?? 1,
         turnIndex: state?.turn_index ?? 0,
       },
-      assets: [...assets],
       note: "Image and audio files are referenced by URL. Use `npm run backup` to archive the database and data/uploads together. Private player notes are never included in campaign exports.",
     };
     const selfContained =

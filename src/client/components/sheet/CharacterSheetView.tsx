@@ -540,6 +540,7 @@ export function CharacterSheetView({
   const conflictWasDetailsRef = useRef(false);
   const detailsSaveInFlightRef = useRef(false);
   const forceSaveRef = useRef(false);
+  const returnFocusRef = useRef<HTMLElement | null>(null);
   const canEdit = Boolean(character?.permissions?.canEdit);
 
   const requestClose = useCallback(() => {
@@ -567,11 +568,23 @@ export function CharacterSheetView({
     return () => window.removeEventListener("keydown", onKeyDown, true);
   }, [mode, onClose, requestClose]);
 
+  // Capture the trigger once when the overlay opens. Changing characters while
+  // the sheet stays open must not replace the element focus returns to later.
+  useEffect(() => {
+    if (mode !== "overlay") return;
+    returnFocusRef.current =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    return () => {
+      const target = returnFocusRef.current;
+      returnFocusRef.current = null;
+      if (target && document.contains(target)) target.focus();
+    };
+  }, [mode]);
+
   useEffect(() => {
     if (mode !== "overlay") return;
     const container = sheetRef.current;
     if (!container) return;
-    const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const frame = window.requestAnimationFrame(() => {
       if (!container.contains(document.activeElement)) container.focus();
     });
@@ -611,7 +624,6 @@ export function CharacterSheetView({
     return () => {
       window.cancelAnimationFrame(frame);
       document.removeEventListener("keydown", onKeyDown);
-      if (previous && document.contains(previous)) previous.focus();
     };
     // The loading branch does not render the sheet container. Re-run once the
     // character and its final container mount, otherwise the trap never arms.

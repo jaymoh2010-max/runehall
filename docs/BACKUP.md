@@ -217,7 +217,7 @@ Deleting a scene, token, handout, or NPC does not immediately delete its image f
 npm run cleanup-assets
 ```
 
-The command scans every database table for `/uploads/` references. It is a dry run by default. To remove the reported files:
+The command scans every database table for `/uploads/` references. It is a dry run by default. Deletion skips files modified in the last hour, so an upload that is still being written or registered cannot be removed. To remove the reported files:
 
 ```bash
 npm run cleanup-assets -- --delete

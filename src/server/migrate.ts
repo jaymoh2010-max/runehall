@@ -43,6 +43,14 @@ function tableColumns(connection: DatabaseSync, table: string): Set<string> {
   );
 }
 
+function hasSchemaMigrationsTable(connection: DatabaseSync): boolean {
+  return Boolean(
+    connection
+      .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'schema_migrations'")
+      .get()
+  );
+}
+
 interface AppliedMigrationRow {
   version: number;
   name: string;
@@ -132,18 +140,21 @@ export function applyMigrationsTo(
   options: MigrationRunOptions
 ): MigrationRunResult {
   const list = options.migrationsList ?? migrations;
-  connection.exec(`
-    CREATE TABLE IF NOT EXISTS schema_migrations (
-      version INTEGER PRIMARY KEY,
-      name TEXT NOT NULL,
-      applied_at INTEGER NOT NULL
-    );
-  `);
-  const appliedRows = validateAppliedMigrations(connection, list);
+  // Check history before creating the bookkeeping table, so an existing
+  // database without it gets a snapshot that is genuinely pre-DDL.
+  const hadSchemaTable = hasSchemaMigrationsTable(connection);
+  const appliedRows = hadSchemaTable ? validateAppliedMigrations(connection, list) : [];
   const appliedVersions = new Set(appliedRows.map((row) => Number(row.version)));
   const pending = list.filter((migration) => !appliedVersions.has(migration.version));
   const current = list.length ? list[list.length - 1].version : 0;
   if (!pending.length) {
+    connection.exec(`
+      CREATE TABLE IF NOT EXISTS schema_migrations (
+        version INTEGER PRIMARY KEY,
+        name TEXT NOT NULL,
+        applied_at INTEGER NOT NULL
+      );
+    `);
     backfillMigrationMetadata(connection, list);
     connection.exec(`PRAGMA user_version = ${current};`);
     return { applied: [], current, backupPath: null };
@@ -181,6 +192,13 @@ export function applyMigrationsTo(
     }
   }
 
+  connection.exec(`
+    CREATE TABLE IF NOT EXISTS schema_migrations (
+      version INTEGER PRIMARY KEY,
+      name TEXT NOT NULL,
+      applied_at INTEGER NOT NULL
+    );
+  `);
   const applied: number[] = [];
   for (const migration of pending) {
     connection.exec("BEGIN");

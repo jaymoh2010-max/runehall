@@ -247,6 +247,38 @@ describe("migration runner safety", () => {
     expect(backups[0]).toContain("0-to-2");
   });
 
+  it("takes the snapshot before creating schema_migrations on an old database", () => {
+    const directory = temporaryDirectory();
+    const databasePath = path.join(directory, "runehall.db");
+    const backupDir = path.join(directory, "backups");
+    createDatabase(databasePath, [
+      "CREATE TABLE notes (id INTEGER PRIMARY KEY, body TEXT NOT NULL);",
+      "INSERT INTO notes (body) VALUES ('before migration');",
+    ]);
+    const connection = new DatabaseSync(databasePath);
+
+    expect(() =>
+      applyMigrationsTo(connection, {
+        databasePath,
+        databaseExisted: true,
+        backupDir,
+        migrationsList: [
+          {
+            version: 1,
+            name: "broken_upgrade",
+            sql: "INSERT INTO missing_table VALUES (1);",
+          },
+        ],
+      })
+    ).toThrow(/Migration 1 \(broken_upgrade\) failed/);
+
+    const backups = fs.readdirSync(backupDir).filter((name) => name.endsWith(".db"));
+    expect(backups).toHaveLength(1);
+    const snapshotTables = readTables(path.join(backupDir, backups[0]));
+    expect(snapshotTables).toContain("notes");
+    expect(snapshotTables).not.toContain("schema_migrations");
+  });
+
   it("applies pending migrations and keeps the rollback point", () => {
     const directory = temporaryDirectory();
     const databasePath = path.join(directory, "runehall.db");

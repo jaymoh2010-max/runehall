@@ -2,7 +2,7 @@
 
 Audit date: 2026-11-27
 
-Reviewed commits: `3065879` (initial audit), `a1c5dac` (sixth pass, after background grants, Runesmith, inventory lifecycle, the affliction picker, live runes, and operational hardening), `5d3427b` (seventh pass, trust-model decisions), and the large-import batch (eighth pass)
+Reviewed commits: `3065879` (initial audit), `a1c5dac` (sixth pass, after background grants, Runesmith, inventory lifecycle, the affliction picker, live runes, and operational hardening), `5d3427b` (seventh pass, trust-model decisions), `16f88e9` (eighth pass, large imports), and the low-severity cleanup batch (ninth pass)
 
 Scope: database and migrations, backups/restore, rules engine and spellcasting, items and inventory, compendium data, server/socket authorization, and the table/sheet client. The initial read-only audit and the second fix pass ran on dedicated worktrees; the second pass is on `audit/gaps-2-2026-11-27`.
 
@@ -10,8 +10,8 @@ Scope: database and migrations, backups/restore, rules engine and spellcasting, 
 
 | Command | Result |
 | --- | --- |
-| `npm run check` | Pass (typecheck, lint, 864 unit tests, build, bundle budget) |
-| `npm run smoke` | Pass, including persistent-damage automation |
+| `npm run check` | Pass (typecheck, lint, 867 unit tests, build, bundle budget) |
+| `npm run smoke` | Pass, including import/export fidelity and persistent-damage automation |
 | `npm run e2e` | 45 passed |
 | `npm run simulate:campaign` | 18 passed, 0 failed |
 | `npm run simulate` | 2,337 characters; 0 problems |
@@ -134,21 +134,24 @@ The large-import batch bounds synchronous campaign imports instead of adding a b
 - **Visibility.** Import duration is recorded in the audit detail; imports over two seconds emit a warning. The dashboard shows the archive size and warns when a large file will pause the table (`DashboardPage.tsx`).
 - **Decision.** A background import worker is not warranted for the local-first target table. Imports are a rare, rate-limited GM operation (5 per IP per 10 minutes); the bound and preflight keep failures cheap, and the rate limit remains the abuse control. The limit is documented in `README.md`, `docs/DEPLOY.md`, and `docs/BACKUP.md`.
 
+## Ninth pass
+
+The low-severity cleanup batch closed the remaining audit findings:
+
+- **Campaign creation atomicity.** The campaign, membership, default scene, and state inserts now run in one transaction (`src/server/routes/campaigns.ts`).
+- **Archive fidelity.** Export gathers every uploaded URL from scene images and thumbnails, props, characters, journal attachments, NPCs, and audio tracks. Import remaps roll-request message ids and preserves soundtrack sort order (`src/shared/campaignArchive.ts`, `campaignImport.ts`).
+- **Cleanup race.** `cleanup-assets --delete` skips files modified in the last hour, so an in-flight upload cannot be removed (`scripts/cleanup-assets.mjs`).
+- **Pre-DDL snapshot.** The migration runner checks history before creating `schema_migrations`, so an existing database without that table is snapshotted before any DDL (`src/server/migrate.ts`).
+- **Overlay focus.** The sheet captures its return-focus target once when the overlay opens; switching characters while it stays open no longer replaces that target (`CharacterSheetView.tsx`).
+- **Coverage.** Added archive-helper and pre-DDL snapshot tests; smoke now checks attachment URLs, request-id remapping, and soundtrack sort order.
+
 ## Remaining findings
 
-No critical, high, or medium-severity findings remain from this audit. The items below are low, optional features, or deliberate boundaries.
-
-### Low
-
-- Campaign creation inserts the campaign, membership, scene, and state separately (`src/server/routes/campaigns.ts:404-427`); wrap them in a transaction.
-- Import/export fidelity gaps: export omits some thumbnail/attachment URLs, import does not remap message request ids, and imported audio sort order is replaced by the import counter.
-- `cleanup-assets --delete` can still race an in-flight upload. Require the server to be stopped or add a grace-period check before deletion.
-- The migration snapshot is taken after `schema_migrations` is created; the ordering is benign but the snapshot is not literally pre-DDL.
-- The overlay focus effect now runs after async load, but the same pattern should be checked if the sheet is remounted with a different character id while open.
+No critical, high, medium, or low-severity findings remain from this audit. The boundaries below are deliberate product decisions, not gaps.
 
 ## Deliberate boundaries
 
-The manual-first model is coherent and should be preserved: the table does not move tokens for players, auto-apply area damage/saves, tick arbitrary conditions, or automate unusual feat/item prose. The gaps above are cases where automated math is wrong or a documented feature has no production path, not requests to turn Runehall into a rules engine.
+The manual-first model is coherent and should be preserved: the table does not move tokens for players, auto-apply area damage/saves, tick arbitrary conditions, or automate unusual feat/item prose. These are deliberate product boundaries, not requests to turn Runehall into a rules engine.
 
 ## Reproduce
 

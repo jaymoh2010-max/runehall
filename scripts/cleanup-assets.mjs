@@ -7,9 +7,8 @@
  *   npm run cleanup-assets -- --delete
  *   npm run cleanup-assets -- --delete --verbose
  *
- * The default is a dry run. Deletion is safe while the server is running
- * because it only removes files that do not appear in any database table or
- * in the uploaded-assets library.
+ * The default is a dry run. Deletion skips files modified in the last hour so
+ * an upload that is still being written or registered cannot be removed.
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -77,24 +76,36 @@ const files = fs.existsSync(uploadsDir)
       .filter((entry) => entry.isFile() && !entry.name.startsWith("."))
       .map((entry) => entry.name)
   : [];
+const GRACE_MS = 60 * 60 * 1000;
 const unused = files.filter((file) => !referenced.has(file));
-const totalBytes = unused.reduce(
-  (total, file) => total + fs.statSync(path.join(uploadsDir, file)).size,
-  0
-);
+const sizes = new Map();
+const recent = [];
+const deletable = [];
+const nowMs = Date.now();
+for (const file of unused) {
+  const stat = fs.statSync(path.join(uploadsDir, file));
+  sizes.set(file, stat.size);
+  if (nowMs - stat.mtimeMs < GRACE_MS) recent.push(file);
+  else deletable.push(file);
+}
+const recentSet = new Set(recent);
+const totalBytes = unused.reduce((total, file) => total + (sizes.get(file) ?? 0), 0);
 
 console.log(`Upload directory: ${uploadsDir}`);
 console.log(`Scanned tables:   ${tables.length}`);
 console.log(`Referenced files: ${[...referenced].filter((name) => files.includes(name)).length}`);
 console.log(`Uploaded files:   ${files.length}`);
-console.log(`Unused files:     ${unused.length} (${(totalBytes / 1024 / 1024).toFixed(2)} MB)`);
+console.log(
+  `Unused files:     ${unused.length} (${(totalBytes / 1024 / 1024).toFixed(2)} MB)${
+    recent.length ? `, ${recent.length} recent` : ""
+  }`
+);
 
 const list = verbose ? unused : unused.slice(0, 50);
 for (const file of list) {
-  const bytes = fs.statSync(path.join(uploadsDir, file)).size;
-  console.log(
-    `  ${shouldDelete ? "delete" : "unused"}  ${file}  (${(bytes / 1024).toFixed(1)} KB)`
-  );
+  const bytes = sizes.get(file) ?? 0;
+  const action = shouldDelete ? (recentSet.has(file) ? "keep" : "delete") : "unused";
+  console.log(`  ${action}  ${file}  (${(bytes / 1024).toFixed(1)} KB)`);
 }
 if (!verbose && unused.length > list.length) {
   console.log(`  .and ${unused.length - list.length} more. Use --verbose to list them all.`);
@@ -108,7 +119,11 @@ if (!shouldDelete) {
   console.log("\nDry run only. Re-run with --delete to remove these files.");
   process.exit(0);
 }
-for (const file of unused) {
+if (!deletable.length) {
+  console.log("\nNo files are older than the one-hour grace period yet.");
+  process.exit(0);
+}
+for (const file of deletable) {
   fs.rmSync(path.join(uploadsDir, file), { force: true });
 }
 
@@ -121,11 +136,15 @@ try {
     .get();
   if (hasAssetTable) {
     const removeRecord = cleanupDb.prepare("DELETE FROM uploaded_assets WHERE filename = ?");
-    for (const file of unused) removeRecord.run(file);
+    for (const file of deletable) removeRecord.run(file);
   }
   cleanupDb.close();
 } catch {
   // File cleanup is still successful if an older database cannot be updated.
 }
 
-console.log(`\nDeleted ${unused.length} unused upload${unused.length === 1 ? "" : "s"}.`);
+console.log(
+  `\nDeleted ${deletable.length} unused upload${deletable.length === 1 ? "" : "s"}${
+    recent.length ? `; kept ${recent.length} recent file${recent.length === 1 ? "" : "s"}` : ""
+  }.`
+);

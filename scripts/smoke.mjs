@@ -879,6 +879,9 @@ async function main() {
   const selfContainedExport = await api(`/api/campaigns/${campaign.id}/export?selfContained=1`, {
     cookie: gmCookie,
   });
+  if (!selfContainedExport.payload.assets?.includes("/uploads/smoke-map.png")) {
+    throw new Error("Campaign export omitted a journal attachment URL");
+  }
   const embedded = selfContainedExport.payload.embeddedAssets?.[firstAsset.url];
   if (embedded !== pixel.toString("base64")) {
     throw new Error("Self-contained export did not embed the referenced asset");
@@ -1860,6 +1863,37 @@ async function main() {
   }
   log("group check responses are linked to the request");
 
+  const requestExport = await api(`/api/campaigns/${campaign.id}/export`, { cookie: gmCookie });
+  const requestImport = await api("/api/campaigns/import", {
+    method: "POST",
+    cookie: gmCookie,
+    body: requestExport.payload,
+  });
+  const requestTable = await api(`/api/campaigns/${requestImport.payload.campaign.id}/table`, {
+    cookie: gmCookie,
+  });
+  const importedRequest = requestTable.payload.messages.find(
+    (message) => message.type === "request" && message.data?.label === "Group Stealth"
+  );
+  const importedResponse = requestTable.payload.messages.find(
+    (message) =>
+      message.type === "roll" && message.data?.requestId === importedRequest?.data?.requestId
+  );
+  if (
+    !importedRequest ||
+    !importedResponse ||
+    importedRequest.data?.requestId !== importedRequest.id ||
+    importedResponse.data?.requestId !== importedRequest.id
+  ) {
+    throw new Error("Imported messages did not remap the roll request id");
+  }
+  await api(`/api/campaigns/${requestImport.payload.campaign.id}`, {
+    method: "DELETE",
+    cookie: gmCookie,
+    body: { confirmName: requestImport.payload.campaign.name },
+  });
+  log("import remaps roll request ids to imported messages");
+
   let playerSawSecret = false;
   const secretLeakHandler = (message) => {
     if (message.type === "roll" && message.content === "Smoke Secret") playerSawSecret = true;
@@ -2178,7 +2212,9 @@ async function main() {
   );
   if (
     importedAudioTable.payload.audioTracks?.length !== 1 ||
-    importedAudioTable.payload.audioTracks[0]?.url !== audioTrack.url
+    importedAudioTable.payload.audioTracks[0]?.url !== audioTrack.url ||
+    importedAudioTable.payload.audioTracks[0]?.sortOrder !==
+      audioExport.payload.audioTracks[0]?.sortOrder
   ) {
     throw new Error("Campaign import did not carry the soundtrack metadata");
   }
